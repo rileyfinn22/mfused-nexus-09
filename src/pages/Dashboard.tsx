@@ -43,14 +43,6 @@ const Dashboard = () => {
   };
 
 
-  const getStockColor = (status: string) => {
-    switch (status) {
-      case 'critical': return 'text-danger bg-danger/10';
-      case 'warning': return 'text-warning bg-warning/10';
-      case 'good': return 'text-success bg-success/10';
-      default: return 'text-muted-foreground';
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -119,7 +111,7 @@ const Dashboard = () => {
             </div>
             <div className="divide-y divide-table-border">
               {lowStockItems.map((item) => (
-                <div key={`${item.sku}-${item.state}`} className={`grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors ${getStockColor(item.status)}`}>
+                <div key={`${item.sku}-${item.state}`} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors">
                   <div className="col-span-4 font-medium font-mono text-sm">{item.sku}</div>
                   <div className="col-span-2 text-sm">{item.state}</div>
                   <div className="col-span-2 text-sm font-semibold">{item.available}</div>
