@@ -42,6 +42,15 @@ const Dashboard = () => {
     }
   };
 
+  const getStockStatusColor = (status: string) => {
+    switch (status) {
+      case 'critical': return 'text-danger';
+      case 'warning': return 'text-warning';
+      case 'good': return 'text-success';
+      default: return 'text-muted-foreground';
+    }
+  };
+
 
 
   return (
@@ -116,7 +125,7 @@ const Dashboard = () => {
                   <div className="col-span-2 text-sm">{item.state}</div>
                   <div className="col-span-2 text-sm font-semibold">{item.available}</div>
                   <div className="col-span-2 text-sm text-muted-foreground">{item.redline}</div>
-                  <div className="col-span-2 text-sm font-medium uppercase">
+                  <div className={`col-span-2 text-sm font-medium uppercase ${getStockStatusColor(item.status)}`}>
                     {item.status}
                   </div>
                 </div>
