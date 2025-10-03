@@ -184,26 +184,26 @@ const Invoices = () => {
   const overdueAmount = filteredInvoices.filter(inv => inv.status === 'overdue').reduce((sum, invoice) => sum + invoice.amount, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="border-b border-table-border pb-4">
-        <h1 className="text-2xl font-semibold">Invoices & Billing</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage invoices, track payments, and monitor due dates</p>
+      <div>
+        <h1 className="text-3xl font-semibold">Invoices & Billing</h1>
+        <p className="text-muted-foreground mt-2">Manage invoices, track payments, and monitor due dates</p>
       </div>
 
       {/* Summary Row */}
-      <div className="grid grid-cols-3 gap-6">
-        <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Outstanding</p>
-          <p className="text-2xl font-semibold mt-1">{formatCurrency(totalAmount - paidAmount)}</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-card border border-border rounded-lg p-6 hover:shadow-sm transition-shadow">
+          <p className="text-sm font-medium text-muted-foreground">Total Outstanding</p>
+          <p className="text-3xl font-bold mt-3">{formatCurrency(totalAmount - paidAmount)}</p>
         </div>
-        <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Paid This Month</p>
-          <p className="text-2xl font-semibold mt-1 text-success">{formatCurrency(paidAmount)}</p>
+        <div className="bg-card border border-border rounded-lg p-6 hover:shadow-sm transition-shadow">
+          <p className="text-sm font-medium text-muted-foreground">Paid This Month</p>
+          <p className="text-3xl font-bold mt-3 text-success">{formatCurrency(paidAmount)}</p>
         </div>
-        <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Overdue Amount</p>
-          <p className="text-2xl font-semibold mt-1 text-danger">{formatCurrency(overdueAmount)}</p>
+        <div className="bg-card border border-border rounded-lg p-6 hover:shadow-sm transition-shadow">
+          <p className="text-sm font-medium text-muted-foreground">Overdue Amount</p>
+          <p className="text-3xl font-bold mt-3 text-danger">{formatCurrency(overdueAmount)}</p>
         </div>
       </div>
 

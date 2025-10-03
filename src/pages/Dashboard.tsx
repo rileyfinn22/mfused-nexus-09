@@ -54,26 +54,22 @@ const Dashboard = () => {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="border-b border-table-border pb-4">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">Operations overview and key metrics</p>
+      <div>
+        <h1 className="text-3xl font-semibold">Dashboard</h1>
+        <p className="text-muted-foreground mt-2">Operations overview and key metrics</p>
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat) => (
-          <div key={stat.title} className="bg-table-row border border-table-border rounded p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{stat.title}</p>
-                <p className="text-2xl font-semibold mt-1">{stat.value}</p>
-                <p className={`text-xs mt-1 ${stat.positive ? 'text-success' : 'text-danger'}`}>
-                  {stat.change}
-                </p>
-              </div>
-            </div>
+          <div key={stat.title} className="bg-card border border-border rounded-lg p-6 hover:shadow-sm transition-shadow">
+            <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
+            <p className="text-3xl font-bold mt-3">{stat.value}</p>
+            <p className={`text-sm mt-2 ${stat.positive ? 'text-success' : 'text-danger'}`}>
+              {stat.change}
+            </p>
           </div>
         ))}
       </div>
@@ -81,56 +77,50 @@ const Dashboard = () => {
       {/* Content Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Orders */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-medium">Recent Orders</h2>
-          <div className="border border-table-border rounded">
-            <div className="bg-table-header border-b border-table-border">
-              <div className="grid grid-cols-8 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                <div className="col-span-3">Order #</div>
-                <div className="col-span-3">PO #</div>
-                <div className="col-span-2">Status</div>
-              </div>
-            </div>
-            <div className="divide-y divide-table-border">
-              {recentOrders.map((order) => (
-                <div key={order.id} className="grid grid-cols-8 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors">
-                  <div className="col-span-3 font-medium font-mono text-sm">{order.id}</div>
-                  <div className="col-span-3 text-sm">{order.sku}</div>
-                  <div className={`col-span-2 text-sm ${getStatusColor(order.status)}`}>
-                    {order.status}
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="p-6 border-b border-border">
+            <h2 className="text-xl font-semibold">Recent Orders</h2>
+          </div>
+          <div className="divide-y divide-border">
+            {recentOrders.map((order) => (
+              <div key={order.id} className="p-4 hover:bg-accent/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="font-mono text-sm font-medium">{order.id}</p>
+                    <p className="text-sm text-muted-foreground">{order.sku}</p>
                   </div>
+                  <Badge variant="outline" className={getStatusColor(order.status)}>
+                    {order.status}
+                  </Badge>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Low Stock Alert */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-medium">Low Stock Alerts</h2>
-          <div className="border border-table-border rounded">
-            <div className="bg-table-header border-b border-table-border">
-              <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                <div className="col-span-4">SKU</div>
-                <div className="col-span-2">State</div>
-                <div className="col-span-2">Available</div>
-                <div className="col-span-2">Redline</div>
-                <div className="col-span-2">Status</div>
-              </div>
-            </div>
-            <div className="divide-y divide-table-border">
-              {lowStockItems.map((item) => (
-                <div key={`${item.sku}-${item.state}`} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors">
-                  <div className="col-span-4 font-medium font-mono text-sm">{item.sku}</div>
-                  <div className="col-span-2 text-sm">{item.state}</div>
-                  <div className="col-span-2 text-sm font-semibold">{item.available}</div>
-                  <div className="col-span-2 text-sm text-muted-foreground">{item.redline}</div>
-                  <div className={`col-span-2 text-sm font-medium uppercase ${getStockStatusColor(item.status)}`}>
-                    {item.status}
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="p-6 border-b border-border">
+            <h2 className="text-xl font-semibold">Low Stock Alerts</h2>
+          </div>
+          <div className="divide-y divide-border">
+            {lowStockItems.map((item) => (
+              <div key={`${item.sku}-${item.state}`} className="p-4 hover:bg-accent/50 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="space-y-1">
+                    <p className="font-mono text-sm font-medium">{item.sku}</p>
+                    <p className="text-xs text-muted-foreground">{item.state}</p>
                   </div>
+                  <Badge className={`${getStockStatusColor(item.status)} border-0`}>
+                    {item.status}
+                  </Badge>
                 </div>
-              ))}
-            </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <span>Available: <strong>{item.available}</strong></span>
+                  <span className="text-muted-foreground">Redline: {item.redline}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

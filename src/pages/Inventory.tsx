@@ -75,11 +75,11 @@ const Inventory = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="border-b border-table-border pb-4">
-        <h1 className="text-2xl font-semibold">Inventory Management</h1>
-        <p className="text-sm text-muted-foreground mt-1">Track stock levels, monitor thresholds, and manage production pipeline</p>
+      <div>
+        <h1 className="text-3xl font-semibold">Inventory Management</h1>
+        <p className="text-muted-foreground mt-2">Track stock levels, monitor thresholds, and manage production pipeline</p>
       </div>
 
       {/* Filters */}
@@ -119,62 +119,46 @@ const Inventory = () => {
       </div>
 
       {/* Inventory Grid */}
-      <div className="border border-table-border rounded">
-        {/* Table Header */}
-        <div className="bg-table-header border-b border-table-border">
-          <div className="grid grid-cols-10 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div className="col-span-3">SKU</div>
-            <div className="col-span-1">State</div>
-            <div 
-              className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
-              onClick={() => handleSort("available")}
-            >
-              Available {getSortIcon("available")}
-            </div>
-            <div 
-              className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
-              onClick={() => handleSort("inProduction")}
-            >
-              In Production {getSortIcon("inProduction")}
-            </div>
-            <div 
-              className="col-span-1 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
-              onClick={() => handleSort("redline")}
-            >
-              Redline {getSortIcon("redline")}
-            </div>
-            <div className="col-span-1">Status</div>
-          </div>
-        </div>
-
-        {/* Table Body */}
-        <div className="divide-y divide-table-border">
-          {filteredAndSortedData.map((item, index) => {
-            const status = getStockStatus(item.available, item.redline);
-            const stockColor = getStockColor(status);
-            
-            return (
-              <div 
-                key={`${item.sku}-${item.state}`}
-                className="grid grid-cols-10 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
-              >
-                <div className="col-span-3 font-mono text-sm font-medium">{item.sku}</div>
-                <div className="col-span-1">
-                  <Badge variant="outline" className="text-xs">{item.state}</Badge>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredAndSortedData.map((item) => {
+          const status = getStockStatus(item.available, item.redline);
+          const stockColor = getStockColor(status);
+          
+          return (
+            <div key={`${item.sku}-${item.state}`} className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-all">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="font-mono font-medium">{item.sku}</p>
+                  <Badge variant="outline" className="mt-2">{item.state}</Badge>
                 </div>
-                <div className="col-span-2 font-semibold text-sm flex items-center gap-1">
-                  {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
-                  {item.available}
+                {status === "critical" && <AlertTriangle className="h-5 w-5 text-danger" />}
+              </div>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-2xl font-bold">{item.available}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Available</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-muted-foreground">{item.inProduction}</p>
+                    <p className="text-xs text-muted-foreground mt-1">In Production</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-muted-foreground">{item.redline}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Redline</p>
+                  </div>
                 </div>
-                <div className="col-span-2 text-sm">{item.inProduction}</div>
-                <div className="col-span-1 text-sm text-muted-foreground">{item.redline}</div>
-                <div className={`col-span-1 text-xs font-medium uppercase ${stockColor}`}>
-                  {status}
+                
+                <div className="pt-4 border-t border-border">
+                  <Badge className={`${stockColor} border-0 w-full justify-center`}>
+                    {status.toUpperCase()}
+                  </Badge>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
       
       {filteredAndSortedData.length === 0 && (
