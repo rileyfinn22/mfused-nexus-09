@@ -79,14 +79,14 @@ const Orders = () => {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-table-border pb-4">
         <div>
-          <h1 className="text-3xl font-semibold">Orders & Production</h1>
-          <p className="text-muted-foreground mt-2">Track order progress and production pipeline</p>
+          <h1 className="text-2xl font-semibold">Orders & Production</h1>
+          <p className="text-sm text-muted-foreground mt-1">Track order progress and production pipeline</p>
         </div>
-        <Button className="bg-primary text-primary-foreground">
+        <Button size="sm" className="bg-primary text-primary-foreground">
           <Plus className="h-4 w-4 mr-2" />
           New Order
         </Button>
@@ -124,41 +124,49 @@ const Orders = () => {
             </Select>
           </div>
 
-          {/* Orders Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredOrders.map((order) => (
-              <div key={order.id} className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-all">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <p className="font-mono text-sm font-medium">{order.id}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{order.sku}</p>
+          {/* Orders Table */}
+          <div className="border border-table-border rounded">
+            {/* Table Header */}
+            <div className="bg-table-header border-b border-table-border">
+              <div className="grid grid-cols-11 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="col-span-2">Order #</div>
+                <div className="col-span-2">PO #</div>
+                <div className="col-span-1">State</div>
+                <div className="col-span-1">Qty</div>
+                <div className="col-span-2">Status</div>
+                <div className="col-span-2">Progress</div>
+                <div className="col-span-1">Actions</div>
+              </div>
+            </div>
+
+            {/* Table Body */}
+            <div className="divide-y divide-table-border">
+              {filteredOrders.map((order) => (
+                <div key={order.id} className="grid grid-cols-11 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors">
+                  <div className="col-span-2 font-medium font-mono text-sm">{order.id}</div>
+                  <div className="col-span-2 text-sm">{order.sku}</div>
+                  <div className="col-span-1">
+                    <Badge variant="outline" className="text-xs">{order.state}</Badge>
                   </div>
-                  <Badge variant="outline" className="text-xs">{order.state}</Badge>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Quantity:</span>
-                    <span className="font-medium">{order.quantity}</span>
+                  <div className="col-span-1 text-sm">{order.quantity}</div>
+                  <div className={`col-span-2 text-sm ${getStatusColor(order.status)}`}>
+                    {order.status}
                   </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className={getStatusColor(order.status)}>{order.status}</span>
-                      <span className="text-muted-foreground">{order.progress}%</span>
+                  <div className="col-span-2 space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>{order.progress}%</span>
+                      <span className="text-muted-foreground">Est: {order.estimatedCompletion}</span>
                     </div>
-                    <Progress value={order.progress} className="h-2" />
+                    <Progress value={order.progress} className="h-1" />
                   </div>
-                  
-                  <div className="pt-3 border-t border-border flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Est: {order.estimatedCompletion}</span>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <Eye className="h-4 w-4" />
+                  <div className="col-span-1">
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                      <Eye className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           {filteredOrders.length === 0 && (
@@ -168,83 +176,95 @@ const Orders = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="progress" className="space-y-8">
+        <TabsContent value="progress" className="space-y-6">
           {/* ETA Timeline */}
-          <div className="bg-card border border-border rounded-lg overflow-hidden">
-            <div className="p-6 border-b border-border">
-              <h2 className="text-xl font-semibold">Order ETAs</h2>
-            </div>
-            <div className="divide-y divide-border">
-              {orders.map((order) => (
-                <div key={order.id} className="p-6 hover:bg-accent/50 transition-colors">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <p className="font-mono font-medium">{order.id}</p>
-                      <p className="text-sm text-muted-foreground mt-1">{order.sku}</p>
-                    </div>
-                    <Badge variant="outline">{order.state}</Badge>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className={getStatusColor(order.status)}>{order.status}</span>
-                      <span className="text-muted-foreground">{order.progress}%</span>
-                    </div>
-                    <Progress value={order.progress} className="h-2" />
-                    
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>Est. Completion: {order.estimatedCompletion}</span>
-                    </div>
-                  </div>
+          <div className="space-y-3">
+            <h2 className="text-lg font-medium">Order ETAs</h2>
+            <div className="border border-table-border rounded">
+              <div className="bg-table-header border-b border-table-border">
+                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <div className="col-span-2">Order #</div>
+                  <div className="col-span-2">PO #</div>
+                  <div className="col-span-1">State</div>
+                  <div className="col-span-2">Status</div>
+                  <div className="col-span-2">Progress</div>
+                  <div className="col-span-3">Estimated Completion</div>
                 </div>
-              ))}
+              </div>
+              <div className="divide-y divide-table-border">
+                {orders.map((order) => (
+                  <div key={order.id} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors">
+                    <div className="col-span-2 font-medium font-mono text-sm">{order.id}</div>
+                    <div className="col-span-2 text-sm">{order.sku}</div>
+                    <div className="col-span-1">
+                      <Badge variant="outline" className="text-xs">{order.state}</Badge>
+                    </div>
+                    <div className={`col-span-2 text-sm ${getStatusColor(order.status)}`}>
+                      {order.status}
+                    </div>
+                    <div className="col-span-2">
+                      <div className="space-y-1">
+                        <div className="text-xs">{order.progress}%</div>
+                        <Progress value={order.progress} className="h-1" />
+                      </div>
+                    </div>
+                    <div className="col-span-3 flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{order.estimatedCompletion}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Pending Orders Checklist */}
-          <div className="bg-card border border-border rounded-lg overflow-hidden">
-            <div className="p-6 border-b border-border">
-              <h2 className="text-xl font-semibold">Pending Orders</h2>
-            </div>
-            <div className="divide-y divide-border">
-              {pendingOrders.map((order) => (
-                <div key={order.id} className="p-6 hover:bg-accent/50 transition-colors">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <p className="font-mono font-medium">{order.id}</p>
-                      <p className="text-sm text-muted-foreground mt-1">{order.sku} • {order.quantity} units</p>
-                    </div>
-                    <Badge variant="outline">{order.state}</Badge>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="flex items-center gap-2">
-                      <Checkbox checked={order.artApproved} />
-                      <span className="text-sm">Art Approved</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox checked={order.quantitiesConfirmed} />
-                      <span className="text-sm">Quantities</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox checked={order.poReceived} />
-                      <span className="text-sm">PO Received</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox checked={order.targetDateSet} />
-                      <span className="text-sm">Target Date</span>
-                    </div>
-                  </div>
-                  
-                  {order.targetDate && (
-                    <div className="pt-3 border-t border-border text-sm">
-                      <span className="text-muted-foreground">Target: </span>
-                      <span className="font-medium">{order.targetDate}</span>
-                    </div>
-                  )}
+          <div className="space-y-3">
+            <h2 className="text-lg font-medium">Pending Orders</h2>
+            <div className="border border-table-border rounded">
+              <div className="bg-table-header border-b border-table-border">
+                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <div className="col-span-2">Order #</div>
+                  <div className="col-span-2">PO #</div>
+                  <div className="col-span-1">State</div>
+                  <div className="col-span-1">Qty</div>
+                  <div className="col-span-4">Requirements</div>
+                  <div className="col-span-2">Target Date</div>
                 </div>
-              ))}
+              </div>
+              <div className="divide-y divide-table-border">
+                {pendingOrders.map((order) => (
+                  <div key={order.id} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors">
+                    <div className="col-span-2 font-medium font-mono text-sm">{order.id}</div>
+                    <div className="col-span-2 text-sm">{order.sku}</div>
+                    <div className="col-span-1">
+                      <Badge variant="outline" className="text-xs">{order.state}</Badge>
+                    </div>
+                    <div className="col-span-1 text-sm">{order.quantity}</div>
+                    <div className="col-span-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Checkbox checked={order.artApproved} />
+                        <span className="text-xs">Art Approved</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox checked={order.quantitiesConfirmed} />
+                        <span className="text-xs">Quantities</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox checked={order.poReceived} />
+                        <span className="text-xs">PO</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox checked={order.targetDateSet} />
+                        <span className="text-xs">Target Date</span>
+                      </div>
+                    </div>
+                    <div className="col-span-2 text-sm">
+                      {order.targetDate || <span className="text-muted-foreground">Not set</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </TabsContent>

@@ -70,40 +70,40 @@ const Artwork = () => {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-table-border pb-4">
         <div>
-          <h1 className="text-3xl font-semibold">Artwork Library & Proofing</h1>
-          <p className="text-muted-foreground mt-2">Manage artwork files, review process, and approval workflow</p>
+          <h1 className="text-2xl font-semibold">Artwork Library & Proofing</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage artwork files, review process, and approval workflow</p>
         </div>
-        <Button className="bg-primary text-primary-foreground">
+        <Button size="sm" className="bg-primary text-primary-foreground">
           <Upload className="h-4 w-4 mr-2" />
           Upload Artwork
         </Button>
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card border border-border rounded-lg p-6 hover:shadow-sm transition-shadow">
-          <p className="text-sm font-medium text-muted-foreground">Total Files</p>
-          <p className="text-3xl font-bold mt-3">{artworkFiles.length}</p>
+      <div className="grid grid-cols-4 gap-6">
+        <div className="bg-table-row border border-table-border rounded p-4">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Files</p>
+          <p className="text-2xl font-semibold mt-1">{artworkFiles.length}</p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-6 hover:shadow-sm transition-shadow">
-          <p className="text-sm font-medium text-muted-foreground">Approved</p>
-          <p className="text-3xl font-bold mt-3 text-success">
+        <div className="bg-table-row border border-table-border rounded p-4">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Approved</p>
+          <p className="text-2xl font-semibold mt-1 text-success">
             {artworkFiles.filter(f => f.status === 'approved').length}
           </p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-6 hover:shadow-sm transition-shadow">
-          <p className="text-sm font-medium text-muted-foreground">Pending Review</p>
-          <p className="text-3xl font-bold mt-3 text-warning">
+        <div className="bg-table-row border border-table-border rounded p-4">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending Review</p>
+          <p className="text-2xl font-semibold mt-1 text-warning">
             {artworkFiles.filter(f => f.status === 'pending').length}
           </p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-6 hover:shadow-sm transition-shadow">
-          <p className="text-sm font-medium text-muted-foreground">Need Revision</p>
-          <p className="text-3xl font-bold mt-3 text-danger">
+        <div className="bg-table-row border border-table-border rounded p-4">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Need Revision</p>
+          <p className="text-2xl font-semibold mt-1 text-danger">
             {artworkFiles.filter(f => f.status === 'rejected').length}
           </p>
         </div>

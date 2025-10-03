@@ -37,7 +37,7 @@ All colors MUST be HSL.
     --input: 218 15% 12%;
     --ring: 217 91% 60%;
 
-    --radius: 0.5rem;
+    --radius: 0.25rem;
 
     /* Enterprise status colors */
     --success: 142 76% 36%;

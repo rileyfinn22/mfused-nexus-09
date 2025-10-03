@@ -88,14 +88,14 @@ const Products = () => {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-table-border pb-4">
         <div>
-          <h1 className="text-3xl font-semibold">Product Catalog</h1>
-          <p className="text-muted-foreground mt-2">Manage SKUs and state-specific packaging requirements</p>
+          <h1 className="text-2xl font-semibold">Product Catalog</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage SKUs and state-specific packaging requirements</p>
         </div>
-        <Button className="bg-primary text-primary-foreground">
+        <Button size="sm" className="bg-primary text-primary-foreground">
           <Plus className="h-4 w-4 mr-2" />
           Add Product
         </Button>
@@ -114,80 +114,101 @@ const Products = () => {
         </div>
       </div>
 
-      {/* Products List */}
-      <div className="space-y-4">
-        {filteredProducts.map((product) => {
-          const isExpanded = expandedProducts.includes(product.id);
-          
-          return (
-            <div key={product.id} className="bg-card border border-border rounded-lg overflow-hidden">
-              {/* Product Header */}
-              <div 
-                className="p-6 cursor-pointer hover:bg-accent/50 transition-colors"
-                onClick={() => toggleExpanded(product.id)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+      {/* Products Table */}
+      <div className="border border-table-border rounded">
+        {/* Table Header */}
+        <div className="bg-table-header border-b border-table-border">
+          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="col-span-1"></div>
+            <div className="col-span-3">Product ID</div>
+            <div className="col-span-4">Product Name</div>
+            <div className="col-span-2">Category</div>
+            <div className="col-span-1">States</div>
+            <div className="col-span-1">Actions</div>
+          </div>
+        </div>
+
+        {/* Table Body */}
+        <div className="divide-y divide-table-border">
+          {filteredProducts.map((product) => {
+            const isExpanded = expandedProducts.includes(product.id);
+            
+            return (
+              <div key={product.id}>
+                {/* Parent Row */}
+                <div 
+                  className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                  onClick={() => toggleExpanded(product.id)}
+                >
+                  <div className="col-span-1 flex items-center">
                     {isExpanded ? (
-                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     ) : (
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
-                    <div>
-                      <p className="font-mono font-medium">{product.id}</p>
-                      <p className="text-sm text-muted-foreground mt-1">{product.name}</p>
-                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Badge variant="outline">{product.category}</Badge>
-                    <span className="text-sm text-muted-foreground">{product.states.length} states</span>
-                    <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                      <Eye className="h-4 w-4" />
+                  <div className="col-span-3 font-medium font-mono text-sm">{product.id}</div>
+                  <div className="col-span-4 text-sm font-medium">{product.name}</div>
+                  <div className="col-span-2 text-sm">{product.category}</div>
+                  <div className="col-span-1 text-sm text-center">{product.states.length}</div>
+                  <div className="col-span-1 flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                      <Eye className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
-              </div>
 
-              {/* Expanded State Details */}
-              {isExpanded && (
-                <div className="border-t border-border bg-accent/20">
-                  <div className="divide-y divide-border">
-                    {product.states.map((stateVersion) => (
-                      <div key={stateVersion.state} className="p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div>
-                            <Badge variant="outline" className="mb-2">{stateVersion.state}</Badge>
-                            <p className="text-sm text-muted-foreground">{stateVersion.specs}</p>
-                          </div>
-                          <Badge className={`${getStatusColor(stateVersion.status)} border-0`}>
-                            {stateVersion.status}
-                          </Badge>
+                {/* Expanded State Rows */}
+                {isExpanded && (
+                  <div className="bg-table-row">
+                    {/* Sub-header */}
+                    <div className="bg-table-header border-t border-b border-table-border">
+                      <div className="grid grid-cols-12 gap-4 px-8 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <div className="col-span-1">State</div>
+                        <div className="col-span-4">Specifications</div>
+                        <div className="col-span-3">Artwork</div>
+                        <div className="col-span-2">Status</div>
+                        <div className="col-span-2">Actions</div>
+                      </div>
+                    </div>
+                    {/* State Version Rows */}
+                    {product.states.map((stateVersion, index) => (
+                      <div 
+                        key={stateVersion.state} 
+                        className={`grid grid-cols-12 gap-4 px-8 py-2 hover:bg-table-row-hover transition-colors text-sm ${
+                          index !== product.states.length - 1 ? 'border-b border-table-border/30' : ''
+                        }`}
+                      >
+                        <div className="col-span-1">
+                          <Badge variant="outline" className="text-xs">{stateVersion.state}</Badge>
                         </div>
-                        
-                        <div className="flex items-center justify-between pt-4 border-t border-border">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Image className="h-4 w-4" />
-                            <span className="font-mono">{stateVersion.artwork}</span>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4 mr-2" />
-                              View
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Download className="h-4 w-4 mr-2" />
-                              Download
-                            </Button>
-                          </div>
+                        <div className="col-span-4 text-muted-foreground">{stateVersion.specs}</div>
+                        <div className="col-span-3 flex items-center gap-1 font-mono text-xs">
+                          <Image className="h-3 w-3 text-muted-foreground" />
+                          {stateVersion.artwork}
+                        </div>
+                        <div className={`col-span-2 font-medium uppercase ${getStatusColor(stateVersion.status)}`}>
+                          {stateVersion.status}
+                        </div>
+                        <div className="col-span-2 flex items-center gap-1">
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Download className="h-3 w-3" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Truck className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {filteredProducts.length === 0 && (
