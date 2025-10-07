@@ -113,6 +113,17 @@ const Artwork = () => {
         }
       }
 
+      // Get user's company
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!userRole?.company_id) {
+        throw new Error('User not associated with a company');
+      }
+
       // Create database record
       const { error: insertError } = await supabase
         .from('artwork_files')
@@ -122,7 +133,8 @@ const Artwork = () => {
           preview_url: previewUrl,
           filename: uploadData.file.name,
           notes: uploadData.notes,
-          is_approved: false
+          is_approved: false,
+          company_id: userRole.company_id
         });
 
       if (insertError) throw insertError;

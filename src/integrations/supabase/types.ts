@@ -19,6 +19,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           artwork_url: string
+          company_id: string
           created_at: string
           filename: string
           id: string
@@ -32,6 +33,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           artwork_url: string
+          company_id: string
           created_at?: string
           filename: string
           id?: string
@@ -45,6 +47,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           artwork_url?: string
+          company_id?: string
           created_at?: string
           filename?: string
           id?: string
@@ -52,6 +55,35 @@ export type Database = {
           notes?: string | null
           preview_url?: string | null
           sku?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artwork_files_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
           updated_at?: string
         }
         Relationships: []
@@ -63,6 +95,7 @@ export type Database = {
           approved_cost: number | null
           approved_lead_time_days: number | null
           approved_pricing: number | null
+          company_id: string
           created_at: string
           customer_id: string | null
           extracted_data: Json | null
@@ -80,6 +113,7 @@ export type Database = {
           approved_cost?: number | null
           approved_lead_time_days?: number | null
           approved_pricing?: number | null
+          company_id: string
           created_at?: string
           customer_id?: string | null
           extracted_data?: Json | null
@@ -97,6 +131,7 @@ export type Database = {
           approved_cost?: number | null
           approved_lead_time_days?: number | null
           approved_pricing?: number | null
+          company_id?: string
           created_at?: string
           customer_id?: string | null
           extracted_data?: Json | null
@@ -108,36 +143,63 @@ export type Database = {
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "po_submissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
+          company_id: string
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
+          company_id: string
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
+          company_id?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_user_company: {
+        Args: { _user_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      user_in_company: {
+        Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
     }

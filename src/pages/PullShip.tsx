@@ -368,6 +368,17 @@ const PullShip = () => {
         .from('po-documents')
         .getPublicUrl(fileName);
 
+      // Get user's company
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!userRole?.company_id) {
+        throw new Error('User not associated with a company');
+      }
+
       // Create submission record
       const { data: submission, error: insertError } = await supabase
         .from('po_submissions')
@@ -375,7 +386,8 @@ const PullShip = () => {
           pdf_url: publicUrl,
           original_filename: selectedPOFile.name,
           customer_id: user.id,
-          status: 'pending_analysis'
+          status: 'pending_analysis',
+          company_id: userRole.company_id
         })
         .select()
         .single();

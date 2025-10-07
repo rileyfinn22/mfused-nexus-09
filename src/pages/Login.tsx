@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const { toast } = useToast();
@@ -21,15 +22,48 @@ export default function Login() {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        if (!companyName.trim()) {
+          toast({
+            title: "Missing company name",
+            description: "Please enter your company name",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
         });
-        if (error) throw error;
-        toast({
-          title: "Success!",
-          description: "Account created successfully",
-        });
+        if (signUpError) throw signUpError;
+
+        if (authData.user) {
+          // Create company
+          const { data: companyData, error: companyError } = await supabase
+            .from('companies')
+            .insert({ name: companyName })
+            .select()
+            .single();
+
+          if (companyError) throw companyError;
+
+          // Create user role linked to company
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .insert({
+              user_id: authData.user.id,
+              role: 'admin',
+              company_id: companyData.id
+            });
+
+          if (roleError) throw roleError;
+
+          toast({
+            title: "Success!",
+            description: "Account and company created successfully",
+          });
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -66,6 +100,19 @@ export default function Login() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input
+                  id="companyName"
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Your Company Inc."
+                  required
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
