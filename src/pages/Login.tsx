@@ -91,11 +91,11 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background to-muted">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{isSignUp ? "Create Account" : "Login"}</CardTitle>
+          <CardTitle>{isSignUp ? "Create Company Account" : "Login"}</CardTitle>
           <CardDescription>
             {isSignUp
-              ? "Create a new account to submit purchase orders"
-              : "Login to your account to manage purchase orders"}
+              ? "Create a new company account with isolated data"
+              : "Login to your company portal"}
           </CardDescription>
         </CardHeader>
         <CardContent>

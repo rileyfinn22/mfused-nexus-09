@@ -39,7 +39,11 @@ const poItems = [
   { title: "PO Approval", url: "/po-approval", icon: CheckSquare },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  companyName: string;
+}
+
+export function AppSidebar({ companyName }: AppSidebarProps) {
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
@@ -51,6 +55,7 @@ export function AppSidebar() {
       : "hover:bg-sidebar-accent/50 text-sidebar-foreground";
 
   const isCollapsed = state === "collapsed";
+  const companyInitial = companyName.charAt(0).toUpperCase();
 
   return (
     <Sidebar
@@ -61,11 +66,11 @@ export function AppSidebar() {
         <div className="p-6 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">M</span>
+              <span className="text-white font-bold text-sm">{companyInitial}</span>
             </div>
             {!isCollapsed && (
               <div>
-                <h2 className="font-semibold text-sidebar-foreground">MFUSED</h2>
+                <h2 className="font-semibold text-sidebar-foreground">{companyName}</h2>
                 <p className="text-xs text-muted-foreground">Packaging Portal</p>
               </div>
             )}
