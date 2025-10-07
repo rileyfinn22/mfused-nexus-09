@@ -82,6 +82,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       await fetchCompanyName(user.id);
     } catch (error) {
       console.error('Auth check error:', error);
+      navigate('/login');
     } finally {
       setLoading(false);
     }
