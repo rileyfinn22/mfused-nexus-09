@@ -14,15 +14,69 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { AddProductDialog } from "@/components/AddProductDialog";
+
+interface Product {
+  id: string;
+  name: string;
+  category: string;
+  states: ProductState[];
+}
+
+interface ProductState {
+  id: string;
+  state: string;
+  specs: string | null;
+  artwork_status: string;
+  status: string;
+}
 
 const Products = () => {
   const [expandedProducts, setExpandedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    fetchProducts();
     fetchArtworkStatus();
   }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (productsError) throw productsError;
+
+      const productsWithStates = await Promise.all(
+        (productsData || []).map(async (product) => {
+          const { data: states, error: statesError } = await supabase
+            .from('product_states')
+            .select('*')
+            .eq('product_id', product.id);
+
+          if (statesError) throw statesError;
+
+          return {
+            id: product.id,
+            name: product.name,
+            category: product.category,
+            states: states || []
+          };
+        })
+      );
+
+      setProducts(productsWithStates);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchArtworkStatus = async () => {
     try {
@@ -49,53 +103,6 @@ const Products = () => {
     return artworkStatus[sku] === true;
   };
 
-  const products = [
-    {
-      id: "VAPE-CART-001",
-      name: "Premium Vape Cartridge Packaging",
-      category: "Vaporizers",
-      states: [
-        { state: "WA", specs: "0.5ml/1ml capacity, 510 thread, ceramic core", artwork: "v2.1-approved", status: "active" },
-        { state: "AZ", specs: "Child-resistant cap, tamper-evident seal", artwork: "v1.3-pending", status: "pending" },
-        { state: "NY", specs: "Medical-grade materials, leak-proof design", artwork: "v2.0-approved", status: "active" },
-        { state: "MD", specs: "Biodegradable plastic, UV-resistant coating", artwork: "v1.5-approved", status: "active" },
-      ]
-    },
-    {
-      id: "EDIBLE-PKG-005",
-      name: "Gummy Bear Container Set",
-      category: "Edibles",
-      states: [
-        { state: "WA", specs: "Opaque HDPE, 100ml volume, moisture barrier", artwork: "v3.1-approved", status: "active" },
-        { state: "AZ", specs: "Tamper-evident closure, food-grade materials", artwork: "v2.8-approved", status: "active" },
-        { state: "NY", specs: "Medical-grade PP, stackable design", artwork: "v3.0-rejected", status: "revision" },
-        { state: "MD", specs: "Recyclable PET, oxygen barrier coating", artwork: "v2.9-approved", status: "active" },
-      ]
-    },
-    {
-      id: "FLOWER-JAR-003",
-      name: "Premium Glass Storage Jars",
-      category: "Flower",
-      states: [
-        { state: "WA", specs: "Borosilicate glass, 8oz capacity, airtight seal", artwork: "v1.8-approved", status: "active" },
-        { state: "AZ", specs: "UV-blocking amber glass, wide mouth opening", artwork: "v1.7-approved", status: "active" },
-        { state: "NY", specs: "Child-resistant lid, break-resistant design", artwork: "v1.9-pending", status: "pending" },
-        { state: "MD", specs: "100% recyclable, nitrogen-flush compatible", artwork: "v1.6-approved", status: "active" },
-      ]
-    },
-    {
-      id: "CONCENTRATE-TIN-002",
-      name: "Medical-Grade Concentrate Containers",
-      category: "Concentrates",
-      states: [
-        { state: "WA", specs: "Aluminum construction, non-stick interior", artwork: "v2.3-approved", status: "active" },
-        { state: "AZ", specs: "Heat-resistant to 200°C, 5ml capacity", artwork: "v2.1-approved", status: "active" },
-        { state: "NY", specs: "FDA-approved materials, precision machined", artwork: "v2.4-pending", status: "pending" },
-        { state: "MD", specs: "Child-proof locking mechanism, anodized finish", artwork: "v2.2-approved", status: "active" },
-      ]
-    },
-  ];
-
   const toggleExpanded = (productId: string) => {
     setExpandedProducts(prev => 
       prev.includes(productId) 
@@ -119,6 +126,10 @@ const Products = () => {
     product.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -127,10 +138,7 @@ const Products = () => {
           <h1 className="text-2xl font-semibold">Product Catalog</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage SKUs and state-specific packaging requirements</p>
         </div>
-        <Button size="sm" className="bg-primary text-primary-foreground">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Product
-        </Button>
+        <AddProductDialog onProductAdded={fetchProducts} />
       </div>
 
       {/* Search */}
@@ -219,10 +227,10 @@ const Products = () => {
                         <div className="col-span-1">
                           <Badge variant="outline" className="text-xs">{stateVersion.state}</Badge>
                         </div>
-                        <div className="col-span-4 text-muted-foreground">{stateVersion.specs}</div>
+                        <div className="col-span-4 text-muted-foreground">{stateVersion.specs || '-'}</div>
                         <div className="col-span-3 flex items-center gap-1 font-mono text-xs">
                           <Image className="h-3 w-3 text-muted-foreground" />
-                          {stateVersion.artwork}
+                          {stateVersion.artwork_status}
                         </div>
                         <div className={`col-span-2 font-medium uppercase ${getStatusColor(stateVersion.status)}`}>
                           {stateVersion.status}

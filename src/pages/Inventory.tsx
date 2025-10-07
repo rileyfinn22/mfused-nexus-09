@@ -10,6 +10,17 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { UploadInventoryDialog } from "@/components/UploadInventoryDialog";
+
+interface InventoryItem {
+  id: string;
+  sku: string;
+  state: string;
+  available: number;
+  in_production: number;
+  redline: number;
+  product_id: string;
+}
 
 const Inventory = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -18,10 +29,29 @@ const Inventory = () => {
   const [sortField, setSortField] = useState("available");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    fetchInventory();
     fetchArtworkStatus();
   }, []);
+
+  const fetchInventory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setInventory(data || []);
+    } catch (error) {
+      console.error('Error fetching inventory:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchArtworkStatus = async () => {
     try {
@@ -48,17 +78,6 @@ const Inventory = () => {
     return artworkStatus[sku] === true;
   };
 
-  const inventoryData = [
-    { sku: "VAPE-CART-001", state: "WA", available: 45, reserved: 15, inProduction: 100, redline: 50, lastUpdated: "2024-01-15" },
-    { sku: "VAPE-CART-001", state: "AZ", available: 12, reserved: 8, inProduction: 50, redline: 25, lastUpdated: "2024-01-14" },
-    { sku: "EDIBLE-PKG-005", state: "WA", available: 150, reserved: 25, inProduction: 200, redline: 100, lastUpdated: "2024-01-15" },
-    { sku: "EDIBLE-PKG-005", state: "CA", available: 85, reserved: 20, inProduction: 150, redline: 100, lastUpdated: "2024-01-15" },
-    { sku: "FLOWER-JAR-003", state: "NY", available: 8, reserved: 12, inProduction: 75, redline: 25, lastUpdated: "2024-01-13" },
-    { sku: "CONCENTRATE-TIN-002", state: "MD", available: 200, reserved: 30, inProduction: 100, redline: 50, lastUpdated: "2024-01-15" },
-    { sku: "PRE-ROLL-TUBE-001", state: "WA", available: 22, reserved: 5, inProduction: 50, redline: 30, lastUpdated: "2024-01-14" },
-    { sku: "PRE-ROLL-TUBE-001", state: "CA", available: 15, reserved: 8, inProduction: 25, redline: 20, lastUpdated: "2024-01-13" },
-  ];
-
   const getStockStatus = (available: number, redline: number) => {
     if (available < redline * 0.5) return "critical";
     if (available < redline) return "warning";
@@ -83,7 +102,7 @@ const Inventory = () => {
     }
   };
 
-  const filteredAndSortedData = inventoryData
+  const filteredAndSortedData = inventory
     .filter(item => {
       const matchesSearch = item.sku.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesState = stateFilter === "all" || item.state === stateFilter;
@@ -105,12 +124,19 @@ const Inventory = () => {
     return sortDirection === "asc" ? "↑" : "↓";
   };
 
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="border-b border-table-border pb-4">
-        <h1 className="text-2xl font-semibold">Inventory Management</h1>
-        <p className="text-sm text-muted-foreground mt-1">Track stock levels, monitor thresholds, and manage production pipeline</p>
+      <div className="flex justify-between items-center border-b border-table-border pb-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Inventory Management</h1>
+          <p className="text-sm text-muted-foreground mt-1">Track stock levels, monitor thresholds, and manage production pipeline</p>
+        </div>
+        <UploadInventoryDialog onInventoryUploaded={fetchInventory} />
       </div>
 
       {/* Filters */}
@@ -164,9 +190,9 @@ const Inventory = () => {
             </div>
             <div 
               className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
-              onClick={() => handleSort("inProduction")}
+              onClick={() => handleSort("in_production")}
             >
-              In Production {getSortIcon("inProduction")}
+              In Production {getSortIcon("in_production")}
             </div>
             <div 
               className="col-span-1 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
@@ -202,7 +228,7 @@ const Inventory = () => {
                   {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
                   {item.available}
                 </div>
-                <div className="col-span-2 text-sm">{item.inProduction}</div>
+                <div className="col-span-2 text-sm">{item.in_production}</div>
                 <div className="col-span-1 text-sm text-muted-foreground">{item.redline}</div>
                 <div className={`col-span-1 text-xs font-medium uppercase ${stockColor}`}>
                   {status}

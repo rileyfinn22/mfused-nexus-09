@@ -88,6 +88,53 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory: {
+        Row: {
+          available: number
+          company_id: string
+          created_at: string
+          id: string
+          in_production: number
+          product_id: string
+          redline: number
+          sku: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          available?: number
+          company_id: string
+          created_at?: string
+          id?: string
+          in_production?: number
+          product_id: string
+          redline?: number
+          sku: string
+          state: string
+          updated_at?: string
+        }
+        Update: {
+          available?: number
+          company_id?: string
+          created_at?: string
+          id?: string
+          in_production?: number
+          product_id?: string
+          redline?: number
+          sku?: string
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       po_submissions: {
         Row: {
           approved_at: string | null
@@ -152,6 +199,74 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      product_states: {
+        Row: {
+          artwork_status: string
+          created_at: string
+          id: string
+          product_id: string
+          specs: string | null
+          state: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          artwork_status?: string
+          created_at?: string
+          id?: string
+          product_id: string
+          specs?: string | null
+          state: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          artwork_status?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          specs?: string | null
+          state?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_states_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
