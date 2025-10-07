@@ -5,7 +5,10 @@ import {
   ClipboardList, 
   FileText, 
   Image, 
-  Truck 
+  Truck,
+  Upload,
+  FolderOpen,
+  CheckSquare
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -28,6 +31,12 @@ const navigationItems = [
   { title: "Invoices", url: "/invoices", icon: FileText },
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Pull & Ship", url: "/pull-ship", icon: Truck },
+];
+
+const poItems = [
+  { title: "Upload PO", url: "/upload-po", icon: Upload },
+  { title: "My POs", url: "/my-pos", icon: FolderOpen },
+  { title: "PO Approval", url: "/po-approval", icon: CheckSquare },
 ];
 
 export function AppSidebar() {
@@ -71,6 +80,24 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className={getNavCls}>
+                      <item.icon className="h-4 w-4" />
+                      {!isCollapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Purchase Orders</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {poItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} className={getNavCls}>
                       <item.icon className="h-4 w-4" />
                       {!isCollapsed && <span>{item.title}</span>}
                     </NavLink>

@@ -11,6 +11,10 @@ import Orders from "./pages/Orders";
 import Invoices from "./pages/Invoices";
 import Artwork from "./pages/Artwork";
 import PullShip from "./pages/PullShip";
+import UploadPO from "./pages/UploadPO";
+import MyPOs from "./pages/MyPOs";
+import POApproval from "./pages/POApproval";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +34,10 @@ const App = () => (
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/artwork" element={<Artwork />} />
             <Route path="/pull-ship" element={<PullShip />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/upload-po" element={<UploadPO />} />
+            <Route path="/my-pos" element={<MyPOs />} />
+            <Route path="/po-approval" element={<POApproval />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
