@@ -31,18 +31,26 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       }
 
       // Get user's company
-      const { data: userRole } = await supabase
+      const { data: userRole, error: roleError } = await supabase
         .from('user_roles')
         .select('company_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+
+      if (roleError) {
+        console.error('Error fetching user role:', roleError);
+      }
 
       if (userRole?.company_id) {
-        const { data: company } = await supabase
+        const { data: company, error: companyError } = await supabase
           .from('companies')
           .select('name')
           .eq('id', userRole.company_id)
-          .single();
+          .maybeSingle();
+
+        if (companyError) {
+          console.error('Error fetching company:', companyError);
+        }
 
         if (company) {
           setCompanyName(company.name);
