@@ -25,23 +25,21 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <DashboardLayout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/invoices" element={<Invoices />} />
-            <Route path="/artwork" element={<Artwork />} />
-            <Route path="/pull-ship" element={<PullShip />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/upload-po" element={<UploadPO />} />
-            <Route path="/my-pos" element={<MyPOs />} />
-            <Route path="/po-approval" element={<POApproval />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </DashboardLayout>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
+          <Route path="/products" element={<DashboardLayout><Products /></DashboardLayout>} />
+          <Route path="/inventory" element={<DashboardLayout><Inventory /></DashboardLayout>} />
+          <Route path="/orders" element={<DashboardLayout><Orders /></DashboardLayout>} />
+          <Route path="/invoices" element={<DashboardLayout><Invoices /></DashboardLayout>} />
+          <Route path="/artwork" element={<DashboardLayout><Artwork /></DashboardLayout>} />
+          <Route path="/pull-ship" element={<DashboardLayout><PullShip /></DashboardLayout>} />
+          <Route path="/upload-po" element={<DashboardLayout><UploadPO /></DashboardLayout>} />
+          <Route path="/my-pos" element={<DashboardLayout><MyPOs /></DashboardLayout>} />
+          <Route path="/po-approval" element={<DashboardLayout><POApproval /></DashboardLayout>} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
