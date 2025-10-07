@@ -22,12 +22,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     
     // Listen to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (event === 'SIGNED_OUT') {
           setCompanyName("Packaging Portal");
           navigate('/login');
         } else if (event === 'SIGNED_IN' && session?.user) {
-          await fetchCompanyName(session.user.id);
+          // Use setTimeout to defer the Supabase call
+          setTimeout(() => {
+            fetchCompanyName(session.user.id);
+          }, 0);
         }
       }
     );
@@ -108,7 +111,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -59,7 +59,7 @@ export default function Login() {
           description: "You've been logged in successfully",
         });
       }
-      navigate('/upload-po');
+      navigate('/dashboard');
     } catch (error: any) {
       toast({
         title: "Error",
