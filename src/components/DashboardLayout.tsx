@@ -19,26 +19,34 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   useEffect(() => {
     checkAuth();
+    
+    // Listen to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setCompanyName("Packaging Portal");
+          navigate('/login');
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          await fetchCompanyName(session.user.id);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const checkAuth = async () => {
+  const fetchCompanyName = async (userId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
       // Get user's company
       const { data: userRole, error: roleError } = await supabase
         .from('user_roles')
         .select('company_id')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (roleError) {
         console.error('Error fetching user role:', roleError);
+        return;
       }
 
       if (userRole?.company_id) {
@@ -50,12 +58,28 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
         if (companyError) {
           console.error('Error fetching company:', companyError);
+          return;
         }
 
         if (company) {
           setCompanyName(company.name);
         }
       }
+    } catch (error) {
+      console.error('Error fetching company name:', error);
+    }
+  };
+
+  const checkAuth = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        navigate('/login');
+        return;
+      }
+
+      await fetchCompanyName(user.id);
     } catch (error) {
       console.error('Auth check error:', error);
     } finally {
