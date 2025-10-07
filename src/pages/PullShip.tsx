@@ -5,8 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { 
@@ -27,10 +29,12 @@ import {
   ArrowUpDown,
   FileText,
   Download,
-  Eye
+  Eye,
+  Upload
 } from "lucide-react";
 
 const PullShip = () => {
+  const { toast } = useToast();
   const [orderData, setOrderData] = useState({
     state: "",
     shippingAddress: "",
@@ -43,6 +47,9 @@ const PullShip = () => {
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
   const [skuQuantities, setSkuQuantities] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [uploadingPO, setUploadingPO] = useState(false);
+  const [analyzingPO, setAnalyzingPO] = useState(false);
+  const [selectedPOFile, setSelectedPOFile] = useState<File | null>(null);
 
   const [invoices, setInvoices] = useState([
     {
@@ -326,7 +333,141 @@ const PullShip = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handlePOFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type === 'application/pdf') {
+      setSelectedPOFile(file);
+    } else {
+      toast({
+        title: "Invalid file type",
+        description: "Please select a PDF file",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePOUpload = async () => {
+    if (!selectedPOFile) return;
+
+    setUploadingPO(true);
+    setAnalyzingPO(false);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Upload PDF to storage
+      const fileName = `${Date.now()}-${selectedPOFile.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('po-documents')
+        .upload(fileName, selectedPOFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('po-documents')
+        .getPublicUrl(fileName);
+
+      // Create submission record
+      const { data: submission, error: insertError } = await supabase
+        .from('po_submissions')
+        .insert({
+          pdf_url: publicUrl,
+          original_filename: selectedPOFile.name,
+          customer_id: user.id,
+          status: 'pending_analysis'
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      setUploadingPO(false);
+      setAnalyzingPO(true);
+
+      // Trigger AI analysis
+      const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-po', {
+        body: { submissionId: submission.id }
+      });
+
+      if (analysisError) throw analysisError;
+
+      setAnalyzingPO(false);
+
+      // Auto-populate form with extracted data
+      const extracted = analysisData.data;
+      if (extracted) {
+        setOrderData({
+          state: extracted.shipping_address?.state || '',
+          shippingAddress: extracted.shipping_address?.street || '',
+          shippingCity: extracted.shipping_address?.city || '',
+          shippingState: extracted.shipping_address?.state || '',
+          shippingZip: extracted.shipping_address?.zip || '',
+          notes: extracted.special_instructions || '',
+        });
+
+        // Auto-select items
+        if (extracted.items && Array.isArray(extracted.items)) {
+          const newSelectedSkus = new Set<string>();
+          const newQuantities: Record<string, number> = {};
+          
+          extracted.items.forEach((item: any) => {
+            if (item.sku) {
+              newSelectedSkus.add(item.sku);
+              newQuantities[item.sku] = item.quantity || 1;
+            }
+          });
+          
+          setSelectedSkus(newSelectedSkus);
+          setSkuQuantities(newQuantities);
+        }
+
+        toast({
+          title: "PO Analyzed Successfully",
+          description: "Order details have been automatically filled in",
+        });
+      }
+
+      setSelectedPOFile(null);
+    } catch (error: any) {
+      console.error('Error uploading PO:', error);
+      toast({
+        title: "Upload Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      setUploadingPO(false);
+      setAnalyzingPO(false);
+    }
+  };
+
+  const sendPackingListEmail = async (packingListPdf: string, invoiceData: any) => {
+    try {
+      const { error } = await supabase.functions.invoke('send-packing-list', {
+        body: {
+          packingListPdf,
+          invoiceData,
+          fulfillmentEmail: 'fulfillment@example.com'
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Email Sent",
+        description: "Packing list has been sent to the fulfillment center",
+      });
+    } catch (error: any) {
+      console.error('Error sending email:', error);
+      toast({
+        title: "Email Notice",
+        description: error.message || "Email functionality requires RESEND_API_KEY to be configured.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedSkus.size === 0) return;
     
@@ -345,6 +486,7 @@ const PullShip = () => {
     
     const packingListBlob = packingListDoc.output("blob");
     const invoiceBlob = invoiceDoc.output("blob");
+    const packingListPdf = packingListDoc.output('dataurlstring');
     
     const newInvoice = {
       id: invoiceId,
@@ -360,10 +502,25 @@ const PullShip = () => {
       packingListPdf: URL.createObjectURL(packingListBlob),
       invoicePdf: URL.createObjectURL(invoiceBlob)
     };
+    
+    // Send email with packing list
+    await sendPackingListEmail(packingListPdf, {
+      invoiceNumber: invoiceId,
+      customerName: 'Customer',
+      state: orderData.state,
+      address: `${orderData.shippingAddress}, ${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZip}`,
+      items
+    });
+    
     setInvoices([newInvoice, ...invoices]);
     setOrderData({ state: "", shippingAddress: "", shippingCity: "", shippingState: "", shippingZip: "", notes: "" });
     setSelectedSkus(new Set());
     setSkuQuantities({});
+    
+    toast({
+      title: "Order Created",
+      description: "Pull order, packing list, and invoice have been generated",
+    });
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -377,6 +534,40 @@ const PullShip = () => {
         <h1 className="text-2xl font-semibold">Pull & Ship Invoices</h1>
         <p className="text-sm text-muted-foreground mt-1">Create multi-SKU pull requests and track invoice fulfillment</p>
       </div>
+
+      {/* PO Upload Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Upload Purchase Order
+          </CardTitle>
+          <CardDescription>Upload a PO PDF to automatically create a pull order</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Input
+                type="file"
+                accept="application/pdf"
+                onChange={handlePOFileSelect}
+                disabled={uploadingPO || analyzingPO}
+              />
+              <Button
+                onClick={handlePOUpload}
+                disabled={!selectedPOFile || uploadingPO || analyzingPO}
+              >
+                {uploadingPO ? "Uploading..." : analyzingPO ? "Analyzing..." : "Upload & Analyze"}
+              </Button>
+            </div>
+            {selectedPOFile && (
+              <p className="text-sm text-muted-foreground">
+                Selected: {selectedPOFile.name}
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Product Selection - Inventory Style */}
