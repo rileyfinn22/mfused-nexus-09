@@ -32,38 +32,22 @@ export default function Login() {
           return;
         }
 
-        const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        // Sign up with company name in metadata - trigger will handle company/role creation
+        const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              company_name: companyName
+            }
+          }
         });
         if (signUpError) throw signUpError;
 
-        if (authData.user) {
-          // Create company
-          const { data: companyData, error: companyError } = await supabase
-            .from('companies')
-            .insert({ name: companyName })
-            .select()
-            .single();
-
-          if (companyError) throw companyError;
-
-          // Create user role linked to company
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .insert({
-              user_id: authData.user.id,
-              role: 'admin',
-              company_id: companyData.id
-            });
-
-          if (roleError) throw roleError;
-
-          toast({
-            title: "Success!",
-            description: "Account and company created successfully",
-          });
-        }
+        toast({
+          title: "Success!",
+          description: "Account and company created successfully",
+        });
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
