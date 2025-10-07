@@ -40,12 +40,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const fetchCompanyName = async (userId: string) => {
     try {
+      console.log('Fetching company for user:', userId);
       // Get user's company
       const { data: userRole, error: roleError } = await supabase
         .from('user_roles')
         .select('company_id')
         .eq('user_id', userId)
         .maybeSingle();
+
+      console.log('User role result:', userRole, roleError);
 
       if (roleError) {
         console.error('Error fetching user role:', roleError);
@@ -59,12 +62,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           .eq('id', userRole.company_id)
           .maybeSingle();
 
+        console.log('Company result:', company, companyError);
+
         if (companyError) {
           console.error('Error fetching company:', companyError);
           return;
         }
 
         if (company) {
+          console.log('Setting company name to:', company.name);
           setCompanyName(company.name);
         }
       }
@@ -75,18 +81,24 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const checkAuth = async () => {
     try {
+      console.log('Checking auth...');
       const { data: { user } } = await supabase.auth.getUser();
       
+      console.log('User:', user);
+      
       if (!user) {
+        console.log('No user found, redirecting to login');
         navigate('/login');
         return;
       }
 
+      console.log('User found, fetching company name');
       await fetchCompanyName(user.id);
     } catch (error) {
       console.error('Auth check error:', error);
       navigate('/login');
     } finally {
+      console.log('Setting loading to false');
       setLoading(false);
     }
   };
