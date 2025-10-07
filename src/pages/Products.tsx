@@ -20,6 +20,9 @@ interface Product {
   id: string;
   name: string;
   category: string;
+  description: string | null;
+  state: string;
+  cost: number | null;
   states: ProductState[];
 }
 
@@ -65,6 +68,9 @@ const Products = () => {
             id: product.id,
             name: product.name,
             category: product.category,
+            description: product.description,
+            state: product.state,
+            cost: product.cost,
             states: states || []
           };
         })
@@ -160,10 +166,13 @@ const Products = () => {
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-1"></div>
-            <div className="col-span-3">Product ID</div>
-            <div className="col-span-4">Product Name</div>
-            <div className="col-span-2">Category</div>
-            <div className="col-span-1">States</div>
+            <div className="col-span-2">Product ID</div>
+            <div className="col-span-2">Item</div>
+            <div className="col-span-2">Description</div>
+            <div className="col-span-1">Category</div>
+            <div className="col-span-1">State</div>
+            <div className="col-span-1">Cost</div>
+            <div className="col-span-1">Details</div>
             <div className="col-span-1">Actions</div>
           </div>
         </div>
@@ -187,14 +196,21 @@ const Products = () => {
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
                   </div>
-                  <div className="col-span-3 font-medium font-mono text-sm flex items-center gap-2">
-                    {product.id}
+                  <div className="col-span-2 font-medium font-mono text-xs flex items-center gap-2">
+                    {product.id.slice(0, 8)}...
                     {!hasApprovedArtwork(product.id) && (
                       <AlertTriangle className="h-4 w-4 text-yellow-500" />
                     )}
                   </div>
-                  <div className="col-span-4 text-sm font-medium">{product.name}</div>
-                  <div className="col-span-2 text-sm">{product.category}</div>
+                  <div className="col-span-2 text-sm font-medium">{product.name}</div>
+                  <div className="col-span-2 text-sm text-muted-foreground">{product.description || '-'}</div>
+                  <div className="col-span-1 text-sm">{product.category}</div>
+                  <div className="col-span-1">
+                    <Badge variant="outline" className="text-xs">{product.state}</Badge>
+                  </div>
+                  <div className="col-span-1 text-sm font-medium">
+                    {product.cost ? `$${product.cost.toFixed(2)}` : '-'}
+                  </div>
                   <div className="col-span-1 text-sm text-center">{product.states.length}</div>
                   <div className="col-span-1 flex items-center gap-1">
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0">

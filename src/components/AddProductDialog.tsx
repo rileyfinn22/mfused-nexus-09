@@ -18,7 +18,9 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
   const [formData, setFormData] = useState({
     name: "",
     category: "",
+    description: "",
     state: "",
+    cost: "",
     specs: ""
   });
 
@@ -45,6 +47,9 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
         .insert({
           name: formData.name,
           category: formData.category,
+          description: formData.description || null,
+          state: formData.state,
+          cost: formData.cost ? parseFloat(formData.cost) : null,
           company_id: userRole.company_id
         })
         .select()
@@ -52,22 +57,24 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
 
       if (productError) throw productError;
 
-      // Create product state
-      const { error: stateError } = await supabase
-        .from('product_states')
-        .insert({
-          product_id: product.id,
-          state: formData.state,
-          specs: formData.specs,
-          artwork_status: 'pending',
-          status: 'active'
-        });
+      // Create product state if specs provided
+      if (formData.specs) {
+        const { error: stateError } = await supabase
+          .from('product_states')
+          .insert({
+            product_id: product.id,
+            state: formData.state,
+            specs: formData.specs,
+            artwork_status: 'pending',
+            status: 'active'
+          });
 
-      if (stateError) throw stateError;
+        if (stateError) throw stateError;
+      }
 
       toast.success("Product added successfully");
       setOpen(false);
-      setFormData({ name: "", category: "", state: "", specs: "" });
+      setFormData({ name: "", category: "", description: "", state: "", cost: "", specs: "" });
       onProductAdded();
     } catch (error) {
       console.error('Error adding product:', error);
@@ -94,12 +101,21 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Product Name</Label>
+            <Label htmlFor="name">Item Name</Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Input
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Product description"
             />
           </div>
           <div className="space-y-2">
@@ -132,15 +148,27 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
                 <SelectValue placeholder="Select state" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="MI">Michigan</SelectItem>
-                <SelectItem value="IL">Illinois</SelectItem>
+                <SelectItem value="WA">Washington</SelectItem>
+                <SelectItem value="AZ">Arizona</SelectItem>
+                <SelectItem value="NY">New York</SelectItem>
                 <SelectItem value="CA">California</SelectItem>
-                <SelectItem value="CO">Colorado</SelectItem>
+                <SelectItem value="MD">Maryland</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="specs">Specifications</Label>
+            <Label htmlFor="cost">Cost</Label>
+            <Input
+              id="cost"
+              type="number"
+              step="0.01"
+              value={formData.cost}
+              onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+              placeholder="0.00"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="specs">Specifications (Optional)</Label>
             <Input
               id="specs"
               value={formData.specs}
