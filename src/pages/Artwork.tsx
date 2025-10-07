@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Search, 
   Upload, 
@@ -12,99 +15,299 @@ import {
   XCircle,
   Clock,
   MessageSquare,
-  FileImage
+  FileImage,
+  AlertTriangle
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Artwork = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [artworkFiles, setArtworkFiles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadData, setUploadData] = useState({
+    sku: '',
+    file: null as File | null,
+    previewFile: null as File | null,
+    notes: ''
+  });
+  const { toast } = useToast();
 
-  const artworkFiles = [
-    {
-      id: "ART-001", fileName: "vape-cart-001-wa-v2.1.ai", sku: "VAPE-CART-001", state: "WA", version: "v2.1",
-      status: "approved", uploadDate: "2024-01-10", approvedDate: "2024-01-12", approvedBy: "John Smith",
-      fileSize: "2.4 MB", fileType: "Adobe Illustrator", notes: "Final version with updated state compliance"
-    },
-    {
-      id: "ART-002", fileName: "edible-pkg-005-ny-v3.0.psd", sku: "EDIBLE-PKG-005", state: "NY", version: "v3.0",
-      status: "rejected", uploadDate: "2024-01-08", approvedDate: null, approvedBy: null,
-      fileSize: "15.7 MB", fileType: "Photoshop", notes: "Color scheme needs adjustment for NY regulations"
-    },
-    {
-      id: "ART-003", fileName: "flower-jar-003-az-v1.9.ai", sku: "FLOWER-JAR-003", state: "AZ", version: "v1.9",
-      status: "pending", uploadDate: "2024-01-14", approvedDate: null, approvedBy: null,
-      fileSize: "3.1 MB", fileType: "Adobe Illustrator", notes: "Awaiting final approval from compliance team"
-    },
-    {
-      id: "ART-004", fileName: "concentrate-tin-002-md-v1.5.ai", sku: "CONCENTRATE-TIN-002", state: "MD", version: "v1.5",
-      status: "approved", uploadDate: "2024-01-06", approvedDate: "2024-01-08", approvedBy: "Sarah Johnson",
-      fileSize: "1.8 MB", fileType: "Adobe Illustrator", notes: "Clean design approved for production"
-    },
-  ];
+  useEffect(() => {
+    fetchArtwork();
+  }, []);
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'approved': return 'text-success';
-      case 'rejected': return 'text-danger';
-      case 'pending': return 'text-warning';
-      case 'revision': return 'text-primary';
-      default: return 'text-muted-foreground';
+  const fetchArtwork = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('artwork_files')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setArtworkFiles(data || []);
+    } catch (error) {
+      console.error('Error fetching artwork:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load artwork files",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'approved': return CheckCircle;
-      case 'rejected': return XCircle;
-      case 'pending': return Clock;
-      case 'revision': return MessageSquare;
-      default: return Clock;
+  const handleUpload = async () => {
+    if (!uploadData.file || !uploadData.sku) {
+      toast({
+        title: "Missing information",
+        description: "Please select a file and enter SKU",
+        variant: "destructive",
+      });
+      return;
     }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Not authenticated",
+          description: "Please log in to upload artwork",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Upload main artwork file
+      const fileExt = uploadData.file.name.split('.').pop();
+      const fileName = `${uploadData.sku}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('artwork')
+        .upload(fileName, uploadData.file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl: artworkUrl } } = supabase.storage
+        .from('artwork')
+        .getPublicUrl(fileName);
+
+      // Upload preview if provided
+      let previewUrl = null;
+      if (uploadData.previewFile) {
+        const previewExt = uploadData.previewFile.name.split('.').pop();
+        const previewName = `${uploadData.sku}/preview-${Date.now()}.${previewExt}`;
+        
+        const { error: previewError } = await supabase.storage
+          .from('artwork')
+          .upload(previewName, uploadData.previewFile);
+
+        if (!previewError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('artwork')
+            .getPublicUrl(previewName);
+          previewUrl = publicUrl;
+        }
+      }
+
+      // Create database record
+      const { error: insertError } = await supabase
+        .from('artwork_files')
+        .insert({
+          sku: uploadData.sku,
+          artwork_url: artworkUrl,
+          preview_url: previewUrl,
+          filename: uploadData.file.name,
+          notes: uploadData.notes,
+          is_approved: false
+        });
+
+      if (insertError) throw insertError;
+
+      toast({
+        title: "Success",
+        description: "Artwork uploaded successfully",
+      });
+
+      setUploadDialogOpen(false);
+      setUploadData({ sku: '', file: null, previewFile: null, notes: '' });
+      fetchArtwork();
+    } catch (error) {
+      console.error('Error uploading artwork:', error);
+      toast({
+        title: "Upload failed",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleApprove = async (id: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('artwork_files')
+        .update({
+          is_approved: true,
+          approved_by: user.id,
+          approved_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Approved",
+        description: "Artwork has been approved",
+      });
+      fetchArtwork();
+    } catch (error) {
+      console.error('Error approving artwork:', error);
+      toast({
+        title: "Error",
+        description: "Failed to approve artwork",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReject = async (id: string, reason: string) => {
+    try {
+      const { error } = await supabase
+        .from('artwork_files')
+        .update({
+          is_approved: false,
+          notes: reason
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Rejected",
+        description: "Artwork has been rejected",
+      });
+      fetchArtwork();
+    } catch (error) {
+      console.error('Error rejecting artwork:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reject artwork",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getStatusIcon = (isApproved: boolean) => {
+    return isApproved ? CheckCircle : Clock;
+  };
+
+  const getStatusColor = (isApproved: boolean) => {
+    return isApproved ? 'text-success' : 'text-warning';
   };
 
   const filteredFiles = artworkFiles.filter(file => {
-    const matchesSearch = file.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = file.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          file.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || file.status.toLowerCase() === statusFilter;
+    const matchesStatus = statusFilter === "all" || 
+                         (statusFilter === "approved" && file.is_approved) ||
+                         (statusFilter === "pending" && !file.is_approved);
     return matchesSearch && matchesStatus;
   });
+
+  if (loading) {
+    return <div className="p-6">Loading...</div>;
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-table-border pb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Artwork Library & Proofing</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage artwork files, review process, and approval workflow</p>
+          <h1 className="text-3xl font-bold">Artwork Library & Proofing</h1>
+          <p className="text-muted-foreground mt-1">Manage artwork files, review process, and approval workflow</p>
         </div>
-        <Button size="sm" className="bg-primary text-primary-foreground">
-          <Upload className="h-4 w-4 mr-2" />
-          Upload Artwork
-        </Button>
+        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Artwork
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Upload Artwork</DialogTitle>
+              <DialogDescription>Upload artwork file for a specific SKU</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="sku">SKU</Label>
+                <Input
+                  id="sku"
+                  value={uploadData.sku}
+                  onChange={(e) => setUploadData({...uploadData, sku: e.target.value})}
+                  placeholder="e.g., VAPE-CART-001"
+                />
+              </div>
+              <div>
+                <Label htmlFor="artwork">Artwork File</Label>
+                <Input
+                  id="artwork"
+                  type="file"
+                  onChange={(e) => setUploadData({...uploadData, file: e.target.files?.[0] || null})}
+                />
+              </div>
+              <div>
+                <Label htmlFor="preview">Preview Image (Optional)</Label>
+                <Input
+                  id="preview"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setUploadData({...uploadData, previewFile: e.target.files?.[0] || null})}
+                />
+              </div>
+              <div>
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={uploadData.notes}
+                  onChange={(e) => setUploadData({...uploadData, notes: e.target.value})}
+                  placeholder="Add any notes about this artwork..."
+                />
+              </div>
+              <Button onClick={handleUpload} className="w-full">Upload</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-4 gap-6">
-        <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Files</p>
-          <p className="text-2xl font-semibold mt-1">{artworkFiles.length}</p>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-card border rounded-lg p-6">
+          <p className="text-sm text-muted-foreground">Total Files</p>
+          <p className="text-3xl font-bold mt-2">{artworkFiles.length}</p>
         </div>
-        <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Approved</p>
-          <p className="text-2xl font-semibold mt-1 text-success">
-            {artworkFiles.filter(f => f.status === 'approved').length}
+        <div className="bg-card border rounded-lg p-6">
+          <p className="text-sm text-muted-foreground">Approved</p>
+          <p className="text-3xl font-bold mt-2 text-green-600">
+            {artworkFiles.filter(f => f.is_approved).length}
           </p>
         </div>
-        <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending Review</p>
-          <p className="text-2xl font-semibold mt-1 text-warning">
-            {artworkFiles.filter(f => f.status === 'pending').length}
+        <div className="bg-card border rounded-lg p-6">
+          <p className="text-sm text-muted-foreground">Pending Review</p>
+          <p className="text-3xl font-bold mt-2 text-yellow-600">
+            {artworkFiles.filter(f => !f.is_approved).length}
           </p>
         </div>
-        <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Need Revision</p>
-          <p className="text-2xl font-semibold mt-1 text-danger">
-            {artworkFiles.filter(f => f.status === 'rejected').length}
+        <div className="bg-card border rounded-lg p-6">
+          <p className="text-sm text-muted-foreground">Unique SKUs</p>
+          <p className="text-3xl font-bold mt-2">
+            {new Set(artworkFiles.map(f => f.sku)).size}
           </p>
         </div>
       </div>
@@ -128,74 +331,102 @@ const Artwork = () => {
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="pending">Pending Review</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {/* Artwork Table */}
-      <div className="border border-table-border rounded">
-        {/* Table Header */}
-        <div className="bg-table-header border-b border-table-border">
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div className="col-span-3">File Name</div>
-            <div className="col-span-2">SKU</div>
-            <div className="col-span-1">State</div>
-            <div className="col-span-1">Version</div>
-            <div className="col-span-2">Upload Date</div>
-            <div className="col-span-1">Status</div>
-            <div className="col-span-1">Size</div>
-            <div className="col-span-1">Actions</div>
-          </div>
-        </div>
-
-        {/* Table Body */}
-        <div className="divide-y divide-table-border">
-          {filteredFiles.map((file) => {
-            const StatusIcon = getStatusIcon(file.status);
-            
-            return (
-              <div key={file.id} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors">
-                <div className="col-span-3">
-                  <div className="flex items-center gap-2">
-                    <FileImage className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-sm">{file.fileName}</span>
+      {/* Artwork Grid */}
+      <div className="grid gap-4">
+        {filteredFiles.map((file) => {
+          const StatusIcon = getStatusIcon(file.is_approved);
+          
+          return (
+            <div key={file.id} className="bg-card border rounded-lg p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <FileImage className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="font-semibold text-lg">{file.filename}</h3>
+                    <Badge 
+                      variant={file.is_approved ? "default" : "secondary"}
+                      className={getStatusColor(file.is_approved)}
+                    >
+                      <StatusIcon className="h-3 w-3 mr-1" />
+                      {file.is_approved ? 'Approved' : 'Pending'}
+                    </Badge>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">{file.fileType}</div>
-                </div>
-                <div className="col-span-2 font-mono text-sm">{file.sku}</div>
-                <div className="col-span-1">
-                  <Badge variant="outline" className="text-xs">{file.state}</Badge>
-                </div>
-                <div className="col-span-1 font-mono text-sm">{file.version}</div>
-                <div className="col-span-2 text-sm">{file.uploadDate}</div>
-                <div className={`col-span-1 text-sm font-medium ${getStatusColor(file.status)}`}>
-                  <div className="flex items-center gap-1">
-                    <StatusIcon className="h-3 w-3" />
-                    {file.status.toUpperCase()}
+                  <div className="grid grid-cols-2 gap-4 text-sm mt-4">
+                    <div>
+                      <p className="text-muted-foreground">SKU</p>
+                      <p className="font-mono font-medium">{file.sku}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Uploaded</p>
+                      <p>{new Date(file.created_at).toLocaleDateString()}</p>
+                    </div>
+                    {file.notes && (
+                      <div className="col-span-2">
+                        <p className="text-muted-foreground">Notes</p>
+                        <p>{file.notes}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="col-span-1 text-xs text-muted-foreground">{file.fileSize}</div>
-                <div className="col-span-1 flex gap-1">
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <Eye className="h-3 w-3" />
+                <div className="flex gap-2">
+                  {file.preview_url && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => window.open(file.preview_url, '_blank')}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => window.open(file.artwork_url, '_blank')}
+                  >
+                    <Download className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <Download className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <MessageSquare className="h-3 w-3" />
-                  </Button>
+                  {!file.is_approved && (
+                    <>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleApprove(file.id)}
+                      >
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          const reason = prompt('Enter rejection reason:');
+                          if (reason) handleReject(file.id, reason);
+                        }}
+                      >
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
 
       {filteredFiles.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          No artwork files found matching your criteria.
+        <div className="text-center py-12 bg-card border rounded-lg">
+          <FileImage className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <p className="text-lg font-medium mb-2">No artwork files found</p>
+          <p className="text-muted-foreground">
+            {searchQuery || statusFilter !== 'all' 
+              ? 'Try adjusting your filters'
+              : 'Upload your first artwork file to get started'
+            }
+          </p>
         </div>
       )}
     </div>

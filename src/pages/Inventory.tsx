@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import {
   ArrowUpDown,
   AlertTriangle
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Inventory = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -16,6 +17,36 @@ const Inventory = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortField, setSortField] = useState("available");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    fetchArtworkStatus();
+  }, []);
+
+  const fetchArtworkStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('artwork_files')
+        .select('sku, is_approved');
+
+      if (error) throw error;
+
+      // Create a map of SKU to approval status
+      const statusMap: Record<string, boolean> = {};
+      data?.forEach(artwork => {
+        if (!statusMap[artwork.sku] || artwork.is_approved) {
+          statusMap[artwork.sku] = artwork.is_approved;
+        }
+      });
+      setArtworkStatus(statusMap);
+    } catch (error) {
+      console.error('Error fetching artwork status:', error);
+    }
+  };
+
+  const hasApprovedArtwork = (sku: string) => {
+    return artworkStatus[sku] === true;
+  };
 
   const inventoryData = [
     { sku: "VAPE-CART-001", state: "WA", available: 45, reserved: 15, inProduction: 100, redline: 50, lastUpdated: "2024-01-15" },
@@ -158,7 +189,12 @@ const Inventory = () => {
                 key={`${item.sku}-${item.state}`}
                 className="grid grid-cols-10 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
               >
-                <div className="col-span-3 font-mono text-sm font-medium">{item.sku}</div>
+                <div className="col-span-3 font-mono text-sm font-medium flex items-center gap-2">
+                  {item.sku}
+                  {!hasApprovedArtwork(item.sku) && (
+                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  )}
+                </div>
                 <div className="col-span-1">
                   <Badge variant="outline" className="text-xs">{item.state}</Badge>
                 </div>

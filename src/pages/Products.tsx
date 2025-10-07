@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,44 @@ import {
   Download, 
   Truck,
   Image,
-  Plus
+  Plus,
+  AlertTriangle
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Products = () => {
   const [expandedProducts, setExpandedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    fetchArtworkStatus();
+  }, []);
+
+  const fetchArtworkStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('artwork_files')
+        .select('sku, is_approved');
+
+      if (error) throw error;
+
+      // Create a map of SKU to approval status
+      const statusMap: Record<string, boolean> = {};
+      data?.forEach(artwork => {
+        if (!statusMap[artwork.sku] || artwork.is_approved) {
+          statusMap[artwork.sku] = artwork.is_approved;
+        }
+      });
+      setArtworkStatus(statusMap);
+    } catch (error) {
+      console.error('Error fetching artwork status:', error);
+    }
+  };
+
+  const hasApprovedArtwork = (sku: string) => {
+    return artworkStatus[sku] === true;
+  };
 
   const products = [
     {
@@ -147,7 +179,12 @@ const Products = () => {
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
                   </div>
-                  <div className="col-span-3 font-medium font-mono text-sm">{product.id}</div>
+                  <div className="col-span-3 font-medium font-mono text-sm flex items-center gap-2">
+                    {product.id}
+                    {!hasApprovedArtwork(product.id) && (
+                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                    )}
+                  </div>
                   <div className="col-span-4 text-sm font-medium">{product.name}</div>
                   <div className="col-span-2 text-sm">{product.category}</div>
                   <div className="col-span-1 text-sm text-center">{product.states.length}</div>

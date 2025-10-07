@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      artwork_files: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          artwork_url: string
+          created_at: string
+          filename: string
+          id: string
+          is_approved: boolean
+          notes: string | null
+          preview_url: string | null
+          sku: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          artwork_url: string
+          created_at?: string
+          filename: string
+          id?: string
+          is_approved?: boolean
+          notes?: string | null
+          preview_url?: string | null
+          sku: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          artwork_url?: string
+          created_at?: string
+          filename?: string
+          id?: string
+          is_approved?: boolean
+          notes?: string | null
+          preview_url?: string | null
+          sku?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       po_submissions: {
         Row: {
           approved_at: string | null
