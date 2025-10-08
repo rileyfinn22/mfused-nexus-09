@@ -80,31 +80,41 @@ serve(async (req) => {
         messages: [
           {
             role: 'user',
-            content: `Analyze this purchase order text and extract structured data in valid JSON format.
+            content: `You are a purchase order data extraction expert. Carefully analyze this PO text and extract ALL line items with their details.
 
-Required fields:
-- po_number: string (purchase order number)
-- customer_name: string (vendor/company name)
-- customer_email: string or null
-- customer_phone: string or null
-- shipping_name: string
-- shipping_street: string
-- shipping_city: string
-- shipping_state: string (2-letter code)
-- shipping_zip: string
-- billing_name: string or null
-- billing_street: string or null
-- billing_city: string or null
-- billing_state: string or null
-- billing_zip: string or null
-- due_date: string (YYYY-MM-DD) or null
-- memo: string or null
-- items: array with sku, name, description, quantity (number), unit_price (number)
+CRITICAL: Look for tables, line items, product lists. Each item MUST have:
+- sku/item code (look for: Item#, SKU, Code, Part#)
+- name/description (the product name or description)
+- quantity (look for: Qty, Quantity, QTY, Amount)
+- unit_price (look for: Price, Unit Price, Rate, Cost per unit)
+
+Also extract:
+- po_number: The PO# or purchase order number
+- customer_name: Vendor or company name at top
+- customer_email: Email address if present
+- customer_phone: Phone number if present
+- shipping_name: Ship To name
+- shipping_street: Ship To street address
+- shipping_city: Ship To city
+- shipping_state: Ship To state (2-letter code)
+- shipping_zip: Ship To zip code
+- billing_name: Bill To name (or same as shipping)
+- billing_street: Bill To street
+- billing_city: Bill To city
+- billing_state: Bill To state
+- billing_zip: Bill To zip
+- due_date: Due date in YYYY-MM-DD format
+- memo: Any special notes or terms
+
+PAY SPECIAL ATTENTION to extracting ALL items from tables or line item sections. Look for patterns like:
+- Item Code | Description | Qty | Price
+- SKU / Product Name / Quantity / Unit Price
+- Multiple rows of similar data
 
 PO Text:
 ${extractedText}
 
-Return ONLY valid JSON with the structure above.`
+Return ONLY valid JSON. If you cannot find certain fields, use null. But you MUST extract all line items you find.`
           }
         ],
         response_format: { type: "json_object" }
