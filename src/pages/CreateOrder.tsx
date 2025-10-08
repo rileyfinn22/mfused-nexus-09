@@ -42,6 +42,7 @@ interface Product {
 interface OrderItem {
   productId: string;
   quantity: number;
+  unit_price?: number; // Preserve PO prices
 }
 
 interface SavedAddress {
@@ -170,6 +171,7 @@ const CreateOrder = () => {
         .map((item: any) => ({
           productId: item.product_id,
           quantity: item.quantity,
+          unit_price: item.unit_price, // Preserve PO prices
         }));
       setSelectedItems(items);
       
@@ -315,9 +317,9 @@ const CreateOrder = () => {
       let subtotal = 0;
       for (const item of selectedItems) {
         const product = products.find(p => p.id === item.productId);
-        if (product && product.cost) {
-          subtotal += product.cost * item.quantity;
-        }
+        // Use stored unit_price if available (from PO), otherwise use product cost
+        const price = item.unit_price ?? product?.cost ?? 0;
+        subtotal += price * item.quantity;
       }
 
       const tax = subtotal * 0.06;
@@ -406,7 +408,9 @@ const CreateOrder = () => {
 
       const orderItems = selectedItems.map(item => {
         const product = products.find(p => p.id === item.productId);
-        const itemTotal = (product?.cost || 0) * item.quantity;
+        // Use stored unit_price if available (from PO), otherwise use product cost
+        const price = item.unit_price ?? product?.cost ?? 0;
+        const itemTotal = price * item.quantity;
         
         return {
           order_id: order.id,
@@ -416,7 +420,7 @@ const CreateOrder = () => {
           name: product?.name || "",
           description: product?.description || null,
           quantity: item.quantity,
-          unit_price: product?.cost || 0,
+          unit_price: price,
           total: itemTotal,
         };
       });
@@ -447,7 +451,9 @@ const CreateOrder = () => {
 
   const subtotal = selectedItems.reduce((sum, item) => {
     const product = products.find(p => p.id === item.productId);
-    return sum + ((product?.cost || 0) * item.quantity);
+    // Use stored unit_price if available (from PO), otherwise use product cost
+    const price = item.unit_price ?? product?.cost ?? 0;
+    return sum + (price * item.quantity);
   }, 0);
   const tax = subtotal * 0.06;
   const total = subtotal + tax;
@@ -743,7 +749,9 @@ const CreateOrder = () => {
                 {selectedItems.map((item) => {
                   const product = products.find(p => p.id === item.productId);
                   if (!product) return null;
-                  const amount = (product.cost || 0) * item.quantity;
+                  // Use stored unit_price if available (from PO), otherwise use product cost
+                  const price = item.unit_price ?? product.cost ?? 0;
+                  const amount = price * item.quantity;
                   
                   return (
                     <TableRow key={item.productId}>
@@ -806,7 +814,7 @@ const CreateOrder = () => {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">${product.cost?.toFixed(3) || '0.000'}</TableCell>
+                      <TableCell className="text-right">${price.toFixed(3)}</TableCell>
                       <TableCell className="text-right font-medium">${amount.toFixed(3)}</TableCell>
                     </TableRow>
                   );
