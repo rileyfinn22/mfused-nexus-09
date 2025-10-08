@@ -7,6 +7,7 @@ import { DashboardLayout } from "./components/DashboardLayout";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
+import EditProduct from "./pages/EditProduct";
 import Inventory from "./pages/Inventory";
 import Orders from "./pages/Orders";
 import Invoices from "./pages/Invoices";
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
           <Route path="/products" element={<DashboardLayout><Products /></DashboardLayout>} />
+          <Route path="/products/edit/:id" element={<DashboardLayout><EditProduct /></DashboardLayout>} />
           <Route path="/inventory" element={<DashboardLayout><Inventory /></DashboardLayout>} />
           <Route path="/orders" element={<DashboardLayout><Orders /></DashboardLayout>} />
           <Route path="/invoices" element={<DashboardLayout><Invoices /></DashboardLayout>} />

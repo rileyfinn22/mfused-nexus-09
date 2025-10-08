@@ -12,7 +12,9 @@ import {
   Truck,
   Image,
   Plus,
-  AlertTriangle
+  AlertTriangle,
+  Edit,
+  Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AddProductDialog } from "@/components/AddProductDialog";
@@ -270,9 +272,21 @@ const Products = () => {
                     {product.cost ? `$${product.cost.toFixed(2)}` : '-'}
                   </div>
                   <div className="col-span-1 text-sm text-center">{product.states.length}</div>
-                  <div className="col-span-1 flex items-center gap-1">
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      <Eye className="h-3 w-3" />
+                  <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 w-6 p-0"
+                      onClick={() => navigate(`/products/edit/${product.id}`)}
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>

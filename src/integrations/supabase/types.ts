@@ -243,6 +243,7 @@ export type Database = {
       }
       products: {
         Row: {
+          cases_per_pallet: number | null
           category: string
           company_id: string
           cost: number | null
@@ -251,10 +252,15 @@ export type Database = {
           id: string
           image_url: string | null
           name: string
+          product_type: string | null
           state: string | null
+          units_per_case: number | null
           updated_at: string
+          volume_per_case: number | null
+          weight_per_case: number | null
         }
         Insert: {
+          cases_per_pallet?: number | null
           category: string
           company_id: string
           cost?: number | null
@@ -263,10 +269,15 @@ export type Database = {
           id?: string
           image_url?: string | null
           name: string
+          product_type?: string | null
           state?: string | null
+          units_per_case?: number | null
           updated_at?: string
+          volume_per_case?: number | null
+          weight_per_case?: number | null
         }
         Update: {
+          cases_per_pallet?: number | null
           category?: string
           company_id?: string
           cost?: number | null
@@ -275,8 +286,12 @@ export type Database = {
           id?: string
           image_url?: string | null
           name?: string
+          product_type?: string | null
           state?: string | null
+          units_per_case?: number | null
           updated_at?: string
+          volume_per_case?: number | null
+          weight_per_case?: number | null
         }
         Relationships: []
       }
