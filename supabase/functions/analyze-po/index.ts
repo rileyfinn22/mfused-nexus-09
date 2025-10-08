@@ -18,13 +18,11 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { pdfUrl, companyId, userId, filename } = await req.json();
-    console.log('Analyzing PO from URL:', pdfUrl);
+    const { pdfPath, companyId, userId, filename } = await req.json();
+    console.log('Analyzing PO from path:', pdfPath);
 
-    // Download PDF from storage using Supabase client (bucket is not public)
+    // Download PDF from storage using Supabase client with service role
     console.log('Downloading PDF from storage...');
-    const pdfPath = pdfUrl.split('/po-documents/')[1];
-    console.log('PDF path:', pdfPath);
     
     const { data: pdfBlob, error: downloadError } = await supabase
       .storage

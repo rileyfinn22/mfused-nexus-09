@@ -66,10 +66,8 @@ export function UploadPODialog() {
         throw uploadError;
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('po-documents')
-        .getPublicUrl(fileName);
+      // Pass the file path (bucket is private, edge function will download with service role)
+      const filePath = fileName;
 
       // Get user's company
       const { data: userRole } = await supabase
@@ -93,7 +91,7 @@ export function UploadPODialog() {
       // Trigger AI analysis
       const { data: functionData, error: functionError } = await supabase.functions.invoke('analyze-po', {
         body: { 
-          pdfUrl: publicUrl,
+          pdfPath: filePath,
           companyId: userRole.company_id,
           userId: user.id,
           filename: selectedFile.name
