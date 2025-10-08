@@ -29,10 +29,17 @@ serve(async (req) => {
       .from('po-documents')
       .download(pdfPath);
 
-    if (downloadError || !pdfBlob) {
-      console.error('Error downloading PDF:', downloadError);
-      throw new Error('Failed to download PDF from storage');
+    if (downloadError) {
+      console.error('Download error details:', JSON.stringify(downloadError, null, 2));
+      throw new Error(`Failed to download PDF: ${downloadError.message || 'Unknown error'}`);
     }
+    
+    if (!pdfBlob) {
+      console.error('No PDF blob returned from download');
+      throw new Error('No PDF data received from storage');
+    }
+    
+    console.log('PDF downloaded successfully, size:', pdfBlob.size);
     
     const pdfArrayBuffer = await pdfBlob.arrayBuffer();
     
