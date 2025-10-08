@@ -200,7 +200,7 @@ export type Database = {
           item_id: string | null
           name: string
           order_id: string
-          product_id: string
+          product_id: string | null
           quantity: number
           sku: string
           total: number
@@ -213,7 +213,7 @@ export type Database = {
           item_id?: string | null
           name: string
           order_id: string
-          product_id: string
+          product_id?: string | null
           quantity: number
           sku: string
           total: number
@@ -226,7 +226,7 @@ export type Database = {
           item_id?: string | null
           name?: string
           order_id?: string
-          product_id?: string
+          product_id?: string | null
           quantity?: number
           sku?: string
           total?: number
