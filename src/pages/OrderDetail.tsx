@@ -129,21 +129,62 @@ const OrderDetail = () => {
   const handleVibeProcessed = async () => {
     if (!isAdmin) return;
     
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
     const { error } = await supabase
       .from('orders')
       .update({ 
         vibe_processed: true,
         vibe_processed_at: new Date().toISOString(),
-        vibe_processed_by: (await supabase.auth.getUser()).data.user?.id
+        vibe_processed_by: user.id
       })
       .eq('id', orderId);
 
     if (!error) {
+      // Check if invoice already exists
+      const { data: existingInvoice } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+      if (!existingInvoice) {
+        // Create invoice with status "Final Review"
+        const invoiceNumber = `INV-${order.order_number}-${Date.now()}`;
+        const { error: invoiceError } = await supabase
+          .from('invoices')
+          .insert({
+            company_id: order.company_id,
+            order_id: orderId,
+            invoice_number: invoiceNumber,
+            status: 'final_review',
+            subtotal: order.subtotal,
+            tax: order.tax,
+            total: order.total,
+            created_by: user.id
+          });
+
+        if (invoiceError) {
+          toast({
+            title: "Warning",
+            description: "Order processed but invoice creation failed",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Order Processed",
+            description: "Order marked as Vibe Processed and invoice created with Final Review status."
+          });
+        }
+      } else {
+        toast({
+          title: "Order Processed",
+          description: "Order has been marked as Vibe Processed."
+        });
+      }
+      
       setVibeProcessed(true);
-      toast({
-        title: "Order Processed",
-        description: "Order has been marked as Vibe Processed."
-      });
       fetchOrder();
     }
   };

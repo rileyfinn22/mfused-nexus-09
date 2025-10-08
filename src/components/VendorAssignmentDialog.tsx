@@ -36,13 +36,27 @@ export const VendorAssignmentDialog = ({
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [bulkVendorId, setBulkVendorId] = useState<string>("");
   const [bulkCost, setBulkCost] = useState<string>("");
+  const [freshOrderItems, setFreshOrderItems] = useState<any[]>([]);
 
   useEffect(() => {
     if (open) {
       fetchVendors();
-      loadExistingAssignments();
+      // Reload order items from database to get fresh vendor assignments
+      refetchOrderItems();
     }
-  }, [open, orderItems]);
+  }, [open]);
+
+  const refetchOrderItems = async () => {
+    const { data } = await supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', orderId);
+    
+    if (data) {
+      setFreshOrderItems(data);
+      loadExistingAssignments(data);
+    }
+  };
 
   const fetchVendors = async () => {
     setLoading(true);
@@ -57,9 +71,9 @@ export const VendorAssignmentDialog = ({
     setLoading(false);
   };
 
-  const loadExistingAssignments = () => {
+  const loadExistingAssignments = (items: any[]) => {
     const existing: Record<string, ItemAssignment> = {};
-    orderItems.forEach(item => {
+    items.forEach(item => {
       if (item.vendor_id) {
         existing[item.id] = {
           vendorId: item.vendor_id,
@@ -90,7 +104,8 @@ export const VendorAssignmentDialog = ({
 
     setSaving(true);
     try {
-      const item = orderItems.find(i => i.id === itemId);
+      const items = freshOrderItems.length > 0 ? freshOrderItems : orderItems;
+      const item = items.find(i => i.id === itemId);
       if (!item) throw new Error("Item not found");
 
       // Get order and company info
@@ -242,10 +257,11 @@ export const VendorAssignmentDialog = ({
   };
 
   const toggleSelectAll = () => {
-    if (selectedItems.size === orderItems.length) {
+    const items = freshOrderItems.length > 0 ? freshOrderItems : orderItems;
+    if (selectedItems.size === items.length) {
       setSelectedItems(new Set());
     } else {
-      setSelectedItems(new Set(orderItems.map(item => item.id)));
+      setSelectedItems(new Set(items.map(item => item.id)));
     }
   };
 
@@ -280,8 +296,9 @@ export const VendorAssignmentDialog = ({
       if (!order) throw new Error("Order not found");
 
       // Process each selected item
+      const items = freshOrderItems.length > 0 ? freshOrderItems : orderItems;
       for (const itemId of Array.from(selectedItems)) {
-        const item = orderItems.find(i => i.id === itemId);
+        const item = items.find(i => i.id === itemId);
         if (!item || assignments[itemId]?.assigned) continue;
 
         // Update order item with vendor info
@@ -434,7 +451,7 @@ export const VendorAssignmentDialog = ({
                     <tr className="border-b">
                       <th className="text-center p-3 font-medium text-sm w-12">
                         <Checkbox
-                          checked={selectedItems.size === orderItems.length && orderItems.length > 0}
+                          checked={selectedItems.size === (freshOrderItems.length > 0 ? freshOrderItems : orderItems).length && (freshOrderItems.length > 0 ? freshOrderItems : orderItems).length > 0}
                           onCheckedChange={toggleSelectAll}
                         />
                       </th>
@@ -448,7 +465,7 @@ export const VendorAssignmentDialog = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {orderItems.map((item) => (
+                    {(freshOrderItems.length > 0 ? freshOrderItems : orderItems).map((item) => (
                       <tr key={item.id} className="border-b hover:bg-muted/30">
                         <td className="p-3 text-center">
                           <Checkbox
