@@ -135,6 +135,223 @@ export type Database = {
           },
         ]
       }
+      order_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          item_id: string | null
+          name: string
+          order_id: string
+          product_id: string
+          quantity: number
+          sku: string
+          total: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          item_id?: string | null
+          name: string
+          order_id: string
+          product_id: string
+          quantity: number
+          sku: string
+          total: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          item_id?: string | null
+          name?: string
+          order_id?: string
+          product_id?: string
+          quantity?: number
+          sku?: string
+          total?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_notes: {
+        Row: {
+          author_name: string
+          created_at: string
+          id: string
+          note_text: string
+          order_id: string
+          user_id: string
+        }
+        Insert: {
+          author_name: string
+          created_at?: string
+          id?: string
+          note_text: string
+          order_id: string
+          user_id: string
+        }
+        Update: {
+          author_name?: string
+          created_at?: string
+          id?: string
+          note_text?: string
+          order_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_production_updates: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          update_text: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          update_text: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          update_text?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_production_updates_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          billing_city: string | null
+          billing_name: string | null
+          billing_state: string | null
+          billing_street: string | null
+          billing_zip: string | null
+          company_id: string
+          created_at: string
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          due_date: string | null
+          id: string
+          memo: string | null
+          order_date: string
+          order_number: string
+          po_number: string | null
+          shipping_city: string
+          shipping_name: string
+          shipping_state: string
+          shipping_street: string
+          shipping_zip: string
+          status: string
+          subtotal: number
+          tax: number
+          terms: string | null
+          total: number
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          billing_city?: string | null
+          billing_name?: string | null
+          billing_state?: string | null
+          billing_street?: string | null
+          billing_zip?: string | null
+          company_id: string
+          created_at?: string
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          due_date?: string | null
+          id?: string
+          memo?: string | null
+          order_date?: string
+          order_number: string
+          po_number?: string | null
+          shipping_city: string
+          shipping_name: string
+          shipping_state: string
+          shipping_street: string
+          shipping_zip: string
+          status?: string
+          subtotal?: number
+          tax?: number
+          terms?: string | null
+          total?: number
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          billing_city?: string | null
+          billing_name?: string | null
+          billing_state?: string | null
+          billing_street?: string | null
+          billing_zip?: string | null
+          company_id?: string
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          due_date?: string | null
+          id?: string
+          memo?: string | null
+          order_date?: string
+          order_number?: string
+          po_number?: string | null
+          shipping_city?: string
+          shipping_name?: string
+          shipping_state?: string
+          shipping_street?: string
+          shipping_zip?: string
+          status?: string
+          subtotal?: number
+          tax?: number
+          terms?: string | null
+          total?: number
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       po_submissions: {
         Row: {
           approved_at: string | null
