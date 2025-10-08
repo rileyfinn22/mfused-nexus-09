@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Edit, Search, Building2 } from "lucide-react";
@@ -22,11 +21,6 @@ const Vendors = () => {
     contact_name: "",
     contact_email: "",
     contact_phone: "",
-    address_street: "",
-    address_city: "",
-    address_state: "",
-    address_zip: "",
-    payment_terms: "Net 30",
     notes: ""
   });
 
@@ -36,7 +30,7 @@ const Vendors = () => {
 
   const fetchVendors = async () => {
     setLoading(true);
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('vendors')
       .select('*')
       .order('name');
@@ -62,7 +56,7 @@ const Vendors = () => {
     if (!userRole) return;
 
     if (editingVendor) {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('vendors')
         .update(formData)
         .eq('id', editingVendor.id);
@@ -75,7 +69,7 @@ const Vendors = () => {
         handleCloseDialog();
       }
     } else {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('vendors')
         .insert({ ...formData, company_id: userRole.company_id });
       
@@ -96,11 +90,6 @@ const Vendors = () => {
       contact_name: vendor.contact_name || "",
       contact_email: vendor.contact_email || "",
       contact_phone: vendor.contact_phone || "",
-      address_street: vendor.address_street || "",
-      address_city: vendor.address_city || "",
-      address_state: vendor.address_state || "",
-      address_zip: vendor.address_zip || "",
-      payment_terms: vendor.payment_terms || "Net 30",
       notes: vendor.notes || ""
     });
     setDialogOpen(true);
@@ -114,11 +103,6 @@ const Vendors = () => {
       contact_name: "",
       contact_email: "",
       contact_phone: "",
-      address_street: "",
-      address_city: "",
-      address_state: "",
-      address_zip: "",
-      payment_terms: "Net 30",
       notes: ""
     });
   };
@@ -174,52 +158,12 @@ const Vendors = () => {
                     placeholder="email@example.com"
                   />
                 </div>
-                <div>
+                <div className="col-span-2">
                   <Label>Contact Phone</Label>
                   <Input
                     value={formData.contact_phone}
                     onChange={(e) => setFormData({...formData, contact_phone: e.target.value})}
                     placeholder="Phone Number"
-                  />
-                </div>
-                <div>
-                  <Label>Payment Terms</Label>
-                  <Input
-                    value={formData.payment_terms}
-                    onChange={(e) => setFormData({...formData, payment_terms: e.target.value})}
-                    placeholder="Net 30"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Label>Street Address</Label>
-                  <Input
-                    value={formData.address_street}
-                    onChange={(e) => setFormData({...formData, address_street: e.target.value})}
-                    placeholder="Street Address"
-                  />
-                </div>
-                <div>
-                  <Label>City</Label>
-                  <Input
-                    value={formData.address_city}
-                    onChange={(e) => setFormData({...formData, address_city: e.target.value})}
-                    placeholder="City"
-                  />
-                </div>
-                <div>
-                  <Label>State</Label>
-                  <Input
-                    value={formData.address_state}
-                    onChange={(e) => setFormData({...formData, address_state: e.target.value})}
-                    placeholder="State"
-                  />
-                </div>
-                <div>
-                  <Label>ZIP Code</Label>
-                  <Input
-                    value={formData.address_zip}
-                    onChange={(e) => setFormData({...formData, address_zip: e.target.value})}
-                    placeholder="ZIP"
                   />
                 </div>
                 <div className="col-span-2">
@@ -258,20 +202,18 @@ const Vendors = () => {
               <TableRow>
                 <TableHead>Vendor Name</TableHead>
                 <TableHead>Contact</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Payment Terms</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Phone</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">Loading vendors...</TableCell>
+                  <TableCell colSpan={4} className="text-center">Loading vendors...</TableCell>
                 </TableRow>
               ) : filteredVendors.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
+                  <TableCell colSpan={4} className="text-center">
                     <div className="py-8">
                       <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
                       <p className="text-muted-foreground">No vendors found</p>
@@ -288,18 +230,7 @@ const Vendors = () => {
                         <div className="text-muted-foreground">{vendor.contact_email || '-'}</div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      {vendor.address_city && vendor.address_state 
-                        ? `${vendor.address_city}, ${vendor.address_state}`
-                        : '-'
-                      }
-                    </TableCell>
-                    <TableCell>{vendor.payment_terms || 'Net 30'}</TableCell>
-                    <TableCell>
-                      <Badge variant={vendor.is_active ? "default" : "secondary"}>
-                        {vendor.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
+                    <TableCell>{vendor.contact_phone || '-'}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" onClick={() => handleEdit(vendor)}>
                         <Edit className="h-4 w-4" />

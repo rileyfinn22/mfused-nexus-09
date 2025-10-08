@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -15,6 +16,12 @@ interface VendorAssignmentDialogProps {
   onSuccess: () => void;
 }
 
+interface ItemAssignment {
+  vendorId: string;
+  vendorCost: string;
+  vendorPO: string;
+}
+
 export const VendorAssignmentDialog = ({ 
   open, 
   onOpenChange, 
@@ -23,162 +30,98 @@ export const VendorAssignmentDialog = ({
   onSuccess 
 }: VendorAssignmentDialogProps) => {
   const [vendors, setVendors] = useState<any[]>([]);
-  const [assignments, setAssignments] = useState<Record<string, string>>({});
+  const [assignments, setAssignments] = useState<Record<string, ItemAssignment>>({});
   const [loading, setLoading] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      fetchVendorsAndPreferences();
+      fetchVendors();
+      loadExistingAssignments();
     }
   }, [open, orderItems]);
 
-  const fetchVendorsAndPreferences = async () => {
+  const fetchVendors = async () => {
     setLoading(true);
-    
-    // Fetch all vendors
-    const { data: vendorsData } = await (supabase as any)
+    const { data } = await supabase
       .from('vendors')
       .select('*')
-      .eq('is_active', true)
       .order('name');
     
-    if (vendorsData) {
-      setVendors(vendorsData);
-      
-      // Fetch preferred vendors for each product
-      const productIds = orderItems.map(item => item.product_id).filter(Boolean);
-      if (productIds.length > 0) {
-        const { data: preferredData } = await (supabase as any)
-          .from('vendor_products')
-          .select('product_id, vendor_id')
-          .in('product_id', productIds)
-          .eq('is_preferred', true);
-        
-        // Pre-populate with preferred vendors
-        const prefMap: Record<string, string> = {};
-        orderItems.forEach(item => {
-          const pref = preferredData?.find((p: any) => p.product_id === item.product_id);
-          if (pref) {
-            prefMap[item.id] = pref.vendor_id;
-          }
-        });
-        setAssignments(prefMap);
-      }
+    if (data) {
+      setVendors(data);
     }
-    
     setLoading(false);
   };
 
-  const handleCreatePOs = async () => {
-    setCreating(true);
+  const loadExistingAssignments = () => {
+    const existing: Record<string, ItemAssignment> = {};
+    orderItems.forEach(item => {
+      if (item.vendor_id) {
+        existing[item.id] = {
+          vendorId: item.vendor_id,
+          vendorCost: item.vendor_cost?.toString() || '',
+          vendorPO: item.vendor_po_number || ''
+        };
+      }
+    });
+    setAssignments(existing);
+  };
+
+  const handleSaveAssignments = async () => {
+    setSaving(true);
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not authenticated");
+      // Update each order item with vendor information
+      for (const [itemId, assignment] of Object.entries(assignments)) {
+        if (!assignment.vendorId) continue;
 
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!userRole) throw new Error("User company not found");
-
-      // Group items by vendor
-      const vendorGroups: Record<string, any[]> = {};
-      orderItems.forEach(item => {
-        const vendorId = assignments[item.id];
-        if (vendorId) {
-          if (!vendorGroups[vendorId]) {
-            vendorGroups[vendorId] = [];
-          }
-          vendorGroups[vendorId].push(item);
-        }
-      });
-
-      // Create a PO for each vendor
-      for (const [vendorId, items] of Object.entries(vendorGroups)) {
-        // Generate PO number
-        const poNumber = `VPO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Calculate totals
-        const subtotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
-        
-        // Create vendor PO
-        const { data: po, error: poError } = await (supabase as any)
-          .from('vendor_pos')
-          .insert({
-            company_id: userRole.company_id,
-            vendor_id: vendorId,
-            customer_order_id: orderId,
-            po_number: poNumber,
-            status: 'draft',
-            subtotal: subtotal,
-            total: subtotal,
-            created_by: user.id
+        const { error } = await supabase
+          .from('order_items')
+          .update({
+            vendor_id: assignment.vendorId,
+            vendor_cost: assignment.vendorCost ? parseFloat(assignment.vendorCost) : null,
+            vendor_po_number: assignment.vendorPO || null
           })
-          .select()
-          .single();
+          .eq('id', itemId);
 
-        if (poError) throw poError;
-
-        // Fetch vendor product costs for accurate costing
-        const productIds = items.map(i => i.product_id).filter(Boolean);
-        const { data: vendorProducts } = await (supabase as any)
-          .from('vendor_products')
-          .select('product_id, vendor_cost')
-          .eq('vendor_id', vendorId)
-          .in('product_id', productIds);
-
-        // Create PO items
-        const poItems = items.map(item => {
-          const vendorProduct = vendorProducts?.find((vp: any) => vp.product_id === item.product_id);
-          const unitCost = vendorProduct?.vendor_cost || item.unit_price || 0;
-          
-          return {
-            vendor_po_id: po.id,
-            product_id: item.product_id,
-            sku: item.sku,
-            name: item.name,
-            description: item.description,
-            quantity: item.quantity,
-            unit_cost: unitCost,
-            total: unitCost * item.quantity
-          };
-        });
-
-        const { error: itemsError } = await (supabase as any)
-          .from('vendor_po_items')
-          .insert(poItems);
-
-        if (itemsError) throw itemsError;
+        if (error) throw error;
       }
 
       toast({
         title: "Success",
-        description: `Created ${Object.keys(vendorGroups).length} vendor PO(s)`
+        description: "Vendor assignments saved successfully"
       });
       
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
-      console.error("Error creating vendor POs:", error);
+      console.error("Error saving vendor assignments:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create vendor POs",
+        description: error.message || "Failed to save vendor assignments",
         variant: "destructive"
       });
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
+  };
+
+  const updateAssignment = (itemId: string, field: keyof ItemAssignment, value: string) => {
+    setAssignments(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        [field]: value
+      }
+    }));
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Assign Vendors to Products</DialogTitle>
+          <DialogTitle>Assign Vendors & Costs to Products</DialogTitle>
         </DialogHeader>
         
         {loading ? (
@@ -188,33 +131,54 @@ export const VendorAssignmentDialog = ({
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Assign a vendor for each product. Multiple vendors will create separate POs.
+              Assign vendor, cost, and PO number for each product in this order.
             </p>
             
             {orderItems.map((item) => (
-              <div key={item.id} className="flex items-center gap-4 p-4 border rounded-lg">
-                <div className="flex-1">
+              <div key={item.id} className="p-4 border rounded-lg space-y-3">
+                <div>
                   <p className="font-medium">{item.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    SKU: {item.sku} • Qty: {item.quantity}
+                    SKU: {item.sku} • Qty: {item.quantity} • Customer Price: ${item.unit_price}
                   </p>
                 </div>
-                <div className="w-64">
-                  <Select
-                    value={assignments[item.id]}
-                    onValueChange={(value) => setAssignments({...assignments, [item.id]: value})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select vendor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {vendors.map((vendor) => (
-                        <SelectItem key={vendor.id} value={vendor.id}>
-                          {vendor.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs">Vendor</Label>
+                    <Select
+                      value={assignments[item.id]?.vendorId || ''}
+                      onValueChange={(value) => updateAssignment(item.id, 'vendorId', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select vendor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vendors.map((vendor) => (
+                          <SelectItem key={vendor.id} value={vendor.id}>
+                            {vendor.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Vendor Cost</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={assignments[item.id]?.vendorCost || ''}
+                      onChange={(e) => updateAssignment(item.id, 'vendorCost', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Vendor PO#</Label>
+                    <Input
+                      placeholder="PO Number"
+                      value={assignments[item.id]?.vendorPO || ''}
+                      onChange={(e) => updateAssignment(item.id, 'vendorPO', e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
             ))}
@@ -223,16 +187,16 @@ export const VendorAssignmentDialog = ({
               <Button 
                 variant="outline" 
                 onClick={() => onOpenChange(false)}
-                disabled={creating}
+                disabled={saving}
               >
                 Cancel
               </Button>
               <Button 
-                onClick={handleCreatePOs}
-                disabled={creating || Object.keys(assignments).length === 0}
+                onClick={handleSaveAssignments}
+                disabled={saving}
               >
-                {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Create Vendor PO(s)
+                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save Vendor Assignments
               </Button>
             </div>
           </div>
