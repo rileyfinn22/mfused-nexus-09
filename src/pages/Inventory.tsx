@@ -19,11 +19,12 @@ import {
   Filter, 
   ArrowUpDown,
   AlertTriangle,
-  Undo2
+  Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadInventoryDialog } from "@/components/UploadInventoryDialog";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface InventoryItem {
   id: string;
@@ -40,12 +41,6 @@ interface InventoryItem {
   };
 }
 
-interface UploadBatch {
-  batch_id: string;
-  upload_timestamp: string;
-  count: number;
-}
-
 const Inventory = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -58,16 +53,28 @@ const Inventory = () => {
   const [artworkThumbnails, setArtworkThumbnails] = useState<Record<string, string>>({});
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploadBatches, setUploadBatches] = useState<UploadBatch[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [batchToDelete, setBatchToDelete] = useState<string | null>(null);
 
   useEffect(() => {
+    checkAdminStatus();
     fetchInventory();
     fetchArtworkStatus();
     fetchArtworkThumbnails();
-    fetchUploadBatches();
   }, []);
+
+  const checkAdminStatus = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      setIsAdmin(data?.role === 'admin');
+    }
+  };
 
   const fetchInventory = async () => {
     try {
@@ -82,39 +89,6 @@ const Inventory = () => {
       console.error('Error fetching inventory:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchUploadBatches = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('upload_batch_id, upload_timestamp')
-        .not('upload_batch_id', 'is', null)
-        .order('upload_timestamp', { ascending: false });
-
-      if (error) throw error;
-
-      // Group by batch_id and count items
-      const batchMap = new Map<string, UploadBatch>();
-      data?.forEach(item => {
-        if (item.upload_batch_id && item.upload_timestamp) {
-          const existing = batchMap.get(item.upload_batch_id);
-          if (existing) {
-            existing.count++;
-          } else {
-            batchMap.set(item.upload_batch_id, {
-              batch_id: item.upload_batch_id,
-              upload_timestamp: item.upload_timestamp,
-              count: 1
-            });
-          }
-        }
-      });
-
-      setUploadBatches(Array.from(batchMap.values()));
-    } catch (error) {
-      console.error('Error fetching upload batches:', error);
     }
   };
 
@@ -189,39 +163,54 @@ const Inventory = () => {
     }
   };
 
-  const handleRevertBatch = (batchId: string) => {
-    setBatchToDelete(batchId);
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedItems(new Set(filteredAndSortedData.map(item => item.id)));
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  const handleSelectItem = (itemId: string, checked: boolean) => {
+    const newSelected = new Set(selectedItems);
+    if (checked) {
+      newSelected.add(itemId);
+    } else {
+      newSelected.delete(itemId);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedItems.size === 0) return;
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteBatchConfirm = async () => {
-    if (!batchToDelete) return;
-
+  const handleDeleteConfirm = async () => {
     try {
       const { error } = await supabase
         .from('inventory')
         .delete()
-        .eq('upload_batch_id', batchToDelete);
+        .in('id', Array.from(selectedItems));
 
       if (error) throw error;
 
       toast({
-        title: "Upload reverted",
-        description: "The inventory upload has been successfully removed.",
+        title: "Items deleted",
+        description: `Successfully deleted ${selectedItems.size} inventory items.`,
       });
 
+      setSelectedItems(new Set());
       fetchInventory();
-      fetchUploadBatches();
     } catch (error) {
-      console.error('Error deleting batch:', error);
+      console.error('Error deleting items:', error);
       toast({
         title: "Error",
-        description: "Failed to revert upload. Please try again.",
+        description: "Failed to delete items. Please try again.",
         variant: "destructive",
       });
     } finally {
       setDeleteDialogOpen(false);
-      setBatchToDelete(null);
     }
   };
 
@@ -260,45 +249,19 @@ const Inventory = () => {
           <p className="text-sm text-muted-foreground mt-1">Track stock levels, monitor thresholds, and manage production pipeline</p>
         </div>
         <div className="flex gap-3">
-          <UploadInventoryDialog onInventoryUploaded={() => {
-            fetchInventory();
-            fetchUploadBatches();
-          }} />
+          {isAdmin && selectedItems.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteSelected}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete ({selectedItems.size})
+            </Button>
+          )}
+          <UploadInventoryDialog onInventoryUploaded={fetchInventory} />
         </div>
       </div>
-
-      {/* Recent Uploads - Undo Section */}
-      {uploadBatches.length > 0 && (
-        <div className="bg-muted/30 border border-border rounded-lg p-4">
-          <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <Undo2 className="h-4 w-4" />
-            Recent Uploads
-          </h2>
-          <div className="space-y-2">
-            {uploadBatches.slice(0, 5).map((batch) => (
-              <div key={batch.batch_id} className="flex items-center justify-between bg-background rounded px-3 py-2 text-sm">
-                <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground">
-                    {new Date(batch.upload_timestamp).toLocaleString()}
-                  </span>
-                  <Badge variant="outline" className="text-xs">
-                    {batch.count} items
-                  </Badge>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-destructive hover:text-destructive"
-                  onClick={() => handleRevertBatch(batch.batch_id)}
-                >
-                  <Undo2 className="h-3 w-3 mr-1" />
-                  Revert
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Filters */}
       <div className="flex flex-col lg:flex-row gap-4">
@@ -340,8 +303,16 @@ const Inventory = () => {
       <div className="border border-table-border rounded">
         {/* Table Header */}
         <div className="bg-table-header border-b border-table-border">
-          <div className="grid grid-cols-9 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div className="col-span-1">Preview</div>
+          <div className="grid grid-cols-10 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isAdmin && (
+              <div className="col-span-1 flex items-center">
+                <Checkbox
+                  checked={selectedItems.size === filteredAndSortedData.length && filteredAndSortedData.length > 0}
+                  onCheckedChange={handleSelectAll}
+                />
+              </div>
+            )}
+            <div className={isAdmin ? "col-span-1" : "col-span-1"}>Preview</div>
             <div className="col-span-2">SKU</div>
             <div className="col-span-1">State</div>
             <div 
@@ -375,9 +346,17 @@ const Inventory = () => {
             return (
               <div 
                 key={`${item.sku}-${item.state}`}
-                className="grid grid-cols-9 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
+                className="grid grid-cols-10 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
               >
-                <div className="col-span-1">
+                {isAdmin && (
+                  <div className="col-span-1 flex items-center">
+                    <Checkbox
+                      checked={selectedItems.has(item.id)}
+                      onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                    />
+                  </div>
+                )}
+                <div className={isAdmin ? "col-span-1" : "col-span-1"}>
                   {artworkThumbnails[item.sku] || item.products?.image_url ? (
                     <img 
                       src={artworkThumbnails[item.sku] || item.products?.image_url} 
@@ -425,15 +404,15 @@ const Inventory = () => {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revert this upload?</AlertDialogTitle>
+            <AlertDialogTitle>Delete selected items?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete all {uploadBatches.find(b => b.batch_id === batchToDelete)?.count || 0} inventory items from this upload batch. This action cannot be undone.
+              This will permanently delete {selectedItems.size} inventory item(s). This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteBatchConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Revert Upload
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
