@@ -235,7 +235,7 @@ const OrderDetail = () => {
   const total = order.total || 0;
   return <div className="max-w-7xl mx-auto">
       {/* Process Order Banner for Pending Orders */}
-      {isAdmin && order.status === 'pending' && (
+      {isAdmin && (order.status === 'pending' || order.status === 'pending_pull') && (
         <div className="mb-6 p-4 bg-blue-500/10 border-2 border-blue-500 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -245,10 +245,10 @@ const OrderDetail = () => {
             <Button 
               size="lg"
               className="bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={() => handleStatusChange('open')}
+              onClick={() => handleStatusChange('in production')}
             >
               <CheckCircle2 className="h-5 w-5 mr-2" />
-              Process Order → Open
+              Process Order → Production
             </Button>
           </div>
         </div>
@@ -263,22 +263,6 @@ const OrderDetail = () => {
         <div className="flex gap-3">
           {isAdmin && (
             <>
-              {order.status === 'pending' && (
-                <Button 
-                  variant="default" 
-                  onClick={() => handleStatusChange('open')}
-                >
-                  Process Order → Open
-                </Button>
-              )}
-              {order.status === 'open' && (
-                <Button 
-                  variant="default" 
-                  onClick={() => handleStatusChange('in_production')}
-                >
-                  Start Production
-                </Button>
-              )}
               {isEditMode ? (
                 <>
                   <Button variant="outline" onClick={() => {
