@@ -781,7 +781,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
-          order_item_id: string
+          order_item_id: string | null
           quantity: number
           sku: string
           total: number
@@ -793,7 +793,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
-          order_item_id: string
+          order_item_id?: string | null
           quantity: number
           sku: string
           total: number
@@ -805,7 +805,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
-          order_item_id?: string
+          order_item_id?: string | null
           quantity?: number
           sku?: string
           total?: number
