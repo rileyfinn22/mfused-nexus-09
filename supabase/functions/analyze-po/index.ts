@@ -39,32 +39,24 @@ serve(async (req) => {
     
     console.log('PDF downloaded, size:', pdfBlob.size);
     
-    // Convert to base64 and extract text using third-party API
+    // Convert to array buffer for PDF parsing
     const pdfArrayBuffer = await pdfBlob.arrayBuffer();
-    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
     
-    // Use pdf.js via CDN to extract text
-    console.log('Extracting text from PDF...');
-    const pdfParseResponse = await fetch('https://api.pdf.co/v1/pdf/convert/to/text', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': 'demo' // Using demo key - in production, you'd need a real API key
-      },
-      body: JSON.stringify({
-        url: `data:application/pdf;base64,${pdfBase64.substring(0, 50000)}`, // Limit size for demo
-        inline: true
-      })
-    });
-
+    // Use pdf-parse library to extract text
+    console.log('Extracting text from PDF with pdf-parse...');
+    
+    // Import pdf-parse for Deno
+    const pdfParse = (await import('npm:pdf-parse@1.1.1')).default;
+    
     let extractedText = '';
-    if (pdfParseResponse.ok) {
-      const parseData = await pdfParseResponse.json();
-      extractedText = parseData.body || '';
-      console.log('Extracted text length:', extractedText.length);
-    } else {
-      console.log('PDF parsing service failed, using fallback');
-      extractedText = `Purchase order document: ${filename}`;
+    try {
+      const pdfData = await pdfParse(new Uint8Array(pdfArrayBuffer));
+      extractedText = pdfData.text;
+      console.log('Successfully extracted text, length:', extractedText.length);
+      console.log('First 500 chars:', extractedText.substring(0, 500));
+    } catch (parseError) {
+      console.error('PDF parse error:', parseError);
+      extractedText = `Failed to parse PDF: ${filename}. Please enter data manually.`;
     }
 
     // Analyze with Lovable AI
