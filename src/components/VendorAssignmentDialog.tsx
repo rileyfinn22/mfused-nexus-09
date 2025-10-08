@@ -203,9 +203,10 @@ export const VendorAssignmentDialog = ({
               name: item.name,
               description: item.description || null,
               quantity: item.quantity,
+              shipped_quantity: item.quantity,
               unit_cost: parseFloat(assignment.vendorCost),
               total: parseFloat(assignment.vendorCost) * item.quantity
-            });
+            } as any);
         }
         
         // Update PO total
@@ -243,9 +244,10 @@ export const VendorAssignmentDialog = ({
             name: item.name,
             description: item.description || null,
             quantity: item.quantity,
+            shipped_quantity: item.quantity,
             unit_cost: parseFloat(assignment.vendorCost),
             total: parseFloat(assignment.vendorCost) * item.quantity
-          });
+          } as any);
       }
 
       // Update invoice if it exists
@@ -432,9 +434,10 @@ export const VendorAssignmentDialog = ({
             name: item.name,
             description: item.description || null,
             quantity: item.quantity,
+            shipped_quantity: item.quantity,
             unit_cost: parseFloat(bulkCost),
             total: parseFloat(bulkCost) * item.quantity
-          });
+          } as any);
 
         // Mark as assigned
         setAssignments(prev => ({

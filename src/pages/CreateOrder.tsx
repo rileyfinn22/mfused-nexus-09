@@ -646,6 +646,7 @@ const CreateOrder = () => {
           name: product?.name || "",
           description: product?.description || null,
           quantity: item.quantity,
+          shipped_quantity: item.quantity,
           unit_price: price,
           total: itemTotal,
         };

@@ -275,6 +275,7 @@ export type Database = {
           order_id: string
           product_id: string | null
           quantity: number
+          shipped_quantity: number
           sku: string
           total: number
           unit_price: number
@@ -291,6 +292,7 @@ export type Database = {
           order_id: string
           product_id?: string | null
           quantity: number
+          shipped_quantity: number
           sku: string
           total: number
           unit_price: number
@@ -307,6 +309,7 @@ export type Database = {
           order_id?: string
           product_id?: string | null
           quantity?: number
+          shipped_quantity?: number
           sku?: string
           total?: number
           unit_price?: number
@@ -783,6 +786,7 @@ export type Database = {
           name: string
           order_item_id: string | null
           quantity: number
+          shipped_quantity: number
           sku: string
           total: number
           unit_cost: number
@@ -795,6 +799,7 @@ export type Database = {
           name: string
           order_item_id?: string | null
           quantity: number
+          shipped_quantity: number
           sku: string
           total: number
           unit_cost: number
@@ -807,6 +812,7 @@ export type Database = {
           name?: string
           order_item_id?: string | null
           quantity?: number
+          shipped_quantity?: number
           sku?: string
           total?: number
           unit_cost?: number

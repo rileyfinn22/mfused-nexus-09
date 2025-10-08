@@ -121,12 +121,12 @@ const InvoiceDetail = () => {
     try {
       // Update each order item
       for (const item of editedItems) {
-        const newTotal = Number(item.quantity) * Number(item.unit_price);
+        const newTotal = Number(item.shipped_quantity) * Number(item.unit_price);
         
         const { error } = await supabase
           .from('order_items')
           .update({
-            quantity: item.quantity,
+            shipped_quantity: item.shipped_quantity,
             total: newTotal
           })
           .eq('id', item.id);
@@ -136,7 +136,7 @@ const InvoiceDetail = () => {
 
       // Recalculate order totals
       const newSubtotal = editedItems.reduce((sum, item) => 
-        sum + (Number(item.quantity) * Number(item.unit_price)), 0
+        sum + (Number(item.shipped_quantity) * Number(item.unit_price)), 0
       );
       const newTotal = newSubtotal + Number(invoice.tax);
 
@@ -185,7 +185,7 @@ const InvoiceDetail = () => {
     setEditedItems(items =>
       items.map(item =>
         item.id === itemId
-          ? { ...item, quantity: newQuantity, total: newQuantity * Number(item.unit_price) }
+          ? { ...item, shipped_quantity: newQuantity, total: newQuantity * Number(item.unit_price) }
           : item
       )
     );
@@ -203,7 +203,7 @@ const InvoiceDetail = () => {
   // Calculate totals using edited items in edit mode
   const displayItems = isEditMode ? editedItems : (order?.order_items || []);
   const displaySubtotal = displayItems.reduce((sum: number, item: any) => 
-    sum + (Number(item.quantity) * Number(item.unit_price)), 0
+    sum + (Number(item.shipped_quantity) * Number(item.unit_price)), 0
   );
   const displayTotal = displaySubtotal + Number(invoice?.tax || 0);
   const totalVendorCost = vendorPOs.reduce((sum, po) => sum + Number(po.total), 0);
@@ -354,7 +354,8 @@ const InvoiceDetail = () => {
                   <TableHead>SKU</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead className="text-center">Quantity</TableHead>
+                  <TableHead className="text-center">Ordered</TableHead>
+                  <TableHead className="text-center">Shipped</TableHead>
                   <TableHead className="text-right">Unit Price</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
@@ -368,21 +369,24 @@ const InvoiceDetail = () => {
                       {item.description || '-'}
                     </TableCell>
                     <TableCell className="text-center">
+                      {item.quantity}
+                    </TableCell>
+                    <TableCell className="text-center">
                       {isEditMode ? (
                         <Input
                           type="number"
                           min="0"
-                          value={item.quantity}
+                          value={item.shipped_quantity}
                           onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 0)}
                           className="w-24 text-center"
                         />
                       ) : (
-                        item.quantity
+                        item.shipped_quantity
                       )}
                     </TableCell>
                     <TableCell className="text-right">{formatCurrency(Number(item.unit_price))}</TableCell>
                     <TableCell className="text-right font-semibold">
-                      {formatCurrency(Number(item.quantity) * Number(item.unit_price))}
+                      {formatCurrency(Number(item.shipped_quantity) * Number(item.unit_price))}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -97,13 +97,13 @@ const VendorPODetail = () => {
       // Update existing items with edited quantities
       for (const item of poItems) {
         if (!item.isNew) {
-          // Update existing items
-          const newTotal = Number(item.quantity) * Number(item.unit_cost);
+          // Update existing items - use shipped_quantity for calculations
+          const newTotal = Number(item.shipped_quantity) * Number(item.unit_cost);
           
           const { error: updateError } = await supabase
             .from('vendor_po_items')
             .update({
-              quantity: item.quantity,
+              shipped_quantity: item.shipped_quantity,
               total: newTotal
             })
             .eq('id', item.id);
@@ -127,9 +127,10 @@ const VendorPODetail = () => {
               name: item.name,
               description: item.description || null,
               quantity: item.quantity,
+              shipped_quantity: item.quantity,
               unit_cost: item.unit_cost,
               total: item.total
-            });
+            } as any);
 
           if (insertError) {
             console.error('Insert error:', insertError);
@@ -401,6 +402,7 @@ const VendorPODetail = () => {
                       sku: '',
                       name: '',
                       quantity: 1,
+                      shipped_quantity: 1,
                       unit_cost: 0,
                       total: 0,
                       isNew: true
@@ -419,7 +421,8 @@ const VendorPODetail = () => {
                   <TableHead>SKU</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead className="text-center">Quantity</TableHead>
+                  <TableHead className="text-center">Ordered</TableHead>
+                  <TableHead className="text-center">Shipped</TableHead>
                   <TableHead className="text-right">Unit Cost</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   {isAdmin && isEditMode && <TableHead className="text-center">Actions</TableHead>}
@@ -475,21 +478,29 @@ const VendorPODetail = () => {
                       )}
                     </TableCell>
                     <TableCell className="text-center">
+                      {item.quantity}
+                    </TableCell>
+                    <TableCell className="text-center">
                       {isEditMode ? (
                         <Input
                           type="number"
                           min="0"
-                          value={item.quantity}
+                          value={item.shipped_quantity}
                           onChange={(e) => {
                             const updated = [...poItems];
-                            updated[index].quantity = parseInt(e.target.value) || 0;
-                            updated[index].total = updated[index].quantity * Number(updated[index].unit_cost);
+                            const newQuantity = parseInt(e.target.value) || 0;
+                            updated[index].shipped_quantity = newQuantity;
+                            // For new items, also update the ordered quantity
+                            if (updated[index].isNew) {
+                              updated[index].quantity = newQuantity;
+                            }
+                            updated[index].total = updated[index].shipped_quantity * Number(updated[index].unit_cost);
                             setPOItems(updated);
                           }}
                           className="w-24 text-center"
                         />
                       ) : (
-                        item.quantity
+                        item.shipped_quantity
                       )}
                     </TableCell>
                     <TableCell className="text-right">
@@ -502,7 +513,7 @@ const VendorPODetail = () => {
                           onChange={(e) => {
                             const updated = [...poItems];
                             updated[index].unit_cost = parseFloat(e.target.value) || 0;
-                            updated[index].total = updated[index].quantity * updated[index].unit_cost;
+                            updated[index].total = updated[index].shipped_quantity * updated[index].unit_cost;
                             setPOItems(updated);
                           }}
                           className="w-28 text-right"
