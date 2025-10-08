@@ -185,6 +185,11 @@ const InvoiceDetail = () => {
                 <p className="text-sm text-muted-foreground">
                   Customer: {order?.customer_name || 'N/A'}
                 </p>
+                {order?.po_number && (
+                  <p className="text-sm text-muted-foreground">
+                    Customer PO: {order.po_number}
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <span className="inline-block px-4 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary capitalize">
@@ -204,139 +209,178 @@ const InvoiceDetail = () => {
             </div>
           </div>
 
-          {/* Invoice Totals Summary */}
+          {/* Shipping Information */}
           <div className="p-8 border-b">
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 gap-8">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Customer Total</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalRevenue)}</p>
+                <h3 className="text-sm font-semibold mb-3">Ship To</h3>
+                <div className="text-sm space-y-1">
+                  <p className="font-medium">{order?.shipping_name}</p>
+                  <p className="text-muted-foreground">{order?.shipping_street}</p>
+                  <p className="text-muted-foreground">
+                    {order?.shipping_city}, {order?.shipping_state} {order?.shipping_zip}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Total Vendor Cost</p>
-                <p className="text-2xl font-bold text-danger">{formatCurrency(totalVendorCost)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Profit</p>
-                <p className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-success' : 'text-danger'}`}>
-                  {formatCurrency(totalProfit)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {profitMargin}% margin
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Vendor POs Section */}
-          {isVibeAdmin && (
-            <div className="p-8">
-              <h2 className="text-lg font-semibold mb-4">Vendor Purchase Orders</h2>
-              
-              {vendorPOs.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">No vendor POs associated with this order</p>
-              ) : (
-                <div className="space-y-4">
-                  {vendorPOs.map((po) => (
-                    <Card key={po.id} className="border">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-semibold">{po.vendors?.name || 'Unknown Vendor'}</h3>
-                              <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary capitalize">
-                                {po.status.replace('_', ' ')}
-                              </span>
-                            </div>
-                            <p className="text-sm text-muted-foreground">PO: {po.po_number}</p>
-                            {po.expected_delivery_date && (
-                              <p className="text-sm text-muted-foreground">
-                                Expected: {new Date(po.expected_delivery_date).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm text-muted-foreground mb-1">PO Total</p>
-                            <p className="text-xl font-bold">{formatCurrency(Number(po.total))}</p>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="mt-2"
-                              onClick={() => navigate(`/vendor-pos/${po.id}`)}
-                            >
-                              <FileText className="h-3 w-3 mr-1" />
-                              View PO
-                            </Button>
-                          </div>
-                        </div>
-
-                        {/* PO Items Table */}
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>SKU</TableHead>
-                              <TableHead>Product</TableHead>
-                              <TableHead className="text-center">Qty</TableHead>
-                              <TableHead className="text-right">Unit Cost</TableHead>
-                              <TableHead className="text-right">Total</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {po.vendor_po_items?.map((item: any) => (
-                              <TableRow key={item.id}>
-                                <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                                <TableCell>
-                                  <div>
-                                    <p className="text-sm">{item.name}</p>
-                                    {item.description && (
-                                      <p className="text-xs text-muted-foreground">{item.description}</p>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-center">{item.quantity}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(Number(item.unit_cost))}</TableCell>
-                                <TableCell className="text-right font-semibold">{formatCurrency(Number(item.total))}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </CardContent>
-                    </Card>
-                  ))}
+              {order?.billing_name && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">Bill To</h3>
+                  <div className="text-sm space-y-1">
+                    <p className="font-medium">{order?.billing_name}</p>
+                    <p className="text-muted-foreground">{order?.billing_street}</p>
+                    <p className="text-muted-foreground">
+                      {order?.billing_city}, {order?.billing_state} {order?.billing_zip}
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
-          )}
+          </div>
 
-          {/* Profit Summary */}
-          {isVibeAdmin && (
-            <div className="bg-muted/30 p-8 border-t">
-              <div className="flex justify-end">
-                <div className="space-y-2 w-96">
+          {/* Order Items - Main Invoice View */}
+          <div className="p-8">
+            <h2 className="text-lg font-semibold mb-4">Order Items</h2>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-center">Quantity</TableHead>
+                  <TableHead className="text-right">Unit Price</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {order?.order_items?.map((item: any) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {item.description || '-'}
+                    </TableCell>
+                    <TableCell className="text-center">{item.quantity}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(Number(item.unit_price))}</TableCell>
+                    <TableCell className="text-right font-semibold">{formatCurrency(Number(item.total))}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {/* Invoice Totals */}
+            <div className="flex justify-end mt-8">
+              <div className="space-y-2 w-80">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-semibold">{formatCurrency(Number(invoice.subtotal))}</span>
+                </div>
+                {Number(invoice.tax) > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total Revenue (Customer)</span>
-                    <span className="font-semibold">{formatCurrency(totalRevenue)}</span>
+                    <span className="text-muted-foreground">Tax</span>
+                    <span className="font-semibold">{formatCurrency(Number(invoice.tax))}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total Vendor Costs</span>
-                    <span className="font-semibold text-danger">-{formatCurrency(totalVendorCost)}</span>
-                  </div>
-                  <div className="h-px bg-border my-2"></div>
-                  <div className="flex justify-between">
-                    <span className="font-semibold">Net Profit</span>
-                    <span className={`text-xl font-bold ${totalProfit >= 0 ? 'text-success' : 'text-danger'}`}>
-                      {formatCurrency(totalProfit)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Profit Margin</span>
-                    <span>{profitMargin}%</span>
-                  </div>
+                )}
+                <div className="h-px bg-border my-2"></div>
+                <div className="flex justify-between">
+                  <span className="text-lg font-semibold">Total</span>
+                  <span className="text-2xl font-bold">{formatCurrency(Number(invoice.total))}</span>
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
+
+      {/* Attached Vendor POs - For Admin View */}
+      {isVibeAdmin && vendorPOs.length > 0 && (
+        <Card className="shadow-lg">
+          <CardContent className="p-8">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-lg font-semibold">Attached Vendor Purchase Orders</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {vendorPOs.length} vendor PO{vendorPOs.length !== 1 ? 's' : ''} connected to this invoice
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Total Vendor Cost</p>
+                <p className="text-xl font-bold text-danger">{formatCurrency(totalVendorCost)}</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {vendorPOs.map((po) => (
+                <Card key={po.id} className="border hover:border-primary/50 transition-colors">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary capitalize">
+                          {po.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <h3 className="font-semibold mb-1">{po.vendors?.name || 'Unknown Vendor'}</h3>
+                    <p className="text-xs text-muted-foreground mb-1">PO: {po.po_number}</p>
+                    
+                    {po.expected_delivery_date && (
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Delivery: {new Date(po.expected_delivery_date).toLocaleDateString()}
+                      </p>
+                    )}
+                    
+                    <div className="flex justify-between items-center pt-3 border-t">
+                      <div>
+                        <p className="text-xs text-muted-foreground">PO Total</p>
+                        <p className="text-lg font-bold">{formatCurrency(Number(po.total))}</p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate(`/vendor-pos/${po.id}`)}
+                      >
+                        <FileText className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                    </div>
+                    
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {po.vendor_po_items?.length || 0} item{po.vendor_po_items?.length !== 1 ? 's' : ''}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Profit Summary */}
+            <div className="bg-muted/30 rounded-lg p-6 mt-6">
+              <h3 className="text-sm font-semibold mb-4">Profit Analysis</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Revenue (Customer)</span>
+                  <span className="font-semibold">{formatCurrency(totalRevenue)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Vendor Costs</span>
+                  <span className="font-semibold text-danger">-{formatCurrency(totalVendorCost)}</span>
+                </div>
+                <div className="h-px bg-border my-2"></div>
+                <div className="flex justify-between">
+                  <span className="font-semibold">Net Profit</span>
+                  <span className={`text-xl font-bold ${totalProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                    {formatCurrency(totalProfit)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Profit Margin</span>
+                  <span>{profitMargin}%</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
