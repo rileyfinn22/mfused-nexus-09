@@ -23,20 +23,62 @@ const Orders = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
 
   useEffect(() => {
-    fetchOrders();
+    checkRole();
   }, []);
+
+  useEffect(() => {
+    if (isVibeAdmin !== null) {
+      fetchOrders();
+      if (isVibeAdmin) {
+        fetchCompanies();
+      }
+    }
+  }, [isVibeAdmin]);
+
+  const checkRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: userRole } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    setIsVibeAdmin(userRole?.role === 'vibe_admin');
+  };
+
+  const fetchCompanies = async () => {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .order('name');
+    
+    if (!error && data) {
+      setCompanies(data);
+    }
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('orders')
-      .select('*, order_items(*)')
-      // Show both standard and pull_ship orders
+      .select('*, order_items(*), companies(name)')
       .order('created_at', { ascending: false });
+
+    // Filter by company if not "all" and user is vibe_admin
+    if (isVibeAdmin && companyFilter !== 'all') {
+      query = query.eq('company_id', companyFilter);
+    }
+
+    const { data, error } = await query;
     
     if (!error && data) {
       // Fetch artwork approval status for all orders
@@ -136,10 +178,15 @@ const Orders = () => {
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (order.customer_name && order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()));
+                         (order.customer_name && order.customer_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                         (order.companies?.name && order.companies.name.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus = statusFilter === "all" || order.status.toLowerCase() === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  useEffect(() => {
+    fetchOrders();
+  }, [companyFilter]);
 
   const draftOrders = filteredOrders.filter(o => o.status.toLowerCase() === 'draft');
   const pendingOrdersList = filteredOrders.filter(o => 
@@ -177,6 +224,21 @@ const Orders = () => {
             className="pl-10"
           />
         </div>
+        {isVibeAdmin && (
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Company" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Companies</SelectItem>
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={company.id}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Status" />
@@ -204,11 +266,12 @@ const Orders = () => {
               <div className="bg-table-header border-b border-table-border">
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
-                  <div className="col-span-2">PO #</div>
+                  {isVibeAdmin && <div className="col-span-2">Company</div>}
+                  <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
                   <div className="col-span-1">State</div>
                   <div className="col-span-1">Total</div>
                   <div className="col-span-2">Status</div>
-                  <div className="col-span-2">Due Date</div>
+                  <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>Due Date</div>
                   <div className="col-span-2">Actions</div>
                 </div>
               </div>
@@ -231,7 +294,10 @@ const Orders = () => {
                           {orderTypeInfo.label}
                         </Badge>
                       </div>
-                      <div className="col-span-2 text-sm">{order.po_number || '-'}</div>
+                      {isVibeAdmin && (
+                        <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
+                      )}
+                      <div className={isVibeAdmin ? "col-span-1 text-sm" : "col-span-2 text-sm"}>{order.po_number || '-'}</div>
                       <div className="col-span-1">
                         <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                       </div>
@@ -239,7 +305,7 @@ const Orders = () => {
                       <div className="col-span-2 text-sm capitalize text-muted-foreground">
                         Draft
                       </div>
-                      <div className="col-span-2 text-sm text-muted-foreground">
+                      <div className={isVibeAdmin ? "col-span-1 text-sm text-muted-foreground" : "col-span-2 text-sm text-muted-foreground"}>
                         {dueDate}
                       </div>
                       <div className="col-span-2 flex gap-1">
@@ -278,11 +344,12 @@ const Orders = () => {
             <div className="bg-table-header border-b border-table-border">
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-2">Order # / Type</div>
-                <div className="col-span-2">PO #</div>
+                {isVibeAdmin && <div className="col-span-1">Company</div>}
+                <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
                 <div className="col-span-1">State</div>
                 <div className="col-span-1">Total</div>
                 <div className="col-span-1">Status</div>
-                <div className="col-span-2">Checklist</div>
+                <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>Checklist</div>
                 <div className="col-span-1">Due Date</div>
                 <div className="col-span-2">Actions</div>
               </div>
@@ -314,7 +381,10 @@ const Orders = () => {
                         {orderTypeInfo.label}
                       </Badge>
                     </div>
-                    <div className="col-span-2 text-sm">{order.po_number || '-'}</div>
+                    {isVibeAdmin && (
+                      <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
+                    )}
+                    <div className={isVibeAdmin ? "col-span-1 text-sm" : "col-span-2 text-sm"}>{order.po_number || '-'}</div>
                     <div className="col-span-1">
                       <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                     </div>
@@ -322,7 +392,7 @@ const Orders = () => {
                     <div className="col-span-1 text-sm capitalize text-blue-500">
                       {order.status.replace('_', ' ')}
                     </div>
-                    <div className="col-span-2">
+                    <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>
                       <div className="flex gap-2 items-center">
                         <div className="flex items-center gap-1" title="Art Approved">
                           {order.artApproved ? (
@@ -399,10 +469,11 @@ const Orders = () => {
             <div className="bg-table-header border-b border-table-border">
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-2">Order # / Type</div>
-                <div className="col-span-2">PO #</div>
+                {isVibeAdmin && <div className="col-span-1">Company</div>}
+                <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
                 <div className="col-span-1">State</div>
                 <div className="col-span-1">Total</div>
-                <div className="col-span-2">Status</div>
+                <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>Status</div>
                 <div className="col-span-2">Progress</div>
                 <div className="col-span-2">Actions</div>
               </div>

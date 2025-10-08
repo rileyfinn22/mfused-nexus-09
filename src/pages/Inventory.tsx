@@ -48,6 +48,7 @@ const Inventory = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [stateFilter, setStateFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
   const [sortField, setSortField] = useState("available");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
@@ -55,27 +56,39 @@ const Inventory = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [companies, setCompanies] = useState<any[]>([]);
 
   useEffect(() => {
     checkAdminStatus();
-    fetchInventory();
-    fetchArtworkStatus();
-    fetchArtworkThumbnails();
   }, []);
+
+  useEffect(() => {
+    if (isVibeAdmin !== null) {
+      fetchInventory();
+      fetchArtworkStatus();
+      fetchArtworkThumbnails();
+      if (isVibeAdmin) {
+        fetchCompanies();
+      }
+    }
+  }, [isVibeAdmin, companyFilter]);
 
   const checkAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-      setIsAdmin(data?.role === 'admin');
+      const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
+      setIsAdmin(data?.role === 'admin' || data?.role === 'vibe_admin');
+      setIsVibeAdmin(data?.role === 'vibe_admin');
     }
+  };
+
+  const fetchCompanies = async () => {
+    const { data } = await supabase.from('companies').select('*').order('name');
+    if (data) setCompanies(data);
   };
 
   const fetchInventory = async () => {

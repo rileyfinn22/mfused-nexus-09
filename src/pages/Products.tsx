@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,6 +57,7 @@ const Products = () => {
   const { toast } = useToast();
   const [expandedProducts, setExpandedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("all");
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
   const [artworkThumbnails, setArtworkThumbnails] = useState<Record<string, string>>({});
   const [products, setProducts] = useState<Product[]>([]);
@@ -64,19 +66,61 @@ const Products = () => {
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
 
   useEffect(() => {
-    fetchProducts();
-    fetchArtworkStatus();
-    fetchArtworkThumbnails();
+    checkRole();
   }, []);
+
+  useEffect(() => {
+    if (isVibeAdmin !== null) {
+      fetchProducts();
+      fetchArtworkStatus();
+      fetchArtworkThumbnails();
+      if (isVibeAdmin) {
+        fetchCompanies();
+      }
+    }
+  }, [isVibeAdmin, companyFilter]);
+
+  const checkRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: userRole } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    setIsVibeAdmin(userRole?.role === 'vibe_admin');
+  };
+
+  const fetchCompanies = async () => {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .order('name');
+    
+    if (!error && data) {
+      setCompanies(data);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
-      const { data: productsData, error: productsError } = await supabase
+      let query = supabase
         .from('products')
-        .select('*')
+        .select('*, companies(name)')
         .order('created_at', { ascending: false });
+
+      // Filter by company if not "all" and user is vibe_admin
+      if (isVibeAdmin && companyFilter !== 'all') {
+        query = query.eq('company_id', companyFilter);
+      }
+
+      const { data: productsData, error: productsError } = await query;
 
       if (productsError) throw productsError;
 
@@ -327,6 +371,21 @@ const Products = () => {
             className="pl-10"
           />
         </div>
+        {isVibeAdmin && (
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Company" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Companies</SelectItem>
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={company.id}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Products Table */}

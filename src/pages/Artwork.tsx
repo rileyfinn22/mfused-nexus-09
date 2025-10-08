@@ -33,6 +33,7 @@ const Artwork = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
   const [artworkFiles, setArtworkFiles] = useState<any[]>([]);
   const [rejectedFiles, setRejectedFiles] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -47,6 +48,8 @@ const Artwork = () => {
   const [skuComboboxOpen, setSkuComboboxOpen] = useState(false);
   const [newThumbnailFile, setNewThumbnailFile] = useState<File | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [approvalData, setApprovalData] = useState({
     printName: '',
     signature: '',
@@ -61,16 +64,37 @@ const Artwork = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchArtwork();
-    fetchRejectedArtwork();
-    fetchProducts();
+    checkRole();
+  }, []);
+
+  useEffect(() => {
+    if (isVibeAdmin !== null) {
+      fetchArtwork();
+      fetchRejectedArtwork();
+      fetchProducts();
+      if (isVibeAdmin) {
+        fetchCompanies();
+      }
+    }
     
     // Check for search query parameter
     const searchParam = searchParams.get('search');
     if (searchParam) {
       setSearchQuery(searchParam);
     }
-  }, [searchParams]);
+  }, [searchParams, isVibeAdmin, companyFilter]);
+
+  const checkRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: userRole } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
+    setIsVibeAdmin(userRole?.role === 'vibe_admin');
+  };
+
+  const fetchCompanies = async () => {
+    const { data } = await supabase.from('companies').select('*').order('name');
+    if (data) setCompanies(data);
+  };
 
   const fetchArtwork = async () => {
     try {
