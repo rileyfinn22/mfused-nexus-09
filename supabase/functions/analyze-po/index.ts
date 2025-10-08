@@ -21,13 +21,22 @@ serve(async (req) => {
     const { pdfUrl, companyId, userId, filename } = await req.json();
     console.log('Analyzing PO from URL:', pdfUrl);
 
-    // Fetch PDF content directly from the public URL
-    console.log('Fetching PDF from URL...');
-    const pdfResponse = await fetch(pdfUrl);
-    if (!pdfResponse.ok) {
-      throw new Error('Failed to fetch PDF from storage');
+    // Download PDF from storage using Supabase client (bucket is not public)
+    console.log('Downloading PDF from storage...');
+    const pdfPath = pdfUrl.split('/po-documents/')[1];
+    console.log('PDF path:', pdfPath);
+    
+    const { data: pdfBlob, error: downloadError } = await supabase
+      .storage
+      .from('po-documents')
+      .download(pdfPath);
+
+    if (downloadError || !pdfBlob) {
+      console.error('Error downloading PDF:', downloadError);
+      throw new Error('Failed to download PDF from storage');
     }
-    const pdfArrayBuffer = await pdfResponse.arrayBuffer();
+    
+    const pdfArrayBuffer = await pdfBlob.arrayBuffer();
     
     // Convert PDF to text using pdfjs
     console.log('Extracting text from PDF...');
