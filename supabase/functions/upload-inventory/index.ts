@@ -66,8 +66,8 @@ serve(async (req) => {
 
     for (const row of jsonData) {
       // Support multiple column name variations
-      const sku = row['SKU'] || row['sku'] || row['Item'];
-      const available = parseInt(String(row['Available Primary'] || row['Available'] || row['available'] || '0'));
+      const sku = row['SKU'] || row['sku'] || row['Item'] || row['Item and State'];
+      const available = parseInt(String(row['Available Primary'] || row['Available'] || row['available'] || row['Qty'] || '0'));
       const state = row['State'] || row['state'] || 'Primary';
       const inProduction = parseInt(String(row['In Production'] || row['in_production'] || '0'));
       const redline = parseInt(String(row['Redline'] || row['redline'] || '0'));
