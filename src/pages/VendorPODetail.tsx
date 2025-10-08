@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Edit, Save, X } from "lucide-react";
+import { ArrowLeft, Download, Edit, Save, X, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -93,25 +93,51 @@ const VendorPODetail = () => {
   const handleSavePO = async () => {
     if (!isAdmin) return;
 
-    const { error } = await supabase
-      .from('vendor_pos')
-      .update({
-        status: editedPO.status,
-        expected_delivery_date: editedPO.expected_delivery_date
-      })
-      .eq('id', poId);
+    try {
+      // Calculate new total from all items
+      const newTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
 
-    if (!error) {
+      // Update the PO
+      const { error } = await supabase
+        .from('vendor_pos')
+        .update({
+          status: editedPO.status,
+          expected_delivery_date: editedPO.expected_delivery_date,
+          total: newTotal
+        })
+        .eq('id', poId);
+
+      if (error) throw error;
+
+      // Handle new items
+      for (const item of poItems) {
+        if (item.isNew) {
+          // Insert new custom line item
+          await supabase
+            .from('vendor_po_items')
+            .insert({
+              vendor_po_id: poId,
+              order_item_id: null, // Custom items don't have order_item_id
+              sku: item.sku,
+              name: item.name,
+              description: item.description || null,
+              quantity: item.quantity,
+              unit_cost: item.unit_cost,
+              total: item.total
+            });
+        }
+      }
+
       toast({
         title: "PO Updated",
         description: "Purchase order updated successfully"
       });
       setIsEditMode(false);
       fetchPODetails();
-    } else {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to update purchase order",
+        description: error.message || "Failed to update purchase order",
         variant: "destructive"
       });
     }
@@ -150,14 +176,15 @@ const VendorPODetail = () => {
     const tableData = poItems.map(item => [
       item.sku,
       item.name,
+      item.description || '',
       item.quantity.toString(),
-      `$${Number(item.unit_cost).toFixed(2)}`,
+      `$${Number(item.unit_cost).toFixed(3)}`,
       `$${Number(item.total).toFixed(2)}`
     ]);
 
     autoTable(doc, {
       startY: 125,
-      head: [['SKU', 'Product', 'Quantity', 'Unit Cost', 'Total']],
+      head: [['SKU', 'Product', 'Description', 'Quantity', 'Unit Cost', 'Total']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [66, 66, 66] },
@@ -166,7 +193,8 @@ const VendorPODetail = () => {
     // Total
     const finalY = (doc as any).lastAutoTable.finalY || 125;
     doc.setFontSize(14);
-    doc.text(`Total: $${Number(po.total).toFixed(2)}`, 150, finalY + 15);
+    const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+    doc.text(`Total: $${totalAmount.toFixed(2)}`, 150, finalY + 15);
 
     // Save
     doc.save(`vendor-po-${po.po_number}.pdf`);
@@ -336,25 +364,142 @@ const VendorPODetail = () => {
 
           {/* Items Table */}
           <div className="p-8">
-            <h2 className="text-lg font-semibold mb-4">Order Items</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Order Items</h2>
+              {isAdmin && isEditMode && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const newItem = {
+                      id: `temp-${Date.now()}`,
+                      sku: '',
+                      name: '',
+                      quantity: 1,
+                      unit_cost: 0,
+                      total: 0,
+                      isNew: true
+                    };
+                    setPOItems([...poItems, newItem]);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Custom Line
+                </Button>
+              )}
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>SKU</TableHead>
                   <TableHead>Product</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead className="text-center">Quantity</TableHead>
                   <TableHead className="text-right">Unit Cost</TableHead>
                   <TableHead className="text-right">Total</TableHead>
+                  {isAdmin && isEditMode && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {poItems.map((item) => (
+                {poItems.map((item, index) => (
                   <TableRow key={item.id}>
-                    <TableCell className="font-mono">{item.sku}</TableCell>
-                    <TableCell>{item.name}</TableCell>
-                    <TableCell className="text-center">{item.quantity}</TableCell>
-                    <TableCell className="text-right">${Number(item.unit_cost).toFixed(2)}</TableCell>
+                    <TableCell>
+                      {isEditMode && item.isNew ? (
+                        <Input
+                          value={item.sku}
+                          onChange={(e) => {
+                            const updated = [...poItems];
+                            updated[index].sku = e.target.value;
+                            setPOItems(updated);
+                          }}
+                          placeholder="SKU"
+                          className="font-mono"
+                        />
+                      ) : (
+                        <span className="font-mono">{item.sku}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {isEditMode && item.isNew ? (
+                        <Input
+                          value={item.name}
+                          onChange={(e) => {
+                            const updated = [...poItems];
+                            updated[index].name = e.target.value;
+                            setPOItems(updated);
+                          }}
+                          placeholder="Product name"
+                        />
+                      ) : (
+                        item.name
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {isEditMode && item.isNew ? (
+                        <Input
+                          value={item.description || ''}
+                          onChange={(e) => {
+                            const updated = [...poItems];
+                            updated[index].description = e.target.value;
+                            setPOItems(updated);
+                          }}
+                          placeholder="Description (optional)"
+                        />
+                      ) : (
+                        <span className="text-sm text-muted-foreground">{item.description || '-'}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {isEditMode && item.isNew ? (
+                        <Input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const updated = [...poItems];
+                            updated[index].quantity = parseInt(e.target.value) || 0;
+                            updated[index].total = updated[index].quantity * Number(updated[index].unit_cost);
+                            setPOItems(updated);
+                          }}
+                          className="w-24 text-center"
+                        />
+                      ) : (
+                        item.quantity
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {isEditMode && item.isNew ? (
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={item.unit_cost}
+                          onChange={(e) => {
+                            const updated = [...poItems];
+                            updated[index].unit_cost = parseFloat(e.target.value) || 0;
+                            updated[index].total = updated[index].quantity * updated[index].unit_cost;
+                            setPOItems(updated);
+                          }}
+                          className="w-28 text-right"
+                        />
+                      ) : (
+                        `$${Number(item.unit_cost).toFixed(3)}`
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">${Number(item.total).toFixed(2)}</TableCell>
+                    {isAdmin && isEditMode && (
+                      <TableCell className="text-center">
+                        {item.isNew && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const updated = poItems.filter((_, i) => i !== index);
+                              setPOItems(updated);
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -364,7 +509,7 @@ const VendorPODetail = () => {
             <div className="flex justify-end mt-6 pt-6 border-t">
               <div className="text-right">
                 <p className="text-sm text-muted-foreground mb-2">Total Amount</p>
-                <p className="text-2xl font-bold">${Number(po.total).toFixed(2)}</p>
+                <p className="text-2xl font-bold">${poItems.reduce((sum, item) => sum + Number(item.total), 0).toFixed(2)}</p>
               </div>
             </div>
           </div>

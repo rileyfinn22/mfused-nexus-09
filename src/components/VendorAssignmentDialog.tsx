@@ -193,7 +193,7 @@ export const VendorAssignmentDialog = ({
           // New item, just add to total
           totalAdjustment = parseFloat(assignment.vendorCost) * item.quantity;
           
-          // Create new vendor PO item
+        // Create new vendor PO item
           await supabase
             .from('vendor_po_items')
             .insert({
@@ -201,6 +201,7 @@ export const VendorAssignmentDialog = ({
               order_item_id: itemId,
               sku: item.sku,
               name: item.name,
+              description: item.description || null,
               quantity: item.quantity,
               unit_cost: parseFloat(assignment.vendorCost),
               total: parseFloat(assignment.vendorCost) * item.quantity
@@ -240,6 +241,7 @@ export const VendorAssignmentDialog = ({
             order_item_id: itemId,
             sku: item.sku,
             name: item.name,
+            description: item.description || null,
             quantity: item.quantity,
             unit_cost: parseFloat(assignment.vendorCost),
             total: parseFloat(assignment.vendorCost) * item.quantity
@@ -428,6 +430,7 @@ export const VendorAssignmentDialog = ({
             order_item_id: itemId,
             sku: item.sku,
             name: item.name,
+            description: item.description || null,
             quantity: item.quantity,
             unit_cost: parseFloat(bulkCost),
             total: parseFloat(bulkCost) * item.quantity
@@ -501,8 +504,8 @@ export const VendorAssignmentDialog = ({
                   <label className="text-sm font-medium mb-1.5 block">Cost per Unit</label>
                   <Input
                     type="number"
-                    step="0.01"
-                    placeholder="0.00"
+                    step="0.001"
+                    placeholder="0.000"
                     value={bulkCost}
                     onChange={(e) => setBulkCost(e.target.value)}
                   />
@@ -580,8 +583,8 @@ export const VendorAssignmentDialog = ({
                         <td className="p-3">
                           <Input
                             type="number"
-                            step="0.01"
-                            placeholder="0.00"
+                            step="0.001"
+                            placeholder="0.000"
                             value={assignments[item.id]?.vendorCost || ''}
                             onChange={(e) => {
                               updateAssignment(item.id, 'vendorCost', e.target.value);
