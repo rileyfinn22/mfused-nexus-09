@@ -164,7 +164,6 @@ const OrderDetail = () => {
       </div>;
   }
   const subtotal = order.subtotal || 0;
-  const tax = order.tax || 0;
   const total = order.total || 0;
   return <div className="max-w-7xl mx-auto">
       {/* Header with Back Button and Download Buttons */}
@@ -329,15 +328,6 @@ const OrderDetail = () => {
             {/* Totals Section - Right Aligned */}
             <div className="flex justify-end mt-6">
               <div className="w-80 space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal:</span>
-                  <span className="font-medium">${subtotal.toFixed(3)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tax (6%):</span>
-                  <span className="font-medium">${tax.toFixed(3)}</span>
-                </div>
-                <Separator />
                 <div className="flex justify-between">
                   <span className="font-semibold text-lg">Total:</span>
                   <span className="font-bold text-xl">${total.toFixed(3)}</span>

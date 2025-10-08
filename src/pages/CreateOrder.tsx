@@ -322,8 +322,7 @@ const CreateOrder = () => {
         subtotal += price * item.quantity;
       }
 
-      const tax = subtotal * 0.06;
-      const total = subtotal + tax;
+      const total = subtotal;
 
       let order;
       let orderNumber = existingOrderNumber;
@@ -350,7 +349,6 @@ const CreateOrder = () => {
             billing_state: sameAsBilling ? formData.shippingState : formData.billingState,
             billing_zip: sameAsBilling ? formData.shippingZip : formData.billingZip,
             subtotal,
-            tax,
             total,
             terms: formData.terms,
             memo: formData.memo || null,
@@ -394,7 +392,6 @@ const CreateOrder = () => {
             billing_state: sameAsBilling ? formData.shippingState : formData.billingState,
             billing_zip: sameAsBilling ? formData.shippingZip : formData.billingZip,
             subtotal,
-            tax,
             total,
             terms: formData.terms,
             memo: formData.memo || null,
@@ -455,8 +452,7 @@ const CreateOrder = () => {
     const price = item.unit_price ?? product?.cost ?? 0;
     return sum + (price * item.quantity);
   }, 0);
-  const tax = subtotal * 0.06;
-  const total = subtotal + tax;
+  const total = subtotal;
 
   return (
     <div className="max-w-7xl mx-auto pb-8">
@@ -938,15 +934,6 @@ const CreateOrder = () => {
           {/* Totals */}
           <div className="flex justify-end">
             <div className="w-80 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal:</span>
-                <span className="font-medium">${subtotal.toFixed(3)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tax (6%):</span>
-                <span className="font-medium">${tax.toFixed(3)}</span>
-              </div>
-              <Separator />
               <div className="flex justify-between">
                 <span className="font-semibold text-lg">Total:</span>
                 <span className="font-bold text-xl">${total.toFixed(3)}</span>
