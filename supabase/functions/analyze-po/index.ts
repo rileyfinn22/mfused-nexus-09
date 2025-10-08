@@ -76,59 +76,51 @@ serve(async (req) => {
           },
           {
             role: 'user',
-            content: `CRITICAL: Purchase orders often have MISLEADING column headers. You must reason about what data is actually in each column.
-
-COMMON PATTERN TO LOOK FOR:
-- A column labeled "Description" often contains SKU/product codes (like "PCK-00430-WABAG")
-- A column labeled "Item" or "Item #" often contains item numbers or IDs
-- The actual product name/description might be in a different column or combined
-- "PO #" or "Purchase Order #" is the PO number
-- "Expected Date", "Due Date", or "Delivery Date" is the due date
+            content: `You are an expert at analyzing purchase orders. Extract data carefully from the table structure.
 
 ANALYSIS INSTRUCTIONS:
 
-1. IDENTIFY COLUMNS - The PO typically has these columns:
-   - "Description" or similar: Contains the SKU/product code (e.g., "PCK-00430-WABAG")
-   - "Item" or "Item #": Contains the Item ID that matches your product catalog
-   - Product name/description: The full product name
-   - "Qty" or "Quantity": Numeric quantities
-   - "Rate" or "Unit Price": Decimal prices
+1. IDENTIFY THE TABLE STRUCTURE:
+Look at the column headers in the purchase order table. Common headers include:
+- Item/Item #/SKU: Usually contains the product code
+- Description: Product name or details
+- Qty/Quantity: Numeric quantities
+- Rate/Unit Price/Price: The price per unit (THIS IS CRITICAL - extract as a decimal number)
+- Amount/Total: Total for that line
 
-2. EXTRACT DATA:
-For each line item, you MUST extract:
-- sku: The SKU from the Description column (e.g., "PCK-00430-WABAG")
-- item_id: The Item ID from the Item/Item# column - THIS IS CRITICAL FOR MATCHING
-- name: The full product name
-- quantity: Numeric quantity
-- unit_price: Price per unit
+2. FOR EACH LINE ITEM, EXTRACT:
+- item_id: The product code from the Item/SKU column (e.g., "PCK-00430-WA")
+- sku: Also use the product code
+- name: The product description/name
+- quantity: The numeric quantity
+- unit_price: The rate/price per unit - MUST be a decimal number (e.g., 0.218, not "$0.218")
 
-Example:
-If the row shows:
-Description: PCK-00430-WABAG | Item: BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb | Qty: 3000 | Rate: 0.218
+EXAMPLE:
+If you see:
+Item: PCK-00430-WABAG
+Description: BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb
+Qty: 3000
+Rate: $0.218
 
 Extract as:
 {
+  "item_id": "PCK-00430-WABAG",
   "sku": "PCK-00430-WABAG",
-  "item_id": "BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb",
-  "name": "E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb",
+  "name": "BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb",
   "quantity": 3000,
   "unit_price": 0.218
 }
 
-For order info:
-- po_number: Look for "PO #", "Purchase Order #", "PO Number"
-- due_date: Look for "Expected Date", "Due Date", "Delivery Date" - convert to YYYY-MM-DD
-- customer_name: Vendor or company name
-- shipping_name, shipping_street, shipping_city, shipping_state, shipping_zip: Ship To address
-- billing info if separate from shipping
+3. FOR ORDER INFO:
+- po_number: Look for "PO #", "Order #"
+- due_date: Look for "Due Date", "Expected Date" - format as YYYY-MM-DD
+- customer_name: Vendor name
+- shipping address: Ship To section
 
 PURCHASE ORDER TEXT:
 ${extractedText}
 
-IMPORTANT: 
-- If "Description" contains codes like "PCK-00430-WABAG", that's the SKU
-- If "Item" contains product names, that's the name
-- Extract ALL line items from the table
+CRITICAL: unit_price MUST be a number (0.218), NOT a string or formatted currency ("$0.218")
 
 Return ONLY valid JSON:
 {
