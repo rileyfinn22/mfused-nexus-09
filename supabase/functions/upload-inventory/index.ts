@@ -73,7 +73,7 @@ serve(async (req) => {
       
       // Support multiple column name variations
       let sku = row['SKU'] || row['sku'] || row['Item'] || row['Item Name'];
-      let itemId = null;
+      let itemId = row['Item ID'] || row['Item Id'] || row['item_id'] || row['Item #'];
       let state = 'Primary'; // Default state
       
       // If "Item and State" column exists, parse it first (format: PCK-00430-WA)
@@ -83,10 +83,14 @@ serve(async (req) => {
         // Split by last dash to separate item number from state
         const lastDashIndex = itemAndState.lastIndexOf('-');
         if (lastDashIndex > 0) {
-          itemId = itemAndState.substring(0, lastDashIndex); // "PCK-00430"
+          const extractedItemId = itemAndState.substring(0, lastDashIndex); // "PCK-00430"
           state = itemAndState.substring(lastDashIndex + 1); // "WA"
+          // Only use extracted item ID if we don't have one from Item ID column
+          if (!itemId) {
+            itemId = extractedItemId;
+          }
           console.log('Extracted - itemId:', itemId, 'state:', state);
-        } else {
+        } else if (!itemId) {
           itemId = itemAndState;
         }
       } else if (row['State'] || row['state']) {
@@ -95,7 +99,7 @@ serve(async (req) => {
         console.log('Using State column:', state);
       }
       
-      // Use Item Name as SKU if available
+      // Use Item Name as product name if available
       if (row['Item Name']) {
         sku = String(row['Item Name']);
       }
@@ -109,38 +113,58 @@ serve(async (req) => {
         continue;
       }
 
-      // Find or create product by SKU
+      // Find or create product by item_id (preferred) or SKU/name
       let productId = row['product_id'];
       
       if (!productId) {
-        // Try to find existing product by name (SKU)
-        const { data: existingProduct } = await supabaseClient
-          .from('products')
-          .select('id')
-          .eq('company_id', userRole.company_id)
-          .eq('name', sku)
-          .maybeSingle();
-
-        if (existingProduct) {
-          productId = existingProduct.id;
-        } else {
-          // Create new product
-          const { data: newProduct, error: productError } = await supabaseClient
+        // Try to find existing product by item_id first (most reliable)
+        if (itemId) {
+          const { data: existingProduct } = await supabaseClient
             .from('products')
-            .insert({
-              company_id: userRole.company_id,
-              name: sku,
-              category: 'General',
-              state: state
-            })
             .select('id')
-            .single();
+            .eq('company_id', userRole.company_id)
+            .eq('item_id', itemId)
+            .maybeSingle();
 
-          if (productError) {
-            console.error('Error creating product:', productError);
-            continue;
+          if (existingProduct) {
+            productId = existingProduct.id;
+            console.log(`Matched product by item_id "${itemId}": ${existingProduct.id}`);
           }
-          productId = newProduct.id;
+        }
+        
+        // Fallback: Try to find by name if item_id didn't match
+        if (!productId) {
+          const { data: existingProduct } = await supabaseClient
+            .from('products')
+            .select('id')
+            .eq('company_id', userRole.company_id)
+            .eq('name', sku)
+            .maybeSingle();
+
+          if (existingProduct) {
+            productId = existingProduct.id;
+            console.log(`Matched product by name "${sku}": ${existingProduct.id}`);
+          } else {
+            // Create new product with item_id
+            const { data: newProduct, error: productError } = await supabaseClient
+              .from('products')
+              .insert({
+                company_id: userRole.company_id,
+                name: sku,
+                item_id: itemId, // Store the item_id for future matching
+                category: 'General',
+                state: state
+              })
+              .select('id')
+              .single();
+
+            if (productError) {
+              console.error('Error creating product:', productError);
+              continue;
+            }
+            productId = newProduct.id;
+            console.log(`Created new product with item_id "${itemId}": ${productId}`);
+          }
         }
       }
 
