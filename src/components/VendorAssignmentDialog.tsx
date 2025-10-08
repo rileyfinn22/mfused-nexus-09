@@ -165,8 +165,50 @@ export const VendorAssignmentDialog = ({
 
       if (existingPO) {
         vendorPO = existingPO;
-        // Update total
-        const newTotal = Number(existingPO.total) + (parseFloat(assignment.vendorCost) * item.quantity);
+        
+        // Check if this item already has a vendor PO item entry
+        const { data: existingPOItem } = await supabase
+          .from('vendor_po_items')
+          .select('*')
+          .eq('vendor_po_id', existingPO.id)
+          .eq('order_item_id', itemId)
+          .maybeSingle();
+
+        let totalAdjustment;
+        if (existingPOItem) {
+          // Item already exists, calculate the difference
+          const oldItemTotal = Number(existingPOItem.total);
+          const newItemTotal = parseFloat(assignment.vendorCost) * item.quantity;
+          totalAdjustment = newItemTotal - oldItemTotal;
+          
+          // Update the existing PO item
+          await supabase
+            .from('vendor_po_items')
+            .update({
+              unit_cost: parseFloat(assignment.vendorCost),
+              total: newItemTotal
+            })
+            .eq('id', existingPOItem.id);
+        } else {
+          // New item, just add to total
+          totalAdjustment = parseFloat(assignment.vendorCost) * item.quantity;
+          
+          // Create new vendor PO item
+          await supabase
+            .from('vendor_po_items')
+            .insert({
+              vendor_po_id: vendorPO.id,
+              order_item_id: itemId,
+              sku: item.sku,
+              name: item.name,
+              quantity: item.quantity,
+              unit_cost: parseFloat(assignment.vendorCost),
+              total: parseFloat(assignment.vendorCost) * item.quantity
+            });
+        }
+        
+        // Update PO total
+        const newTotal = Number(existingPO.total) + totalAdjustment;
         await supabase
           .from('vendor_pos')
           .update({ total: newTotal })
@@ -189,20 +231,20 @@ export const VendorAssignmentDialog = ({
 
         if (poError) throw poError;
         vendorPO = newPO;
-      }
 
-      // Create vendor PO item
-      await supabase
-        .from('vendor_po_items')
-        .insert({
-          vendor_po_id: vendorPO.id,
-          order_item_id: itemId,
-          sku: item.sku,
-          name: item.name,
-          quantity: item.quantity,
-          unit_cost: parseFloat(assignment.vendorCost),
-          total: parseFloat(assignment.vendorCost) * item.quantity
-        });
+        // Create vendor PO item
+        await supabase
+          .from('vendor_po_items')
+          .insert({
+            vendor_po_id: vendorPO.id,
+            order_item_id: itemId,
+            sku: item.sku,
+            name: item.name,
+            quantity: item.quantity,
+            unit_cost: parseFloat(assignment.vendorCost),
+            total: parseFloat(assignment.vendorCost) * item.quantity
+          });
+      }
 
       // Update invoice if it exists
       const { data: invoice } = await supabase
