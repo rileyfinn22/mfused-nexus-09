@@ -14,13 +14,17 @@ import {
   Package
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 const Invoices = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     checkRole();
@@ -30,6 +34,7 @@ const Invoices = () => {
     if (isVibeAdmin) {
       fetchCompanies();
     }
+    fetchInvoices();
   }, [isVibeAdmin]);
 
   const checkRole = async () => {
@@ -45,123 +50,21 @@ const Invoices = () => {
     if (data) setCompanies(data);
   };
 
-  // Regular billing invoices
-  const billingInvoices = [
-    {
-      id: "INV-2024-001", 
-      type: "billing",
-      orderIds: ["ORD-001", "ORD-002"], 
-      amount: 4750.00, 
-      status: "paid",
-      issueDate: "2024-01-10", 
-      dueDate: "2024-01-25", 
-      paidDate: "2024-01-20", 
-      customerPO: "PO-MFUSED-001",
-      packingListPdf: null,
-      invoicePdf: null
-    },
-    {
-      id: "INV-2024-002", 
-      type: "billing",
-      orderIds: ["ORD-003"], 
-      amount: 2850.00, 
-      status: "open",
-      issueDate: "2024-01-12", 
-      dueDate: "2024-01-27", 
-      paidDate: null, 
-      customerPO: "PO-MFUSED-002",
-      packingListPdf: null,
-      invoicePdf: null
-    },
-    {
-      id: "INV-2024-003", 
-      type: "billing",
-      orderIds: ["ORD-004", "ORD-005"], 
-      amount: 8200.00, 
-      status: "overdue",
-      issueDate: "2024-01-05", 
-      dueDate: "2024-01-20", 
-      paidDate: null, 
-      customerPO: "PO-MFUSED-003",
-      packingListPdf: null,
-      invoicePdf: null
-    },
-    {
-      id: "INV-2024-004", 
-      type: "billing",
-      orderIds: ["ORD-006"], 
-      amount: 1950.00, 
-      status: "open",
-      issueDate: "2024-01-15", 
-      dueDate: "2024-01-30", 
-      paidDate: null, 
-      customerPO: "PO-MFUSED-004",
-      packingListPdf: null,
-      invoicePdf: null
-    },
-    {
-      id: "INV-2024-005", 
-      type: "billing",
-      orderIds: ["ORD-007", "ORD-008"], 
-      amount: 6300.00, 
-      status: "pending",
-      issueDate: "2024-01-16", 
-      dueDate: "2024-01-31", 
-      paidDate: null, 
-      customerPO: "PO-MFUSED-005",
-      packingListPdf: null,
-      invoicePdf: null
-    },
-  ];
-
-  // Pull & Ship invoices (these would normally come from a shared state or API)
-  const pullShipInvoices = [
-    {
-      id: "INV-001", 
-      type: "pullship",
-      state: "WA", 
-      items: [
-        { sku: "VAPE-CART-001", quantity: 100 },
-        { sku: "EDIBLE-PKG-005", quantity: 50 }
-      ],
-      status: "pending",
-      issueDate: "2024-01-15", 
-      dueDate: "2024-01-30",
-      paidDate: null,
-      estimatedShip: "2024-01-17", 
-      shippingAddress: "123 Main St, Seattle, WA 98101",
-      trackingNumber: null, 
-      notes: "Rush order for new dispensary opening",
-      amount: 15250.00,
-      customerPO: "PS-WA-001",
-      packingListPdf: null,
-      invoicePdf: null
-    },
-    {
-      id: "INV-002", 
-      type: "pullship",
-      state: "CA", 
-      items: [
-        { sku: "EDIBLE-PKG-005", quantity: 250 },
-        { sku: "FLOWER-JAR-003", quantity: 75 }
-      ],
-      status: "picked",
-      issueDate: "2024-01-12", 
-      dueDate: "2024-01-27",
-      paidDate: null,
-      estimatedShip: "2024-01-16", 
-      shippingAddress: "456 Oak Ave, Los Angeles, CA 90210",
-      trackingNumber: null, 
-      notes: "Standard delivery",
-      amount: 18750.00,
-      customerPO: "PS-CA-001",
-      packingListPdf: null,
-      invoicePdf: null
-    },
-  ];
-
-  // Combine all invoices
-  const allInvoices = [...billingInvoices, ...pullShipInvoices];
+  const fetchInvoices = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('invoices')
+      .select(`
+        *,
+        orders(order_number, customer_name, po_number)
+      `)
+      .order('created_at', { ascending: false });
+    
+    if (data) {
+      setInvoices(data);
+    }
+    setLoading(false);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -195,22 +98,23 @@ const Invoices = () => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 3,
-      maximumFractionDigits: 3,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
-  const filteredInvoices = allInvoices.filter(invoice => {
-    const matchesSearch = invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         invoice.customerPO.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (invoice.type === "pullship" && "state" in invoice && invoice.state?.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredInvoices = invoices.filter(invoice => {
+    const matchesSearch = invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         invoice.orders?.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         invoice.orders?.customer_name?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || invoice.status.toLowerCase() === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesCompany = companyFilter === "all" || invoice.company_id === companyFilter;
+    return matchesSearch && matchesStatus && matchesCompany;
   });
 
-  const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
-  const paidAmount = filteredInvoices.filter(inv => inv.status === 'paid').reduce((sum, invoice) => sum + invoice.amount, 0);
-  const overdueAmount = filteredInvoices.filter(inv => inv.status === 'overdue').reduce((sum, invoice) => sum + invoice.amount, 0);
+  const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + Number(invoice.total), 0);
+  const paidAmount = filteredInvoices.filter(inv => inv.status === 'paid').reduce((sum, invoice) => sum + Number(invoice.total), 0);
+  const overdueAmount = filteredInvoices.filter(inv => inv.status === 'overdue').reduce((sum, invoice) => sum + Number(invoice.total), 0);
 
   return (
     <div className="space-y-6">
@@ -291,101 +195,76 @@ const Invoices = () => {
 
         {/* Table Body */}
         <div className="divide-y divide-table-border">
-          {filteredInvoices.map((invoice) => {
-            const StatusIcon = getStatusIcon(invoice.status);
-            const daysUntilDue = getDaysUntilDue(invoice.dueDate);
-            
-            return (
-              <div key={invoice.id} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors">
-                <div className="col-span-2 font-medium font-mono text-sm">{invoice.id}</div>
-                <div className="col-span-2">
-                  <div className="flex items-center gap-2">
-                    {invoice.type === "pullship" ? <Package className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-muted-foreground" />}
-                    <span className="text-sm capitalize">{invoice.type === "pullship" ? "Pull & Ship" : "Billing"}</span>
-                  </div>
-                  {invoice.type === "pullship" && "state" in invoice && "items" in invoice && (
-                    <div className="text-xs text-muted-foreground">
-                      {invoice.state} • {invoice.items?.reduce((sum: number, item: any) => sum + item.quantity, 0)} units
+          {loading ? (
+            <div className="text-center py-12 text-muted-foreground">
+              Loading invoices...
+            </div>
+          ) : filteredInvoices.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No invoices found matching your criteria.
+            </div>
+          ) : (
+            filteredInvoices.map((invoice) => {
+              const StatusIcon = getStatusIcon(invoice.status);
+              const daysUntilDue = invoice.due_date ? getDaysUntilDue(invoice.due_date) : null;
+              
+              return (
+                <div 
+                  key={invoice.id} 
+                  className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                  onClick={() => navigate(`/orders/${invoice.order_id}`)}
+                >
+                  <div className="col-span-2 font-medium font-mono text-sm">{invoice.invoice_number}</div>
+                  <div className="col-span-2">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">Billing</span>
                     </div>
-                  )}
-                </div>
-                <div className="col-span-2 font-semibold text-sm">{formatCurrency(invoice.amount)}</div>
-                <div className="col-span-2 text-sm">{invoice.customerPO}</div>
-                <div className="col-span-2 text-sm">
-                  <div className={
-                    invoice.status === 'overdue' ? 'text-danger' : 
-                    daysUntilDue <= 7 ? 'text-warning' : 'text-foreground'
-                  }>
-                    {invoice.dueDate}
-                    {invoice.status !== 'paid' && (
+                    {invoice.orders?.order_number && (
                       <div className="text-xs text-muted-foreground">
-                        {daysUntilDue > 0 ? `${daysUntilDue}d remaining` : `${Math.abs(daysUntilDue)}d overdue`}
+                        {invoice.orders.order_number}
                       </div>
                     )}
                   </div>
-                </div>
-                <div className={`col-span-1 text-sm font-medium ${getStatusColor(invoice.status)}`}>
-                  <div className="flex items-center gap-1">
-                    <StatusIcon className="h-3 w-3" />
-                    {invoice.status.toUpperCase()}
+                  <div className="col-span-2 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
+                  <div className="col-span-2 text-sm">{invoice.orders?.po_number || 'N/A'}</div>
+                  <div className="col-span-2 text-sm">
+                    {invoice.due_date ? (
+                      <div className={
+                        invoice.status === 'overdue' ? 'text-danger' : 
+                        daysUntilDue && daysUntilDue <= 7 ? 'text-warning' : 'text-foreground'
+                      }>
+                        {new Date(invoice.due_date).toLocaleDateString()}
+                        {invoice.status !== 'paid' && daysUntilDue !== null && (
+                          <div className="text-xs text-muted-foreground">
+                            {daysUntilDue > 0 ? `${daysUntilDue}d remaining` : `${Math.abs(daysUntilDue)}d overdue`}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Not set</span>
+                    )}
+                  </div>
+                  <div className={`col-span-1 text-sm font-medium ${getStatusColor(invoice.status)}`}>
+                    <div className="flex items-center gap-1">
+                      <StatusIcon className="h-3 w-3" />
+                      {invoice.status.replace('_', ' ').toUpperCase()}
+                    </div>
+                  </div>
+                  <div className="col-span-1 flex gap-1">
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="View Invoice">
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Download Invoice">
+                      <Download className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
-                <div className="col-span-1 flex gap-1">
-                  {invoice.type === "pullship" ? (
-                    <>
-                      {invoice.packingListPdf ? (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 w-6 p-0" 
-                          onClick={() => window.open(invoice.packingListPdf!)}
-                          title="View Packing List"
-                        >
-                          <Package className="h-3 w-3" />
-                        </Button>
-                      ) : (
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" disabled title="Packing List Not Available">
-                          <Package className="h-3 w-3 opacity-30" />
-                        </Button>
-                      )}
-                      {invoice.invoicePdf ? (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 w-6 p-0"
-                          onClick={() => window.open(invoice.invoicePdf!)}
-                          title="View Invoice PDF"
-                        >
-                          <Download className="h-3 w-3" />
-                        </Button>
-                      ) : (
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" disabled title="Invoice PDF Not Available">
-                          <Download className="h-3 w-3 opacity-30" />
-                        </Button>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="View Invoice">
-                        <Eye className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Download Invoice">
-                        <Download className="h-3 w-3" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
-
-      {filteredInvoices.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          No invoices found matching your criteria.
-        </div>
-      )}
     </div>
   );
 };
