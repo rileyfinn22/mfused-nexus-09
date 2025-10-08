@@ -18,23 +18,11 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { submissionId } = await req.json();
-    console.log('Analyzing PO submission:', submissionId);
-
-    // Get submission details
-    const { data: submission, error: fetchError } = await supabase
-      .from('po_submissions')
-      .select('*')
-      .eq('id', submissionId)
-      .single();
-
-    if (fetchError) {
-      console.error('Error fetching submission:', fetchError);
-      throw new Error('Failed to fetch submission');
-    }
+    const { pdfUrl, companyId, userId, filename } = await req.json();
+    console.log('Analyzing PO from URL:', pdfUrl);
 
     // Download the PDF from storage
-    const pdfPath = submission.pdf_url.replace(`${supabaseUrl}/storage/v1/object/public/po-documents/`, '');
+    const pdfPath = pdfUrl.replace(`${supabaseUrl}/storage/v1/object/public/po-documents/`, '');
     const { data: pdfData, error: downloadError } = await supabase
       .storage
       .from('po-documents')
@@ -69,7 +57,7 @@ serve(async (req) => {
             content: [
               {
                 type: 'text',
-                text: 'Analyze this purchase order PDF and extract the following information in valid JSON format: po_number, customer_name, shipping_address (object with street, city, state, zip), items (array of objects with sku, description, quantity, unit_price), total_amount, requested_delivery_date, special_instructions. If any field is not found, use null.'
+                text: 'Analyze this purchase order PDF and extract the following information in valid JSON format: po_number, customer_name, customer_email, customer_phone, shipping_name, shipping_street, shipping_city, shipping_state, shipping_zip, billing_name, billing_street, billing_city, billing_state, billing_zip, items (array of objects with sku, name, description, quantity, unit_price), due_date, memo. If any field is not found, use null. For items, calculate the total as quantity * unit_price.'
               },
               {
                 type: 'image_url',
@@ -94,22 +82,88 @@ serve(async (req) => {
     const extractedData = JSON.parse(aiData.choices[0].message.content);
     console.log('Extracted data:', extractedData);
 
-    // Update submission with extracted data
-    const { error: updateError } = await supabase
-      .from('po_submissions')
-      .update({
-        extracted_data: extractedData,
-        status: 'pending_approval'
-      })
-      .eq('id', submissionId);
+    // Generate order number
+    const orderNumber = `ORD-${Date.now()}`;
 
-    if (updateError) {
-      console.error('Error updating submission:', updateError);
-      throw new Error('Failed to update submission');
+    // Calculate totals
+    let subtotal = 0;
+    if (extractedData.items && Array.isArray(extractedData.items)) {
+      subtotal = extractedData.items.reduce((sum: number, item: any) => {
+        return sum + ((item.quantity || 0) * (item.unit_price || 0));
+      }, 0);
+    }
+    const tax = subtotal * 0.06; // 6% tax
+    const total = subtotal + tax;
+
+    // Create order
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        company_id: companyId,
+        order_number: orderNumber,
+        po_number: extractedData.po_number || null,
+        customer_name: extractedData.customer_name || 'Unknown Customer',
+        customer_email: extractedData.customer_email || null,
+        customer_phone: extractedData.customer_phone || null,
+        shipping_name: extractedData.shipping_name || extractedData.customer_name || 'Unknown',
+        shipping_street: extractedData.shipping_street || '',
+        shipping_city: extractedData.shipping_city || '',
+        shipping_state: extractedData.shipping_state || '',
+        shipping_zip: extractedData.shipping_zip || '',
+        billing_name: extractedData.billing_name || extractedData.customer_name,
+        billing_street: extractedData.billing_street || extractedData.shipping_street,
+        billing_city: extractedData.billing_city || extractedData.shipping_city,
+        billing_state: extractedData.billing_state || extractedData.shipping_state,
+        billing_zip: extractedData.billing_zip || extractedData.shipping_zip,
+        due_date: extractedData.due_date || null,
+        memo: extractedData.memo || `Order created from PO: ${filename}`,
+        subtotal,
+        tax,
+        total,
+        status: 'pending',
+        terms: 'Net 30'
+      })
+      .select()
+      .single();
+
+    if (orderError) {
+      console.error('Error creating order:', orderError);
+      throw new Error('Failed to create order');
     }
 
+    // Create order items
+    if (extractedData.items && Array.isArray(extractedData.items)) {
+      const orderItems = extractedData.items.map((item: any) => ({
+        order_id: order.id,
+        product_id: null, // Will need to be matched manually or by SKU
+        sku: item.sku || 'UNKNOWN',
+        name: item.name || item.description || 'Unknown Item',
+        description: item.description || null,
+        quantity: item.quantity || 1,
+        unit_price: item.unit_price || 0,
+        total: (item.quantity || 1) * (item.unit_price || 0),
+        item_id: item.sku || null
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) {
+        console.error('Error creating order items:', itemsError);
+        // Continue anyway - order is created
+      }
+    }
+
+    console.log('Order created successfully:', order.id);
+
     return new Response(
-      JSON.stringify({ success: true, data: extractedData }),
+      JSON.stringify({ 
+        success: true, 
+        orderId: order.id,
+        orderNumber: orderNumber,
+        extractedData 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

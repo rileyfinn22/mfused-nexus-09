@@ -1,12 +1,20 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Upload, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
-export default function UploadPO() {
+export function UploadPODialog() {
+  const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -74,24 +82,6 @@ export default function UploadPO() {
         throw new Error('User not associated with a company');
       }
 
-      // Create submission record
-      const { data: submission, error: insertError } = await supabase
-        .from('po_submissions')
-        .insert({
-          customer_id: user.id,
-          pdf_url: publicUrl,
-          original_filename: selectedFile.name,
-          status: 'pending_analysis',
-          company_id: userRole.company_id
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error('Insert error:', insertError);
-        throw insertError;
-      }
-
       toast({
         title: "Upload successful",
         description: "Your PO is being analyzed...",
@@ -102,26 +92,34 @@ export default function UploadPO() {
 
       // Trigger AI analysis
       const { data: functionData, error: functionError } = await supabase.functions.invoke('analyze-po', {
-        body: { submissionId: submission.id }
+        body: { 
+          pdfUrl: publicUrl,
+          companyId: userRole.company_id,
+          userId: user.id,
+          filename: selectedFile.name
+        }
       });
 
       if (functionError) {
         console.error('Analysis error:', functionError);
         toast({
           title: "Analysis failed",
-          description: "We'll process your PO manually",
+          description: "Creating order with manual entry",
           variant: "destructive",
         });
-      } else {
+      } else if (functionData?.orderId) {
         toast({
-          title: "Analysis complete",
-          description: "Your PO has been submitted for approval",
+          title: "Order created successfully",
+          description: "Your PO has been analyzed and order created",
         });
+        
+        // Navigate to the created order
+        navigate(`/orders/${functionData.orderId}`);
       }
 
       setAnalyzing(false);
       setSelectedFile(null);
-      navigate('/my-pos');
+      setOpen(false);
 
     } catch (error) {
       console.error('Error uploading PO:', error);
@@ -136,19 +134,26 @@ export default function UploadPO() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-2xl">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-6 w-6" />
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Upload className="h-4 w-4 mr-2" />
+          Upload PO
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
             Upload Purchase Order
-          </CardTitle>
-          <CardDescription>
-            Upload a PDF of your purchase order for automated processing
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-primary/50 transition-colors">
+          </DialogTitle>
+          <DialogDescription>
+            Upload a PDF of your purchase order to automatically create an order
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-6 py-4">
+          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
             <input
               type="file"
               accept="application/pdf"
@@ -190,7 +195,7 @@ export default function UploadPO() {
                 {uploading ? 'Uploading...' : 'Analyzing...'}
               </>
             ) : (
-              'Submit Purchase Order'
+              'Create Order from PO'
             )}
           </Button>
 
@@ -198,12 +203,12 @@ export default function UploadPO() {
             <p className="font-medium">What happens next?</p>
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
               <li>Your PO is analyzed by AI to extract order details</li>
-              <li>Our team reviews pricing and lead times</li>
-              <li>You'll be notified once approved</li>
+              <li>An order is automatically created with the extracted data</li>
+              <li>You can review and edit the order details</li>
             </ol>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

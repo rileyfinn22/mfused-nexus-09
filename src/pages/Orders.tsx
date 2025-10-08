@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
+import { UploadPODialog } from "@/components/UploadPODialog";
 import { 
   Search, 
   Plus, 
@@ -90,10 +91,13 @@ const Orders = () => {
             <h1 className="text-2xl font-semibold">Orders & Production</h1>
             <p className="text-sm text-muted-foreground mt-1">Track order progress and production pipeline</p>
           </div>
-          <Button size="sm" className="bg-primary text-primary-foreground" onClick={() => navigate("/orders/create")}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Order
-          </Button>
+          <div className="flex gap-3">
+            <UploadPODialog />
+            <Button size="sm" className="bg-primary text-primary-foreground" onClick={() => navigate("/orders/create")}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Order
+            </Button>
+          </div>
         </div>
 
       <Tabs defaultValue="pending" className="space-y-6">
