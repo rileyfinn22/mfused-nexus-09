@@ -94,35 +94,35 @@ const VendorPODetail = () => {
     if (!isAdmin) return;
 
     try {
-      // Calculate new total from all items
-      const newTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
-
-      // Update the PO
-      const { error: poError } = await supabase
-        .from('vendor_pos')
-        .update({
-          status: editedPO.status,
-          expected_delivery_date: editedPO.expected_delivery_date,
-          total: newTotal
-        })
-        .eq('id', poId);
-
-      if (poError) throw poError;
-
-      // Handle new items
+      // Update existing items with edited quantities
       for (const item of poItems) {
-        if (item.isNew) {
-          // Validate required fields
+        if (!item.isNew) {
+          // Update existing items
+          const newTotal = Number(item.quantity) * Number(item.unit_cost);
+          
+          const { error: updateError } = await supabase
+            .from('vendor_po_items')
+            .update({
+              quantity: item.quantity,
+              total: newTotal
+            })
+            .eq('id', item.id);
+
+          if (updateError) {
+            console.error('Update error:', updateError);
+            throw new Error(`Failed to update item: ${updateError.message}`);
+          }
+        } else {
+          // Insert new custom line items
           if (!item.sku || !item.name || item.quantity <= 0) {
             throw new Error('Please fill in all required fields for custom line items');
           }
 
-          // Insert new custom line item
           const { error: insertError } = await supabase
             .from('vendor_po_items')
             .insert({
               vendor_po_id: poId,
-              order_item_id: null, // Custom items don't have order_item_id
+              order_item_id: null,
               sku: item.sku,
               name: item.name,
               description: item.description || null,
@@ -137,6 +137,21 @@ const VendorPODetail = () => {
           }
         }
       }
+
+      // Calculate new total from all items
+      const newTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+
+      // Update the PO
+      const { error: poError } = await supabase
+        .from('vendor_pos')
+        .update({
+          status: editedPO.status,
+          expected_delivery_date: editedPO.expected_delivery_date,
+          total: newTotal
+        })
+        .eq('id', poId);
+
+      if (poError) throw poError;
 
       toast({
         title: "PO Updated",
@@ -460,9 +475,10 @@ const VendorPODetail = () => {
                       )}
                     </TableCell>
                     <TableCell className="text-center">
-                      {isEditMode && item.isNew ? (
+                      {isEditMode ? (
                         <Input
                           type="number"
+                          min="0"
                           value={item.quantity}
                           onChange={(e) => {
                             const updated = [...poItems];
@@ -481,6 +497,7 @@ const VendorPODetail = () => {
                         <Input
                           type="number"
                           step="0.001"
+                          min="0"
                           value={item.unit_cost}
                           onChange={(e) => {
                             const updated = [...poItems];

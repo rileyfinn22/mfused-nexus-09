@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Download, FileText, Edit, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -26,6 +27,8 @@ const InvoiceDetail = () => {
   const [loading, setLoading] = useState(true);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedItems, setEditedItems] = useState<any[]>([]);
 
   useEffect(() => {
     checkAdminStatus();
@@ -74,6 +77,7 @@ const InvoiceDetail = () => {
 
     setInvoice(invoiceData);
     setOrder(invoiceData.orders);
+    setEditedItems(invoiceData.orders?.order_items || []);
 
     // Fetch vendor POs for this order
     const { data: vendorPOData } = await supabase
@@ -113,6 +117,80 @@ const InvoiceDetail = () => {
     }
   };
 
+  const handleSaveQuantities = async () => {
+    try {
+      // Update each order item
+      for (const item of editedItems) {
+        const newTotal = Number(item.quantity) * Number(item.unit_price);
+        
+        const { error } = await supabase
+          .from('order_items')
+          .update({
+            quantity: item.quantity,
+            total: newTotal
+          })
+          .eq('id', item.id);
+
+        if (error) throw error;
+      }
+
+      // Recalculate order totals
+      const newSubtotal = editedItems.reduce((sum, item) => 
+        sum + (Number(item.quantity) * Number(item.unit_price)), 0
+      );
+      const newTotal = newSubtotal + Number(invoice.tax);
+
+      // Update order totals
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          subtotal: newSubtotal,
+          total: newTotal
+        })
+        .eq('id', invoice.order_id);
+
+      if (orderError) throw orderError;
+
+      // Update invoice totals
+      const { error: invoiceError } = await supabase
+        .from('invoices')
+        .update({
+          subtotal: newSubtotal,
+          total: newTotal
+        })
+        .eq('id', invoiceId);
+
+      if (invoiceError) throw invoiceError;
+
+      toast({
+        title: "Success",
+        description: "Quantities and totals updated successfully"
+      });
+
+      setIsEditMode(false);
+      fetchInvoiceDetails();
+    } catch (error: any) {
+      console.error('Save error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update quantities",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleQuantityChange = (itemId: string, newQuantity: number) => {
+    if (newQuantity < 0) return;
+    
+    setEditedItems(items =>
+      items.map(item =>
+        item.id === itemId
+          ? { ...item, quantity: newQuantity, total: newQuantity * Number(item.unit_price) }
+          : item
+      )
+    );
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -122,11 +200,15 @@ const InvoiceDetail = () => {
     }).format(amount);
   };
 
-  // Calculate totals
+  // Calculate totals using edited items in edit mode
+  const displayItems = isEditMode ? editedItems : (order?.order_items || []);
+  const displaySubtotal = displayItems.reduce((sum: number, item: any) => 
+    sum + (Number(item.quantity) * Number(item.unit_price)), 0
+  );
+  const displayTotal = displaySubtotal + Number(invoice?.tax || 0);
   const totalVendorCost = vendorPOs.reduce((sum, po) => sum + Number(po.total), 0);
-  const totalRevenue = Number(invoice?.total || 0);
-  const totalProfit = totalRevenue - totalVendorCost;
-  const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(2) : '0.00';
+  const totalProfit = displayTotal - totalVendorCost;
+  const profitMargin = displayTotal > 0 ? ((totalProfit / displayTotal) * 100).toFixed(2) : '0.00';
 
   if (loading) {
     return (
@@ -155,14 +237,33 @@ const InvoiceDetail = () => {
         <div className="flex gap-3">
           {isVibeAdmin && (
             <>
-              <Button variant="outline" onClick={() => navigate(`/orders/${invoice.order_id}`)}>
-                <Edit className="h-4 w-4 mr-2" />
-                View Order
-              </Button>
-              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
+              {isEditMode ? (
+                <>
+                  <Button variant="outline" onClick={() => {
+                    setIsEditMode(false);
+                    setEditedItems(order?.order_items || []);
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveQuantities}>
+                    Save Changes
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Quantities
+                  </Button>
+                  <Button variant="outline" onClick={() => navigate(`/orders/${invoice.order_id}`)}>
+                    View Order
+                  </Button>
+                  <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </>
+              )}
             </>
           )}
           <Button onClick={() => {}}>
@@ -239,7 +340,14 @@ const InvoiceDetail = () => {
 
           {/* Order Items - Main Invoice View */}
           <div className="p-8">
-            <h2 className="text-lg font-semibold mb-4">Order Items</h2>
+            <h2 className="text-lg font-semibold mb-4">
+              Order Items
+              {isEditMode && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  (Editing Mode - Adjust quantities as needed)
+                </span>
+              )}
+            </h2>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -252,16 +360,30 @@ const InvoiceDetail = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {order?.order_items?.map((item: any) => (
+                {displayItems.map((item: any) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {item.description || '-'}
                     </TableCell>
-                    <TableCell className="text-center">{item.quantity}</TableCell>
+                    <TableCell className="text-center">
+                      {isEditMode ? (
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.quantity}
+                          onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 0)}
+                          className="w-24 text-center"
+                        />
+                      ) : (
+                        item.quantity
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">{formatCurrency(Number(item.unit_price))}</TableCell>
-                    <TableCell className="text-right font-semibold">{formatCurrency(Number(item.total))}</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(Number(item.quantity) * Number(item.unit_price))}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -272,7 +394,7 @@ const InvoiceDetail = () => {
               <div className="space-y-2 w-80">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-semibold">{formatCurrency(Number(invoice.subtotal))}</span>
+                  <span className="font-semibold">{formatCurrency(displaySubtotal)}</span>
                 </div>
                 {Number(invoice.tax) > 0 && (
                   <div className="flex justify-between text-sm">
@@ -283,8 +405,13 @@ const InvoiceDetail = () => {
                 <div className="h-px bg-border my-2"></div>
                 <div className="flex justify-between">
                   <span className="text-lg font-semibold">Total</span>
-                  <span className="text-2xl font-bold">{formatCurrency(Number(invoice.total))}</span>
+                  <span className="text-2xl font-bold">{formatCurrency(displayTotal)}</span>
                 </div>
+                {isEditMode && (
+                  <p className="text-xs text-muted-foreground italic mt-2">
+                    Totals will be saved when you click "Save Changes"
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -359,7 +486,7 @@ const InvoiceDetail = () => {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Total Revenue (Customer)</span>
-                  <span className="font-semibold">{formatCurrency(totalRevenue)}</span>
+                  <span className="font-semibold">{formatCurrency(displayTotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Total Vendor Costs</span>
