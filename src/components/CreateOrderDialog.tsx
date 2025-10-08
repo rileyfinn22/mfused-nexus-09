@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Minus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -290,256 +291,356 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
             </DialogHeader>
           </div>
 
-          <ScrollArea className="flex-1 px-6">
-            <div className="space-y-8 py-6">
-              {/* Product Selection - ERP Table Style */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-lg font-semibold">Items</Label>
-                  <span className="text-sm text-muted-foreground">
-                    {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} selected
-                  </span>
-                </div>
-                <div className="border border-table-border rounded-lg overflow-hidden">
-                  <div className="bg-table-header border-b border-table-border px-4 py-3">
-                    <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      <div className="col-span-1">Select</div>
-                      <div className="col-span-2">Item ID</div>
-                      <div className="col-span-4">Product/Service</div>
-                      <div className="col-span-2 text-right">Rate</div>
-                      <div className="col-span-2 text-center">Quantity</div>
-                      <div className="col-span-1 text-right">Amount</div>
+          <ScrollArea className="flex-1 px-8 py-6">
+            <div className="space-y-6">
+              {/* Customer & Address Grid - Similar to Order Detail Page */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-muted/30 backdrop-blur rounded-lg p-6 border border-table-border">
+                <div className="space-y-4">
+                  <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-3">Customer</h3>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="customerName" className="text-xs">Name *</Label>
+                      <Input
+                        id="customerName"
+                        value={formData.customerName}
+                        onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                        required
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="customerEmail" className="text-xs">Email</Label>
+                      <Input
+                        id="customerEmail"
+                        type="email"
+                        value={formData.customerEmail}
+                        onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="customerPhone" className="text-xs">Phone</Label>
+                      <Input
+                        id="customerPhone"
+                        value={formData.customerPhone}
+                        onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="poNumber" className="text-xs">PO Number</Label>
+                      <Input
+                        id="poNumber"
+                        value={formData.poNumber}
+                        onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
+                        className="h-9"
+                      />
                     </div>
                   </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    {products.map((product) => {
-                      const selected = selectedItems.find(item => item.productId === product.id);
-                      const amount = selected ? (product.cost || 0) * selected.quantity : 0;
-                      
-                      return (
-                        <div key={product.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-table-border hover:bg-muted/30 transition-colors items-center">
-                          <div className="col-span-1">
-                            <Checkbox
-                              checked={!!selected}
-                              onCheckedChange={() => handleProductToggle(product.id)}
-                            />
-                          </div>
-                          <div className="col-span-2 font-mono text-xs text-muted-foreground">
-                            {product.item_id || '-'}
-                          </div>
-                          <div className="col-span-4">
-                            <p className="font-medium text-sm">{product.name}</p>
-                            <p className="text-xs text-muted-foreground line-clamp-1">{product.description}</p>
-                          </div>
-                          <div className="col-span-2 text-right text-sm">
-                            ${product.cost?.toFixed(2) || '0.00'}
-                          </div>
-                          <div className="col-span-2">
-                            {selected ? (
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-3">Ship To</h3>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="shippingName" className="text-xs">Name *</Label>
+                      <Input
+                        id="shippingName"
+                        value={formData.shippingName}
+                        onChange={(e) => setFormData({ ...formData, shippingName: e.target.value })}
+                        required
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="shippingStreet" className="text-xs">Street *</Label>
+                      <Input
+                        id="shippingStreet"
+                        value={formData.shippingStreet}
+                        onChange={(e) => setFormData({ ...formData, shippingStreet: e.target.value })}
+                        required
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="shippingCity" className="text-xs">City *</Label>
+                        <Input
+                          id="shippingCity"
+                          value={formData.shippingCity}
+                          onChange={(e) => setFormData({ ...formData, shippingCity: e.target.value })}
+                          required
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="shippingState" className="text-xs">State *</Label>
+                        <Input
+                          id="shippingState"
+                          value={formData.shippingState}
+                          onChange={(e) => setFormData({ ...formData, shippingState: e.target.value.toUpperCase() })}
+                          maxLength={2}
+                          required
+                          className="h-9"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="shippingZip" className="text-xs">ZIP *</Label>
+                      <Input
+                        id="shippingZip"
+                        value={formData.shippingZip}
+                        onChange={(e) => setFormData({ ...formData, shippingZip: e.target.value })}
+                        required
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-3">Bill To</h3>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Checkbox
+                      id="sameAsBilling"
+                      checked={sameAsBilling}
+                      onCheckedChange={(checked) => setSameAsBilling(checked as boolean)}
+                    />
+                    <Label htmlFor="sameAsBilling" className="text-xs cursor-pointer">Same as shipping</Label>
+                  </div>
+                  {!sameAsBilling && (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="billingName" className="text-xs">Name</Label>
+                        <Input
+                          id="billingName"
+                          value={formData.billingName}
+                          onChange={(e) => setFormData({ ...formData, billingName: e.target.value })}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="billingStreet" className="text-xs">Street</Label>
+                        <Input
+                          id="billingStreet"
+                          value={formData.billingStreet}
+                          onChange={(e) => setFormData({ ...formData, billingStreet: e.target.value })}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="billingCity" className="text-xs">City</Label>
+                          <Input
+                            id="billingCity"
+                            value={formData.billingCity}
+                            onChange={(e) => setFormData({ ...formData, billingCity: e.target.value })}
+                            className="h-9"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="billingState" className="text-xs">State</Label>
+                          <Input
+                            id="billingState"
+                            value={formData.billingState}
+                            onChange={(e) => setFormData({ ...formData, billingState: e.target.value.toUpperCase() })}
+                            maxLength={2}
+                            className="h-9"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="billingZip" className="text-xs">ZIP</Label>
+                        <Input
+                          id="billingZip"
+                          value={formData.billingZip}
+                          onChange={(e) => setFormData({ ...formData, billingZip: e.target.value })}
+                          className="h-9"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Items Section - Like Order Detail Table */}
+              <div className="space-y-3">
+                <h2 className="text-lg font-semibold">Items</h2>
+                <div className="border border-table-border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-table-header">
+                        <TableHead className="w-12"></TableHead>
+                        <TableHead>Item ID</TableHead>
+                        <TableHead>Product/Service</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-center w-32">Qty</TableHead>
+                        <TableHead className="text-right">Rate</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedItems.map((item) => {
+                        const product = products.find(p => p.id === item.productId);
+                        if (!product) return null;
+                        const amount = (product.cost || 0) * item.quantity;
+                        
+                        return (
+                          <TableRow key={item.productId}>
+                            <TableCell>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-destructive"
+                                onClick={() => handleProductToggle(item.productId)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{product.item_id || '-'}</TableCell>
+                            <TableCell className="font-medium">{product.name}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                              {product.description}
+                            </TableCell>
+                            <TableCell>
                               <div className="flex items-center justify-center gap-1">
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
                                   className="h-7 w-7 p-0"
-                                  onClick={() => handleQuantityChange(product.id, -1)}
+                                  onClick={() => handleQuantityChange(item.productId, -1)}
                                 >
                                   <Minus className="h-3 w-3" />
                                 </Button>
-                                <span className="w-12 text-center font-medium text-sm">{selected.quantity}</span>
+                                <span className="w-12 text-center font-medium">{item.quantity}</span>
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
                                   className="h-7 w-7 p-0"
-                                  onClick={() => handleQuantityChange(product.id, 1)}
+                                  onClick={() => handleQuantityChange(item.productId, 1)}
                                 >
                                   <Plus className="h-3 w-3" />
                                 </Button>
                               </div>
-                            ) : (
-                              <div className="text-center text-muted-foreground text-sm">-</div>
-                            )}
-                          </div>
-                          <div className="col-span-1 text-right font-medium text-sm">
-                            {selected ? `$${amount.toFixed(2)}` : '-'}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+                            </TableCell>
+                            <TableCell className="text-right">${product.cost?.toFixed(2) || '0.00'}</TableCell>
+                            <TableCell className="text-right font-medium">${amount.toFixed(2)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
 
-              {/* Customer Information - ERP Grid Style */}
-              <div className="space-y-4">
-                <Label className="text-lg font-semibold">Customer Information</Label>
-                <div className="bg-muted/30 rounded-lg p-6 border border-table-border">
-                  <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="customerName">Customer Name *</Label>
-                    <Input
-                      id="customerName"
-                      value={formData.customerName}
-                      onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="customerEmail">Email</Label>
-                    <Input
-                      id="customerEmail"
-                      type="email"
-                      value={formData.customerEmail}
-                      onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="customerPhone">Phone</Label>
-                    <Input
-                      id="customerPhone"
-                      value={formData.customerPhone}
-                      onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="poNumber">PO Number</Label>
-                    <Input
-                      id="poNumber"
-                      value={formData.poNumber}
-                      onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-              </div>
-
-              {/* Shipping Address - ERP Grid Style */}
-              <div className="space-y-4">
-                <Label className="text-lg font-semibold">Shipping Address</Label>
-                <div className="bg-muted/30 rounded-lg p-6 border border-table-border">
-                  <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor="shippingName">Name *</Label>
-                    <Input
-                      id="shippingName"
-                      value={formData.shippingName}
-                      onChange={(e) => setFormData({ ...formData, shippingName: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor="shippingStreet">Street Address *</Label>
-                    <Input
-                      id="shippingStreet"
-                      value={formData.shippingStreet}
-                      onChange={(e) => setFormData({ ...formData, shippingStreet: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="shippingCity">City *</Label>
-                    <Input
-                      id="shippingCity"
-                      value={formData.shippingCity}
-                      onChange={(e) => setFormData({ ...formData, shippingCity: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="shippingState">State *</Label>
-                    <Input
-                      id="shippingState"
-                      value={formData.shippingState}
-                      onChange={(e) => setFormData({ ...formData, shippingState: e.target.value.toUpperCase() })}
-                      maxLength={2}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="shippingZip">ZIP Code *</Label>
-                    <Input
-                      id="shippingZip"
-                      value={formData.shippingZip}
-                      onChange={(e) => setFormData({ ...formData, shippingZip: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-              </div>
-
-              {/* Order Details - ERP Grid Style */}
-              <div className="space-y-4">
-                <Label className="text-lg font-semibold">Order Details</Label>
-                <div className="bg-muted/30 rounded-lg p-6 border border-table-border">
-                  <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dueDate">Due Date</Label>
-                    <Input
-                      id="dueDate"
-                      type="date"
-                      value={formData.dueDate}
-                      onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="terms">Terms</Label>
-                    <Select value={formData.terms} onValueChange={(value) => setFormData({ ...formData, terms: value })}>
-                      <SelectTrigger>
-                        <SelectValue />
+                  {/* Add Item Dropdown */}
+                  <div className="border-t border-table-border p-3 bg-muted/20">
+                    <Select onValueChange={(value) => handleProductToggle(value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Add an item..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Net 30">Net 30</SelectItem>
-                        <SelectItem value="Net 60">Net 60</SelectItem>
-                        <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
-                        <SelectItem value="Prepaid">Prepaid</SelectItem>
+                        {products
+                          .filter(p => !selectedItems.find(item => item.productId === p.id))
+                          .map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.item_id ? `${product.item_id} - ` : ''}{product.name} (${product.cost?.toFixed(2) || '0.00'})
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor="memo">Memo</Label>
-                    <Textarea
-                      id="memo"
-                      value={formData.memo}
-                      onChange={(e) => setFormData({ ...formData, memo: e.target.value })}
-                      rows={3}
-                    />
+                </div>
+
+                {/* Totals - Right Aligned */}
+                <div className="flex justify-end">
+                  <div className="w-80 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span className="font-medium">
+                        ${(() => {
+                          const subtotal = selectedItems.reduce((sum, item) => {
+                            const product = products.find(p => p.id === item.productId);
+                            return sum + ((product?.cost || 0) * item.quantity);
+                          }, 0);
+                          return subtotal.toFixed(2);
+                        })()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Tax (6%):</span>
+                      <span className="font-medium">
+                        ${(() => {
+                          const subtotal = selectedItems.reduce((sum, item) => {
+                            const product = products.find(p => p.id === item.productId);
+                            return sum + ((product?.cost || 0) * item.quantity);
+                          }, 0);
+                          const tax = subtotal * 0.06;
+                          return tax.toFixed(2);
+                        })()}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between">
+                      <span className="font-semibold text-lg">Total:</span>
+                      <span className="font-bold text-xl">
+                        ${(() => {
+                          const subtotal = selectedItems.reduce((sum, item) => {
+                            const product = products.find(p => p.id === item.productId);
+                            return sum + ((product?.cost || 0) * item.quantity);
+                          }, 0);
+                          const tax = subtotal * 0.06;
+                          return (subtotal + tax).toFixed(2);
+                        })()}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
               </div>
 
-              {/* Order Summary - ERP Style */}
-              <div className="bg-gradient-to-r from-primary/5 to-transparent rounded-lg p-6 border border-table-border">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Order Summary</p>
-                    <p className="text-xs text-muted-foreground">
-                      {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} • 
-                      {' '}{selectedItems.reduce((sum, item) => sum + item.quantity, 0)} total units
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground mb-1">Estimated Total</p>
-                    <p className="text-2xl font-bold">
-                      ${(() => {
-                        const subtotal = selectedItems.reduce((sum, item) => {
-                          const product = products.find(p => p.id === item.productId);
-                          return sum + ((product?.cost || 0) * item.quantity);
-                        }, 0);
-                        const tax = subtotal * 0.06;
-                        return (subtotal + tax).toFixed(2);
-                      })()}
-                    </p>
-                  </div>
+              {/* Terms & Additional Info */}
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="dueDate">Due Date</Label>
+                  <Input
+                    id="dueDate"
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                  />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="terms">Terms</Label>
+                  <Select value={formData.terms} onValueChange={(value) => setFormData({ ...formData, terms: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Net 30">Net 30</SelectItem>
+                      <SelectItem value="Net 60">Net 60</SelectItem>
+                      <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
+                      <SelectItem value="Prepaid">Prepaid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="memo">Memo</Label>
+                <Textarea
+                  id="memo"
+                  value={formData.memo}
+                  onChange={(e) => setFormData({ ...formData, memo: e.target.value })}
+                  rows={3}
+                  placeholder="Any additional notes or special instructions..."
+                />
               </div>
             </div>
           </ScrollArea>
 
-          {/* Footer Actions - ERP Style */}
-          <div className="border-t border-table-border bg-muted/20 px-6 py-4">
+          {/* Footer Actions */}
+          <div className="border-t border-table-border bg-muted/20 px-8 py-4">
             <div className="flex justify-between items-center">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} size="lg">
                 Cancel
