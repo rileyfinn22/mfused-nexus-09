@@ -320,7 +320,7 @@ const Inventory = () => {
       <div className="border border-table-border rounded">
         {/* Table Header */}
         <div className="bg-table-header border-b border-table-border">
-          <div className="grid grid-cols-10 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             {isAdmin && isEditMode && (
               <div className="col-span-1 flex items-center">
                 <Checkbox
@@ -330,16 +330,16 @@ const Inventory = () => {
               </div>
             )}
             <div className={isAdmin && isEditMode ? "col-span-1" : "col-span-1"}>Preview</div>
-            <div className={isAdmin && isEditMode ? "col-span-2" : "col-span-3"}>SKU</div>
+            <div className={isAdmin && isEditMode ? "col-span-3" : "col-span-3"}>SKU</div>
             <div className="col-span-1">State</div>
             <div 
-              className="col-span-1 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
+              className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
               onClick={() => handleSort("available")}
             >
               Available {getSortIcon("available")}
             </div>
             <div 
-              className="col-span-1 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
+              className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
               onClick={() => handleSort("in_production")}
             >
               In Prod {getSortIcon("in_production")}
@@ -350,7 +350,7 @@ const Inventory = () => {
             >
               Redline {getSortIcon("redline")}
             </div>
-            <div className="col-span-2">Status</div>
+            <div className="col-span-1">Status</div>
           </div>
         </div>
 
@@ -363,7 +363,7 @@ const Inventory = () => {
             return (
               <div 
                 key={`${item.sku}-${item.state}`}
-                className="grid grid-cols-10 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
+                className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
               >
                 {isAdmin && isEditMode && (
                   <div className="col-span-1 flex items-center">
@@ -387,7 +387,7 @@ const Inventory = () => {
                     </div>
                   )}
                 </div>
-                <div className={`${isAdmin && isEditMode ? "col-span-2" : "col-span-3"} font-mono text-sm font-medium flex items-center gap-2`}>
+                <div className={`${isAdmin && isEditMode ? "col-span-3" : "col-span-3"} font-mono text-sm font-medium flex items-center gap-2`}>
                   <span 
                     className="break-words"
                     title={item.sku}
@@ -401,13 +401,13 @@ const Inventory = () => {
                 <div className="col-span-1">
                   <Badge variant="outline" className="text-xs">{item.state}</Badge>
                 </div>
-                <div className="col-span-1 font-semibold text-sm flex items-center gap-1">
+                <div className="col-span-2 font-semibold text-sm flex items-center gap-1">
                   {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
                   {item.available}
                 </div>
-                <div className="col-span-1 text-sm">{item.in_production}</div>
+                <div className="col-span-2 text-sm">{item.in_production}</div>
                 <div className="col-span-1 text-sm text-muted-foreground">{item.redline}</div>
-                <div className={`col-span-2 text-xs font-medium uppercase ${stockColor}`}>
+                <div className={`col-span-1 text-xs font-medium uppercase ${stockColor}`}>
                   {status}
                 </div>
               </div>

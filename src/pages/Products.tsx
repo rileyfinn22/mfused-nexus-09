@@ -333,7 +333,7 @@ const Products = () => {
       <div className="border border-table-border rounded">
         {/* Table Header */}
         <div className="bg-table-header border-b border-table-border">
-          <div className="grid grid-cols-11 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="grid grid-cols-10 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             {isEditMode && (
               <div className="col-span-1 flex items-center">
                 <Checkbox
@@ -349,7 +349,6 @@ const Products = () => {
             <div className="col-span-1">Category</div>
             <div className="col-span-1">State</div>
             <div className="col-span-1">Cost</div>
-            <div className="col-span-1">Details</div>
             {!isEditMode && <div className="col-span-1">Actions</div>}
           </div>
         </div>
@@ -363,7 +362,7 @@ const Products = () => {
               <div key={product.id}>
                 {/* Parent Row */}
                 <div 
-                  className="grid grid-cols-11 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                  className="grid grid-cols-10 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
                   onClick={() => toggleExpanded(product.id)}
                 >
                   {isEditMode && (
@@ -415,7 +414,6 @@ const Products = () => {
                   <div className="col-span-1 text-sm font-medium">
                     {product.cost ? `$${product.cost.toFixed(2)}` : '-'}
                   </div>
-                  <div className="col-span-1 text-sm text-center">{product.states.length}</div>
                   {!isEditMode && (
                     <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <Button 
