@@ -319,8 +319,8 @@ const OrderDetail = () => {
                       <TableCell className="font-medium">{item.name}</TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-xs">{item.description || '-'}</TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">${item.unit_price?.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-medium">${item.total?.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">${item.unit_price?.toFixed(3)}</TableCell>
+                      <TableCell className="text-right font-medium">${item.total?.toFixed(3)}</TableCell>
                     </TableRow>)}
                 </TableBody>
               </Table>
@@ -331,16 +331,16 @@ const OrderDetail = () => {
               <div className="w-80 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal:</span>
-                  <span className="font-medium">${subtotal.toFixed(2)}</span>
+                  <span className="font-medium">${subtotal.toFixed(3)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Tax (6%):</span>
-                  <span className="font-medium">${tax.toFixed(2)}</span>
+                  <span className="font-medium">${tax.toFixed(3)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
                   <span className="font-semibold text-lg">Total:</span>
-                  <span className="font-bold text-xl">${total.toFixed(2)}</span>
+                  <span className="font-bold text-xl">${total.toFixed(3)}</span>
                 </div>
               </div>
             </div>

@@ -412,7 +412,7 @@ const Products = () => {
                     <Badge variant="outline" className="text-xs">{product.state}</Badge>
                   </div>
                   <div className="col-span-1 text-sm font-medium">
-                    {product.cost ? `$${product.cost.toFixed(2)}` : '-'}
+                    {product.cost ? `$${product.cost.toFixed(3)}` : '-'}
                   </div>
                   {!isEditMode && (
                     <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>

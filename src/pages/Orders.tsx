@@ -165,7 +165,7 @@ const Orders = () => {
                         <div className="col-span-1">
                           <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                         </div>
-                        <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
+                        <div className="col-span-1 text-sm">${order.total?.toFixed(3)}</div>
                         <div className="col-span-2 text-sm capitalize text-muted-foreground">
                           Draft
                         </div>
@@ -231,7 +231,7 @@ const Orders = () => {
                       <div className="col-span-1">
                         <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                       </div>
-                      <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
+                      <div className="col-span-1 text-sm">${order.total?.toFixed(3)}</div>
                       <div className="col-span-2 text-sm capitalize text-blue-500">
                         Pending
                       </div>
@@ -322,7 +322,7 @@ const Orders = () => {
                     <div className="col-span-1">
                       <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                     </div>
-                    <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
+                    <div className="col-span-1 text-sm">${order.total?.toFixed(3)}</div>
                     <div className={`col-span-2 text-sm capitalize ${getStatusColor(order.status)}`}>
                       {order.status}
                     </div>

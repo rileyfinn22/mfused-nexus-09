@@ -752,8 +752,8 @@ const CreateOrder = () => {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">${product.cost?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell className="text-right font-medium">${amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">${product.cost?.toFixed(3) || '0.000'}</TableCell>
+                      <TableCell className="text-right font-medium">${amount.toFixed(3)}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -834,7 +834,7 @@ const CreateOrder = () => {
                               <TableCell className="font-mono text-xs">{product.item_id || '-'}</TableCell>
                               <TableCell className="font-medium">{product.name}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">{product.category}</TableCell>
-                              <TableCell className="text-right">${product.cost?.toFixed(2) || '0.00'}</TableCell>
+                              <TableCell className="text-right">${product.cost?.toFixed(3) || '0.000'}</TableCell>
                             </TableRow>
                           ))
                         )}
@@ -878,16 +878,16 @@ const CreateOrder = () => {
             <div className="w-80 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal:</span>
-                <span className="font-medium">${subtotal.toFixed(2)}</span>
+                <span className="font-medium">${subtotal.toFixed(3)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Tax (6%):</span>
-                <span className="font-medium">${tax.toFixed(2)}</span>
+                <span className="font-medium">${tax.toFixed(3)}</span>
               </div>
               <Separator />
               <div className="flex justify-between">
                 <span className="font-semibold text-lg">Total:</span>
-                <span className="font-bold text-xl">${total.toFixed(2)}</span>
+                <span className="font-bold text-xl">${total.toFixed(3)}</span>
               </div>
             </div>
           </div>
