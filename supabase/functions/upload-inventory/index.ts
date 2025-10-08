@@ -65,6 +65,12 @@ serve(async (req) => {
     const inventoryItems = [];
 
     for (const row of jsonData) {
+      // Log the first row to see what columns we have
+      if (jsonData.indexOf(row) === 0) {
+        console.log('First row columns:', Object.keys(row));
+        console.log('First row data:', row);
+      }
+      
       // Support multiple column name variations
       let sku = row['SKU'] || row['sku'] || row['Item'] || row['Item Name'];
       let itemId = null;
@@ -73,17 +79,20 @@ serve(async (req) => {
       // If "Item and State" column exists, parse it first (format: PCK-00430-WA)
       if (row['Item and State']) {
         const itemAndState = String(row['Item and State']);
+        console.log('Parsing Item and State:', itemAndState);
         // Split by last dash to separate item number from state
         const lastDashIndex = itemAndState.lastIndexOf('-');
         if (lastDashIndex > 0) {
           itemId = itemAndState.substring(0, lastDashIndex); // "PCK-00430"
           state = itemAndState.substring(lastDashIndex + 1); // "WA"
+          console.log('Extracted - itemId:', itemId, 'state:', state);
         } else {
           itemId = itemAndState;
         }
       } else if (row['State'] || row['state']) {
         // Only use separate State column if "Item and State" doesn't exist
         state = row['State'] || row['state'];
+        console.log('Using State column:', state);
       }
       
       // Use Item Name as SKU if available
