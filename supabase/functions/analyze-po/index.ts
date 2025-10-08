@@ -21,23 +21,36 @@ serve(async (req) => {
     const { pdfUrl, companyId, userId, filename } = await req.json();
     console.log('Analyzing PO from URL:', pdfUrl);
 
-    // Download the PDF from storage
-    const pdfPath = pdfUrl.replace(`${supabaseUrl}/storage/v1/object/public/po-documents/`, '');
-    const { data: pdfData, error: downloadError } = await supabase
-      .storage
-      .from('po-documents')
-      .download(pdfPath);
-
-    if (downloadError) {
-      console.error('Error downloading PDF:', downloadError);
-      throw new Error('Failed to download PDF');
+    // Fetch PDF content directly from the public URL
+    console.log('Fetching PDF from URL...');
+    const pdfResponse = await fetch(pdfUrl);
+    if (!pdfResponse.ok) {
+      throw new Error('Failed to fetch PDF from storage');
     }
+    const pdfArrayBuffer = await pdfResponse.arrayBuffer();
+    
+    // Convert PDF to text using pdfjs
+    console.log('Extracting text from PDF...');
+    const pdfjsLib = await import('https://esm.sh/pdfjs-dist@3.11.174/build/pdf.mjs');
+    
+    // Initialize pdfjs with worker
+    const pdfData = new Uint8Array(pdfArrayBuffer);
+    const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+    const pdf = await loadingTask.promise;
+    
+    // Extract text from all pages
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(' ');
+      fullText += pageText + '\n\n';
+    }
+    
+    console.log('Extracted text length:', fullText.length);
+    console.log('First 500 chars:', fullText.substring(0, 500));
 
-    // Convert PDF to base64
-    const arrayBuffer = await pdfData.arrayBuffer();
-    const base64Pdf = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-
-    // Analyze with Lovable AI
+    // Analyze with Lovable AI using text instead of image
     console.log('Sending to AI for analysis...');
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -50,22 +63,40 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a purchase order analysis assistant. Extract structured data from PO documents and return it in JSON format.'
+            content: 'You are a purchase order analysis assistant. Extract structured data from PO text and return it in JSON format. Be precise with numeric values and maintain the exact format.'
           },
           {
             role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Analyze this purchase order PDF and extract the following information in valid JSON format: po_number, customer_name, customer_email, customer_phone, shipping_name, shipping_street, shipping_city, shipping_state, shipping_zip, billing_name, billing_street, billing_city, billing_state, billing_zip, items (array of objects with sku, name, description, quantity, unit_price), due_date, memo. If any field is not found, use null. For items, calculate the total as quantity * unit_price.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:application/pdf;base64,${base64Pdf}`
-                }
-              }
-            ]
+            content: `Analyze this purchase order text and extract the following information in valid JSON format:
+            
+Required fields:
+- po_number: string (the purchase order number)
+- customer_name: string (the vendor or company name)
+- customer_email: string or null
+- customer_phone: string or null
+- shipping_name: string (ship to name)
+- shipping_street: string
+- shipping_city: string
+- shipping_state: string (2-letter state code)
+- shipping_zip: string
+- billing_name: string or null
+- billing_street: string or null
+- billing_city: string or null
+- billing_state: string or null
+- billing_zip: string or null
+- due_date: string in YYYY-MM-DD format or null
+- memo: string or null
+- items: array of objects with:
+  - sku: string (the item code/SKU)
+  - name: string (full product description)
+  - description: string or null
+  - quantity: number (integer)
+  - unit_price: number (decimal, e.g., 0.218)
+
+PO Text:
+${fullText}
+
+Return ONLY valid JSON, no additional text or explanation.`
           }
         ],
         response_format: { type: "json_object" }
