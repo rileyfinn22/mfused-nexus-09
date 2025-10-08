@@ -112,7 +112,7 @@ const Products = () => {
     try {
       let query = supabase
         .from('products')
-        .select('*, companies(name)')
+        .select('*, product_states(*)')
         .order('created_at', { ascending: false });
 
       // Filter by company if not "all" and user is vibe_admin

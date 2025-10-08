@@ -40,7 +40,7 @@ const Orders = () => {
         fetchCompanies();
       }
     }
-  }, [isVibeAdmin]);
+  }, [isVibeAdmin, companyFilter]);
 
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();

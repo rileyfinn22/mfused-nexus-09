@@ -98,10 +98,17 @@ const Artwork = () => {
 
   const fetchArtwork = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('artwork_files')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Filter by company if not "all" and user is vibe_admin
+      if (isVibeAdmin && companyFilter !== 'all') {
+        query = query.eq('company_id', companyFilter);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setArtworkFiles(data || []);
@@ -119,12 +126,17 @@ const Artwork = () => {
 
   const fetchRejectedArtwork = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('rejected_artwork_files')
         .select('*')
         .order('rejected_at', { ascending: false });
 
-      if (error) throw error;
+      // Filter by company if not "all" and user is vibe_admin
+      if (isVibeAdmin && companyFilter !== 'all') {
+        query = query.eq('company_id', companyFilter);
+      }
+
+      const { data, error } = await query;
       setRejectedFiles(data || []);
     } catch (error) {
       console.error('Error fetching rejected artwork:', error);

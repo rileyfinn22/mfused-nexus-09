@@ -93,10 +93,17 @@ const Inventory = () => {
 
   const fetchInventory = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('inventory')
         .select('*, products(image_url)')
         .order('created_at', { ascending: false });
+
+      // Filter by company if not "all" and user is vibe_admin
+      if (isVibeAdmin && companyFilter !== 'all') {
+        query = query.eq('company_id', companyFilter);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setInventory(data || []);
@@ -304,6 +311,19 @@ const Inventory = () => {
             className="pl-10"
           />
         </div>
+        {isVibeAdmin && (
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="w-full lg:w-40">
+              <SelectValue placeholder="Company" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Companies</SelectItem>
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={stateFilter} onValueChange={setStateFilter}>
           <SelectTrigger className="w-full lg:w-40">
             <SelectValue placeholder="State" />
