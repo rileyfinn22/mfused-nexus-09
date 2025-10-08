@@ -36,7 +36,7 @@ const Vendors = () => {
 
   const fetchVendors = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('vendors')
       .select('*')
       .order('name');
@@ -62,7 +62,7 @@ const Vendors = () => {
     if (!userRole) return;
 
     if (editingVendor) {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('vendors')
         .update(formData)
         .eq('id', editingVendor.id);
@@ -75,7 +75,7 @@ const Vendors = () => {
         handleCloseDialog();
       }
     } else {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('vendors')
         .insert({ ...formData, company_id: userRole.company_id });
       

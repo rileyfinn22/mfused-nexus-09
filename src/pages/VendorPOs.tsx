@@ -21,7 +21,7 @@ const VendorPOs = () => {
 
   const fetchVendorPOs = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('vendor_pos')
       .select('*, vendors(name), orders(order_number)')
       .order('created_at', { ascending: false });

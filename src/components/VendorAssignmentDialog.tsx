@@ -37,7 +37,7 @@ export const VendorAssignmentDialog = ({
     setLoading(true);
     
     // Fetch all vendors
-    const { data: vendorsData } = await supabase
+    const { data: vendorsData } = await (supabase as any)
       .from('vendors')
       .select('*')
       .eq('is_active', true)
@@ -49,7 +49,7 @@ export const VendorAssignmentDialog = ({
       // Fetch preferred vendors for each product
       const productIds = orderItems.map(item => item.product_id).filter(Boolean);
       if (productIds.length > 0) {
-        const { data: preferredData } = await supabase
+        const { data: preferredData } = await (supabase as any)
           .from('vendor_products')
           .select('product_id, vendor_id')
           .in('product_id', productIds)
@@ -58,7 +58,7 @@ export const VendorAssignmentDialog = ({
         // Pre-populate with preferred vendors
         const prefMap: Record<string, string> = {};
         orderItems.forEach(item => {
-          const pref = preferredData?.find(p => p.product_id === item.product_id);
+          const pref = preferredData?.find((p: any) => p.product_id === item.product_id);
           if (pref) {
             prefMap[item.id] = pref.vendor_id;
           }
@@ -106,7 +106,7 @@ export const VendorAssignmentDialog = ({
         const subtotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
         
         // Create vendor PO
-        const { data: po, error: poError } = await supabase
+        const { data: po, error: poError } = await (supabase as any)
           .from('vendor_pos')
           .insert({
             company_id: userRole.company_id,
@@ -125,7 +125,7 @@ export const VendorAssignmentDialog = ({
 
         // Fetch vendor product costs for accurate costing
         const productIds = items.map(i => i.product_id).filter(Boolean);
-        const { data: vendorProducts } = await supabase
+        const { data: vendorProducts } = await (supabase as any)
           .from('vendor_products')
           .select('product_id, vendor_cost')
           .eq('vendor_id', vendorId)
@@ -133,7 +133,7 @@ export const VendorAssignmentDialog = ({
 
         // Create PO items
         const poItems = items.map(item => {
-          const vendorProduct = vendorProducts?.find(vp => vp.product_id === item.product_id);
+          const vendorProduct = vendorProducts?.find((vp: any) => vp.product_id === item.product_id);
           const unitCost = vendorProduct?.vendor_cost || item.unit_price || 0;
           
           return {
@@ -148,7 +148,7 @@ export const VendorAssignmentDialog = ({
           };
         });
 
-        const { error: itemsError } = await supabase
+        const { error: itemsError } = await (supabase as any)
           .from('vendor_po_items')
           .insert(poItems);
 
