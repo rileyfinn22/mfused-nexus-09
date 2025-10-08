@@ -74,6 +74,7 @@ const CreateOrder = () => {
   const [tempSelectedProducts, setTempSelectedProducts] = useState<string[]>([]);
   const [existingOrderNumber, setExistingOrderNumber] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [unmatchedPoItems, setUnmatchedPoItems] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -172,12 +173,14 @@ const CreateOrder = () => {
         }));
       setSelectedItems(items);
       
-      // Show toast if some items couldn't be loaded
+      // Store unmatched items from PO for display
       const unmatchedItems = order.order_items.filter((item: any) => item.product_id === null);
+      setUnmatchedPoItems(unmatchedItems);
+      
       if (unmatchedItems.length > 0) {
         toast({
-          title: "Some items need matching",
-          description: `${unmatchedItems.length} item(s) from the PO don't match your products. Please add them manually.`,
+          title: "Items extracted from PO",
+          description: `${unmatchedItems.length} item(s) from the PO are shown below. Add products from your catalog to match them.`,
         });
       }
     }
@@ -679,6 +682,46 @@ const CreateOrder = () => {
             )}
           </div>
         </div>
+
+        {/* Unmatched PO Items Section */}
+        {unmatchedPoItems.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Items from PO (Need Matching)</h2>
+              <span className="text-sm text-muted-foreground">{unmatchedPoItems.length} items extracted</span>
+            </div>
+            <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 rounded-lg p-4 space-y-3">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                These items were extracted from the purchase order but don't match any products in your catalog. 
+                Add products from your catalog below to fulfill this order.
+              </p>
+              <div className="border border-table-border rounded-lg overflow-hidden bg-background">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-table-header">
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Product Name</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Unit Price</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {unmatchedPoItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-right">${Number(item.unit_price).toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-medium">${Number(item.total).toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Items Section */}
         <div className="space-y-3">
