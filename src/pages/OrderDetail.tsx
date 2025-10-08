@@ -11,114 +11,97 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Download, Plus, Upload, FileText, Package } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
 const OrderDetail = () => {
-  const { orderId } = useParams();
+  const {
+    orderId
+  } = useParams();
   const navigate = useNavigate();
-  
   const [vibeNotes, setVibeNotes] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [productionUpdate, setProductionUpdate] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
       fetchOrder();
     }
   }, [orderId]);
-
   const checkAdminStatus = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: {
+        user
+      }
+    } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
+      const {
+        data
+      } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
       setIsAdmin(data?.role === 'admin');
     }
   };
-
   const fetchOrder = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*, order_items(*)')
-      .eq('id', orderId)
-      .single();
-
+    const {
+      data,
+      error
+    } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).single();
     if (!error && data) {
       setOrder(data);
     }
     setLoading(false);
   };
-
   const handleAddVibeNote = () => {
     if (!vibeNotes.trim() || !isAdmin) return;
     toast({
       title: "Vibe Note Added",
-      description: "Your note has been saved to the order.",
+      description: "Your note has been saved to the order."
     });
     setVibeNotes("");
   };
-
   const handleAddTracking = () => {
     if (!trackingNumber.trim()) return;
     toast({
       title: "Tracking Added",
-      description: `Tracking number ${trackingNumber} has been added.`,
+      description: `Tracking number ${trackingNumber} has been added.`
     });
     setTrackingNumber("");
   };
-
   const handleAddProductionUpdate = () => {
     if (!productionUpdate.trim()) return;
     toast({
       title: "Production Update Added",
-      description: "Production update has been logged.",
+      description: "Production update has been logged."
     });
     setProductionUpdate("");
   };
-
   const handleDownloadPackingList = () => {
     toast({
       title: "Downloading Packing List",
-      description: "Generating packing list PDF...",
+      description: "Generating packing list PDF..."
     });
   };
-
   const handleDownloadInvoice = () => {
     toast({
       title: "Downloading Invoice",
-      description: "Generating invoice PDF...",
+      description: "Generating invoice PDF..."
     });
   };
-
   if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto py-12 text-center">
+    return <div className="max-w-7xl mx-auto py-12 text-center">
         <p className="text-muted-foreground">Loading order...</p>
-      </div>
-    );
+      </div>;
   }
-
   if (!order) {
-    return (
-      <div className="max-w-7xl mx-auto py-12 text-center">
+    return <div className="max-w-7xl mx-auto py-12 text-center">
         <p className="text-muted-foreground">Order not found</p>
-      </div>
-    );
+      </div>;
   }
-
   const subtotal = order.subtotal || 0;
   const tax = order.tax || 0;
   const total = order.total || 0;
-
-  return (
-    <div className="max-w-7xl mx-auto">
+  return <div className="max-w-7xl mx-auto">
       {/* Header with Back Button and Download Buttons */}
       <div className="mb-6 flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => navigate("/orders")}>
@@ -201,8 +184,7 @@ const OrderDetail = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {order.order_items?.map((item: any, index: number) => (
-                    <TableRow key={index}>
+                  {order.order_items?.map((item: any, index: number) => <TableRow key={index}>
                       <TableCell>
                         <div className="w-12 h-12 bg-muted rounded border border-table-border flex items-center justify-center">
                           <Package className="h-6 w-6 text-muted-foreground" />
@@ -214,8 +196,7 @@ const OrderDetail = () => {
                       <TableCell className="text-right">{item.quantity}</TableCell>
                       <TableCell className="text-right">${item.unit_price?.toFixed(2)}</TableCell>
                       <TableCell className="text-right font-medium">${item.total?.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
+                    </TableRow>)}
                 </TableBody>
               </Table>
             </div>
@@ -240,12 +221,10 @@ const OrderDetail = () => {
             </div>
 
             {/* Memo Section */}
-            {order.memo && (
-              <div className="mt-8 p-4 bg-muted/50 rounded-lg">
+            {order.memo && <div className="mt-8 p-4 bg-muted/50 rounded-lg">
                 <h3 className="text-sm font-semibold mb-2">Memo</h3>
                 <p className="text-sm text-muted-foreground">{order.memo}</p>
-              </div>
-            )}
+              </div>}
 
             {/* Terms and Conditions */}
             <div className="mt-8 p-6 bg-muted/30 rounded-lg border border-table-border">
@@ -269,26 +248,15 @@ const OrderDetail = () => {
           <div className="border-t border-table-border bg-muted/30 p-8">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Vibe Notes & Internal Management</h2>
-              {isAdmin ? (
-                <Badge variant="default" className="text-xs">Admin</Badge>
-              ) : (
-                <Badge variant="outline" className="text-xs">View Only</Badge>
-              )}
+              <h2 className="text-lg font-semibold">Vibe Notes & Management</h2>
+              {isAdmin ? <Badge variant="default" className="text-xs">Admin</Badge> : <Badge variant="outline" className="text-xs">View Only</Badge>}
             </div>
             
-            {isAdmin && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {isAdmin && <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 {/* Vibe Notes */}
                 <div className="p-4 bg-background rounded-lg border border-table-border">
                   <h3 className="font-medium text-sm mb-3">Add Vibe Note (Visible to Customer)</h3>
-                  <Textarea
-                    placeholder="Add a note visible to the customer..."
-                    value={vibeNotes}
-                    onChange={(e) => setVibeNotes(e.target.value)}
-                    rows={3}
-                    className="mb-2"
-                  />
+                  <Textarea placeholder="Add a note visible to the customer..." value={vibeNotes} onChange={e => setVibeNotes(e.target.value)} rows={3} className="mb-2" />
                   <Button onClick={handleAddVibeNote} size="sm">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Vibe Note
@@ -299,34 +267,23 @@ const OrderDetail = () => {
                 <div className="p-4 bg-background rounded-lg border border-table-border">
                   <h3 className="font-medium text-sm mb-3">Tracking Information</h3>
                   <div className="space-y-2">
-                    <Input
-                      placeholder="Enter tracking number..."
-                      value={trackingNumber}
-                      onChange={(e) => setTrackingNumber(e.target.value)}
-                    />
+                    <Input placeholder="Enter tracking number..." value={trackingNumber} onChange={e => setTrackingNumber(e.target.value)} />
                     <Button onClick={handleAddTracking} size="sm" className="w-full">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Tracking
                     </Button>
                   </div>
-                  {order.tracking_number && (
-                    <div className="mt-3 p-3 bg-muted/50 rounded">
+                  {order.tracking_number && <div className="mt-3 p-3 bg-muted/50 rounded">
                       <p className="text-xs font-medium mb-1">Current Tracking</p>
                       <p className="text-sm font-mono">{order.tracking_number}</p>
-                    </div>
-                  )}
+                    </div>}
                 </div>
 
                 {/* Production Updates */}
                 <div className="p-4 bg-background rounded-lg border border-table-border md:col-span-2">
                   <h3 className="font-medium text-sm mb-3">Production Updates (Internal Only)</h3>
                   <div className="space-y-2">
-                    <Textarea
-                      placeholder="Add internal production update..."
-                      value={productionUpdate}
-                      onChange={(e) => setProductionUpdate(e.target.value)}
-                      rows={3}
-                    />
+                    <Textarea placeholder="Add internal production update..." value={productionUpdate} onChange={e => setProductionUpdate(e.target.value)} rows={3} />
                     <Button onClick={handleAddProductionUpdate} size="sm">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Update
@@ -341,33 +298,24 @@ const OrderDetail = () => {
                     Upload Production Images
                   </Button>
                 </div>
-              </div>
-            )}
+              </div>}
 
             {/* Display Vibe Notes (Visible to All) */}
             <div className="space-y-3">
               <h3 className="font-medium text-sm">Customer-Visible Notes</h3>
-              {(!order.vibeNotes || order.vibeNotes.length === 0) ? (
-                <p className="text-sm text-muted-foreground p-4 bg-background rounded border border-table-border">
+              {!order.vibeNotes || order.vibeNotes.length === 0 ? <p className="text-sm text-muted-foreground p-4 bg-background rounded border border-table-border">
                   No vibe notes yet
-                </p>
-              ) : (
-                order.vibeNotes?.map((note: any, index: number) => (
-                  <div key={index} className="p-4 bg-background rounded-lg border border-table-border">
+                </p> : order.vibeNotes?.map((note: any, index: number) => <div key={index} className="p-4 bg-background rounded-lg border border-table-border">
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-xs font-medium text-primary">{note.author}</span>
                       <span className="text-xs text-muted-foreground">{note.date}</span>
                     </div>
                     <p className="text-sm">{note.text}</p>
-                  </div>
-                ))
-              )}
+                  </div>)}
             </div>
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
-
 export default OrderDetail;
