@@ -33,6 +33,7 @@ const Artwork = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [artworkFiles, setArtworkFiles] = useState<any[]>([]);
+  const [rejectedFiles, setRejectedFiles] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -60,6 +61,7 @@ const Artwork = () => {
 
   useEffect(() => {
     fetchArtwork();
+    fetchRejectedArtwork();
     fetchProducts();
     
     // Check for search query parameter
@@ -87,6 +89,20 @@ const Artwork = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRejectedArtwork = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rejected_artwork_files')
+        .select('*')
+        .order('rejected_at', { ascending: false });
+
+      if (error) throw error;
+      setRejectedFiles(data || []);
+    } catch (error) {
+      console.error('Error fetching rejected artwork:', error);
     }
   };
 
@@ -326,6 +342,7 @@ const Artwork = () => {
       setRejectionReason('');
       setSelectedFile(null);
       fetchArtwork();
+      fetchRejectedArtwork();
     } catch (error) {
       console.error('Error rejecting artwork:', error);
       toast({
@@ -740,6 +757,51 @@ const Artwork = () => {
               : 'Upload your first artwork file to get started'
             }
           </p>
+        </div>
+      )}
+
+      {/* Rejected Archive Section */}
+      {rejectedFiles.length > 0 && (
+        <div className="mt-8 border-t pt-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <XCircle className="h-5 w-5 text-destructive" />
+            Rejected Archive ({rejectedFiles.length})
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {rejectedFiles.map((file) => (
+              <div key={file.id} className="bg-card border rounded-lg p-3 hover:shadow-md transition-shadow">
+                <div className="aspect-square bg-muted rounded mb-2 overflow-hidden">
+                  {file.preview_url ? (
+                    <img 
+                      src={file.preview_url} 
+                      alt={file.sku}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : file.artwork_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                    <img 
+                      src={file.artwork_url} 
+                      alt={file.sku}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <FileImage className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs font-mono font-medium truncate" title={file.sku}>{file.sku}</p>
+                <p className="text-xs text-muted-foreground truncate" title={file.filename}>{file.filename}</p>
+                <p className="text-xs text-destructive mt-1">
+                  {new Date(file.rejected_at).toLocaleDateString()}
+                </p>
+                {file.rejection_reason && (
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2" title={file.rejection_reason}>
+                    {file.rejection_reason}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
