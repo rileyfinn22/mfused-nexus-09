@@ -384,8 +384,8 @@ const PullShip = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Upload PDF to storage
-      const fileName = `${Date.now()}-${selectedPOFile.name}`;
+      // Upload PDF to storage with user ID folder for RLS
+      const fileName = `${user.id}/${Date.now()}-${selectedPOFile.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('po-documents')
         .upload(fileName, selectedPOFile);
