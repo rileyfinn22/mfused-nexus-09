@@ -741,23 +741,17 @@ const CreateOrder = () => {
           </div>
         )}
 
-        {/* Upload PO Section */}
+        {/* Upload PO Option */}
         {!orderId && (
-          <div className="bg-muted/30 backdrop-blur rounded-lg p-6 border border-table-border">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-muted/30 backdrop-blur rounded-lg p-4 border border-table-border">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <Upload className="h-4 w-4" />
-                  Upload Purchase Order
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Upload a PDF to automatically extract order details, or skip to enter manually below
+                <h3 className="text-sm font-medium">Order Entry</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Upload a PO to auto-fill or enter manually
                 </p>
               </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+              <div className="flex items-center gap-2">
                 <input
                   type="file"
                   accept="application/pdf"
@@ -766,60 +760,38 @@ const CreateOrder = () => {
                   id="po-upload"
                   disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
                 />
-                <label 
-                  htmlFor="po-upload" 
-                  className={`cursor-pointer block ${(uploading || analyzing || (isVibeAdmin && !selectedCompanyId)) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {selectedFile ? (
-                    <div className="space-y-2">
-                      <FileText className="h-10 w-10 mx-auto text-primary" />
-                      <p className="font-medium text-sm">{selectedFile.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Click to change file
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Upload className="h-10 w-10 mx-auto text-muted-foreground" />
-                      <p className="font-medium text-sm">Click to upload PDF</p>
-                      <p className="text-xs text-muted-foreground">
-                        or drag and drop your purchase order here
-                      </p>
-                    </div>
-                  )}
-                </label>
-              </div>
-
-              {isVibeAdmin && !selectedCompanyId && (
-                <p className="text-sm text-amber-600">Please select a company above before uploading a PO</p>
-              )}
-
-              <Button
-                onClick={handlePOUpload}
-                disabled={!selectedFile || uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
-                className="w-full"
-                size="sm"
-              >
-                {uploading || analyzing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {uploading ? 'Uploading...' : 'Analyzing...'}
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Analyze PO & Load Details
-                  </>
+                {selectedFile && !uploading && !analyzing && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <FileText className="h-3 w-3" />
+                    {selectedFile.name.substring(0, 20)}...
+                  </span>
                 )}
-              </Button>
-
-              <div className="bg-muted/50 rounded-lg p-3 text-xs space-y-1">
-                <p className="font-medium">What happens next?</p>
-                <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
-                  <li>Your PO is analyzed by AI to extract order details</li>
-                  <li>Customer info and line items are auto-filled below</li>
-                  <li>Review, edit, and add products before saving</li>
-                </ol>
+                {!selectedFile ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('po-upload')?.click()}
+                    disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload PO
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handlePOUpload}
+                    disabled={uploading || analyzing}
+                    size="sm"
+                  >
+                    {uploading || analyzing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {uploading ? 'Uploading...' : 'Analyzing...'}
+                      </>
+                    ) : (
+                      'Analyze'
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
