@@ -294,20 +294,25 @@ Return ONLY valid JSON:
       const orderItems = extractedData.items.map((item: any) => {
         const matchedProductId = findMatchingProduct(item);
         
+        // ALWAYS use PO unit_price, never pull from product cost
+        const unitPrice = item.unit_price || 0;
+        const quantity = item.quantity || 1;
+        
         return {
           order_id: order.id,
           product_id: matchedProductId, // Will be null if no match found
           sku: item.sku || 'UNKNOWN',
           name: item.name || item.description || 'Unknown Item',
           description: item.description || null,
-          quantity: item.quantity || 1,
-          unit_price: item.unit_price || 0,
-          total: (item.quantity || 1) * (item.unit_price || 0),
+          quantity: quantity,
+          unit_price: unitPrice, // PO price overrides product cost
+          total: quantity * unitPrice,
           item_id: item.sku || null
         };
       });
 
       console.log(`Creating ${orderItems.length} order items, ${orderItems.filter(i => i.product_id).length} matched to products`);
+      console.log('Using PO unit prices, not product costs');
 
       const { error: itemsError } = await supabase
         .from('order_items')
