@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +21,8 @@ interface ItemAssignment {
   vendorId: string;
   vendorCost: string;
   assigned: boolean;
+  vendorPoId?: string;
+  vendorPoNumber?: string;
 }
 
 export const VendorAssignmentDialog = ({ 
@@ -29,6 +32,7 @@ export const VendorAssignmentDialog = ({
   orderItems,
   onSuccess 
 }: VendorAssignmentDialogProps) => {
+  const navigate = useNavigate();
   const [vendors, setVendors] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<Record<string, ItemAssignment>>({});
   const [loading, setLoading] = useState(false);
@@ -75,16 +79,28 @@ export const VendorAssignmentDialog = ({
     setLoading(false);
   };
 
-  const loadExistingAssignments = (items: any[]) => {
+  const loadExistingAssignments = async (items: any[]) => {
     console.log('Loading existing assignments from items:', items);
     const existing: Record<string, ItemAssignment> = {};
+    
+    // Fetch vendor POs for this order
+    const { data: vendorPOs } = await supabase
+      .from('vendor_pos')
+      .select('id, po_number, vendor_id')
+      .eq('order_id', orderId);
+    
     items.forEach(item => {
       console.log('Processing item:', item.id, 'vendor_id:', item.vendor_id, 'vendor_cost:', item.vendor_cost);
       if (item.vendor_id) {
+        // Find the vendor PO for this vendor
+        const vendorPO = vendorPOs?.find(po => po.vendor_id === item.vendor_id);
+        
         existing[item.id] = {
           vendorId: item.vendor_id,
           vendorCost: item.vendor_cost?.toString() || '',
-          assigned: true
+          assigned: true,
+          vendorPoId: vendorPO?.id,
+          vendorPoNumber: vendorPO?.po_number
         };
       }
     });
@@ -133,7 +149,10 @@ export const VendorAssignmentDialog = ({
         })
         .eq('id', itemId);
 
-      if (itemError) throw itemError;
+      if (itemError) {
+        console.error('Error updating order item:', itemError);
+        throw itemError;
+      }
 
       // Check if vendor PO exists for this vendor and order
       let vendorPO;
@@ -214,10 +233,15 @@ export const VendorAssignmentDialog = ({
         }
       }
 
-      // Mark as assigned
+      // Mark as assigned and save PO info
       setAssignments(prev => ({
         ...prev,
-        [itemId]: { ...prev[itemId], assigned: true }
+        [itemId]: { 
+          ...prev[itemId], 
+          assigned: true,
+          vendorPoId: vendorPO.id,
+          vendorPoNumber: vendorPO.po_number
+        }
       }));
 
       toast({
@@ -468,7 +492,8 @@ export const VendorAssignmentDialog = ({
                       <th className="text-right p-3 font-medium text-sm">Sale Price</th>
                       <th className="text-left p-3 font-medium text-sm w-48">Vendor</th>
                       <th className="text-left p-3 font-medium text-sm w-32">Cost</th>
-                      <th className="text-center p-3 font-medium text-sm w-32">Status</th>
+                      <th className="text-left p-3 font-medium text-sm w-32">Vendor PO</th>
+                      <th className="text-center p-3 font-medium text-sm w-32">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -478,7 +503,6 @@ export const VendorAssignmentDialog = ({
                           <Checkbox
                             checked={selectedItems.has(item.id)}
                             onCheckedChange={() => toggleItemSelection(item.id)}
-                            disabled={assignments[item.id]?.assigned}
                           />
                         </td>
                         <td className="p-3 text-sm font-mono">{item.sku}</td>
@@ -488,8 +512,16 @@ export const VendorAssignmentDialog = ({
                         <td className="p-3">
                           <Select
                             value={assignments[item.id]?.vendorId || ''}
-                            onValueChange={(value) => updateAssignment(item.id, 'vendorId', value)}
-                            disabled={assignments[item.id]?.assigned}
+                            onValueChange={(value) => {
+                              updateAssignment(item.id, 'vendorId', value);
+                              // Reset assigned status when vendor changes
+                              if (assignments[item.id]?.assigned) {
+                                setAssignments(prev => ({
+                                  ...prev,
+                                  [item.id]: { ...prev[item.id], assigned: false }
+                                }));
+                              }
+                            }}
                           >
                             <SelectTrigger className="h-9">
                               <SelectValue placeholder="Select..." />
@@ -509,26 +541,43 @@ export const VendorAssignmentDialog = ({
                             step="0.01"
                             placeholder="0.00"
                             value={assignments[item.id]?.vendorCost || ''}
-                            onChange={(e) => updateAssignment(item.id, 'vendorCost', e.target.value)}
-                            disabled={assignments[item.id]?.assigned}
+                            onChange={(e) => {
+                              updateAssignment(item.id, 'vendorCost', e.target.value);
+                              // Reset assigned status when cost changes
+                              if (assignments[item.id]?.assigned) {
+                                setAssignments(prev => ({
+                                  ...prev,
+                                  [item.id]: { ...prev[item.id], assigned: false }
+                                }));
+                              }
+                            }}
                             className="h-9"
                           />
                         </td>
-                        <td className="p-3 text-center">
-                          {assignments[item.id]?.assigned ? (
-                            <div className="flex items-center justify-center text-green-600">
-                              <CheckCircle className="h-5 w-5" />
-                            </div>
-                          ) : (
+                        <td className="p-3">
+                          {assignments[item.id]?.vendorPoNumber ? (
                             <Button
+                              variant="link"
                               size="sm"
-                              onClick={() => handleAssignSingle(item.id)}
-                              disabled={saving || !assignments[item.id]?.vendorId || !assignments[item.id]?.vendorCost}
-                              className="h-8 px-3"
+                              className="h-8 px-2 text-xs"
+                              onClick={() => navigate(`/vendor-pos/${assignments[item.id]?.vendorPoId}`)}
                             >
-                              Assign
+                              {assignments[item.id]?.vendorPoNumber}
                             </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
                           )}
+                        </td>
+                        <td className="p-3 text-center">
+                          <Button
+                            size="sm"
+                            onClick={() => handleAssignSingle(item.id)}
+                            disabled={saving || !assignments[item.id]?.vendorId || !assignments[item.id]?.vendorCost}
+                            className="h-8 px-3"
+                            variant={assignments[item.id]?.assigned ? "secondary" : "default"}
+                          >
+                            {assignments[item.id]?.assigned ? "Update" : "Assign"}
+                          </Button>
                         </td>
                       </tr>
                     ))}

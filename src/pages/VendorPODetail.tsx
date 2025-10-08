@@ -1,0 +1,377 @@
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowLeft, Download, Edit, Save, X } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+const VendorPODetail = () => {
+  const { poId } = useParams();
+  const navigate = useNavigate();
+  const [po, setPO] = useState<any>(null);
+  const [poItems, setPOItems] = useState<any[]>([]);
+  const [vendor, setVendor] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedPO, setEditedPO] = useState<any>({});
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    checkAdminStatus();
+    if (poId) {
+      fetchPODetails();
+    }
+  }, [poId]);
+
+  const checkAdminStatus = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      const role = data?.role as string;
+      setIsAdmin(role === 'admin' || role === 'vibe_admin');
+    }
+  };
+
+  const fetchPODetails = async () => {
+    setLoading(true);
+    
+    // Fetch PO
+    const { data: poData, error: poError } = await supabase
+      .from('vendor_pos')
+      .select('*, orders(order_number, customer_name)')
+      .eq('id', poId)
+      .single();
+
+    if (poError || !poData) {
+      toast({
+        title: "Error",
+        description: "Failed to load vendor PO",
+        variant: "destructive"
+      });
+      setLoading(false);
+      return;
+    }
+
+    setPO(poData);
+    setEditedPO(poData);
+
+    // Fetch vendor
+    const { data: vendorData } = await supabase
+      .from('vendors')
+      .select('*')
+      .eq('id', poData.vendor_id)
+      .single();
+
+    if (vendorData) {
+      setVendor(vendorData);
+    }
+
+    // Fetch PO items
+    const { data: itemsData } = await supabase
+      .from('vendor_po_items')
+      .select('*')
+      .eq('vendor_po_id', poId);
+
+    if (itemsData) {
+      setPOItems(itemsData);
+    }
+
+    setLoading(false);
+  };
+
+  const handleSavePO = async () => {
+    if (!isAdmin) return;
+
+    const { error } = await supabase
+      .from('vendor_pos')
+      .update({
+        status: editedPO.status,
+        expected_delivery_date: editedPO.expected_delivery_date
+      })
+      .eq('id', poId);
+
+    if (!error) {
+      toast({
+        title: "PO Updated",
+        description: "Purchase order updated successfully"
+      });
+      setIsEditMode(false);
+      fetchPODetails();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to update purchase order",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDownloadPDF = () => {
+    if (!po || !vendor) return;
+
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.text("VENDOR PURCHASE ORDER", 105, 20, { align: "center" });
+    
+    // PO Info
+    doc.setFontSize(12);
+    doc.text(`PO Number: ${po.po_number}`, 20, 40);
+    doc.text(`Order Date: ${new Date(po.order_date).toLocaleDateString()}`, 20, 48);
+    doc.text(`Customer Order: ${po.orders?.order_number || 'N/A'}`, 20, 56);
+    doc.text(`Status: ${po.status.replace('_', ' ').toUpperCase()}`, 20, 64);
+    
+    if (po.expected_delivery_date) {
+      doc.text(`Expected Delivery: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 20, 72);
+    }
+
+    // Vendor Info
+    doc.setFontSize(14);
+    doc.text("Vendor Information", 20, 88);
+    doc.setFontSize(11);
+    doc.text(`${vendor.name}`, 20, 96);
+    if (vendor.contact_name) doc.text(`Contact: ${vendor.contact_name}`, 20, 102);
+    if (vendor.contact_email) doc.text(`Email: ${vendor.contact_email}`, 20, 108);
+    if (vendor.contact_phone) doc.text(`Phone: ${vendor.contact_phone}`, 20, 114);
+
+    // Items table
+    const tableData = poItems.map(item => [
+      item.sku,
+      item.name,
+      item.quantity.toString(),
+      `$${Number(item.unit_cost).toFixed(2)}`,
+      `$${Number(item.total).toFixed(2)}`
+    ]);
+
+    autoTable(doc, {
+      startY: 125,
+      head: [['SKU', 'Product', 'Quantity', 'Unit Cost', 'Total']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [66, 66, 66] },
+    });
+
+    // Total
+    const finalY = (doc as any).lastAutoTable.finalY || 125;
+    doc.setFontSize(14);
+    doc.text(`Total: $${Number(po.total).toFixed(2)}`, 150, finalY + 15);
+
+    // Save
+    doc.save(`vendor-po-${po.po_number}.pdf`);
+    
+    toast({
+      title: "PDF Downloaded",
+      description: "Vendor PO has been downloaded"
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto py-12 text-center">
+        <p className="text-muted-foreground">Loading vendor PO...</p>
+      </div>
+    );
+  }
+
+  if (!po) {
+    return (
+      <div className="max-w-7xl mx-auto py-12 text-center">
+        <p className="text-muted-foreground">Vendor PO not found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="mb-6 flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/vendor-pos")}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Vendor POs
+        </Button>
+        <div className="flex gap-3">
+          {isAdmin && (
+            <>
+              {isEditMode ? (
+                <>
+                  <Button variant="outline" onClick={() => {
+                    setIsEditMode(false);
+                    setEditedPO(po);
+                  }}>
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSavePO}>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit PO
+                </Button>
+              )}
+            </>
+          )}
+          <Button onClick={handleDownloadPDF}>
+            <Download className="h-4 w-4 mr-2" />
+            Download PDF
+          </Button>
+        </div>
+      </div>
+
+      {/* PO Details Card */}
+      <Card className="shadow-lg">
+        <CardContent className="p-0">
+          {/* Header Section */}
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-table-border p-8">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">Vendor PO #{po.po_number}</h1>
+                <p className="text-sm text-muted-foreground">
+                  Customer Order: {po.orders?.order_number || 'N/A'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Customer: {po.orders?.customer_name || 'N/A'}
+                </p>
+              </div>
+              <div className="text-right">
+                {isEditMode ? (
+                  <Select
+                    value={editedPO.status}
+                    onValueChange={(value) => setEditedPO({...editedPO, status: value})}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="submitted">Submitted</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="in_production">In Production</SelectItem>
+                      <SelectItem value="received">Received</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <span className="inline-block px-4 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary capitalize">
+                    {po.status.replace('_', ' ')}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Dates */}
+            <div className="grid grid-cols-2 gap-6 mt-6 bg-background/80 backdrop-blur rounded-lg p-6">
+              <div>
+                <Label className="text-xs text-muted-foreground">Order Date</Label>
+                <p className="font-medium">{new Date(po.order_date).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Expected Delivery</Label>
+                {isEditMode ? (
+                  <Input
+                    type="date"
+                    value={editedPO.expected_delivery_date || ''}
+                    onChange={(e) => setEditedPO({...editedPO, expected_delivery_date: e.target.value})}
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="font-medium">
+                    {po.expected_delivery_date 
+                      ? new Date(po.expected_delivery_date).toLocaleDateString()
+                      : 'Not set'
+                    }
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Vendor Info */}
+          <div className="p-8 border-b">
+            <h2 className="text-lg font-semibold mb-4">Vendor Information</h2>
+            {vendor ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Vendor Name</Label>
+                  <p className="font-medium">{vendor.name}</p>
+                </div>
+                {vendor.contact_name && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Contact Person</Label>
+                    <p className="font-medium">{vendor.contact_name}</p>
+                  </div>
+                )}
+                {vendor.contact_email && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Email</Label>
+                    <p className="font-medium">{vendor.contact_email}</p>
+                  </div>
+                )}
+                {vendor.contact_phone && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Phone</Label>
+                    <p className="font-medium">{vendor.contact_phone}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">Vendor information not available</p>
+            )}
+          </div>
+
+          {/* Items Table */}
+          <div className="p-8">
+            <h2 className="text-lg font-semibold mb-4">Order Items</h2>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-center">Quantity</TableHead>
+                  <TableHead className="text-right">Unit Cost</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {poItems.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-mono">{item.sku}</TableCell>
+                    <TableCell>{item.name}</TableCell>
+                    <TableCell className="text-center">{item.quantity}</TableCell>
+                    <TableCell className="text-right">${Number(item.unit_cost).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">${Number(item.total).toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {/* Total */}
+            <div className="flex justify-end mt-6 pt-6 border-t">
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground mb-2">Total Amount</p>
+                <p className="text-2xl font-bold">${Number(po.total).toFixed(2)}</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default VendorPODetail;

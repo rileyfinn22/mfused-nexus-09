@@ -20,6 +20,7 @@ import PullShipOrderDetail from "./pages/PullShipOrderDetail";
 import MyPOs from "./pages/MyPOs";
 import Vendors from "./pages/Vendors";
 import VendorPOs from "./pages/VendorPOs";
+import VendorPODetail from "./pages/VendorPODetail";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -50,6 +51,7 @@ const App = () => (
           <Route path="/my-pos" element={<DashboardLayout><MyPOs /></DashboardLayout>} />
           <Route path="/vendors" element={<DashboardLayout><Vendors /></DashboardLayout>} />
           <Route path="/vendor-pos" element={<DashboardLayout><VendorPOs /></DashboardLayout>} />
+          <Route path="/vendor-pos/:poId" element={<DashboardLayout><VendorPODetail /></DashboardLayout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
