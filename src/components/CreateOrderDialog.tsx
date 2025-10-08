@@ -278,71 +278,104 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>Create New Order</DialogTitle>
-          <DialogDescription>
-            Select products and enter customer information to create a new order
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-6xl max-h-[95vh] p-0">
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          {/* ERP-Style Header */}
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-table-border p-6">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold">Create New Order</DialogTitle>
+              <DialogDescription className="text-base mt-2">
+                Complete the information below to create a new order
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-        <form onSubmit={handleSubmit}>
-          <ScrollArea className="max-h-[60vh] pr-4">
-            <div className="space-y-6">
-              {/* Product Selection */}
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">Select Products</Label>
-                <div className="space-y-2 border border-table-border rounded-lg p-4 max-h-60 overflow-y-auto">
-                  {products.map((product) => {
-                    const selected = selectedItems.find(item => item.productId === product.id);
-                    return (
-                      <div key={product.id} className="flex items-center gap-3 p-2 hover:bg-muted/50 rounded">
-                        <Checkbox
-                          checked={!!selected}
-                          onCheckedChange={() => handleProductToggle(product.id)}
-                        />
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{product.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {product.item_id && `${product.item_id} • `}
-                            ${product.cost?.toFixed(2) || '0.00'} each
-                          </p>
-                        </div>
-                        {selected && (
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => handleQuantityChange(product.id, -1)}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="w-12 text-center font-medium">{selected.quantity}</span>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => handleQuantityChange(product.id, 1)}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
+          <ScrollArea className="flex-1 px-6">
+            <div className="space-y-8 py-6">
+              {/* Product Selection - ERP Table Style */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-lg font-semibold">Items</Label>
+                  <span className="text-sm text-muted-foreground">
+                    {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} selected
+                  </span>
+                </div>
+                <div className="border border-table-border rounded-lg overflow-hidden">
+                  <div className="bg-table-header border-b border-table-border px-4 py-3">
+                    <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <div className="col-span-1">Select</div>
+                      <div className="col-span-2">Item ID</div>
+                      <div className="col-span-4">Product/Service</div>
+                      <div className="col-span-2 text-right">Rate</div>
+                      <div className="col-span-2 text-center">Quantity</div>
+                      <div className="col-span-1 text-right">Amount</div>
+                    </div>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {products.map((product) => {
+                      const selected = selectedItems.find(item => item.productId === product.id);
+                      const amount = selected ? (product.cost || 0) * selected.quantity : 0;
+                      
+                      return (
+                        <div key={product.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-table-border hover:bg-muted/30 transition-colors items-center">
+                          <div className="col-span-1">
+                            <Checkbox
+                              checked={!!selected}
+                              onCheckedChange={() => handleProductToggle(product.id)}
+                            />
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          <div className="col-span-2 font-mono text-xs text-muted-foreground">
+                            {product.item_id || '-'}
+                          </div>
+                          <div className="col-span-4">
+                            <p className="font-medium text-sm">{product.name}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-1">{product.description}</p>
+                          </div>
+                          <div className="col-span-2 text-right text-sm">
+                            ${product.cost?.toFixed(2) || '0.00'}
+                          </div>
+                          <div className="col-span-2">
+                            {selected ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => handleQuantityChange(product.id, -1)}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <span className="w-12 text-center font-medium text-sm">{selected.quantity}</span>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => handleQuantityChange(product.id, 1)}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="text-center text-muted-foreground text-sm">-</div>
+                            )}
+                          </div>
+                          <div className="col-span-1 text-right font-medium text-sm">
+                            {selected ? `$${amount.toFixed(2)}` : '-'}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              <Separator />
-
-              {/* Customer Information */}
+              {/* Customer Information - ERP Grid Style */}
               <div className="space-y-4">
-                <Label className="text-base font-semibold">Customer Information</Label>
-                <div className="grid grid-cols-2 gap-4">
+                <Label className="text-lg font-semibold">Customer Information</Label>
+                <div className="bg-muted/30 rounded-lg p-6 border border-table-border">
+                  <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="customerName">Customer Name *</Label>
                     <Input
@@ -379,13 +412,13 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                   </div>
                 </div>
               </div>
+              </div>
 
-              <Separator />
-
-              {/* Shipping Address */}
+              {/* Shipping Address - ERP Grid Style */}
               <div className="space-y-4">
-                <Label className="text-base font-semibold">Shipping Address</Label>
-                <div className="grid grid-cols-2 gap-4">
+                <Label className="text-lg font-semibold">Shipping Address</Label>
+                <div className="bg-muted/30 rounded-lg p-6 border border-table-border">
+                  <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2 space-y-2">
                     <Label htmlFor="shippingName">Name *</Label>
                     <Input
@@ -434,13 +467,13 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                   </div>
                 </div>
               </div>
+              </div>
 
-              <Separator />
-
-              {/* Order Details */}
+              {/* Order Details - ERP Grid Style */}
               <div className="space-y-4">
-                <Label className="text-base font-semibold">Order Details</Label>
-                <div className="grid grid-cols-2 gap-4">
+                <Label className="text-lg font-semibold">Order Details</Label>
+                <div className="bg-muted/30 rounded-lg p-6 border border-table-border">
+                  <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="dueDate">Due Date</Label>
                     <Input
@@ -475,17 +508,47 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                   </div>
                 </div>
               </div>
+              </div>
+
+              {/* Order Summary - ERP Style */}
+              <div className="bg-gradient-to-r from-primary/5 to-transparent rounded-lg p-6 border border-table-border">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Order Summary</p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} • 
+                      {' '}{selectedItems.reduce((sum, item) => sum + item.quantity, 0)} total units
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground mb-1">Estimated Total</p>
+                    <p className="text-2xl font-bold">
+                      ${(() => {
+                        const subtotal = selectedItems.reduce((sum, item) => {
+                          const product = products.find(p => p.id === item.productId);
+                          return sum + ((product?.cost || 0) * item.quantity);
+                        }, 0);
+                        const tax = subtotal * 0.06;
+                        return (subtotal + tax).toFixed(2);
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </ScrollArea>
 
-          <DialogFooter className="mt-6">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create Order"}
-            </Button>
-          </DialogFooter>
+          {/* Footer Actions - ERP Style */}
+          <div className="border-t border-table-border bg-muted/20 px-6 py-4">
+            <div className="flex justify-between items-center">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} size="lg">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading || selectedItems.length === 0} size="lg" className="min-w-32">
+                {loading ? "Creating..." : "Create Order"}
+              </Button>
+            </div>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
