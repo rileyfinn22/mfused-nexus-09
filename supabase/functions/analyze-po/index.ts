@@ -72,64 +72,51 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'You are an expert at analyzing purchase orders. Use chain-of-thought reasoning to understand the document structure before extracting data.'
+            content: 'You are an expert at analyzing purchase orders. Use reasoning to understand document structure.'
           },
           {
             role: 'user',
-            content: `TASK: Analyze this purchase order and extract structured data.
+            content: `CRITICAL: Purchase orders often have MISLEADING column headers. You must reason about what data is actually in each column.
 
-STEP 1 - REASONING: First, analyze the document structure
-Think through:
-- What are the column headers in the line items table? (e.g., "Description", "Item", "Qty", "Rate", "Amount")
-- Which column likely contains the SKU/product code? (Look for patterns like PCK-, alphanumeric codes)
-- Which column contains the product name/description? (Usually longer text descriptions)
-- Which column has quantities? (Look for "Qty", "Quantity", numeric values)
-- Which column has unit prices? (Look for "Rate", "Price", "Unit Price", decimal numbers)
-- Where is the PO number? (Look for "PO #", "Purchase Order", "PO Number")
-- Where is the due/expected date? (Look for "Due Date", "Expected Date", "Delivery Date")
+COMMON PATTERN TO LOOK FOR:
+- A column labeled "Description" often contains SKU/product codes (like "PCK-00430-WABAG")
+- A column labeled "Item" or "Item #" often contains item numbers or IDs
+- The actual product name/description might be in a different column or combined
+- "PO #" or "Purchase Order #" is the PO number
+- "Expected Date", "Due Date", or "Delivery Date" is the due date
 
-IMPORTANT: Column headers vary between POs. For example:
-- The "Description" column might actually contain SKUs
-- The "Item" column might contain item numbers
-- The "Product" column might contain descriptions
-YOU MUST reason about what each column actually contains, not just use the header name.
+ANALYSIS INSTRUCTIONS:
 
-STEP 2 - EXTRACT: Based on your reasoning, extract:
+1. IDENTIFY COLUMNS by looking at the actual data patterns, NOT just headers:
+   - SKU column: Contains alphanumeric codes (e.g., "PCK-00430-WABAG", "SDA10065")
+   - Product name: Contains full descriptive text about the product
+   - Quantity: Contains numeric values for quantities
+   - Unit price: Contains decimal prices (e.g., 0.218, 23.51)
 
+2. EXTRACT DATA:
 For each line item:
-- sku: The product code/SKU (look for alphanumeric patterns like "PCK-00430-WABAG", "SDA10065", etc.)
-- name: The full product description/name
-- quantity: Numeric quantity ordered (integer)
-- unit_price: Price per unit (decimal)
+- sku: The SKU/product code (often in "Description" column!)
+- name: The full product name (might be in "Item" or separate column)
+- quantity: Numeric quantity
+- unit_price: Price per unit
 
-For order header:
-- po_number: The PO# or purchase order number
-- customer_name: Vendor/company name (often at top, or in "Vendor" field)
-- shipping_name: Ship To name
-- shipping_street: Ship To street address
-- shipping_city: Ship To city
-- shipping_state: Ship To state (2 letters)
-- shipping_zip: Ship To zip code
-- billing_name: Bill To name (if separate from shipping)
-- billing_street: Bill To street
-- billing_city: Bill To city
-- billing_state: Bill To state
-- billing_zip: Bill To zip
-- due_date: Due/Expected/Delivery date in YYYY-MM-DD format
-- customer_email: Email if present
-- customer_phone: Phone if present
+For order info:
+- po_number: Look for "PO #", "Purchase Order #", "PO Number"
+- due_date: Look for "Expected Date", "Due Date", "Delivery Date" - convert to YYYY-MM-DD
+- customer_name: Vendor or company name
+- shipping_name, shipping_street, shipping_city, shipping_state, shipping_zip: Ship To address
+- billing info if separate from shipping
 
 PURCHASE ORDER TEXT:
 ${extractedText}
 
-Return ONLY valid JSON. Show your reasoning in the structure:
+IMPORTANT: 
+- If "Description" contains codes like "PCK-00430-WABAG", that's the SKU
+- If "Item" contains product names, that's the name
+- Extract ALL line items from the table
+
+Return ONLY valid JSON:
 {
-  "reasoning": {
-    "sku_column": "which column contains SKUs and why",
-    "name_column": "which column contains product names and why",
-    "qty_column": "which column contains quantities",
-    "price_column": "which column contains unit prices"
-  },
   "po_number": "...",
   "customer_name": "...",
   "customer_email": null,
@@ -137,14 +124,14 @@ Return ONLY valid JSON. Show your reasoning in the structure:
   "shipping_name": "...",
   "shipping_street": "...",
   "shipping_city": "...",
-  "shipping_state": "...",
+  "shipping_state": "XX",
   "shipping_zip": "...",
   "billing_name": null,
   "billing_street": null,
   "billing_city": null,
   "billing_state": null,
   "billing_zip": null,
-  "due_date": "...",
+  "due_date": "YYYY-MM-DD",
   "memo": null,
   "items": [
     {"sku": "...", "name": "...", "description": null, "quantity": 0, "unit_price": 0.0}
