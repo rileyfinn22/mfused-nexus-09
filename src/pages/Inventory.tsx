@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ interface InventoryItem {
 }
 
 const Inventory = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [stateFilter, setStateFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -206,9 +208,8 @@ const Inventory = () => {
       <div className="border border-table-border rounded">
         {/* Table Header */}
         <div className="bg-table-header border-b border-table-border">
-          <div className="grid grid-cols-10 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div className="col-span-1">Image</div>
-            <div className="col-span-1">Artwork</div>
+          <div className="grid grid-cols-9 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="col-span-1">Preview</div>
             <div className="col-span-2">SKU</div>
             <div className="col-span-1">State</div>
             <div 
@@ -242,31 +243,19 @@ const Inventory = () => {
             return (
               <div 
                 key={`${item.sku}-${item.state}`}
-                className="grid grid-cols-10 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
+                className="grid grid-cols-9 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
               >
                 <div className="col-span-1">
-                  {item.products?.image_url ? (
+                  {artworkThumbnails[item.sku] || item.products?.image_url ? (
                     <img 
-                      src={item.products.image_url} 
+                      src={artworkThumbnails[item.sku] || item.products?.image_url} 
                       alt={item.sku}
-                      className="w-12 h-12 object-cover rounded border"
+                      className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => navigate(`/artwork?search=${encodeURIComponent(item.sku)}`)}
                     />
                   ) : (
                     <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center text-xs text-muted-foreground">
-                      No img
-                    </div>
-                  )}
-                </div>
-                <div className="col-span-1">
-                  {artworkThumbnails[item.sku] ? (
-                    <img 
-                      src={artworkThumbnails[item.sku]} 
-                      alt={`${item.sku} artwork`}
-                      className="w-12 h-12 object-cover rounded border"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center text-xs text-muted-foreground">
-                      No art
+                      No preview
                     </div>
                   )}
                 </div>
