@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
@@ -28,6 +28,8 @@ const OrderDetail = () => {
   const [artApproved, setArtApproved] = useState(false);
   const [orderFinalized, setOrderFinalized] = useState(false);
   const [vibeProcessed, setVibeProcessed] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedOrder, setEditedOrder] = useState<any>({});
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -54,6 +56,7 @@ const OrderDetail = () => {
     } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).single();
     if (!error && data) {
       setOrder(data);
+      setEditedOrder(data);
       setVibeProcessed(data.vibe_processed || false);
       setOrderFinalized(data.order_finalized || false);
       
@@ -143,6 +146,69 @@ const OrderDetail = () => {
       fetchOrder();
     }
   };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!isAdmin) return;
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: newStatus })
+      .eq('id', orderId);
+
+    if (!error) {
+      toast({
+        title: "Status Updated",
+        description: `Order status changed to ${newStatus}`
+      });
+      fetchOrder();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to update order status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSaveOrder = async () => {
+    if (!isAdmin) return;
+
+    const { error } = await supabase
+      .from('orders')
+      .update({
+        customer_name: editedOrder.customer_name,
+        customer_email: editedOrder.customer_email,
+        customer_phone: editedOrder.customer_phone,
+        shipping_name: editedOrder.shipping_name,
+        shipping_street: editedOrder.shipping_street,
+        shipping_city: editedOrder.shipping_city,
+        shipping_state: editedOrder.shipping_state,
+        shipping_zip: editedOrder.shipping_zip,
+        billing_name: editedOrder.billing_name,
+        billing_street: editedOrder.billing_street,
+        billing_city: editedOrder.billing_city,
+        billing_state: editedOrder.billing_state,
+        billing_zip: editedOrder.billing_zip,
+        po_number: editedOrder.po_number,
+        memo: editedOrder.memo
+      })
+      .eq('id', orderId);
+
+    if (!error) {
+      toast({
+        title: "Order Updated",
+        description: "Order details saved successfully"
+      });
+      setIsEditMode(false);
+      fetchOrder();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to update order",
+        variant: "destructive"
+      });
+    }
+  };
   const handleDownloadPackingList = () => {
     toast({
       title: "Downloading Packing List",
@@ -168,26 +234,64 @@ const OrderDetail = () => {
   const subtotal = order.subtotal || 0;
   const total = order.total || 0;
   return <div className="max-w-7xl mx-auto">
-      {/* Header with Back Button and Download Buttons */}
+      {/* Header with Back Button and Action Buttons */}
       <div className="mb-6 flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => navigate("/orders")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Orders
         </Button>
         <div className="flex gap-3">
+          {isAdmin && (
+            <>
+              {order.status === 'pending' && (
+                <Button 
+                  variant="default" 
+                  onClick={() => handleStatusChange('open')}
+                >
+                  Process Order → Open
+                </Button>
+              )}
+              {order.status === 'open' && (
+                <Button 
+                  variant="default" 
+                  onClick={() => handleStatusChange('in_production')}
+                >
+                  Start Production
+                </Button>
+              )}
+              {isEditMode ? (
+                <>
+                  <Button variant="outline" onClick={() => {
+                    setIsEditMode(false);
+                    setEditedOrder(order);
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveOrder}>
+                    Save Changes
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Order
+                </Button>
+              )}
+            </>
+          )}
           {isVibeAdmin && order?.order_items && order.order_items.length > 0 && (
             <Button onClick={() => setShowVendorDialog(true)}>
               <Truck className="h-4 w-4 mr-2" />
-              Assign Vendors & Create POs
+              Assign Vendors
             </Button>
           )}
           <Button variant="outline" onClick={handleDownloadPackingList}>
             <Download className="h-4 w-4 mr-2" />
-            Download Packing List
+            Packing List
           </Button>
           <Button variant="outline" onClick={handleDownloadInvoice}>
             <Download className="h-4 w-4 mr-2" />
-            Download Invoice
+            Invoice
           </Button>
         </div>
       </div>
@@ -279,7 +383,16 @@ const OrderDetail = () => {
               </div>
               <div className="text-right">
                 <Badge className="text-sm px-4 py-1.5 mb-2 capitalize">{order.status}</Badge>
-                <p className="text-sm text-muted-foreground">PO #: {order.po_number || '-'}</p>
+                {isEditMode ? (
+                  <Input
+                    value={editedOrder.po_number || ''}
+                    onChange={(e) => setEditedOrder({...editedOrder, po_number: e.target.value})}
+                    placeholder="PO Number"
+                    className="text-sm mt-2"
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">PO #: {order.po_number || '-'}</p>
+                )}
               </div>
             </div>
 
@@ -287,25 +400,119 @@ const OrderDetail = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-background/80 backdrop-blur rounded-lg p-6">
               <div>
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Customer</h3>
-                <p className="font-medium">{order.customer_name}</p>
-                <p className="text-sm text-muted-foreground">{order.customer_email || '-'}</p>
-                <p className="text-sm text-muted-foreground">{order.customer_phone || '-'}</p>
+                {isEditMode ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={editedOrder.customer_name}
+                      onChange={(e) => setEditedOrder({...editedOrder, customer_name: e.target.value})}
+                      placeholder="Customer Name"
+                    />
+                    <Input
+                      value={editedOrder.customer_email || ''}
+                      onChange={(e) => setEditedOrder({...editedOrder, customer_email: e.target.value})}
+                      placeholder="Email"
+                    />
+                    <Input
+                      value={editedOrder.customer_phone || ''}
+                      onChange={(e) => setEditedOrder({...editedOrder, customer_phone: e.target.value})}
+                      placeholder="Phone"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-medium">{order.customer_name}</p>
+                    <p className="text-sm text-muted-foreground">{order.customer_email || '-'}</p>
+                    <p className="text-sm text-muted-foreground">{order.customer_phone || '-'}</p>
+                  </>
+                )}
               </div>
               <div>
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Ship To</h3>
-                <p className="font-medium">{order.shipping_name}</p>
-                <p className="text-sm text-muted-foreground">{order.shipping_street}</p>
-                <p className="text-sm text-muted-foreground">
-                  {order.shipping_city}, {order.shipping_state} {order.shipping_zip}
-                </p>
+                {isEditMode ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={editedOrder.shipping_name}
+                      onChange={(e) => setEditedOrder({...editedOrder, shipping_name: e.target.value})}
+                      placeholder="Name"
+                    />
+                    <Input
+                      value={editedOrder.shipping_street}
+                      onChange={(e) => setEditedOrder({...editedOrder, shipping_street: e.target.value})}
+                      placeholder="Street"
+                    />
+                    <div className="flex gap-2">
+                      <Input
+                        value={editedOrder.shipping_city}
+                        onChange={(e) => setEditedOrder({...editedOrder, shipping_city: e.target.value})}
+                        placeholder="City"
+                      />
+                      <Input
+                        value={editedOrder.shipping_state}
+                        onChange={(e) => setEditedOrder({...editedOrder, shipping_state: e.target.value})}
+                        placeholder="ST"
+                        className="w-20"
+                      />
+                      <Input
+                        value={editedOrder.shipping_zip}
+                        onChange={(e) => setEditedOrder({...editedOrder, shipping_zip: e.target.value})}
+                        placeholder="ZIP"
+                        className="w-28"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-medium">{order.shipping_name}</p>
+                    <p className="text-sm text-muted-foreground">{order.shipping_street}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {order.shipping_city}, {order.shipping_state} {order.shipping_zip}
+                    </p>
+                  </>
+                )}
               </div>
               <div>
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Bill To</h3>
-                <p className="font-medium">{order.billing_name || order.shipping_name}</p>
-                <p className="text-sm text-muted-foreground">{order.billing_street || order.shipping_street}</p>
-                <p className="text-sm text-muted-foreground">
-                  {order.billing_city || order.shipping_city}, {order.billing_state || order.shipping_state} {order.billing_zip || order.shipping_zip}
-                </p>
+                {isEditMode ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={editedOrder.billing_name || editedOrder.shipping_name}
+                      onChange={(e) => setEditedOrder({...editedOrder, billing_name: e.target.value})}
+                      placeholder="Name"
+                    />
+                    <Input
+                      value={editedOrder.billing_street || editedOrder.shipping_street}
+                      onChange={(e) => setEditedOrder({...editedOrder, billing_street: e.target.value})}
+                      placeholder="Street"
+                    />
+                    <div className="flex gap-2">
+                      <Input
+                        value={editedOrder.billing_city || editedOrder.shipping_city}
+                        onChange={(e) => setEditedOrder({...editedOrder, billing_city: e.target.value})}
+                        placeholder="City"
+                      />
+                      <Input
+                        value={editedOrder.billing_state || editedOrder.shipping_state}
+                        onChange={(e) => setEditedOrder({...editedOrder, billing_state: e.target.value})}
+                        placeholder="ST"
+                        className="w-20"
+                      />
+                      <Input
+                        value={editedOrder.billing_zip || editedOrder.shipping_zip}
+                        onChange={(e) => setEditedOrder({...editedOrder, billing_zip: e.target.value})}
+                        placeholder="ZIP"
+                        className="w-28"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-medium">{order.billing_name || order.shipping_name}</p>
+                    <p className="text-sm text-muted-foreground">{order.billing_street || order.shipping_street}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {order.billing_city || order.shipping_city}, {order.billing_state || order.shipping_state} {order.billing_zip || order.shipping_zip}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -355,10 +562,21 @@ const OrderDetail = () => {
             </div>
 
             {/* Memo Section */}
-            {order.memo && <div className="mt-8 p-4 bg-muted/50 rounded-lg">
+            {(order.memo || isEditMode) && (
+              <div className="mt-8 p-4 bg-muted/50 rounded-lg">
                 <h3 className="text-sm font-semibold mb-2">Memo</h3>
-                <p className="text-sm text-muted-foreground">{order.memo}</p>
-              </div>}
+                {isEditMode ? (
+                  <Textarea
+                    value={editedOrder.memo || ''}
+                    onChange={(e) => setEditedOrder({...editedOrder, memo: e.target.value})}
+                    placeholder="Add order memo..."
+                    rows={3}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">{order.memo}</p>
+                )}
+              </div>
+            )}
 
             {/* Terms and Conditions */}
             <div className="mt-8 p-6 bg-muted/30 rounded-lg border border-table-border">
