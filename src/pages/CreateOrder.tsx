@@ -895,30 +895,14 @@ const CreateOrder = () => {
 
         {/* Terms & Additional Info */}
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="dueDate">Due Date</Label>
-              <Input
-                id="dueDate"
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="paymentTerms">Payment Terms</Label>
-              <Select value={formData.terms} onValueChange={(value) => setFormData({ ...formData, terms: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Net 30">Net 30</SelectItem>
-                  <SelectItem value="Net 60">Net 60</SelectItem>
-                  <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
-                  <SelectItem value="Prepaid">Prepaid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="dueDate">Due Date</Label>
+            <Input
+              id="dueDate"
+              type="date"
+              value={formData.dueDate}
+              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+            />
           </div>
 
           <div className="space-y-2">
