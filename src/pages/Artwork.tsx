@@ -28,6 +28,14 @@ const Artwork = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [approvalData, setApprovalData] = useState({
+    printName: '',
+    signature: '',
+    date: new Date().toISOString().split('T')[0]
+  });
   const [uploadData, setUploadData] = useState({
     sku: '',
     file: null as File | null,
@@ -179,7 +187,16 @@ const Artwork = () => {
     }
   };
 
-  const handleApprove = async (id: string) => {
+  const handleApprove = async () => {
+    if (!approvalData.printName || !approvalData.signature) {
+      toast({
+        title: "Missing information",
+        description: "Please provide print name and signature",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -189,9 +206,10 @@ const Artwork = () => {
         .update({
           is_approved: true,
           approved_by: user.id,
-          approved_at: new Date().toISOString()
+          approved_at: new Date().toISOString(),
+          notes: `Approved by: ${approvalData.printName}\nSignature: ${approvalData.signature}\nDate: ${approvalData.date}\n\n${selectedFile?.notes || ''}`
         })
-        .eq('id', id);
+        .eq('id', selectedFile.id);
 
       if (error) throw error;
 
@@ -199,12 +217,41 @@ const Artwork = () => {
         title: "Approved",
         description: "Artwork has been approved",
       });
+      
+      setApprovalDialogOpen(false);
+      setApprovalData({
+        printName: '',
+        signature: '',
+        date: new Date().toISOString().split('T')[0]
+      });
       fetchArtwork();
     } catch (error) {
       console.error('Error approving artwork:', error);
       toast({
         title: "Error",
         description: "Failed to approve artwork",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownload = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast({
+        title: "Error",
+        description: "Failed to download file",
         variant: "destructive",
       });
     }
@@ -416,19 +463,20 @@ const Artwork = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {file.preview_url && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => window.open(file.preview_url, '_blank')}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  )}
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    onClick={() => window.open(file.artwork_url, '_blank')}
+                    onClick={() => {
+                      setSelectedFile(file);
+                      setPreviewDialogOpen(true);
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => handleDownload(file.artwork_url, file.filename)}
                   >
                     <Download className="h-4 w-4" />
                   </Button>
@@ -437,7 +485,10 @@ const Artwork = () => {
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        onClick={() => handleApprove(file.id)}
+                        onClick={() => {
+                          setSelectedFile(file);
+                          setApprovalDialogOpen(true);
+                        }}
                       >
                         <CheckCircle className="h-4 w-4 text-green-600" />
                       </Button>
@@ -472,6 +523,99 @@ const Artwork = () => {
           </p>
         </div>
       )}
+
+      {/* Preview Dialog */}
+      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>{selectedFile?.filename}</DialogTitle>
+            <DialogDescription>SKU: {selectedFile?.sku}</DialogDescription>
+          </DialogHeader>
+          <div className="overflow-auto max-h-[70vh]">
+            {selectedFile?.preview_url ? (
+              <img 
+                src={selectedFile.preview_url} 
+                alt={selectedFile.filename}
+                className="w-full h-auto"
+              />
+            ) : selectedFile?.artwork_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+              <img 
+                src={selectedFile.artwork_url} 
+                alt={selectedFile.filename}
+                className="w-full h-auto"
+              />
+            ) : (
+              <div className="text-center py-12">
+                <FileImage className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Preview not available for this file type</p>
+                <Button 
+                  className="mt-4"
+                  onClick={() => handleDownload(selectedFile?.artwork_url, selectedFile?.filename)}
+                >
+                  Download to View
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Dialog */}
+      <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Artwork</DialogTitle>
+            <DialogDescription>
+              Please provide your approval details for {selectedFile?.filename}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="printName">Print Name *</Label>
+              <Input
+                id="printName"
+                value={approvalData.printName}
+                onChange={(e) => setApprovalData({...approvalData, printName: e.target.value})}
+                placeholder="Enter your full name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="signature">Signature *</Label>
+              <Input
+                id="signature"
+                value={approvalData.signature}
+                onChange={(e) => setApprovalData({...approvalData, signature: e.target.value})}
+                placeholder="Type your signature"
+                className="font-cursive"
+              />
+            </div>
+            <div>
+              <Label htmlFor="approvalDate">Date</Label>
+              <Input
+                id="approvalDate"
+                type="date"
+                value={approvalData.date}
+                onChange={(e) => setApprovalData({...approvalData, date: e.target.value})}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleApprove} 
+                className="flex-1"
+              >
+                Approve Artwork
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setApprovalDialogOpen(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
