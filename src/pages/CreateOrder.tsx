@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, Minus, X, Save, Send } from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Save, Send, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -68,6 +68,9 @@ const CreateOrder = () => {
   const [showAddressDialog, setShowAddressDialog] = useState(false);
   const [editingQuantityId, setEditingQuantityId] = useState<string | null>(null);
   const [tempQuantity, setTempQuantity] = useState<string>("");
+  const [showAddItemsDialog, setShowAddItemsDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [tempSelectedProducts, setTempSelectedProducts] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -162,6 +165,39 @@ const CreateOrder = () => {
     ));
     setEditingQuantityId(null);
   };
+
+  const handleAddSelectedItems = () => {
+    const newItems = tempSelectedProducts.map(productId => ({
+      productId,
+      quantity: 1
+    }));
+    setSelectedItems([...selectedItems, ...newItems]);
+    setTempSelectedProducts([]);
+    setSearchQuery("");
+    setShowAddItemsDialog(false);
+  };
+
+  const toggleProductSelection = (productId: string) => {
+    setTempSelectedProducts(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  const filteredProducts = products.filter(p => {
+    const alreadySelected = selectedItems.find(item => item.productId === p.id);
+    if (alreadySelected) return false;
+    
+    if (!searchQuery) return true;
+    
+    const search = searchQuery.toLowerCase();
+    return (
+      p.name.toLowerCase().includes(search) ||
+      p.item_id?.toLowerCase().includes(search) ||
+      p.category.toLowerCase().includes(search)
+    );
+  });
 
   const saveOrder = async (isDraft: boolean) => {
     if (selectedItems.length === 0) {
@@ -617,22 +653,116 @@ const CreateOrder = () => {
               </TableBody>
             </Table>
 
-            {/* Add Item Dropdown */}
+            {/* Add Items Button */}
             <div className="border-t border-table-border p-3 bg-muted/20">
-              <Select onValueChange={(value) => handleProductToggle(value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Add an item..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {products
-                    .filter(p => !selectedItems.find(item => item.productId === p.id))
-                    .map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.item_id ? `${product.item_id} - ` : ''}{product.name} (${product.cost?.toFixed(2) || '0.00'})
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <Dialog open={showAddItemsDialog} onOpenChange={setShowAddItemsDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full" type="button">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Items
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+                  <DialogHeader>
+                    <DialogTitle>Add Items to Order</DialogTitle>
+                    <DialogDescription>
+                      Search and select multiple items to add to your order
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name, item ID, or category..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+
+                  {/* Products List */}
+                  <div className="flex-1 overflow-y-auto border rounded-md">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background z-10">
+                        <TableRow>
+                          <TableHead className="w-12">
+                            <Checkbox
+                              checked={tempSelectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setTempSelectedProducts(filteredProducts.map(p => p.id));
+                                } else {
+                                  setTempSelectedProducts([]);
+                                }
+                              }}
+                            />
+                          </TableHead>
+                          <TableHead>Item ID</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead className="text-right">Price</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredProducts.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                              {searchQuery ? "No products found matching your search" : "All products are already added"}
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredProducts.map((product) => (
+                            <TableRow 
+                              key={product.id}
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => toggleProductSelection(product.id)}
+                            >
+                              <TableCell>
+                                <Checkbox
+                                  checked={tempSelectedProducts.includes(product.id)}
+                                  onCheckedChange={() => toggleProductSelection(product.id)}
+                                />
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">{product.item_id || '-'}</TableCell>
+                              <TableCell className="font-medium">{product.name}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{product.category}</TableCell>
+                              <TableCell className="text-right">${product.cost?.toFixed(2) || '0.00'}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-4 border-t">
+                    <p className="text-sm text-muted-foreground">
+                      {tempSelectedProducts.length} item{tempSelectedProducts.length !== 1 ? 's' : ''} selected
+                    </p>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          setShowAddItemsDialog(false);
+                          setTempSelectedProducts([]);
+                          setSearchQuery("");
+                        }}
+                        type="button"
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={handleAddSelectedItems}
+                        disabled={tempSelectedProducts.length === 0}
+                        type="button"
+                      >
+                        Add {tempSelectedProducts.length} Item{tempSelectedProducts.length !== 1 ? 's' : ''}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 
