@@ -58,6 +58,10 @@ serve(async (req) => {
 
     console.log('Parsed Excel data:', jsonData.length, 'rows');
 
+    // Generate a unique batch ID for this upload
+    const batchId = crypto.randomUUID();
+    const uploadTimestamp = new Date().toISOString();
+
     const inventoryItems = [];
 
     for (const row of jsonData) {
@@ -116,6 +120,8 @@ serve(async (req) => {
         available: available,
         in_production: inProduction,
         redline: redline,
+        upload_batch_id: batchId,
+        upload_timestamp: uploadTimestamp,
       });
     }
 
@@ -137,6 +143,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         inserted: inserted?.length || 0,
+        batchId: batchId,
+        uploadTimestamp: uploadTimestamp,
         message: `Successfully uploaded ${inserted?.length || 0} inventory items`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -4,14 +4,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Search, 
   Filter, 
   ArrowUpDown,
-  AlertTriangle
+  AlertTriangle,
+  Undo2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadInventoryDialog } from "@/components/UploadInventoryDialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface InventoryItem {
   id: string;
@@ -21,13 +33,22 @@ interface InventoryItem {
   in_production: number;
   redline: number;
   product_id: string;
+  upload_batch_id?: string;
+  upload_timestamp?: string;
   products?: {
     image_url: string | null;
   };
 }
 
+interface UploadBatch {
+  batch_id: string;
+  upload_timestamp: string;
+  count: number;
+}
+
 const Inventory = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [stateFilter, setStateFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -37,11 +58,15 @@ const Inventory = () => {
   const [artworkThumbnails, setArtworkThumbnails] = useState<Record<string, string>>({});
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploadBatches, setUploadBatches] = useState<UploadBatch[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [batchToDelete, setBatchToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchInventory();
     fetchArtworkStatus();
     fetchArtworkThumbnails();
+    fetchUploadBatches();
   }, []);
 
   const fetchInventory = async () => {
@@ -57,6 +82,39 @@ const Inventory = () => {
       console.error('Error fetching inventory:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUploadBatches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('upload_batch_id, upload_timestamp')
+        .not('upload_batch_id', 'is', null)
+        .order('upload_timestamp', { ascending: false });
+
+      if (error) throw error;
+
+      // Group by batch_id and count items
+      const batchMap = new Map<string, UploadBatch>();
+      data?.forEach(item => {
+        if (item.upload_batch_id && item.upload_timestamp) {
+          const existing = batchMap.get(item.upload_batch_id);
+          if (existing) {
+            existing.count++;
+          } else {
+            batchMap.set(item.upload_batch_id, {
+              batch_id: item.upload_batch_id,
+              upload_timestamp: item.upload_timestamp,
+              count: 1
+            });
+          }
+        }
+      });
+
+      setUploadBatches(Array.from(batchMap.values()));
+    } catch (error) {
+      console.error('Error fetching upload batches:', error);
     }
   };
 
@@ -131,6 +189,42 @@ const Inventory = () => {
     }
   };
 
+  const handleRevertBatch = (batchId: string) => {
+    setBatchToDelete(batchId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteBatchConfirm = async () => {
+    if (!batchToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('inventory')
+        .delete()
+        .eq('upload_batch_id', batchToDelete);
+
+      if (error) throw error;
+
+      toast({
+        title: "Upload reverted",
+        description: "The inventory upload has been successfully removed.",
+      });
+
+      fetchInventory();
+      fetchUploadBatches();
+    } catch (error) {
+      console.error('Error deleting batch:', error);
+      toast({
+        title: "Error",
+        description: "Failed to revert upload. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setBatchToDelete(null);
+    }
+  };
+
   const filteredAndSortedData = inventory
     .filter(item => {
       const matchesSearch = item.sku.toLowerCase().includes(searchQuery.toLowerCase());
@@ -165,8 +259,46 @@ const Inventory = () => {
           <h1 className="text-2xl font-semibold">Inventory Management</h1>
           <p className="text-sm text-muted-foreground mt-1">Track stock levels, monitor thresholds, and manage production pipeline</p>
         </div>
-        <UploadInventoryDialog onInventoryUploaded={fetchInventory} />
+        <div className="flex gap-3">
+          <UploadInventoryDialog onInventoryUploaded={() => {
+            fetchInventory();
+            fetchUploadBatches();
+          }} />
+        </div>
       </div>
+
+      {/* Recent Uploads - Undo Section */}
+      {uploadBatches.length > 0 && (
+        <div className="bg-muted/30 border border-border rounded-lg p-4">
+          <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <Undo2 className="h-4 w-4" />
+            Recent Uploads
+          </h2>
+          <div className="space-y-2">
+            {uploadBatches.slice(0, 5).map((batch) => (
+              <div key={batch.batch_id} className="flex items-center justify-between bg-background rounded px-3 py-2 text-sm">
+                <div className="flex items-center gap-3">
+                  <span className="text-muted-foreground">
+                    {new Date(batch.upload_timestamp).toLocaleString()}
+                  </span>
+                  <Badge variant="outline" className="text-xs">
+                    {batch.count} items
+                  </Badge>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-destructive hover:text-destructive"
+                  onClick={() => handleRevertBatch(batch.batch_id)}
+                >
+                  <Undo2 className="h-3 w-3 mr-1" />
+                  Revert
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col lg:flex-row gap-4">
@@ -288,6 +420,24 @@ const Inventory = () => {
           No inventory items found matching your criteria.
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revert this upload?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all {uploadBatches.find(b => b.batch_id === batchToDelete)?.count || 0} inventory items from this upload batch. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteBatchConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Revert Upload
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

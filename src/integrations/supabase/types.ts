@@ -151,6 +151,8 @@ export type Database = {
           sku: string
           state: string
           updated_at: string
+          upload_batch_id: string | null
+          upload_timestamp: string | null
         }
         Insert: {
           available?: number
@@ -163,6 +165,8 @@ export type Database = {
           sku: string
           state: string
           updated_at?: string
+          upload_batch_id?: string | null
+          upload_timestamp?: string | null
         }
         Update: {
           available?: number
@@ -175,6 +179,8 @@ export type Database = {
           sku?: string
           state?: string
           updated_at?: string
+          upload_batch_id?: string | null
+          upload_timestamp?: string | null
         }
         Relationships: [
           {
