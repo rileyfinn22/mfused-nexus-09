@@ -37,6 +37,7 @@ const Orders = () => {
     const { data, error } = await supabase
       .from('orders')
       .select('*, order_items(*)')
+      .eq('order_type', 'standard') // Only show standard orders, not pull_ship
       .order('created_at', { ascending: false });
     
     if (!error && data) {

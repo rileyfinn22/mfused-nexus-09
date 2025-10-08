@@ -336,6 +336,7 @@ export type Database = {
           order_finalized_at: string | null
           order_finalized_by: string | null
           order_number: string
+          order_type: string
           po_number: string | null
           shipping_city: string
           shipping_name: string
@@ -372,6 +373,7 @@ export type Database = {
           order_finalized_at?: string | null
           order_finalized_by?: string | null
           order_number: string
+          order_type?: string
           po_number?: string | null
           shipping_city: string
           shipping_name: string
@@ -408,6 +410,7 @@ export type Database = {
           order_finalized_at?: string | null
           order_finalized_by?: string | null
           order_number?: string
+          order_type?: string
           po_number?: string | null
           shipping_city?: string
           shipping_name?: string

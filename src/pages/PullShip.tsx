@@ -441,68 +441,17 @@ const PullShip = () => {
 
       setAnalyzingPO(false);
 
-      // The edge function has already created the order
+      // The edge function has created a pull & ship order
       if (analysisData.success && analysisData.orderId) {
-        // Fetch the full order with items to generate PDFs
-        const { data: fullOrder, error: orderError } = await supabase
-          .from('orders')
-          .select('*, order_items(*)')
-          .eq('id', analysisData.orderId)
-          .single();
-
-        if (orderError || !fullOrder) {
-          console.error('Error fetching order:', orderError);
-          throw new Error('Failed to fetch order details');
-        }
-
-        // Generate packing list and invoice PDFs
-        const items = fullOrder.order_items.map((item: any) => ({
-          sku: item.sku,
-          itemId: item.item_id,
-          quantity: item.quantity
-        }));
-
-        const invoiceData = {
-          invoiceNumber: fullOrder.order_number,
-          customerName: fullOrder.customer_name,
-          state: fullOrder.shipping_state,
-          address: `${fullOrder.shipping_street}, ${fullOrder.shipping_city}, ${fullOrder.shipping_state} ${fullOrder.shipping_zip}`,
-          items: items
-        };
-
-        const orderData = {
-          state: fullOrder.shipping_state,
-          shippingAddress: fullOrder.shipping_street,
-          shippingCity: fullOrder.shipping_city,
-          shippingState: fullOrder.shipping_state,
-          shippingZip: fullOrder.shipping_zip,
-          notes: fullOrder.memo || ''
-        };
-
-        // Generate PDFs
-        const packingListDoc = generatePackingListPDF(items, orderData, fullOrder.order_number);
-        const invoiceDoc = generateInvoicePDF(
-          items, 
-          orderData, 
-          fullOrder.order_number, 
-          `$${fullOrder.total.toFixed(2)}`
-        );
-
-        // Convert PDFs to base64 for email
-        const packingListPdf = packingListDoc.output('dataurlstring');
-
-        // Send packing list email to warehouse fulfillment
-        await sendPackingListEmail(packingListPdf, invoiceData);
-
         toast({
-          title: "Order Created & Sent",
-          description: `Order ${analysisData.orderNumber} created and packing list sent to fulfillment`,
+          title: "Pull & Ship Order Created",
+          description: `Order ${analysisData.orderNumber} has been created from the PO`,
         });
 
-        // Navigate to the order detail page
-        navigate(`/orders/${analysisData.orderId}`);
+        // Navigate to the pull & ship order detail page
+        navigate(`/pull-ship/${analysisData.orderId}`);
       } else {
-        throw new Error('Failed to create order from PO');
+        throw new Error('Failed to create pull & ship order from PO');
       }
 
       setSelectedPOFile(null);

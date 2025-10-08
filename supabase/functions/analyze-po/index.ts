@@ -252,12 +252,13 @@ Return ONLY valid JSON:
     const tax = subtotal * 0.06;
     const total = subtotal + tax;
 
-    // Create order
+    // Create order as pull_ship type with pending_pull status
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
         company_id: companyId,
         order_number: orderNumber,
+        order_type: 'pull_ship',
         po_number: extractedData.po_number || null,
         customer_name: extractedData.customer_name || 'Unknown Customer',
         customer_email: extractedData.customer_email || null,
@@ -273,11 +274,11 @@ Return ONLY valid JSON:
         billing_state: extractedData.billing_state || extractedData.shipping_state,
         billing_zip: extractedData.billing_zip || extractedData.shipping_zip,
         due_date: extractedData.due_date || null,
-        memo: extractedData.memo || `Order from PO: ${filename}`,
+        memo: extractedData.memo || `Pull & Ship order from PO: ${filename}`,
         subtotal,
         tax,
         total,
-        status: 'draft',
+        status: 'pending_pull',
         terms: 'Net 30'
       })
       .select()

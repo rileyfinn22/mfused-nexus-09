@@ -16,6 +16,7 @@ import Invoices from "./pages/Invoices";
 import Artwork from "./pages/Artwork";
 import RejectedArchive from "./pages/RejectedArchive";
 import PullShip from "./pages/PullShip";
+import PullShipOrderDetail from "./pages/PullShipOrderDetail";
 import MyPOs from "./pages/MyPOs";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -43,6 +44,7 @@ const App = () => (
           <Route path="/artwork" element={<DashboardLayout><Artwork /></DashboardLayout>} />
           <Route path="/artwork/rejected" element={<DashboardLayout><RejectedArchive /></DashboardLayout>} />
           <Route path="/pull-ship" element={<DashboardLayout><PullShip /></DashboardLayout>} />
+          <Route path="/pull-ship/:orderId" element={<DashboardLayout><PullShipOrderDetail /></DashboardLayout>} />
           <Route path="/my-pos" element={<DashboardLayout><MyPOs /></DashboardLayout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
