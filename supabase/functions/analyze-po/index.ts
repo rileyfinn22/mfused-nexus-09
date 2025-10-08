@@ -43,29 +43,12 @@ serve(async (req) => {
     
     const pdfArrayBuffer = await pdfBlob.arrayBuffer();
     
-    // Convert PDF to text using pdfjs
-    console.log('Extracting text from PDF...');
-    const pdfjsLib = await import('https://esm.sh/pdfjs-dist@3.11.174/build/pdf.mjs');
-    
-    // Initialize pdfjs with worker
-    const pdfData = new Uint8Array(pdfArrayBuffer);
-    const loadingTask = pdfjsLib.getDocument({ data: pdfData });
-    const pdf = await loadingTask.promise;
-    
-    // Extract text from all pages
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item: any) => item.str).join(' ');
-      fullText += pageText + '\n\n';
-    }
-    
-    console.log('Extracted text length:', fullText.length);
-    console.log('First 500 chars:', fullText.substring(0, 500));
+    // Convert PDF to base64 for AI vision analysis
+    console.log('Converting PDF to base64...');
+    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
 
-    // Analyze with Lovable AI using text instead of image
-    console.log('Sending to AI for analysis...');
+    // Analyze with Lovable AI using vision capability
+    console.log('Sending PDF to AI for analysis...');
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -76,13 +59,12 @@ serve(async (req) => {
         model: 'google/gemini-2.5-flash',
         messages: [
           {
-            role: 'system',
-            content: 'You are a purchase order analysis assistant. Extract structured data from PO text and return it in JSON format. Be precise with numeric values and maintain the exact format.'
-          },
-          {
             role: 'user',
-            content: `Analyze this purchase order text and extract the following information in valid JSON format:
-            
+            content: [
+              {
+                type: 'text',
+                text: `Analyze this purchase order PDF and extract the following information in valid JSON format:
+
 Required fields:
 - po_number: string (the purchase order number)
 - customer_name: string (the vendor or company name)
@@ -107,10 +89,15 @@ Required fields:
   - quantity: number (integer)
   - unit_price: number (decimal, e.g., 0.218)
 
-PO Text:
-${fullText}
-
 Return ONLY valid JSON, no additional text or explanation.`
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:application/pdf;base64,${pdfBase64}`
+                }
+              }
+            ]
           }
         ],
         response_format: { type: "json_object" }
