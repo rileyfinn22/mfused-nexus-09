@@ -74,7 +74,12 @@ const Vendors = () => {
         .insert({ ...formData, company_id: userRole.company_id });
       
       if (error) {
-        toast({ title: "Error", description: "Failed to create vendor", variant: "destructive" });
+        console.error("Vendor creation error:", error);
+        toast({ 
+          title: "Error", 
+          description: error.message || "Failed to create vendor", 
+          variant: "destructive" 
+        });
       } else {
         toast({ title: "Success", description: "Vendor created successfully" });
         fetchVendors();
