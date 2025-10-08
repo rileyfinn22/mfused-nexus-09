@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadPODialog } from "@/components/UploadPODialog";
 import { 
@@ -14,11 +12,11 @@ import {
   Plus, 
   Eye,
   Edit,
-  Package,
   CheckCircle,
-  Clock,
   Trash2,
-  Circle
+  Circle,
+  Truck,
+  Factory
 } from "lucide-react";
 
 const Orders = () => {
@@ -37,7 +35,7 @@ const Orders = () => {
     const { data, error } = await supabase
       .from('orders')
       .select('*, order_items(*)')
-      // Remove filter to show both standard and pull_ship orders
+      // Show both standard and pull_ship orders
       .order('created_at', { ascending: false });
     
     if (!error && data) {
@@ -94,7 +92,9 @@ const Orders = () => {
     switch (status.toLowerCase()) {
       case 'draft': return 0;
       case 'pending': return 5;
+      case 'pending_pull': return 5;
       case 'confirmed': return 15;
+      case 'picked': return 30;
       case 'in production': return 50;
       case 'qc review': return 85;
       case 'ready to ship': return 100;
@@ -107,6 +107,8 @@ const Orders = () => {
     switch (status.toLowerCase()) {
       case 'draft': return 'text-muted-foreground';
       case 'pending': return 'text-blue-500';
+      case 'pending_pull': return 'text-blue-500';
+      case 'picked': return 'text-blue-600';
       case 'order placed': return 'text-muted-foreground';
       case 'in production': return 'text-primary';
       case 'qc review': return 'text-warning';
@@ -115,6 +117,22 @@ const Orders = () => {
     }
   };
 
+  const getOrderTypeDisplay = (orderType: string) => {
+    if (orderType === 'pull_ship') {
+      return {
+        label: 'Pull & Ship',
+        icon: Truck,
+        badgeColor: 'bg-blue-500 text-white hover:bg-blue-600',
+        textColor: 'text-blue-600'
+      };
+    }
+    return {
+      label: 'Production',
+      icon: Factory,
+      badgeColor: 'bg-purple-500 text-white hover:bg-purple-600',
+      textColor: 'text-purple-600'
+    };
+  };
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -124,212 +142,104 @@ const Orders = () => {
   });
 
   const draftOrders = filteredOrders.filter(o => o.status.toLowerCase() === 'draft');
-  const pendingOrdersList = filteredOrders.filter(o => o.status.toLowerCase() === 'pending');
+  const pendingOrdersList = filteredOrders.filter(o => 
+    ['pending', 'pending_pull'].includes(o.status.toLowerCase())
+  );
   const productionOrders = filteredOrders.filter(o => 
-    !['draft', 'pending'].includes(o.status.toLowerCase())
+    !['draft', 'pending', 'pending_pull'].includes(o.status.toLowerCase())
   );
 
   return (
-    <>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-table-border pb-4">
-          <div>
-            <h1 className="text-2xl font-semibold">Orders & Production</h1>
-            <p className="text-sm text-muted-foreground mt-1">Track order progress and production pipeline</p>
-          </div>
-          <div className="flex gap-3">
-            <UploadPODialog />
-            <Button size="sm" className="bg-primary text-primary-foreground" onClick={() => navigate("/orders/create")}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Order
-            </Button>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-table-border pb-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Orders & Production</h1>
+          <p className="text-sm text-muted-foreground mt-1">Track order progress and production pipeline</p>
         </div>
+        <div className="flex gap-3">
+          <UploadPODialog />
+          <Button size="sm" className="bg-primary text-primary-foreground" onClick={() => navigate("/orders/create")}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Order
+          </Button>
+        </div>
+      </div>
 
-      <Tabs defaultValue="pending" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="pending">Pending Orders</TabsTrigger>
-          <TabsTrigger value="production">In Production</TabsTrigger>
-        </TabsList>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search orders..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="pending_pull">Pending Pull</SelectItem>
+            <SelectItem value="picked">Picked</SelectItem>
+            <SelectItem value="in production">In Production</SelectItem>
+            <SelectItem value="qc review">QC Review</SelectItem>
+            <SelectItem value="ready to ship">Ready to Ship</SelectItem>
+            <SelectItem value="shipped">Shipped</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-        <TabsContent value="pending" className="space-y-6">
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search orders..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="order placed">Order Placed</SelectItem>
-                <SelectItem value="in production">In Production</SelectItem>
-                <SelectItem value="qc review">QC Review</SelectItem>
-                <SelectItem value="ready to ship">Ready to Ship</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Draft Orders */}
-          {draftOrders.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-lg font-medium">Draft Orders</h2>
-              <div className="border border-table-border rounded">
-                <div className="bg-table-header border-b border-table-border">
-                  <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    <div className="col-span-2">Order #</div>
-                    <div className="col-span-2">PO #</div>
-                    <div className="col-span-1">State</div>
-                    <div className="col-span-1">Total</div>
-                    <div className="col-span-2">Status</div>
-                    <div className="col-span-2">Due Date</div>
-                    <div className="col-span-2">Actions</div>
-                  </div>
-                </div>
-                <div className="divide-y divide-table-border">
-                  {draftOrders.map((order) => {
-                    const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
-                    
-                    return (
-                      <div 
-                        key={order.id} 
-                        className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
-                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`)}
-                      >
-                        <div className="col-span-2 font-medium font-mono text-sm flex items-center gap-2">
-                          {order.order_number}
-                          <Badge variant={order.order_type === 'pull_ship' ? 'default' : 'secondary'} className="text-xs">
-                            {order.order_type === 'pull_ship' ? 'P&S' : 'Prod'}
-                          </Badge>
-                        </div>
-                        <div className="col-span-2 text-sm">{order.po_number || '-'}</div>
-                        <div className="col-span-1">
-                          <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
-                        </div>
-                        <div className="col-span-1 text-sm">${order.total?.toFixed(3)}</div>
-                        <div className="col-span-2 text-sm capitalize text-muted-foreground">
-                          Draft
-                        </div>
-                        <div className="col-span-2 text-sm text-muted-foreground">
-                          {dueDate}
-                        </div>
-                        <div className="col-span-2 flex gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-6 w-6 p-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`);
-                            }}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                            onClick={(e) => handleDeleteOrder(order.id, e)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Pending Orders (Awaiting Production) */}
+      <div className="space-y-8">
+        {/* Draft Orders */}
+        {draftOrders.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-lg font-medium">Pending Orders - Awaiting Production</h2>
+            <h2 className="text-lg font-medium">Draft Orders - Incomplete</h2>
             <div className="border border-table-border rounded">
               <div className="bg-table-header border-b border-table-border">
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  <div className="col-span-2">Order #</div>
+                  <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-2">PO #</div>
                   <div className="col-span-1">State</div>
                   <div className="col-span-1">Total</div>
-                  <div className="col-span-1">Status</div>
-                  <div className="col-span-2">Checklist</div>
-                  <div className="col-span-1">Due Date</div>
+                  <div className="col-span-2">Status</div>
+                  <div className="col-span-2">Due Date</div>
                   <div className="col-span-2">Actions</div>
                 </div>
               </div>
               <div className="divide-y divide-table-border">
-                {loading ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    Loading orders...
-                  </div>
-                ) : pendingOrdersList.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    No pending orders
-                  </div>
-                ) : pendingOrdersList.map((order) => {
+                {draftOrders.map((order) => {
                   const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
+                  const orderTypeInfo = getOrderTypeDisplay(order.order_type);
+                  const OrderIcon = orderTypeInfo.icon;
                   
                   return (
                     <div 
                       key={order.id} 
                       className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
-                      onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`)}
+                      onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`)}
                     >
-                      <div className="col-span-2 font-medium font-mono text-sm flex items-center gap-2">
-                        {order.order_number}
-                        <Badge variant={order.order_type === 'pull_ship' ? 'default' : 'secondary'} className="text-xs">
-                          {order.order_type === 'pull_ship' ? 'P&S' : 'Prod'}
+                      <div className="col-span-2 space-y-1">
+                        <div className="font-medium font-mono text-sm">{order.order_number}</div>
+                        <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-1 w-fit`}>
+                          <OrderIcon className="h-3 w-3" />
+                          {orderTypeInfo.label}
                         </Badge>
                       </div>
                       <div className="col-span-2 text-sm">{order.po_number || '-'}</div>
                       <div className="col-span-1">
                         <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                       </div>
-                      <div className="col-span-1 text-sm">${order.total?.toFixed(3)}</div>
-                      <div className="col-span-1 text-sm capitalize text-blue-500">
-                        Pending
+                      <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
+                      <div className="col-span-2 text-sm capitalize text-muted-foreground">
+                        Draft
                       </div>
-                      <div className="col-span-2">
-                        <div className="flex gap-2 items-center">
-                          <div className="flex items-center gap-1" title="Art Approved">
-                            {order.artApproved ? (
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <Circle className="h-4 w-4 text-muted-foreground" />
-                            )}
-                            <span className="text-xs text-muted-foreground">Art</span>
-                          </div>
-                          <div className="flex items-center gap-1" title="Order Finalized">
-                            {order.order_finalized ? (
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <Circle className="h-4 w-4 text-muted-foreground" />
-                            )}
-                            <span className="text-xs text-muted-foreground">Order</span>
-                          </div>
-                          <div className="flex items-center gap-1" title="Vibe Processed">
-                            {order.vibe_processed ? (
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <Circle className="h-4 w-4 text-muted-foreground" />
-                            )}
-                            <span className="text-xs text-muted-foreground">Vibe</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-span-1 text-sm text-muted-foreground">
+                      <div className="col-span-2 text-sm text-muted-foreground">
                         {dueDate}
                       </div>
                       <div className="col-span-2 flex gap-1">
@@ -347,17 +257,6 @@ const Orders = () => {
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          className="h-6 w-6 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`);
-                          }}
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
                           className="h-6 w-6 p-0 text-destructive hover:text-destructive"
                           onClick={(e) => handleDeleteOrder(order.id, e)}
                         >
@@ -370,39 +269,136 @@ const Orders = () => {
               </div>
             </div>
           </div>
-        </TabsContent>
+        )}
 
-        <TabsContent value="production" className="space-y-6">
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search orders..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="in production">In Production</SelectItem>
-                <SelectItem value="qc review">QC Review</SelectItem>
-                <SelectItem value="ready to ship">Ready to Ship</SelectItem>
-                <SelectItem value="shipped">Shipped</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Production Orders */}
+        {/* Pending Orders (Awaiting Production) */}
+        <div className="space-y-3">
+          <h2 className="text-lg font-medium">Pending Orders - Awaiting Production</h2>
           <div className="border border-table-border rounded">
             <div className="bg-table-header border-b border-table-border">
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                <div className="col-span-2">Order #</div>
+                <div className="col-span-2">Order # / Type</div>
+                <div className="col-span-2">PO #</div>
+                <div className="col-span-1">State</div>
+                <div className="col-span-1">Total</div>
+                <div className="col-span-1">Status</div>
+                <div className="col-span-2">Checklist</div>
+                <div className="col-span-1">Due Date</div>
+                <div className="col-span-2">Actions</div>
+              </div>
+            </div>
+            <div className="divide-y divide-table-border">
+              {loading ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  Loading orders...
+                </div>
+              ) : pendingOrdersList.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  No pending orders
+                </div>
+              ) : pendingOrdersList.map((order) => {
+                const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
+                const orderTypeInfo = getOrderTypeDisplay(order.order_type);
+                const OrderIcon = orderTypeInfo.icon;
+                
+                return (
+                  <div 
+                    key={order.id} 
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                    onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`)}
+                  >
+                    <div className="col-span-2 space-y-1">
+                      <div className="font-medium font-mono text-sm">{order.order_number}</div>
+                      <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-1 w-fit`}>
+                        <OrderIcon className="h-3 w-3" />
+                        {orderTypeInfo.label}
+                      </Badge>
+                    </div>
+                    <div className="col-span-2 text-sm">{order.po_number || '-'}</div>
+                    <div className="col-span-1">
+                      <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
+                    </div>
+                    <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
+                    <div className="col-span-1 text-sm capitalize text-blue-500">
+                      {order.status.replace('_', ' ')}
+                    </div>
+                    <div className="col-span-2">
+                      <div className="flex gap-2 items-center">
+                        <div className="flex items-center gap-1" title="Art Approved">
+                          {order.artApproved ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Circle className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="text-xs text-muted-foreground">Art</span>
+                        </div>
+                        <div className="flex items-center gap-1" title="Order Finalized">
+                          {order.order_finalized ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Circle className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="text-xs text-muted-foreground">Order</span>
+                        </div>
+                        <div className="flex items-center gap-1" title="Vibe Processed">
+                          {order.vibe_processed ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Circle className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="text-xs text-muted-foreground">Vibe</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-span-1 text-sm text-muted-foreground">
+                      {dueDate}
+                    </div>
+                    <div className="col-span-2 flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`);
+                        }}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`);
+                        }}
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        onClick={(e) => handleDeleteOrder(order.id, e)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Production Orders */}
+        <div className="space-y-3">
+          <h2 className="text-lg font-medium">Orders in Production</h2>
+          <div className="border border-table-border rounded">
+            <div className="bg-table-header border-b border-table-border">
+              <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="col-span-2">Order # / Type</div>
                 <div className="col-span-2">PO #</div>
                 <div className="col-span-1">State</div>
                 <div className="col-span-1">Total</div>
@@ -423,6 +419,8 @@ const Orders = () => {
               ) : productionOrders.map((order) => {
                 const progress = getProgressForStatus(order.status);
                 const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
+                const orderTypeInfo = getOrderTypeDisplay(order.order_type);
+                const OrderIcon = orderTypeInfo.icon;
                 
                 return (
                   <div 
@@ -430,19 +428,20 @@ const Orders = () => {
                     className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
                     onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`)}
                   >
-                    <div className="col-span-2 font-medium font-mono text-sm flex items-center gap-2">
-                      {order.order_number}
-                      <Badge variant={order.order_type === 'pull_ship' ? 'default' : 'secondary'} className="text-xs">
-                        {order.order_type === 'pull_ship' ? 'P&S' : 'Prod'}
+                    <div className="col-span-2 space-y-1">
+                      <div className="font-medium font-mono text-sm">{order.order_number}</div>
+                      <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-1 w-fit`}>
+                        <OrderIcon className="h-3 w-3" />
+                        {orderTypeInfo.label}
                       </Badge>
                     </div>
                     <div className="col-span-2 text-sm">{order.po_number || '-'}</div>
                     <div className="col-span-1">
                       <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                     </div>
-                    <div className="col-span-1 text-sm">${order.total?.toFixed(3)}</div>
+                    <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
                     <div className={`col-span-2 text-sm capitalize ${getStatusColor(order.status)}`}>
-                      {order.status}
+                      {order.status.replace('_', ' ')}
                     </div>
                     <div className="col-span-2 space-y-1">
                       <div className="flex justify-between text-xs">
@@ -488,55 +487,9 @@ const Orders = () => {
               })}
             </div>
           </div>
-        </TabsContent>
-
-        <TabsContent value="old-progress" className="space-y-6">
-          {/* Old Progress View - Hidden */}
-          <div className="space-y-3 hidden">
-            <h2 className="text-lg font-medium">Order ETAs</h2>
-            <div className="border border-table-border rounded">
-              <div className="bg-table-header border-b border-table-border">
-                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  <div className="col-span-2">Order #</div>
-                  <div className="col-span-2">PO #</div>
-                  <div className="col-span-1">State</div>
-                  <div className="col-span-2">Status</div>
-                  <div className="col-span-2">Progress</div>
-                  <div className="col-span-3">Estimated Completion</div>
-                </div>
-              </div>
-              <div className="divide-y divide-table-border">
-                {orders.map((order) => (
-                  <div key={order.id} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors">
-                    <div className="col-span-2 font-medium font-mono text-sm">{order.id}</div>
-                    <div className="col-span-2 text-sm">{order.sku}</div>
-                    <div className="col-span-1">
-                      <Badge variant="outline" className="text-xs">{order.state}</Badge>
-                    </div>
-                    <div className={`col-span-2 text-sm ${getStatusColor(order.status)}`}>
-                      {order.status}
-                    </div>
-                    <div className="col-span-2">
-                      <div className="space-y-1">
-                        <div className="text-xs">{order.progress}%</div>
-                        <Progress value={order.progress} className="h-1" />
-                      </div>
-                    </div>
-                    <div className="col-span-3 flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{order.estimatedCompletion}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Pending Orders Checklist - Old/Hidden */}
-        </TabsContent>
-      </Tabs>
+        </div>
       </div>
-    </>
+    </div>
   );
 };
 
