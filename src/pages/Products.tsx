@@ -207,11 +207,18 @@ const Products = () => {
   const handleDeleteConfirm = async () => {
     const idsToDelete = productToDelete ? [productToDelete] : Array.from(selectedProducts);
     
-    if (idsToDelete.length === 0) return;
+    console.log('Deleting products:', idsToDelete);
+    
+    if (idsToDelete.length === 0) {
+      console.log('No products to delete');
+      return;
+    }
 
     try {
       // Delete related records first for all selected products
       for (const id of idsToDelete) {
+        console.log('Deleting product:', id);
+        
         await supabase
           .from('product_states')
           .delete()
@@ -228,7 +235,10 @@ const Products = () => {
           .delete()
           .eq('id', id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error deleting product:', error);
+          throw error;
+        }
       }
 
       toast({
