@@ -73,28 +73,45 @@ serve(async (req) => {
       
       // Support multiple column name variations
       let sku = row['SKU'] || row['sku'] || row['Item'] || row['Item Name'];
-      let itemId = row['Item ID'] || row['Item Id'] || row['item_id'] || row['Item #'];
+      let itemId = null;
       let state = 'Primary'; // Default state
       
-      // If "Item and State" column exists, parse it first (format: PCK-00430-WA)
+      // Check if "Item #" contains both item ID and state (format: PCK-00430-WA)
+      const itemNumberRaw = row['Item #'] || row['Item ID'] || row['Item Id'] || row['item_id'];
+      if (itemNumberRaw) {
+        const itemNumberStr = String(itemNumberRaw);
+        console.log('Processing Item #:', itemNumberStr);
+        // Check if it contains a dash (likely has state appended)
+        const lastDashIndex = itemNumberStr.lastIndexOf('-');
+        if (lastDashIndex > 0 && itemNumberStr.length - lastDashIndex <= 3) {
+          // Likely format: PCK-00430-WA (state is 2-3 chars after last dash)
+          itemId = itemNumberStr.substring(0, lastDashIndex); // "PCK-00430"
+          state = itemNumberStr.substring(lastDashIndex + 1); // "WA"
+          console.log('Extracted from Item # - itemId:', itemId, 'state:', state);
+        } else {
+          // No state in item number, use as-is
+          itemId = itemNumberStr;
+          console.log('Using Item # as-is:', itemId);
+        }
+      }
+      
+      // If "Item and State" column exists, it takes precedence
       if (row['Item and State']) {
         const itemAndState = String(row['Item and State']);
         console.log('Parsing Item and State:', itemAndState);
         // Split by last dash to separate item number from state
         const lastDashIndex = itemAndState.lastIndexOf('-');
         if (lastDashIndex > 0) {
-          const extractedItemId = itemAndState.substring(0, lastDashIndex); // "PCK-00430"
+          itemId = itemAndState.substring(0, lastDashIndex); // "PCK-00430"
           state = itemAndState.substring(lastDashIndex + 1); // "WA"
-          // Only use extracted item ID if we don't have one from Item ID column
-          if (!itemId) {
-            itemId = extractedItemId;
-          }
           console.log('Extracted - itemId:', itemId, 'state:', state);
-        } else if (!itemId) {
+        } else {
           itemId = itemAndState;
         }
-      } else if (row['State'] || row['state']) {
-        // Only use separate State column if "Item and State" doesn't exist
+      }
+      
+      // Check for separate State column if state wasn't already extracted
+      if (state === 'Primary' && (row['State'] || row['state'])) {
         state = row['State'] || row['state'];
         console.log('Using State column:', state);
       }
