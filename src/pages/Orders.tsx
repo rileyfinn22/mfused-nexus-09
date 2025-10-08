@@ -37,7 +37,7 @@ const Orders = () => {
     const { data, error } = await supabase
       .from('orders')
       .select('*, order_items(*)')
-      .eq('order_type', 'standard') // Only show standard orders, not pull_ship
+      // Remove filter to show both standard and pull_ship orders
       .order('created_at', { ascending: false });
     
     if (!error && data) {
@@ -205,9 +205,14 @@ const Orders = () => {
                       <div 
                         key={order.id} 
                         className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
-                        onClick={() => navigate(`/orders/edit/${order.id}`)}
+                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`)}
                       >
-                        <div className="col-span-2 font-medium font-mono text-sm">{order.order_number}</div>
+                        <div className="col-span-2 font-medium font-mono text-sm flex items-center gap-2">
+                          {order.order_number}
+                          <Badge variant={order.order_type === 'pull_ship' ? 'default' : 'secondary'} className="text-xs">
+                            {order.order_type === 'pull_ship' ? 'P&S' : 'Prod'}
+                          </Badge>
+                        </div>
                         <div className="col-span-2 text-sm">{order.po_number || '-'}</div>
                         <div className="col-span-1">
                           <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
@@ -226,7 +231,7 @@ const Orders = () => {
                             className="h-6 w-6 p-0"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/orders/edit/${order.id}`);
+                              navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`);
                             }}
                           >
                             <Edit className="h-3 w-3" />
@@ -280,9 +285,14 @@ const Orders = () => {
                     <div 
                       key={order.id} 
                       className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
-                      onClick={() => navigate(`/orders/${order.id}`)}
+                      onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`)}
                     >
-                      <div className="col-span-2 font-medium font-mono text-sm">{order.order_number}</div>
+                      <div className="col-span-2 font-medium font-mono text-sm flex items-center gap-2">
+                        {order.order_number}
+                        <Badge variant={order.order_type === 'pull_ship' ? 'default' : 'secondary'} className="text-xs">
+                          {order.order_type === 'pull_ship' ? 'P&S' : 'Prod'}
+                        </Badge>
+                      </div>
                       <div className="col-span-2 text-sm">{order.po_number || '-'}</div>
                       <div className="col-span-1">
                         <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
@@ -329,7 +339,7 @@ const Orders = () => {
                           className="h-6 w-6 p-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/orders/edit/${order.id}`);
+                            navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`);
                           }}
                         >
                           <Edit className="h-3 w-3" />
@@ -340,7 +350,7 @@ const Orders = () => {
                           className="h-6 w-6 p-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/orders/${order.id}`);
+                            navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`);
                           }}
                         >
                           <Eye className="h-3 w-3" />
@@ -418,9 +428,14 @@ const Orders = () => {
                   <div 
                     key={order.id} 
                     className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
-                    onClick={() => navigate(`/orders/${order.id}`)}
+                    onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`)}
                   >
-                    <div className="col-span-2 font-medium font-mono text-sm">{order.order_number}</div>
+                    <div className="col-span-2 font-medium font-mono text-sm flex items-center gap-2">
+                      {order.order_number}
+                      <Badge variant={order.order_type === 'pull_ship' ? 'default' : 'secondary'} className="text-xs">
+                        {order.order_type === 'pull_ship' ? 'P&S' : 'Prod'}
+                      </Badge>
+                    </div>
                     <div className="col-span-2 text-sm">{order.po_number || '-'}</div>
                     <div className="col-span-1">
                       <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
@@ -443,7 +458,7 @@ const Orders = () => {
                         className="h-6 w-6 p-0"
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/orders/edit/${order.id}`);
+                          navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`);
                         }}
                       >
                         <Edit className="h-3 w-3" />
@@ -454,7 +469,7 @@ const Orders = () => {
                         className="h-6 w-6 p-0"
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/orders/${order.id}`);
+                          navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`);
                         }}
                       >
                         <Eye className="h-3 w-3" />
