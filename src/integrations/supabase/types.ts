@@ -340,6 +340,9 @@ export type Database = {
           total: number
           tracking_number: string | null
           updated_at: string
+          vibe_processed: boolean
+          vibe_processed_at: string | null
+          vibe_processed_by: string | null
         }
         Insert: {
           billing_city?: string | null
@@ -370,6 +373,9 @@ export type Database = {
           total?: number
           tracking_number?: string | null
           updated_at?: string
+          vibe_processed?: boolean
+          vibe_processed_at?: string | null
+          vibe_processed_by?: string | null
         }
         Update: {
           billing_city?: string | null
@@ -400,6 +406,9 @@ export type Database = {
           total?: number
           tracking_number?: string | null
           updated_at?: string
+          vibe_processed?: boolean
+          vibe_processed_at?: string | null
+          vibe_processed_by?: string | null
         }
         Relationships: []
       }

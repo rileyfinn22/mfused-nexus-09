@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 const OrderDetail = () => {
@@ -22,6 +22,9 @@ const OrderDetail = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [artApproved, setArtApproved] = useState(false);
+  const [poApproved, setPoApproved] = useState(false);
+  const [vibeProcessed, setVibeProcessed] = useState(false);
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -49,6 +52,32 @@ const OrderDetail = () => {
     } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).single();
     if (!error && data) {
       setOrder(data);
+      setVibeProcessed(data.vibe_processed || false);
+      
+      // Check PO approval status
+      if (data.po_number) {
+        const { data: poData } = await supabase
+          .from('po_submissions')
+          .select('status')
+          .eq('id', data.po_number)
+          .single();
+        setPoApproved(poData?.status === 'approved');
+      }
+      
+      // Check artwork approval status for all products in order
+      if (data.order_items && data.order_items.length > 0) {
+        const productIds = data.order_items.map((item: any) => item.product_id);
+        const { data: artworkData } = await supabase
+          .from('artwork_files')
+          .select('is_approved, sku')
+          .in('sku', data.order_items.map((item: any) => item.sku));
+        
+        // All products must have approved artwork
+        const allApproved = data.order_items.every((item: any) => 
+          artworkData?.some((art: any) => art.sku === item.sku && art.is_approved)
+        );
+        setArtApproved(allApproved);
+      }
     }
     setLoading(false);
   };
@@ -75,6 +104,28 @@ const OrderDetail = () => {
       description: "Production update has been logged."
     });
     setProductionUpdate("");
+  };
+
+  const handleVibeProcessed = async () => {
+    if (!isAdmin) return;
+    
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        vibe_processed: true,
+        vibe_processed_at: new Date().toISOString(),
+        vibe_processed_by: (await supabase.auth.getUser()).data.user?.id
+      })
+      .eq('id', orderId);
+
+    if (!error) {
+      setVibeProcessed(true);
+      toast({
+        title: "Order Processed",
+        description: "Order has been marked as Vibe Processed."
+      });
+      fetchOrder();
+    }
   };
   const handleDownloadPackingList = () => {
     toast({
@@ -119,6 +170,61 @@ const OrderDetail = () => {
           </Button>
         </div>
       </div>
+
+      {/* Order Checklist */}
+      <Card className="mb-6 shadow-md">
+        <CardContent className="p-6">
+          <h2 className="text-lg font-semibold mb-4">Order Status Checklist</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="flex items-center gap-3">
+              {artApproved ? (
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              ) : (
+                <Circle className="h-6 w-6 text-muted-foreground" />
+              )}
+              <div>
+                <p className="font-medium">Art Approved</p>
+                <p className="text-sm text-muted-foreground">
+                  {artApproved ? "All artwork approved" : "Pending artwork approval"}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {poApproved ? (
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              ) : (
+                <Circle className="h-6 w-6 text-muted-foreground" />
+              )}
+              <div>
+                <p className="font-medium">PO Approved</p>
+                <p className="text-sm text-muted-foreground">
+                  {poApproved ? "PO reviewed and accepted" : "Pending PO approval"}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {vibeProcessed ? (
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              ) : (
+                <Circle className="h-6 w-6 text-muted-foreground" />
+              )}
+              <div className="flex-1">
+                <p className="font-medium">Vibe Processed</p>
+                <p className="text-sm text-muted-foreground">
+                  {vibeProcessed ? "Order reviewed and approved" : "Pending admin review"}
+                </p>
+              </div>
+              {isAdmin && !vibeProcessed && (
+                <Button size="sm" onClick={handleVibeProcessed}>
+                  Mark as Processed
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Main Order Card - ERP Style */}
       <Card className="shadow-lg">
