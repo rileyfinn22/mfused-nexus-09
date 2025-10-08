@@ -98,7 +98,7 @@ const VendorPODetail = () => {
       const newTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
 
       // Update the PO
-      const { error } = await supabase
+      const { error: poError } = await supabase
         .from('vendor_pos')
         .update({
           status: editedPO.status,
@@ -107,13 +107,18 @@ const VendorPODetail = () => {
         })
         .eq('id', poId);
 
-      if (error) throw error;
+      if (poError) throw poError;
 
       // Handle new items
       for (const item of poItems) {
         if (item.isNew) {
+          // Validate required fields
+          if (!item.sku || !item.name || item.quantity <= 0) {
+            throw new Error('Please fill in all required fields for custom line items');
+          }
+
           // Insert new custom line item
-          await supabase
+          const { error: insertError } = await supabase
             .from('vendor_po_items')
             .insert({
               vendor_po_id: poId,
@@ -125,6 +130,11 @@ const VendorPODetail = () => {
               unit_cost: item.unit_cost,
               total: item.total
             });
+
+          if (insertError) {
+            console.error('Insert error:', insertError);
+            throw new Error(`Failed to add custom line item: ${insertError.message}`);
+          }
         }
       }
 
@@ -135,6 +145,7 @@ const VendorPODetail = () => {
       setIsEditMode(false);
       fetchPODetails();
     } catch (error: any) {
+      console.error('Save error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to update purchase order",
