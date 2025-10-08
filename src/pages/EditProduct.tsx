@@ -122,9 +122,10 @@ const EditProduct = () => {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-semibold">Edit Product</h1>
           <p className="text-sm text-muted-foreground mt-1">Update product details and specifications</p>
+          <p className="text-xs text-muted-foreground mt-1 font-mono">ID: {id}</p>
         </div>
       </div>
 
