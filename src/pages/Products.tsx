@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +62,8 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchProducts();
@@ -172,46 +175,74 @@ const Products = () => {
     );
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedProducts(new Set(filteredProducts.map(p => p.id)));
+    } else {
+      setSelectedProducts(new Set());
+    }
+  };
+
+  const handleSelectProduct = (productId: string, checked: boolean) => {
+    const newSelected = new Set(selectedProducts);
+    if (checked) {
+      newSelected.add(productId);
+    } else {
+      newSelected.delete(productId);
+    }
+    setSelectedProducts(newSelected);
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedProducts.size === 0) return;
+    setDeleteDialogOpen(true);
+  };
+
   const handleDeleteClick = (productId: string) => {
     setProductToDelete(productId);
+    setSelectedProducts(new Set([productId]));
     setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!productToDelete) return;
+    const idsToDelete = productToDelete ? [productToDelete] : Array.from(selectedProducts);
+    
+    if (idsToDelete.length === 0) return;
 
     try {
-      // Delete related records first
-      await supabase
-        .from('product_states')
-        .delete()
-        .eq('product_id', productToDelete);
+      // Delete related records first for all selected products
+      for (const id of idsToDelete) {
+        await supabase
+          .from('product_states')
+          .delete()
+          .eq('product_id', id);
 
-      await supabase
-        .from('inventory')
-        .delete()
-        .eq('product_id', productToDelete);
+        await supabase
+          .from('inventory')
+          .delete()
+          .eq('product_id', id);
 
-      // Delete the product
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productToDelete);
+        // Delete the product
+        const { error } = await supabase
+          .from('products')
+          .delete()
+          .eq('id', id);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       toast({
-        title: "Product deleted",
-        description: "The product has been successfully removed.",
+        title: "Products deleted",
+        description: `Successfully deleted ${idsToDelete.length} product(s).`,
       });
 
-      // Refresh the products list
+      setSelectedProducts(new Set());
       fetchProducts();
     } catch (error) {
-      console.error('Error deleting product:', error);
+      console.error('Error deleting products:', error);
       toast({
         title: "Error",
-        description: "Failed to delete product. Please try again.",
+        description: "Failed to delete products. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -247,7 +278,32 @@ const Products = () => {
           <h1 className="text-2xl font-semibold">Product Catalog</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage SKUs and state-specific packaging requirements</p>
         </div>
-        <AddProductDialog onProductAdded={fetchProducts} />
+        <div className="flex gap-3">
+          {selectedProducts.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteSelected}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete ({selectedProducts.size})
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setIsEditMode(!isEditMode);
+              if (isEditMode) {
+                setSelectedProducts(new Set());
+              }
+            }}
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            {isEditMode ? "Done" : "Edit"}
+          </Button>
+          <AddProductDialog onProductAdded={fetchProducts} />
+        </div>
       </div>
 
       {/* Search */}
@@ -268,15 +324,23 @@ const Products = () => {
         {/* Table Header */}
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-11 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div className="col-span-1"></div>
-            <div className="col-span-2">Product ID</div>
+            {isEditMode && (
+              <div className="col-span-1 flex items-center">
+                <Checkbox
+                  checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
+                  onCheckedChange={handleSelectAll}
+                />
+              </div>
+            )}
+            <div className={isEditMode ? "col-span-1" : "col-span-1"}></div>
+            <div className={isEditMode ? "col-span-1" : "col-span-2"}>Product ID</div>
             <div className="col-span-1">Preview</div>
             <div className="col-span-2">Item</div>
             <div className="col-span-1">Category</div>
             <div className="col-span-1">State</div>
             <div className="col-span-1">Cost</div>
             <div className="col-span-1">Details</div>
-            <div className="col-span-1">Actions</div>
+            {!isEditMode && <div className="col-span-1">Actions</div>}
           </div>
         </div>
 
@@ -292,14 +356,22 @@ const Products = () => {
                   className="grid grid-cols-11 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
                   onClick={() => toggleExpanded(product.id)}
                 >
-                  <div className="col-span-1 flex items-center">
+                  {isEditMode && (
+                    <div className="col-span-1 flex items-center" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedProducts.has(product.id)}
+                        onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
+                      />
+                    </div>
+                  )}
+                  <div className={`${isEditMode ? "col-span-1" : "col-span-1"} flex items-center`}>
                     {isExpanded ? (
                       <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     ) : (
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
                   </div>
-                  <div className="col-span-2 font-medium font-mono text-xs flex items-center gap-2">
+                  <div className={`${isEditMode ? "col-span-1" : "col-span-2"} font-medium font-mono text-xs flex items-center gap-2`}>
                     {product.id.slice(0, 8)}...
                     {product.sku && !hasApprovedArtwork(product.sku) && (
                       <AlertTriangle className="h-4 w-4 text-yellow-500" />
@@ -334,24 +406,26 @@ const Products = () => {
                     {product.cost ? `$${product.cost.toFixed(2)}` : '-'}
                   </div>
                   <div className="col-span-1 text-sm text-center">{product.states.length}</div>
-                  <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-6 w-6 p-0"
-                      onClick={() => navigate(`/products/edit/${product.id}`)}
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteClick(product.id)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+                  {!isEditMode && (
+                    <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0"
+                        onClick={() => navigate(`/products/edit/${product.id}`)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteClick(product.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Expanded State Rows */}
@@ -417,9 +491,9 @@ const Products = () => {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete selected products?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this product and all associated data including inventory records and state-specific configurations. This action cannot be undone.
+              This will permanently delete {productToDelete ? '1 product' : `${selectedProducts.size} products`} and all associated data including inventory records and state-specific configurations. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
