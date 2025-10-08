@@ -6,9 +6,12 @@ import {
   FileText, 
   Image, 
   Truck,
-  FolderOpen
+  FolderOpen,
+  Building2
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +24,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const navigationItems = [
+const customerNavigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Products", url: "/products", icon: Package },
   { title: "Inventory", url: "/inventory", icon: Archive },
@@ -32,6 +35,17 @@ const navigationItems = [
   { title: "My POs", url: "/my-pos", icon: FolderOpen },
 ];
 
+const vibeAdminNavigationItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "All Orders", url: "/orders", icon: ClipboardList },
+  { title: "Vendors", url: "/vendors", icon: Building2 },
+  { title: "Vendor POs", url: "/vendor-pos", icon: FolderOpen },
+  { title: "Invoices", url: "/invoices", icon: FileText },
+  { title: "Products", url: "/products", icon: Package },
+  { title: "Inventory", url: "/inventory", icon: Archive },
+  { title: "Artwork", url: "/artwork", icon: Image },
+];
+
 interface AppSidebarProps {
   companyName: string;
 }
@@ -40,6 +54,25 @@ export function AppSidebar({ companyName }: AppSidebarProps) {
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+
+  useEffect(() => {
+    checkVibeAdmin();
+  }, []);
+
+  const checkVibeAdmin = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      setIsVibeAdmin((data?.role as string) === 'vibe_admin');
+    }
+  };
+
+  const navigationItems = isVibeAdmin ? vibeAdminNavigationItems : customerNavigationItems;
 
   const isActive = (path: string) => currentPath === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>

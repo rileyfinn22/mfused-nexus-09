@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
 const OrderDetail = () => {
   const {
     orderId
@@ -20,6 +21,8 @@ const OrderDetail = () => {
   const [trackingNumber, setTrackingNumber] = useState("");
   const [productionUpdate, setProductionUpdate] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [showVendorDialog, setShowVendorDialog] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [artApproved, setArtApproved] = useState(false);
@@ -32,16 +35,15 @@ const OrderDetail = () => {
     }
   }, [orderId]);
   const checkAdminStatus = async () => {
-    const {
-      data: {
-        user
-      }
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const {
-        data
-      } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
       setIsAdmin(data?.role === 'admin');
+      setIsVibeAdmin((data?.role as string) === 'vibe_admin');
     }
   };
   const fetchOrder = async () => {
@@ -173,6 +175,12 @@ const OrderDetail = () => {
           Back to Orders
         </Button>
         <div className="flex gap-3">
+          {isVibeAdmin && order?.order_items && order.order_items.length > 0 && (
+            <Button onClick={() => setShowVendorDialog(true)}>
+              <Truck className="h-4 w-4 mr-2" />
+              Assign Vendors & Create POs
+            </Button>
+          )}
           <Button variant="outline" onClick={handleDownloadPackingList}>
             <Download className="h-4 w-4 mr-2" />
             Download Packing List
@@ -183,6 +191,17 @@ const OrderDetail = () => {
           </Button>
         </div>
       </div>
+
+      {/* Vendor Assignment Dialog */}
+      {isVibeAdmin && order?.order_items && (
+        <VendorAssignmentDialog
+          open={showVendorDialog}
+          onOpenChange={setShowVendorDialog}
+          orderId={orderId || ''}
+          orderItems={order.order_items}
+          onSuccess={fetchOrder}
+        />
+      )}
 
       {/* Order Checklist */}
       <Card className="mb-6 shadow-md">
