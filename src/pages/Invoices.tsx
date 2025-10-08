@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,10 +13,37 @@ import {
   FileText,
   Package
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Invoices = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [companies, setCompanies] = useState<any[]>([]);
+
+  useEffect(() => {
+    checkRole();
+  }, []);
+
+  useEffect(() => {
+    if (isVibeAdmin) {
+      fetchCompanies();
+    }
+  }, [isVibeAdmin]);
+
+  const checkRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
+      setIsVibeAdmin(data?.role === 'vibe_admin');
+    }
+  };
+
+  const fetchCompanies = async () => {
+    const { data } = await supabase.from('companies').select('*').order('name');
+    if (data) setCompanies(data);
+  };
 
   // Regular billing invoices
   const billingInvoices = [
@@ -220,6 +247,19 @@ const Invoices = () => {
             className="pl-10"
           />
         </div>
+        {isVibeAdmin && (
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Company" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Companies</SelectItem>
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Status" />
