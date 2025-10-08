@@ -5,19 +5,46 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Eye, FileText } from "lucide-react";
+import { Search, Eye, FileText, Trash2 } from "lucide-react";
 
 const VendorPOs = () => {
   const navigate = useNavigate();
   const [pos, setPOs] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [poToDelete, setPOToDelete] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    checkAdminStatus();
     fetchVendorPOs();
   }, []);
+
+  const checkAdminStatus = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      const role = data?.role as string;
+      setIsAdmin(role === 'admin' || role === 'vibe_admin');
+    }
+  };
 
   const fetchVendorPOs = async () => {
     setLoading(true);
@@ -30,6 +57,50 @@ const VendorPOs = () => {
       setPOs(data);
     }
     setLoading(false);
+  };
+
+  const handleDeleteClick = (po: any) => {
+    setPOToDelete(po);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!poToDelete) return;
+
+    try {
+      // First delete all vendor PO items
+      const { error: itemsError } = await supabase
+        .from('vendor_po_items')
+        .delete()
+        .eq('vendor_po_id', poToDelete.id);
+
+      if (itemsError) throw itemsError;
+
+      // Then delete the vendor PO
+      const { error: poError } = await supabase
+        .from('vendor_pos')
+        .delete()
+        .eq('id', poToDelete.id);
+
+      if (poError) throw poError;
+
+      toast({
+        title: "PO Deleted",
+        description: "Vendor purchase order has been deleted"
+      });
+
+      // Refresh the list
+      fetchVendorPOs();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete vendor PO",
+        variant: "destructive"
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setPOToDelete(null);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -129,6 +200,16 @@ const VendorPOs = () => {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+                        {isAdmin && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDeleteClick(po)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -138,6 +219,24 @@ const VendorPOs = () => {
           </Table>
         </div>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Vendor PO</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete vendor PO {poToDelete?.po_number}? This will also delete all associated items. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
