@@ -38,6 +38,7 @@ const App = () => (
           <Route path="/inventory" element={<DashboardLayout><Inventory /></DashboardLayout>} />
           <Route path="/orders" element={<DashboardLayout><Orders /></DashboardLayout>} />
           <Route path="/orders/create" element={<DashboardLayout><CreateOrder /></DashboardLayout>} />
+          <Route path="/orders/edit/:orderId" element={<DashboardLayout><CreateOrder /></DashboardLayout>} />
           <Route path="/orders/:orderId" element={<DashboardLayout><OrderDetail /></DashboardLayout>} />
           <Route path="/invoices" element={<DashboardLayout><Invoices /></DashboardLayout>} />
           <Route path="/artwork" element={<DashboardLayout><Artwork /></DashboardLayout>} />

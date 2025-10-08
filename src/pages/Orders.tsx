@@ -12,6 +12,7 @@ import {
   Search, 
   Plus, 
   Eye,
+  Edit,
   Package,
   CheckCircle,
   Clock
@@ -73,6 +74,8 @@ const Orders = () => {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
+      case 'draft': return 'text-muted-foreground';
+      case 'pending': return 'text-blue-500';
       case 'order placed': return 'text-muted-foreground';
       case 'in production': return 'text-primary';
       case 'qc review': return 'text-warning';
@@ -128,6 +131,8 @@ const Orders = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="order placed">Order Placed</SelectItem>
                 <SelectItem value="in production">In Production</SelectItem>
                 <SelectItem value="qc review">QC Review</SelectItem>
@@ -184,17 +189,31 @@ const Orders = () => {
                       <Progress value={progress} className="h-1" />
                     </div>
                     <div className="col-span-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 w-6 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/orders/${order.id}`);
-                        }}
-                      >
-                        <Eye className="h-3 w-3" />
-                      </Button>
+                      {order.status === 'draft' ? (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/orders/edit/${order.id}`);
+                          }}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/orders/${order.id}`);
+                          }}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );

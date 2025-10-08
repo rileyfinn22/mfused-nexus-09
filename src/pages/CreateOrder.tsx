@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,6 +60,7 @@ interface SavedAddress {
 
 const CreateOrder = () => {
   const navigate = useNavigate();
+  const { orderId } = useParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,6 +72,8 @@ const CreateOrder = () => {
   const [showAddItemsDialog, setShowAddItemsDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [tempSelectedProducts, setTempSelectedProducts] = useState<string[]>([]);
+  const [existingOrderNumber, setExistingOrderNumber] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -95,7 +98,10 @@ const CreateOrder = () => {
   useEffect(() => {
     fetchProducts();
     fetchSavedAddresses();
-  }, []);
+    if (orderId) {
+      loadExistingOrder(orderId);
+    }
+  }, [orderId]);
 
   const fetchProducts = async () => {
     const { data, error } = await supabase
@@ -116,6 +122,53 @@ const CreateOrder = () => {
     
     if (!error && data) {
       setSavedAddresses(data);
+    }
+  };
+
+  const loadExistingOrder = async (id: string) => {
+    const { data: order, error } = await supabase
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('id', id)
+      .single();
+
+    if (!error && order) {
+      if (order.status !== 'draft') {
+        toast({
+          title: "Cannot Edit",
+          description: "Only draft orders can be edited",
+          variant: "destructive",
+        });
+        navigate('/orders');
+        return;
+      }
+
+      setExistingOrderNumber(order.order_number);
+      setFormData({
+        customerName: order.customer_name,
+        customerEmail: order.customer_email || "",
+        customerPhone: order.customer_phone || "",
+        shippingName: order.shipping_name,
+        shippingStreet: order.shipping_street,
+        shippingCity: order.shipping_city,
+        shippingState: order.shipping_state,
+        shippingZip: order.shipping_zip,
+        billingName: order.billing_name || "",
+        billingStreet: order.billing_street || "",
+        billingCity: order.billing_city || "",
+        billingState: order.billing_state || "",
+        billingZip: order.billing_zip || "",
+        poNumber: order.po_number || "",
+        dueDate: order.due_date || "",
+        terms: order.terms,
+        memo: order.memo || "",
+      });
+
+      const items = order.order_items.map((item: any) => ({
+        productId: item.product_id,
+        quantity: item.quantity,
+      }));
+      setSelectedItems(items);
     }
   };
 
@@ -209,6 +262,15 @@ const CreateOrder = () => {
       return;
     }
 
+    if (!isDraft && !termsAccepted) {
+      toast({
+        title: "Terms Required",
+        description: "Please accept the terms and conditions to place the order",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       orderSchema.parse(formData);
     } catch (error) {
@@ -247,43 +309,86 @@ const CreateOrder = () => {
       const tax = subtotal * 0.06;
       const total = subtotal + tax;
 
-      const { count } = await supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true });
-      
-      const orderNumber = `ORD-${String((count || 0) + 1).padStart(3, '0')}`;
+      let order;
+      let orderNumber = existingOrderNumber;
 
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          order_number: orderNumber,
-          po_number: formData.poNumber || null,
-          company_id: userRole.company_id,
-          customer_name: formData.customerName,
-          customer_email: formData.customerEmail || null,
-          customer_phone: formData.customerPhone || null,
-          status: isDraft ? 'draft' : 'pending',
-          due_date: formData.dueDate || null,
-          shipping_name: formData.shippingName,
-          shipping_street: formData.shippingStreet,
-          shipping_city: formData.shippingCity,
-          shipping_state: formData.shippingState,
-          shipping_zip: formData.shippingZip,
-          billing_name: sameAsBilling ? formData.shippingName : formData.billingName,
-          billing_street: sameAsBilling ? formData.shippingStreet : formData.billingStreet,
-          billing_city: sameAsBilling ? formData.shippingCity : formData.billingCity,
-          billing_state: sameAsBilling ? formData.shippingState : formData.billingState,
-          billing_zip: sameAsBilling ? formData.shippingZip : formData.billingZip,
-          subtotal,
-          tax,
-          total,
-          terms: formData.terms,
-          memo: formData.memo || null,
-        })
-        .select()
-        .single();
+      if (orderId) {
+        // Update existing order
+        const { data: updatedOrder, error: orderError } = await supabase
+          .from('orders')
+          .update({
+            po_number: formData.poNumber || null,
+            customer_name: formData.customerName,
+            customer_email: formData.customerEmail || null,
+            customer_phone: formData.customerPhone || null,
+            status: isDraft ? 'draft' : 'pending',
+            due_date: formData.dueDate || null,
+            shipping_name: formData.shippingName,
+            shipping_street: formData.shippingStreet,
+            shipping_city: formData.shippingCity,
+            shipping_state: formData.shippingState,
+            shipping_zip: formData.shippingZip,
+            billing_name: sameAsBilling ? formData.shippingName : formData.billingName,
+            billing_street: sameAsBilling ? formData.shippingStreet : formData.billingStreet,
+            billing_city: sameAsBilling ? formData.shippingCity : formData.billingCity,
+            billing_state: sameAsBilling ? formData.shippingState : formData.billingState,
+            billing_zip: sameAsBilling ? formData.shippingZip : formData.billingZip,
+            subtotal,
+            tax,
+            total,
+            terms: formData.terms,
+            memo: formData.memo || null,
+          })
+          .eq('id', orderId)
+          .select()
+          .single();
 
-      if (orderError) throw orderError;
+        if (orderError) throw orderError;
+        order = updatedOrder;
+
+        // Delete existing order items
+        await supabase.from('order_items').delete().eq('order_id', orderId);
+      } else {
+        // Create new order
+        const { count } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true });
+        
+        orderNumber = `ORD-${String((count || 0) + 1).padStart(3, '0')}`;
+
+        const { data: newOrder, error: orderError } = await supabase
+          .from('orders')
+          .insert({
+            order_number: orderNumber,
+            po_number: formData.poNumber || null,
+            company_id: userRole.company_id,
+            customer_name: formData.customerName,
+            customer_email: formData.customerEmail || null,
+            customer_phone: formData.customerPhone || null,
+            status: isDraft ? 'draft' : 'pending',
+            due_date: formData.dueDate || null,
+            shipping_name: formData.shippingName,
+            shipping_street: formData.shippingStreet,
+            shipping_city: formData.shippingCity,
+            shipping_state: formData.shippingState,
+            shipping_zip: formData.shippingZip,
+            billing_name: sameAsBilling ? formData.shippingName : formData.billingName,
+            billing_street: sameAsBilling ? formData.shippingStreet : formData.billingStreet,
+            billing_city: sameAsBilling ? formData.shippingCity : formData.billingCity,
+            billing_state: sameAsBilling ? formData.shippingState : formData.billingState,
+            billing_zip: sameAsBilling ? formData.shippingZip : formData.billingZip,
+            subtotal,
+            tax,
+            total,
+            terms: formData.terms,
+            memo: formData.memo || null,
+          })
+          .select()
+          .single();
+
+        if (orderError) throw orderError;
+        order = newOrder;
+      }
 
       const orderItems = selectedItems.map(item => {
         const product = products.find(p => p.id === item.productId);
@@ -315,10 +420,10 @@ const CreateOrder = () => {
 
       navigate(`/orders/${order.id}`);
     } catch (error: any) {
-      console.error("Error creating order:", error);
+      console.error("Error saving order:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create order",
+        description: error.message || "Failed to save order",
         variant: "destructive",
       });
     } finally {
@@ -344,8 +449,10 @@ const CreateOrder = () => {
               Back
             </Button>
             <div>
-              <h1 className="text-2xl font-semibold">Create New Order</h1>
-              <p className="text-sm text-muted-foreground">Fill in the details below</p>
+              <h1 className="text-2xl font-semibold">{orderId ? 'Edit Draft Order' : 'Create New Order'}</h1>
+              <p className="text-sm text-muted-foreground">
+                {orderId ? `Editing ${existingOrderNumber}` : 'Fill in the details below'}
+              </p>
             </div>
           </div>
           <div className="flex gap-3">
@@ -787,41 +894,92 @@ const CreateOrder = () => {
         </div>
 
         {/* Terms & Additional Info */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="dueDate">Due Date</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                value={formData.dueDate}
+                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paymentTerms">Payment Terms</Label>
+              <Select value={formData.terms} onValueChange={(value) => setFormData({ ...formData, terms: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Net 30">Net 30</SelectItem>
+                  <SelectItem value="Net 60">Net 60</SelectItem>
+                  <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
+                  <SelectItem value="Prepaid">Prepaid</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="dueDate">Due Date</Label>
-            <Input
-              id="dueDate"
-              type="date"
-              value={formData.dueDate}
-              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+            <Label htmlFor="memo">Memo</Label>
+            <Textarea
+              id="memo"
+              value={formData.memo}
+              onChange={(e) => setFormData({ ...formData, memo: e.target.value })}
+              rows={3}
+              placeholder="Any additional notes or special instructions..."
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="terms">Terms</Label>
-            <Select value={formData.terms} onValueChange={(value) => setFormData({ ...formData, terms: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Net 30">Net 30</SelectItem>
-                <SelectItem value="Net 60">Net 60</SelectItem>
-                <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
-                <SelectItem value="Prepaid">Prepaid</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="memo">Memo</Label>
-          <Textarea
-            id="memo"
-            value={formData.memo}
-            onChange={(e) => setFormData({ ...formData, memo: e.target.value })}
-            rows={3}
-            placeholder="Any additional notes or special instructions..."
-          />
+          {/* Terms and Conditions */}
+          <div className="bg-muted/30 backdrop-blur rounded-lg p-6 border border-table-border space-y-4">
+            <h3 className="text-sm font-semibold uppercase text-muted-foreground">Terms and Conditions</h3>
+            <div className="space-y-3 text-sm text-muted-foreground max-h-64 overflow-y-auto pr-2">
+              <div>
+                <h4 className="font-semibold text-foreground mb-1">1. Payment Terms</h4>
+                <p>Payment is due according to the terms specified above. Late payments may incur additional fees. All prices are in USD unless otherwise specified.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-foreground mb-1">2. Order Acceptance</h4>
+                <p>All orders are subject to acceptance and availability. We reserve the right to refuse or cancel any order for any reason, including product availability, errors in pricing, or credit issues.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-foreground mb-1">3. Shipping and Delivery</h4>
+                <p>Delivery dates are estimates only. We are not liable for delays in delivery. Risk of loss passes to the buyer upon delivery to the carrier. Shipping charges are non-refundable.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-foreground mb-1">4. Returns and Cancellations</h4>
+                <p>Custom orders cannot be cancelled once production has begun. Standard items may be returned within 30 days in original condition. Restocking fees may apply. Customer is responsible for return shipping costs.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-foreground mb-1">5. Quality and Inspection</h4>
+                <p>Products are inspected before shipment. Claims for defects must be made within 7 days of receipt. Our liability is limited to replacement or refund of defective products.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-foreground mb-1">6. Artwork and Proofs</h4>
+                <p>Customer is responsible for approving artwork proofs. Once approved, we are not liable for errors in customer-provided content. Changes after approval may incur additional charges.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-foreground mb-1">7. Limitation of Liability</h4>
+                <p>Our liability is limited to the purchase price of the products. We are not liable for indirect, incidental, or consequential damages.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-foreground mb-1">8. Force Majeure</h4>
+                <p>We are not liable for delays or failure to perform due to circumstances beyond our reasonable control, including natural disasters, labor disputes, or supply chain disruptions.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 pt-4 border-t border-table-border">
+              <Checkbox
+                id="termsAccepted"
+                checked={termsAccepted}
+                onCheckedChange={(checked) => setTermsAccepted(checked as boolean)}
+              />
+              <Label htmlFor="termsAccepted" className="text-sm cursor-pointer leading-relaxed">
+                I have read and agree to the terms and conditions outlined above. I understand that by placing this order, I am entering into a binding agreement.
+              </Label>
+            </div>
+          </div>
         </div>
       </div>
     </div>
