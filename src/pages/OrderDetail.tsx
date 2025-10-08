@@ -23,7 +23,7 @@ const OrderDetail = () => {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [artApproved, setArtApproved] = useState(false);
-  const [poApproved, setPoApproved] = useState(false);
+  const [orderFinalized, setOrderFinalized] = useState(false);
   const [vibeProcessed, setVibeProcessed] = useState(false);
   useEffect(() => {
     checkAdminStatus();
@@ -53,16 +53,7 @@ const OrderDetail = () => {
     if (!error && data) {
       setOrder(data);
       setVibeProcessed(data.vibe_processed || false);
-      
-      // Check PO approval status
-      if (data.po_number) {
-        const { data: poData } = await supabase
-          .from('po_submissions')
-          .select('status')
-          .eq('id', data.po_number)
-          .single();
-        setPoApproved(poData?.status === 'approved');
-      }
+      setOrderFinalized(data.order_finalized || false);
       
       // Check artwork approval status for all products in order
       if (data.order_items && data.order_items.length > 0) {
@@ -104,6 +95,29 @@ const OrderDetail = () => {
       description: "Production update has been logged."
     });
     setProductionUpdate("");
+  };
+
+  const handleOrderFinalized = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        order_finalized: true,
+        order_finalized_at: new Date().toISOString(),
+        order_finalized_by: user.id
+      })
+      .eq('id', orderId);
+
+    if (!error) {
+      setOrderFinalized(true);
+      toast({
+        title: "Order Finalized",
+        description: "Order has been approved and finalized."
+      });
+      fetchOrder();
+    }
   };
 
   const handleVibeProcessed = async () => {
@@ -191,17 +205,22 @@ const OrderDetail = () => {
             </div>
             
             <div className="flex items-center gap-3">
-              {poApproved ? (
+              {orderFinalized ? (
                 <CheckCircle2 className="h-6 w-6 text-green-600" />
               ) : (
                 <Circle className="h-6 w-6 text-muted-foreground" />
               )}
-              <div>
-                <p className="font-medium">PO Approved</p>
+              <div className="flex-1">
+                <p className="font-medium">Order Finalized Approval</p>
                 <p className="text-sm text-muted-foreground">
-                  {poApproved ? "PO reviewed and accepted" : "Pending PO approval"}
+                  {orderFinalized ? "Order approved by customer" : "Pending customer approval"}
                 </p>
               </div>
+              {!orderFinalized && order?.status === 'pending' && (
+                <Button size="sm" onClick={handleOrderFinalized}>
+                  Approve Order
+                </Button>
+              )}
             </div>
             
             <div className="flex items-center gap-3">

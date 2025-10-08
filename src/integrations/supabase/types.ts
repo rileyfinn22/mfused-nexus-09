@@ -326,6 +326,9 @@ export type Database = {
           id: string
           memo: string | null
           order_date: string
+          order_finalized: boolean
+          order_finalized_at: string | null
+          order_finalized_by: string | null
           order_number: string
           po_number: string | null
           shipping_city: string
@@ -359,6 +362,9 @@ export type Database = {
           id?: string
           memo?: string | null
           order_date?: string
+          order_finalized?: boolean
+          order_finalized_at?: string | null
+          order_finalized_by?: string | null
           order_number: string
           po_number?: string | null
           shipping_city: string
@@ -392,6 +398,9 @@ export type Database = {
           id?: string
           memo?: string | null
           order_date?: string
+          order_finalized?: boolean
+          order_finalized_at?: string | null
+          order_finalized_by?: string | null
           order_number?: string
           po_number?: string | null
           shipping_city?: string
