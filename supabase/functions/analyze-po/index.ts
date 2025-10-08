@@ -153,6 +153,59 @@ Return ONLY valid JSON:
     const extractedData = JSON.parse(aiData.choices[0].message.content);
     console.log('Extracted data:', extractedData);
 
+    // Fetch products to try matching SKUs and names
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id, item_id, name')
+      .eq('company_id', companyId);
+
+    if (productsError) {
+      console.error('Error fetching products:', productsError);
+    }
+
+    console.log(`Found ${products?.length || 0} products for matching`);
+
+    // Function to find matching product
+    const findMatchingProduct = (poItem: any) => {
+      if (!products || products.length === 0) return null;
+
+      // Try exact SKU match first
+      let match = products.find(p => p.item_id === poItem.sku);
+      if (match) {
+        console.log(`Exact SKU match for ${poItem.sku}: ${match.name}`);
+        return match.id;
+      }
+
+      // Try fuzzy name matching - remove common variations
+      const normalizeName = (name: string) => {
+        return name
+          .toLowerCase()
+          .replace(/bag\s*-?\s*/gi, '') // Remove "BAG -" prefix
+          .replace(/\s*\(1\s*x\s*1g\)/gi, ' 1g') // Normalize (1 x 1g) to 1g
+          .replace(/\s+/g, ' ') // Normalize whitespace
+          .trim();
+      };
+
+      const normalizedPoName = normalizeName(poItem.name);
+      
+      match = products.find(p => {
+        const normalizedProductName = normalizeName(p.name);
+        // Check if 80% of the words match
+        const poWords = normalizedPoName.split(' ');
+        const productWords = normalizedProductName.split(' ');
+        const matchingWords = poWords.filter(w => productWords.includes(w));
+        const similarity = matchingWords.length / Math.max(poWords.length, productWords.length);
+        
+        if (similarity >= 0.8) {
+          console.log(`Fuzzy match (${Math.round(similarity * 100)}%): "${poItem.name}" -> "${p.name}"`);
+          return true;
+        }
+        return false;
+      });
+
+      return match ? match.id : null;
+    };
+
     // Generate order number
     const orderNumber = `ORD-${Date.now()}`;
 
@@ -202,19 +255,25 @@ Return ONLY valid JSON:
       throw new Error('Failed to create order');
     }
 
-    // Create order items
+    // Create order items with product matching
     if (extractedData.items && Array.isArray(extractedData.items)) {
-      const orderItems = extractedData.items.map((item: any) => ({
-        order_id: order.id,
-        product_id: null,
-        sku: item.sku || 'UNKNOWN',
-        name: item.name || item.description || 'Unknown Item',
-        description: item.description || null,
-        quantity: item.quantity || 1,
-        unit_price: item.unit_price || 0,
-        total: (item.quantity || 1) * (item.unit_price || 0),
-        item_id: item.sku || null
-      }));
+      const orderItems = extractedData.items.map((item: any) => {
+        const matchedProductId = findMatchingProduct(item);
+        
+        return {
+          order_id: order.id,
+          product_id: matchedProductId, // Will be null if no match found
+          sku: item.sku || 'UNKNOWN',
+          name: item.name || item.description || 'Unknown Item',
+          description: item.description || null,
+          quantity: item.quantity || 1,
+          unit_price: item.unit_price || 0,
+          total: (item.quantity || 1) * (item.unit_price || 0),
+          item_id: item.sku || null
+        };
+      });
+
+      console.log(`Creating ${orderItems.length} order items, ${orderItems.filter(i => i.product_id).length} matched to products`);
 
       const { error: itemsError } = await supabase
         .from('order_items')
