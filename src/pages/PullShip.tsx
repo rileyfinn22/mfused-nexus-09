@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ import {
 
 const PullShip = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [orderData, setOrderData] = useState({
     state: "",
     shippingAddress: "",
@@ -425,47 +427,31 @@ const PullShip = () => {
       setUploadingPO(false);
       setAnalyzingPO(true);
 
-      // Trigger AI analysis
+      // Trigger AI analysis with file path
+      console.log('Calling analyze-po with path:', fileName);
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-po', {
-        body: { submissionId: submission.id }
+        body: { 
+          pdfPath: fileName,
+          companyId: userRole.company_id,
+          filename: selectedPOFile.name
+        }
       });
 
       if (analysisError) throw analysisError;
 
       setAnalyzingPO(false);
 
-      // Auto-populate form with extracted data
-      const extracted = analysisData.data;
-      if (extracted) {
-        setOrderData({
-          state: extracted.shipping_address?.state || '',
-          shippingAddress: extracted.shipping_address?.street || '',
-          shippingCity: extracted.shipping_address?.city || '',
-          shippingState: extracted.shipping_address?.state || '',
-          shippingZip: extracted.shipping_address?.zip || '',
-          notes: extracted.special_instructions || '',
-        });
-
-        // Auto-select items
-        if (extracted.items && Array.isArray(extracted.items)) {
-          const newSelectedSkus = new Set<string>();
-          const newQuantities: Record<string, number> = {};
-          
-          extracted.items.forEach((item: any) => {
-            if (item.sku) {
-              newSelectedSkus.add(item.sku);
-              newQuantities[item.sku] = item.quantity || 1;
-            }
-          });
-          
-          setSelectedSkus(newSelectedSkus);
-          setSkuQuantities(newQuantities);
-        }
-
+      // The edge function has already created the order
+      if (analysisData.success && analysisData.orderId) {
         toast({
-          title: "PO Analyzed Successfully",
-          description: "Order details have been automatically filled in",
+          title: "Order Created Successfully",
+          description: `Order ${analysisData.orderNumber} has been created from the PO`,
         });
+
+        // Navigate to the order detail page
+        navigate(`/order/${analysisData.orderId}`);
+      } else {
+        throw new Error('Failed to create order from PO');
       }
 
       setSelectedPOFile(null);
