@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const Artwork = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [artworkFiles, setArtworkFiles] = useState<any[]>([]);
@@ -763,14 +764,35 @@ const Artwork = () => {
       {/* Rejected Archive Section */}
       {rejectedFiles.length > 0 && (
         <div className="mt-8 border-t pt-6">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <XCircle className="h-5 w-5 text-destructive" />
-            Rejected Archive ({rejectedFiles.length})
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {rejectedFiles.map((file) => (
-              <div key={file.id} className="bg-card border rounded-lg p-3 hover:shadow-md transition-shadow">
-                <div className="aspect-square bg-muted rounded mb-2 overflow-hidden">
+          <div 
+            className="bg-card border border-destructive/20 rounded-lg p-6 hover:shadow-lg transition-all cursor-pointer"
+            onClick={() => navigate('/artwork/rejected')}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <XCircle className="h-6 w-6 text-destructive" />
+                <div>
+                  <h2 className="text-xl font-semibold">Rejected Archive</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    View all {rejectedFiles.length} rejected artwork files
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-3xl font-bold text-destructive">{rejectedFiles.length}</p>
+                  <p className="text-xs text-muted-foreground uppercase">Files</p>
+                </div>
+                <Button variant="outline" size="sm">
+                  View Archive
+                </Button>
+              </div>
+            </div>
+            
+            {/* Preview thumbnails */}
+            <div className="grid grid-cols-6 gap-2 mt-4">
+              {rejectedFiles.slice(0, 6).map((file) => (
+                <div key={file.id} className="aspect-square bg-muted rounded overflow-hidden">
                   {file.preview_url ? (
                     <img 
                       src={file.preview_url} 
@@ -785,22 +807,12 @@ const Artwork = () => {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <FileImage className="h-6 w-6 text-muted-foreground" />
+                      <FileImage className="h-4 w-4 text-muted-foreground" />
                     </div>
                   )}
                 </div>
-                <p className="text-xs font-mono font-medium truncate" title={file.sku}>{file.sku}</p>
-                <p className="text-xs text-muted-foreground truncate" title={file.filename}>{file.filename}</p>
-                <p className="text-xs text-destructive mt-1">
-                  {new Date(file.rejected_at).toLocaleDateString()}
-                </p>
-                {file.rejection_reason && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2" title={file.rejection_reason}>
-                    {file.rejection_reason}
-                  </p>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
