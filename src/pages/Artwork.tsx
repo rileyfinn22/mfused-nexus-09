@@ -25,6 +25,7 @@ const Artwork = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [artworkFiles, setArtworkFiles] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadData, setUploadData] = useState({
@@ -37,6 +38,7 @@ const Artwork = () => {
 
   useEffect(() => {
     fetchArtwork();
+    fetchProducts();
   }, []);
 
   const fetchArtwork = async () => {
@@ -57,6 +59,26 @@ const Artwork = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('sku, products(name)')
+        .order('sku');
+
+      if (error) throw error;
+      
+      // Remove duplicates and create unique product list
+      const uniqueProducts = Array.from(
+        new Map(data?.map(item => [item.sku, item])).values()
+      );
+      
+      setProducts(uniqueProducts || []);
+    } catch (error) {
+      console.error('Error fetching products:', error);
     }
   };
 
@@ -259,12 +281,21 @@ const Artwork = () => {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="sku">SKU</Label>
-                <Input
-                  id="sku"
+                <Select
                   value={uploadData.sku}
-                  onChange={(e) => setUploadData({...uploadData, sku: e.target.value})}
-                  placeholder="e.g., VAPE-CART-001"
-                />
+                  onValueChange={(value) => setUploadData({...uploadData, sku: value})}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a SKU" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background z-50">
+                    {products.map((product) => (
+                      <SelectItem key={product.sku} value={product.sku}>
+                        {product.sku} {product.products?.name ? `- ${product.products.name}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="artwork">Artwork File</Label>
