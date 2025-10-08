@@ -87,18 +87,33 @@ COMMON PATTERN TO LOOK FOR:
 
 ANALYSIS INSTRUCTIONS:
 
-1. IDENTIFY COLUMNS by looking at the actual data patterns, NOT just headers:
-   - SKU column: Contains alphanumeric codes (e.g., "PCK-00430-WABAG", "SDA10065")
-   - Product name: Contains full descriptive text about the product
-   - Quantity: Contains numeric values for quantities
-   - Unit price: Contains decimal prices (e.g., 0.218, 23.51)
+1. IDENTIFY COLUMNS - The PO typically has these columns:
+   - "Description" or similar: Contains the SKU/product code (e.g., "PCK-00430-WABAG")
+   - "Item" or "Item #": Contains the Item ID that matches your product catalog
+   - Product name/description: The full product name
+   - "Qty" or "Quantity": Numeric quantities
+   - "Rate" or "Unit Price": Decimal prices
 
 2. EXTRACT DATA:
-For each line item:
-- sku: The SKU/product code (often in "Description" column!)
-- name: The full product name (might be in "Item" or separate column)
+For each line item, you MUST extract:
+- sku: The SKU from the Description column (e.g., "PCK-00430-WABAG")
+- item_id: The Item ID from the Item/Item# column - THIS IS CRITICAL FOR MATCHING
+- name: The full product name
 - quantity: Numeric quantity
 - unit_price: Price per unit
+
+Example:
+If the row shows:
+Description: PCK-00430-WABAG | Item: BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb | Qty: 3000 | Rate: 0.218
+
+Extract as:
+{
+  "sku": "PCK-00430-WABAG",
+  "item_id": "BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb",
+  "name": "E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb",
+  "quantity": 3000,
+  "unit_price": 0.218
+}
 
 For order info:
 - po_number: Look for "PO #", "Purchase Order #", "PO Number"
@@ -134,7 +149,7 @@ Return ONLY valid JSON:
   "due_date": "YYYY-MM-DD",
   "memo": null,
   "items": [
-    {"sku": "...", "name": "...", "description": null, "quantity": 0, "unit_price": 0.0}
+    {"sku": "...", "item_id": "...", "name": "...", "description": null, "quantity": 0, "unit_price": 0.0}
   ]
 }`
           }
@@ -165,45 +180,30 @@ Return ONLY valid JSON:
 
     console.log(`Found ${products?.length || 0} products for matching`);
 
-    // Function to find matching product
+    // Function to find matching product by item_id
     const findMatchingProduct = (poItem: any) => {
       if (!products || products.length === 0) return null;
 
-      // Try exact SKU match first
-      let match = products.find(p => p.item_id === poItem.sku);
-      if (match) {
-        console.log(`Exact SKU match for ${poItem.sku}: ${match.name}`);
-        return match.id;
+      // Match by item_id (exact match)
+      if (poItem.item_id) {
+        const match = products.find(p => p.item_id === poItem.item_id);
+        if (match) {
+          console.log(`Matched item_id "${poItem.item_id}" to product: ${match.name}`);
+          return match.id;
+        }
       }
 
-      // Try fuzzy name matching - remove common variations
-      const normalizeName = (name: string) => {
-        return name
-          .toLowerCase()
-          .replace(/bag\s*-?\s*/gi, '') // Remove "BAG -" prefix
-          .replace(/\s*\(1\s*x\s*1g\)/gi, ' 1g') // Normalize (1 x 1g) to 1g
-          .replace(/\s+/g, ' ') // Normalize whitespace
-          .trim();
-      };
-
-      const normalizedPoName = normalizeName(poItem.name);
-      
-      match = products.find(p => {
-        const normalizedProductName = normalizeName(p.name);
-        // Check if 80% of the words match
-        const poWords = normalizedPoName.split(' ');
-        const productWords = normalizedProductName.split(' ');
-        const matchingWords = poWords.filter(w => productWords.includes(w));
-        const similarity = matchingWords.length / Math.max(poWords.length, productWords.length);
-        
-        if (similarity >= 0.8) {
-          console.log(`Fuzzy match (${Math.round(similarity * 100)}%): "${poItem.name}" -> "${p.name}"`);
-          return true;
+      // Fallback: try matching by SKU if item_id didn't work
+      if (poItem.sku) {
+        const match = products.find(p => p.item_id === poItem.sku);
+        if (match) {
+          console.log(`Matched SKU "${poItem.sku}" to product: ${match.name}`);
+          return match.id;
         }
-        return false;
-      });
+      }
 
-      return match ? match.id : null;
+      console.log(`No match found for item_id: "${poItem.item_id}", sku: "${poItem.sku}"`);
+      return null;
     };
 
     // Generate order number
