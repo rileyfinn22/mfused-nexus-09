@@ -44,8 +44,9 @@ const OrderDetail = () => {
         .select('role')
         .eq('user_id', user.id)
         .single();
-      setIsAdmin(data?.role === 'admin');
-      setIsVibeAdmin((data?.role as string) === 'vibe_admin');
+      const role = data?.role as string;
+      setIsAdmin(role === 'admin' || role === 'vibe_admin');
+      setIsVibeAdmin(role === 'vibe_admin');
     }
   };
   const fetchOrder = async () => {
