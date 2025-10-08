@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import * as XLSX from 'https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,39 +47,75 @@ serve(async (req) => {
       throw new Error('No file uploaded');
     }
 
-    const text = await file.text();
-    const lines = text.split('\n').filter(line => line.trim());
+    // Read file as array buffer for Excel parsing
+    const arrayBuffer = await file.arrayBuffer();
+    const data = new Uint8Array(arrayBuffer);
     
-    // Parse CSV - assume first line is header
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-    const data = lines.slice(1);
+    // Parse Excel file
+    const workbook = XLSX.read(data, { type: 'array' });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+    console.log('Parsed Excel data:', jsonData.length, 'rows');
 
     const inventoryItems = [];
 
-    for (const line of data) {
-      if (!line.trim()) continue;
-      
-      const values = line.split(',').map(v => v.trim());
-      const row: any = {};
-      
-      headers.forEach((header, index) => {
-        row[header] = values[index];
-      });
+    for (const row of jsonData) {
+      // Support multiple column name variations
+      const sku = row['SKU'] || row['sku'] || row['Item'];
+      const available = parseInt(String(row['Available Primary'] || row['Available'] || row['available'] || '0'));
+      const state = row['State'] || row['state'] || 'Primary';
+      const inProduction = parseInt(String(row['In Production'] || row['in_production'] || '0'));
+      const redline = parseInt(String(row['Redline'] || row['redline'] || '0'));
 
-      // Validate required fields
-      if (!row.product_id || !row.sku || !row.state) {
-        console.log('Skipping invalid row:', row);
+      if (!sku) {
+        console.log('Skipping row without SKU:', row);
         continue;
+      }
+
+      // Find or create product by SKU
+      let productId = row['product_id'];
+      
+      if (!productId) {
+        // Try to find existing product by name (SKU)
+        const { data: existingProduct } = await supabaseClient
+          .from('products')
+          .select('id')
+          .eq('company_id', userRole.company_id)
+          .eq('name', sku)
+          .maybeSingle();
+
+        if (existingProduct) {
+          productId = existingProduct.id;
+        } else {
+          // Create new product
+          const { data: newProduct, error: productError } = await supabaseClient
+            .from('products')
+            .insert({
+              company_id: userRole.company_id,
+              name: sku,
+              category: 'General',
+              state: state
+            })
+            .select('id')
+            .single();
+
+          if (productError) {
+            console.error('Error creating product:', productError);
+            continue;
+          }
+          productId = newProduct.id;
+        }
       }
 
       inventoryItems.push({
         company_id: userRole.company_id,
-        product_id: row.product_id,
-        sku: row.sku,
-        state: row.state,
-        available: parseInt(row.available) || 0,
-        in_production: parseInt(row.in_production) || 0,
-        redline: parseInt(row.redline) || 0,
+        product_id: productId,
+        sku: sku,
+        state: state,
+        available: available,
+        in_production: inProduction,
+        redline: redline,
       });
     }
 
