@@ -42,7 +42,7 @@ serve(async (req) => {
         <p><strong>Items:</strong></p>
         <ul>
           ${invoiceData.items.map((item: any) => `
-            <li>${item.sku} - Quantity: ${item.quantity}</li>
+            <li>${item.itemId ? `${item.itemId} - ` : ''}${item.sku} - Quantity: ${item.quantity}</li>
           `).join('')}
         </ul>
         <br>

@@ -144,7 +144,7 @@ const PullShip = () => {
     try {
       const { data, error } = await supabase
         .from('inventory')
-        .select('*, products(image_url)')
+        .select('*, products(image_url, item_id, name)')
         .eq('state', state)
         .gt('available', 0)
         .order('sku', { ascending: true });
@@ -221,7 +221,7 @@ const PullShip = () => {
     setSkuQuantities(prev => ({ ...prev, [sku]: Math.max(1, quantity) }));
   };
 
-  const generatePackingListPDF = (items: Array<{sku: string, quantity: number}>, orderData: any, invoiceId: string) => {
+  const generatePackingListPDF = (items: Array<{sku: string, itemId?: string, quantity: number}>, orderData: any, invoiceId: string) => {
     const doc = new jsPDF();
     
     // Header
@@ -239,10 +239,15 @@ const PullShip = () => {
     doc.text(`${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZip}`, 20, 100);
     
     // Items table
-    const tableData = items.map(item => [item.sku, item.quantity.toString(), "Units"]);
+    const tableData = items.map(item => [
+      item.itemId || "N/A",
+      item.sku, 
+      item.quantity.toString(), 
+      "Units"
+    ]);
     
     autoTable(doc, {
-      head: [["SKU", "Quantity", "Unit"]],
+      head: [["Item ID", "SKU", "Quantity", "Unit"]],
       body: tableData,
       startY: 120,
       theme: "grid",
@@ -261,7 +266,7 @@ const PullShip = () => {
     return doc;
   };
 
-  const generateInvoicePDF = (items: Array<{sku: string, quantity: number}>, orderData: any, invoiceId: string, invoiceAmount: string) => {
+  const generateInvoicePDF = (items: Array<{sku: string, itemId?: string, quantity: number}>, orderData: any, invoiceId: string, invoiceAmount: string) => {
     const doc = new jsPDF();
     
     // Header
@@ -280,6 +285,7 @@ const PullShip = () => {
     
     // Items table with pricing
     const tableData = items.map(item => [
+      item.itemId || "N/A",
       item.sku, 
       item.quantity.toString(), 
       "$75.00", 
@@ -287,7 +293,7 @@ const PullShip = () => {
     ]);
     
     autoTable(doc, {
-      head: [["SKU", "Quantity", "Unit Price", "Total"]],
+      head: [["Item ID", "SKU", "Quantity", "Unit Price", "Total"]],
       body: tableData,
       startY: 120,
       theme: "grid",
@@ -310,10 +316,14 @@ const PullShip = () => {
   const viewPackingList = () => {
     if (selectedSkus.size === 0) return;
     
-    const items = Array.from(selectedSkus).map(sku => ({
-      sku,
-      quantity: skuQuantities[sku] || 1
-    }));
+    const items = Array.from(selectedSkus).map(sku => {
+      const inventoryItem = inventory.find(item => item.sku === sku);
+      return {
+        sku,
+        itemId: inventoryItem?.products?.item_id,
+        quantity: skuQuantities[sku] || 1
+      };
+    });
     
     const doc = generatePackingListPDF(items, orderData, "PREVIEW");
     doc.save(`packing-list-preview-${Date.now()}.pdf`);
@@ -322,10 +332,14 @@ const PullShip = () => {
   const viewInvoice = () => {
     if (selectedSkus.size === 0) return;
     
-    const items = Array.from(selectedSkus).map(sku => ({
-      sku,
-      quantity: skuQuantities[sku] || 1
-    }));
+    const items = Array.from(selectedSkus).map(sku => {
+      const inventoryItem = inventory.find(item => item.sku === sku);
+      return {
+        sku,
+        itemId: inventoryItem?.products?.item_id,
+        quantity: skuQuantities[sku] || 1
+      };
+    });
     
     const totalValue = items.reduce((sum, item) => sum + item.quantity, 0) * 75;
     const doc = generateInvoicePDF(items, orderData, "PREVIEW", `$${totalValue.toLocaleString()}.00`);
@@ -497,10 +511,14 @@ const PullShip = () => {
     e.preventDefault();
     if (selectedSkus.size === 0) return;
     
-    const items = Array.from(selectedSkus).map(sku => ({
-      sku,
-      quantity: skuQuantities[sku] || 1
-    }));
+    const items = Array.from(selectedSkus).map(sku => {
+      const inventoryItem = inventory.find(item => item.sku === sku);
+      return {
+        sku,
+        itemId: inventoryItem?.products?.item_id,
+        quantity: skuQuantities[sku] || 1
+      };
+    });
     
     const invoiceId = `INV-${String(invoices.length + 1).padStart(3, '0')}`;
     const totalValue = items.reduce((sum, item) => sum + item.quantity, 0) * 75;
