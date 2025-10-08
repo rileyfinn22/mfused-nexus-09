@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Plus, Upload, FileText } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -20,12 +20,15 @@ const OrderDetail = () => {
   const [trackingNumber, setTrackingNumber] = useState("");
   const [productionUpdate, setProductionUpdate] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
-  const [companyName, setCompanyName] = useState("");
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     checkAdminStatus();
-    fetchCompanyName();
-  }, []);
+    if (orderId) {
+      fetchOrder();
+    }
+  }, [orderId]);
 
   const checkAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -39,103 +42,19 @@ const OrderDetail = () => {
     }
   };
 
-  const fetchCompanyName = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('company_id, companies(name)')
-        .eq('user_id', user.id)
-        .single();
-      if (data?.companies) {
-        setCompanyName((data.companies as any).name);
-      }
+  const fetchOrder = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('id', orderId)
+      .single();
+
+    if (!error && data) {
+      setOrder(data);
     }
+    setLoading(false);
   };
-
-  // Mock order data - will be replaced with real data
-  const order = {
-    id: orderId,
-    orderNumber: orderId,
-    poNumber: `PO-${orderId}`,
-    orderDate: "2024-01-10",
-    dueDate: "2024-01-20",
-    status: "In Production",
-    customer: {
-      name: companyName || "Common Citizen",
-      email: "orders@commoncitizen.com",
-      phone: "(555) 123-4567"
-    },
-    items: orderId === "ORD-001" ? [
-      {
-        sku: "VAPE-CART-001",
-        itemId: "CC-VC-001",
-        name: "Vape Cartridge Box - White",
-        description: "Premium vape cartridge packaging with child-resistant cap and tamper-evident seal.",
-        quantity: 500,
-        unitPrice: 2.50,
-        image: "/placeholder.svg"
-      },
-      {
-        sku: "EDIBLE-PKG-001",
-        itemId: "CC-ED-001", 
-        name: "Edible Package - Clear",
-        description: "Food-grade transparent packaging for edibles with resealable zipper.",
-        quantity: 300,
-        unitPrice: 1.75,
-        image: "/placeholder.svg"
-      },
-      {
-        sku: "FLOWER-JAR-001",
-        itemId: "CC-FJ-001",
-        name: "Flower Jar 1oz",
-        description: "UV-protected glass jar with child-resistant lid for flower products.",
-        quantity: 250,
-        unitPrice: 3.25,
-        image: "/placeholder.svg"
-      }
-    ] : [
-      {
-        sku: "VAPE-CART-001",
-        itemId: "VC-001",
-        name: "Vape Cartridge Box",
-        description: "Premium vape cartridge packaging with child-resistant cap.",
-        quantity: 500,
-        unitPrice: 2.50,
-        image: "/placeholder.svg"
-      }
-    ],
-    shippingAddress: {
-      name: companyName || "Common Citizen",
-      street: "123 Cannabis Ave",
-      city: "Detroit",
-      state: "MI",
-      zip: "48201"
-    },
-    billingAddress: {
-      name: companyName || "Common Citizen",
-      street: "123 Cannabis Ave",
-      city: "Detroit", 
-      state: "MI",
-      zip: "48201"
-    },
-    terms: "Net 30",
-    memo: "Rush order - expedited production requested",
-    vibeNotes: [
-      { date: "2024-01-10 10:30 AM", author: "VibePKG Team", text: "Order received and confirmed. Production scheduled to begin 1/11." },
-      { date: "2024-01-12 2:15 PM", author: "VibePKG Team", text: "Production in progress. First batch completed QC inspection." }
-    ],
-    tracking: "1Z999AA10123456784",
-    productionUpdates: [
-      { date: "2024-01-11", text: "Production started - plates prepared" },
-      { date: "2024-01-13", text: "50% complete - first run completed" }
-    ]
-  };
-
-  const subtotal = order.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-  const taxRate = 0.06;
-  const tax = subtotal * taxRate;
-  const total = subtotal + tax;
 
   const handleAddVibeNote = () => {
     if (!vibeNotes.trim() || !isAdmin) return;
@@ -178,14 +97,44 @@ const OrderDetail = () => {
     });
   };
 
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto py-12 text-center">
+        <p className="text-muted-foreground">Loading order...</p>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="max-w-7xl mx-auto py-12 text-center">
+        <p className="text-muted-foreground">Order not found</p>
+      </div>
+    );
+  }
+
+  const subtotal = order.subtotal || 0;
+  const tax = order.tax || 0;
+  const total = order.total || 0;
+
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Header with Back Button */}
-      <div className="mb-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/orders")} className="mb-4">
+      {/* Header with Back Button and Download Buttons */}
+      <div className="mb-6 flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/orders")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Orders
         </Button>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={handleDownloadPackingList}>
+            <Download className="h-4 w-4 mr-2" />
+            Download Packing List
+          </Button>
+          <Button variant="outline" onClick={handleDownloadInvoice}>
+            <Download className="h-4 w-4 mr-2" />
+            Download Invoice
+          </Button>
+        </div>
       </div>
 
       {/* Main Order Card - ERP Style */}
@@ -195,16 +144,16 @@ const OrderDetail = () => {
           <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-table-border p-8">
             <div className="flex justify-between items-start mb-6">
               <div>
-                <h1 className="text-3xl font-bold mb-2">Order #{order.orderNumber}</h1>
+                <h1 className="text-3xl font-bold mb-2">Order #{order.order_number}</h1>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span>Order Date: {order.orderDate}</span>
+                  <span>Order Date: {new Date(order.order_date || order.created_at).toLocaleDateString()}</span>
                   <span>•</span>
-                  <span>Due Date: {order.dueDate}</span>
+                  <span>Due Date: {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set'}</span>
                 </div>
               </div>
               <div className="text-right">
-                <Badge className="text-sm px-4 py-1.5 mb-2">{order.status}</Badge>
-                <p className="text-sm text-muted-foreground">PO #: {order.poNumber}</p>
+                <Badge className="text-sm px-4 py-1.5 mb-2 capitalize">{order.status}</Badge>
+                <p className="text-sm text-muted-foreground">PO #: {order.po_number || '-'}</p>
               </div>
             </div>
 
@@ -212,24 +161,24 @@ const OrderDetail = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-background/80 backdrop-blur rounded-lg p-6">
               <div>
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Customer</h3>
-                <p className="font-medium">{order.customer.name}</p>
-                <p className="text-sm text-muted-foreground">{order.customer.email}</p>
-                <p className="text-sm text-muted-foreground">{order.customer.phone}</p>
+                <p className="font-medium">{order.customer_name}</p>
+                <p className="text-sm text-muted-foreground">{order.customer_email || '-'}</p>
+                <p className="text-sm text-muted-foreground">{order.customer_phone || '-'}</p>
               </div>
               <div>
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Ship To</h3>
-                <p className="font-medium">{order.shippingAddress.name}</p>
-                <p className="text-sm text-muted-foreground">{order.shippingAddress.street}</p>
+                <p className="font-medium">{order.shipping_name}</p>
+                <p className="text-sm text-muted-foreground">{order.shipping_street}</p>
                 <p className="text-sm text-muted-foreground">
-                  {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zip}
+                  {order.shipping_city}, {order.shipping_state} {order.shipping_zip}
                 </p>
               </div>
               <div>
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Bill To</h3>
-                <p className="font-medium">{order.billingAddress.name}</p>
-                <p className="text-sm text-muted-foreground">{order.billingAddress.street}</p>
+                <p className="font-medium">{order.billing_name || order.shipping_name}</p>
+                <p className="text-sm text-muted-foreground">{order.billing_street || order.shipping_street}</p>
                 <p className="text-sm text-muted-foreground">
-                  {order.billingAddress.city}, {order.billingAddress.state} {order.billingAddress.zip}
+                  {order.billing_city || order.shipping_city}, {order.billing_state || order.shipping_state} {order.billing_zip || order.shipping_zip}
                 </p>
               </div>
             </div>
@@ -252,21 +201,19 @@ const OrderDetail = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {order.items.map((item, index) => (
+                  {order.order_items?.map((item: any, index: number) => (
                     <TableRow key={index}>
                       <TableCell>
-                        <img 
-                          src={item.image} 
-                          alt={item.name}
-                          className="w-12 h-12 object-cover rounded border border-table-border"
-                        />
+                        <div className="w-12 h-12 bg-muted rounded border border-table-border flex items-center justify-center">
+                          <Package className="h-6 w-6 text-muted-foreground" />
+                        </div>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{item.itemId}</TableCell>
+                      <TableCell className="font-mono text-xs">{item.item_id || '-'}</TableCell>
                       <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-xs">{item.description}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-xs">{item.description || '-'}</TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">${item.unitPrice.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-medium">${(item.quantity * item.unitPrice).toFixed(2)}</TableCell>
+                      <TableCell className="text-right">${item.unit_price?.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-medium">${item.total?.toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -300,62 +247,57 @@ const OrderDetail = () => {
               </div>
             )}
 
-            {/* Terms */}
-            <div className="mt-6 flex items-center gap-2 text-sm">
-              <span className="font-medium">Terms:</span>
-              <span className="text-muted-foreground">{order.terms}</span>
+            {/* Terms and Conditions */}
+            <div className="mt-8 p-6 bg-muted/30 rounded-lg border border-table-border">
+              <h3 className="text-sm font-semibold mb-3">Terms and Conditions</h3>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p><strong>Payment Terms:</strong> {order.terms}</p>
+                <div className="space-y-1 pl-4">
+                  <p>• Payment is due according to the terms specified above</p>
+                  <p>• Late payments may incur additional fees</p>
+                  <p>• All prices are in USD unless otherwise specified</p>
+                </div>
+                <p className="pt-2"><strong>Order Acceptance:</strong> All orders are subject to acceptance and availability</p>
+                <p><strong>Shipping & Delivery:</strong> Delivery dates are estimates only. Risk of loss passes to buyer upon delivery to carrier</p>
+                <p><strong>Returns:</strong> Custom orders cannot be cancelled once production begins. Standard items may be returned within 30 days</p>
+                <p><strong>Liability:</strong> Our liability is limited to the purchase price of the products</p>
+              </div>
             </div>
           </div>
 
-          {/* Vibe Notes Section - Visible to All, Editable by Admin */}
+          {/* Vibe Notes & Internal Management Section - Admin Only Editing */}
           <div className="border-t border-table-border bg-muted/30 p-8">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Vibe Notes</h2>
-              {!isAdmin && <Badge variant="outline" className="text-xs">View Only</Badge>}
+              <h2 className="text-lg font-semibold">Vibe Notes & Internal Management</h2>
+              {isAdmin ? (
+                <Badge variant="default" className="text-xs">Admin</Badge>
+              ) : (
+                <Badge variant="outline" className="text-xs">View Only</Badge>
+              )}
             </div>
             
             {isAdmin && (
-              <div className="mb-6 p-4 bg-background rounded-lg border border-table-border">
-                <Textarea
-                  placeholder="Add a note visible to the customer..."
-                  value={vibeNotes}
-                  onChange={(e) => setVibeNotes(e.target.value)}
-                  rows={3}
-                  className="mb-2"
-                />
-                <Button onClick={handleAddVibeNote} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Vibe Note
-                </Button>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {order.vibeNotes.map((note, index) => (
-                <div key={index} className="p-4 bg-background rounded-lg border border-table-border">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-medium text-primary">{note.author}</span>
-                    <span className="text-xs text-muted-foreground">{note.date}</span>
-                  </div>
-                  <p className="text-sm">{note.text}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                {/* Vibe Notes */}
+                <div className="p-4 bg-background rounded-lg border border-table-border">
+                  <h3 className="font-medium text-sm mb-3">Add Vibe Note (Visible to Customer)</h3>
+                  <Textarea
+                    placeholder="Add a note visible to the customer..."
+                    value={vibeNotes}
+                    onChange={(e) => setVibeNotes(e.target.value)}
+                    rows={3}
+                    className="mb-2"
+                  />
+                  <Button onClick={handleAddVibeNote} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Vibe Note
+                  </Button>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Admin Section - Only Visible to Admins */}
-          {isAdmin && (
-            <div className="border-t border-table-border bg-primary/5 p-8">
-              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                <Badge variant="default" className="text-xs">Admin Only</Badge>
-                Internal Management
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Tracking */}
-                <div className="space-y-3">
-                  <h3 className="font-medium text-sm">Tracking Information</h3>
+                <div className="p-4 bg-background rounded-lg border border-table-border">
+                  <h3 className="font-medium text-sm mb-3">Tracking Information</h3>
                   <div className="space-y-2">
                     <Input
                       placeholder="Enter tracking number..."
@@ -367,17 +309,17 @@ const OrderDetail = () => {
                       Add Tracking
                     </Button>
                   </div>
-                  {order.tracking && (
-                    <div className="p-3 bg-background rounded border border-table-border">
+                  {order.tracking_number && (
+                    <div className="mt-3 p-3 bg-muted/50 rounded">
                       <p className="text-xs font-medium mb-1">Current Tracking</p>
-                      <p className="text-sm font-mono">{order.tracking}</p>
+                      <p className="text-sm font-mono">{order.tracking_number}</p>
                     </div>
                   )}
                 </div>
 
                 {/* Production Updates */}
-                <div className="space-y-3">
-                  <h3 className="font-medium text-sm">Production Updates</h3>
+                <div className="p-4 bg-background rounded-lg border border-table-border md:col-span-2">
+                  <h3 className="font-medium text-sm mb-3">Production Updates (Internal Only)</h3>
                   <div className="space-y-2">
                     <Textarea
                       placeholder="Add internal production update..."
@@ -385,45 +327,41 @@ const OrderDetail = () => {
                       onChange={(e) => setProductionUpdate(e.target.value)}
                       rows={3}
                     />
-                    <Button onClick={handleAddProductionUpdate} size="sm" className="w-full">
+                    <Button onClick={handleAddProductionUpdate} size="sm">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Update
                     </Button>
                   </div>
-                  {order.productionUpdates.length > 0 && (
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {order.productionUpdates.map((update, index) => (
-                        <div key={index} className="p-3 bg-background rounded border border-table-border text-sm">
-                          <p className="text-xs text-muted-foreground mb-1">{update.date}</p>
-                          <p>{update.text}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                </div>
+
+                {/* Image Upload */}
+                <div className="md:col-span-2">
+                  <Button variant="outline" className="w-full md:w-auto">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Production Images
+                  </Button>
                 </div>
               </div>
+            )}
 
-              {/* Image Upload */}
-              <div className="mt-6">
-                <Button variant="outline" className="w-full md:w-auto">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Production Images
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Documents Footer */}
-          <div className="border-t border-table-border p-8 bg-muted/20">
-            <div className="flex flex-wrap gap-3">
-              <Button variant="outline" onClick={handleDownloadPackingList}>
-                <Download className="h-4 w-4 mr-2" />
-                Download Packing List
-              </Button>
-              <Button variant="outline" onClick={handleDownloadInvoice}>
-                <Download className="h-4 w-4 mr-2" />
-                Download Invoice
-              </Button>
+            {/* Display Vibe Notes (Visible to All) */}
+            <div className="space-y-3">
+              <h3 className="font-medium text-sm">Customer-Visible Notes</h3>
+              {(!order.vibeNotes || order.vibeNotes.length === 0) ? (
+                <p className="text-sm text-muted-foreground p-4 bg-background rounded border border-table-border">
+                  No vibe notes yet
+                </p>
+              ) : (
+                order.vibeNotes?.map((note: any, index: number) => (
+                  <div key={index} className="p-4 bg-background rounded-lg border border-table-border">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs font-medium text-primary">{note.author}</span>
+                      <span className="text-xs text-muted-foreground">{note.date}</span>
+                    </div>
+                    <p className="text-sm">{note.text}</p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </CardContent>
