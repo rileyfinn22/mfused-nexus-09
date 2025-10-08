@@ -763,56 +763,16 @@ const Artwork = () => {
 
       {/* Rejected Archive Section */}
       {rejectedFiles.length > 0 && (
-        <div className="mt-8 border-t pt-6">
+        <div className="mt-6">
           <div 
-            className="bg-card border border-destructive/20 rounded-lg p-6 hover:shadow-lg transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 bg-card border border-destructive/20 rounded-lg px-4 py-2 hover:shadow-md transition-all cursor-pointer"
             onClick={() => navigate('/artwork/rejected')}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <XCircle className="h-6 w-6 text-destructive" />
-                <div>
-                  <h2 className="text-xl font-semibold">Rejected Archive</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    View all {rejectedFiles.length} rejected artwork files
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-3xl font-bold text-destructive">{rejectedFiles.length}</p>
-                  <p className="text-xs text-muted-foreground uppercase">Files</p>
-                </div>
-                <Button variant="outline" size="sm">
-                  View Archive
-                </Button>
-              </div>
-            </div>
-            
-            {/* Preview thumbnails */}
-            <div className="grid grid-cols-6 gap-2 mt-4">
-              {rejectedFiles.slice(0, 6).map((file) => (
-                <div key={file.id} className="aspect-square bg-muted rounded overflow-hidden">
-                  {file.preview_url ? (
-                    <img 
-                      src={file.preview_url} 
-                      alt={file.sku}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : file.artwork_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                    <img 
-                      src={file.artwork_url} 
-                      alt={file.sku}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <FileImage className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <XCircle className="h-4 w-4 text-destructive" />
+            <span className="text-sm font-medium">Rejected Archive</span>
+            <Badge variant="destructive" className="text-xs">
+              {rejectedFiles.length}
+            </Badge>
           </div>
         </div>
       )}
