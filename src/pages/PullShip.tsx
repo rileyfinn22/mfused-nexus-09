@@ -131,10 +131,10 @@ const PullShip = () => {
     "MD": { address: "654 Harbor Dr", city: "Baltimore", zip: "21201" },
     "CO": { address: "987 Mountain View", city: "Denver", zip: "80202" },
     "OR": { address: "147 Pine St", city: "Portland", zip: "97201" },
-    "NO_STATE": { address: "", city: "", zip: "" }
+    "Primary": { address: "", city: "", zip: "" }
   };
 
-  const stateOptions = [...Object.keys(stateAddressMapping).filter(s => s !== "NO_STATE"), "NO_STATE"];
+  const stateOptions = [...Object.keys(stateAddressMapping).filter(s => s !== "Primary"), "Primary"];
 
   // Mock inventory data for the selected state
   const getInventoryForState = (state: string) => {
@@ -147,12 +147,14 @@ const PullShip = () => {
       { sku: "TINCTURE-BTL-002", available: 75, reserved: 10, inProduction: 80, redline: 40 }
     ];
     
-    // If NO_STATE is selected, return products with no state (simulating empty state items)
-    if (state === "NO_STATE") {
+    // If Primary is selected, return products with Primary state
+    if (state === "Primary") {
       return [
-        { sku: "UNASSIGNED-001", available: 30, reserved: 0, inProduction: 0, redline: 20 },
-        { sku: "UNASSIGNED-002", available: 15, reserved: 0, inProduction: 0, redline: 10 },
-        { sku: "UNASSIGNED-003", available: 45, reserved: 0, inProduction: 0, redline: 25 }
+        { sku: "CC Vape Boxes", available: 0, reserved: 0, inProduction: 0, redline: 100 },
+        { sku: "CC Concentrate Box", available: 0, reserved: 0, inProduction: 0, redline: 50 },
+        { sku: "Cannavista", available: 4490, reserved: 0, inProduction: 0, redline: 1000 },
+        { sku: "Small Liv bags", available: 18690, reserved: 0, inProduction: 0, redline: 5000 },
+        { sku: "Large Liv bags", available: 29790, reserved: 0, inProduction: 0, redline: 10000 }
       ].filter(item => item.available > 0);
     }
     
@@ -610,7 +612,7 @@ const PullShip = () => {
                       <SelectContent className="bg-background border border-border shadow-lg z-50">
                         {stateOptions.map(state => (
                           <SelectItem key={state} value={state}>
-                            {state === "NO_STATE" ? "No State / Unassigned" : state}
+                            {state}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -635,7 +637,7 @@ const PullShip = () => {
             {orderData.state && (
               <div className="bg-table-row border border-table-border rounded p-4">
                 <h3 className="text-lg font-semibold mb-4">
-                  Available Inventory - {orderData.state === "NO_STATE" ? "No State / Unassigned" : orderData.state}
+                  Available Inventory - {orderData.state}
                 </h3>
                 
                 {/* Search */}
@@ -718,7 +720,7 @@ const PullShip = () => {
                 <div className="space-y-4">
                   <div className="text-sm">
                     <div className="font-medium">
-                      Destination: {orderData.state === "NO_STATE" ? "No State / Unassigned" : orderData.state || 'Not selected'}
+                      Destination: {orderData.state || 'Not selected'}
                     </div>
                     <div className="text-muted-foreground">Items: {selectedSkus.size}</div>
                     <div className="text-muted-foreground">
