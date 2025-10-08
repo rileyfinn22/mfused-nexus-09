@@ -16,7 +16,8 @@ import {
   Edit,
   Package,
   CheckCircle,
-  Clock
+  Clock,
+  Trash2
 } from "lucide-react";
 
 const Orders = () => {
@@ -41,6 +42,25 @@ const Orders = () => {
       setOrders(data);
     }
     setLoading(false);
+  };
+
+  const handleDeleteOrder = async (orderId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', orderId);
+
+    if (error) {
+      console.error('Error deleting order:', error);
+      alert('Failed to delete order');
+    } else {
+      fetchOrders();
+    }
   };
 
   const getProgressForStatus = (status: string) => {
@@ -140,14 +160,14 @@ const Orders = () => {
               <h2 className="text-lg font-medium">Draft Orders</h2>
               <div className="border border-table-border rounded">
                 <div className="bg-table-header border-b border-table-border">
-                  <div className="grid grid-cols-11 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     <div className="col-span-2">Order #</div>
                     <div className="col-span-2">PO #</div>
                     <div className="col-span-1">State</div>
                     <div className="col-span-1">Total</div>
                     <div className="col-span-2">Status</div>
                     <div className="col-span-2">Due Date</div>
-                    <div className="col-span-1">Actions</div>
+                    <div className="col-span-2">Actions</div>
                   </div>
                 </div>
                 <div className="divide-y divide-table-border">
@@ -157,7 +177,7 @@ const Orders = () => {
                     return (
                       <div 
                         key={order.id} 
-                        className="grid grid-cols-11 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                        className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
                         onClick={() => navigate(`/orders/edit/${order.id}`)}
                       >
                         <div className="col-span-2 font-medium font-mono text-sm">{order.order_number}</div>
@@ -172,7 +192,7 @@ const Orders = () => {
                         <div className="col-span-2 text-sm text-muted-foreground">
                           {dueDate}
                         </div>
-                        <div className="col-span-1">
+                        <div className="col-span-2 flex gap-1">
                           <Button 
                             variant="ghost" 
                             size="sm" 
@@ -183,6 +203,14 @@ const Orders = () => {
                             }}
                           >
                             <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                            onClick={(e) => handleDeleteOrder(order.id, e)}
+                          >
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </div>
@@ -198,14 +226,14 @@ const Orders = () => {
             <h2 className="text-lg font-medium">Pending Orders - Awaiting Production</h2>
             <div className="border border-table-border rounded">
               <div className="bg-table-header border-b border-table-border">
-                <div className="grid grid-cols-11 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order #</div>
                   <div className="col-span-2">PO #</div>
                   <div className="col-span-1">State</div>
                   <div className="col-span-1">Total</div>
                   <div className="col-span-2">Status</div>
                   <div className="col-span-2">Due Date</div>
-                  <div className="col-span-1">Actions</div>
+                  <div className="col-span-2">Actions</div>
                 </div>
               </div>
               <div className="divide-y divide-table-border">
@@ -223,7 +251,7 @@ const Orders = () => {
                   return (
                     <div 
                       key={order.id} 
-                      className="grid grid-cols-11 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
                       onClick={() => navigate(`/orders/${order.id}`)}
                     >
                       <div className="col-span-2 font-medium font-mono text-sm">{order.order_number}</div>
@@ -238,7 +266,18 @@ const Orders = () => {
                       <div className="col-span-2 text-sm text-muted-foreground">
                         {dueDate}
                       </div>
-                      <div className="col-span-1">
+                      <div className="col-span-2 flex gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/orders/edit/${order.id}`);
+                          }}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="sm" 
@@ -249,6 +288,14 @@ const Orders = () => {
                           }}
                         >
                           <Eye className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                          onClick={(e) => handleDeleteOrder(order.id, e)}
+                        >
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
@@ -288,14 +335,14 @@ const Orders = () => {
           {/* Production Orders */}
           <div className="border border-table-border rounded">
             <div className="bg-table-header border-b border-table-border">
-              <div className="grid grid-cols-11 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-2">Order #</div>
                 <div className="col-span-2">PO #</div>
                 <div className="col-span-1">State</div>
                 <div className="col-span-1">Total</div>
                 <div className="col-span-2">Status</div>
                 <div className="col-span-2">Progress</div>
-                <div className="col-span-1">Actions</div>
+                <div className="col-span-2">Actions</div>
               </div>
             </div>
             <div className="divide-y divide-table-border">
@@ -314,7 +361,7 @@ const Orders = () => {
                 return (
                   <div 
                     key={order.id} 
-                    className="grid grid-cols-11 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
                     onClick={() => navigate(`/orders/${order.id}`)}
                   >
                     <div className="col-span-2 font-medium font-mono text-sm">{order.order_number}</div>
@@ -333,7 +380,18 @@ const Orders = () => {
                       </div>
                       <Progress value={progress} className="h-1" />
                     </div>
-                    <div className="col-span-1">
+                    <div className="col-span-2 flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/orders/edit/${order.id}`);
+                        }}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
                       <Button 
                         variant="ghost" 
                         size="sm" 
@@ -344,6 +402,14 @@ const Orders = () => {
                         }}
                       >
                         <Eye className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        onClick={(e) => handleDeleteOrder(order.id, e)}
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
