@@ -68,7 +68,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
           {
             role: 'system',
@@ -158,7 +158,14 @@ Return ONLY valid JSON:
 
     const aiData = await aiResponse.json();
     const extractedData = JSON.parse(aiData.choices[0].message.content);
-    console.log('Extracted data:', extractedData);
+    console.log('Extracted data:', JSON.stringify(extractedData, null, 2));
+    
+    // Log first few items with prices
+    if (extractedData.items && extractedData.items.length > 0) {
+      console.log('First item details:', JSON.stringify(extractedData.items[0], null, 2));
+      console.log('Unit price type:', typeof extractedData.items[0].unit_price);
+      console.log('Unit price value:', extractedData.items[0].unit_price);
+    }
 
     // Fetch products to try matching SKUs and names
     const { data: products, error: productsError } = await supabase
@@ -290,6 +297,8 @@ Return ONLY valid JSON:
         const unitPrice = item.unit_price || 0;
         const quantity = item.quantity || 1;
         
+        console.log(`Item "${item.name}": unit_price=${item.unit_price}, type=${typeof item.unit_price}`);
+        
         return {
           order_id: order.id,
           product_id: matchedProductId, // Will be null if no match found
@@ -304,7 +313,7 @@ Return ONLY valid JSON:
       });
 
       console.log(`Creating ${orderItems.length} order items, ${orderItems.filter(i => i.product_id).length} matched to products`);
-      console.log('Using PO unit prices, not product costs');
+      console.log('Sample order item:', JSON.stringify(orderItems[0], null, 2));
 
       const { error: itemsError } = await supabase
         .from('order_items')
