@@ -19,7 +19,8 @@ import {
   Filter, 
   ArrowUpDown,
   AlertTriangle,
-  Trash2
+  Trash2,
+  Edit
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadInventoryDialog } from "@/components/UploadInventoryDialog";
@@ -56,6 +57,7 @@ const Inventory = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -259,6 +261,21 @@ const Inventory = () => {
               Delete ({selectedItems.size})
             </Button>
           )}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsEditMode(!isEditMode);
+                if (isEditMode) {
+                  setSelectedItems(new Set());
+                }
+              }}
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              {isEditMode ? "Done" : "Edit"}
+            </Button>
+          )}
           <UploadInventoryDialog onInventoryUploaded={fetchInventory} />
         </div>
       </div>
@@ -304,7 +321,7 @@ const Inventory = () => {
         {/* Table Header */}
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-10 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {isAdmin && (
+            {isAdmin && isEditMode && (
               <div className="col-span-1 flex items-center">
                 <Checkbox
                   checked={selectedItems.size === filteredAndSortedData.length && filteredAndSortedData.length > 0}
@@ -312,8 +329,8 @@ const Inventory = () => {
                 />
               </div>
             )}
-            <div className={isAdmin ? "col-span-1" : "col-span-1"}>Preview</div>
-            <div className="col-span-2">SKU</div>
+            <div className={isAdmin && isEditMode ? "col-span-1" : "col-span-1"}>Preview</div>
+            <div className={isAdmin && isEditMode ? "col-span-2" : "col-span-3"}>SKU</div>
             <div className="col-span-1">State</div>
             <div 
               className="col-span-1 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
@@ -322,10 +339,10 @@ const Inventory = () => {
               Available {getSortIcon("available")}
             </div>
             <div 
-              className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
+              className="col-span-1 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
               onClick={() => handleSort("in_production")}
             >
-              In Production {getSortIcon("in_production")}
+              In Prod {getSortIcon("in_production")}
             </div>
             <div 
               className="col-span-1 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
@@ -333,7 +350,7 @@ const Inventory = () => {
             >
               Redline {getSortIcon("redline")}
             </div>
-            <div className="col-span-1">Status</div>
+            <div className="col-span-2">Status</div>
           </div>
         </div>
 
@@ -348,7 +365,7 @@ const Inventory = () => {
                 key={`${item.sku}-${item.state}`}
                 className="grid grid-cols-10 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
               >
-                {isAdmin && (
+                {isAdmin && isEditMode && (
                   <div className="col-span-1 flex items-center">
                     <Checkbox
                       checked={selectedItems.has(item.id)}
@@ -356,7 +373,7 @@ const Inventory = () => {
                     />
                   </div>
                 )}
-                <div className={isAdmin ? "col-span-1" : "col-span-1"}>
+                <div className={isAdmin && isEditMode ? "col-span-1" : "col-span-1"}>
                   {artworkThumbnails[item.sku] || item.products?.image_url ? (
                     <img 
                       src={artworkThumbnails[item.sku] || item.products?.image_url} 
@@ -370,9 +387,9 @@ const Inventory = () => {
                     </div>
                   )}
                 </div>
-                <div className="col-span-2 font-mono text-sm font-medium flex items-center gap-2">
+                <div className={`${isAdmin && isEditMode ? "col-span-2" : "col-span-3"} font-mono text-sm font-medium flex items-center gap-2`}>
                   <span 
-                    className="line-clamp-2 break-words"
+                    className="break-words"
                     title={item.sku}
                   >
                     {item.sku}
@@ -388,9 +405,9 @@ const Inventory = () => {
                   {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
                   {item.available}
                 </div>
-                <div className="col-span-2 text-sm">{item.in_production}</div>
+                <div className="col-span-1 text-sm">{item.in_production}</div>
                 <div className="col-span-1 text-sm text-muted-foreground">{item.redline}</div>
-                <div className={`col-span-1 text-xs font-medium uppercase ${stockColor}`}>
+                <div className={`col-span-2 text-xs font-medium uppercase ${stockColor}`}>
                   {status}
                 </div>
               </div>
