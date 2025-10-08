@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,8 +15,10 @@ const EditProduct = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [availableStock, setAvailableStock] = useState<number>(0);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
   
   const [formData, setFormData] = useState({
+    item_id: "",
     product_type: "",
     name: "",
     description: "",
@@ -33,6 +35,14 @@ const EditProduct = () => {
     }
   }, [id]);
 
+  useEffect(() => {
+    // Auto-resize description textarea when content loads
+    if (descriptionRef.current) {
+      descriptionRef.current.style.height = 'auto';
+      descriptionRef.current.style.height = descriptionRef.current.scrollHeight + 'px';
+    }
+  }, [formData.description]);
+
   const fetchProduct = async () => {
     try {
       const { data, error } = await supabase
@@ -44,6 +54,7 @@ const EditProduct = () => {
       if (error) throw error;
 
       setFormData({
+        item_id: data.item_id || "",
         product_type: data.product_type || "",
         name: data.name || "",
         description: data.description || "",
@@ -84,6 +95,7 @@ const EditProduct = () => {
       const { error } = await supabase
         .from('products')
         .update({
+          item_id: formData.item_id || null,
           product_type: formData.product_type,
           name: formData.name,
           description: formData.description,
@@ -135,6 +147,16 @@ const EditProduct = () => {
           <h2 className="text-lg font-semibold mb-4">Product</h2>
           
           <div className="space-y-2">
+            <Label htmlFor="item_id">Item ID</Label>
+            <Input
+              id="item_id"
+              value={formData.item_id}
+              onChange={(e) => setFormData({ ...formData, item_id: e.target.value })}
+              placeholder="e.g., SKU-12345"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="product_type">Product Type</Label>
             <Select
               value={formData.product_type}
@@ -166,16 +188,16 @@ const EditProduct = () => {
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
+              ref={descriptionRef}
               id="description"
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="min-h-[120px] resize-none"
-              style={{ height: 'auto', minHeight: '120px' }}
-              onInput={(e) => {
+              onChange={(e) => {
+                setFormData({ ...formData, description: e.target.value });
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
                 target.style.height = target.scrollHeight + 'px';
               }}
+              className="min-h-[120px] resize-none overflow-hidden"
             />
           </div>
         </div>
