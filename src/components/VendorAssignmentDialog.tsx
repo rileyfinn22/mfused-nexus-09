@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle } from "lucide-react";
@@ -32,6 +33,9 @@ export const VendorAssignmentDialog = ({
   const [assignments, setAssignments] = useState<Record<string, ItemAssignment>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [bulkVendorId, setBulkVendorId] = useState<string>("");
+  const [bulkCost, setBulkCost] = useState<string>("");
 
   useEffect(() => {
     if (open) {
@@ -225,6 +229,152 @@ export const VendorAssignmentDialog = ({
     }));
   };
 
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedItems.size === orderItems.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(orderItems.map(item => item.id)));
+    }
+  };
+
+  const handleBulkAssign = async () => {
+    if (selectedItems.size === 0) {
+      toast({
+        title: "No Items Selected",
+        description: "Please select at least one product",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!bulkVendorId || !bulkCost) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a vendor and enter a cost",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Get order and company info
+      const { data: order } = await supabase
+        .from('orders')
+        .select('company_id, order_number')
+        .eq('id', orderId)
+        .single();
+
+      if (!order) throw new Error("Order not found");
+
+      // Process each selected item
+      for (const itemId of Array.from(selectedItems)) {
+        const item = orderItems.find(i => i.id === itemId);
+        if (!item || assignments[itemId]?.assigned) continue;
+
+        // Update order item with vendor info
+        await supabase
+          .from('order_items')
+          .update({
+            vendor_id: bulkVendorId,
+            vendor_cost: parseFloat(bulkCost)
+          })
+          .eq('id', itemId);
+
+        // Check if vendor PO exists for this vendor and order
+        let vendorPO;
+        const { data: existingPO } = await supabase
+          .from('vendor_pos')
+          .select('*')
+          .eq('order_id', orderId)
+          .eq('vendor_id', bulkVendorId)
+          .maybeSingle();
+
+        if (existingPO) {
+          vendorPO = existingPO;
+          // Update total
+          const newTotal = Number(existingPO.total) + (parseFloat(bulkCost) * item.quantity);
+          await supabase
+            .from('vendor_pos')
+            .update({ total: newTotal })
+            .eq('id', existingPO.id);
+        } else {
+          // Create new vendor PO
+          const poNumber = generatePONumber();
+          const { data: newPO, error: poError } = await supabase
+            .from('vendor_pos')
+            .insert({
+              company_id: order.company_id,
+              order_id: orderId,
+              vendor_id: bulkVendorId,
+              po_number: poNumber,
+              total: parseFloat(bulkCost) * item.quantity,
+              status: 'draft'
+            })
+            .select()
+            .single();
+
+          if (poError) throw poError;
+          vendorPO = newPO;
+        }
+
+        // Create vendor PO item
+        await supabase
+          .from('vendor_po_items')
+          .insert({
+            vendor_po_id: vendorPO.id,
+            order_item_id: itemId,
+            sku: item.sku,
+            name: item.name,
+            quantity: item.quantity,
+            unit_cost: parseFloat(bulkCost),
+            total: parseFloat(bulkCost) * item.quantity
+          });
+
+        // Mark as assigned
+        setAssignments(prev => ({
+          ...prev,
+          [itemId]: { 
+            vendorId: bulkVendorId,
+            vendorCost: bulkCost,
+            assigned: true 
+          }
+        }));
+      }
+
+      // Clear selections and bulk fields
+      setSelectedItems(new Set());
+      setBulkVendorId("");
+      setBulkCost("");
+
+      toast({
+        title: "Success",
+        description: `Assigned vendor to ${selectedItems.size} product(s)`
+      });
+    } catch (error: any) {
+      console.error("Error bulk assigning vendor:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign vendor",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl max-h-[85vh]">
@@ -238,27 +388,75 @@ export const VendorAssignmentDialog = ({
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Select vendor and cost for each product. PO numbers will be auto-generated.
-            </p>
+            {/* Bulk Assignment Section */}
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <h3 className="font-medium mb-3">Bulk Assignment</h3>
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-1.5 block">Vendor</label>
+                  <Select value={bulkVendorId} onValueChange={setBulkVendorId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vendor..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendors.map((vendor) => (
+                        <SelectItem key={vendor.id} value={vendor.id}>
+                          {vendor.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-40">
+                  <label className="text-sm font-medium mb-1.5 block">Cost per Unit</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={bulkCost}
+                    onChange={(e) => setBulkCost(e.target.value)}
+                  />
+                </div>
+                <Button
+                  onClick={handleBulkAssign}
+                  disabled={saving || selectedItems.size === 0 || !bulkVendorId || !bulkCost}
+                  className="px-8"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : `Assign to ${selectedItems.size} Selected`}
+                </Button>
+              </div>
+            </div>
             
             <div className="border rounded-lg overflow-hidden">
               <div className="max-h-[55vh] overflow-y-auto">
                 <table className="w-full">
                   <thead className="bg-muted/50 sticky top-0 z-10">
                     <tr className="border-b">
+                      <th className="text-center p-3 font-medium text-sm w-12">
+                        <Checkbox
+                          checked={selectedItems.size === orderItems.length && orderItems.length > 0}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </th>
                       <th className="text-left p-3 font-medium text-sm">SKU</th>
                       <th className="text-left p-3 font-medium text-sm">Product</th>
                       <th className="text-center p-3 font-medium text-sm">Qty</th>
                       <th className="text-right p-3 font-medium text-sm">Sale Price</th>
                       <th className="text-left p-3 font-medium text-sm w-48">Vendor</th>
                       <th className="text-left p-3 font-medium text-sm w-32">Cost</th>
-                      <th className="text-center p-3 font-medium text-sm w-32">Action</th>
+                      <th className="text-center p-3 font-medium text-sm w-32">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {orderItems.map((item) => (
                       <tr key={item.id} className="border-b hover:bg-muted/30">
+                        <td className="p-3 text-center">
+                          <Checkbox
+                            checked={selectedItems.has(item.id)}
+                            onCheckedChange={() => toggleItemSelection(item.id)}
+                            disabled={assignments[item.id]?.assigned}
+                          />
+                        </td>
                         <td className="p-3 text-sm font-mono">{item.sku}</td>
                         <td className="p-3 text-sm">{item.name}</td>
                         <td className="p-3 text-sm text-center">{item.quantity}</td>
