@@ -38,6 +38,7 @@ const customerNavigationItems = [
 const vibeAdminNavigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "All Orders", url: "/orders", icon: ClipboardList },
+  { title: "Pull & Ship", url: "/pull-ship", icon: Truck },
   { title: "Vendors", url: "/vendors", icon: Building2 },
   { title: "Vendor POs", url: "/vendor-pos", icon: FolderOpen },
   { title: "Invoices", url: "/invoices", icon: FileText },

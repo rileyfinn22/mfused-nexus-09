@@ -18,8 +18,8 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { pdfPath, companyId, userId, filename } = await req.json();
-    console.log('Analyzing PO from path:', pdfPath);
+    const { pdfPath, companyId, userId, filename, orderType = 'pull_ship' } = await req.json();
+    console.log('Analyzing PO from path:', pdfPath, 'for order type:', orderType);
 
     // Download PDF from storage
     console.log('Downloading PDF from storage...');
@@ -252,13 +252,14 @@ Return ONLY valid JSON:
     const tax = 0; // No tax on pull & ship orders
     const total = subtotal;
 
-    // Create order as pull_ship type with pending_pull status
+    // Create order with the specified order_type
+    const orderStatus = orderType === 'pull_ship' ? 'pending_pull' : 'draft';
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
         company_id: companyId,
         order_number: orderNumber,
-        order_type: 'pull_ship',
+        order_type: orderType,
         po_number: extractedData.po_number || null,
         customer_name: extractedData.customer_name || 'Unknown Customer',
         customer_email: extractedData.customer_email || null,
@@ -278,7 +279,7 @@ Return ONLY valid JSON:
         subtotal,
         tax,
         total,
-        status: 'pending_pull',
+        status: orderStatus,
         terms: 'Net 30'
       })
       .select()
