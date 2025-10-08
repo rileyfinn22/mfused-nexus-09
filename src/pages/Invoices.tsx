@@ -11,7 +11,9 @@ import {
   AlertTriangle,
   Clock,
   FileText,
-  Package
+  Package,
+  Edit,
+  Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -186,10 +188,10 @@ const Invoices = () => {
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-2">Type</div>
             <div className="col-span-2">Amount</div>
-            <div className="col-span-2">PO Number</div>
+            <div className="col-span-1">PO Number</div>
             <div className="col-span-2">Due Date</div>
             <div className="col-span-1">Status</div>
-            <div className="col-span-1">Actions</div>
+            <div className="col-span-2">Actions</div>
           </div>
         </div>
 
@@ -211,8 +213,7 @@ const Invoices = () => {
               return (
                 <div 
                   key={invoice.id} 
-                  className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
-                  onClick={() => navigate(`/orders/${invoice.order_id}`)}
+                  className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
                 >
                   <div className="col-span-2 font-medium font-mono text-sm">{invoice.invoice_number}</div>
                   <div className="col-span-2">
@@ -227,7 +228,7 @@ const Invoices = () => {
                     )}
                   </div>
                   <div className="col-span-2 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
-                  <div className="col-span-2 text-sm">{invoice.orders?.po_number || 'N/A'}</div>
+                  <div className="col-span-1 text-sm">{invoice.orders?.po_number || 'N/A'}</div>
                   <div className="col-span-2 text-sm">
                     {invoice.due_date ? (
                       <div className={
@@ -251,11 +252,56 @@ const Invoices = () => {
                       {invoice.status.replace('_', ' ').toUpperCase()}
                     </div>
                   </div>
-                  <div className="col-span-1 flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="View Invoice">
+                  <div className="col-span-2 flex gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 w-6 p-0" 
+                      title="View Invoice"
+                      onClick={() => navigate(`/invoices/${invoice.id}`)}
+                    >
                       <Eye className="h-3 w-3" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Download Invoice">
+                    {isVibeAdmin && (
+                      <>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0" 
+                          title="Edit Order"
+                          onClick={() => navigate(`/orders/${invoice.order_id}`)}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive" 
+                          title="Delete Invoice"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (confirm('Are you sure you want to delete this invoice?')) {
+                              const { error } = await supabase
+                                .from('invoices')
+                                .delete()
+                                .eq('id', invoice.id);
+                              
+                              if (!error) {
+                                fetchInvoices();
+                              }
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 w-6 p-0" 
+                      title="Download Invoice"
+                    >
                       <Download className="h-3 w-3" />
                     </Button>
                   </div>
