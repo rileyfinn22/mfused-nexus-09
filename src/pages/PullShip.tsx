@@ -316,9 +316,7 @@ const PullShip = () => {
     }));
     
     const doc = generatePackingListPDF(items, orderData, "PREVIEW");
-    const pdfBlob = doc.output("blob");
-    const url = URL.createObjectURL(pdfBlob);
-    window.open(url);
+    doc.save(`packing-list-preview-${Date.now()}.pdf`);
   };
 
   const viewInvoice = () => {
@@ -331,9 +329,7 @@ const PullShip = () => {
     
     const totalValue = items.reduce((sum, item) => sum + item.quantity, 0) * 75;
     const doc = generateInvoicePDF(items, orderData, "PREVIEW", `$${totalValue.toLocaleString()}.00`);
-    const pdfBlob = doc.output("blob");
-    const url = URL.createObjectURL(pdfBlob);
-    window.open(url);
+    doc.save(`invoice-preview-${Date.now()}.pdf`);
   };
 
   const handleStateChange = (state: string) => {
