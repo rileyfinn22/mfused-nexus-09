@@ -449,7 +449,7 @@ const PullShip = () => {
         });
 
         // Navigate to the order detail page
-        navigate(`/order/${analysisData.orderId}`);
+        navigate(`/orders/${analysisData.orderId}`);
       } else {
         throw new Error('Failed to create order from PO');
       }
