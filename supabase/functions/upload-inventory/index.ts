@@ -188,7 +188,7 @@ serve(async (req) => {
       inventoryItems.push({
         company_id: userRole.company_id,
         product_id: productId,
-        sku: itemId || sku, // Use item ID if available, otherwise use SKU
+        sku: sku, // Keep the item name/description as SKU
         state: state,
         available: available,
         in_production: inProduction,
