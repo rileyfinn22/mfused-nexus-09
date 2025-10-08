@@ -234,6 +234,26 @@ const OrderDetail = () => {
   const subtotal = order.subtotal || 0;
   const total = order.total || 0;
   return <div className="max-w-7xl mx-auto">
+      {/* Process Order Banner for Pending Orders */}
+      {isAdmin && order.status === 'pending' && (
+        <div className="mb-6 p-4 bg-blue-500/10 border-2 border-blue-500 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-blue-600">Order Ready to Process</h3>
+              <p className="text-sm text-muted-foreground">This order is pending and ready to be moved to production</p>
+            </div>
+            <Button 
+              size="lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => handleStatusChange('open')}
+            >
+              <CheckCircle2 className="h-5 w-5 mr-2" />
+              Process Order → Open
+            </Button>
+          </div>
+        </div>
+      )}
+      
       {/* Header with Back Button and Action Buttons */}
       <div className="mb-6 flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => navigate("/orders")}>

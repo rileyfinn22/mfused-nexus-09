@@ -10,7 +10,6 @@ import { UploadPODialog } from "@/components/UploadPODialog";
 import { 
   Search, 
   Plus, 
-  Eye,
   Edit,
   CheckCircle,
   Trash2,
@@ -284,8 +283,7 @@ const Orders = () => {
                   return (
                     <div 
                       key={order.id} 
-                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
-                      onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`)}
+                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
                     >
                       <div className="col-span-2 space-y-1">
                         <div className="font-medium font-mono text-sm">{order.order_number}</div>
@@ -371,8 +369,7 @@ const Orders = () => {
                 return (
                   <div 
                     key={order.id} 
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
-                    onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`)}
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-sm">{order.order_number}</div>
@@ -428,23 +425,9 @@ const Orders = () => {
                         variant="ghost" 
                         size="sm" 
                         className="h-6 w-6 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`);
-                        }}
+                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`)}
                       >
                         <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 w-6 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`);
-                        }}
-                      >
-                        <Eye className="h-3 w-3" />
                       </Button>
                       <Button 
                         variant="ghost" 
@@ -496,8 +479,7 @@ const Orders = () => {
                 return (
                   <div 
                     key={order.id} 
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
-                    onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`)}
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-sm">{order.order_number}</div>
@@ -526,23 +508,9 @@ const Orders = () => {
                         variant="ghost" 
                         size="sm" 
                         className="h-6 w-6 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`);
-                        }}
+                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`)}
                       >
                         <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 w-6 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`);
-                        }}
-                      >
-                        <Eye className="h-3 w-3" />
                       </Button>
                       <Button 
                         variant="ghost" 
