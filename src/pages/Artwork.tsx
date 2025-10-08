@@ -21,7 +21,8 @@ import {
   FileImage,
   AlertTriangle,
   ChevronsUpDown,
-  Check
+  Check,
+  Edit
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -36,8 +37,10 @@ const Artwork = () => {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [editThumbnailDialogOpen, setEditThumbnailDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [skuComboboxOpen, setSkuComboboxOpen] = useState(false);
+  const [newThumbnailFile, setNewThumbnailFile] = useState<File | null>(null);
   const [approvalData, setApprovalData] = useState({
     printName: '',
     signature: '',
@@ -297,6 +300,57 @@ const Artwork = () => {
     }
   };
 
+  const handleEditThumbnail = async () => {
+    if (!newThumbnailFile || !selectedFile) {
+      toast({
+        title: "Missing file",
+        description: "Please select a thumbnail image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Upload new thumbnail
+      const fileExt = newThumbnailFile.name.split('.').pop();
+      const fileName = `${selectedFile.sku}/preview-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('artwork')
+        .upload(fileName, newThumbnailFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('artwork')
+        .getPublicUrl(fileName);
+
+      // Update database record
+      const { error: updateError } = await supabase
+        .from('artwork_files')
+        .update({ preview_url: publicUrl })
+        .eq('id', selectedFile.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Success",
+        description: "Thumbnail updated successfully",
+      });
+
+      setEditThumbnailDialogOpen(false);
+      setNewThumbnailFile(null);
+      fetchArtwork();
+    } catch (error) {
+      console.error('Error updating thumbnail:', error);
+      toast({
+        title: "Update failed",
+        description: "Failed to update thumbnail",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusIcon = (isApproved: boolean) => {
     return isApproved ? CheckCircle : Clock;
   };
@@ -470,7 +524,7 @@ const Artwork = () => {
             <div key={file.id} className="bg-card border rounded-lg p-6">
               <div className="flex items-start gap-4">
                 {/* Thumbnail Image */}
-                <div className="w-32 h-32 flex-shrink-0 bg-muted rounded-lg overflow-hidden border">
+                <div className="relative w-32 h-32 flex-shrink-0 bg-muted rounded-lg overflow-hidden border group">
                   {file.preview_url ? (
                     <img 
                       src={file.preview_url} 
@@ -496,6 +550,18 @@ const Artwork = () => {
                       <FileImage className="h-8 w-8 text-muted-foreground" />
                     </div>
                   )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="absolute bottom-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFile(file);
+                      setEditThumbnailDialogOpen(true);
+                    }}
+                  >
+                    <Edit className="h-3 w-3" />
+                  </Button>
                 </div>
 
                 {/* File Details */}
@@ -662,6 +728,59 @@ const Artwork = () => {
               <Button 
                 variant="outline" 
                 onClick={() => setApprovalDialogOpen(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Thumbnail Dialog */}
+      <Dialog open={editThumbnailDialogOpen} onOpenChange={setEditThumbnailDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Thumbnail</DialogTitle>
+            <DialogDescription>
+              Upload a new thumbnail image for {selectedFile?.filename}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedFile?.preview_url && (
+              <div>
+                <Label>Current Thumbnail</Label>
+                <img 
+                  src={selectedFile.preview_url} 
+                  alt="Current thumbnail"
+                  className="w-full h-48 object-cover rounded border mt-2"
+                />
+              </div>
+            )}
+            <div>
+              <Label htmlFor="newThumbnail">New Thumbnail Image *</Label>
+              <Input
+                id="newThumbnail"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setNewThumbnailFile(e.target.files?.[0] || null)}
+                className="mt-2"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleEditThumbnail} 
+                className="flex-1"
+                disabled={!newThumbnailFile}
+              >
+                Update Thumbnail
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setEditThumbnailDialogOpen(false);
+                  setNewThumbnailFile(null);
+                }}
                 className="flex-1"
               >
                 Cancel
