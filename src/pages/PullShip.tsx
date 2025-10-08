@@ -130,10 +130,11 @@ const PullShip = () => {
     "AZ": { address: "321 Desert Rd", city: "Phoenix", zip: "85001" },
     "MD": { address: "654 Harbor Dr", city: "Baltimore", zip: "21201" },
     "CO": { address: "987 Mountain View", city: "Denver", zip: "80202" },
-    "OR": { address: "147 Pine St", city: "Portland", zip: "97201" }
+    "OR": { address: "147 Pine St", city: "Portland", zip: "97201" },
+    "NO_STATE": { address: "", city: "", zip: "" }
   };
 
-  const stateOptions = Object.keys(stateAddressMapping);
+  const stateOptions = [...Object.keys(stateAddressMapping).filter(s => s !== "NO_STATE"), "NO_STATE"];
 
   // Mock inventory data for the selected state
   const getInventoryForState = (state: string) => {
@@ -145,6 +146,16 @@ const PullShip = () => {
       { sku: "PRE-ROLL-TUBE-001", available: 22, reserved: 5, inProduction: 50, redline: 30 },
       { sku: "TINCTURE-BTL-002", available: 75, reserved: 10, inProduction: 80, redline: 40 }
     ];
+    
+    // If NO_STATE is selected, return products with no state (simulating empty state items)
+    if (state === "NO_STATE") {
+      return [
+        { sku: "UNASSIGNED-001", available: 30, reserved: 0, inProduction: 0, redline: 20 },
+        { sku: "UNASSIGNED-002", available: 15, reserved: 0, inProduction: 0, redline: 10 },
+        { sku: "UNASSIGNED-003", available: 45, reserved: 0, inProduction: 0, redline: 25 }
+      ].filter(item => item.available > 0);
+    }
+    
     return inventoryData.filter(item => item.available > 0);
   };
 
@@ -597,7 +608,11 @@ const PullShip = () => {
                         <SelectValue placeholder="Select State" />
                       </SelectTrigger>
                       <SelectContent className="bg-background border border-border shadow-lg z-50">
-                        {stateOptions.map(state => <SelectItem key={state} value={state}>{state}</SelectItem>)}
+                        {stateOptions.map(state => (
+                          <SelectItem key={state} value={state}>
+                            {state === "NO_STATE" ? "No State / Unassigned" : state}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -619,7 +634,9 @@ const PullShip = () => {
             {/* Product Selection */}
             {orderData.state && (
               <div className="bg-table-row border border-table-border rounded p-4">
-                <h3 className="text-lg font-semibold mb-4">Available Inventory - {orderData.state}</h3>
+                <h3 className="text-lg font-semibold mb-4">
+                  Available Inventory - {orderData.state === "NO_STATE" ? "No State / Unassigned" : orderData.state}
+                </h3>
                 
                 {/* Search */}
                 <div className="mb-4">
@@ -698,14 +715,16 @@ const PullShip = () => {
             {selectedSkus.size === 0 ? (
               <p className="text-sm text-muted-foreground">No items selected</p>
             ) : (
-              <div className="space-y-4">
-                <div className="text-sm">
-                  <div className="font-medium">Destination: {orderData.state || 'Not selected'}</div>
-                  <div className="text-muted-foreground">Items: {selectedSkus.size}</div>
-                  <div className="text-muted-foreground">
-                    Total Units: {Array.from(selectedSkus).reduce((sum, sku) => sum + (skuQuantities[sku] || 1), 0)}
+                <div className="space-y-4">
+                  <div className="text-sm">
+                    <div className="font-medium">
+                      Destination: {orderData.state === "NO_STATE" ? "No State / Unassigned" : orderData.state || 'Not selected'}
+                    </div>
+                    <div className="text-muted-foreground">Items: {selectedSkus.size}</div>
+                    <div className="text-muted-foreground">
+                      Total Units: {Array.from(selectedSkus).reduce((sum, sku) => sum + (skuQuantities[sku] || 1), 0)}
+                    </div>
                   </div>
-                </div>
 
                 <div className="border-t pt-4 space-y-3">
                   <div className="flex gap-2">
