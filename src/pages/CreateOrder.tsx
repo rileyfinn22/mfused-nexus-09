@@ -164,11 +164,22 @@ const CreateOrder = () => {
         memo: order.memo || "",
       });
 
-      const items = order.order_items.map((item: any) => ({
-        productId: item.product_id,
-        quantity: item.quantity,
-      }));
+      const items = order.order_items
+        .filter((item: any) => item.product_id !== null) // Only load items with matching products
+        .map((item: any) => ({
+          productId: item.product_id,
+          quantity: item.quantity,
+        }));
       setSelectedItems(items);
+      
+      // Show toast if some items couldn't be loaded
+      const unmatchedItems = order.order_items.filter((item: any) => item.product_id === null);
+      if (unmatchedItems.length > 0) {
+        toast({
+          title: "Some items need matching",
+          description: `${unmatchedItems.length} item(s) from the PO don't match your products. Please add them manually.`,
+        });
+      }
     }
   };
 

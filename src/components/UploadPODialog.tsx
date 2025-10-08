@@ -107,12 +107,12 @@ export function UploadPODialog() {
         });
       } else if (functionData?.orderId) {
         toast({
-          title: "Order created successfully",
-          description: "Your PO has been analyzed and order created",
+          title: "PO analyzed successfully",
+          description: "Review and edit the order details before saving",
         });
         
-        // Navigate to the created order
-        navigate(`/orders/${functionData.orderId}`);
+        // Navigate to the create/edit order page so user can review and edit
+        navigate(`/orders/edit/${functionData.orderId}`);
       }
 
       setAnalyzing(false);
@@ -201,8 +201,8 @@ export function UploadPODialog() {
             <p className="font-medium">What happens next?</p>
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
               <li>Your PO is analyzed by AI to extract order details</li>
-              <li>An order is automatically created with the extracted data</li>
-              <li>You can review and edit the order details</li>
+              <li>A draft order is created with the extracted data</li>
+              <li>You can review, edit, and add products before saving</li>
             </ol>
           </div>
         </div>

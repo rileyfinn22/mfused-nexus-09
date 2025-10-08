@@ -191,7 +191,7 @@ Return ONLY valid JSON with this structure:
         subtotal,
         tax,
         total,
-        status: 'pending',
+        status: 'draft',
         terms: 'Net 30'
       })
       .select()
