@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -258,7 +259,10 @@ const Invoices = () => {
                       size="sm" 
                       className="h-6 w-6 p-0" 
                       title="View Invoice"
-                      onClick={() => navigate(`/invoices/${invoice.id}`)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/invoices/${invoice.id}`);
+                      }}
                     >
                       <Eye className="h-3 w-3" />
                     </Button>
@@ -269,25 +273,48 @@ const Invoices = () => {
                           size="sm" 
                           className="h-6 w-6 p-0" 
                           title="Edit Order"
-                          onClick={() => navigate(`/orders/${invoice.order_id}`)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/orders/${invoice.order_id}`);
+                          }}
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          className="h-6 w-6 p-0 text-destructive hover:text-destructive" 
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" 
                           title="Delete Invoice"
                           onClick={async (e) => {
                             e.stopPropagation();
-                            if (confirm('Are you sure you want to delete this invoice?')) {
-                              const { error } = await supabase
-                                .from('invoices')
-                                .delete()
-                                .eq('id', invoice.id);
-                              
-                              if (!error) {
-                                fetchInvoices();
+                            if (window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
+                              try {
+                                const { error } = await supabase
+                                  .from('invoices')
+                                  .delete()
+                                  .eq('id', invoice.id);
+                                
+                                if (error) {
+                                  console.error('Delete error:', error);
+                                  toast({
+                                    title: "Error",
+                                    description: "Failed to delete invoice: " + error.message,
+                                    variant: "destructive"
+                                  });
+                                } else {
+                                  toast({
+                                    title: "Success",
+                                    description: "Invoice deleted successfully"
+                                  });
+                                  fetchInvoices();
+                                }
+                              } catch (err: any) {
+                                console.error('Delete exception:', err);
+                                toast({
+                                  title: "Error",
+                                  description: "An error occurred while deleting the invoice",
+                                  variant: "destructive"
+                                });
                               }
                             }
                           }}
@@ -301,6 +328,9 @@ const Invoices = () => {
                       size="sm" 
                       className="h-6 w-6 p-0" 
                       title="Download Invoice"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
                     >
                       <Download className="h-3 w-3" />
                     </Button>
