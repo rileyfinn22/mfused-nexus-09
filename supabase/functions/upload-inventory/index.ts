@@ -68,9 +68,9 @@ serve(async (req) => {
       // Support multiple column name variations
       let sku = row['SKU'] || row['sku'] || row['Item'] || row['Item Name'];
       let itemId = null;
-      let state = row['State'] || row['state'] || 'Primary';
+      let state = 'Primary'; // Default state
       
-      // If "Item and State" column exists, parse it (format: PCK-00430-WA)
+      // If "Item and State" column exists, parse it first (format: PCK-00430-WA)
       if (row['Item and State']) {
         const itemAndState = String(row['Item and State']);
         // Split by last dash to separate item number from state
@@ -81,6 +81,9 @@ serve(async (req) => {
         } else {
           itemId = itemAndState;
         }
+      } else if (row['State'] || row['state']) {
+        // Only use separate State column if "Item and State" doesn't exist
+        state = row['State'] || row['state'];
       }
       
       // Use Item Name as SKU if available
