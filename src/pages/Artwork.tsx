@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { 
   Search, 
   Upload, 
@@ -16,7 +18,9 @@ import {
   Clock,
   MessageSquare,
   FileImage,
-  AlertTriangle
+  AlertTriangle,
+  ChevronsUpDown,
+  Check
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +35,7 @@ const Artwork = () => {
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [skuComboboxOpen, setSkuComboboxOpen] = useState(false);
   const [approvalData, setApprovalData] = useState({
     printName: '',
     signature: '',
@@ -328,34 +333,44 @@ const Artwork = () => {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="sku">SKU</Label>
-                <Select
-                  value={uploadData.sku}
-                  onValueChange={(value) => setUploadData({...uploadData, sku: value})}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Search or select a SKU" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background z-50">
-                    <div className="p-2">
-                      <Input
-                        placeholder="Search SKU..."
-                        onChange={(e) => {
-                          const searchTerm = e.target.value.toLowerCase();
-                          const filtered = products.filter(p => 
-                            p.sku.toLowerCase().includes(searchTerm) ||
-                            p.products?.name?.toLowerCase().includes(searchTerm)
-                          );
-                        }}
-                        className="mb-2"
-                      />
-                    </div>
-                    {products.map((product) => (
-                      <SelectItem key={product.sku} value={product.sku}>
-                        {product.sku} {product.products?.name ? `- ${product.products.name}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={skuComboboxOpen} onOpenChange={setSkuComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={skuComboboxOpen}
+                      className="w-full justify-between"
+                    >
+                      {uploadData.sku || "Search or select a SKU"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search SKU..." />
+                      <CommandList>
+                        <CommandEmpty>No SKU found.</CommandEmpty>
+                        <CommandGroup>
+                          {products.map((product) => (
+                            <CommandItem
+                              key={product.sku}
+                              value={product.sku}
+                              onSelect={(currentValue) => {
+                                setUploadData({...uploadData, sku: currentValue});
+                                setSkuComboboxOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={uploadData.sku === product.sku ? "mr-2 h-4 w-4 opacity-100" : "mr-2 h-4 w-4 opacity-0"}
+                              />
+                              {product.sku} {product.products?.name ? `- ${product.products.name}` : ''}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <Label htmlFor="artwork">Artwork File</Label>
