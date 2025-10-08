@@ -88,6 +88,57 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_addresses: {
+        Row: {
+          address_type: string
+          city: string
+          company_id: string
+          created_at: string
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          id: string
+          is_default: boolean
+          name: string
+          state: string
+          street: string
+          updated_at: string
+          zip: string
+        }
+        Insert: {
+          address_type?: string
+          city: string
+          company_id: string
+          created_at?: string
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          state: string
+          street: string
+          updated_at?: string
+          zip: string
+        }
+        Update: {
+          address_type?: string
+          city?: string
+          company_id?: string
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          state?: string
+          street?: string
+          updated_at?: string
+          zip?: string
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           available: number

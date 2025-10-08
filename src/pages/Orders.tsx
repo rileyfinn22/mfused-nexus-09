@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CreateOrderDialog } from "@/components/CreateOrderDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Search, 
@@ -22,7 +21,6 @@ const Orders = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -100,7 +98,7 @@ const Orders = () => {
             <h1 className="text-2xl font-semibold">Orders & Production</h1>
             <p className="text-sm text-muted-foreground mt-1">Track order progress and production pipeline</p>
           </div>
-          <Button size="sm" className="bg-primary text-primary-foreground" onClick={() => setCreateDialogOpen(true)}>
+          <Button size="sm" className="bg-primary text-primary-foreground" onClick={() => navigate("/orders/create")}>
             <Plus className="h-4 w-4 mr-2" />
             New Order
           </Button>
@@ -305,12 +303,6 @@ const Orders = () => {
         </TabsContent>
       </Tabs>
       </div>
-
-      <CreateOrderDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        onOrderCreated={fetchOrders}
-      />
     </>
   );
 };
