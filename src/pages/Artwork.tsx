@@ -432,10 +432,39 @@ const Artwork = () => {
           
           return (
             <div key={file.id} className="bg-card border rounded-lg p-6">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                {/* Thumbnail Image */}
+                <div className="w-32 h-32 flex-shrink-0 bg-muted rounded-lg overflow-hidden border">
+                  {file.preview_url ? (
+                    <img 
+                      src={file.preview_url} 
+                      alt={file.sku}
+                      className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => {
+                        setSelectedFile(file);
+                        setPreviewDialogOpen(true);
+                      }}
+                    />
+                  ) : file.artwork_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                    <img 
+                      src={file.artwork_url} 
+                      alt={file.sku}
+                      className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => {
+                        setSelectedFile(file);
+                        setPreviewDialogOpen(true);
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <FileImage className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+
+                {/* File Details */}
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <FileImage className="h-5 w-5 text-muted-foreground" />
                     <h3 className="font-semibold text-lg">{file.filename}</h3>
                     <Badge 
                       variant={file.is_approved ? "default" : "secondary"}
@@ -454,25 +483,23 @@ const Artwork = () => {
                       <p className="text-muted-foreground">Uploaded</p>
                       <p>{new Date(file.created_at).toLocaleDateString()}</p>
                     </div>
+                    {file.is_approved && file.approved_at && (
+                      <div>
+                        <p className="text-muted-foreground">Approved Date</p>
+                        <p>{new Date(file.approved_at).toLocaleDateString()}</p>
+                      </div>
+                    )}
                     {file.notes && (
                       <div className="col-span-2">
                         <p className="text-muted-foreground">Notes</p>
-                        <p>{file.notes}</p>
+                        <p className="whitespace-pre-wrap">{file.notes}</p>
                       </div>
                     )}
                   </div>
                 </div>
+
+                {/* Action Buttons */}
                 <div className="flex gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => {
-                      setSelectedFile(file);
-                      setPreviewDialogOpen(true);
-                    }}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
                   <Button 
                     variant="ghost" 
                     size="sm"
