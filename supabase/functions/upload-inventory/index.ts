@@ -66,9 +66,29 @@ serve(async (req) => {
 
     for (const row of jsonData) {
       // Support multiple column name variations
-      const sku = row['SKU'] || row['sku'] || row['Item'] || row['Item and State'];
+      let sku = row['SKU'] || row['sku'] || row['Item'] || row['Item Name'];
+      let itemId = null;
+      let state = row['State'] || row['state'] || 'Primary';
+      
+      // If "Item and State" column exists, parse it (format: PCK-00430-WA)
+      if (row['Item and State']) {
+        const itemAndState = String(row['Item and State']);
+        // Split by last dash to separate item number from state
+        const lastDashIndex = itemAndState.lastIndexOf('-');
+        if (lastDashIndex > 0) {
+          itemId = itemAndState.substring(0, lastDashIndex); // "PCK-00430"
+          state = itemAndState.substring(lastDashIndex + 1); // "WA"
+        } else {
+          itemId = itemAndState;
+        }
+      }
+      
+      // Use Item Name as SKU if available
+      if (row['Item Name']) {
+        sku = String(row['Item Name']);
+      }
+      
       const available = parseInt(String(row['Available Primary'] || row['Available'] || row['available'] || row['Qty'] || '0'));
-      const state = row['State'] || row['state'] || 'Primary';
       const inProduction = parseInt(String(row['In Production'] || row['in_production'] || '0'));
       const redline = parseInt(String(row['Redline'] || row['redline'] || '0'));
 
@@ -115,7 +135,7 @@ serve(async (req) => {
       inventoryItems.push({
         company_id: userRole.company_id,
         product_id: productId,
-        sku: sku,
+        sku: itemId || sku, // Use item ID if available, otherwise use SKU
         state: state,
         available: available,
         in_production: inProduction,
