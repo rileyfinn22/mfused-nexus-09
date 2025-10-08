@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 
 const Orders = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -142,7 +144,11 @@ const Orders = () => {
             {/* Table Body */}
             <div className="divide-y divide-table-border">
               {filteredOrders.map((order) => (
-                <div key={order.id} className="grid grid-cols-11 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors">
+                <div 
+                  key={order.id} 
+                  className="grid grid-cols-11 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                  onClick={() => navigate(`/orders/${order.id}`)}
+                >
                   <div className="col-span-2 font-medium font-mono text-sm">{order.id}</div>
                   <div className="col-span-2 text-sm">{order.sku}</div>
                   <div className="col-span-1">
@@ -160,7 +166,15 @@ const Orders = () => {
                     <Progress value={order.progress} className="h-1" />
                   </div>
                   <div className="col-span-1">
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/orders/${order.id}`);
+                      }}
+                    >
                       <Eye className="h-3 w-3" />
                     </Button>
                   </div>
