@@ -590,6 +590,54 @@ export type Database = {
         }
         Relationships: []
       }
+      rejected_artwork_files: {
+        Row: {
+          artwork_url: string
+          company_id: string
+          created_at: string
+          filename: string
+          id: string
+          notes: string | null
+          original_artwork_id: string
+          original_created_at: string
+          preview_url: string | null
+          rejected_at: string
+          rejected_by: string | null
+          rejection_reason: string
+          sku: string
+        }
+        Insert: {
+          artwork_url: string
+          company_id: string
+          created_at?: string
+          filename: string
+          id?: string
+          notes?: string | null
+          original_artwork_id: string
+          original_created_at: string
+          preview_url?: string | null
+          rejected_at?: string
+          rejected_by?: string | null
+          rejection_reason: string
+          sku: string
+        }
+        Update: {
+          artwork_url?: string
+          company_id?: string
+          created_at?: string
+          filename?: string
+          id?: string
+          notes?: string | null
+          original_artwork_id?: string
+          original_created_at?: string
+          preview_url?: string | null
+          rejected_at?: string
+          rejected_by?: string | null
+          rejection_reason?: string
+          sku?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           company_id: string

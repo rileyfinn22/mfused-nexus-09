@@ -22,7 +22,8 @@ import {
   AlertTriangle,
   ChevronsUpDown,
   Check,
-  Edit
+  Edit,
+  Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -38,9 +39,12 @@ const Artwork = () => {
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [editThumbnailDialogOpen, setEditThumbnailDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [skuComboboxOpen, setSkuComboboxOpen] = useState(false);
   const [newThumbnailFile, setNewThumbnailFile] = useState<File | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
   const [approvalData, setApprovalData] = useState({
     printName: '',
     signature: '',
@@ -273,28 +277,103 @@ const Artwork = () => {
     }
   };
 
-  const handleReject = async (id: string, reason: string) => {
-    try {
-      const { error } = await supabase
-        .from('artwork_files')
-        .update({
-          is_approved: false,
-          notes: reason
-        })
-        .eq('id', id);
+  const handleReject = async () => {
+    if (!rejectionReason.trim()) {
+      toast({
+        title: "Rejection reason required",
+        description: "Please provide a reason for rejecting this artwork",
+        variant: "destructive",
+      });
+      return;
+    }
 
-      if (error) throw error;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Archive the rejected artwork
+      const { error: archiveError } = await supabase
+        .from('rejected_artwork_files')
+        .insert({
+          original_artwork_id: selectedFile.id,
+          company_id: selectedFile.company_id,
+          sku: selectedFile.sku,
+          filename: selectedFile.filename,
+          artwork_url: selectedFile.artwork_url,
+          preview_url: selectedFile.preview_url,
+          notes: selectedFile.notes,
+          rejection_reason: rejectionReason,
+          rejected_by: user.id,
+          original_created_at: selectedFile.created_at
+        });
+
+      if (archiveError) throw archiveError;
+
+      // Delete from main table
+      const { error: deleteError } = await supabase
+        .from('artwork_files')
+        .delete()
+        .eq('id', selectedFile.id);
+
+      if (deleteError) throw deleteError;
 
       toast({
-        title: "Rejected",
-        description: "Artwork has been rejected",
+        title: "Artwork rejected",
+        description: "Artwork has been archived and removed from active files",
       });
+
+      setRejectDialogOpen(false);
+      setRejectionReason('');
+      setSelectedFile(null);
       fetchArtwork();
     } catch (error) {
       console.error('Error rejecting artwork:', error);
       toast({
         title: "Error",
         description: "Failed to reject artwork",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedFile) return;
+
+    try {
+      // Delete the file from storage
+      const artworkPath = selectedFile.artwork_url.split('/artwork/')[1];
+      if (artworkPath) {
+        await supabase.storage.from('artwork').remove([artworkPath]);
+      }
+
+      if (selectedFile.preview_url) {
+        const previewPath = selectedFile.preview_url.split('/artwork/')[1];
+        if (previewPath) {
+          await supabase.storage.from('artwork').remove([previewPath]);
+        }
+      }
+
+      // Delete from database
+      const { error } = await supabase
+        .from('artwork_files')
+        .delete()
+        .eq('id', selectedFile.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Deleted",
+        description: "Artwork file has been deleted",
+      });
+
+      setDeleteDialogOpen(false);
+      setSelectedFile(null);
+      fetchArtwork();
+    } catch (error) {
+      console.error('Error deleting artwork:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete artwork",
         variant: "destructive",
       });
     }
@@ -626,14 +705,24 @@ const Artwork = () => {
                         variant="ghost" 
                         size="sm"
                         onClick={() => {
-                          const reason = prompt('Enter rejection reason:');
-                          if (reason) handleReject(file.id, reason);
+                          setSelectedFile(file);
+                          setRejectDialogOpen(true);
                         }}
                       >
                         <XCircle className="h-4 w-4 text-red-600" />
                       </Button>
                     </>
                   )}
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      setSelectedFile(file);
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
               </div>
             </div>
@@ -786,6 +875,82 @@ const Artwork = () => {
                 Cancel
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rejection Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Artwork</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting {selectedFile?.filename}. This artwork will be moved to the rejected archive.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="rejectionReason">Rejection Reason *</Label>
+              <Textarea
+                id="rejectionReason"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Explain why this artwork is being rejected..."
+                rows={4}
+                className="mt-2"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleReject} 
+                className="flex-1"
+                variant="destructive"
+                disabled={!rejectionReason.trim()}
+              >
+                Reject & Archive
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setRejectDialogOpen(false);
+                  setRejectionReason('');
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Artwork</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete {selectedFile?.filename}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleDelete} 
+              className="flex-1"
+              variant="destructive"
+            >
+              Delete Permanently
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setSelectedFile(null);
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
