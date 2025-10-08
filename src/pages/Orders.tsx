@@ -7,6 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadPODialog } from "@/components/UploadPODialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Search, 
   Plus, 
@@ -27,6 +37,7 @@ const Orders = () => {
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState<any[]>([]);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     checkRole();
@@ -110,16 +121,13 @@ const Orders = () => {
     setLoading(false);
   };
 
-  const handleDeleteOrder = async (orderId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
-      return;
-    }
+  const handleDeleteOrder = async () => {
+    if (!deleteOrderId) return;
 
     const { error } = await supabase
       .from('orders')
       .delete()
-      .eq('id', orderId);
+      .eq('id', deleteOrderId);
 
     if (error) {
       console.error('Error deleting order:', error);
@@ -127,6 +135,12 @@ const Orders = () => {
     } else {
       fetchOrders();
     }
+    setDeleteOrderId(null);
+  };
+
+  const confirmDelete = (orderId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteOrderId(orderId);
   };
 
   const getProgressForStatus = (status: string) => {
@@ -322,7 +336,7 @@ const Orders = () => {
                           variant="ghost" 
                           size="sm" 
                           className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                          onClick={(e) => handleDeleteOrder(order.id, e)}
+                          onClick={(e) => confirmDelete(order.id, e)}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -433,7 +447,7 @@ const Orders = () => {
                         variant="ghost" 
                         size="sm" 
                         className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                        onClick={(e) => handleDeleteOrder(order.id, e)}
+                        onClick={(e) => confirmDelete(order.id, e)}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -516,7 +530,7 @@ const Orders = () => {
                         variant="ghost" 
                         size="sm" 
                         className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                        onClick={(e) => handleDeleteOrder(order.id, e)}
+                        onClick={(e) => confirmDelete(order.id, e)}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -528,6 +542,23 @@ const Orders = () => {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={deleteOrderId !== null} onOpenChange={(open) => !open && setDeleteOrderId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this order? This action cannot be undone and will remove all associated data including vendor POs, invoices, and notes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
