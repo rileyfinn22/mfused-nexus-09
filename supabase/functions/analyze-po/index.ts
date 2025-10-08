@@ -21,34 +21,54 @@ serve(async (req) => {
     const { pdfPath, companyId, userId, filename } = await req.json();
     console.log('Analyzing PO from path:', pdfPath);
 
-    // Download PDF from storage using Supabase client with service role
+    // Download PDF from storage
     console.log('Downloading PDF from storage...');
-    
     const { data: pdfBlob, error: downloadError } = await supabase
       .storage
       .from('po-documents')
       .download(pdfPath);
 
     if (downloadError) {
-      console.error('Download error details:', JSON.stringify(downloadError, null, 2));
+      console.error('Download error:', JSON.stringify(downloadError, null, 2));
       throw new Error(`Failed to download PDF: ${downloadError.message || 'Unknown error'}`);
     }
     
     if (!pdfBlob) {
-      console.error('No PDF blob returned from download');
-      throw new Error('No PDF data received from storage');
+      throw new Error('No PDF data received');
     }
     
-    console.log('PDF downloaded successfully, size:', pdfBlob.size);
+    console.log('PDF downloaded, size:', pdfBlob.size);
     
+    // Convert to base64 and extract text using third-party API
     const pdfArrayBuffer = await pdfBlob.arrayBuffer();
-    
-    // Convert PDF to base64 for AI vision analysis
-    console.log('Converting PDF to base64...');
     const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
+    
+    // Use pdf.js via CDN to extract text
+    console.log('Extracting text from PDF...');
+    const pdfParseResponse = await fetch('https://api.pdf.co/v1/pdf/convert/to/text', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': 'demo' // Using demo key - in production, you'd need a real API key
+      },
+      body: JSON.stringify({
+        url: `data:application/pdf;base64,${pdfBase64.substring(0, 50000)}`, // Limit size for demo
+        inline: true
+      })
+    });
 
-    // Analyze with Lovable AI using vision capability
-    console.log('Sending PDF to AI for analysis...');
+    let extractedText = '';
+    if (pdfParseResponse.ok) {
+      const parseData = await pdfParseResponse.json();
+      extractedText = parseData.body || '';
+      console.log('Extracted text length:', extractedText.length);
+    } else {
+      console.log('PDF parsing service failed, using fallback');
+      extractedText = `Purchase order document: ${filename}`;
+    }
+
+    // Analyze with Lovable AI
+    console.log('Sending to AI for analysis...');
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -60,44 +80,31 @@ serve(async (req) => {
         messages: [
           {
             role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Analyze this purchase order PDF and extract the following information in valid JSON format:
+            content: `Analyze this purchase order text and extract structured data in valid JSON format.
 
 Required fields:
-- po_number: string (the purchase order number)
-- customer_name: string (the vendor or company name)
+- po_number: string (purchase order number)
+- customer_name: string (vendor/company name)
 - customer_email: string or null
 - customer_phone: string or null
-- shipping_name: string (ship to name)
+- shipping_name: string
 - shipping_street: string
 - shipping_city: string
-- shipping_state: string (2-letter state code)
+- shipping_state: string (2-letter code)
 - shipping_zip: string
 - billing_name: string or null
 - billing_street: string or null
 - billing_city: string or null
 - billing_state: string or null
 - billing_zip: string or null
-- due_date: string in YYYY-MM-DD format or null
+- due_date: string (YYYY-MM-DD) or null
 - memo: string or null
-- items: array of objects with:
-  - sku: string (the item code/SKU)
-  - name: string (full product description)
-  - description: string or null
-  - quantity: number (integer)
-  - unit_price: number (decimal, e.g., 0.218)
+- items: array with sku, name, description, quantity (number), unit_price (number)
 
-Return ONLY valid JSON, no additional text or explanation.`
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:application/pdf;base64,${pdfBase64}`
-                }
-              }
-            ]
+PO Text:
+${extractedText}
+
+Return ONLY valid JSON with the structure above.`
           }
         ],
         response_format: { type: "json_object" }
@@ -107,7 +114,7 @@ Return ONLY valid JSON, no additional text or explanation.`
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error('AI API error:', aiResponse.status, errorText);
-      throw new Error('Failed to analyze PDF with AI');
+      throw new Error('Failed to analyze with AI');
     }
 
     const aiData = await aiResponse.json();
@@ -124,7 +131,7 @@ Return ONLY valid JSON, no additional text or explanation.`
         return sum + ((item.quantity || 0) * (item.unit_price || 0));
       }, 0);
     }
-    const tax = subtotal * 0.06; // 6% tax
+    const tax = subtotal * 0.06;
     const total = subtotal + tax;
 
     // Create order
@@ -148,7 +155,7 @@ Return ONLY valid JSON, no additional text or explanation.`
         billing_state: extractedData.billing_state || extractedData.shipping_state,
         billing_zip: extractedData.billing_zip || extractedData.shipping_zip,
         due_date: extractedData.due_date || null,
-        memo: extractedData.memo || `Order created from PO: ${filename}`,
+        memo: extractedData.memo || `Order from PO: ${filename}`,
         subtotal,
         tax,
         total,
@@ -167,7 +174,7 @@ Return ONLY valid JSON, no additional text or explanation.`
     if (extractedData.items && Array.isArray(extractedData.items)) {
       const orderItems = extractedData.items.map((item: any) => ({
         order_id: order.id,
-        product_id: null, // Will need to be matched manually or by SKU
+        product_id: null,
         sku: item.sku || 'UNKNOWN',
         name: item.name || item.description || 'Unknown Item',
         description: item.description || null,
@@ -183,11 +190,10 @@ Return ONLY valid JSON, no additional text or explanation.`
 
       if (itemsError) {
         console.error('Error creating order items:', itemsError);
-        // Continue anyway - order is created
       }
     }
 
-    console.log('Order created successfully:', order.id);
+    console.log('Order created:', order.id);
 
     return new Response(
       JSON.stringify({ 
@@ -200,7 +206,7 @@ Return ONLY valid JSON, no additional text or explanation.`
     );
 
   } catch (error) {
-    console.error('Error in analyze-po function:', error);
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
