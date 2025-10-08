@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, Minus, X, Save, Send, Search } from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -79,6 +79,9 @@ const CreateOrder = () => {
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [uploading, setUploading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -185,6 +188,128 @@ const CreateOrder = () => {
       }
 
       setSavedAddresses(data);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload a PDF file",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handlePOUpload = async () => {
+    if (!selectedFile) return;
+
+    setUploading(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Not authenticated",
+          description: "Please log in to upload purchase orders",
+          variant: "destructive",
+        });
+        navigate('/login');
+        return;
+      }
+
+      // For vibe_admin, require company selection
+      let companyId: string;
+      if (isVibeAdmin) {
+        if (!selectedCompanyId) {
+          toast({
+            title: "Company Required",
+            description: "Please select a company before uploading a PO",
+            variant: "destructive",
+          });
+          setUploading(false);
+          return;
+        }
+        companyId = selectedCompanyId;
+      } else {
+        // Get user's company
+        const { data: userRole } = await supabase
+          .from('user_roles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!userRole?.company_id) {
+          throw new Error('User not associated with a company');
+        }
+        companyId = userRole.company_id;
+      }
+
+      // Upload to storage
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('po-documents')
+        .upload(fileName, selectedFile);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+
+      toast({
+        title: "Upload successful",
+        description: "Your PO is being analyzed...",
+      });
+
+      setUploading(false);
+      setAnalyzing(true);
+
+      // Trigger AI analysis
+      const { data: functionData, error: functionError } = await supabase.functions.invoke('analyze-po', {
+        body: { 
+          pdfPath: fileName,
+          companyId: companyId,
+          userId: user.id,
+          filename: selectedFile.name
+        }
+      });
+
+      if (functionError) {
+        console.error('Analysis error:', functionError);
+        toast({
+          title: "Analysis failed",
+          description: "Continue with manual entry below",
+          variant: "destructive",
+        });
+      } else if (functionData?.orderId) {
+        toast({
+          title: "PO analyzed successfully",
+          description: "Order details loaded below - review and edit before saving",
+        });
+        
+        // Load the created order
+        await loadExistingOrder(functionData.orderId);
+      }
+
+      setAnalyzing(false);
+      setSelectedFile(null);
+
+    } catch (error: any) {
+      console.error('Error uploading PO:', error);
+      toast({
+        title: "Upload failed",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+      setUploading(false);
+      setAnalyzing(false);
     }
   };
 
@@ -613,6 +738,90 @@ const CreateOrder = () => {
                 }
               </p>
             )}
+          </div>
+        )}
+
+        {/* Upload PO Section */}
+        {!orderId && (
+          <div className="bg-muted/30 backdrop-blur rounded-lg p-6 border border-table-border">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Upload Purchase Order
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload a PDF to automatically extract order details, or skip to enter manually below
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="po-upload"
+                  disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
+                />
+                <label 
+                  htmlFor="po-upload" 
+                  className={`cursor-pointer block ${(uploading || analyzing || (isVibeAdmin && !selectedCompanyId)) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {selectedFile ? (
+                    <div className="space-y-2">
+                      <FileText className="h-10 w-10 mx-auto text-primary" />
+                      <p className="font-medium text-sm">{selectedFile.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Click to change file
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Upload className="h-10 w-10 mx-auto text-muted-foreground" />
+                      <p className="font-medium text-sm">Click to upload PDF</p>
+                      <p className="text-xs text-muted-foreground">
+                        or drag and drop your purchase order here
+                      </p>
+                    </div>
+                  )}
+                </label>
+              </div>
+
+              {isVibeAdmin && !selectedCompanyId && (
+                <p className="text-sm text-amber-600">Please select a company above before uploading a PO</p>
+              )}
+
+              <Button
+                onClick={handlePOUpload}
+                disabled={!selectedFile || uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
+                className="w-full"
+                size="sm"
+              >
+                {uploading || analyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {uploading ? 'Uploading...' : 'Analyzing...'}
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Analyze PO & Load Details
+                  </>
+                )}
+              </Button>
+
+              <div className="bg-muted/50 rounded-lg p-3 text-xs space-y-1">
+                <p className="font-medium">What happens next?</p>
+                <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
+                  <li>Your PO is analyzed by AI to extract order details</li>
+                  <li>Customer info and line items are auto-filled below</li>
+                  <li>Review, edit, and add products before saving</li>
+                </ol>
+              </div>
+            </div>
           </div>
         )}
 

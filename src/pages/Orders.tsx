@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { UploadPODialog } from "@/components/UploadPODialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -218,7 +217,6 @@ const Orders = () => {
           <p className="text-sm text-muted-foreground mt-1">Track order progress and production pipeline</p>
         </div>
         <div className="flex gap-3">
-          <UploadPODialog />
           <Button size="sm" className="bg-primary text-primary-foreground" onClick={() => navigate("/orders/create")}>
             <Plus className="h-4 w-4 mr-2" />
             New Order
