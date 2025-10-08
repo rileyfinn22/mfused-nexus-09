@@ -76,6 +76,9 @@ const CreateOrder = () => {
   const [existingOrderNumber, setExistingOrderNumber] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [unmatchedPoItems, setUnmatchedPoItems] = useState<any[]>([]);
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -98,12 +101,92 @@ const CreateOrder = () => {
   });
 
   useEffect(() => {
+    checkRole();
+  }, []);
+
+  useEffect(() => {
     fetchProducts();
+    if (isVibeAdmin) {
+      fetchCompanies();
+    }
     fetchSavedAddresses();
     if (orderId) {
       loadExistingOrder(orderId);
     }
-  }, [orderId]);
+  }, [orderId, isVibeAdmin]);
+
+  useEffect(() => {
+    if (selectedCompanyId) {
+      loadCompanyAddresses();
+    }
+  }, [selectedCompanyId]);
+
+  const checkRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: userRole } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    setIsVibeAdmin(userRole?.role === 'vibe_admin');
+  };
+
+  const fetchCompanies = async () => {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .order('name');
+    
+    if (!error && data) {
+      setCompanies(data);
+    }
+  };
+
+  const loadCompanyAddresses = async () => {
+    const { data, error } = await supabase
+      .from('customer_addresses')
+      .select('*')
+      .eq('company_id', selectedCompanyId)
+      .order('is_default', { ascending: false });
+    
+    if (!error && data) {
+      // Auto-fill with default addresses or first addresses
+      const defaultShipping = data.find(a => a.address_type === 'shipping' && a.is_default) || 
+                              data.find(a => a.address_type === 'shipping');
+      const defaultBilling = data.find(a => a.address_type === 'billing' && a.is_default) || 
+                             data.find(a => a.address_type === 'billing');
+
+      if (defaultShipping) {
+        setFormData(prev => ({
+          ...prev,
+          customerName: defaultShipping.customer_name,
+          customerEmail: defaultShipping.customer_email || "",
+          customerPhone: defaultShipping.customer_phone || "",
+          shippingName: defaultShipping.name,
+          shippingStreet: defaultShipping.street,
+          shippingCity: defaultShipping.city,
+          shippingState: defaultShipping.state,
+          shippingZip: defaultShipping.zip,
+        }));
+      }
+
+      if (defaultBilling && !sameAsBilling) {
+        setFormData(prev => ({
+          ...prev,
+          billingName: defaultBilling.name,
+          billingStreet: defaultBilling.street,
+          billingCity: defaultBilling.city,
+          billingState: defaultBilling.state,
+          billingZip: defaultBilling.zip,
+        }));
+      }
+
+      setSavedAddresses(data);
+    }
+  };
 
   const fetchProducts = async () => {
     const { data, error } = await supabase
@@ -117,13 +200,15 @@ const CreateOrder = () => {
   };
 
   const fetchSavedAddresses = async () => {
-    const { data, error } = await supabase
-      .from('customer_addresses')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (!error && data) {
-      setSavedAddresses(data);
+    if (!isVibeAdmin) {
+      const { data, error } = await supabase
+        .from('customer_addresses')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setSavedAddresses(data);
+      }
     }
   };
 
@@ -146,6 +231,7 @@ const CreateOrder = () => {
       }
 
       setExistingOrderNumber(order.order_number);
+      setSelectedCompanyId(order.company_id); // Set company when loading existing order
       setFormData({
         customerName: order.customer_name,
         customerEmail: order.customer_email || "",
@@ -306,13 +392,29 @@ const CreateOrder = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
+      let companyId: string;
 
-      if (!userRole) throw new Error("User company not found");
+      if (isVibeAdmin) {
+        if (!selectedCompanyId) {
+          toast({
+            title: "Company Required",
+            description: "Please select a company for this order",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        companyId = selectedCompanyId;
+      } else {
+        const { data: userRole } = await supabase
+          .from('user_roles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!userRole) throw new Error("User company not found");
+        companyId = userRole.company_id;
+      }
 
       let subtotal = 0;
       for (const item of selectedItems) {
@@ -375,7 +477,7 @@ const CreateOrder = () => {
           .insert({
             order_number: orderNumber,
             po_number: formData.poNumber || null,
-            company_id: userRole.company_id,
+            company_id: companyId,
             customer_name: formData.customerName,
             customer_email: formData.customerEmail || null,
             customer_phone: formData.customerPhone || null,
@@ -485,6 +587,35 @@ const CreateOrder = () => {
       </div>
 
       <div className="space-y-6">
+        {/* Company Selector for Vibe Admin */}
+        {isVibeAdmin && (
+          <div className="bg-muted/30 backdrop-blur rounded-lg p-6 border border-table-border">
+            <Label htmlFor="company" className="text-xs font-semibold uppercase text-muted-foreground">
+              Select Company *
+            </Label>
+            <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId} disabled={!!orderId}>
+              <SelectTrigger className="w-full mt-2">
+                <SelectValue placeholder="Choose a company..." />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedCompanyId && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {orderId 
+                  ? "Company cannot be changed for existing orders"
+                  : "Customer and shipping information will be auto-filled from saved addresses"
+                }
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Customer & Address Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-muted/30 backdrop-blur rounded-lg p-6 border border-table-border">
           <div className="space-y-4">
