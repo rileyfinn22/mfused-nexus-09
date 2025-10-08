@@ -71,42 +71,72 @@ serve(async (req) => {
         model: 'google/gemini-2.5-flash',
         messages: [
           {
+            role: 'system',
+            content: 'You are a purchase order data extraction expert. Your primary goal is to extract ALL line items from tabular sections of POs with perfect accuracy. Focus on finding tables with Item/SKU, Description, and Quantity columns.'
+          },
+          {
             role: 'user',
-            content: `You are a purchase order data extraction expert. Carefully analyze this PO text and extract ALL line items with their details.
+            content: `TASK: Extract all line items from this purchase order PDF text.
 
-CRITICAL: Look for tables, line items, product lists. Each item MUST have:
-- sku/item code (look for: Item#, SKU, Code, Part#)
-- name/description (the product name or description)
-- quantity (look for: Qty, Quantity, QTY, Amount)
-- unit_price (look for: Price, Unit Price, Rate, Cost per unit)
+STEP 1 - LOCATE THE TABLE:
+Find the tabular section containing product data. Look for headers like:
+- Item, Item #, SKU, Product Code, Part Number (often starts with patterns like PCK-, SDA, numbers)
+- Description, Product Description, Item Description
+- Qty, Quantity, QTY
+- Rate, Unit Price, Price, Cost
+- Amount, Total, Line Total
 
-Also extract:
+STEP 2 - EXTRACT EACH ROW:
+For EVERY row in the item table, extract:
+- sku: The item/product code (e.g., "PCK-123", "SDA10065", "3770-072")
+- name: The FULL product description (merge wrapped lines if needed)
+- quantity: Numeric quantity (integer)
+- unit_price: Price per unit (decimal number)
+
+STEP 3 - CLEAN THE DATA:
+- Merge multi-line descriptions into single entries
+- Skip header rows, totals, subtotals, and footer text
+- Ensure all quantities are numeric
+- Ensure all prices are decimal numbers
+
+STEP 4 - ALSO EXTRACT (if present):
 - po_number: The PO# or purchase order number
-- customer_name: Vendor or company name at top
-- customer_email: Email address if present
-- customer_phone: Phone number if present
+- customer_name: Vendor/company name
 - shipping_name: Ship To name
-- shipping_street: Ship To street address
+- shipping_street: Ship To address
 - shipping_city: Ship To city
-- shipping_state: Ship To state (2-letter code)
-- shipping_zip: Ship To zip code
-- billing_name: Bill To name (or same as shipping)
-- billing_street: Bill To street
+- shipping_state: Ship To state (2 letters)
+- shipping_zip: Ship To zip
+- billing_name: Bill To name
+- billing_street: Bill To address
 - billing_city: Bill To city
 - billing_state: Bill To state
 - billing_zip: Bill To zip
-- due_date: Due date in YYYY-MM-DD format
-- memo: Any special notes or terms
+- due_date: Due date (YYYY-MM-DD format)
 
-PAY SPECIAL ATTENTION to extracting ALL items from tables or line item sections. Look for patterns like:
-- Item Code | Description | Qty | Price
-- SKU / Product Name / Quantity / Unit Price
-- Multiple rows of similar data
-
-PO Text:
+PURCHASE ORDER TEXT:
 ${extractedText}
 
-Return ONLY valid JSON. If you cannot find certain fields, use null. But you MUST extract all line items you find.`
+Return ONLY valid JSON with this structure:
+{
+  "po_number": "...",
+  "customer_name": "...",
+  "shipping_name": "...",
+  "shipping_street": "...",
+  "shipping_city": "...",
+  "shipping_state": "...",
+  "shipping_zip": "...",
+  "billing_name": "...",
+  "billing_street": "...",
+  "billing_city": "...",
+  "billing_state": "...",
+  "billing_zip": "...",
+  "due_date": "...",
+  "memo": null,
+  "items": [
+    {"sku": "...", "name": "...", "description": null, "quantity": 0, "unit_price": 0.0}
+  ]
+}`
           }
         ],
         response_format: { type: "json_object" }
