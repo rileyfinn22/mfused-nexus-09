@@ -3,6 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -18,6 +28,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AddProductDialog } from "@/components/AddProductDialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface Product {
   id: string;
@@ -41,12 +52,15 @@ interface ProductState {
 
 const Products = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [expandedProducts, setExpandedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
   const [artworkThumbnails, setArtworkThumbnails] = useState<Record<string, string>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -156,6 +170,54 @@ const Products = () => {
         ? prev.filter(id => id !== productId)
         : [...prev, productId]
     );
+  };
+
+  const handleDeleteClick = (productId: string) => {
+    setProductToDelete(productId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return;
+
+    try {
+      // Delete related records first
+      await supabase
+        .from('product_states')
+        .delete()
+        .eq('product_id', productToDelete);
+
+      await supabase
+        .from('inventory')
+        .delete()
+        .eq('product_id', productToDelete);
+
+      // Delete the product
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productToDelete);
+
+      if (error) throw error;
+
+      toast({
+        title: "Product deleted",
+        description: "The product has been successfully removed.",
+      });
+
+      // Refresh the products list
+      fetchProducts();
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete product. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setProductToDelete(null);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -285,6 +347,7 @@ const Products = () => {
                       variant="ghost" 
                       size="sm" 
                       className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteClick(product.id)}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -349,6 +412,24 @@ const Products = () => {
           No products found matching your search criteria.
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this product and all associated data including inventory records and state-specific configurations. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
