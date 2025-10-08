@@ -242,15 +242,15 @@ Return ONLY valid JSON:
     // Generate order number
     const orderNumber = `ORD-${Date.now()}`;
 
-    // Calculate totals
+    // Calculate totals - no tax for pull_ship orders
     let subtotal = 0;
     if (extractedData.items && Array.isArray(extractedData.items)) {
       subtotal = extractedData.items.reduce((sum: number, item: any) => {
         return sum + ((item.quantity || 0) * (item.unit_price || 0));
       }, 0);
     }
-    const tax = subtotal * 0.06;
-    const total = subtotal + tax;
+    const tax = 0; // No tax on pull & ship orders
+    const total = subtotal;
 
     // Create order as pull_ship type with pending_pull status
     const { data: order, error: orderError } = await supabase

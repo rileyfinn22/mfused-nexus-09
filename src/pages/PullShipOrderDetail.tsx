@@ -23,6 +23,8 @@ const PullShipOrderDetail = () => {
   const [trackingNumber, setTrackingNumber] = useState("");
   const [isPicked, setIsPicked] = useState(false);
   const [isShipped, setIsShipped] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedOrder, setEditedOrder] = useState<any>(null);
 
   useEffect(() => {
     checkAdminStatus();
@@ -54,6 +56,7 @@ const PullShipOrderDetail = () => {
 
     if (!error && data) {
       setOrder(data);
+      setEditedOrder(data);
       setIsPicked(data.status === 'picked' || data.status === 'shipped' || data.status === 'delivered');
       setIsShipped(data.status === 'shipped' || data.status === 'delivered');
     }
@@ -254,6 +257,85 @@ const PullShipOrderDetail = () => {
     }
   };
 
+  const handleSaveOrder = async () => {
+    if (!editedOrder) return;
+
+    // Recalculate totals based on edited items (no tax)
+    const subtotal = editedOrder.order_items.reduce((sum: number, item: any) => {
+      return sum + (item.quantity * item.unit_price);
+    }, 0);
+
+    const { error: orderError } = await supabase
+      .from('orders')
+      .update({
+        customer_name: editedOrder.customer_name,
+        customer_email: editedOrder.customer_email,
+        customer_phone: editedOrder.customer_phone,
+        shipping_name: editedOrder.shipping_name,
+        shipping_street: editedOrder.shipping_street,
+        shipping_city: editedOrder.shipping_city,
+        shipping_state: editedOrder.shipping_state,
+        shipping_zip: editedOrder.shipping_zip,
+        billing_name: editedOrder.billing_name,
+        billing_street: editedOrder.billing_street,
+        billing_city: editedOrder.billing_city,
+        billing_state: editedOrder.billing_state,
+        billing_zip: editedOrder.billing_zip,
+        po_number: editedOrder.po_number,
+        due_date: editedOrder.due_date,
+        memo: editedOrder.memo,
+        subtotal: subtotal,
+        tax: 0,
+        total: subtotal
+      })
+      .eq('id', orderId);
+
+    if (orderError) {
+      toast({
+        title: "Error",
+        description: "Failed to save order",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Update order items
+    for (const item of editedOrder.order_items) {
+      const itemTotal = item.quantity * item.unit_price;
+      await supabase
+        .from('order_items')
+        .update({
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total: itemTotal,
+          name: item.name,
+          sku: item.sku
+        })
+        .eq('id', item.id);
+    }
+
+    setIsEditing(false);
+    toast({ title: "Order Saved" });
+    fetchOrder();
+  };
+
+  const handleCancelEdit = () => {
+    setEditedOrder(order);
+    setIsEditing(false);
+  };
+
+  const updateOrderField = (field: string, value: any) => {
+    setEditedOrder((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  const updateItemField = (itemIndex: number, field: string, value: any) => {
+    setEditedOrder((prev: any) => {
+      const newItems = [...prev.order_items];
+      newItems[itemIndex] = { ...newItems[itemIndex], [field]: value };
+      return { ...prev, order_items: newItems };
+    });
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto py-12 text-center">
@@ -279,14 +361,30 @@ const PullShipOrderDetail = () => {
           Back to Pull & Ship
         </Button>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={handleDownloadPackingList}>
-            <Download className="h-4 w-4 mr-2" />
-            Download Packing List
-          </Button>
-          <Button variant="outline" onClick={handleDownloadInvoice}>
-            <Download className="h-4 w-4 mr-2" />
-            Download Invoice
-          </Button>
+          {isEditing ? (
+            <>
+              <Button variant="outline" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveOrder}>
+                Save Changes
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setIsEditing(true)} disabled={isPicked}>
+                Edit Order
+              </Button>
+              <Button variant="outline" onClick={handleDownloadPackingList}>
+                <Download className="h-4 w-4 mr-2" />
+                Download Packing List
+              </Button>
+              <Button variant="outline" onClick={handleDownloadInvoice}>
+                <Download className="h-4 w-4 mr-2" />
+                Download Invoice
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -399,17 +497,74 @@ const PullShipOrderDetail = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-background/80 backdrop-blur rounded-lg p-6">
               <div>
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Customer</h3>
-                <p className="font-medium">{order.customer_name}</p>
-                <p className="text-sm text-muted-foreground">{order.customer_email || '-'}</p>
-                <p className="text-sm text-muted-foreground">{order.customer_phone || '-'}</p>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={editedOrder?.customer_name || ''}
+                      onChange={(e) => updateOrderField('customer_name', e.target.value)}
+                      placeholder="Customer name"
+                    />
+                    <Input
+                      value={editedOrder?.customer_email || ''}
+                      onChange={(e) => updateOrderField('customer_email', e.target.value)}
+                      placeholder="Email"
+                    />
+                    <Input
+                      value={editedOrder?.customer_phone || ''}
+                      onChange={(e) => updateOrderField('customer_phone', e.target.value)}
+                      placeholder="Phone"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-medium">{order.customer_name}</p>
+                    <p className="text-sm text-muted-foreground">{order.customer_email || '-'}</p>
+                    <p className="text-sm text-muted-foreground">{order.customer_phone || '-'}</p>
+                  </>
+                )}
               </div>
               <div>
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Ship To</h3>
-                <p className="font-medium">{order.shipping_name}</p>
-                <p className="text-sm text-muted-foreground">{order.shipping_street}</p>
-                <p className="text-sm text-muted-foreground">
-                  {order.shipping_city}, {order.shipping_state} {order.shipping_zip}
-                </p>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={editedOrder?.shipping_name || ''}
+                      onChange={(e) => updateOrderField('shipping_name', e.target.value)}
+                      placeholder="Name"
+                    />
+                    <Input
+                      value={editedOrder?.shipping_street || ''}
+                      onChange={(e) => updateOrderField('shipping_street', e.target.value)}
+                      placeholder="Street"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={editedOrder?.shipping_city || ''}
+                        onChange={(e) => updateOrderField('shipping_city', e.target.value)}
+                        placeholder="City"
+                      />
+                      <Input
+                        value={editedOrder?.shipping_state || ''}
+                        onChange={(e) => updateOrderField('shipping_state', e.target.value)}
+                        placeholder="State"
+                        maxLength={2}
+                      />
+                    </div>
+                    <Input
+                      value={editedOrder?.shipping_zip || ''}
+                      onChange={(e) => updateOrderField('shipping_zip', e.target.value)}
+                      placeholder="ZIP"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-medium">{order.shipping_name}</p>
+                    <p className="text-sm text-muted-foreground">{order.shipping_street}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {order.shipping_city}, {order.shipping_state} {order.shipping_zip}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -430,14 +585,59 @@ const PullShipOrderDetail = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {order.order_items?.map((item: any, index: number) => (
+                  {(isEditing ? editedOrder?.order_items : order.order_items)?.map((item: any, index: number) => (
                     <TableRow key={index}>
                       <TableCell className="font-mono text-xs">{item.item_id || '-'}</TableCell>
-                      <TableCell className="font-mono text-sm">{item.sku}</TableCell>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">${item.unit_price?.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-medium">${item.total?.toFixed(2)}</TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {isEditing ? (
+                          <Input
+                            value={item.sku}
+                            onChange={(e) => updateItemField(index, 'sku', e.target.value)}
+                            className="h-8"
+                          />
+                        ) : (
+                          item.sku
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {isEditing ? (
+                          <Input
+                            value={item.name}
+                            onChange={(e) => updateItemField(index, 'name', e.target.value)}
+                            className="h-8"
+                          />
+                        ) : (
+                          item.name
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isEditing ? (
+                          <Input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateItemField(index, 'quantity', parseInt(e.target.value) || 0)}
+                            className="h-8 w-24"
+                          />
+                        ) : (
+                          item.quantity
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isEditing ? (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.unit_price}
+                            onChange={(e) => updateItemField(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                            className="h-8 w-24"
+                          />
+                        ) : (
+                          `$${item.unit_price?.toFixed(2)}`
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        ${(item.quantity * item.unit_price).toFixed(2)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -447,18 +647,17 @@ const PullShipOrderDetail = () => {
             {/* Totals */}
             <div className="flex justify-end mt-6">
               <div className="w-80 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal:</span>
-                  <span>${order.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Tax:</span>
-                  <span>${order.tax.toFixed(2)}</span>
-                </div>
                 <div className="flex justify-between font-bold text-lg pt-2 border-t">
                   <span>Total:</span>
-                  <span>${order.total.toFixed(2)}</span>
+                  <span>
+                    ${isEditing 
+                      ? editedOrder?.order_items.reduce((sum: number, item: any) => 
+                          sum + (item.quantity * item.unit_price), 0).toFixed(2)
+                      : order.total.toFixed(2)
+                    }
+                  </span>
                 </div>
+                <p className="text-xs text-muted-foreground text-right">No tax on Pull & Ship orders</p>
               </div>
             </div>
 
