@@ -184,20 +184,54 @@ Return ONLY valid JSON:
     const findMatchingProduct = (poItem: any) => {
       if (!products || products.length === 0) return null;
 
-      // Match by item_id (exact match)
+      // Helper to normalize item_id by removing common suffixes
+      const normalizeItemId = (id: string): string => {
+        if (!id) return '';
+        // Remove "BAG" suffix if present (e.g., "PCK-00430-WABAG" -> "PCK-00430-WA")
+        let normalized = id.replace(/BAG$/i, '');
+        // If ends with state code like "-WA", extract just the base (e.g., "PCK-00430-WA" -> "PCK-00430")
+        const stateMatch = normalized.match(/^(.+?)-(WA|CA|OR|CO|NV|AZ|FL|TX|NY)$/i);
+        if (stateMatch) {
+          return stateMatch[1]; // Return just the base part
+        }
+        return normalized;
+      };
+
+      // Try exact match first
       if (poItem.item_id) {
         const match = products.find(p => p.item_id === poItem.item_id);
         if (match) {
-          console.log(`Matched item_id "${poItem.item_id}" to product: ${match.name}`);
+          console.log(`Exact match item_id "${poItem.item_id}" to product: ${match.name}`);
           return match.id;
         }
       }
 
-      // Fallback: try matching by SKU if item_id didn't work
-      if (poItem.sku) {
-        const match = products.find(p => p.item_id === poItem.sku);
+      // Try normalized match on item_id
+      if (poItem.item_id) {
+        const normalizedPoId = normalizeItemId(poItem.item_id);
+        console.log(`Trying normalized item_id: "${normalizedPoId}" from "${poItem.item_id}"`);
+        
+        const match = products.find(p => {
+          const normalizedProductId = normalizeItemId(p.item_id || '');
+          return normalizedProductId === normalizedPoId;
+        });
+        
         if (match) {
-          console.log(`Matched SKU "${poItem.sku}" to product: ${match.name}`);
+          console.log(`Normalized match "${normalizedPoId}" to product: ${match.name}`);
+          return match.id;
+        }
+      }
+
+      // Try matching by SKU
+      if (poItem.sku) {
+        const normalizedSku = normalizeItemId(poItem.sku);
+        const match = products.find(p => {
+          const normalizedProductId = normalizeItemId(p.item_id || '');
+          return normalizedProductId === normalizedSku;
+        });
+        
+        if (match) {
+          console.log(`Matched SKU "${poItem.sku}" (normalized: "${normalizedSku}") to product: ${match.name}`);
           return match.id;
         }
       }
