@@ -47,10 +47,14 @@ export const VendorAssignmentDialog = ({
   }, [open]);
 
   const refetchOrderItems = async () => {
-    const { data } = await supabase
+    console.log('Refetching order items for order:', orderId);
+    const { data, error } = await supabase
       .from('order_items')
       .select('*')
       .eq('order_id', orderId);
+    
+    console.log('Fetched order items:', data);
+    console.log('Fetch error:', error);
     
     if (data) {
       setFreshOrderItems(data);
@@ -72,8 +76,10 @@ export const VendorAssignmentDialog = ({
   };
 
   const loadExistingAssignments = (items: any[]) => {
+    console.log('Loading existing assignments from items:', items);
     const existing: Record<string, ItemAssignment> = {};
     items.forEach(item => {
+      console.log('Processing item:', item.id, 'vendor_id:', item.vendor_id, 'vendor_cost:', item.vendor_cost);
       if (item.vendor_id) {
         existing[item.id] = {
           vendorId: item.vendor_id,
@@ -82,6 +88,7 @@ export const VendorAssignmentDialog = ({
         };
       }
     });
+    console.log('Final assignments state:', existing);
     setAssignments(existing);
   };
 
