@@ -622,6 +622,7 @@ const CreateOrder = () => {
             total,
             terms: formData.terms,
             memo: formData.memo || null,
+            order_type: 'standard',
           })
           .select()
           .single();
