@@ -775,6 +775,114 @@ export type Database = {
           },
         ]
       }
+      vendor_po_items: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          order_item_id: string
+          quantity: number
+          sku: string
+          total: number
+          unit_cost: number
+          vendor_po_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          order_item_id: string
+          quantity: number
+          sku: string
+          total: number
+          unit_cost: number
+          vendor_po_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          order_item_id?: string
+          quantity?: number
+          sku?: string
+          total?: number
+          unit_cost?: number
+          vendor_po_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_po_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_po_items_vendor_po_id_fkey"
+            columns: ["vendor_po_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_pos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_pos: {
+        Row: {
+          company_id: string
+          created_at: string
+          expected_delivery_date: string | null
+          id: string
+          order_date: string
+          order_id: string
+          po_number: string
+          status: string
+          total: number
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          expected_delivery_date?: string | null
+          id?: string
+          order_date?: string
+          order_id: string
+          po_number: string
+          status?: string
+          total?: number
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          expected_delivery_date?: string | null
+          id?: string
+          order_date?: string
+          order_id?: string
+          po_number?: string
+          status?: string
+          total?: number
+          updated_at?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_pos_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_pos_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendors: {
         Row: {
           company_id: string
