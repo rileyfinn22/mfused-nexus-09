@@ -17,7 +17,8 @@ import {
   Package,
   CheckCircle,
   Clock,
-  Trash2
+  Trash2,
+  Circle
 } from "lucide-react";
 
 const Orders = () => {
@@ -35,11 +36,36 @@ const Orders = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('orders')
-      .select('*')
+      .select('*, order_items(*)')
       .order('created_at', { ascending: false });
     
     if (!error && data) {
-      setOrders(data);
+      // Fetch artwork approval status for all orders
+      const ordersWithChecklist = await Promise.all(data.map(async (order) => {
+        if (order.order_items && order.order_items.length > 0) {
+          const { data: artworkData } = await supabase
+            .from('artwork_files')
+            .select('is_approved, sku')
+            .in('sku', order.order_items.map((item: any) => item.sku));
+          
+          const allApproved = order.order_items.every((item: any) => 
+            artworkData?.some((art: any) => art.sku === item.sku && art.is_approved)
+          );
+          
+          return {
+            ...order,
+            artApproved: allApproved,
+            checklistComplete: allApproved && order.order_finalized && order.vibe_processed
+          };
+        }
+        return {
+          ...order,
+          artApproved: false,
+          checklistComplete: false
+        };
+      }));
+      
+      setOrders(ordersWithChecklist);
     }
     setLoading(false);
   };
@@ -231,8 +257,9 @@ const Orders = () => {
                   <div className="col-span-2">PO #</div>
                   <div className="col-span-1">State</div>
                   <div className="col-span-1">Total</div>
-                  <div className="col-span-2">Status</div>
-                  <div className="col-span-2">Due Date</div>
+                  <div className="col-span-1">Status</div>
+                  <div className="col-span-2">Checklist</div>
+                  <div className="col-span-1">Due Date</div>
                   <div className="col-span-2">Actions</div>
                 </div>
               </div>
@@ -260,10 +287,38 @@ const Orders = () => {
                         <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                       </div>
                       <div className="col-span-1 text-sm">${order.total?.toFixed(3)}</div>
-                      <div className="col-span-2 text-sm capitalize text-blue-500">
+                      <div className="col-span-1 text-sm capitalize text-blue-500">
                         Pending
                       </div>
-                      <div className="col-span-2 text-sm text-muted-foreground">
+                      <div className="col-span-2">
+                        <div className="flex gap-2 items-center">
+                          <div className="flex items-center gap-1" title="Art Approved">
+                            {order.artApproved ? (
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className="text-xs text-muted-foreground">Art</span>
+                          </div>
+                          <div className="flex items-center gap-1" title="Order Finalized">
+                            {order.order_finalized ? (
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className="text-xs text-muted-foreground">Order</span>
+                          </div>
+                          <div className="flex items-center gap-1" title="Vibe Processed">
+                            {order.vibe_processed ? (
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className="text-xs text-muted-foreground">Vibe</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-span-1 text-sm text-muted-foreground">
                         {dueDate}
                       </div>
                       <div className="col-span-2 flex gap-1">
