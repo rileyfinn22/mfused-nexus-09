@@ -23,7 +23,6 @@ const EditProduct = () => {
     units_per_case: "",
     cases_per_pallet: "",
     weight_per_case: "",
-    volume_per_case: "",
     cost: ""
   });
 
@@ -51,7 +50,6 @@ const EditProduct = () => {
         units_per_case: data.units_per_case?.toString() || "",
         cases_per_pallet: data.cases_per_pallet?.toString() || "",
         weight_per_case: data.weight_per_case?.toString() || "",
-        volume_per_case: data.volume_per_case?.toString() || "",
         cost: data.cost?.toString() || ""
       });
     } catch (error) {
@@ -92,7 +90,6 @@ const EditProduct = () => {
           units_per_case: formData.units_per_case ? parseInt(formData.units_per_case) : null,
           cases_per_pallet: formData.cases_per_pallet ? parseInt(formData.cases_per_pallet) : null,
           weight_per_case: formData.weight_per_case ? parseFloat(formData.weight_per_case) : null,
-          volume_per_case: formData.volume_per_case ? parseFloat(formData.volume_per_case) : null,
           cost: formData.cost ? parseFloat(formData.cost) : null
         })
         .eq('id', id);
@@ -185,9 +182,9 @@ const EditProduct = () => {
             <div className="text-2xl font-semibold text-primary">{availableStock}</div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="units_per_case">Units per Case / Carton</Label>
+              <Label htmlFor="units_per_case">Average Units / Case</Label>
               <Input
                 id="units_per_case"
                 type="number"
@@ -197,7 +194,7 @@ const EditProduct = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="cases_per_pallet">Cases per Pallet</Label>
+              <Label htmlFor="cases_per_pallet">Average Cases / Pallet</Label>
               <Input
                 id="cases_per_pallet"
                 type="number"
@@ -207,24 +204,13 @@ const EditProduct = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="weight_per_case">Weight per Case</Label>
+              <Label htmlFor="weight_per_case">Average Weight per Case</Label>
               <Input
                 id="weight_per_case"
                 type="number"
                 step="0.01"
                 value={formData.weight_per_case}
                 onChange={(e) => setFormData({ ...formData, weight_per_case: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="volume_per_case">Volume per Case</Label>
-              <Input
-                id="volume_per_case"
-                type="number"
-                step="0.01"
-                value={formData.volume_per_case}
-                onChange={(e) => setFormData({ ...formData, volume_per_case: e.target.value })}
               />
             </div>
           </div>
