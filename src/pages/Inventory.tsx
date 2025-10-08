@@ -371,9 +371,14 @@ const Inventory = () => {
                   )}
                 </div>
                 <div className="col-span-2 font-mono text-sm font-medium flex items-center gap-2">
-                  {item.sku}
+                  <span 
+                    className="line-clamp-2 break-words"
+                    title={item.sku}
+                  >
+                    {item.sku}
+                  </span>
                   {!hasApprovedArtwork(item.sku) && (
-                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                    <AlertTriangle className="h-4 w-4 text-yellow-500 flex-shrink-0" />
                   )}
                 </div>
                 <div className="col-span-1">
