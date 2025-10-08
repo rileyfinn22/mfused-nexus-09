@@ -25,6 +25,7 @@ interface Product {
   state: string;
   cost: number | null;
   image_url: string | null;
+  sku?: string;
   states: ProductState[];
 }
 
@@ -69,6 +70,14 @@ const Products = () => {
 
           if (statesError) throw statesError;
 
+          // Get SKU from inventory table
+          const { data: inventoryData } = await supabase
+            .from('inventory')
+            .select('sku')
+            .eq('product_id', product.id)
+            .limit(1)
+            .single();
+
           return {
             id: product.id,
             name: product.name,
@@ -77,6 +86,7 @@ const Products = () => {
             state: product.state,
             cost: product.cost,
             image_url: product.image_url,
+            sku: inventoryData?.sku,
             states: states || []
           };
         })
@@ -133,7 +143,8 @@ const Products = () => {
     }
   };
 
-  const hasApprovedArtwork = (sku: string) => {
+  const hasApprovedArtwork = (sku?: string) => {
+    if (!sku) return false;
     return artworkStatus[sku] === true;
   };
 
@@ -226,17 +237,23 @@ const Products = () => {
                   </div>
                   <div className="col-span-2 font-medium font-mono text-xs flex items-center gap-2">
                     {product.id.slice(0, 8)}...
-                    {!hasApprovedArtwork(product.id) && (
+                    {product.sku && !hasApprovedArtwork(product.sku) && (
                       <AlertTriangle className="h-4 w-4 text-yellow-500" />
                     )}
                   </div>
                   <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
-                    {artworkThumbnails[product.id] || product.image_url ? (
+                    {product.sku && (artworkThumbnails[product.sku] || product.image_url) ? (
                       <img 
-                        src={artworkThumbnails[product.id] || product.image_url} 
+                        src={artworkThumbnails[product.sku] || product.image_url} 
                         alt={product.name}
                         className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.id)}`)}
+                        onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.sku)}`)}
+                      />
+                    ) : product.image_url ? (
+                      <img 
+                        src={product.image_url} 
+                        alt={product.name}
+                        className="w-12 h-12 object-cover rounded border"
                       />
                     ) : (
                       <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center text-xs text-muted-foreground">
