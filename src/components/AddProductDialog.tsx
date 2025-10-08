@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 
 interface AddProductDialogProps {
   onProductAdded: () => void;
@@ -23,6 +23,20 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
     cost: "",
     specs: ""
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +55,26 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
 
       if (!userRole) throw new Error("No company associated");
 
+      let imageUrl = null;
+
+      // Upload image if provided
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${userRole.company_id}/${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(fileName, imageFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(fileName);
+
+        imageUrl = publicUrl;
+      }
+
       // Create product
       const { data: product, error: productError } = await supabase
         .from('products')
@@ -50,6 +84,7 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
           description: formData.description || null,
           state: formData.state,
           cost: formData.cost ? parseFloat(formData.cost) : null,
+          image_url: imageUrl,
           company_id: userRole.company_id
         })
         .select()
@@ -75,6 +110,8 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
       toast.success("Product added successfully");
       setOpen(false);
       setFormData({ name: "", category: "", description: "", state: "", cost: "", specs: "" });
+      setImageFile(null);
+      setImagePreview(null);
       onProductAdded();
     } catch (error) {
       console.error('Error adding product:', error);
@@ -175,6 +212,32 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
               onChange={(e) => setFormData({ ...formData, specs: e.target.value })}
               placeholder="e.g., 1g, 510 thread"
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="image">Product Image</Label>
+            <div className="flex items-center gap-4">
+              <Input
+                id="image"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+              <Label 
+                htmlFor="image" 
+                className="flex items-center gap-2 px-4 py-2 border rounded-md cursor-pointer hover:bg-accent"
+              >
+                <Upload className="h-4 w-4" />
+                {imageFile ? imageFile.name : "Choose Image"}
+              </Label>
+              {imagePreview && (
+                <img 
+                  src={imagePreview} 
+                  alt="Preview" 
+                  className="w-16 h-16 object-cover rounded border"
+                />
+              )}
+            </div>
           </div>
           <Button type="submit" disabled={loading} className="w-full">
             {loading ? "Adding..." : "Add Product"}

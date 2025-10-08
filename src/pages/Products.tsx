@@ -23,6 +23,7 @@ interface Product {
   description: string | null;
   state: string;
   cost: number | null;
+  image_url: string | null;
   states: ProductState[];
 }
 
@@ -71,6 +72,7 @@ const Products = () => {
             description: product.description,
             state: product.state,
             cost: product.cost,
+            image_url: product.image_url,
             states: states || []
           };
         })
@@ -167,8 +169,9 @@ const Products = () => {
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-1"></div>
             <div className="col-span-2">Product ID</div>
+            <div className="col-span-1">Image</div>
             <div className="col-span-2">Item</div>
-            <div className="col-span-2">Description</div>
+            <div className="col-span-1">Description</div>
             <div className="col-span-1">Category</div>
             <div className="col-span-1">State</div>
             <div className="col-span-1">Cost</div>
@@ -202,8 +205,21 @@ const Products = () => {
                       <AlertTriangle className="h-4 w-4 text-yellow-500" />
                     )}
                   </div>
+                  <div className="col-span-1">
+                    {product.image_url ? (
+                      <img 
+                        src={product.image_url} 
+                        alt={product.name}
+                        className="w-12 h-12 object-cover rounded border"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center text-xs text-muted-foreground">
+                        No img
+                      </div>
+                    )}
+                  </div>
                   <div className="col-span-2 text-sm font-medium">{product.name}</div>
-                  <div className="col-span-2 text-sm text-muted-foreground">{product.description || '-'}</div>
+                  <div className="col-span-1 text-sm text-muted-foreground truncate">{product.description || '-'}</div>
                   <div className="col-span-1 text-sm">{product.category}</div>
                   <div className="col-span-1">
                     <Badge variant="outline" className="text-xs">{product.state}</Badge>

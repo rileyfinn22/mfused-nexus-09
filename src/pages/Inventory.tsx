@@ -20,6 +20,9 @@ interface InventoryItem {
   in_production: number;
   redline: number;
   product_id: string;
+  products?: {
+    image_url: string | null;
+  };
 }
 
 const Inventory = () => {
@@ -41,7 +44,7 @@ const Inventory = () => {
     try {
       const { data, error } = await supabase
         .from('inventory')
-        .select('*')
+        .select('*, products(image_url)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -180,7 +183,8 @@ const Inventory = () => {
         {/* Table Header */}
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-10 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div className="col-span-3">SKU</div>
+            <div className="col-span-1">Image</div>
+            <div className="col-span-2">SKU</div>
             <div className="col-span-1">State</div>
             <div 
               className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
@@ -215,7 +219,20 @@ const Inventory = () => {
                 key={`${item.sku}-${item.state}`}
                 className="grid grid-cols-10 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
               >
-                <div className="col-span-3 font-mono text-sm font-medium flex items-center gap-2">
+                <div className="col-span-1">
+                  {item.products?.image_url ? (
+                    <img 
+                      src={item.products.image_url} 
+                      alt={item.sku}
+                      className="w-12 h-12 object-cover rounded border"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center text-xs text-muted-foreground">
+                      No img
+                    </div>
+                  )}
+                </div>
+                <div className="col-span-2 font-mono text-sm font-medium flex items-center gap-2">
                   {item.sku}
                   {!hasApprovedArtwork(item.sku) && (
                     <AlertTriangle className="h-4 w-4 text-yellow-500" />
