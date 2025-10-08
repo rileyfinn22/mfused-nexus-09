@@ -50,6 +50,8 @@ const PullShip = () => {
   const [uploadingPO, setUploadingPO] = useState(false);
   const [analyzingPO, setAnalyzingPO] = useState(false);
   const [selectedPOFile, setSelectedPOFile] = useState<File | null>(null);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [loadingInventory, setLoadingInventory] = useState(false);
 
   const [invoices, setInvoices] = useState([
     {
@@ -136,29 +138,29 @@ const PullShip = () => {
 
   const stateOptions = [...Object.keys(stateAddressMapping).filter(s => s !== "Primary"), "Primary"];
 
-  // Mock inventory data for the selected state
-  const getInventoryForState = (state: string) => {
-    const inventoryData = [
-      { sku: "VAPE-CART-001", available: 45, reserved: 15, inProduction: 100, redline: 50 },
-      { sku: "EDIBLE-PKG-005", available: 150, reserved: 25, inProduction: 200, redline: 100 },
-      { sku: "FLOWER-JAR-003", available: 85, reserved: 20, inProduction: 150, redline: 100 },
-      { sku: "CONCENTRATE-TIN-002", available: 200, reserved: 30, inProduction: 100, redline: 50 },
-      { sku: "PRE-ROLL-TUBE-001", available: 22, reserved: 5, inProduction: 50, redline: 30 },
-      { sku: "TINCTURE-BTL-002", available: 75, reserved: 10, inProduction: 80, redline: 40 }
-    ];
-    
-    // If Primary is selected, return products with Primary state
-    if (state === "Primary") {
-      return [
-        { sku: "CC Vape Boxes", available: 0, reserved: 0, inProduction: 0, redline: 100 },
-        { sku: "CC Concentrate Box", available: 0, reserved: 0, inProduction: 0, redline: 50 },
-        { sku: "Cannavista", available: 4490, reserved: 0, inProduction: 0, redline: 1000 },
-        { sku: "Small Liv bags", available: 18690, reserved: 0, inProduction: 0, redline: 5000 },
-        { sku: "Large Liv bags", available: 29790, reserved: 0, inProduction: 0, redline: 10000 }
-      ].filter(item => item.available > 0);
+  // Fetch inventory from database for the selected state
+  const fetchInventoryForState = async (state: string) => {
+    setLoadingInventory(true);
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*, products(image_url)')
+        .eq('state', state)
+        .gt('available', 0)
+        .order('sku', { ascending: true });
+
+      if (error) throw error;
+      setInventory(data || []);
+    } catch (error) {
+      console.error('Error fetching inventory:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load inventory data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingInventory(false);
     }
-    
-    return inventoryData.filter(item => item.available > 0);
   };
 
   const getStockStatus = (available: number, redline: number) => {
@@ -344,6 +346,9 @@ const PullShip = () => {
       shippingState: state,
       shippingZip: addressData?.zip || ""
     }));
+    
+    // Fetch inventory for the selected state
+    fetchInventoryForState(state);
   };
 
   const handlePOFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -667,38 +672,48 @@ const PullShip = () => {
                   </div>
 
                   <div className="divide-y divide-table-border">
-                    {getInventoryForState(orderData.state)
-                      .filter(item => item.sku.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .map((item) => {
-                        const status = getStockStatus(item.available, item.redline);
-                        const stockColor = getStockColor(status);
-                        const isSelected = selectedSkus.has(item.sku);
-                        
-                        return (
-                          <div 
-                            key={item.sku}
-                            className={`grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors ${isSelected ? 'bg-primary/5 border-l-4 border-l-primary' : ''}`}
-                          >
-                            <div className="col-span-1 flex items-center">
-                              <Checkbox
-                                checked={isSelected}
-                                onCheckedChange={(checked) => handleSkuSelection(item.sku, checked as boolean)}
-                                className="h-4 w-4"
-                              />
+                    {loadingInventory ? (
+                      <div className="px-4 py-8 text-center text-muted-foreground">
+                        Loading inventory...
+                      </div>
+                    ) : inventory.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-muted-foreground">
+                        No inventory available for this state
+                      </div>
+                    ) : (
+                      inventory
+                        .filter(item => item.sku.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .map((item) => {
+                          const status = getStockStatus(item.available, item.redline);
+                          const stockColor = getStockColor(status);
+                          const isSelected = selectedSkus.has(item.sku);
+                          
+                          return (
+                            <div 
+                              key={item.id}
+                              className={`grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors ${isSelected ? 'bg-primary/5 border-l-4 border-l-primary' : ''}`}
+                            >
+                              <div className="col-span-1 flex items-center">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => handleSkuSelection(item.sku, checked as boolean)}
+                                  className="h-4 w-4"
+                                />
+                              </div>
+                              <div className="col-span-4 font-mono text-sm font-medium">{item.sku}</div>
+                              <div className="col-span-2 font-semibold text-sm flex items-center gap-1">
+                                {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
+                                {item.available}
+                              </div>
+                              <div className="col-span-2 text-sm">{item.in_production || 0}</div>
+                              <div className="col-span-2 text-sm">{item.in_production}</div>
+                              <div className={`col-span-1 text-xs font-medium uppercase ${stockColor}`}>
+                                {status}
+                              </div>
                             </div>
-                            <div className="col-span-4 font-mono text-sm font-medium">{item.sku}</div>
-                            <div className="col-span-2 font-semibold text-sm flex items-center gap-1">
-                              {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
-                              {item.available}
-                            </div>
-                            <div className="col-span-2 text-sm">{item.reserved}</div>
-                            <div className="col-span-2 text-sm">{item.inProduction}</div>
-                            <div className={`col-span-1 text-xs font-medium uppercase ${stockColor}`}>
-                              {status}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })
+                    )}
                   </div>
                 </div>
               </div>
