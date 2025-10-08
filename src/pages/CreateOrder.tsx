@@ -79,9 +79,6 @@ const CreateOrder = () => {
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
-  const [uploading, setUploading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -191,127 +188,6 @@ const CreateOrder = () => {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== 'application/pdf') {
-        toast({
-          title: "Invalid file type",
-          description: "Please upload a PDF file",
-          variant: "destructive",
-        });
-        return;
-      }
-      setSelectedFile(file);
-    }
-  };
-
-  const handlePOUpload = async () => {
-    if (!selectedFile) return;
-
-    setUploading(true);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Not authenticated",
-          description: "Please log in to upload purchase orders",
-          variant: "destructive",
-        });
-        navigate('/login');
-        return;
-      }
-
-      // For vibe_admin, require company selection
-      let companyId: string;
-      if (isVibeAdmin) {
-        if (!selectedCompanyId) {
-          toast({
-            title: "Company Required",
-            description: "Please select a company before uploading a PO",
-            variant: "destructive",
-          });
-          setUploading(false);
-          return;
-        }
-        companyId = selectedCompanyId;
-      } else {
-        // Get user's company
-        const { data: userRole } = await supabase
-          .from('user_roles')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .single();
-
-        if (!userRole?.company_id) {
-          throw new Error('User not associated with a company');
-        }
-        companyId = userRole.company_id;
-      }
-
-      // Upload to storage
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('po-documents')
-        .upload(fileName, selectedFile);
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw uploadError;
-      }
-
-      toast({
-        title: "Upload successful",
-        description: "Your PO is being analyzed...",
-      });
-
-      setUploading(false);
-      setAnalyzing(true);
-
-      // Trigger AI analysis
-      const { data: functionData, error: functionError } = await supabase.functions.invoke('analyze-po', {
-        body: { 
-          pdfPath: fileName,
-          companyId: companyId,
-          userId: user.id,
-          filename: selectedFile.name
-        }
-      });
-
-      if (functionError) {
-        console.error('Analysis error:', functionError);
-        toast({
-          title: "Analysis failed",
-          description: "Continue with manual entry below",
-          variant: "destructive",
-        });
-      } else if (functionData?.orderId) {
-        toast({
-          title: "PO analyzed successfully",
-          description: "Order details loaded below - review and edit before saving",
-        });
-        
-        // Load the created order
-        await loadExistingOrder(functionData.orderId);
-      }
-
-      setAnalyzing(false);
-      setSelectedFile(null);
-
-    } catch (error: any) {
-      console.error('Error uploading PO:', error);
-      toast({
-        title: "Upload failed",
-        description: error.message || "Please try again",
-        variant: "destructive",
-      });
-      setUploading(false);
-      setAnalyzing(false);
-    }
-  };
 
   const fetchProducts = async () => {
     const { data, error } = await supabase
@@ -739,62 +615,6 @@ const CreateOrder = () => {
                 }
               </p>
             )}
-          </div>
-        )}
-
-        {/* Upload PO Option */}
-        {!orderId && (
-          <div className="bg-muted/30 backdrop-blur rounded-lg p-4 border border-table-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium">Order Entry</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Upload a PO to auto-fill or enter manually
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="po-upload"
-                  disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
-                />
-                {selectedFile && !uploading && !analyzing && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <FileText className="h-3 w-3" />
-                    {selectedFile.name.substring(0, 20)}...
-                  </span>
-                )}
-                {!selectedFile ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => document.getElementById('po-upload')?.click()}
-                    disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload PO
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handlePOUpload}
-                    disabled={uploading || analyzing}
-                    size="sm"
-                  >
-                    {uploading || analyzing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {uploading ? 'Uploading...' : 'Analyzing...'}
-                      </>
-                    ) : (
-                      'Analyze'
-                    )}
-                  </Button>
-                )}
-              </div>
-            </div>
           </div>
         )}
 
