@@ -39,12 +39,14 @@ const Products = () => {
   const [expandedProducts, setExpandedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
+  const [artworkThumbnails, setArtworkThumbnails] = useState<Record<string, string>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchProducts();
     fetchArtworkStatus();
+    fetchArtworkThumbnails();
   }, []);
 
   const fetchProducts = async () => {
@@ -104,6 +106,28 @@ const Products = () => {
       setArtworkStatus(statusMap);
     } catch (error) {
       console.error('Error fetching artwork status:', error);
+    }
+  };
+
+  const fetchArtworkThumbnails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('artwork_files')
+        .select('sku, preview_url, artwork_url')
+        .eq('is_approved', true);
+
+      if (error) throw error;
+
+      // Create a map of SKU to thumbnail URL
+      const thumbnailMap: Record<string, string> = {};
+      data?.forEach(artwork => {
+        if (!thumbnailMap[artwork.sku]) {
+          thumbnailMap[artwork.sku] = artwork.preview_url || artwork.artwork_url;
+        }
+      });
+      setArtworkThumbnails(thumbnailMap);
+    } catch (error) {
+      console.error('Error fetching artwork thumbnails:', error);
     }
   };
 
@@ -170,8 +194,8 @@ const Products = () => {
             <div className="col-span-1"></div>
             <div className="col-span-2">Product ID</div>
             <div className="col-span-1">Image</div>
+            <div className="col-span-1">Artwork</div>
             <div className="col-span-2">Item</div>
-            <div className="col-span-1">Description</div>
             <div className="col-span-1">Category</div>
             <div className="col-span-1">State</div>
             <div className="col-span-1">Cost</div>
@@ -218,8 +242,20 @@ const Products = () => {
                       </div>
                     )}
                   </div>
+                  <div className="col-span-1">
+                    {artworkThumbnails[product.id] ? (
+                      <img 
+                        src={artworkThumbnails[product.id]} 
+                        alt={`${product.name} artwork`}
+                        className="w-12 h-12 object-cover rounded border"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center text-xs text-muted-foreground">
+                        No art
+                      </div>
+                    )}
+                  </div>
                   <div className="col-span-2 text-sm font-medium">{product.name}</div>
-                  <div className="col-span-1 text-sm text-muted-foreground truncate">{product.description || '-'}</div>
                   <div className="col-span-1 text-sm">{product.category}</div>
                   <div className="col-span-1">
                     <Badge variant="outline" className="text-xs">{product.state}</Badge>

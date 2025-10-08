@@ -188,10 +188,10 @@ const Artwork = () => {
   };
 
   const handleApprove = async () => {
-    if (!approvalData.printName || !approvalData.signature) {
+    if (!approvalData.printName) {
       toast({
         title: "Missing information",
-        description: "Please provide print name and signature",
+        description: "Please provide print name",
         variant: "destructive",
       });
       return;
@@ -207,7 +207,7 @@ const Artwork = () => {
           is_approved: true,
           approved_by: user.id,
           approved_at: new Date().toISOString(),
-          notes: `Approved by: ${approvalData.printName}\nSignature: ${approvalData.signature}\nDate: ${approvalData.date}\n\n${selectedFile?.notes || ''}`
+          notes: `Approved by: ${approvalData.printName}\nDate: ${approvalData.date}\n\n${selectedFile?.notes || ''}`
         })
         .eq('id', selectedFile.id);
 
@@ -333,9 +333,22 @@ const Artwork = () => {
                   onValueChange={(value) => setUploadData({...uploadData, sku: value})}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a SKU" />
+                    <SelectValue placeholder="Search or select a SKU" />
                   </SelectTrigger>
                   <SelectContent className="bg-background z-50">
+                    <div className="p-2">
+                      <Input
+                        placeholder="Search SKU..."
+                        onChange={(e) => {
+                          const searchTerm = e.target.value.toLowerCase();
+                          const filtered = products.filter(p => 
+                            p.sku.toLowerCase().includes(searchTerm) ||
+                            p.products?.name?.toLowerCase().includes(searchTerm)
+                          );
+                        }}
+                        className="mb-2"
+                      />
+                    </div>
                     {products.map((product) => (
                       <SelectItem key={product.sku} value={product.sku}>
                         {product.sku} {product.products?.name ? `- ${product.products.name}` : ''}
@@ -466,13 +479,14 @@ const Artwork = () => {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="font-semibold text-lg">{file.filename}</h3>
-                    <Badge 
-                      variant={file.is_approved ? "default" : "secondary"}
-                      className={getStatusColor(file.is_approved)}
-                    >
-                      <StatusIcon className="h-3 w-3 mr-1" />
-                      {file.is_approved ? 'Approved' : 'Pending'}
-                    </Badge>
+                    {file.is_approved ? (
+                      <span className="text-green-600 font-bold">✓ Approved</span>
+                    ) : (
+                      <Badge variant="secondary" className="text-warning">
+                        <StatusIcon className="h-3 w-3 mr-1" />
+                        Pending
+                      </Badge>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm mt-4">
                     <div>
@@ -604,16 +618,6 @@ const Artwork = () => {
                 value={approvalData.printName}
                 onChange={(e) => setApprovalData({...approvalData, printName: e.target.value})}
                 placeholder="Enter your full name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="signature">Signature *</Label>
-              <Input
-                id="signature"
-                value={approvalData.signature}
-                onChange={(e) => setApprovalData({...approvalData, signature: e.target.value})}
-                placeholder="Type your signature"
-                className="font-cursive"
               />
             </div>
             <div>

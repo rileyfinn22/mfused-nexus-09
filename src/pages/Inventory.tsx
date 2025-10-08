@@ -32,12 +32,14 @@ const Inventory = () => {
   const [sortField, setSortField] = useState("available");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
+  const [artworkThumbnails, setArtworkThumbnails] = useState<Record<string, string>>({});
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchInventory();
     fetchArtworkStatus();
+    fetchArtworkThumbnails();
   }, []);
 
   const fetchInventory = async () => {
@@ -74,6 +76,28 @@ const Inventory = () => {
       setArtworkStatus(statusMap);
     } catch (error) {
       console.error('Error fetching artwork status:', error);
+    }
+  };
+
+  const fetchArtworkThumbnails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('artwork_files')
+        .select('sku, preview_url, artwork_url')
+        .eq('is_approved', true);
+
+      if (error) throw error;
+
+      // Create a map of SKU to thumbnail URL
+      const thumbnailMap: Record<string, string> = {};
+      data?.forEach(artwork => {
+        if (!thumbnailMap[artwork.sku]) {
+          thumbnailMap[artwork.sku] = artwork.preview_url || artwork.artwork_url;
+        }
+      });
+      setArtworkThumbnails(thumbnailMap);
+    } catch (error) {
+      console.error('Error fetching artwork thumbnails:', error);
     }
   };
 
@@ -184,10 +208,11 @@ const Inventory = () => {
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-10 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-1">Image</div>
+            <div className="col-span-1">Artwork</div>
             <div className="col-span-2">SKU</div>
             <div className="col-span-1">State</div>
             <div 
-              className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
+              className="col-span-1 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
               onClick={() => handleSort("available")}
             >
               Available {getSortIcon("available")}
@@ -232,6 +257,19 @@ const Inventory = () => {
                     </div>
                   )}
                 </div>
+                <div className="col-span-1">
+                  {artworkThumbnails[item.sku] ? (
+                    <img 
+                      src={artworkThumbnails[item.sku]} 
+                      alt={`${item.sku} artwork`}
+                      className="w-12 h-12 object-cover rounded border"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center text-xs text-muted-foreground">
+                      No art
+                    </div>
+                  )}
+                </div>
                 <div className="col-span-2 font-mono text-sm font-medium flex items-center gap-2">
                   {item.sku}
                   {!hasApprovedArtwork(item.sku) && (
@@ -241,7 +279,7 @@ const Inventory = () => {
                 <div className="col-span-1">
                   <Badge variant="outline" className="text-xs">{item.state}</Badge>
                 </div>
-                <div className="col-span-2 font-semibold text-sm flex items-center gap-1">
+                <div className="col-span-1 font-semibold text-sm flex items-center gap-1">
                   {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
                   {item.available}
                 </div>
