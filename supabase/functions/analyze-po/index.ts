@@ -72,65 +72,78 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a purchase order data extraction expert. Your primary goal is to extract ALL line items from tabular sections of POs with perfect accuracy. Focus on finding tables with Item/SKU, Description, and Quantity columns.'
+            content: 'You are an expert at analyzing purchase orders. Use chain-of-thought reasoning to understand the document structure before extracting data.'
           },
           {
             role: 'user',
-            content: `TASK: Extract all line items from this purchase order PDF text.
+            content: `TASK: Analyze this purchase order and extract structured data.
 
-STEP 1 - LOCATE THE TABLE:
-Find the tabular section containing product data. Look for headers like:
-- Item, Item #, SKU, Product Code, Part Number (often starts with patterns like PCK-, SDA, numbers)
-- Description, Product Description, Item Description
-- Qty, Quantity, QTY
-- Rate, Unit Price, Price, Cost
-- Amount, Total, Line Total
+STEP 1 - REASONING: First, analyze the document structure
+Think through:
+- What are the column headers in the line items table? (e.g., "Description", "Item", "Qty", "Rate", "Amount")
+- Which column likely contains the SKU/product code? (Look for patterns like PCK-, alphanumeric codes)
+- Which column contains the product name/description? (Usually longer text descriptions)
+- Which column has quantities? (Look for "Qty", "Quantity", numeric values)
+- Which column has unit prices? (Look for "Rate", "Price", "Unit Price", decimal numbers)
+- Where is the PO number? (Look for "PO #", "Purchase Order", "PO Number")
+- Where is the due/expected date? (Look for "Due Date", "Expected Date", "Delivery Date")
 
-STEP 2 - EXTRACT EACH ROW:
-For EVERY row in the item table, extract:
-- sku: The item/product code (e.g., "PCK-123", "SDA10065", "3770-072")
-- name: The FULL product description (merge wrapped lines if needed)
-- quantity: Numeric quantity (integer)
-- unit_price: Price per unit (decimal number)
+IMPORTANT: Column headers vary between POs. For example:
+- The "Description" column might actually contain SKUs
+- The "Item" column might contain item numbers
+- The "Product" column might contain descriptions
+YOU MUST reason about what each column actually contains, not just use the header name.
 
-STEP 3 - CLEAN THE DATA:
-- Merge multi-line descriptions into single entries
-- Skip header rows, totals, subtotals, and footer text
-- Ensure all quantities are numeric
-- Ensure all prices are decimal numbers
+STEP 2 - EXTRACT: Based on your reasoning, extract:
 
-STEP 4 - ALSO EXTRACT (if present):
+For each line item:
+- sku: The product code/SKU (look for alphanumeric patterns like "PCK-00430-WABAG", "SDA10065", etc.)
+- name: The full product description/name
+- quantity: Numeric quantity ordered (integer)
+- unit_price: Price per unit (decimal)
+
+For order header:
 - po_number: The PO# or purchase order number
-- customer_name: Vendor/company name
+- customer_name: Vendor/company name (often at top, or in "Vendor" field)
 - shipping_name: Ship To name
-- shipping_street: Ship To address
+- shipping_street: Ship To street address
 - shipping_city: Ship To city
 - shipping_state: Ship To state (2 letters)
-- shipping_zip: Ship To zip
-- billing_name: Bill To name
-- billing_street: Bill To address
+- shipping_zip: Ship To zip code
+- billing_name: Bill To name (if separate from shipping)
+- billing_street: Bill To street
 - billing_city: Bill To city
 - billing_state: Bill To state
 - billing_zip: Bill To zip
-- due_date: Due date (YYYY-MM-DD format)
+- due_date: Due/Expected/Delivery date in YYYY-MM-DD format
+- customer_email: Email if present
+- customer_phone: Phone if present
 
 PURCHASE ORDER TEXT:
 ${extractedText}
 
-Return ONLY valid JSON with this structure:
+Return ONLY valid JSON. Show your reasoning in the structure:
 {
+  "reasoning": {
+    "sku_column": "which column contains SKUs and why",
+    "name_column": "which column contains product names and why",
+    "qty_column": "which column contains quantities",
+    "price_column": "which column contains unit prices"
+  },
   "po_number": "...",
   "customer_name": "...",
+  "customer_email": null,
+  "customer_phone": null,
   "shipping_name": "...",
   "shipping_street": "...",
   "shipping_city": "...",
   "shipping_state": "...",
   "shipping_zip": "...",
-  "billing_name": "...",
-  "billing_street": "...",
-  "billing_city": "...",
-  "billing_state": "...",
-  "billing_zip": "...",
+  "billing_name": null,
+  "billing_street": null,
+  "billing_city": null,
+  "billing_state": null,
+  "billing_zip": null,
   "due_date": "...",
   "memo": null,
   "items": [
