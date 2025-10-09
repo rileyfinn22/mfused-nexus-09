@@ -596,7 +596,7 @@ const CreateOrder = () => {
           .from('orders')
           .select('*', { count: 'exact', head: true });
         
-        orderNumber = `ORD-${String((count || 0) + 1).padStart(3, '0')}`;
+        orderNumber = `ORD-${String((count || 0) + 1).padStart(3, '0')}-${Date.now()}`;
 
         const { data: newOrder, error: orderError } = await supabase
           .from('orders')
