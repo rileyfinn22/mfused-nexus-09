@@ -527,45 +527,21 @@ const Artwork = () => {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="sku">SKU</Label>
-                <Popover open={skuComboboxOpen} onOpenChange={setSkuComboboxOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={skuComboboxOpen}
-                      className="w-full justify-between"
-                    >
-                      {uploadData.sku || "Search or select a SKU"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search SKU..." />
-                      <CommandList>
-                        <CommandEmpty>No SKU found.</CommandEmpty>
-                        <CommandGroup>
-                          {products.map((product) => (
-                            <CommandItem
-                              key={product.sku}
-                              value={product.sku}
-                              onSelect={(currentValue) => {
-                                setUploadData({...uploadData, sku: currentValue});
-                                setSkuComboboxOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={uploadData.sku === product.sku ? "mr-2 h-4 w-4 opacity-100" : "mr-2 h-4 w-4 opacity-0"}
-                              />
-                              {product.sku} {product.products?.name ? `- ${product.products.name}` : ''}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <Label htmlFor="sku">SKU *</Label>
+                <Input
+                  id="sku"
+                  value={uploadData.sku}
+                  onChange={(e) => setUploadData({...uploadData, sku: e.target.value.toUpperCase()})}
+                  placeholder="Enter SKU"
+                  list="sku-suggestions"
+                />
+                <datalist id="sku-suggestions">
+                  {products.map((product) => (
+                    <option key={product.sku} value={product.sku}>
+                      {product.products?.name ? `${product.sku} - ${product.products.name}` : product.sku}
+                    </option>
+                  ))}
+                </datalist>
               </div>
               <div>
                 <Label htmlFor="artwork">Artwork File</Label>
