@@ -277,7 +277,7 @@ const OrderDetail = () => {
   const total = order.total || 0;
   return <div className="max-w-7xl mx-auto">
       {/* Process Order Banner for Pending Orders */}
-      {isAdmin && (order.status === 'pending' || order.status === 'pending_pull') && (
+      {isVibeAdmin && (order.status === 'pending' || order.status === 'pending_pull') && (
         <div className="mb-6 p-4 bg-blue-500/10 border-2 border-blue-500 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
