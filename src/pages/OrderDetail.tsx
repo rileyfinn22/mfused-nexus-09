@@ -384,7 +384,7 @@ const OrderDetail = () => {
                   {orderFinalized ? "Order approved by customer" : "Pending customer approval"}
                 </p>
               </div>
-              {isVibeAdmin && !orderFinalized && order?.status === 'pending' && (
+              {!orderFinalized && order?.status === 'pending' && (
                 <Button size="sm" onClick={handleOrderFinalized}>
                   Approve Order
                 </Button>
