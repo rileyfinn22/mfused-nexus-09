@@ -90,7 +90,7 @@ export default function ProductionDetail() {
       .select('role')
       .eq('user_id', user.id);
 
-    const roles = data?.map(r => r.role) || [];
+    const roles = data?.map(r => r.role as string) || [];
     setIsVibeAdmin(roles.includes('vibe_admin'));
     setIsVendor(roles.includes('vendor'));
   };
@@ -124,7 +124,7 @@ export default function ProductionDetail() {
       setOrder(orderData);
 
       // Fetch stages
-      const { data: stagesData, error: stagesError } = await supabase
+      const { data: stagesData, error: stagesError } = await (supabase as any)
         .from('production_stages')
         .select(`
           id,
@@ -149,7 +149,7 @@ export default function ProductionDetail() {
         .order('sequence_order');
 
       if (stagesError) throw stagesError;
-      setStages(stagesData || []);
+      setStages((stagesData as any) || []);
 
       // If no stages exist and user is vibe admin, create them
       if ((!stagesData || stagesData.length === 0) && isVibeAdmin) {
@@ -176,7 +176,7 @@ export default function ProductionDetail() {
         status: 'pending'
       }));
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('production_stages')
         .insert(stagesToCreate);
 
@@ -198,7 +198,7 @@ export default function ProductionDetail() {
 
   const handleAssignVendor = async (stageId: string, vendorId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('production_stages')
         .update({ vendor_id: vendorId || null })
         .eq('id', stageId);
@@ -277,7 +277,7 @@ export default function ProductionDetail() {
         });
 
         // Update stage status
-        const { error: statusError } = await supabase
+        const { error: statusError } = await (supabase as any)
           .from('production_stages')
           .update({ status: newStatus })
           .eq('id', selectedStage.id);
@@ -286,7 +286,7 @@ export default function ProductionDetail() {
       }
 
       if (updates.length > 0) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('production_stage_updates')
           .insert(updates);
 
