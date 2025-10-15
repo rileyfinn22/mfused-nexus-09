@@ -2,11 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Package, Eye } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Loader2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface ProductionOrder {
@@ -15,20 +14,13 @@ interface ProductionOrder {
   customer_name: string;
   order_date: string;
   company_id: string;
+  po_number: string | null;
+  shipping_state: string;
+  total: number;
   companies: {
     name: string;
   };
-}
-
-interface ProductionStage {
-  id: string;
-  stage_name: string;
-  status: string;
-  vendor_id: string | null;
-  sequence_order: number;
-  vendors: {
-    name: string;
-  } | null;
+  production_progress?: number;
 }
 
 export default function Production() {
@@ -67,6 +59,9 @@ export default function Production() {
           customer_name,
           order_date,
           company_id,
+          po_number,
+          shipping_state,
+          total,
           companies (
             name
           )
@@ -75,7 +70,21 @@ export default function Production() {
         .order('order_date', { ascending: false });
 
       if (error) throw error;
-      setOrders(data || []);
+      
+      // Fetch production stages for each order to calculate progress
+      const ordersWithProgress = await Promise.all(
+        (data || []).map(async (order) => {
+          const { data: stages } = await supabase
+            .from('production_stages')
+            .select('status')
+            .eq('order_id', order.id);
+          
+          const progress = calculateProgress(stages || []);
+          return { ...order, production_progress: progress };
+        })
+      );
+      
+      setOrders(ordersWithProgress);
     } catch (error: any) {
       console.error('Error fetching production orders:', error);
       toast({
@@ -86,6 +95,12 @@ export default function Production() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const calculateProgress = (stages: any[]) => {
+    if (stages.length === 0) return 0;
+    const completedStages = stages.filter(s => s.status === 'completed').length;
+    return Math.round((completedStages / stages.length) * 100);
   };
 
   const filteredOrders = orders.filter(order =>
@@ -107,60 +122,78 @@ export default function Production() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-table-border pb-4">
           <div>
-            <h1 className="text-3xl font-bold">Production Tracking</h1>
-            <p className="text-muted-foreground">
-              Monitor orders in production and track stage progress
-            </p>
+            <h1 className="text-2xl font-semibold">Production Tracking</h1>
+            <p className="text-sm text-muted-foreground mt-1">Monitor orders in production and track stage progress</p>
           </div>
         </div>
 
-        <div className="flex gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search orders..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="max-w-md"
+            className="pl-10"
           />
         </div>
 
-        <div className="grid gap-4">
-          {filteredOrders.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Package className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No orders in production</p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredOrders.map((order) => (
-              <Card key={order.id} className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-xl">{order.order_number}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {order.customer_name}
-                        {isVibeAdmin && ` • ${order.companies.name}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Order Date: {new Date(order.order_date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/production/${order.id}`)}
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Stages
-                    </Button>
+        <div className="border border-table-border rounded">
+          <div className="bg-table-header border-b border-table-border">
+            <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="col-span-2">Order #</div>
+              {isVibeAdmin && <div className="col-span-2">Company</div>}
+              <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Customer</div>
+              <div className="col-span-1">PO #</div>
+              <div className="col-span-1">State</div>
+              <div className="col-span-1">Total</div>
+              <div className="col-span-2">Progress</div>
+              <div className="col-span-1">Order Date</div>
+            </div>
+          </div>
+          <div className="divide-y divide-table-border">
+            {loading ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                Loading orders...
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                No orders in production
+              </div>
+            ) : (
+              filteredOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                  onClick={() => navigate(`/orders/${order.id}`)}
+                >
+                  <div className="col-span-2 font-medium font-mono text-sm">{order.order_number}</div>
+                  {isVibeAdmin && (
+                    <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
+                  )}
+                  <div className={isVibeAdmin ? "col-span-2 text-sm" : "col-span-3 text-sm"}>{order.customer_name}</div>
+                  <div className="col-span-1 text-sm">{order.po_number || '-'}</div>
+                  <div className="col-span-1">
+                    <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                   </div>
-                </CardHeader>
-              </Card>
-            ))
-          )}
+                  <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
+                  <div className="col-span-2">
+                    <div className="flex items-center gap-2">
+                      <Progress value={order.production_progress || 0} className="h-2 flex-1" />
+                      <span className="text-xs font-medium text-muted-foreground w-8">
+                        {order.production_progress || 0}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="col-span-1 text-sm text-muted-foreground">
+                    {new Date(order.order_date).toLocaleDateString()}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </DashboardLayout>

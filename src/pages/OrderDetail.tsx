@@ -7,8 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
@@ -31,10 +33,15 @@ const OrderDetail = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedOrder, setEditedOrder] = useState<any>({});
   const [editedItems, setEditedItems] = useState<any[]>([]);
+  const [productionStages, setProductionStages] = useState<any[]>([]);
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [stageUpdates, setStageUpdates] = useState<{[key: string]: any[]}>({});
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
       fetchOrder();
+      fetchProductionStages();
+      fetchVendors();
     }
   }, [orderId]);
   const checkAdminStatus = async () => {
@@ -79,6 +86,112 @@ const OrderDetail = () => {
       }
     }
     setLoading(false);
+  };
+
+  const fetchProductionStages = async () => {
+    const { data, error } = await supabase
+      .from('production_stages')
+      .select('*, vendors(name)')
+      .eq('order_id', orderId)
+      .order('sequence_order');
+    
+    if (!error && data) {
+      setProductionStages(data);
+      
+      // Fetch updates for each stage
+      const updates: {[key: string]: any[]} = {};
+      for (const stage of data) {
+        const { data: stageUpdatesData } = await supabase
+          .from('production_stage_updates')
+          .select('*')
+          .eq('stage_id', stage.id)
+          .order('created_at', { ascending: false });
+        
+        if (stageUpdatesData) {
+          updates[stage.id] = stageUpdatesData;
+        }
+      }
+      setStageUpdates(updates);
+    }
+  };
+
+  const fetchVendors = async () => {
+    const { data, error } = await supabase
+      .from('vendors')
+      .select('*')
+      .eq('is_active', true)
+      .order('name');
+    
+    if (!error && data) {
+      setVendors(data);
+    }
+  };
+
+  const calculateProductionProgress = () => {
+    if (productionStages.length === 0) return 0;
+    const completedStages = productionStages.filter(s => s.status === 'completed').length;
+    return Math.round((completedStages / productionStages.length) * 100);
+  };
+
+  const handleStageStatusChange = async (stageId: string, newStatus: string) => {
+    if (!isVibeAdmin) return;
+
+    const { error } = await supabase
+      .from('production_stages')
+      .update({ status: newStatus })
+      .eq('id', stageId);
+
+    if (!error) {
+      // Log the status change
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('production_stage_updates')
+          .insert({
+            stage_id: stageId,
+            updated_by: user.id,
+            update_type: 'status_change',
+            previous_status: productionStages.find(s => s.id === stageId)?.status,
+            new_status: newStatus,
+          });
+      }
+
+      toast({
+        title: "Stage Updated",
+        description: "Production stage status has been updated"
+      });
+      fetchProductionStages();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to update stage status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAssignVendor = async (stageId: string, vendorId: string) => {
+    if (!isVibeAdmin) return;
+
+    const actualVendorId = vendorId === 'none' ? null : vendorId;
+    const { error } = await supabase
+      .from('production_stages')
+      .update({ vendor_id: actualVendorId })
+      .eq('id', stageId);
+
+    if (!error) {
+      toast({
+        title: "Vendor Assigned",
+        description: "Vendor has been assigned to the stage"
+      });
+      fetchProductionStages();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to assign vendor",
+        variant: "destructive"
+      });
+    }
   };
   const handleAddVibeNote = () => {
     if (!vibeNotes.trim() || !isAdmin) return;
@@ -807,6 +920,133 @@ const OrderDetail = () => {
                   </div>)}
             </div>
           </div>
+
+          {/* Production Stages Section */}
+          {order.status === 'in production' && (
+            <div className="border-t border-table-border bg-muted/30 p-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-semibold">Production Stages</h2>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-muted-foreground">Overall Progress:</span>
+                  <div className="flex items-center gap-2 w-48">
+                    <Progress value={calculateProductionProgress()} className="h-2 flex-1" />
+                    <span className="text-sm font-semibold">{calculateProductionProgress()}%</span>
+                  </div>
+                </div>
+              </div>
+
+              {productionStages.length === 0 ? (
+                <div className="text-center py-8 p-4 bg-background rounded-lg border border-table-border">
+                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No production stages have been set up for this order yet.</p>
+                  {isVibeAdmin && (
+                    <p className="text-xs text-muted-foreground mt-2">Go to production detail view to initialize stages.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {productionStages.map((stage, index) => (
+                    <div key={stage.id} className="p-4 bg-background rounded-lg border border-table-border">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                            stage.status === 'completed' ? 'bg-green-500 text-white' :
+                            stage.status === 'in_progress' ? 'bg-blue-500 text-white' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <div>
+                            <h3 className="font-medium">{stage.stage_name}</h3>
+                            <p className="text-xs text-muted-foreground">
+                              {stage.vendors?.name ? `Vendor: ${stage.vendors.name}` : 'No vendor assigned'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={
+                            stage.status === 'completed' ? 'bg-green-500' :
+                            stage.status === 'in_progress' ? 'bg-blue-500' :
+                            'bg-muted-foreground'
+                          }>
+                            {stage.status.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {isVibeAdmin && (
+                        <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-table-border">
+                          <div>
+                            <Label className="text-xs">Status</Label>
+                            <Select
+                              value={stage.status}
+                              onValueChange={(value) => handleStageStatusChange(stage.id, value)}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Assign Vendor</Label>
+                            <Select
+                              value={stage.vendor_id || "none"}
+                              onValueChange={(value) => handleAssignVendor(stage.id, value)}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No vendor</SelectItem>
+                                {vendors.map((vendor) => (
+                                  <SelectItem key={vendor.id} value={vendor.id}>
+                                    {vendor.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Stage Updates */}
+                      {stageUpdates[stage.id] && stageUpdates[stage.id].length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-table-border">
+                          <p className="text-xs font-medium mb-2">Recent Updates:</p>
+                          <div className="space-y-2">
+                            {stageUpdates[stage.id].slice(0, 2).map((update, idx) => (
+                              <div key={idx} className="text-xs p-2 bg-muted/50 rounded">
+                                <div className="flex justify-between items-start mb-1">
+                                  <span className="font-medium capitalize">{update.update_type.replace('_', ' ')}</span>
+                                  <span className="text-muted-foreground">
+                                    {new Date(update.created_at).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                {update.note_text && <p className="text-muted-foreground">{update.note_text}</p>}
+                                {update.previous_status && update.new_status && (
+                                  <p className="text-muted-foreground">
+                                    Status changed: {update.previous_status} → {update.new_status}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>;
