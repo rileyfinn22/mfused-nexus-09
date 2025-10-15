@@ -200,6 +200,11 @@ const OrderDetail = () => {
       .eq('id', orderId);
 
     if (!error) {
+      // If moving to production, automatically create invoice and mark as vibe processed
+      if (newStatus === 'in production' && isVibeAdmin) {
+        await handleVibeProcessed();
+      }
+      
       toast({
         title: "Status Updated",
         description: `Order status changed to ${newStatus}`
