@@ -195,9 +195,10 @@ export default function ProductionDetail() {
 
   const handleAssignVendor = async (stageId: string, vendorId: string) => {
     try {
+      const actualVendorId = vendorId === 'none' ? null : vendorId;
       const { error } = await (supabase as any)
         .from('production_stages')
-        .update({ vendor_id: vendorId || null })
+        .update({ vendor_id: actualVendorId })
         .eq('id', stageId);
 
       if (error) throw error;
@@ -480,14 +481,14 @@ export default function ProductionDetail() {
                     <div className="mb-4">
                       <Label>Assign Vendor</Label>
                       <Select
-                        value={stage.vendor_id || ""}
+                        value={stage.vendor_id || "none"}
                         onValueChange={(value) => handleAssignVendor(stage.id, value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select vendor" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No vendor</SelectItem>
+                          <SelectItem value="none">No vendor</SelectItem>
                           {vendors.map((vendor) => (
                             <SelectItem key={vendor.id} value={vendor.id}>
                               {vendor.name}
