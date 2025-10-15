@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Download, FileText, Edit, Trash2 } from "lucide-react";
@@ -29,6 +30,8 @@ const InvoiceDetail = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedItems, setEditedItems] = useState<any[]>([]);
+  const [inventoryAllocations, setInventoryAllocations] = useState<any[]>([]);
+  const [relatedInvoices, setRelatedInvoices] = useState<any[]>([]);
 
   useEffect(() => {
     checkAdminStatus();
@@ -91,6 +94,32 @@ const InvoiceDetail = () => {
 
     if (vendorPOData) {
       setVendorPOs(vendorPOData);
+    }
+
+    // Fetch inventory allocations for this invoice
+    const { data: allocationsData } = await supabase
+      .from('inventory_allocations')
+      .select(`
+        *,
+        order_items(name, sku),
+        inventory(state, available)
+      `)
+      .eq('invoice_id', invoiceId);
+    
+    if (allocationsData) {
+      setInventoryAllocations(allocationsData);
+    }
+
+    // Fetch related invoices for the same order
+    const { data: relatedData } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('order_id', invoiceData.order_id)
+      .neq('id', invoiceId)
+      .order('shipment_number');
+    
+    if (relatedData) {
+      setRelatedInvoices(relatedData);
     }
 
     setLoading(false);
@@ -291,6 +320,25 @@ const InvoiceDetail = () => {
             <div className="flex justify-between items-start">
               <div>
                 <h1 className="text-3xl font-bold mb-2">{invoice.invoice_number}</h1>
+                {invoice.shipment_number && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md font-mono text-sm">
+                      Shipment #{invoice.shipment_number}
+                    </span>
+                    <span className={`px-3 py-1 rounded-md text-sm font-medium ${
+                      invoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
+                      invoice.invoice_type === 'final' ? 'bg-green-500 text-white' :
+                      'bg-purple-500 text-white'
+                    }`}>
+                      {invoice.invoice_type?.toUpperCase() || 'FULL'}
+                    </span>
+                    {invoice.billed_percentage && (
+                      <span className="text-sm text-muted-foreground">
+                        ({invoice.billed_percentage.toFixed(1)}% of order)
+                      </span>
+                    )}
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground">
                   Order: {order?.order_number || 'N/A'}
                 </p>
@@ -532,6 +580,92 @@ const InvoiceDetail = () => {
                   <span>{profitMargin}%</span>
                 </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Inventory Allocations - For Admin View */}
+      {isVibeAdmin && inventoryAllocations.length > 0 && (
+        <Card className="shadow-lg">
+          <CardContent className="p-8">
+            <h2 className="text-lg font-semibold mb-4">Inventory Allocations</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Inventory pulled for this shipment from various locations
+            </p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Location (State)</TableHead>
+                  <TableHead className="text-right">Qty Allocated</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Allocated Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {inventoryAllocations.map((allocation: any) => (
+                  <TableRow key={allocation.id}>
+                    <TableCell className="font-medium">{allocation.order_items?.name}</TableCell>
+                    <TableCell className="font-mono text-xs">{allocation.order_items?.sku}</TableCell>
+                    <TableCell>{allocation.inventory?.state}</TableCell>
+                    <TableCell className="text-right font-semibold">{allocation.quantity_allocated}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        allocation.status === 'shipped' ? 'bg-green-500/10 text-green-600' :
+                        allocation.status === 'picked' ? 'bg-blue-500/10 text-blue-600' :
+                        'bg-gray-500/10 text-gray-600'
+                      }`}>
+                        {allocation.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(allocation.allocated_at).toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Related Invoices - For Multiple Shipments */}
+      {relatedInvoices.length > 0 && (
+        <Card className="shadow-lg">
+          <CardContent className="p-8">
+            <h2 className="text-lg font-semibold mb-4">Other Shipments for This Order</h2>
+            <div className="space-y-3">
+              {relatedInvoices.map((relInvoice: any) => (
+                <div 
+                  key={relInvoice.id}
+                  className="p-4 bg-muted/30 rounded-lg border border-table-border hover:border-primary/40 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/invoices/${relInvoice.id}`)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md font-mono text-sm">
+                        Shipment #{relInvoice.shipment_number}
+                      </span>
+                      <span className="font-mono text-sm">{relInvoice.invoice_number}</span>
+                      <span className={`px-3 py-1 rounded-md text-xs font-medium ${
+                        relInvoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
+                        relInvoice.invoice_type === 'final' ? 'bg-green-500 text-white' :
+                        'bg-purple-500 text-white'
+                      }`}>
+                        {relInvoice.invoice_type?.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">{formatCurrency(Number(relInvoice.total))}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(relInvoice.invoice_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

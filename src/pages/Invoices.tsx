@@ -69,6 +69,15 @@ const Invoices = () => {
     setLoading(false);
   };
 
+  const getInvoiceTypeColor = (type: string) => {
+    switch (type) {
+      case 'partial': return 'bg-blue-500 text-white';
+      case 'final': return 'bg-green-500 text-white';
+      case 'full': return 'bg-purple-500 text-white';
+      default: return 'bg-gray-500 text-white';
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'paid': return 'text-success';
@@ -187,7 +196,8 @@ const Invoices = () => {
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
-            <div className="col-span-2">Type</div>
+            <div className="col-span-1">Shipment</div>
+            <div className="col-span-1">Type</div>
             <div className="col-span-2">Amount</div>
             <div className="col-span-1">PO Number</div>
             <div className="col-span-2">Due Date</div>
@@ -216,17 +226,23 @@ const Invoices = () => {
                   key={invoice.id} 
                   className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
                 >
-                  <div className="col-span-2 font-medium font-mono text-sm">{invoice.invoice_number}</div>
                   <div className="col-span-2">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">Billing</span>
-                    </div>
+                    <div className="font-medium font-mono text-sm">{invoice.invoice_number}</div>
                     {invoice.orders?.order_number && (
                       <div className="text-xs text-muted-foreground">
-                        {invoice.orders.order_number}
+                        Order: {invoice.orders.order_number}
                       </div>
                     )}
+                  </div>
+                  <div className="col-span-1">
+                    <Badge variant="secondary" className="text-xs">
+                      #{invoice.shipment_number || 1}
+                    </Badge>
+                  </div>
+                  <div className="col-span-1">
+                    <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>
+                      {(invoice.invoice_type || 'full').charAt(0).toUpperCase() + (invoice.invoice_type || 'full').slice(1)}
+                    </Badge>
                   </div>
                   <div className="col-span-2 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
                   <div className="col-span-1 text-sm">{invoice.orders?.po_number || 'N/A'}</div>

@@ -15,6 +15,7 @@ import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Cir
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
+import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
 const OrderDetail = () => {
   const {
     orderId
@@ -43,12 +44,15 @@ const OrderDetail = () => {
   const [stageNotes, setStageNotes] = useState<{[key: string]: string}>({});
   const [stageImages, setStageImages] = useState<{[key: string]: File | null}>({});
   const [updatingStages, setUpdatingStages] = useState<{[key: string]: boolean}>({});
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [showShipmentDialog, setShowShipmentDialog] = useState(false);
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
       fetchOrder();
       fetchProductionStages();
       fetchVendors();
+      fetchInvoices();
     }
   }, [orderId]);
   const checkAdminStatus = async () => {
@@ -149,6 +153,18 @@ const OrderDetail = () => {
     
     if (!error && data) {
       setVendors(data);
+    }
+  };
+
+  const fetchInvoices = async () => {
+    const { data } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('shipment_number');
+    
+    if (data) {
+      setInvoices(data);
     }
   };
 
@@ -912,6 +928,59 @@ const OrderDetail = () => {
                 )}
               </div>
             )}
+
+            {/* Shipments & Invoices Section */}
+            {isVibeAdmin && (
+              <div className="mt-8 p-6 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Shipments & Invoices</h3>
+                  <Button onClick={() => setShowShipmentDialog(true)} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Shipment Invoice
+                  </Button>
+                </div>
+                
+                {invoices.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No shipment invoices created yet. Create your first one to start billing.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {invoices.map((invoice) => (
+                      <div key={invoice.id} className="p-4 bg-background rounded-lg border border-table-border hover:border-primary/40 transition-colors cursor-pointer" onClick={() => navigate(`/invoices/${invoice.id}`)}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <Badge variant="secondary" className="font-mono">
+                              Shipment #{invoice.shipment_number}
+                            </Badge>
+                            <span className="font-mono text-sm">{invoice.invoice_number}</span>
+                            <Badge className={
+                              invoice.invoice_type === 'partial' ? 'bg-blue-500' :
+                              invoice.invoice_type === 'final' ? 'bg-green-500' :
+                              'bg-purple-500'
+                            }>
+                              {invoice.invoice_type}
+                            </Badge>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">${Number(invoice.total).toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">{invoice.billed_percentage?.toFixed(1)}% of order</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <CreateShipmentInvoiceDialog
+              open={showShipmentDialog}
+              onOpenChange={setShowShipmentDialog}
+              order={order}
+              onSuccess={() => {
+                fetchInvoices();
+                fetchOrder();
+              }}
+            />
 
             {/* Terms and Conditions */}
             <div className="mt-8 p-6 bg-muted/30 rounded-lg border border-table-border">

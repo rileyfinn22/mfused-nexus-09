@@ -199,8 +199,67 @@ export type Database = {
           },
         ]
       }
+      inventory_allocations: {
+        Row: {
+          allocated_at: string
+          allocated_by: string | null
+          created_at: string
+          id: string
+          inventory_id: string
+          invoice_id: string
+          order_item_id: string
+          quantity_allocated: number
+          status: string
+        }
+        Insert: {
+          allocated_at?: string
+          allocated_by?: string | null
+          created_at?: string
+          id?: string
+          inventory_id: string
+          invoice_id: string
+          order_item_id: string
+          quantity_allocated: number
+          status?: string
+        }
+        Update: {
+          allocated_at?: string
+          allocated_by?: string | null
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          invoice_id?: string
+          order_item_id?: string
+          quantity_allocated?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_allocations_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_allocations_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_allocations_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
+          billed_percentage: number | null
           company_id: string
           created_at: string
           created_by: string | null
@@ -208,8 +267,11 @@ export type Database = {
           id: string
           invoice_date: string
           invoice_number: string
+          invoice_type: string | null
           notes: string | null
           order_id: string
+          shipment_number: number | null
+          shipping_cost: number | null
           status: string
           subtotal: number
           tax: number
@@ -217,6 +279,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billed_percentage?: number | null
           company_id: string
           created_at?: string
           created_by?: string | null
@@ -224,8 +287,11 @@ export type Database = {
           id?: string
           invoice_date?: string
           invoice_number: string
+          invoice_type?: string | null
           notes?: string | null
           order_id: string
+          shipment_number?: number | null
+          shipping_cost?: number | null
           status?: string
           subtotal?: number
           tax?: number
@@ -233,6 +299,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billed_percentage?: number | null
           company_id?: string
           created_at?: string
           created_by?: string | null
@@ -240,8 +307,11 @@ export type Database = {
           id?: string
           invoice_date?: string
           invoice_number?: string
+          invoice_type?: string | null
           notes?: string | null
           order_id?: string
+          shipment_number?: number | null
+          shipping_cost?: number | null
           status?: string
           subtotal?: number
           tax?: number
