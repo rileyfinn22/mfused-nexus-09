@@ -40,11 +40,9 @@ const OrderDetail = () => {
   const [isVendor, setIsVendor] = useState(false);
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
-  const [selectedStageForUpdate, setSelectedStageForUpdate] = useState<any | null>(null);
-  const [updateNote, setUpdateNote] = useState("");
-  const [updateImage, setUpdateImage] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [stageNotes, setStageNotes] = useState<{[key: string]: string}>({});
+  const [stageImages, setStageImages] = useState<{[key: string]: File | null}>({});
+  const [updatingStages, setUpdatingStages] = useState<{[key: string]: boolean}>({});
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -177,37 +175,78 @@ const OrderDetail = () => {
       }
     }
 
-    const { error } = await supabase
-      .from('production_stages')
-      .update({ status: newStatus })
-      .eq('id', stageId);
-
-    if (!error) {
-      // Log the status change
+    try {
+      setUpdatingStages(prev => ({ ...prev, [stageId]: true }));
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('production_stage_updates')
-          .insert({
-            stage_id: stageId,
-            updated_by: user.id,
-            update_type: 'status_change',
-            previous_status: productionStages.find(s => s.id === stageId)?.status,
-            new_status: newStatus,
-          });
+      if (!user) throw new Error("Not authenticated");
+
+      let imageUrl = null;
+
+      // Upload image if provided
+      if (stageImages[stageId]) {
+        const fileExt = stageImages[stageId]!.name.split('.').pop();
+        const fileName = `${stageId}-${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('production-images')
+          .upload(fileName, stageImages[stageId]!);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('production-images')
+          .getPublicUrl(fileName);
+
+        imageUrl = publicUrl;
       }
+
+      // Update stage status
+      const { error } = await supabase
+        .from('production_stages')
+        .update({ status: newStatus })
+        .eq('id', stageId);
+
+      if (error) throw error;
+
+      // Create updates
+      const updates = [];
+
+      // Status change update
+      updates.push({
+        stage_id: stageId,
+        updated_by: user.id,
+        update_type: 'status_change',
+        previous_status: productionStages.find(s => s.id === stageId)?.status,
+        new_status: newStatus,
+        note_text: stageNotes[stageId] || null,
+        image_url: imageUrl,
+      });
+
+      if (updates.length > 0) {
+        const { error: updateError } = await supabase
+          .from('production_stage_updates')
+          .insert(updates);
+
+        if (updateError) throw updateError;
+      }
+
+      // Clear note and image for this stage
+      setStageNotes(prev => ({ ...prev, [stageId]: "" }));
+      setStageImages(prev => ({ ...prev, [stageId]: null }));
 
       toast({
         title: "Stage Updated",
-        description: "Production stage status has been updated"
+        description: "Production stage has been updated successfully"
       });
       fetchProductionStages();
-    } else {
+    } catch (error: any) {
+      console.error('Error updating stage:', error);
       toast({
         title: "Error",
-        description: "Failed to update stage status",
+        description: "Failed to update stage",
         variant: "destructive"
       });
+    } finally {
+      setUpdatingStages(prev => ({ ...prev, [stageId]: false }));
     }
   };
 
@@ -235,98 +274,6 @@ const OrderDetail = () => {
     }
   };
 
-  const handleOpenUpdateDialog = (stage: any) => {
-    setSelectedStageForUpdate(stage);
-    setUpdateNote("");
-    setUpdateImage(null);
-    setUpdateDialogOpen(true);
-  };
-
-  const handleAddStageUpdate = async () => {
-    if (!selectedStageForUpdate) return;
-    if (!updateNote && !updateImage) {
-      toast({
-        title: "Error",
-        description: "Please add a note or image",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setUploading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      let imageUrl = null;
-
-      // Upload image if provided
-      if (updateImage) {
-        const fileExt = updateImage.name.split('.').pop();
-        const fileName = `${selectedStageForUpdate.id}-${Date.now()}.${fileExt}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('production-images')
-          .upload(fileName, updateImage);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('production-images')
-          .getPublicUrl(fileName);
-
-        imageUrl = publicUrl;
-      }
-
-      // Create updates
-      const updates = [];
-
-      if (updateNote) {
-        updates.push({
-          stage_id: selectedStageForUpdate.id,
-          updated_by: user.id,
-          update_type: 'note',
-          note_text: updateNote,
-        });
-      }
-
-      if (imageUrl) {
-        updates.push({
-          stage_id: selectedStageForUpdate.id,
-          updated_by: user.id,
-          update_type: 'image',
-          image_url: imageUrl,
-        });
-      }
-
-      if (updates.length > 0) {
-        const { error } = await supabase
-          .from('production_stage_updates')
-          .insert(updates);
-
-        if (error) throw error;
-      }
-
-      toast({
-        title: "Success",
-        description: "Stage update added successfully",
-      });
-
-      setUpdateDialogOpen(false);
-      setUpdateNote("");
-      setUpdateImage(null);
-      setSelectedStageForUpdate(null);
-      await fetchProductionStages();
-    } catch (error: any) {
-      console.error('Error adding update:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add stage update",
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
   const handleAddVibeNote = () => {
     if (!vibeNotes.trim() || !isAdmin) return;
     toast({
@@ -1101,7 +1048,6 @@ const OrderDetail = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-2">
                           <Badge className={
                             stage.status === 'completed' ? 'bg-green-500' :
                             stage.status === 'in_progress' ? 'bg-blue-500' :
@@ -1109,59 +1055,98 @@ const OrderDetail = () => {
                           }>
                             {stage.status.replace('_', ' ')}
                           </Badge>
-                          {(isVibeAdmin || (isVendor && stage.vendor_id === vendorId)) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenUpdateDialog(stage)}
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              Add Update
-                            </Button>
-                          )}
-                        </div>
                         </div>
                       </div>
 
                       {(isVibeAdmin || (isVendor && stage.vendor_id === vendorId)) && (
-                        <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-table-border">
-                          <div>
-                            <Label className="text-xs">Status</Label>
-                            <Select
-                              value={stage.status}
-                              onValueChange={(value) => handleStageStatusChange(stage.id, value)}
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="in_progress">In Progress</SelectItem>
-                                <SelectItem value="completed">Completed</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          {isVibeAdmin && (
+                        <div className="space-y-3 mt-3 pt-3 border-t border-table-border">
+                          <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <Label className="text-xs">Assign Vendor</Label>
+                              <Label className="text-xs">Status</Label>
                               <Select
-                                value={stage.vendor_id || "none"}
-                                onValueChange={(value) => handleAssignVendor(stage.id, value)}
+                                value={stage.status}
+                                onValueChange={(value) => {
+                                  setProductionStages(prev => 
+                                    prev.map(s => s.id === stage.id ? { ...s, status: value } : s)
+                                  );
+                                }}
                               >
                                 <SelectTrigger className="h-8 text-xs">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="none">No vendor</SelectItem>
-                                  {vendors.map((vendor) => (
-                                    <SelectItem key={vendor.id} value={vendor.id}>
-                                      {vendor.name}
-                                    </SelectItem>
-                                  ))}
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="in_progress">In Progress</SelectItem>
+                                  <SelectItem value="completed">Completed</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
-                          )}
+                            {isVibeAdmin && (
+                              <div>
+                                <Label className="text-xs">Assign Vendor</Label>
+                                <Select
+                                  value={stage.vendor_id || "none"}
+                                  onValueChange={(value) => handleAssignVendor(stage.id, value)}
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">No vendor</SelectItem>
+                                    {vendors.map((vendor) => (
+                                      <SelectItem key={vendor.id} value={vendor.id}>
+                                        {vendor.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor={`note-${stage.id}`} className="text-xs">Add Note (Optional)</Label>
+                            <Textarea
+                              id={`note-${stage.id}`}
+                              value={stageNotes[stage.id] || ""}
+                              onChange={(e) => setStageNotes(prev => ({ ...prev, [stage.id]: e.target.value }))}
+                              placeholder="Add notes about the update..."
+                              rows={2}
+                              className="mt-1 text-xs"
+                            />
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor={`image-${stage.id}`} className="text-xs">Add Image (Optional)</Label>
+                            <Input
+                              id={`image-${stage.id}`}
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => setStageImages(prev => ({ ...prev, [stage.id]: e.target.files?.[0] || null }))}
+                              className="mt-1 text-xs"
+                            />
+                            {stageImages[stage.id] && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Selected: {stageImages[stage.id]!.name}
+                              </p>
+                            )}
+                          </div>
+                          
+                          <Button
+                            size="sm"
+                            onClick={() => handleStageStatusChange(stage.id, stage.status)}
+                            disabled={updatingStages[stage.id]}
+                            className="w-full"
+                          >
+                            {updatingStages[stage.id] ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Updating...
+                              </>
+                            ) : (
+                              "Update Stage"
+                            )}
+                          </Button>
                         </div>
                       )}
 
@@ -1240,76 +1225,6 @@ const OrderDetail = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add Stage Update Dialog */}
-      <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              Add Update to {selectedStageForUpdate?.stage_name}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="note">Note</Label>
-              <Textarea
-                id="note"
-                value={updateNote}
-                onChange={(e) => setUpdateNote(e.target.value)}
-                placeholder="Add a note about the progress..."
-                rows={4}
-                className="mt-1"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="image">Upload Image</Label>
-              <Input
-                id="image"
-                type="file"
-                accept="image/*"
-                onChange={(e) => setUpdateImage(e.target.files?.[0] || null)}
-                className="mt-1"
-              />
-              {updateImage && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Selected: {updateImage.name}
-                </p>
-              )}
-            </div>
-
-            <div className="flex gap-2 justify-end pt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setUpdateDialogOpen(false);
-                  setUpdateNote("");
-                  setUpdateImage(null);
-                  setSelectedStageForUpdate(null);
-                }}
-                disabled={uploading}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAddStageUpdate}
-                disabled={uploading || (!updateNote && !updateImage)}
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Update
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>;
 };
 export default OrderDetail;
