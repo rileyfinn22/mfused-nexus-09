@@ -636,6 +636,98 @@ export type Database = {
           },
         ]
       }
+      production_stage_updates: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string | null
+          new_status: string | null
+          note_text: string | null
+          previous_status: string | null
+          stage_id: string
+          update_type: string
+          updated_by: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          new_status?: string | null
+          note_text?: string | null
+          previous_status?: string | null
+          stage_id: string
+          update_type: string
+          updated_by: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          new_status?: string | null
+          note_text?: string | null
+          previous_status?: string | null
+          stage_id?: string
+          update_type?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_stage_updates_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "production_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_stages: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          sequence_order: number
+          stage_name: string
+          status: string
+          updated_at: string
+          vendor_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          sequence_order: number
+          stage_name: string
+          status?: string
+          updated_at?: string
+          vendor_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          sequence_order?: number
+          stage_name?: string
+          status?: string
+          updated_at?: string
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_stages_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_stages_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           cases_per_pallet: number | null
@@ -900,9 +992,11 @@ export type Database = {
           contact_phone: string | null
           created_at: string
           id: string
+          is_active: boolean
           name: string
           notes: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           company_id: string
@@ -911,9 +1005,11 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           name: string
           notes?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           company_id?: string
@@ -922,9 +1018,11 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           name?: string
           notes?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -958,7 +1056,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "customer" | "vibe_admin"
+      app_role: "admin" | "customer" | "vibe_admin" | "vendor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1086,7 +1184,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "customer", "vibe_admin"],
+      app_role: ["admin", "customer", "vibe_admin", "vendor"],
     },
   },
 } as const
