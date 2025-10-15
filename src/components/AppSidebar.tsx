@@ -7,7 +7,8 @@ import {
   Image, 
   Truck,
   FolderOpen,
-  Building2
+  Building2,
+  Factory
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -38,6 +39,7 @@ const customerNavigationItems = [
 const vibeAdminNavigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "All Orders", url: "/orders", icon: ClipboardList },
+  { title: "Production", url: "/production", icon: Factory },
   { title: "Pull & Ship", url: "/pull-ship", icon: Truck },
   { title: "Vendors", url: "/vendors", icon: Building2 },
   { title: "Vendor POs", url: "/vendor-pos", icon: FolderOpen },
