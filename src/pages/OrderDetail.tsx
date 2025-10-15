@@ -36,6 +36,8 @@ const OrderDetail = () => {
   const [productionStages, setProductionStages] = useState<any[]>([]);
   const [vendors, setVendors] = useState<any[]>([]);
   const [stageUpdates, setStageUpdates] = useState<{[key: string]: any[]}>({});
+  const [isVendor, setIsVendor] = useState(false);
+  const [vendorId, setVendorId] = useState<string | null>(null);
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -55,6 +57,17 @@ const OrderDetail = () => {
       const role = data?.role as string;
       setIsAdmin(role === 'admin' || role === 'vibe_admin');
       setIsVibeAdmin(role === 'vibe_admin');
+      setIsVendor(role === 'vendor');
+
+      if (role === 'vendor') {
+        const { data: vendorData } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        setVendorId(vendorData?.id || null);
+      }
     }
   };
   const fetchOrder = async () => {
@@ -89,11 +102,18 @@ const OrderDetail = () => {
   };
 
   const fetchProductionStages = async () => {
-    const { data, error } = await supabase
+    let stagesQuery = supabase
       .from('production_stages')
       .select('*, vendors(name)')
       .eq('order_id', orderId)
       .order('sequence_order');
+
+    // Vendors only see their assigned stages
+    if (isVendor && vendorId) {
+      stagesQuery = stagesQuery.eq('vendor_id', vendorId);
+    }
+
+    const { data, error } = await stagesQuery;
     
     if (!error && data) {
       setProductionStages(data);
@@ -134,7 +154,21 @@ const OrderDetail = () => {
   };
 
   const handleStageStatusChange = async (stageId: string, newStatus: string) => {
-    if (!isVibeAdmin) return;
+    // Both vendors and vibe admins can update stage status
+    if (!isVibeAdmin && !isVendor) return;
+
+    // Vendors can only update their own stages
+    if (isVendor) {
+      const stage = productionStages.find(s => s.id === stageId);
+      if (!stage || stage.vendor_id !== vendorId) {
+        toast({
+          title: "Error",
+          description: "You can only update your assigned stages",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
 
     const { error } = await supabase
       .from('production_stages')
@@ -977,7 +1011,7 @@ const OrderDetail = () => {
                         </div>
                       </div>
 
-                      {isVibeAdmin && (
+                      {(isVibeAdmin || (isVendor && stage.vendor_id === vendorId)) && (
                         <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-table-border">
                           <div>
                             <Label className="text-xs">Status</Label>
@@ -995,25 +1029,27 @@ const OrderDetail = () => {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div>
-                            <Label className="text-xs">Assign Vendor</Label>
-                            <Select
-                              value={stage.vendor_id || "none"}
-                              onValueChange={(value) => handleAssignVendor(stage.id, value)}
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No vendor</SelectItem>
-                                {vendors.map((vendor) => (
-                                  <SelectItem key={vendor.id} value={vendor.id}>
-                                    {vendor.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {isVibeAdmin && (
+                            <div>
+                              <Label className="text-xs">Assign Vendor</Label>
+                              <Select
+                                value={stage.vendor_id || "none"}
+                                onValueChange={(value) => handleAssignVendor(stage.id, value)}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No vendor</SelectItem>
+                                  {vendors.map((vendor) => (
+                                    <SelectItem key={vendor.id} value={vendor.id}>
+                                      {vendor.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1022,7 +1058,7 @@ const OrderDetail = () => {
                         <div className="mt-3 pt-3 border-t border-table-border">
                           <p className="text-xs font-medium mb-2">Recent Updates:</p>
                           <div className="space-y-2">
-                            {stageUpdates[stage.id].slice(0, 2).map((update, idx) => (
+                            {stageUpdates[stage.id].slice(0, 3).map((update, idx) => (
                               <div key={idx} className="text-xs p-2 bg-muted/50 rounded">
                                 <div className="flex justify-between items-start mb-1">
                                   <span className="font-medium capitalize">{update.update_type.replace('_', ' ')}</span>
@@ -1030,7 +1066,14 @@ const OrderDetail = () => {
                                     {new Date(update.created_at).toLocaleDateString()}
                                   </span>
                                 </div>
-                                {update.note_text && <p className="text-muted-foreground">{update.note_text}</p>}
+                                {update.note_text && <p className="text-muted-foreground mb-1">{update.note_text}</p>}
+                                {update.image_url && (
+                                  <img 
+                                    src={update.image_url} 
+                                    alt="Production update" 
+                                    className="w-full h-32 object-cover rounded border border-table-border mt-1"
+                                  />
+                                )}
                                 {update.previous_status && update.new_status && (
                                   <p className="text-muted-foreground">
                                     Status changed: {update.previous_status} → {update.new_status}

@@ -44,7 +44,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       // Get user's company
       const { data: userRole, error: roleError } = await supabase
         .from('user_roles')
-        .select('company_id')
+        .select('company_id, role')
         .eq('user_id', userId)
         .maybeSingle();
 
@@ -53,6 +53,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       if (roleError) {
         console.error('Error fetching user role:', roleError);
         return;
+      }
+
+      // If user is a vendor, get vendor name instead
+      if (userRole?.role === 'vendor') {
+        const { data: vendor } = await supabase
+          .from('vendors')
+          .select('name, company_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (vendor) {
+          setCompanyName(vendor.name);
+          return;
+        }
       }
 
       if (userRole?.company_id) {

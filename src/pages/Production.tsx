@@ -29,11 +29,18 @@ export default function Production() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [isVendor, setIsVendor] = useState(false);
+  const [vendorId, setVendorId] = useState<string | null>(null);
 
   useEffect(() => {
     checkRole();
-    fetchProductionOrders();
   }, []);
+
+  useEffect(() => {
+    if (vendorId !== null || isVibeAdmin) {
+      fetchProductionOrders();
+    }
+  }, [vendorId, isVibeAdmin]);
 
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -43,42 +50,100 @@ export default function Production() {
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .eq('role', 'vibe_admin')
       .maybeSingle();
 
-    setIsVibeAdmin(!!data);
+    const role = data?.role as string;
+    setIsVibeAdmin(role === 'vibe_admin');
+    setIsVendor(role === 'vendor');
+
+    if (role === 'vendor') {
+      // Get vendor ID for this user
+      const { data: vendorData } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      setVendorId(vendorData?.id || null);
+    }
   };
 
   const fetchProductionOrders = async () => {
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          order_number,
-          customer_name,
-          order_date,
-          company_id,
-          po_number,
-          shipping_state,
-          total,
-          companies (
-            name
-          )
-        `)
-        .eq('status', 'in production')
-        .order('order_date', { ascending: false });
+      let ordersData: any[] = [];
 
-      if (error) throw error;
+      if (isVendor && vendorId) {
+        // Vendors: get orders where they have assigned stages
+        const { data: stages, error: stagesError } = await supabase
+          .from('production_stages')
+          .select('order_id')
+          .eq('vendor_id', vendorId);
+
+        if (stagesError) throw stagesError;
+
+        const orderIds = [...new Set(stages?.map(s => s.order_id) || [])];
+        
+        if (orderIds.length > 0) {
+          const { data, error } = await supabase
+            .from('orders')
+            .select(`
+              id,
+              order_number,
+              customer_name,
+              order_date,
+              company_id,
+              po_number,
+              shipping_state,
+              total,
+              companies (
+                name
+              )
+            `)
+            .in('id', orderIds)
+            .eq('status', 'in production')
+            .order('order_date', { ascending: false });
+
+          if (error) throw error;
+          ordersData = data || [];
+        }
+      } else {
+        // Admin/Customer: get all production orders
+        const { data, error } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            customer_name,
+            order_date,
+            company_id,
+            po_number,
+            shipping_state,
+            total,
+            companies (
+              name
+            )
+          `)
+          .eq('status', 'in production')
+          .order('order_date', { ascending: false });
+
+        if (error) throw error;
+        ordersData = data || [];
+      }
       
       // Fetch production stages for each order to calculate progress
       const ordersWithProgress = await Promise.all(
-        (data || []).map(async (order) => {
-          const { data: stages } = await supabase
+        ordersData.map(async (order) => {
+          let stagesQuery = supabase
             .from('production_stages')
             .select('status')
             .eq('order_id', order.id);
-          
+
+          // Vendors only see their assigned stages
+          if (isVendor && vendorId) {
+            stagesQuery = stagesQuery.eq('vendor_id', vendorId);
+          }
+
+          const { data: stages } = await stagesQuery;
           const progress = calculateProgress(stages || []);
           return { ...order, production_progress: progress };
         })
@@ -124,8 +189,14 @@ export default function Production() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-table-border pb-4">
           <div>
-            <h1 className="text-2xl font-semibold">Production Tracking</h1>
-            <p className="text-sm text-muted-foreground mt-1">Monitor orders in production and track stage progress</p>
+            <h1 className="text-2xl font-semibold">
+              {isVendor ? "My Production Orders" : "Production Tracking"}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isVendor 
+                ? "View and update your assigned production stages" 
+                : "Monitor orders in production and track stage progress"}
+            </p>
           </div>
         </div>
 

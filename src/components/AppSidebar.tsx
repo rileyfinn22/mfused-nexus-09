@@ -50,6 +50,10 @@ const vibeAdminNavigationItems = [
   { title: "Artwork", url: "/artwork", icon: Image },
 ];
 
+const vendorNavigationItems = [
+  { title: "My Production", url: "/production", icon: Factory },
+];
+
 interface AppSidebarProps {
   companyName: string;
 }
@@ -59,12 +63,13 @@ export function AppSidebar({ companyName }: AppSidebarProps) {
   const location = useLocation();
   const currentPath = location.pathname;
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [isVendor, setIsVendor] = useState(false);
 
   useEffect(() => {
-    checkVibeAdmin();
+    checkRole();
   }, []);
 
-  const checkVibeAdmin = async () => {
+  const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data } = await supabase
@@ -72,11 +77,15 @@ export function AppSidebar({ companyName }: AppSidebarProps) {
         .select('role')
         .eq('user_id', user.id)
         .single();
-      setIsVibeAdmin((data?.role as string) === 'vibe_admin');
+      const role = data?.role as string;
+      setIsVibeAdmin(role === 'vibe_admin');
+      setIsVendor(role === 'vendor');
     }
   };
 
-  const navigationItems = isVibeAdmin ? vibeAdminNavigationItems : customerNavigationItems;
+  const navigationItems = isVendor 
+    ? vendorNavigationItems 
+    : (isVibeAdmin ? vibeAdminNavigationItems : customerNavigationItems);
 
   const isActive = (path: string) => currentPath === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
