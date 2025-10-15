@@ -218,13 +218,15 @@ const OrderDetail = () => {
     if (!isAdmin) return;
 
     try {
-      // Update each order item with new unit prices
+      // Update each order item with new unit prices and quantities
       for (const item of editedItems) {
         const newTotal = Number(item.quantity) * Number(item.unit_price);
         
         const { error } = await supabase
           .from('order_items')
           .update({
+            quantity: item.quantity,
+            shipped_quantity: item.quantity,
             unit_price: item.unit_price,
             total: newTotal
           })
@@ -285,6 +287,18 @@ const OrderDetail = () => {
       items.map(item =>
         item.id === itemId
           ? { ...item, unit_price: newPrice, total: Number(item.quantity) * newPrice }
+          : item
+      )
+    );
+  };
+
+  const handleItemQuantityChange = (itemId: string, newQuantity: number) => {
+    if (newQuantity < 0) return;
+    
+    setEditedItems(items =>
+      items.map(item =>
+        item.id === itemId
+          ? { ...item, quantity: newQuantity, total: newQuantity * Number(item.unit_price) }
           : item
       )
     );
@@ -613,7 +627,7 @@ const OrderDetail = () => {
               Items
               {isEditMode && (
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  (Editing Mode - Adjust prices as needed)
+                  (Editing Mode - Adjust quantities and prices as needed)
                 </span>
               )}
             </h2>
@@ -640,7 +654,19 @@ const OrderDetail = () => {
                       <TableCell className="font-mono text-xs">{item.item_id || '-'}</TableCell>
                       <TableCell className="font-medium">{item.name}</TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-xs">{item.description || '-'}</TableCell>
-                      <TableCell className="text-right">{item.quantity}</TableCell>
+                      <TableCell className="text-right">
+                        {isEditMode ? (
+                          <Input
+                            type="number"
+                            min="0"
+                            value={item.quantity}
+                            onChange={(e) => handleItemQuantityChange(item.id, parseInt(e.target.value) || 0)}
+                            className="w-24 text-right"
+                          />
+                        ) : (
+                          item.quantity
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         {isEditMode ? (
                           <Input
