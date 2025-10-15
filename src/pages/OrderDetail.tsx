@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
@@ -40,6 +40,11 @@ const OrderDetail = () => {
   const [isVendor, setIsVendor] = useState(false);
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [selectedStageForUpdate, setSelectedStageForUpdate] = useState<any | null>(null);
+  const [updateNote, setUpdateNote] = useState("");
+  const [updateImage, setUpdateImage] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -227,6 +232,99 @@ const OrderDetail = () => {
         description: "Failed to assign vendor",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleOpenUpdateDialog = (stage: any) => {
+    setSelectedStageForUpdate(stage);
+    setUpdateNote("");
+    setUpdateImage(null);
+    setUpdateDialogOpen(true);
+  };
+
+  const handleAddStageUpdate = async () => {
+    if (!selectedStageForUpdate) return;
+    if (!updateNote && !updateImage) {
+      toast({
+        title: "Error",
+        description: "Please add a note or image",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      let imageUrl = null;
+
+      // Upload image if provided
+      if (updateImage) {
+        const fileExt = updateImage.name.split('.').pop();
+        const fileName = `${selectedStageForUpdate.id}-${Date.now()}.${fileExt}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('production-images')
+          .upload(fileName, updateImage);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('production-images')
+          .getPublicUrl(fileName);
+
+        imageUrl = publicUrl;
+      }
+
+      // Create updates
+      const updates = [];
+
+      if (updateNote) {
+        updates.push({
+          stage_id: selectedStageForUpdate.id,
+          updated_by: user.id,
+          update_type: 'note',
+          note_text: updateNote,
+        });
+      }
+
+      if (imageUrl) {
+        updates.push({
+          stage_id: selectedStageForUpdate.id,
+          updated_by: user.id,
+          update_type: 'image',
+          image_url: imageUrl,
+        });
+      }
+
+      if (updates.length > 0) {
+        const { error } = await supabase
+          .from('production_stage_updates')
+          .insert(updates);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Success",
+        description: "Stage update added successfully",
+      });
+
+      setUpdateDialogOpen(false);
+      setUpdateNote("");
+      setUpdateImage(null);
+      setSelectedStageForUpdate(null);
+      await fetchProductionStages();
+    } catch (error: any) {
+      console.error('Error adding update:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add stage update",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
     }
   };
   const handleAddVibeNote = () => {
@@ -1003,6 +1101,7 @@ const OrderDetail = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
                           <Badge className={
                             stage.status === 'completed' ? 'bg-green-500' :
                             stage.status === 'in_progress' ? 'bg-blue-500' :
@@ -1010,6 +1109,17 @@ const OrderDetail = () => {
                           }>
                             {stage.status.replace('_', ' ')}
                           </Badge>
+                          {(isVibeAdmin || (isVendor && stage.vendor_id === vendorId)) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenUpdateDialog(stage)}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add Update
+                            </Button>
+                          )}
+                        </div>
                         </div>
                       </div>
 
@@ -1126,6 +1236,77 @@ const OrderDetail = () => {
                 className="w-full h-auto rounded"
               />
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Stage Update Dialog */}
+      <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Add Update to {selectedStageForUpdate?.stage_name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="note">Note</Label>
+              <Textarea
+                id="note"
+                value={updateNote}
+                onChange={(e) => setUpdateNote(e.target.value)}
+                placeholder="Add a note about the progress..."
+                rows={4}
+                className="mt-1"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="image">Upload Image</Label>
+              <Input
+                id="image"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setUpdateImage(e.target.files?.[0] || null)}
+                className="mt-1"
+              />
+              {updateImage && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Selected: {updateImage.name}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setUpdateDialogOpen(false);
+                  setUpdateNote("");
+                  setUpdateImage(null);
+                  setSelectedStageForUpdate(null);
+                }}
+                disabled={uploading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddStageUpdate}
+                disabled={uploading || (!updateNote && !updateImage)}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Update
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
