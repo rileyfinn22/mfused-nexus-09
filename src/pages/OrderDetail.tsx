@@ -30,6 +30,7 @@ const OrderDetail = () => {
   const [vibeProcessed, setVibeProcessed] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedOrder, setEditedOrder] = useState<any>({});
+  const [editedItems, setEditedItems] = useState<any[]>([]);
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -58,6 +59,7 @@ const OrderDetail = () => {
     if (!error && data) {
       setOrder(data);
       setEditedOrder(data);
+      setEditedItems(data.order_items || []);
       setVibeProcessed(data.vibe_processed || false);
       setOrderFinalized(data.order_finalized || false);
       
@@ -215,41 +217,77 @@ const OrderDetail = () => {
   const handleSaveOrder = async () => {
     if (!isAdmin) return;
 
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        customer_name: editedOrder.customer_name,
-        customer_email: editedOrder.customer_email,
-        customer_phone: editedOrder.customer_phone,
-        shipping_name: editedOrder.shipping_name,
-        shipping_street: editedOrder.shipping_street,
-        shipping_city: editedOrder.shipping_city,
-        shipping_state: editedOrder.shipping_state,
-        shipping_zip: editedOrder.shipping_zip,
-        billing_name: editedOrder.billing_name,
-        billing_street: editedOrder.billing_street,
-        billing_city: editedOrder.billing_city,
-        billing_state: editedOrder.billing_state,
-        billing_zip: editedOrder.billing_zip,
-        po_number: editedOrder.po_number,
-        memo: editedOrder.memo
-      })
-      .eq('id', orderId);
+    try {
+      // Update each order item with new unit prices
+      for (const item of editedItems) {
+        const newTotal = Number(item.quantity) * Number(item.unit_price);
+        
+        const { error } = await supabase
+          .from('order_items')
+          .update({
+            unit_price: item.unit_price,
+            total: newTotal
+          })
+          .eq('id', item.id);
 
-    if (!error) {
+        if (error) throw error;
+      }
+
+      // Recalculate order totals
+      const newSubtotal = editedItems.reduce((sum, item) => 
+        sum + (Number(item.quantity) * Number(item.unit_price)), 0
+      );
+      const newTotal = newSubtotal + Number(editedOrder.tax || 0);
+
+      // Update order
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          customer_name: editedOrder.customer_name,
+          customer_email: editedOrder.customer_email,
+          customer_phone: editedOrder.customer_phone,
+          shipping_name: editedOrder.shipping_name,
+          shipping_street: editedOrder.shipping_street,
+          shipping_city: editedOrder.shipping_city,
+          shipping_state: editedOrder.shipping_state,
+          shipping_zip: editedOrder.shipping_zip,
+          billing_name: editedOrder.billing_name,
+          billing_street: editedOrder.billing_street,
+          billing_city: editedOrder.billing_city,
+          billing_state: editedOrder.billing_state,
+          billing_zip: editedOrder.billing_zip,
+          po_number: editedOrder.po_number,
+          memo: editedOrder.memo,
+          subtotal: newSubtotal,
+          total: newTotal
+        })
+        .eq('id', orderId);
+
+      if (orderError) throw orderError;
+
       toast({
         title: "Order Updated",
         description: "Order details saved successfully"
       });
       setIsEditMode(false);
       fetchOrder();
-    } else {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to update order",
+        description: error.message || "Failed to update order",
         variant: "destructive"
       });
     }
+  };
+
+  const handleItemPriceChange = (itemId: string, newPrice: number) => {
+    setEditedItems(items =>
+      items.map(item =>
+        item.id === itemId
+          ? { ...item, unit_price: newPrice, total: Number(item.quantity) * newPrice }
+          : item
+      )
+    );
   };
   const handleDownloadPackingList = () => {
     toast({
@@ -273,8 +311,13 @@ const OrderDetail = () => {
         <p className="text-muted-foreground">Order not found</p>
       </div>;
   }
-  const subtotal = order.subtotal || 0;
-  const total = order.total || 0;
+  const displayItems = isEditMode ? editedItems : (order.order_items || []);
+  const subtotal = isEditMode 
+    ? displayItems.reduce((sum: number, item: any) => sum + (Number(item.quantity) * Number(item.unit_price)), 0)
+    : (order.subtotal || 0);
+  const total = isEditMode
+    ? subtotal + Number(order.tax || 0)
+    : (order.total || 0);
   return <div className="max-w-7xl mx-auto">
       {/* Process Order Banner for Pending Orders */}
       {isVibeAdmin && (order.status === 'pending' || order.status === 'pending_pull') && (
@@ -310,6 +353,7 @@ const OrderDetail = () => {
                   <Button variant="outline" onClick={() => {
                     setIsEditMode(false);
                     setEditedOrder(order);
+                    setEditedItems(order.order_items || []);
                   }}>
                     Cancel
                   </Button>
@@ -565,7 +609,14 @@ const OrderDetail = () => {
 
           {/* Items Table - ERP Style */}
           <div className="p-8">
-            <h2 className="text-lg font-semibold mb-4">Items</h2>
+            <h2 className="text-lg font-semibold mb-4">
+              Items
+              {isEditMode && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  (Editing Mode - Adjust prices as needed)
+                </span>
+              )}
+            </h2>
             <div className="border border-table-border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
@@ -580,7 +631,7 @@ const OrderDetail = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {order.order_items?.map((item: any, index: number) => <TableRow key={index}>
+                  {displayItems.map((item: any, index: number) => <TableRow key={index}>
                       <TableCell>
                         <div className="w-12 h-12 bg-muted rounded border border-table-border flex items-center justify-center">
                           <Package className="h-6 w-6 text-muted-foreground" />
@@ -590,7 +641,20 @@ const OrderDetail = () => {
                       <TableCell className="font-medium">{item.name}</TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-xs">{item.description || '-'}</TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">${item.unit_price?.toFixed(3)}</TableCell>
+                      <TableCell className="text-right">
+                        {isEditMode ? (
+                          <Input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            value={item.unit_price}
+                            onChange={(e) => handleItemPriceChange(item.id, parseFloat(e.target.value) || 0)}
+                            className="w-28 text-right"
+                          />
+                        ) : (
+                          `$${item.unit_price?.toFixed(3)}`
+                        )}
+                      </TableCell>
                       <TableCell className="text-right font-medium">${item.total?.toFixed(3)}</TableCell>
                     </TableRow>)}
                 </TableBody>

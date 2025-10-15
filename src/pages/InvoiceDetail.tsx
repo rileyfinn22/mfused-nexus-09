@@ -127,6 +127,7 @@ const InvoiceDetail = () => {
           .from('order_items')
           .update({
             shipped_quantity: item.shipped_quantity,
+            unit_price: item.unit_price,
             total: newTotal
           })
           .eq('id', item.id);
@@ -164,7 +165,7 @@ const InvoiceDetail = () => {
 
       toast({
         title: "Success",
-        description: "Quantities and totals updated successfully"
+        description: "Prices and quantities updated successfully"
       });
 
       setIsEditMode(false);
@@ -173,10 +174,20 @@ const InvoiceDetail = () => {
       console.error('Save error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update quantities",
+        description: error.message || "Failed to update items",
         variant: "destructive"
       });
     }
+  };
+
+  const handlePriceChange = (itemId: string, newPrice: number) => {
+    setEditedItems(items =>
+      items.map(item =>
+        item.id === itemId
+          ? { ...item, unit_price: newPrice, total: Number(item.shipped_quantity) * newPrice }
+          : item
+      )
+    );
   };
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
@@ -253,7 +264,7 @@ const InvoiceDetail = () => {
                 <>
                   <Button variant="outline" onClick={() => setIsEditMode(true)}>
                     <Edit className="h-4 w-4 mr-2" />
-                    Edit Quantities
+                    Edit Items
                   </Button>
                   <Button variant="outline" onClick={() => navigate(`/orders/${invoice.order_id}`)}>
                     View Order
@@ -344,7 +355,7 @@ const InvoiceDetail = () => {
               Order Items
               {isEditMode && (
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  (Editing Mode - Adjust quantities as needed)
+                  (Editing Mode - Adjust quantities and prices as needed)
                 </span>
               )}
             </h2>
@@ -384,7 +395,20 @@ const InvoiceDetail = () => {
                         item.shipped_quantity
                       )}
                     </TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(item.unit_price))}</TableCell>
+                    <TableCell className="text-right">
+                      {isEditMode ? (
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.unit_price}
+                          onChange={(e) => handlePriceChange(item.id, parseFloat(e.target.value) || 0)}
+                          className="w-28 text-right"
+                        />
+                      ) : (
+                        formatCurrency(Number(item.unit_price))
+                      )}
+                    </TableCell>
                     <TableCell className="text-right font-semibold">
                       {formatCurrency(Number(item.shipped_quantity) * Number(item.unit_price))}
                     </TableCell>
