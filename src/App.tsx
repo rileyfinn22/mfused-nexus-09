@@ -25,6 +25,8 @@ import VendorPODetail from "./pages/VendorPODetail";
 import Production from "./pages/Production";
 import ProductionDetail from "./pages/ProductionDetail";
 import Login from "./pages/Login";
+import VendorSignup from "./pages/VendorSignup";
+
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +40,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/vendor-signup" element={<VendorSignup />} />
           <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
           <Route path="/products" element={<DashboardLayout><Products /></DashboardLayout>} />
           <Route path="/products/edit/:id" element={<DashboardLayout><EditProduct /></DashboardLayout>} />

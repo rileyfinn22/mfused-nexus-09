@@ -8,14 +8,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Edit, Search, Building2 } from "lucide-react";
+import { Plus, Edit, Search, Building2, Mail } from "lucide-react";
+import VendorInviteDialog from "@/components/VendorInviteDialog";
 
 const Vendors = () => {
   const [vendors, setVendors] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<any>(null);
+  const [selectedVendor, setSelectedVendor] = useState<{ id: string; name: string } | null>(null);
+  const [companyId, setCompanyId] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "",
     contact_name: "",
@@ -26,7 +30,23 @@ const Vendors = () => {
 
   useEffect(() => {
     fetchVendors();
+    fetchCompanyId();
   }, []);
+
+  const fetchCompanyId = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (data) {
+        setCompanyId(data.company_id);
+      }
+    }
+  };
 
   const fetchVendors = async () => {
     setLoading(true);
@@ -98,6 +118,11 @@ const Vendors = () => {
       notes: vendor.notes || ""
     });
     setDialogOpen(true);
+  };
+
+  const handleInvite = (vendor: any) => {
+    setSelectedVendor({ id: vendor.id, name: vendor.name });
+    setInviteDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
@@ -237,9 +262,14 @@ const Vendors = () => {
                     </TableCell>
                     <TableCell>{vendor.contact_phone || '-'}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(vendor)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(vendor)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleInvite(vendor)} title="Invite vendor to portal">
+                          <Mail className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -248,6 +278,16 @@ const Vendors = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {selectedVendor && (
+        <VendorInviteDialog
+          open={inviteDialogOpen}
+          onOpenChange={setInviteDialogOpen}
+          vendorId={selectedVendor.id}
+          vendorName={selectedVendor.name}
+          companyId={companyId}
+        />
+      )}
     </div>
   );
 };

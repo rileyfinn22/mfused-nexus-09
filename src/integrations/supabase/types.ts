@@ -870,6 +870,60 @@ export type Database = {
           },
         ]
       }
+      vendor_invitations: {
+        Row: {
+          accepted_at: string | null
+          company_id: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invitation_token: string
+          invited_by: string
+          status: string
+          vendor_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          company_id: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invitation_token?: string
+          invited_by: string
+          status?: string
+          vendor_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          company_id?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invitation_token?: string
+          invited_by?: string
+          status?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_invitations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_invitations_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_po_items: {
         Row: {
           created_at: string
@@ -1039,6 +1093,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_vendor_invitation: {
+        Args: { invitation_token_param: string; user_email: string }
+        Returns: Json
+      }
       get_user_company: {
         Args: { _user_id: string }
         Returns: string
@@ -1056,7 +1114,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "customer" | "vibe_admin" | "vendor"
+      app_role: "admin" | "customer" | "vibe_admin" | "vendor" | "company"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1184,7 +1242,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "customer", "vibe_admin", "vendor"],
+      app_role: ["admin", "customer", "vibe_admin", "vendor", "company"],
     },
   },
 } as const
