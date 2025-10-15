@@ -18,6 +18,7 @@ import Artwork from "./pages/Artwork";
 import RejectedArchive from "./pages/RejectedArchive";
 import PullShip from "./pages/PullShip";
 import PullShipOrderDetail from "./pages/PullShipOrderDetail";
+import PullShipOrders from "./pages/PullShipOrders";
 import MyPOs from "./pages/MyPOs";
 import Vendors from "./pages/Vendors";
 import VendorPOs from "./pages/VendorPOs";
@@ -54,7 +55,8 @@ const App = () => (
           <Route path="/artwork" element={<DashboardLayout><Artwork /></DashboardLayout>} />
           <Route path="/artwork/rejected" element={<DashboardLayout><RejectedArchive /></DashboardLayout>} />
           <Route path="/pull-ship" element={<DashboardLayout><PullShip /></DashboardLayout>} />
-          <Route path="/pull-ship/:orderId" element={<DashboardLayout><PullShipOrderDetail /></DashboardLayout>} />
+          <Route path="/pull-ship-orders" element={<DashboardLayout><PullShipOrders /></DashboardLayout>} />
+          <Route path="/pull-ship-orders/:orderId" element={<DashboardLayout><PullShipOrderDetail /></DashboardLayout>} />
           <Route path="/my-pos" element={<DashboardLayout><MyPOs /></DashboardLayout>} />
           <Route path="/vendors" element={<DashboardLayout><Vendors /></DashboardLayout>} />
           <Route path="/vendor-pos" element={<DashboardLayout><VendorPOs /></DashboardLayout>} />

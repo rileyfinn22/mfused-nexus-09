@@ -421,6 +421,7 @@ export type Database = {
           customer_name: string
           customer_phone: string | null
           due_date: string | null
+          fulfillment_vendor_id: string | null
           id: string
           memo: string | null
           order_date: string
@@ -431,6 +432,7 @@ export type Database = {
           order_type: string
           po_number: string | null
           shipping_city: string
+          shipping_cost: number | null
           shipping_name: string
           shipping_state: string
           shipping_street: string
@@ -442,6 +444,9 @@ export type Database = {
           total: number
           tracking_number: string | null
           updated_at: string
+          vibe_approved: boolean
+          vibe_approved_at: string | null
+          vibe_approved_by: string | null
           vibe_processed: boolean
           vibe_processed_at: string | null
           vibe_processed_by: string | null
@@ -458,6 +463,7 @@ export type Database = {
           customer_name: string
           customer_phone?: string | null
           due_date?: string | null
+          fulfillment_vendor_id?: string | null
           id?: string
           memo?: string | null
           order_date?: string
@@ -468,6 +474,7 @@ export type Database = {
           order_type?: string
           po_number?: string | null
           shipping_city: string
+          shipping_cost?: number | null
           shipping_name: string
           shipping_state: string
           shipping_street: string
@@ -479,6 +486,9 @@ export type Database = {
           total?: number
           tracking_number?: string | null
           updated_at?: string
+          vibe_approved?: boolean
+          vibe_approved_at?: string | null
+          vibe_approved_by?: string | null
           vibe_processed?: boolean
           vibe_processed_at?: string | null
           vibe_processed_by?: string | null
@@ -495,6 +505,7 @@ export type Database = {
           customer_name?: string
           customer_phone?: string | null
           due_date?: string | null
+          fulfillment_vendor_id?: string | null
           id?: string
           memo?: string | null
           order_date?: string
@@ -505,6 +516,7 @@ export type Database = {
           order_type?: string
           po_number?: string | null
           shipping_city?: string
+          shipping_cost?: number | null
           shipping_name?: string
           shipping_state?: string
           shipping_street?: string
@@ -516,6 +528,9 @@ export type Database = {
           total?: number
           tracking_number?: string | null
           updated_at?: string
+          vibe_approved?: boolean
+          vibe_approved_at?: string | null
+          vibe_approved_by?: string | null
           vibe_processed?: boolean
           vibe_processed_at?: string | null
           vibe_processed_by?: string | null
@@ -526,6 +541,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_fulfillment_vendor_id_fkey"
+            columns: ["fulfillment_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]
@@ -1047,6 +1069,7 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          is_fulfillment_vendor: boolean
           name: string
           notes: string | null
           updated_at: string
@@ -1060,6 +1083,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_fulfillment_vendor?: boolean
           name: string
           notes?: string | null
           updated_at?: string
@@ -1073,6 +1097,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_fulfillment_vendor?: boolean
           name?: string
           notes?: string | null
           updated_at?: string

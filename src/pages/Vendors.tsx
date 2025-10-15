@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -261,6 +262,17 @@ const Vendors = () => {
                       </div>
                     </TableCell>
                     <TableCell>{vendor.contact_phone || '-'}</TableCell>
+                    <TableCell className="max-w-xs truncate text-sm">{vendor.notes || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant={vendor.is_fulfillment_vendor ? "default" : "outline"}>
+                        {vendor.is_fulfillment_vendor ? 'Fulfillment' : 'Production'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={vendor.is_active ? "default" : "secondary"}>
+                        {vendor.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(vendor)}>

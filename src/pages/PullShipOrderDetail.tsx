@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Download, Package, CheckCircle2, Circle, Truck, FileText, Send } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,9 +26,12 @@ const PullShipOrderDetail = () => {
   const [isShipped, setIsShipped] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedOrder, setEditedOrder] = useState<any>(null);
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [approving, setApproving] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
+    fetchVendors();
     if (orderId) {
       fetchOrder();
     }
@@ -41,7 +45,20 @@ const PullShipOrderDetail = () => {
         .select('role')
         .eq('user_id', user.id)
         .single();
-      setIsAdmin(data?.role === 'admin');
+      setIsAdmin(data?.role === 'vibe_admin');
+    }
+  };
+
+  const fetchVendors = async () => {
+    const { data, error } = await supabase
+      .from('vendors')
+      .select('*')
+      .eq('is_fulfillment_vendor', true)
+      .eq('is_active', true)
+      .order('name');
+    
+    if (!error && data) {
+      setVendors(data);
     }
   };
 
@@ -49,7 +66,11 @@ const PullShipOrderDetail = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*)')
+      .select(`
+        *,
+        order_items(*),
+        vendors!orders_fulfillment_vendor_id_fkey(name, contact_email)
+      `)
       .eq('id', orderId)
       .eq('order_type', 'pull_ship')
       .single();
@@ -324,15 +345,130 @@ const PullShipOrderDetail = () => {
     setIsEditing(false);
   };
 
+  const handleApproveOrder = async () => {
+    if (!editedOrder.fulfillment_vendor_id) {
+      toast({
+        title: "Missing Fulfillment Vendor",
+        description: "Please select a fulfillment vendor before approving",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setApproving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Save any edits and mark as approved
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          ...editedOrder,
+          vibe_approved: true,
+          vibe_approved_by: user.id,
+          vibe_approved_at: new Date().toISOString(),
+          status: 'picked'
+        })
+        .eq('id', orderId);
+
+      if (updateError) throw updateError;
+
+      // Update order items
+      if (editedOrder.order_items) {
+        for (const item of editedOrder.order_items) {
+          const { error: itemError } = await supabase
+            .from('order_items')
+            .update({
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              total: item.total
+            })
+            .eq('id', item.id);
+
+          if (itemError) throw itemError;
+        }
+      }
+
+      // Generate and send packing list to fulfillment vendor
+      const items = editedOrder.order_items.map((item: any) => ({
+        sku: item.sku,
+        itemId: item.item_id,
+        quantity: item.quantity
+      }));
+
+      const packingListDoc = generatePackingListPDF();
+      const packingListPdf = packingListDoc.output('dataurlstring');
+
+      const invoiceDoc = generateInvoicePDF();
+      const invoicePdf = invoiceDoc.output('dataurlstring');
+
+      // Send to fulfillment vendor
+      const { error: emailError } = await supabase.functions.invoke('send-packing-list', {
+        body: {
+          packingListPdf,
+          invoicePdf,
+          orderData: editedOrder,
+          recipientEmail: editedOrder.vendors?.contact_email
+        }
+      });
+
+      if (emailError) {
+        console.error('Error sending email:', emailError);
+        toast({
+          title: "Order Approved",
+          description: "Order approved but email notification failed. Please send manually.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Order Approved & Sent",
+          description: "Order has been approved and sent to the fulfillment vendor",
+        });
+      }
+
+      setIsEditing(false);
+      fetchOrder();
+    } catch (error: any) {
+      console.error('Error approving order:', error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setApproving(false);
+    }
+  };
+
   const updateOrderField = (field: string, value: any) => {
     setEditedOrder((prev: any) => ({ ...prev, [field]: value }));
   };
 
-  const updateItemField = (itemIndex: number, field: string, value: any) => {
+  const updateItemField = (itemId: string, field: string, value: any) => {
     setEditedOrder((prev: any) => {
-      const newItems = [...prev.order_items];
-      newItems[itemIndex] = { ...newItems[itemIndex], [field]: value };
-      return { ...prev, order_items: newItems };
+      const newItems = prev.order_items.map((item: any) => {
+        if (item.id === itemId) {
+          const updated = { ...item, [field]: value };
+          // Recalculate total if quantity or unit_price changed
+          if (field === 'quantity' || field === 'unit_price') {
+            updated.total = (updated.quantity || 0) * (updated.unit_price || 0);
+          }
+          return updated;
+        }
+        return item;
+      });
+      
+      // Recalculate order totals
+      const subtotal = newItems.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
+      const shipping = prev.shipping_cost || 0;
+      
+      return { 
+        ...prev, 
+        order_items: newItems,
+        subtotal: subtotal,
+        total: subtotal + shipping
+      };
     });
   };
 
@@ -356,12 +492,17 @@ const PullShipOrderDetail = () => {
     <div className="max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/pull-ship")}>
+        <Button variant="ghost" size="sm" onClick={() => navigate("/pull-ship-orders")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Pull & Ship
+          Back to Pull & Ship Orders
         </Button>
         <div className="flex gap-3">
-          {isEditing ? (
+          {isAdmin && !order?.vibe_approved && !isEditing && (
+            <Button onClick={() => setIsEditing(true)}>
+              Review & Edit
+            </Button>
+          )}
+          {isEditing && (
             <>
               <Button variant="outline" onClick={handleCancelEdit}>
                 Cancel
@@ -369,12 +510,22 @@ const PullShipOrderDetail = () => {
               <Button onClick={handleSaveOrder}>
                 Save Changes
               </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => setIsEditing(true)} disabled={isPicked}>
-                Edit Order
+              <Button 
+                onClick={handleApproveOrder}
+                disabled={approving}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {approving ? "Approving..." : "Approve & Send to Fulfillment"}
               </Button>
+            </>
+          )}
+          {isAdmin && order?.vibe_approved && (
+            <Badge className="bg-green-500 text-white px-4 py-2">
+              Approved {order.vibe_approved_at && `on ${new Date(order.vibe_approved_at).toLocaleDateString()}`}
+            </Badge>
+          )}
+          {!isEditing && (
+            <>
               <Button variant="outline" onClick={handleDownloadPackingList}>
                 <Download className="h-4 w-4 mr-2" />
                 Download Packing List
@@ -494,7 +645,7 @@ const PullShipOrderDetail = () => {
             </div>
 
             {/* Customer & Address */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-background/80 backdrop-blur rounded-lg p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-background/80 backdrop-blur rounded-lg p-6">
               <div>
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Customer</h3>
                 {isEditing ? (
@@ -566,6 +717,40 @@ const PullShipOrderDetail = () => {
                   </>
                 )}
               </div>
+              <div>
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Fulfillment</h3>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Fulfillment Vendor</Label>
+                    <select
+                      value={editedOrder?.fulfillment_vendor_id || ''}
+                      onChange={(e) => updateOrderField('fulfillment_vendor_id', e.target.value)}
+                      className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                    >
+                      <option value="">Select vendor...</option>
+                      {vendors.map((vendor) => (
+                        <option key={vendor.id} value={vendor.id}>
+                          {vendor.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Label className="text-xs mt-3">Shipping Cost</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editedOrder?.shipping_cost || 0}
+                      onChange={(e) => updateOrderField('shipping_cost', parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-medium">{order.vendors?.name || 'Not assigned'}</p>
+                    <p className="text-sm text-muted-foreground mt-2">Shipping Cost:</p>
+                    <p className="text-sm font-medium">${order.shipping_cost?.toFixed(2) || '0.00'}</p>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -586,13 +771,13 @@ const PullShipOrderDetail = () => {
                 </TableHeader>
                 <TableBody>
                   {(isEditing ? editedOrder?.order_items : order.order_items)?.map((item: any, index: number) => (
-                    <TableRow key={index}>
+                    <TableRow key={item.id || index}>
                       <TableCell className="font-mono text-xs">{item.item_id || '-'}</TableCell>
                       <TableCell className="font-mono text-sm">
                         {isEditing ? (
                           <Input
                             value={item.sku}
-                            onChange={(e) => updateItemField(index, 'sku', e.target.value)}
+                            onChange={(e) => updateItemField(item.id, 'sku', e.target.value)}
                             className="h-8"
                           />
                         ) : (
@@ -603,7 +788,7 @@ const PullShipOrderDetail = () => {
                         {isEditing ? (
                           <Input
                             value={item.name}
-                            onChange={(e) => updateItemField(index, 'name', e.target.value)}
+                            onChange={(e) => updateItemField(item.id, 'name', e.target.value)}
                             className="h-8"
                           />
                         ) : (
@@ -615,7 +800,7 @@ const PullShipOrderDetail = () => {
                           <Input
                             type="number"
                             value={item.quantity}
-                            onChange={(e) => updateItemField(index, 'quantity', parseInt(e.target.value) || 0)}
+                            onChange={(e) => updateItemField(item.id, 'quantity', parseInt(e.target.value) || 0)}
                             className="h-8 w-24"
                           />
                         ) : (
@@ -628,7 +813,7 @@ const PullShipOrderDetail = () => {
                             type="number"
                             step="0.01"
                             value={item.unit_price}
-                            onChange={(e) => updateItemField(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                            onChange={(e) => updateItemField(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
                             className="h-8 w-24"
                           />
                         ) : (
