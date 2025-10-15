@@ -30,6 +30,7 @@ const customerNavigationItems = [
   { title: "Products", url: "/products", icon: Package },
   { title: "Inventory", url: "/inventory", icon: Archive },
   { title: "Orders", url: "/orders", icon: ClipboardList },
+  { title: "Production", url: "/production", icon: Factory },
   { title: "Invoices", url: "/invoices", icon: FileText },
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Pull & Ship", url: "/pull-ship", icon: Truck },

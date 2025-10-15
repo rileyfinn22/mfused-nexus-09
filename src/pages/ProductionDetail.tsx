@@ -68,6 +68,7 @@ export default function ProductionDetail() {
   const [loading, setLoading] = useState(true);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
+  const [isCustomer, setIsCustomer] = useState(false);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [selectedStage, setSelectedStage] = useState<ProductionStage | null>(null);
   const [updateNote, setUpdateNote] = useState("");
@@ -93,6 +94,7 @@ export default function ProductionDetail() {
     const roles = data?.map(r => r.role as string) || [];
     setIsVibeAdmin(roles.includes('vibe_admin'));
     setIsVendor(roles.includes('vendor'));
+    setIsCustomer(roles.includes('admin') || roles.includes('customer'));
   };
 
   const fetchVendors = async () => {
@@ -150,11 +152,6 @@ export default function ProductionDetail() {
 
       if (stagesError) throw stagesError;
       setStages((stagesData as any) || []);
-
-      // If no stages exist and user is vibe admin, create them
-      if ((!stagesData || stagesData.length === 0) && isVibeAdmin) {
-        await initializeStages();
-      }
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast({
@@ -229,8 +226,8 @@ export default function ProductionDetail() {
 
       let imageUrl = null;
 
-      // Upload image if provided
-      if (updateImage) {
+      // Upload image if provided (only for admins and vendors)
+      if (updateImage && (isVibeAdmin || isVendor)) {
         const fileExt = updateImage.name.split('.').pop();
         const fileName = `${selectedStage.id}-${Date.now()}.${fileExt}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -258,7 +255,7 @@ export default function ProductionDetail() {
         });
       }
 
-      if (imageUrl) {
+      if (imageUrl && (isVibeAdmin || isVendor)) {
         updates.push({
           stage_id: selectedStage.id,
           updated_by: user.id,
@@ -267,7 +264,7 @@ export default function ProductionDetail() {
         });
       }
 
-      if (newStatus && newStatus !== selectedStage.status) {
+      if (newStatus && newStatus !== selectedStage.status && (isVibeAdmin || isVendor)) {
         updates.push({
           stage_id: selectedStage.id,
           updated_by: user.id,
@@ -372,14 +369,16 @@ export default function ProductionDetail() {
           {isVibeAdmin && <p className="text-sm text-muted-foreground">{order.companies.name}</p>}
         </div>
 
-        {stages.length === 0 && isVibeAdmin && (
+        {stages.length === 0 && (
           <Card>
             <CardContent className="py-8 text-center">
               <p className="text-muted-foreground mb-4">No production stages initialized</p>
-              <Button onClick={initializeStages}>
-                <Plus className="h-4 w-4 mr-2" />
-                Initialize Stages
-              </Button>
+              {isVibeAdmin && (
+                <Button onClick={initializeStages}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Initialize Stages
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
@@ -413,27 +412,31 @@ export default function ProductionDetail() {
                       }}>
                         <DialogTrigger asChild>
                           <Button size="sm" variant="outline">
-                            Update
+                            {isCustomer ? 'Add Note' : 'Update'}
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-2xl">
                           <DialogHeader>
-                            <DialogTitle>Update {stageDef.label} Stage</DialogTitle>
+                            <DialogTitle>
+                              {isCustomer ? 'Add Note to' : 'Update'} {stageDef.label} Stage
+                            </DialogTitle>
                           </DialogHeader>
                           <div className="space-y-4">
-                            <div>
-                              <Label>Status</Label>
-                              <Select value={newStatus} onValueChange={setNewStatus}>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="in_progress">In Progress</SelectItem>
-                                  <SelectItem value="completed">Completed</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
+                            {(isVibeAdmin || isVendor) && (
+                              <div>
+                                <Label>Status</Label>
+                                <Select value={newStatus} onValueChange={setNewStatus}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="in_progress">In Progress</SelectItem>
+                                    <SelectItem value="completed">Completed</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
                             <div>
                               <Label>Add Note</Label>
                               <Textarea
@@ -443,14 +446,16 @@ export default function ProductionDetail() {
                                 rows={3}
                               />
                             </div>
-                            <div>
-                              <Label>Upload Image</Label>
-                              <Input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => setUpdateImage(e.target.files?.[0] || null)}
-                              />
-                            </div>
+                            {(isVibeAdmin || isVendor) && (
+                              <div>
+                                <Label>Upload Image</Label>
+                                <Input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => setUpdateImage(e.target.files?.[0] || null)}
+                                />
+                              </div>
+                            )}
                             <Button onClick={handleUpdateStage} disabled={uploading} className="w-full">
                               {uploading ? (
                                 <>
@@ -460,7 +465,7 @@ export default function ProductionDetail() {
                               ) : (
                                 <>
                                   <Upload className="h-4 w-4 mr-2" />
-                                  Save Update
+                                  {isCustomer ? 'Add Note' : 'Save Update'}
                                 </>
                               )}
                             </Button>
