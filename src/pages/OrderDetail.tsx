@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
@@ -38,6 +39,7 @@ const OrderDetail = () => {
   const [stageUpdates, setStageUpdates] = useState<{[key: string]: any[]}>({});
   const [isVendor, setIsVendor] = useState(false);
   const [vendorId, setVendorId] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -1068,11 +1070,19 @@ const OrderDetail = () => {
                                 </div>
                                 {update.note_text && <p className="text-muted-foreground mb-1">{update.note_text}</p>}
                                 {update.image_url && (
-                                  <img 
-                                    src={update.image_url} 
-                                    alt="Production update" 
-                                    className="w-full h-32 object-cover rounded border border-table-border mt-1"
-                                  />
+                                  <div 
+                                    className="relative group cursor-pointer"
+                                    onClick={() => setPreviewImage(update.image_url)}
+                                  >
+                                    <img 
+                                      src={update.image_url} 
+                                      alt="Production update" 
+                                      className="w-full h-32 object-cover rounded border border-table-border mt-1 transition-opacity group-hover:opacity-80"
+                                    />
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded">
+                                      <span className="text-white text-sm font-medium">Click to preview</span>
+                                    </div>
+                                  </div>
                                 )}
                                 {update.previous_status && update.new_status && (
                                   <p className="text-muted-foreground">
@@ -1092,6 +1102,33 @@ const OrderDetail = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Image Preview Dialog */}
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <DialogTitle>Production Image</DialogTitle>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setPreviewImage(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="p-4 overflow-auto">
+            {previewImage && (
+              <img 
+                src={previewImage} 
+                alt="Production preview" 
+                className="w-full h-auto rounded"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>;
 };
 export default OrderDetail;
