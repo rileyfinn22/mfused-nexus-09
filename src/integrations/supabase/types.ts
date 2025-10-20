@@ -88,6 +88,57 @@ export type Database = {
         }
         Relationships: []
       }
+      company_settings: {
+        Row: {
+          address_city: string | null
+          address_state: string | null
+          address_street: string | null
+          address_zip: string | null
+          company_id: string
+          created_at: string
+          id: string
+          logo_url: string | null
+          notification_preferences: Json | null
+          primary_contact_email: string | null
+          primary_contact_name: string | null
+          primary_contact_phone: string | null
+          session_timeout_minutes: number | null
+          updated_at: string
+        }
+        Insert: {
+          address_city?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          notification_preferences?: Json | null
+          primary_contact_email?: string | null
+          primary_contact_name?: string | null
+          primary_contact_phone?: string | null
+          session_timeout_minutes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          address_city?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          notification_preferences?: Json | null
+          primary_contact_email?: string | null
+          primary_contact_name?: string | null
+          primary_contact_phone?: string | null
+          session_timeout_minutes?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customer_addresses: {
         Row: {
           address_type: string
@@ -334,6 +385,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          link: string | null
+          message: string
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          message: string
+          read?: boolean
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          message?: string
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       order_items: {
         Row: {

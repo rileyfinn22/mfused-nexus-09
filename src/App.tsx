@@ -27,7 +27,10 @@ import Production from "./pages/Production";
 import ProductionDetail from "./pages/ProductionDetail";
 import Login from "./pages/Login";
 import VendorSignup from "./pages/VendorSignup";
-
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import Settings from "./pages/Settings";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +44,8 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/vendor-signup" element={<VendorSignup />} />
           <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
           <Route path="/products" element={<DashboardLayout><Products /></DashboardLayout>} />
@@ -63,6 +68,8 @@ const App = () => (
           <Route path="/vendor-pos/:poId" element={<DashboardLayout><VendorPODetail /></DashboardLayout>} />
           <Route path="/production" element={<DashboardLayout><Production /></DashboardLayout>} />
           <Route path="/production/:orderId" element={<DashboardLayout><ProductionDetail /></DashboardLayout>} />
+          <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
+          <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

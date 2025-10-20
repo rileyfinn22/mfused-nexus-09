@@ -20,12 +20,14 @@ import {
   ArrowUpDown,
   AlertTriangle,
   Trash2,
-  Edit
+  Edit,
+  Download
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadInventoryDialog } from "@/components/UploadInventoryDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { exportToCSV } from "@/lib/exportUtils";
 
 interface InventoryItem {
   id: string;
@@ -271,6 +273,14 @@ const Inventory = () => {
           <p className="text-sm text-muted-foreground mt-1">Track stock levels, monitor thresholds, and manage production pipeline</p>
         </div>
         <div className="flex gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportToCSV(filteredAndSortedData, 'inventory')}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
           {isAdmin && selectedItems.size > 0 && (
             <Button
               variant="destructive"

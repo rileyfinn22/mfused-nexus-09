@@ -18,6 +18,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import { exportToCSV } from "@/lib/exportUtils";
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -131,9 +132,15 @@ const Invoices = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="border-b border-table-border pb-4">
-        <h1 className="text-2xl font-semibold">Invoices & Billing</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage invoices, track payments, and monitor due dates</p>
+      <div className="border-b border-table-border pb-4 flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-semibold">Invoices & Billing</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage invoices, track payments, and monitor due dates</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => exportToCSV(filteredInvoices, 'invoices')}>
+          <Download className="h-4 w-4 mr-2" />
+          Export CSV
+        </Button>
       </div>
 
       {/* Summary Row */}

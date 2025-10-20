@@ -24,8 +24,10 @@ import {
   Trash2,
   Circle,
   Truck,
-  Factory
+  Factory,
+  Download
 } from "lucide-react";
+import { exportToCSV } from "@/lib/exportUtils";
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -217,6 +219,10 @@ const Orders = () => {
           <p className="text-sm text-muted-foreground mt-1">Track order progress and production pipeline</p>
         </div>
         <div className="flex gap-3">
+          <Button size="sm" variant="outline" onClick={() => exportToCSV(filteredOrders, 'orders')}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
           <Button size="sm" className="bg-primary text-primary-foreground" onClick={() => navigate("/orders/create")}>
             <Plus className="h-4 w-4 mr-2" />
             New Order

@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
+import { NotificationsDropdown } from "./NotificationsDropdown";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -157,10 +158,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="flex-1">
               <h1 className="text-lg font-semibold">{companyName} Portal</h1>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
+            <div className="flex items-center gap-2">
+              <NotificationsDropdown />
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
           </header>
           <main className="flex-1 p-6">
             {children}
