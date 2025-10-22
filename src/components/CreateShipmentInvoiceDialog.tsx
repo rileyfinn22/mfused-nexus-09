@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle, Info, Package } from "lucide-react";
 
 interface CreateShipmentInvoiceDialogProps {
   open: boolean;
@@ -86,13 +88,14 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       if (!user) throw new Error("Not authenticated");
 
       // Validate that at least one item has quantity > 0
-      const hasQuantity = Object.values(shipmentQuantities).some(q => q > 0);
-      if (!hasQuantity) {
+      const totalToShip = Object.values(shipmentQuantities).reduce((sum, q) => sum + q, 0);
+      if (totalToShip === 0) {
         toast({
           title: "Error",
           description: "Please specify quantities to ship",
           variant: "destructive"
         });
+        setLoading(false);
         return;
       }
 
@@ -232,19 +235,80 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Invoice Type Preview */}
+          {(() => {
+            const totalToShip = Object.values(shipmentQuantities).reduce((sum, q) => sum + q, 0);
+            const totalOrdered = order.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
+            const totalPreviouslyShipped = order.order_items?.reduce((sum: number, item: any) => sum + (item.shipped_quantity || 0), 0) || 0;
+            const afterThisShipment = totalPreviouslyShipped + totalToShip;
+            const willBeFinal = afterThisShipment >= totalOrdered;
+            const nextShipmentNumber = existingInvoices.length + 1;
+            const projectedPercentage = totalOrdered > 0 ? ((afterThisShipment / totalOrdered) * 100).toFixed(1) : '0.0';
+            
+            // Check for inventory issues
+            const inventoryIssues = order.order_items?.filter((item: any) => {
+              const availInv = availableInventory[item.sku]?.reduce((sum, inv) => sum + inv.available, 0) || 0;
+              const remaining = item.quantity - (item.shipped_quantity || 0);
+              const toShip = shipmentQuantities[item.id] || 0;
+              return toShip > 0 && availInv < toShip;
+            }) || [];
+
+            return (
+              <>
+                {inventoryIssues.length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="ml-2">
+                      <strong>Insufficient Inventory:</strong> {inventoryIssues.length} item(s) don't have enough inventory. 
+                      The system will allocate what's available.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {totalToShip > 0 && (
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="ml-2">
+                      <div className="space-y-1">
+                        <p>
+                          <strong>This will be a {willBeFinal ? 'FINAL' : 'PARTIAL'} invoice</strong> 
+                          {' '}(Shipment #{nextShipmentNumber})
+                        </p>
+                        <p className="text-sm">
+                          Shipping {totalToShip} units ({projectedPercentage}% of order total) • 
+                          {' '}{afterThisShipment} of {totalOrdered} units will be shipped after this shipment
+                        </p>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </>
+            );
+          })()}
+
           {existingInvoices.length > 0 && (
-            <div className="bg-muted p-3 rounded-lg text-sm">
-              <p className="font-medium">Previous Shipments: {existingInvoices.length}</p>
-              {existingInvoices.map(inv => (
-                <p key={inv.id} className="text-muted-foreground">
-                  Shipment {inv.shipment_number}: {inv.invoice_number} - {inv.invoice_type}
-                </p>
-              ))}
+            <div className="bg-muted p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Package className="h-4 w-4" />
+                <p className="font-medium text-sm">Previous Shipments ({existingInvoices.length})</p>
+              </div>
+              <div className="space-y-1">
+                {existingInvoices.map(inv => (
+                  <div key={inv.id} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Shipment {inv.shipment_number}: {inv.invoice_number}
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {inv.invoice_type}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           <div>
-            <Label>Items to Ship</Label>
+            <Label className="text-base">Items to Ship</Label>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -282,9 +346,18 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                         />
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className={availInv < remaining ? "text-destructive font-medium" : ""}>
-                          {availInv}
-                        </span>
+                        <div className="flex items-center justify-end gap-1">
+                          {availInv < (shipmentQuantities[item.id] || 0) && (
+                            <AlertTriangle className="h-3 w-3 text-destructive" />
+                          )}
+                          <span className={
+                            availInv < (shipmentQuantities[item.id] || 0) ? "text-destructive font-bold" :
+                            availInv < remaining ? "text-warning font-medium" : 
+                            "text-success"
+                          }>
+                            {availInv}
+                          </span>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -305,11 +378,47 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                 placeholder="0.00"
               />
             </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Tax Calculation</p>
-              <p className="text-sm text-muted-foreground">
-                {order.order_type === 'pull_ship' ? 'No tax (Pull & Ship)' : 'Tax will be calculated at 8.25%'}
-              </p>
+            <div className="space-y-2">
+              <div>
+                <p className="text-sm font-medium">Tax Calculation</p>
+                <p className="text-xs text-muted-foreground">
+                  {order.order_type === 'pull_ship' ? 'No tax (Pull & Ship)' : 'Tax will be calculated at 8.25%'}
+                </p>
+              </div>
+              {(() => {
+                const itemsToShip = order.order_items?.filter((item: any) => shipmentQuantities[item.id] > 0) || [];
+                const subtotal = itemsToShip.reduce((sum: number, item: any) => 
+                  sum + (shipmentQuantities[item.id] * item.unit_price), 0
+                );
+                const tax = order.order_type === 'pull_ship' ? 0 : (subtotal * 0.0825);
+                const shipping = parseFloat(shippingCost) || 0;
+                const total = subtotal + tax + shipping;
+                
+                return subtotal > 0 ? (
+                  <div className="text-sm space-y-0.5">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span className="font-medium">${subtotal.toFixed(2)}</span>
+                    </div>
+                    {tax > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Tax:</span>
+                        <span className="font-medium">${tax.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {shipping > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Shipping:</span>
+                        <span className="font-medium">${shipping.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-1 border-t">
+                      <span className="font-semibold">Total:</span>
+                      <span className="font-bold">${total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
             </div>
           </div>
 

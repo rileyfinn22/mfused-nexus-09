@@ -197,6 +197,60 @@ const Invoices = () => {
         </Select>
       </div>
 
+      {/* Invoice Type Filter Tabs */}
+      <div className="flex gap-2 flex-wrap">
+        <Button
+          variant={statusFilter === "all" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setStatusFilter("all")}
+          className="h-8"
+        >
+          All Invoices
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={() => {
+            const fullInvoices = invoices.filter(inv => !inv.invoice_type || inv.invoice_type === 'full');
+            if (fullInvoices.length === 0) {
+              toast({ title: "No Full Invoices", description: "No full invoices found" });
+            }
+          }}
+        >
+          <Badge className="bg-purple-500 text-white mr-2">Full</Badge>
+          {invoices.filter(inv => !inv.invoice_type || inv.invoice_type === 'full').length}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={() => {
+            const partialInvoices = invoices.filter(inv => inv.invoice_type === 'partial');
+            if (partialInvoices.length === 0) {
+              toast({ title: "No Partial Invoices", description: "No partial invoices found" });
+            }
+          }}
+        >
+          <Badge className="bg-blue-500 text-white mr-2">Partial</Badge>
+          {invoices.filter(inv => inv.invoice_type === 'partial').length}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={() => {
+            const finalInvoices = invoices.filter(inv => inv.invoice_type === 'final');
+            if (finalInvoices.length === 0) {
+              toast({ title: "No Final Invoices", description: "No final invoices found" });
+            }
+          }}
+        >
+          <Badge className="bg-green-500 text-white mr-2">Final</Badge>
+          {invoices.filter(inv => inv.invoice_type === 'final').length}
+        </Button>
+      </div>
+
       {/* Invoices Table */}
       <div className="border border-table-border rounded">
         {/* Table Header */}

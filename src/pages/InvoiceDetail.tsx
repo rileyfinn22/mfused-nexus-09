@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Download, FileText, Edit, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -396,6 +397,127 @@ const InvoiceDetail = () => {
               )}
             </div>
           </div>
+
+          {/* Shipment Timeline - Show all related invoices */}
+          {relatedInvoices.length > 0 && (
+            <div className="p-8 border-t bg-gradient-to-b from-primary/5 to-transparent">
+              <h2 className="text-lg font-semibold mb-4">Shipment Timeline for Order {order?.order_number}</h2>
+              <div className="space-y-3">
+                {/* Current invoice first */}
+                <div className="p-4 bg-primary/10 border-2 border-primary rounded-lg">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg shrink-0">
+                      {invoice.shipment_number}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-mono font-semibold">{invoice.invoice_number}</span>
+                        <Badge className={
+                          invoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
+                          invoice.invoice_type === 'final' ? 'bg-green-500 text-white' :
+                          'bg-purple-500 text-white'
+                        }>
+                          {invoice.invoice_type?.toUpperCase() || 'FULL'}
+                        </Badge>
+                        <Badge variant="default">CURRENT</Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Amount: </span>
+                          <span className="font-semibold">{formatCurrency(Number(invoice.total))}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Status: </span>
+                          <span className="capitalize">{invoice.status.replace('_', ' ')}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Date: </span>
+                          <span>{new Date(invoice.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-primary">{invoice.billed_percentage?.toFixed(1)}%</div>
+                      <div className="text-xs text-muted-foreground">of order</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Other invoices */}
+                {[...relatedInvoices].sort((a, b) => a.shipment_number - b.shipment_number).map((relInv, idx) => {
+                  const allInvoices = [...relatedInvoices, invoice].sort((a, b) => a.shipment_number - b.shipment_number);
+                  const upToThisShipment = allInvoices.slice(0, allInvoices.findIndex(i => i.id === relInv.id) + 1);
+                  const cumulativePercent = upToThisShipment.reduce((sum, i) => sum + (i.billed_percentage || 0), 0);
+                  
+                  return (
+                    <div key={relInv.id} className="p-4 bg-background border border-table-border rounded-lg hover:border-primary/40 transition-colors">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center font-bold text-lg shrink-0">
+                          {relInv.shipment_number}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <button
+                              onClick={() => navigate(`/invoices/${relInv.id}`)}
+                              className="font-mono font-medium hover:text-primary underline"
+                            >
+                              {relInv.invoice_number}
+                            </button>
+                            <Badge className={
+                              relInv.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
+                              relInv.invoice_type === 'final' ? 'bg-green-500 text-white' :
+                              'bg-purple-500 text-white'
+                            }>
+                              {relInv.invoice_type?.toUpperCase() || 'FULL'}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Amount: </span>
+                              <span className="font-semibold">{formatCurrency(Number(relInv.total))}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Status: </span>
+                              <span className="capitalize">{relInv.status.replace('_', ' ')}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Date: </span>
+                              <span>{new Date(relInv.created_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-semibold">{relInv.billed_percentage?.toFixed(1)}%</div>
+                          <div className="text-xs text-muted-foreground">Cumulative: {cumulativePercent.toFixed(1)}%</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Overall Progress */}
+              <div className="mt-6 p-4 bg-background rounded-lg border border-table-border">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium">Total Billed Progress</span>
+                  {(() => {
+                    const allInvoicesForOrder = [...relatedInvoices, invoice];
+                    const totalBilled = allInvoicesForOrder.reduce((sum, i) => sum + (i.billed_percentage || 0), 0);
+                    return (
+                      <span className="text-sm font-semibold">{totalBilled.toFixed(1)}% of order complete</span>
+                    );
+                  })()}
+                </div>
+                <Progress 
+                  value={(() => {
+                    const allInvoicesForOrder = [...relatedInvoices, invoice];
+                    return allInvoicesForOrder.reduce((sum, i) => sum + (i.billed_percentage || 0), 0);
+                  })()} 
+                  className="h-3" 
+                />
+              </div>
+            </div>
+          )}
 
           {/* Order Items - Main Invoice View */}
           <div className="p-8">

@@ -836,6 +836,90 @@ const OrderDetail = () => {
             </div>
           </div>
 
+          {/* Order Fulfillment Status Section */}
+          {!isEditMode && (
+            <div className="p-8 border-t border-table-border bg-gradient-to-b from-primary/5 to-transparent">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Order Fulfillment Status
+              </h2>
+              
+              {(() => {
+                const totalOrdered = order.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
+                const totalShipped = order.order_items?.reduce((sum: number, item: any) => sum + (item.shipped_quantity || 0), 0) || 0;
+                const fulfillmentProgress = totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
+                
+                return (
+                  <>
+                    {/* Overall Progress */}
+                    <div className="mb-6 p-4 bg-background rounded-lg border border-table-border">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium">Overall Progress</span>
+                        <span className="text-sm text-muted-foreground">
+                          {totalShipped} of {totalOrdered} units shipped ({fulfillmentProgress.toFixed(1)}%)
+                        </span>
+                      </div>
+                      <Progress value={fulfillmentProgress} className="h-3" />
+                      <div className="flex justify-between mt-2">
+                        <Badge variant={totalShipped === 0 ? "secondary" : totalShipped < totalOrdered ? "outline" : "default"}>
+                          {totalShipped === 0 ? "Not Shipped" : totalShipped < totalOrdered ? "Partially Shipped" : "Fully Shipped"}
+                        </Badge>
+                        {invoices.length > 0 && (
+                          <span className="text-xs text-muted-foreground">{invoices.length} shipment(s) created</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Item-by-Item Breakdown */}
+                    <div className="border border-table-border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-table-header">
+                            <TableHead>Item</TableHead>
+                            <TableHead>SKU</TableHead>
+                            <TableHead className="text-right">Ordered</TableHead>
+                            <TableHead className="text-right">Shipped</TableHead>
+                            <TableHead className="text-right">Remaining</TableHead>
+                            <TableHead className="w-48">Progress</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {order.order_items?.map((item: any) => {
+                            const shipped = item.shipped_quantity || 0;
+                            const remaining = item.quantity - shipped;
+                            const itemProgress = (shipped / item.quantity) * 100;
+                            
+                            return (
+                              <TableRow key={item.id}>
+                                <TableCell className="font-medium">{item.name}</TableCell>
+                                <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                                <TableCell className="text-right">{item.quantity}</TableCell>
+                                <TableCell className="text-right font-medium">{shipped}</TableCell>
+                                <TableCell className="text-right">
+                                  <span className={remaining > 0 ? "text-warning" : "text-success"}>
+                                    {remaining}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <Progress value={itemProgress} className="h-2 flex-1" />
+                                    <span className="text-xs text-muted-foreground w-12 text-right">
+                                      {itemProgress.toFixed(0)}%
+                                    </span>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
           {/* Items Table - ERP Style */}
           <div className="p-8">
             <h2 className="text-lg font-semibold mb-4">
@@ -929,11 +1013,25 @@ const OrderDetail = () => {
               </div>
             )}
 
-            {/* Shipments & Invoices Section */}
+            {/* Shipments & Invoices Section - Enhanced */}
             {isVibeAdmin && (
               <div className="mt-8 p-6 bg-primary/5 rounded-lg border border-primary/20">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Shipments & Invoices</h3>
+                  <div>
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Truck className="h-5 w-5" />
+                      Shipments & Invoices
+                    </h3>
+                    {invoices.length > 0 && (() => {
+                      const totalBilled = invoices.reduce((sum, inv) => sum + Number(inv.total), 0);
+                      const billingProgress = (totalBilled / order.total) * 100;
+                      return (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {invoices.length} shipment(s) • ${totalBilled.toFixed(2)} billed ({billingProgress.toFixed(1)}% of order total)
+                        </p>
+                      );
+                    })()}
+                  </div>
                   <Button onClick={() => setShowShipmentDialog(true)} size="sm">
                     <Plus className="h-4 w-4 mr-2" />
                     Create Shipment Invoice
@@ -944,25 +1042,56 @@ const OrderDetail = () => {
                   <p className="text-sm text-muted-foreground">No shipment invoices created yet. Create your first one to start billing.</p>
                 ) : (
                   <div className="space-y-3">
-                    {invoices.map((invoice) => (
-                      <div key={invoice.id} className="p-4 bg-background rounded-lg border border-table-border hover:border-primary/40 transition-colors cursor-pointer" onClick={() => navigate(`/invoices/${invoice.id}`)}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <Badge variant="secondary" className="font-mono">
-                              Shipment #{invoice.shipment_number}
-                            </Badge>
-                            <span className="font-mono text-sm">{invoice.invoice_number}</span>
-                            <Badge className={
-                              invoice.invoice_type === 'partial' ? 'bg-blue-500' :
-                              invoice.invoice_type === 'final' ? 'bg-green-500' :
-                              'bg-purple-500'
-                            }>
-                              {invoice.invoice_type}
-                            </Badge>
+                    {invoices.map((invoice, idx) => (
+                      <div 
+                        key={invoice.id} 
+                        className="p-4 bg-background rounded-lg border border-table-border hover:border-primary/40 transition-colors cursor-pointer" 
+                        onClick={() => navigate(`/invoices/${invoice.id}`)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-4">
+                            <div className="flex flex-col items-center">
+                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-sm">
+                                {invoice.shipment_number}
+                              </div>
+                              {idx < invoices.length - 1 && (
+                                <div className="w-0.5 h-8 bg-table-border mt-2"></div>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-sm font-medium">{invoice.invoice_number}</span>
+                                <Badge className={
+                                  invoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
+                                  invoice.invoice_type === 'final' ? 'bg-green-500 text-white' :
+                                  'bg-purple-500 text-white'
+                                }>
+                                  {invoice.invoice_type?.toUpperCase() || 'FULL'}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {invoice.status.replace('_', ' ')}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                <span>Created: {new Date(invoice.created_at).toLocaleDateString()}</span>
+                                {invoice.shipping_cost > 0 && (
+                                  <span>• Shipping: ${Number(invoice.shipping_cost).toFixed(2)}</span>
+                                )}
+                              </div>
+                            </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-semibold">${Number(invoice.total).toFixed(2)}</p>
+                            <p className="font-bold text-lg">${Number(invoice.total).toFixed(2)}</p>
                             <p className="text-xs text-muted-foreground">{invoice.billed_percentage?.toFixed(1)}% of order</p>
+                            {(() => {
+                              const cumulativeBilled = invoices.slice(0, idx + 1).reduce((sum, inv) => sum + Number(inv.total), 0);
+                              const cumulativePercent = (cumulativeBilled / order.total) * 100;
+                              return (
+                                <p className="text-xs text-primary font-medium mt-1">
+                                  Cumulative: {cumulativePercent.toFixed(1)}%
+                                </p>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
