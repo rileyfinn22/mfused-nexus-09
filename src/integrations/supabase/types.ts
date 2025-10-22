@@ -1289,6 +1289,10 @@ export type Database = {
         Args: { invitation_token_param: string; user_email: string }
         Returns: Json
       }
+      can_view_child_order: {
+        Args: { _order_id: string; _user_id: string }
+        Returns: boolean
+      }
       get_user_company: {
         Args: { _user_id: string }
         Returns: string
