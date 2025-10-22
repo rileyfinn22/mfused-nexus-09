@@ -449,7 +449,7 @@ const PullShip = () => {
         });
 
         // Navigate to the pull & ship order detail page
-        navigate(`/pull-ship/${analysisData.orderId}`);
+        navigate(`/pull-ship-orders/${analysisData.orderId}`);
       } else {
         throw new Error('Failed to create pull & ship order from PO');
       }

@@ -331,7 +331,7 @@ const Orders = () => {
                           className="h-6 w-6 p-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/edit/${order.id}`);
+                            navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/edit/${order.id}`);
                           }}
                         >
                           <Edit className="h-3 w-3" />
@@ -443,7 +443,7 @@ const Orders = () => {
                         variant="ghost" 
                         size="sm" 
                         className="h-6 w-6 p-0"
-                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`)}
+                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
                       >
                         <Edit className="h-3 w-3" />
                       </Button>
@@ -526,7 +526,7 @@ const Orders = () => {
                         variant="ghost" 
                         size="sm" 
                         className="h-6 w-6 p-0"
-                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship/${order.id}` : `/orders/${order.id}`)}
+                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
                       >
                         <Edit className="h-3 w-3" />
                       </Button>
