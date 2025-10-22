@@ -63,7 +63,8 @@ const InvoiceDetail = () => {
         *,
         orders(
           *,
-          order_items(*)
+          order_items(*),
+          parent_order:parent_order_id(id, order_number, order_type)
         )
       `)
       .eq('id', invoiceId)
@@ -318,6 +319,23 @@ const InvoiceDetail = () => {
       <Card className="shadow-lg">
         <CardContent className="p-0">
           <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-table-border p-8">
+            {/* Parent Order Link for Pull & Ship */}
+            {order?.order_type === 'pull_ship' && order?.parent_order && (
+              <div className="mb-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                <p className="text-sm font-medium mb-1">Pull & Ship Invoice - Linked to Production Order:</p>
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto font-mono text-blue-600"
+                  onClick={() => navigate(`/orders/${order.parent_order.id}`)}
+                >
+                  {order.parent_order.order_number}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This invoice bills against inventory from the production order above
+                </p>
+              </div>
+            )}
+            
             <div className="flex justify-between items-start">
               <div>
                 <h1 className="text-3xl font-bold mb-2">{invoice.invoice_number}</h1>

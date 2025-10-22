@@ -587,6 +587,7 @@ export type Database = {
           order_finalized_by: string | null
           order_number: string
           order_type: string
+          parent_order_id: string | null
           po_number: string | null
           shipping_city: string
           shipping_cost: number | null
@@ -629,6 +630,7 @@ export type Database = {
           order_finalized_by?: string | null
           order_number: string
           order_type?: string
+          parent_order_id?: string | null
           po_number?: string | null
           shipping_city: string
           shipping_cost?: number | null
@@ -671,6 +673,7 @@ export type Database = {
           order_finalized_by?: string | null
           order_number?: string
           order_type?: string
+          parent_order_id?: string | null
           po_number?: string | null
           shipping_city?: string
           shipping_cost?: number | null
@@ -705,6 +708,13 @@ export type Database = {
             columns: ["fulfillment_vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_parent_order_id_fkey"
+            columns: ["parent_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]

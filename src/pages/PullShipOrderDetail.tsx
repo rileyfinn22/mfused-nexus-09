@@ -69,7 +69,8 @@ const PullShipOrderDetail = () => {
       .select(`
         *,
         order_items(*),
-        vendors!orders_fulfillment_vendor_id_fkey(name, contact_email)
+        vendors!orders_fulfillment_vendor_id_fkey(name, contact_email),
+        parent_order:parent_order_id(id, order_number, order_type)
       `)
       .eq('id', orderId)
       .eq('order_type', 'pull_ship')
@@ -242,18 +243,41 @@ const PullShipOrderDetail = () => {
       return;
     }
 
-    const { error } = await supabase
-      .from('orders')
-      .update({ 
-        status: 'shipped',
-        tracking_number: trackingNumber
-      })
-      .eq('id', orderId);
+    try {
+      // Update order status
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({ 
+          status: 'shipped',
+          tracking_number: trackingNumber
+        })
+        .eq('id', orderId);
 
-    if (!error) {
+      if (orderError) throw orderError;
+
+      // IMPORTANT: Update shipped_quantity for all order items to match quantity
+      // This ensures invoices show the correct shipped amounts
+      if (order.order_items) {
+        for (const item of order.order_items) {
+          await supabase
+            .from('order_items')
+            .update({ shipped_quantity: item.quantity })
+            .eq('id', item.id);
+        }
+      }
+
       setIsShipped(true);
-      toast({ title: "Marked as Shipped" });
+      toast({ 
+        title: "Marked as Shipped",
+        description: "Order shipped and quantities updated for invoicing"
+      });
       fetchOrder();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -626,6 +650,23 @@ const PullShipOrderDetail = () => {
         <CardContent className="p-0">
           {/* Header Section */}
           <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b p-8">
+            {/* Parent Order Link */}
+            {order.parent_order && (
+              <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                <p className="text-sm font-medium mb-1">Linked to Production Order:</p>
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto font-mono text-primary"
+                  onClick={() => navigate(`/orders/${order.parent_order.id}`)}
+                >
+                  {order.parent_order.order_number}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This pull & ship order fulfills items from the above production order
+                </p>
+              </div>
+            )}
+            
             <div className="flex justify-between items-start mb-6">
               <div>
                 <div className="flex items-center gap-3 mb-2">
