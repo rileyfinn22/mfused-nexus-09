@@ -37,7 +37,6 @@ const customerNavigationItems = [
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Pull & Ship", url: "/pull-ship", icon: Truck },
   { title: "My POs", url: "/my-pos", icon: FolderOpen },
-  { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
@@ -53,6 +52,7 @@ const vibeAdminNavigationItems = [
   { title: "Products", url: "/products", icon: Package },
   { title: "Inventory", url: "/inventory", icon: Archive },
   { title: "Artwork", url: "/artwork", icon: Image },
+  { title: "Reports", url: "/reports", icon: BarChart3 },
 ];
 
 const vendorNavigationItems = [

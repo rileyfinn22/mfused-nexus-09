@@ -31,20 +31,24 @@ export default function Production() {
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
   const [vendorId, setVendorId] = useState<string | null>(null);
+  const [roleChecked, setRoleChecked] = useState(false);
 
   useEffect(() => {
     checkRole();
   }, []);
 
   useEffect(() => {
-    if (vendorId !== null || isVibeAdmin) {
+    if (roleChecked) {
       fetchProductionOrders();
     }
-  }, [vendorId, isVibeAdmin]);
+  }, [roleChecked, isVibeAdmin, isVendor, vendorId]);
 
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setRoleChecked(true);
+      return;
+    }
 
     const { data } = await supabase
       .from('user_roles')
@@ -66,6 +70,8 @@ export default function Production() {
       
       setVendorId(vendorData?.id || null);
     }
+    
+    setRoleChecked(true);
   };
 
   const fetchProductionOrders = async () => {
