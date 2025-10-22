@@ -612,12 +612,6 @@ const InvoiceDetail = () => {
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-semibold">{formatCurrency(displaySubtotal)}</span>
                 </div>
-                {Number(invoice.tax) > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Tax</span>
-                    <span className="font-semibold">{formatCurrency(Number(invoice.tax))}</span>
-                  </div>
-                )}
                 <div className="h-px bg-border my-2"></div>
                 <div className="flex justify-between">
                   <span className="text-lg font-semibold">Total</span>

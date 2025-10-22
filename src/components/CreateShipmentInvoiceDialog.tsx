@@ -111,9 +111,9 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         subtotal += quantity * item.unit_price;
       });
 
-      const tax = order.order_type === 'pull_ship' ? 0 : (subtotal * 0.0825); // 8.25% tax for non-pull_ship
+      const tax = 0; // Tax removed - included in unit price
       const shipping = parseFloat(shippingCost) || 0;
-      const total = subtotal + tax + shipping;
+      const total = subtotal + shipping;
 
       // Determine invoice type
       const totalShipped = itemsToShip.reduce((sum: number, item: any) => 
@@ -379,20 +379,13 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
               />
             </div>
             <div className="space-y-2">
-              <div>
-                <p className="text-sm font-medium">Tax Calculation</p>
-                <p className="text-xs text-muted-foreground">
-                  {order.order_type === 'pull_ship' ? 'No tax (Pull & Ship)' : 'Tax will be calculated at 8.25%'}
-                </p>
-              </div>
               {(() => {
                 const itemsToShip = order.order_items?.filter((item: any) => shipmentQuantities[item.id] > 0) || [];
                 const subtotal = itemsToShip.reduce((sum: number, item: any) => 
                   sum + (shipmentQuantities[item.id] * item.unit_price), 0
                 );
-                const tax = order.order_type === 'pull_ship' ? 0 : (subtotal * 0.0825);
                 const shipping = parseFloat(shippingCost) || 0;
-                const total = subtotal + tax + shipping;
+                const total = subtotal + shipping;
                 
                 return subtotal > 0 ? (
                   <div className="text-sm space-y-0.5">
@@ -400,12 +393,6 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                       <span className="text-muted-foreground">Subtotal:</span>
                       <span className="font-medium">${subtotal.toFixed(2)}</span>
                     </div>
-                    {tax > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tax:</span>
-                        <span className="font-medium">${tax.toFixed(2)}</span>
-                      </div>
-                    )}
                     {shipping > 0 && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Shipping:</span>
