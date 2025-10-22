@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, Package, CheckCircle2, Circle, Truck, FileText, Send } from "lucide-react";
+import { ArrowLeft, Download, Package, CheckCircle2, Circle, Truck, FileText, Send, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -388,7 +388,26 @@ const PullShipOrderDetail = () => {
       const { error: updateError } = await supabase
         .from('orders')
         .update({
-          ...editedOrder,
+          customer_name: editedOrder.customer_name,
+          customer_email: editedOrder.customer_email,
+          customer_phone: editedOrder.customer_phone,
+          shipping_name: editedOrder.shipping_name,
+          shipping_street: editedOrder.shipping_street,
+          shipping_city: editedOrder.shipping_city,
+          shipping_state: editedOrder.shipping_state,
+          shipping_zip: editedOrder.shipping_zip,
+          billing_name: editedOrder.billing_name,
+          billing_street: editedOrder.billing_street,
+          billing_city: editedOrder.billing_city,
+          billing_state: editedOrder.billing_state,
+          billing_zip: editedOrder.billing_zip,
+          po_number: editedOrder.po_number,
+          due_date: editedOrder.due_date,
+          memo: editedOrder.memo,
+          fulfillment_vendor_id: editedOrder.fulfillment_vendor_id,
+          subtotal: editedOrder.subtotal,
+          tax: 0,
+          total: editedOrder.total,
           vibe_approved: true,
           vibe_approved_by: user.id,
           vibe_approved_at: new Date().toISOString(),
@@ -536,7 +555,7 @@ const PullShipOrderDetail = () => {
               </Button>
               <Button 
                 onClick={handleApproveOrder}
-                disabled={approving}
+                disabled={approving || !order.order_items || order.order_items.length === 0}
                 className="bg-green-600 hover:bg-green-700"
               >
                 {approving ? "Approving..." : "Approve & Send to Fulfillment"}
@@ -562,6 +581,39 @@ const PullShipOrderDetail = () => {
           )}
         </div>
       </div>
+
+      {/* Warning if no order items */}
+      {(!order.order_items || order.order_items.length === 0) && (
+        <Card className="mb-6 border-destructive bg-destructive/10">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-4">
+              <AlertTriangle className="h-6 w-6 text-destructive flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-destructive mb-2">No Order Items Found</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  This order was created but no items were added. This usually happens when the PO upload fails to extract item data.
+                  We recommend deleting this order and re-uploading the PO (the system has been fixed to prevent this issue).
+                </p>
+                {isAdmin && (
+                  <Button 
+                    onClick={async () => {
+                      if (confirm('Delete this order and re-upload the PO?')) {
+                        await supabase.from('orders').delete().eq('id', orderId);
+                        toast({ title: "Order Deleted", description: "Please re-upload the PO" });
+                        navigate('/pull-ship-orders');
+                      }
+                    }} 
+                    variant="destructive" 
+                    size="sm"
+                  >
+                    Delete This Order
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Workflow Status */}
       <Card className="mb-6 shadow-md">

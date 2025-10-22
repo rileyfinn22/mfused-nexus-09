@@ -323,7 +323,24 @@ Return ONLY valid JSON:
 
       if (itemsError) {
         console.error('Error creating order items:', itemsError);
+        // Clean up the order since items failed
+        await supabase.from('orders').delete().eq('id', order.id);
+        throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
+      
+      if (orderItems.length === 0) {
+        console.warn('No items extracted from PO');
+        // Clean up the order
+        await supabase.from('orders').delete().eq('id', order.id);
+        throw new Error('No items could be extracted from the PO. Please check the document format and try again, or create the order manually.');
+      }
+      
+      console.log(`Successfully created ${orderItems.length} order items`);
+    } else {
+      console.error('No items array in extracted data');
+      // Clean up the order
+      await supabase.from('orders').delete().eq('id', order.id);
+      throw new Error('No items found in the PO. Please verify the document format.');
     }
 
     console.log('Order created:', order.id);
