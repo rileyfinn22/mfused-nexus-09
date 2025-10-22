@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, Package, CheckCircle2, Circle, Truck, FileText, Send, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Download, Package, CheckCircle2, Circle, Truck, FileText, Send, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -515,6 +515,33 @@ const PullShipOrderDetail = () => {
     });
   };
 
+  const handleDeleteOrder = async () => {
+    if (!confirm('Are you sure you want to delete this pull & ship order? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast({ 
+        title: "Order Deleted", 
+        description: "Pull & ship order has been deleted"
+      });
+      navigate('/pull-ship-orders');
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto py-12 text-center">
@@ -540,6 +567,12 @@ const PullShipOrderDetail = () => {
           Back to Pull & Ship Orders
         </Button>
         <div className="flex gap-3">
+          {isAdmin && (
+            <Button variant="destructive" size="sm" onClick={handleDeleteOrder}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Order
+            </Button>
+          )}
           {isAdmin && !order?.vibe_approved && !isEditing && (
             <Button onClick={() => setIsEditing(true)}>
               Review & Edit

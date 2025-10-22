@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Eye, CheckCircle, Clock } from "lucide-react";
+import { Search, Eye, CheckCircle, Clock, Trash2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 const PullShipOrders = () => {
   const navigate = useNavigate();
@@ -90,6 +91,35 @@ const PullShipOrders = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const handleDeleteOrder = async (orderId: string, orderNumber: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!confirm(`Delete order ${orderNumber}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast({ 
+        title: "Order Deleted", 
+        description: `Order ${orderNumber} has been deleted`
+      });
+      fetchOrders();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -132,8 +162,8 @@ const PullShipOrders = () => {
             <div className="col-span-2">Customer</div>
             <div className="col-span-2">Fulfillment Vendor</div>
             <div className="col-span-1">Total</div>
-            <div className="col-span-2">Approval Status</div>
-            <div className="col-span-1">Actions</div>
+            <div className="col-span-1">Status</div>
+            <div className="col-span-2">Actions</div>
           </div>
         </div>
         <div className="divide-y divide-table-border">
@@ -163,10 +193,10 @@ const PullShipOrders = () => {
                 {order.vendors?.name || <span className="text-yellow-600">Not Assigned</span>}
               </div>
               <div className="col-span-1 text-sm">${order.total?.toFixed(2) || '0.00'}</div>
-              <div className="col-span-2">
+              <div className="col-span-1">
                 {getApprovalBadge(order)}
               </div>
-              <div className="col-span-1">
+              <div className="col-span-2 flex gap-2">
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -177,6 +207,14 @@ const PullShipOrders = () => {
                   }}
                 >
                   <Eye className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                  onClick={(e) => handleDeleteOrder(order.id, order.order_number, e)}
+                >
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             </div>
