@@ -43,7 +43,8 @@ const PullShip = () => {
     shippingCity: "",
     shippingState: "",
     shippingZip: "",
-    notes: ""
+    notes: "",
+    parentOrderId: ""
   });
 
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
@@ -56,9 +57,11 @@ const PullShip = () => {
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [blanketOrders, setBlanketOrders] = useState<any[]>([]);
 
   useEffect(() => {
     fetchPullShipOrders();
+    fetchBlanketOrders();
   }, []);
 
   const fetchPullShipOrders = async () => {
@@ -80,6 +83,34 @@ const PullShip = () => {
       console.error('Error fetching pull & ship orders:', error);
     } finally {
       setLoadingOrders(false);
+    }
+  };
+
+  const fetchBlanketOrders = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!userRole?.company_id) return;
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, order_number, customer_name, total, created_at')
+        .eq('company_id', userRole.company_id)
+        .eq('order_type', 'standard')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      setBlanketOrders(data || []);
+    } catch (error) {
+      console.error('Error fetching blanket orders:', error);
     }
   };
   
@@ -499,6 +530,7 @@ const PullShip = () => {
           order_number: orderNumber,
           company_id: userRole.company_id,
           order_type: 'pull_ship',
+          parent_order_id: orderData.parentOrderId || null,
           customer_name: orderData.state,
           shipping_name: orderData.state,
           shipping_street: orderData.shippingAddress,
@@ -550,7 +582,8 @@ const PullShip = () => {
         shippingCity: "",
         shippingState: "",
         shippingZip: "",
-        notes: ""
+        notes: "",
+        parentOrderId: ""
       });
       setSelectedSkus(new Set());
       setSkuQuantities({});
@@ -623,6 +656,25 @@ const PullShip = () => {
               <h2 className="text-lg font-semibold mb-4">Order Details</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Link to Blanket Order (Optional)</Label>
+                    <Select value={orderData.parentOrderId} onValueChange={(value) => handleInputChange('parentOrderId', value)}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select blanket order..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border border-border shadow-lg z-50">
+                        <SelectItem value="">None (standalone order)</SelectItem>
+                        {blanketOrders.map(order => (
+                          <SelectItem key={order.id} value={order.id}>
+                            {order.order_number} - {order.customer_name} (${order.total?.toFixed(2)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Select a blanket order to create invoice when approved
+                    </p>
+                  </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Destination State</Label>
                     <Select value={orderData.state} onValueChange={handleStateChange}>
