@@ -15,6 +15,7 @@ const EditProduct = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [availableStock, setAvailableStock] = useState<number>(0);
+  const [vendors, setVendors] = useState<any[]>([]);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   
   const [formData, setFormData] = useState({
@@ -25,13 +26,16 @@ const EditProduct = () => {
     units_per_case: "",
     cases_per_pallet: "",
     weight_per_case: "",
-    cost: ""
+    cost: "",
+    price: "",
+    preferred_vendor_id: ""
   });
 
   useEffect(() => {
     if (id) {
       fetchProduct();
       fetchInventory();
+      fetchVendors();
     }
   }, [id]);
 
@@ -61,13 +65,30 @@ const EditProduct = () => {
         units_per_case: data.units_per_case?.toString() || "",
         cases_per_pallet: data.cases_per_pallet?.toString() || "",
         weight_per_case: data.weight_per_case?.toString() || "",
-        cost: data.cost?.toString() || ""
+        cost: data.cost?.toString() || "",
+        price: data.price?.toString() || "",
+        preferred_vendor_id: data.preferred_vendor_id || ""
       });
     } catch (error) {
       console.error('Error fetching product:', error);
       toast.error("Failed to load product");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchVendors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setVendors(data || []);
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
     }
   };
 
@@ -102,7 +123,9 @@ const EditProduct = () => {
           units_per_case: formData.units_per_case ? parseInt(formData.units_per_case) : null,
           cases_per_pallet: formData.cases_per_pallet ? parseInt(formData.cases_per_pallet) : null,
           weight_per_case: formData.weight_per_case ? parseFloat(formData.weight_per_case) : null,
-          cost: formData.cost ? parseFloat(formData.cost) : null
+          cost: formData.cost ? parseFloat(formData.cost) : null,
+          price: formData.price ? parseFloat(formData.price) : null,
+          preferred_vendor_id: formData.preferred_vendor_id || null
         })
         .eq('id', id);
 
@@ -245,20 +268,57 @@ const EditProduct = () => {
           </div>
         </div>
 
-        {/* Cost Section */}
+        {/* Pricing Section */}
         <div className="space-y-4 bg-card p-6 rounded-lg border">
-          <h2 className="text-lg font-semibold mb-4">Cost</h2>
+          <h2 className="text-lg font-semibold mb-4">Pricing</h2>
           
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="cost">Cost per Unit (Vendor Cost)</Label>
+              <Input
+                id="cost"
+                type="number"
+                step="0.001"
+                value={formData.cost}
+                onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                placeholder="0.000"
+              />
+              <p className="text-xs text-muted-foreground">What the vendor charges</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="price">Price per Unit (Customer Price)</Label>
+              <Input
+                id="price"
+                type="number"
+                step="0.001"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                placeholder="0.000"
+              />
+              <p className="text-xs text-muted-foreground">What you charge the customer</p>
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="cost">Cost per Unit</Label>
-            <Input
-              id="cost"
-              type="number"
-              step="0.01"
-              value={formData.cost}
-              onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-              placeholder="0.00"
-            />
+            <Label htmlFor="preferred_vendor">Preferred Vendor</Label>
+            <Select
+              value={formData.preferred_vendor_id}
+              onValueChange={(value) => setFormData({ ...formData, preferred_vendor_id: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select preferred vendor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No preferred vendor</SelectItem>
+                {vendors.map((vendor) => (
+                  <SelectItem key={vendor.id} value={vendor.id}>
+                    {vendor.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Auto-populates when creating orders (can be edited)</p>
           </div>
         </div>
 

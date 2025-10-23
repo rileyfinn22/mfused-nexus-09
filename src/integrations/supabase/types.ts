@@ -932,6 +932,8 @@ export type Database = {
           image_url: string | null
           item_id: string | null
           name: string
+          preferred_vendor_id: string | null
+          price: number | null
           product_type: string | null
           state: string | null
           units_per_case: number | null
@@ -950,6 +952,8 @@ export type Database = {
           image_url?: string | null
           item_id?: string | null
           name: string
+          preferred_vendor_id?: string | null
+          price?: number | null
           product_type?: string | null
           state?: string | null
           units_per_case?: number | null
@@ -968,6 +972,8 @@ export type Database = {
           image_url?: string | null
           item_id?: string | null
           name?: string
+          preferred_vendor_id?: string | null
+          price?: number | null
           product_type?: string | null
           state?: string | null
           units_per_case?: number | null
@@ -981,6 +987,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_preferred_vendor_id_fkey"
+            columns: ["preferred_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]

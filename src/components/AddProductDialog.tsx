@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,16 +15,40 @@ interface AddProductDialogProps {
 export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [vendors, setVendors] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     category: "",
     description: "",
     state: "",
     cost: "",
+    price: "",
+    preferred_vendor_id: "",
     specs: ""
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      fetchVendors();
+    }
+  }, [open]);
+
+  const fetchVendors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setVendors(data || []);
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,6 +108,8 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
           description: formData.description || null,
           state: formData.state,
           cost: formData.cost ? parseFloat(formData.cost) : null,
+          price: formData.price ? parseFloat(formData.price) : null,
+          preferred_vendor_id: formData.preferred_vendor_id || null,
           image_url: imageUrl,
           company_id: userRole.company_id
         })
@@ -109,7 +135,7 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
 
       toast.success("Product added successfully");
       setOpen(false);
-      setFormData({ name: "", category: "", description: "", state: "", cost: "", specs: "" });
+      setFormData({ name: "", category: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "" });
       setImageFile(null);
       setImagePreview(null);
       onProductAdded();
@@ -193,16 +219,48 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
               </SelectContent>
             </Select>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="cost">Cost (Vendor Cost)</Label>
+              <Input
+                id="cost"
+                type="number"
+                step="0.001"
+                value={formData.cost}
+                onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                placeholder="0.000"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="price">Price (Customer Price)</Label>
+              <Input
+                id="price"
+                type="number"
+                step="0.001"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                placeholder="0.000"
+              />
+            </div>
+          </div>
           <div className="space-y-2">
-            <Label htmlFor="cost">Cost</Label>
-            <Input
-              id="cost"
-              type="number"
-              step="0.01"
-              value={formData.cost}
-              onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-              placeholder="0.00"
-            />
+            <Label htmlFor="preferred_vendor">Preferred Vendor (Optional)</Label>
+            <Select
+              value={formData.preferred_vendor_id}
+              onValueChange={(value) => setFormData({ ...formData, preferred_vendor_id: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select preferred vendor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No preferred vendor</SelectItem>
+                {vendors.map((vendor) => (
+                  <SelectItem key={vendor.id} value={vendor.id}>
+                    {vendor.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="specs">Specifications (Optional)</Label>
