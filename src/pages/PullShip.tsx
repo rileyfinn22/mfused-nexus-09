@@ -961,7 +961,14 @@ const PullShip = () => {
 
                 <div className="bg-primary/10 border border-primary/20 p-3 rounded text-center">
                   <div className="text-sm font-semibold text-primary">
-                    Est. Value: ${(Array.from(selectedSkus).reduce((sum, sku) => sum + (skuQuantities[sku] || 1), 0) * 75).toLocaleString()}.00
+                    Est. Value: ${(() => {
+                      return Array.from(selectedSkus).reduce((sum, sku) => {
+                        const inventoryItem = inventory.find(item => item.sku === sku);
+                        const quantity = skuQuantities[sku] || 1;
+                        const unitPrice = inventoryItem?.products?.cost || 1;
+                        return sum + (quantity * unitPrice);
+                      }, 0).toFixed(2);
+                    })()}
                   </div>
                 </div>
               </div>
