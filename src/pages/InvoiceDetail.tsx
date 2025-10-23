@@ -63,7 +63,7 @@ const InvoiceDetail = () => {
         *,
         orders(
           *,
-          order_items(*),
+          order_items(*, shipped_quantity, quantity),
           parent_order:parent_order_id(id, order_number, order_type)
         )
       `)
@@ -82,7 +82,36 @@ const InvoiceDetail = () => {
 
     setInvoice(invoiceData);
     setOrder(invoiceData.orders);
-    setEditedItems(invoiceData.orders?.order_items || []);
+
+    // Fetch inventory allocations for this invoice to get actual pulled items
+    const { data: allocationsData } = await supabase
+      .from('inventory_allocations')
+      .select(`
+        *,
+        order_items(id, name, sku, unit_price, quantity, shipped_quantity, item_id, description),
+        inventory(state, available)
+      `)
+      .eq('invoice_id', invoiceId);
+    
+    if (allocationsData) {
+      setInventoryAllocations(allocationsData);
+      
+      // For partial invoices, use only the items that were allocated (pulled)
+      if (invoiceData.invoice_type === 'partial' && allocationsData.length > 0) {
+        const pulledItems = allocationsData.map((alloc: any) => ({
+          ...alloc.order_items,
+          quantity: alloc.quantity_allocated, // Use allocated quantity as the quantity for this invoice
+          shipped_quantity: alloc.quantity_allocated,
+          total: alloc.quantity_allocated * (alloc.order_items?.unit_price || 0)
+        }));
+        setEditedItems(pulledItems);
+      } else {
+        // For full invoices, use all order items
+        setEditedItems(invoiceData.orders?.order_items || []);
+      }
+    } else {
+      setEditedItems(invoiceData.orders?.order_items || []);
+    }
 
     // Fetch vendor POs for this order
     const { data: vendorPOData } = await supabase
@@ -96,20 +125,6 @@ const InvoiceDetail = () => {
 
     if (vendorPOData) {
       setVendorPOs(vendorPOData);
-    }
-
-    // Fetch inventory allocations for this invoice
-    const { data: allocationsData } = await supabase
-      .from('inventory_allocations')
-      .select(`
-        *,
-        order_items(name, sku),
-        inventory(state, available)
-      `)
-      .eq('invoice_id', invoiceId);
-    
-    if (allocationsData) {
-      setInventoryAllocations(allocationsData);
     }
 
     // Fetch related invoices for the same order
@@ -227,7 +242,7 @@ const InvoiceDetail = () => {
     setEditedItems(items =>
       items.map(item =>
         item.id === itemId
-          ? { ...item, shipped_quantity: newQuantity, total: newQuantity * Number(item.unit_price) }
+          ? { ...item, quantity: newQuantity, shipped_quantity: newQuantity, total: newQuantity * Number(item.unit_price) }
           : item
       )
     );
@@ -242,12 +257,13 @@ const InvoiceDetail = () => {
     }).format(amount);
   };
 
-  // Calculate totals using edited items in edit mode
-  const displayItems = isEditMode ? editedItems : (order?.order_items || []);
+  // Calculate totals - always use editedItems which contains the correct items
+  // (pulled items for partial invoices, all items for full invoices)
+  const displayItems = editedItems;
   const displaySubtotal = displayItems.reduce((sum: number, item: any) => 
-    sum + (Number(item.shipped_quantity) * Number(item.unit_price)), 0
+    sum + (Number(item.quantity || item.shipped_quantity) * Number(item.unit_price)), 0
   );
-  const displayTotal = displaySubtotal + Number(invoice?.tax || 0);
+  const displayTotal = displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0);
   const totalVendorCost = vendorPOs.reduce((sum, po) => sum + Number(po.total), 0);
   const totalProfit = displayTotal - totalVendorCost;
   const profitMargin = displayTotal > 0 ? ((totalProfit / displayTotal) * 100).toFixed(2) : '0.00';
@@ -568,19 +584,19 @@ const InvoiceDetail = () => {
                       {item.description || '-'}
                     </TableCell>
                     <TableCell className="text-center">
-                      {item.quantity}
+                      {invoice?.invoice_type === 'partial' ? item.quantity : item.quantity}
                     </TableCell>
                     <TableCell className="text-center">
                       {isEditMode ? (
                         <Input
                           type="number"
                           min="0"
-                          value={item.shipped_quantity}
+                          value={item.quantity}
                           onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 0)}
                           className="w-24 text-center"
                         />
                       ) : (
-                        item.shipped_quantity
+                        item.quantity || item.shipped_quantity
                       )}
                     </TableCell>
                     <TableCell className="text-right">
@@ -598,7 +614,7 @@ const InvoiceDetail = () => {
                       )}
                     </TableCell>
                     <TableCell className="text-right font-semibold">
-                      {formatCurrency(Number(item.shipped_quantity) * Number(item.unit_price))}
+                      {formatCurrency(Number(item.quantity || item.shipped_quantity) * Number(item.unit_price))}
                     </TableCell>
                   </TableRow>
                 ))}
