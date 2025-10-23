@@ -196,11 +196,33 @@ const PullShipOrders = () => {
             );
 
             if (parentItem) {
-              const newShippedQty = (parentItem.shipped_quantity || 0) + (pullItem.quantity || 0);
+              // Get total shipped quantity from all approved pull & ship orders for this SKU
+              const { data: allPullOrders } = await supabase
+                .from('orders')
+                .select('id')
+                .eq('parent_order_id', order.parent_order_id)
+                .eq('order_type', 'pull_ship')
+                .eq('vibe_approved', true);
+
+              let totalShippedForSku = 0;
+              
+              if (allPullOrders && allPullOrders.length > 0) {
+                const pullOrderIds = allPullOrders.map(po => po.id);
+                
+                const { data: allPullItems } = await supabase
+                  .from('order_items')
+                  .select('quantity')
+                  .in('order_id', pullOrderIds)
+                  .eq('sku', pullItem.sku);
+                
+                if (allPullItems) {
+                  totalShippedForSku = allPullItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+                }
+              }
               
               await supabase
                 .from('order_items')
-                .update({ shipped_quantity: newShippedQty })
+                .update({ shipped_quantity: totalShippedForSku })
                 .eq('id', parentItem.id);
             }
           }
