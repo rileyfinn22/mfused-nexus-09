@@ -678,6 +678,69 @@ const PullShipOrderDetail = () => {
     }
 
     try {
+      // If this was an approved pull & ship order with a parent, recalculate parent's shipped quantities
+      if (order.parent_order_id && order.vibe_approved) {
+        // Get all remaining approved pull & ship orders for this parent (excluding current one)
+        const { data: remainingOrders } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('parent_order_id', order.parent_order_id)
+          .eq('order_type', 'pull_ship')
+          .eq('vibe_approved', true)
+          .neq('id', orderId);
+
+        // Get parent order items
+        const { data: parentItems } = await supabase
+          .from('order_items')
+          .select('id, sku')
+          .eq('order_id', order.parent_order_id);
+
+        if (parentItems) {
+          for (const parentItem of parentItems) {
+            // Calculate total shipped for this SKU from remaining PS orders
+            let totalShipped = 0;
+            
+            if (remainingOrders && remainingOrders.length > 0) {
+              const { data: pullItems } = await supabase
+                .from('order_items')
+                .select('quantity')
+                .in('order_id', remainingOrders.map(o => o.id))
+                .eq('sku', parentItem.sku);
+              
+              if (pullItems) {
+                totalShipped = pullItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+              }
+            }
+
+            // Update parent order item shipped quantity
+            await supabase
+              .from('order_items')
+              .update({ shipped_quantity: totalShipped })
+              .eq('id', parentItem.id);
+          }
+        }
+
+        // Recalculate blanket invoice billed_percentage
+        const { data: invoices } = await supabase
+          .from('invoices')
+          .select('id, invoice_type, billed_percentage')
+          .eq('order_id', order.parent_order_id);
+
+        if (invoices) {
+          const partialInvoices = invoices.filter(inv => inv.invoice_type === 'partial');
+          const totalBilledPercent = partialInvoices.reduce((sum, inv) => sum + (inv.billed_percentage || 0), 0);
+          
+          const blanketInvoice = invoices.find(inv => inv.invoice_type === 'full');
+          if (blanketInvoice) {
+            await supabase
+              .from('invoices')
+              .update({ billed_percentage: Number(totalBilledPercent.toFixed(2)) })
+              .eq('id', blanketInvoice.id);
+          }
+        }
+      }
+
+      // Delete the order
       const { error } = await supabase
         .from('orders')
         .delete()
@@ -687,7 +750,7 @@ const PullShipOrderDetail = () => {
 
       toast({ 
         title: "Order Deleted", 
-        description: "Pull & ship order has been deleted"
+        description: "Pull & ship order has been deleted and parent order updated"
       });
       navigate('/pull-ship-orders');
     } catch (error: any) {
