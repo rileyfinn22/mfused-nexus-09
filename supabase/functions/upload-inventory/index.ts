@@ -75,14 +75,6 @@ serve(async (req) => {
       let sku = row['SKU'] || row['sku'] || row['Item'] || row['Item Name'];
       let itemId = null;
       let state = 'Primary'; // Default state
-      let invoiceNumber = null;
-      
-      // Extract invoice number if provided (links inventory to specific invoice)
-      invoiceNumber = row['Invoice #'] || row['Invoice Number'] || row['Invoice'] || row['invoice_number'] || null;
-      if (invoiceNumber) {
-        invoiceNumber = String(invoiceNumber).trim();
-        console.log('Invoice Number found:', invoiceNumber);
-      }
       
       // Check if "Item #" contains both item ID and state (format: PCK-00430-WA)
       const itemNumberRaw = row['Item #'] || row['Item ID'] || row['Item Id'] || row['item_id'];
@@ -201,7 +193,6 @@ serve(async (req) => {
         available: available,
         in_production: inProduction,
         redline: redline,
-        invoice_number: invoiceNumber, // Link to specific invoice
         upload_batch_id: batchId,
         upload_timestamp: uploadTimestamp,
       });

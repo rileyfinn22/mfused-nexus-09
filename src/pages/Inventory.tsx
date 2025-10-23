@@ -37,7 +37,6 @@ interface InventoryItem {
   in_production: number;
   redline: number;
   product_id: string;
-  invoice_number?: string | null;
   upload_batch_id?: string;
   upload_timestamp?: string;
   products?: {
@@ -374,9 +373,8 @@ const Inventory = () => {
               </div>
             )}
             <div className={isAdmin && isEditMode ? "col-span-1" : "col-span-1"}>Preview</div>
-            <div className={isAdmin && isEditMode ? "col-span-2" : "col-span-2"}>SKU</div>
+            <div className={isAdmin && isEditMode ? "col-span-3" : "col-span-3"}>SKU</div>
             <div className="col-span-1">State</div>
-            <div className="col-span-2">Invoice #</div>
             <div 
               className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
               onClick={() => handleSort("available")}
@@ -384,7 +382,7 @@ const Inventory = () => {
               Available {getSortIcon("available")}
             </div>
             <div 
-              className="col-span-1 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
+              className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
               onClick={() => handleSort("in_production")}
             >
               In Prod {getSortIcon("in_production")}
@@ -432,7 +430,7 @@ const Inventory = () => {
                     </div>
                   )}
                 </div>
-                <div className={`${isAdmin && isEditMode ? "col-span-2" : "col-span-2"} font-mono text-sm font-medium flex items-center gap-2`}>
+                <div className={`${isAdmin && isEditMode ? "col-span-3" : "col-span-3"} font-mono text-sm font-medium flex items-center gap-2`}>
                   <span 
                     className="break-words"
                     title={item.sku}
@@ -446,18 +444,11 @@ const Inventory = () => {
                 <div className="col-span-1">
                   <Badge variant="outline" className="text-xs">{item.state}</Badge>
                 </div>
-                <div className="col-span-2 text-sm text-muted-foreground">
-                  {item.invoice_number ? (
-                    <span className="font-mono">{item.invoice_number}</span>
-                  ) : (
-                    <span className="text-xs italic">—</span>
-                  )}
-                </div>
                 <div className="col-span-2 font-semibold text-sm flex items-center gap-1">
                   {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
                   {item.available}
                 </div>
-                <div className="col-span-1 text-sm">{item.in_production}</div>
+                <div className="col-span-2 text-sm">{item.in_production}</div>
                 <div className="col-span-1 text-sm text-muted-foreground">{item.redline}</div>
                 <div className={`col-span-1 text-xs font-medium uppercase ${stockColor}`}>
                   {status}

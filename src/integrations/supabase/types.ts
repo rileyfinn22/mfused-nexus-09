@@ -197,7 +197,6 @@ export type Database = {
           created_at: string
           id: string
           in_production: number
-          invoice_number: string | null
           product_id: string
           redline: number
           sku: string
@@ -212,7 +211,6 @@ export type Database = {
           created_at?: string
           id?: string
           in_production?: number
-          invoice_number?: string | null
           product_id: string
           redline?: number
           sku: string
@@ -227,7 +225,6 @@ export type Database = {
           created_at?: string
           id?: string
           in_production?: number
-          invoice_number?: string | null
           product_id?: string
           redline?: number
           sku?: string
@@ -1296,7 +1293,10 @@ export type Database = {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
       }
-      get_user_company: { Args: { _user_id: string }; Returns: string }
+      get_user_company: {
+        Args: { _user_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
