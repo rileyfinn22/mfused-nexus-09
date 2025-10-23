@@ -130,10 +130,37 @@ const PullShipOrders = () => {
 
       // If there's a parent order (blanket order), create an invoice for it
       if (order.parent_order_id) {
-        const invoiceNumber = `INV-${orderNumber}`;
-        
-        console.log('Creating invoice for parent order:', order.parent_order_id);
-        
+        // Get parent order and its existing invoices
+        const { data: parentOrder, error: parentError } = await supabase
+          .from('orders')
+          .select('order_number, subtotal, total, order_items(*)')
+          .eq('id', order.parent_order_id)
+          .single();
+
+        if (parentError) throw parentError;
+
+        // Get existing invoices for the parent order to determine next shipment number
+        const { data: existingInvoices, error: invoicesError } = await supabase
+          .from('invoices')
+          .select('invoice_number, shipment_number')
+          .eq('order_id', order.parent_order_id)
+          .order('shipment_number', { ascending: false });
+
+        if (invoicesError) throw invoicesError;
+
+        const nextShipmentNumber = existingInvoices && existingInvoices.length > 0 
+          ? (existingInvoices[0].shipment_number || 0) + 1 
+          : 1;
+
+        const baseInvoiceNumber = `INV-${parentOrder.order_number}`;
+        const invoiceNumber = `${baseInvoiceNumber}-${String(nextShipmentNumber).padStart(2, '0')}`;
+
+        // Calculate percentage of order
+        const pullShipTotal = order.total || 0;
+        const blanketTotal = parentOrder.total || 1;
+        const percentageOfOrder = (pullShipTotal / blanketTotal) * 100;
+
+        // Create invoice for this shipment
         const { data: invoiceData, error: invoiceError } = await supabase
           .from('invoices')
           .insert({
@@ -144,9 +171,12 @@ const PullShipOrders = () => {
             invoice_date: new Date().toISOString(),
             subtotal: order.subtotal || 0,
             tax: order.tax || 0,
-            total: order.total || 0,
+            total: pullShipTotal,
             shipping_cost: order.shipping_cost || 0,
+            shipment_number: nextShipmentNumber,
+            billed_percentage: Number(percentageOfOrder.toFixed(2)),
             status: 'draft',
+            notes: `Pull & Ship Order: ${orderNumber}`,
             created_by: user.id
           })
           .select()
@@ -154,19 +184,63 @@ const PullShipOrders = () => {
 
         if (invoiceError) {
           console.error('Invoice creation error:', invoiceError);
-          toast({
-            title: "Order Approved",
-            description: `Order approved but invoice creation failed: ${invoiceError.message}`,
-            variant: "default",
-          });
-          fetchOrders();
-          return;
+          throw invoiceError;
         }
-        
-        console.log('Invoice created successfully:', invoiceData);
+
+        // Update order items shipped_quantity based on pull & ship order items
+        if (order.order_items && order.order_items.length > 0) {
+          for (const pullItem of order.order_items) {
+            // Find matching item in parent order by SKU
+            const parentItem = parentOrder.order_items?.find(
+              (pi: any) => pi.sku === pullItem.sku
+            );
+
+            if (parentItem) {
+              const newShippedQty = (parentItem.shipped_quantity || 0) + (pullItem.quantity || 0);
+              
+              await supabase
+                .from('order_items')
+                .update({ shipped_quantity: newShippedQty })
+                .eq('id', parentItem.id);
+            }
+          }
+
+          // Create inventory allocations for this pull
+          for (const pullItem of order.order_items) {
+            const { data: inventory } = await supabase
+              .from('inventory')
+              .select('*')
+              .eq('sku', pullItem.sku)
+              .eq('company_id', order.company_id)
+              .eq('state', order.shipping_state)
+              .maybeSingle();
+
+            if (inventory) {
+              await supabase
+                .from('inventory_allocations')
+                .insert({
+                  inventory_id: inventory.id,
+                  order_item_id: pullItem.id,
+                  invoice_id: invoiceData.id,
+                  quantity_allocated: pullItem.quantity,
+                  allocated_by: user.id,
+                  status: 'allocated'
+                });
+
+              // Update inventory available quantity
+              await supabase
+                .from('inventory')
+                .update({ 
+                  available: (inventory.available || 0) - pullItem.quantity 
+                })
+                .eq('id', inventory.id);
+            }
+          }
+        }
+
         toast({ 
           title: "Order Approved", 
-          description: `Order ${orderNumber} approved and invoice ${invoiceNumber} created`
+          description: `Order ${orderNumber} approved and invoice ${invoiceNumber} created (${percentageOfOrder.toFixed(1)}% of blanket order)`
         });
       } else {
         toast({ 
