@@ -91,6 +91,80 @@ const PullShipOrders = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const handleApproveOrder = async (orderId: string, orderNumber: string, order: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Check if fulfillment vendor is assigned
+    if (!order.fulfillment_vendor_id) {
+      toast({
+        title: "Cannot Approve",
+        description: "Please open the order and assign a fulfillment vendor first",
+        variant: "destructive",
+      });
+      navigate(`/pull-ship-orders/${orderId}`);
+      return;
+    }
+    
+    if (!confirm(`Approve order ${orderNumber}? This will send it to fulfillment.`)) {
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Approve the pull & ship order
+      const { error: approveError } = await supabase
+        .from('orders')
+        .update({
+          vibe_approved: true,
+          vibe_approved_by: user.id,
+          vibe_approved_at: new Date().toISOString(),
+          status: 'picked'
+        })
+        .eq('id', orderId);
+
+      if (approveError) throw approveError;
+
+      // If there's a parent order, create an invoice for it
+      if (order.parent_order_id) {
+        const invoiceNumber = `INV-${orderNumber}`;
+        
+        const { error: invoiceError } = await supabase
+          .from('invoices')
+          .insert({
+            order_id: order.parent_order_id,
+            company_id: order.company_id,
+            invoice_number: invoiceNumber,
+            invoice_type: 'partial',
+            subtotal: order.subtotal || 0,
+            tax: order.tax || 0,
+            total: order.total || 0,
+            shipping_cost: order.shipping_cost || 0,
+            status: 'draft',
+            created_by: user.id
+          });
+
+        if (invoiceError) {
+          console.error('Invoice creation error:', invoiceError);
+          throw new Error('Order approved but invoice creation failed');
+        }
+      }
+
+      toast({ 
+        title: "Order Approved", 
+        description: `Order ${orderNumber} has been approved and invoice created`
+      });
+      fetchOrders();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDeleteOrder = async (orderId: string, orderNumber: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
@@ -197,6 +271,16 @@ const PullShipOrders = () => {
                 {getApprovalBadge(order)}
               </div>
               <div className="col-span-2 flex gap-2">
+                {!order.vibe_approved && (
+                  <Button 
+                    size="sm" 
+                    className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
+                    onClick={(e) => handleApproveOrder(order.id, order.order_number, order, e)}
+                  >
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Approve
+                  </Button>
+                )}
                 <Button 
                   variant="ghost" 
                   size="sm" 

@@ -433,6 +433,35 @@ const PullShipOrderDetail = () => {
         }
       }
 
+      // If there's a parent order (blanket order), create an invoice for it
+      if (order.parent_order_id) {
+        const invoiceNumber = `INV-${order.order_number}`;
+        
+        const { error: invoiceError } = await supabase
+          .from('invoices')
+          .insert({
+            order_id: order.parent_order_id,
+            company_id: order.company_id,
+            invoice_number: invoiceNumber,
+            invoice_type: 'partial',
+            subtotal: editedOrder.subtotal || 0,
+            tax: editedOrder.tax || 0,
+            total: editedOrder.total || 0,
+            shipping_cost: editedOrder.shipping_cost || 0,
+            status: 'draft',
+            created_by: user.id
+          });
+
+        if (invoiceError) {
+          console.error('Invoice creation error:', invoiceError);
+          toast({
+            title: "Warning",
+            description: "Order approved but invoice creation failed",
+            variant: "default",
+          });
+        }
+      }
+
       // Generate and send packing list to fulfillment vendor
       const items = editedOrder.order_items.map((item: any) => ({
         sku: item.sku,
@@ -460,13 +489,13 @@ const PullShipOrderDetail = () => {
         console.error('Error sending email:', emailError);
         toast({
           title: "Order Approved",
-          description: "Order approved but email notification failed. Please send manually.",
+          description: "Order approved and invoice created. Email notification failed.",
           variant: "default",
         });
       } else {
         toast({
           title: "Order Approved & Sent",
-          description: "Order has been approved and sent to the fulfillment vendor",
+          description: "Order approved, invoice created, and sent to fulfillment vendor",
         });
       }
 
