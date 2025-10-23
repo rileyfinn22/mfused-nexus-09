@@ -38,6 +38,7 @@ const PullShip = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [orderData, setOrderData] = useState({
+    companyId: "",
     state: "",
     shippingAddress: "",
     shippingCity: "",
@@ -58,10 +59,11 @@ const PullShip = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [blanketOrders, setBlanketOrders] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
 
   useEffect(() => {
     fetchPullShipOrders();
-    fetchBlanketOrders();
+    fetchCompanies();
   }, []);
 
   const fetchPullShipOrders = async () => {
@@ -86,23 +88,17 @@ const PullShip = () => {
     }
   };
 
-  const fetchBlanketOrders = async () => {
+  const fetchBlanketOrders = async (companyId: string) => {
+    if (!companyId) {
+      setBlanketOrders([]);
+      return;
+    }
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!userRole?.company_id) return;
-
       const { data, error } = await supabase
         .from('orders')
         .select('id, order_number, customer_name, total, created_at')
-        .eq('company_id', userRole.company_id)
+        .eq('company_id', companyId)
         .eq('order_type', 'standard')
         .order('created_at', { ascending: false })
         .limit(20);
@@ -111,6 +107,20 @@ const PullShip = () => {
       setBlanketOrders(data || []);
     } catch (error) {
       console.error('Error fetching blanket orders:', error);
+    }
+  };
+
+  const fetchCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setCompanies(data || []);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
     }
   };
   
@@ -127,14 +137,17 @@ const PullShip = () => {
 
   const stateOptions = [...Object.keys(stateAddressMapping).filter(s => s !== "Primary"), "Primary"];
 
-  // Fetch inventory from database for the selected state
-  const fetchInventoryForState = async (state: string) => {
+  // Fetch inventory from database for the selected state and company
+  const fetchInventoryForState = async (state: string, companyId: string) => {
+    if (!state || !companyId) return;
+    
     setLoadingInventory(true);
     try {
       const { data, error } = await supabase
         .from('inventory')
         .select('*, products(image_url, item_id, name)')
         .eq('state', state)
+        .eq('company_id', companyId)
         .gt('available', 0)
         .order('sku', { ascending: true });
 
@@ -335,6 +348,18 @@ const PullShip = () => {
     doc.save(`invoice-preview-${Date.now()}.pdf`);
   };
 
+  const handleCompanyChange = (companyId: string) => {
+    setOrderData(prev => ({
+      ...prev,
+      companyId,
+      state: "",
+      parentOrderId: ""
+    }));
+    setInventory([]);
+    setBlanketOrders([]);
+    fetchBlanketOrders(companyId);
+  };
+
   const handleStateChange = (state: string) => {
     const addressData = stateAddressMapping[state as keyof typeof stateAddressMapping];
     setOrderData(prev => ({
@@ -346,8 +371,10 @@ const PullShip = () => {
       shippingZip: addressData?.zip || ""
     }));
     
-    // Fetch inventory for the selected state
-    fetchInventoryForState(state);
+    // Fetch inventory for the selected state and company
+    if (orderData.companyId) {
+      fetchInventoryForState(state, orderData.companyId);
+    }
   };
 
   const handlePOFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -489,20 +516,18 @@ const PullShip = () => {
     e.preventDefault();
     if (selectedSkus.size === 0) return;
     
+    if (!orderData.companyId) {
+      toast({
+        title: "Company Required",
+        description: "Please select a company first",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-
-      // Get user's company
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!userRole?.company_id) {
-        throw new Error('User not associated with a company');
-      }
 
       const items = Array.from(selectedSkus).map(sku => {
         const inventoryItem = inventory.find(item => item.sku === sku);
@@ -528,7 +553,7 @@ const PullShip = () => {
         .from('orders')
         .insert({
           order_number: orderNumber,
-          company_id: userRole.company_id,
+          company_id: orderData.companyId,
           order_type: 'pull_ship',
           parent_order_id: orderData.parentOrderId || null,
           customer_name: orderData.state,
@@ -577,6 +602,7 @@ const PullShip = () => {
 
       // Reset the form
       setOrderData({
+        companyId: "",
         state: "",
         shippingAddress: "",
         shippingCity: "",
@@ -655,41 +681,62 @@ const PullShip = () => {
             <div className="bg-table-row border border-table-border rounded p-4">
               <h2 className="text-lg font-semibold mb-4">Order Details</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Link to Blanket Order (Optional)</Label>
-                    <Select value={orderData.parentOrderId || "none"} onValueChange={(value) => handleInputChange('parentOrderId', value === "none" ? "" : value)}>
+                    <Label className="text-sm font-medium">Company</Label>
+                    <Select value={orderData.companyId} onValueChange={handleCompanyChange}>
                       <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Select blanket order..." />
+                        <SelectValue placeholder="Select Company" />
                       </SelectTrigger>
                       <SelectContent className="bg-background border border-border shadow-lg z-50">
-                        <SelectItem value="none">None (standalone order)</SelectItem>
-                        {blanketOrders.map(order => (
-                          <SelectItem key={order.id} value={order.id}>
-                            {order.order_number} - {order.customer_name} (${order.total?.toFixed(2)})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Select a blanket order to create invoice when approved
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Destination State</Label>
-                    <Select value={orderData.state} onValueChange={handleStateChange}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Select State" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background border border-border shadow-lg z-50">
-                        {stateOptions.map(state => (
-                          <SelectItem key={state} value={state}>
-                            {state}
+                        {companies.map(company => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {orderData.companyId && (
+                    <>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Destination State</Label>
+                        <Select value={orderData.state} onValueChange={handleStateChange}>
+                          <SelectTrigger className="h-10">
+                            <SelectValue placeholder="Select State" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border border-border shadow-lg z-50">
+                            {stateOptions.map(state => (
+                              <SelectItem key={state} value={state}>
+                                {state}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Link to Blanket Order (Optional)</Label>
+                        <Select value={orderData.parentOrderId || "none"} onValueChange={(value) => handleInputChange('parentOrderId', value === "none" ? "" : value)}>
+                          <SelectTrigger className="h-10">
+                            <SelectValue placeholder="Select blanket order..." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border border-border shadow-lg z-50">
+                            <SelectItem value="none">None (standalone order)</SelectItem>
+                            {blanketOrders.map(order => (
+                              <SelectItem key={order.id} value={order.id}>
+                                {order.order_number} - {order.customer_name} (${order.total?.toFixed(2)})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Select a blanket order to create invoice when approved
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {orderData.state && (
