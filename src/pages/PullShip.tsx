@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,78 +54,34 @@ const PullShip = () => {
   const [selectedPOFile, setSelectedPOFile] = useState<File | null>(null);
   const [inventory, setInventory] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(false);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
-  const [invoices, setInvoices] = useState([
-    {
-      id: "INV-001", 
-      state: "WA", 
-      items: [
-        { sku: "VAPE-CART-001", quantity: 100 },
-        { sku: "EDIBLE-PKG-005", quantity: 50 }
-      ],
-      status: "pending",
-      requestDate: "2024-01-15", 
-      estimatedShip: "2024-01-17", 
-      shippingAddress: "123 Main St, Seattle, WA 98101",
-      trackingNumber: null, 
-      notes: "Rush order for new dispensary opening",
-      invoiceAmount: "$15,250.00",
-      packingListPdf: "data:application/pdf;base64,sample", // Mock PDF URL
-      invoicePdf: "data:application/pdf;base64,sample" // Mock PDF URL
-    },
-    {
-      id: "INV-002", 
-      state: "CA", 
-      items: [
-        { sku: "EDIBLE-PKG-005", quantity: 250 },
-        { sku: "FLOWER-JAR-003", quantity: 75 }
-      ],
-      status: "picked",
-      requestDate: "2024-01-12", 
-      estimatedShip: "2024-01-16", 
-      shippingAddress: "456 Oak Ave, Los Angeles, CA 90210",
-      trackingNumber: null, 
-      notes: "Standard delivery",
-      invoiceAmount: "$18,750.00",
-      packingListPdf: "data:application/pdf;base64,sample", // Mock PDF URL
-      invoicePdf: "data:application/pdf;base64,sample" // Mock PDF URL
-    },
-    {
-      id: "INV-003", 
-      state: "NY", 
-      items: [
-        { sku: "FLOWER-JAR-003", quantity: 75 }
-      ],
-      status: "shipped",
-      requestDate: "2024-01-10", 
-      estimatedShip: "2024-01-14", 
-      shippingAddress: "789 Broadway, New York, NY 10001",
-      trackingNumber: "1Z999AA1234567890", 
-      notes: "Fragile - handle with care",
-      invoiceAmount: "$5,625.00",
-      packingListPdf: "data:application/pdf;base64,sample", // Mock PDF URL
-      invoicePdf: "data:application/pdf;base64,sample" // Mock PDF URL
-    },
-    {
-      id: "INV-004", 
-      state: "AZ", 
-      items: [
-        { sku: "CONCENTRATE-TIN-002", quantity: 150 },
-        { sku: "PRE-ROLL-TUBE-001", quantity: 200 }
-      ],
-      status: "delivered",
-      requestDate: "2024-01-08", 
-      estimatedShip: "2024-01-12", 
-      shippingAddress: "321 Desert Rd, Phoenix, AZ 85001",
-      trackingNumber: "1Z999AA1234567891", 
-      notes: "Regular monthly shipment",
-      invoiceAmount: "$22,500.00",
-      packingListPdf: "data:application/pdf;base64,sample", // Mock PDF URL
-      invoicePdf: "data:application/pdf;base64,sample" // Mock PDF URL
-    },
-  ]);
+  useEffect(() => {
+    fetchPullShipOrders();
+  }, []);
 
-  const skuOptions = ["VAPE-CART-001", "EDIBLE-PKG-005", "FLOWER-JAR-003", "CONCENTRATE-TIN-002", "PRE-ROLL-TUBE-001", "TINCTURE-BTL-002"];
+  const fetchPullShipOrders = async () => {
+    setLoadingOrders(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items(sku, quantity),
+          companies(name)
+        `)
+        .eq('order_type', 'pull_ship')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (error) {
+      console.error('Error fetching pull & ship orders:', error);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
   
   const stateAddressMapping = {
     "WA": { address: "123 Main St", city: "Seattle", zip: "98101" },
@@ -506,50 +462,10 @@ const PullShip = () => {
       };
     });
     
-    const invoiceId = `INV-${String(invoices.length + 1).padStart(3, '0')}`;
-    const totalValue = items.reduce((sum, item) => sum + item.quantity, 0) * 75;
-    const invoiceAmount = `$${totalValue.toLocaleString()}.00`;
-    
-    // Generate PDFs
-    const packingListDoc = generatePackingListPDF(items, orderData, invoiceId);
-    const invoiceDoc = generateInvoicePDF(items, orderData, invoiceId, invoiceAmount);
-    
-    const packingListBlob = packingListDoc.output("blob");
-    const invoiceBlob = invoiceDoc.output("blob");
-    const packingListPdf = packingListDoc.output('dataurlstring');
-    
-    const newInvoice = {
-      id: invoiceId,
-      state: orderData.state,
-      items,
-      status: "pending",
-      requestDate: new Date().toISOString().split('T')[0],
-      estimatedShip: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      shippingAddress: `${orderData.shippingAddress}, ${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZip}`,
-      trackingNumber: null,
-      notes: orderData.notes,
-      invoiceAmount,
-      packingListPdf: URL.createObjectURL(packingListBlob),
-      invoicePdf: URL.createObjectURL(invoiceBlob)
-    };
-    
-    // Send email with packing list
-    await sendPackingListEmail(packingListPdf, {
-      invoiceNumber: invoiceId,
-      customerName: 'Customer',
-      state: orderData.state,
-      address: `${orderData.shippingAddress}, ${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZip}`,
-      items
-    });
-    
-    setInvoices([newInvoice, ...invoices]);
-    setOrderData({ state: "", shippingAddress: "", shippingCity: "", shippingState: "", shippingZip: "", notes: "" });
-    setSelectedSkus(new Set());
-    setSkuQuantities({});
-    
     toast({
-      title: "Order Created",
-      description: "Pull order, packing list, and invoice have been generated",
+      title: "Legacy Feature",
+      description: "Please use the PO Upload feature above to create pull & ship orders",
+      variant: "destructive",
     });
   };
 
@@ -820,78 +736,100 @@ const PullShip = () => {
 
       {/* Previous Orders Section */}
       <div className="mt-12 space-y-4">
-        <div className="border-t border-table-border pt-6">
-          <h2 className="text-lg font-semibold mb-4">Previous Invoice Requests</h2>
+        <div className="border-t border-table-border pt-6 flex justify-between items-center">
+          <h2 className="text-lg font-semibold">Previous Pull & Ship Orders</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/pull-ship-orders')}
+          >
+            View All Orders
+          </Button>
         </div>
         
         <div className="space-y-3">
-          {invoices.map((invoice) => {
-            const StatusIcon = getStatusIcon(invoice.status);
-            const totalItems = invoice.items.reduce((sum, item) => sum + item.quantity, 0);
-            
-            return (
-              <div key={invoice.id} className="bg-table-row border border-table-border rounded p-4 hover:bg-table-row-hover transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="font-medium font-mono">{invoice.id}</div>
-                    <Badge variant="outline" className="text-xs">{invoice.state}</Badge>
-                    <div className={`flex items-center gap-1 text-sm ${getStatusColor(invoice.status)}`}>
-                      <StatusIcon className="h-4 w-4" />
-                      {invoice.status.toUpperCase()}
+          {loadingOrders ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Loading orders...
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No pull & ship orders found. Upload a PO to get started.
+            </div>
+          ) : (
+            orders.slice(0, 5).map((order) => {
+              const totalItems = order.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
+              
+              return (
+                <div 
+                  key={order.id} 
+                  className="bg-table-row border border-table-border rounded p-4 hover:bg-table-row-hover transition-colors cursor-pointer"
+                  onClick={() => navigate(`/pull-ship-orders/${order.id}`)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="font-medium font-mono">{order.order_number}</div>
+                      <Badge variant="outline" className="text-xs">{order.companies?.name || 'N/A'}</Badge>
+                      {order.vibe_approved ? (
+                        <Badge className="bg-green-500 text-white text-xs">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Approved
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-yellow-600 border-yellow-600 text-xs">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Pending
+                        </Badge>
+                      )}
                     </div>
-                  </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="text-sm font-medium">{invoice.invoiceAmount}</div>
-                    <div className="text-sm text-muted-foreground">{invoice.estimatedShip}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    {invoice.packingListPdf && (
+                    <div className="flex items-center gap-4">
+                      <div className="text-sm font-medium">${order.total?.toFixed(2) || '0.00'}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(order.created_at).toLocaleDateString()}
+                      </div>
                       <Button 
                         variant="outline" 
-                        size="sm" 
-                        onClick={() => window.open(invoice.packingListPdf!)}
-                        className="h-7 px-2 text-xs"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/pull-ship-orders/${order.id}`);
+                        }}
+                        className="h-7 px-3 text-xs"
                       >
-                        <FileText className="h-3 w-3 mr-1" />
-                        Packing List
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
                       </Button>
-                    )}
-                    {invoice.invoicePdf && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => window.open(invoice.invoicePdf!)}
-                        className="h-7 px-2 text-xs"
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Invoice
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                </div>
-                
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {invoice.items.map((item, idx) => (
-                    <div key={idx} className="bg-background border border-table-border px-3 py-1 rounded text-xs">
-                      <span className="font-medium">{item.sku}</span>
-                      <span className="text-muted-foreground ml-1">x{item.quantity}</span>
                     </div>
-                  ))}
-                  <div className="bg-primary/10 border border-primary/20 px-3 py-1 rounded text-xs font-medium text-primary">
-                    Total: {totalItems} units
                   </div>
+                  
+                  {order.order_items && order.order_items.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {order.order_items.slice(0, 5).map((item: any, idx: number) => (
+                        <div key={idx} className="bg-background border border-table-border px-3 py-1 rounded text-xs">
+                          <span className="font-medium">{item.sku}</span>
+                          <span className="text-muted-foreground ml-1">x{item.quantity}</span>
+                        </div>
+                      ))}
+                      {order.order_items.length > 5 && (
+                        <div className="bg-background border border-table-border px-3 py-1 rounded text-xs text-muted-foreground">
+                          +{order.order_items.length - 5} more
+                        </div>
+                      )}
+                      <div className="bg-primary/10 border border-primary/20 px-3 py-1 rounded text-xs font-medium text-primary">
+                        Total: {totalItems} units
+                      </div>
+                    </div>
+                  )}
+                  
+                  {order.memo && (
+                    <div className="mt-2 text-sm text-muted-foreground">
+                      {order.memo}
+                    </div>
+                  )}
                 </div>
-                
-                {invoice.notes && (
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    {invoice.notes}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
     </div>
