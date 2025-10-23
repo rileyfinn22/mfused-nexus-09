@@ -142,7 +142,7 @@ const PullShipOrders = () => {
         // Get existing invoices for the parent order to determine next shipment number
         const { data: existingInvoices, error: invoicesError } = await supabase
           .from('invoices')
-          .select('invoice_number, shipment_number')
+          .select('id, invoice_number, shipment_number, billed_percentage, invoice_type')
           .eq('order_id', order.parent_order_id)
           .order('shipment_number', { ascending: false });
 
@@ -257,6 +257,25 @@ const PullShipOrders = () => {
                 })
                 .eq('id', inventory.id);
             }
+          }
+        }
+
+        // Update the blanket order's main invoice to show overall completion percentage
+        if (existingInvoices && existingInvoices.length > 0) {
+          // Calculate total billed percentage across all invoices
+          const totalBilledPercent = existingInvoices.reduce((sum, inv) => 
+            sum + (inv.billed_percentage || 0), percentageOfOrder
+          );
+          
+          // Update the first (full) invoice with cumulative percentage
+          const firstInvoice = existingInvoices.find(inv => inv.invoice_type === 'full');
+          if (firstInvoice) {
+            await supabase
+              .from('invoices')
+              .update({ 
+                billed_percentage: Number(totalBilledPercent.toFixed(2))
+              })
+              .eq('id', firstInvoice.id);
           }
         }
 

@@ -557,6 +557,11 @@ const InvoiceDetail = () => {
           <div className="p-8">
             <h2 className="text-lg font-semibold mb-4">
               Order Items
+              {invoice?.invoice_type === 'partial' && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  (Items in this shipment only)
+                </span>
+              )}
               {isEditMode && (
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
                   (Editing Mode - Adjust quantities and prices as needed)
@@ -570,54 +575,65 @@ const InvoiceDetail = () => {
                   <TableHead>Product</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-center">Ordered</TableHead>
-                  <TableHead className="text-center">Shipped</TableHead>
+                  <TableHead className="text-center">
+                    {invoice?.invoice_type === 'partial' ? 'In Shipment' : 'Shipped'}
+                  </TableHead>
                   <TableHead className="text-right">Unit Price</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayItems.map((item: any) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {item.description || '-'}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {invoice?.invoice_type === 'partial' ? item.quantity : item.quantity}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {isEditMode ? (
-                        <Input
-                          type="number"
-                          min="0"
-                          value={item.quantity}
-                          onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 0)}
-                          className="w-24 text-center"
-                        />
-                      ) : (
-                        item.quantity || item.shipped_quantity
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {isEditMode ? (
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={item.unit_price}
-                          onChange={(e) => handlePriceChange(item.id, parseFloat(e.target.value) || 0)}
-                          className="w-28 text-right"
-                        />
-                      ) : (
-                        formatCurrency(Number(item.unit_price))
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {formatCurrency(Number(item.quantity || item.shipped_quantity) * Number(item.unit_price))}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {displayItems.map((item: any) => {
+                  // For full invoices, show total quantity but actual shipped quantity
+                  // For partial invoices, show only the items in this shipment
+                  const orderedQty = invoice?.invoice_type === 'partial' 
+                    ? (item.quantity || 0) 
+                    : (order?.order_items?.find((oi: any) => oi.sku === item.sku)?.quantity || item.quantity);
+                  const shippedQty = item.quantity || item.shipped_quantity || 0;
+                  
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {item.description || '-'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {orderedQty}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {isEditMode ? (
+                          <Input
+                            type="number"
+                            min="0"
+                            value={shippedQty}
+                            onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 0)}
+                            className="w-24 text-center"
+                          />
+                        ) : (
+                          shippedQty
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isEditMode ? (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.unit_price}
+                            onChange={(e) => handlePriceChange(item.id, parseFloat(e.target.value) || 0)}
+                            className="w-28 text-right"
+                          />
+                        ) : (
+                          formatCurrency(Number(item.unit_price))
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {formatCurrency(shippedQty * Number(item.unit_price))}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
 
