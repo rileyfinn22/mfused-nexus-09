@@ -658,12 +658,12 @@ const PullShip = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Link to Blanket Order (Optional)</Label>
-                    <Select value={orderData.parentOrderId} onValueChange={(value) => handleInputChange('parentOrderId', value)}>
+                    <Select value={orderData.parentOrderId || "none"} onValueChange={(value) => handleInputChange('parentOrderId', value === "none" ? "" : value)}>
                       <SelectTrigger className="h-10">
                         <SelectValue placeholder="Select blanket order..." />
                       </SelectTrigger>
                       <SelectContent className="bg-background border border-border shadow-lg z-50">
-                        <SelectItem value="">None (standalone order)</SelectItem>
+                        <SelectItem value="none">None (standalone order)</SelectItem>
                         {blanketOrders.map(order => (
                           <SelectItem key={order.id} value={order.id}>
                             {order.order_number} - {order.customer_name} (${order.total?.toFixed(2)})
