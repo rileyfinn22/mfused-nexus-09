@@ -50,7 +50,7 @@ const PullShipOrders = () => {
     setLoading(true);
     let query = supabase
       .from('orders')
-      .select('*, order_items(*), companies(name), vendors!orders_fulfillment_vendor_id_fkey(name)')
+      .select('*, order_items(*), companies(name), vendors!orders_fulfillment_vendor_id_fkey(name), parent_order:parent_order_id(id, order_number)')
       .eq('order_type', 'pull_ship')
       .order('created_at', { ascending: false });
 
@@ -58,6 +58,8 @@ const PullShipOrders = () => {
     
     if (!error && data) {
       setOrders(data);
+    } else if (error) {
+      console.error('Error fetching orders:', error);
     }
     setLoading(false);
   };
@@ -126,35 +128,52 @@ const PullShipOrders = () => {
 
       if (approveError) throw approveError;
 
-      // If there's a parent order, create an invoice for it
+      // If there's a parent order (blanket order), create an invoice for it
       if (order.parent_order_id) {
         const invoiceNumber = `INV-${orderNumber}`;
         
-        const { error: invoiceError } = await supabase
+        console.log('Creating invoice for parent order:', order.parent_order_id);
+        
+        const { data: invoiceData, error: invoiceError } = await supabase
           .from('invoices')
           .insert({
             order_id: order.parent_order_id,
             company_id: order.company_id,
             invoice_number: invoiceNumber,
             invoice_type: 'partial',
+            invoice_date: new Date().toISOString(),
             subtotal: order.subtotal || 0,
             tax: order.tax || 0,
             total: order.total || 0,
             shipping_cost: order.shipping_cost || 0,
             status: 'draft',
             created_by: user.id
-          });
+          })
+          .select()
+          .single();
 
         if (invoiceError) {
           console.error('Invoice creation error:', invoiceError);
-          throw new Error('Order approved but invoice creation failed');
+          toast({
+            title: "Order Approved",
+            description: `Order approved but invoice creation failed: ${invoiceError.message}`,
+            variant: "default",
+          });
+          fetchOrders();
+          return;
         }
+        
+        console.log('Invoice created successfully:', invoiceData);
+        toast({ 
+          title: "Order Approved", 
+          description: `Order ${orderNumber} approved and invoice ${invoiceNumber} created`
+        });
+      } else {
+        toast({ 
+          title: "Order Approved", 
+          description: `Order ${orderNumber} has been approved (no parent order to invoice)`
+        });
       }
-
-      toast({ 
-        title: "Order Approved", 
-        description: `Order ${orderNumber} has been approved and invoice created`
-      });
       fetchOrders();
     } catch (error: any) {
       toast({
