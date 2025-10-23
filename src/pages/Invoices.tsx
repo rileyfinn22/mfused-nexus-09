@@ -84,8 +84,6 @@ const Invoices = () => {
     switch (status.toLowerCase()) {
       case 'paid': return 'text-success';
       case 'open': return 'text-primary';
-      case 'overdue': return 'text-danger';
-      case 'pending': return 'text-warning';
       default: return 'text-muted-foreground';
     }
   };
@@ -94,8 +92,6 @@ const Invoices = () => {
     switch (status.toLowerCase()) {
       case 'paid': return CheckCircle;
       case 'open': return Clock;
-      case 'overdue': return AlertTriangle;
-      case 'pending': return Clock;
       default: return Clock;
     }
   };
@@ -128,7 +124,7 @@ const Invoices = () => {
 
   const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + Number(invoice.total), 0);
   const paidAmount = filteredInvoices.filter(inv => inv.status === 'paid').reduce((sum, invoice) => sum + Number(invoice.total), 0);
-  const overdueAmount = filteredInvoices.filter(inv => inv.status === 'overdue').reduce((sum, invoice) => sum + Number(invoice.total), 0);
+  const openAmount = filteredInvoices.filter(inv => inv.status === 'open').reduce((sum, invoice) => sum + Number(invoice.total), 0);
 
   return (
     <div className="space-y-6">
@@ -147,16 +143,16 @@ const Invoices = () => {
       {/* Summary Row */}
       <div className="grid grid-cols-3 gap-6">
         <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Outstanding</p>
-          <p className="text-2xl font-semibold mt-1">{formatCurrency(totalAmount - paidAmount)}</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Amount</p>
+          <p className="text-2xl font-semibold mt-1">{formatCurrency(totalAmount)}</p>
         </div>
         <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Paid This Month</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Invoices</p>
+          <p className="text-2xl font-semibold mt-1 text-primary">{formatCurrency(openAmount)}</p>
+        </div>
+        <div className="bg-table-row border border-table-border rounded p-4">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Paid Amount</p>
           <p className="text-2xl font-semibold mt-1 text-success">{formatCurrency(paidAmount)}</p>
-        </div>
-        <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Overdue Amount</p>
-          <p className="text-2xl font-semibold mt-1 text-danger">{formatCurrency(overdueAmount)}</p>
         </div>
       </div>
 
@@ -190,10 +186,8 @@ const Invoices = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="open">Open</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="overdue">Overdue</SelectItem>
           </SelectContent>
         </Select>
       </div>

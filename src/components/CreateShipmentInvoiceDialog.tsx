@@ -140,7 +140,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
           shipment_number: nextShipmentNumber,
           invoice_type: invoiceType,
           billed_percentage: billedPercentage,
-          status: 'draft',
+          status: 'open',
           subtotal,
           tax,
           shipping_cost: shipping,
