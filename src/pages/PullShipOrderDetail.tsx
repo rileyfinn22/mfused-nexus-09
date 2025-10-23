@@ -678,6 +678,35 @@ const PullShipOrderDetail = () => {
     }
 
     try {
+      // If this was an approved order, restore inventory
+      if (order.vibe_approved) {
+        // Get inventory allocations for this order's items
+        const { data: allocations } = await supabase
+          .from('inventory_allocations')
+          .select('*, inventory(id, available)')
+          .in('order_item_id', order.order_items.map((item: any) => item.id));
+
+        if (allocations) {
+          // Restore inventory quantities
+          for (const alloc of allocations) {
+            if (alloc.inventory) {
+              await supabase
+                .from('inventory')
+                .update({ 
+                  available: (alloc.inventory.available || 0) + alloc.quantity_allocated 
+                })
+                .eq('id', alloc.inventory.id);
+            }
+          }
+
+          // Delete the allocations
+          await supabase
+            .from('inventory_allocations')
+            .delete()
+            .in('order_item_id', order.order_items.map((item: any) => item.id));
+        }
+      }
+
       // If this was an approved pull & ship order with a parent, recalculate parent's shipped quantities
       if (order.parent_order_id && order.vibe_approved) {
         // Get all remaining approved pull & ship orders for this parent (excluding current one)
@@ -750,7 +779,7 @@ const PullShipOrderDetail = () => {
 
       toast({ 
         title: "Order Deleted", 
-        description: "Pull & ship order has been deleted and parent order updated"
+        description: "Pull & ship order deleted, inventory restored, and parent order updated"
       });
       navigate('/pull-ship-orders');
     } catch (error: any) {
