@@ -398,24 +398,29 @@ const PullShip = () => {
       setAnalyzingPO(false);
 
       // The edge function has created a pull & ship order
-      if (analysisData.success && analysisData.orderId) {
+      if (analysisData?.success && analysisData?.orderId) {
         toast({
           title: "Pull & Ship Order Created",
-          description: `Order ${analysisData.orderNumber} has been created from the PO`,
+          description: `Order ${analysisData.orderNumber} has been created and is pending approval`,
         });
 
-        // Navigate to the pull & ship order detail page
-        navigate(`/pull-ship-orders/${analysisData.orderId}`);
+        // Refresh the orders list to show the new order
+        await fetchPullShipOrders();
+        
+        // Clear the file selection
+        setSelectedPOFile(null);
+        
+        // Scroll to the orders section
+        document.querySelector('.mt-12')?.scrollIntoView({ behavior: 'smooth' });
       } else {
         throw new Error('Failed to create pull & ship order from PO');
       }
-
-      setSelectedPOFile(null);
     } catch (error: any) {
       console.error('Error uploading PO:', error);
+      console.error('Full error details:', JSON.stringify(error, null, 2));
       toast({
         title: "Upload Failed",
-        description: error.message,
+        description: error.message || 'An unknown error occurred',
         variant: "destructive",
       });
       setUploadingPO(false);
