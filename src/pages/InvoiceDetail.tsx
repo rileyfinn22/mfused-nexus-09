@@ -584,12 +584,17 @@ const InvoiceDetail = () => {
               </TableHeader>
               <TableBody>
                 {displayItems.map((item: any) => {
-                  // For full invoices, show total quantity but actual shipped quantity
+                  // For blanket (full) invoices, show the original order quantity and actual shipped quantity from DB
                   // For partial invoices, show only the items in this shipment
                   const orderedQty = invoice?.invoice_type === 'partial' 
                     ? (item.quantity || 0) 
                     : (order?.order_items?.find((oi: any) => oi.sku === item.sku)?.quantity || item.quantity);
-                  const shippedQty = item.quantity || item.shipped_quantity || 0;
+                  
+                  // For blanket invoices, get the real shipped_quantity from order_items
+                  // For partial invoices, show the quantity in this shipment
+                  const shippedQty = invoice?.invoice_type === 'partial'
+                    ? (item.quantity || 0)
+                    : (order?.order_items?.find((oi: any) => oi.sku === item.sku)?.shipped_quantity || 0);
                   
                   return (
                     <TableRow key={item.id}>

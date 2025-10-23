@@ -646,7 +646,7 @@ const CreateOrder = () => {
           name: product?.name || "",
           description: product?.description || null,
           quantity: item.quantity,
-          shipped_quantity: item.quantity,
+          shipped_quantity: 0, // Start at 0, will be updated when invoiced or Pull & Ship orders approved
           unit_price: price,
           total: itemTotal,
         };
