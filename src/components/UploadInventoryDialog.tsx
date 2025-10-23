@@ -62,7 +62,7 @@ export function UploadInventoryDialog({ onInventoryUploaded }: UploadInventoryDi
         <DialogHeader>
           <DialogTitle>Upload Inventory</DialogTitle>
             <DialogDescription>
-              Upload a CSV or Excel file with inventory data. Required columns: SKU (or Item), Available Primary (or Available). Optional: State, In Production, Redline. Products will be created automatically if they don't exist.
+              Upload a CSV or Excel file with inventory data. Required: SKU (or Item), Available Primary (or Available). Recommended: Invoice # or Invoice Number (links inventory to specific invoice). Optional: State, In Production, Redline, Item #. Products are created automatically if they don't exist.
             </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
