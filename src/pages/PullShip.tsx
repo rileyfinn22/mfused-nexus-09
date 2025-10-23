@@ -458,20 +458,114 @@ const PullShip = () => {
     e.preventDefault();
     if (selectedSkus.size === 0) return;
     
-    const items = Array.from(selectedSkus).map(sku => {
-      const inventoryItem = inventory.find(item => item.sku === sku);
-      return {
-        sku,
-        itemId: inventoryItem?.products?.item_id,
-        quantity: skuQuantities[sku] || 1
-      };
-    });
-    
-    toast({
-      title: "Legacy Feature",
-      description: "Please use the PO Upload feature above to create pull & ship orders",
-      variant: "destructive",
-    });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get user's company
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!userRole?.company_id) {
+        throw new Error('User not associated with a company');
+      }
+
+      const items = Array.from(selectedSkus).map(sku => {
+        const inventoryItem = inventory.find(item => item.sku === sku);
+        return {
+          sku,
+          itemId: inventoryItem?.products?.item_id,
+          name: inventoryItem?.products?.name || sku,
+          quantity: skuQuantities[sku] || 1
+        };
+      });
+
+      // Calculate total
+      const totalUnits = items.reduce((sum, item) => sum + item.quantity, 0);
+      const subtotal = totalUnits * 75;
+      const tax = subtotal * 0.08;
+      const total = subtotal + tax;
+
+      // Generate order number
+      const orderNumber = `PS-${Date.now()}`;
+
+      // Create the pull & ship order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          order_number: orderNumber,
+          company_id: userRole.company_id,
+          order_type: 'pull_ship',
+          customer_name: orderData.state,
+          shipping_name: orderData.state,
+          shipping_street: orderData.shippingAddress,
+          shipping_city: orderData.shippingCity,
+          shipping_state: orderData.shippingState,
+          shipping_zip: orderData.shippingZip,
+          subtotal,
+          tax,
+          total,
+          memo: orderData.notes,
+          status: 'pending',
+          vibe_approved: false
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Create order items
+      const orderItems = items.map(item => ({
+        order_id: order.id,
+        sku: item.sku,
+        name: item.name,
+        item_id: item.itemId,
+        quantity: item.quantity,
+        shipped_quantity: 0,
+        unit_price: 75,
+        total: item.quantity * 75
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      toast({
+        title: "Pull & Ship Order Created",
+        description: `Order ${orderNumber} has been created and is pending approval`,
+      });
+
+      // Refresh the orders list
+      await fetchPullShipOrders();
+
+      // Reset the form
+      setOrderData({
+        state: "",
+        shippingAddress: "",
+        shippingCity: "",
+        shippingState: "",
+        shippingZip: "",
+        notes: ""
+      });
+      setSelectedSkus(new Set());
+      setSkuQuantities({});
+      setInventory([]);
+
+      // Scroll to the orders section
+      document.querySelector('.mt-12')?.scrollIntoView({ behavior: 'smooth' });
+    } catch (error: any) {
+      console.error('Error creating order:', error);
+      toast({
+        title: "Order Creation Failed",
+        description: error.message || 'An unknown error occurred',
+        variant: "destructive",
+      });
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
