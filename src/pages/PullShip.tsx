@@ -268,7 +268,7 @@ const PullShip = () => {
     return doc;
   };
 
-  const generateInvoicePDF = (items: Array<{sku: string, itemId?: string, quantity: number}>, orderData: any, invoiceId: string, invoiceAmount: string) => {
+  const generateInvoicePDF = (items: Array<{sku: string, itemId?: string, quantity: number, unitPrice?: number}>, orderData: any, invoiceId: string, invoiceAmount: string) => {
     const doc = new jsPDF();
     
     // Header
@@ -290,8 +290,8 @@ const PullShip = () => {
       item.itemId || "N/A",
       item.sku, 
       item.quantity.toString(), 
-      "$75.00", 
-      `$${(item.quantity * 75).toLocaleString()}.00`
+      `$${(item.unitPrice || 1).toFixed(2)}`, 
+      `$${(item.quantity * (item.unitPrice || 1)).toFixed(2)}`
     ]);
     
     autoTable(doc, {
@@ -303,14 +303,14 @@ const PullShip = () => {
     });
     
     // Totals
-    const subtotal = items.reduce((sum, item) => sum + (item.quantity * 75), 0);
+    const subtotal = items.reduce((sum, item) => sum + (item.quantity * (item.unitPrice || 1)), 0);
     const tax = subtotal * 0.08; // 8% tax
     const total = subtotal + tax;
     
     const finalY = (doc as any).lastAutoTable.finalY + 20;
-    doc.text(`Subtotal: $${subtotal.toLocaleString()}.00`, 130, finalY);
-    doc.text(`Tax (8%): $${tax.toLocaleString()}.00`, 130, finalY + 10);
-    doc.text(`Total: $${total.toLocaleString()}.00`, 130, finalY + 20);
+    doc.text(`Subtotal: $${subtotal.toFixed(2)}`, 130, finalY);
+    doc.text(`Tax (8%): $${tax.toFixed(2)}`, 130, finalY + 10);
+    doc.text(`Total: $${total.toFixed(2)}`, 130, finalY + 20);
     
     return doc;
   };
@@ -331,20 +331,36 @@ const PullShip = () => {
     doc.save(`packing-list-preview-${Date.now()}.pdf`);
   };
 
-  const viewInvoice = () => {
+  const viewInvoice = async () => {
     if (selectedSkus.size === 0) return;
+    
+    // Get parent order item prices if available
+    let parentOrderItems: any[] = [];
+    if (orderData.parentOrderId) {
+      const { data: parentData } = await supabase
+        .from('order_items')
+        .select('sku, unit_price')
+        .eq('order_id', orderData.parentOrderId);
+      
+      if (parentData) {
+        parentOrderItems = parentData;
+      }
+    }
     
     const items = Array.from(selectedSkus).map(sku => {
       const inventoryItem = inventory.find(item => item.sku === sku);
+      const parentItem = parentOrderItems.find(pi => pi.sku === sku);
+      const unitPrice = parentItem?.unit_price || 1;
       return {
         sku,
         itemId: inventoryItem?.products?.item_id,
-        quantity: skuQuantities[sku] || 1
+        quantity: skuQuantities[sku] || 1,
+        unitPrice
       };
     });
     
-    const totalValue = items.reduce((sum, item) => sum + item.quantity, 0) * 75;
-    const doc = generateInvoicePDF(items, orderData, "PREVIEW", `$${totalValue.toLocaleString()}.00`);
+    const totalValue = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const doc = generateInvoicePDF(items, orderData, "PREVIEW", `$${totalValue.toFixed(2)}`);
     doc.save(`invoice-preview-${Date.now()}.pdf`);
   };
 
@@ -539,14 +555,36 @@ const PullShip = () => {
         };
       });
 
-      // Calculate total
-      const totalUnits = items.reduce((sum, item) => sum + item.quantity, 0);
-      const subtotal = totalUnits * 75;
-      const tax = subtotal * 0.08;
-      const total = subtotal + tax;
-
       // Generate order number
       const orderNumber = `PS-${Date.now()}`;
+
+      // Get parent order item prices if this is linked to a blanket order
+      let parentOrderItems: any[] = [];
+      if (orderData.parentOrderId) {
+        const { data: parentData, error: parentError } = await supabase
+          .from('order_items')
+          .select('sku, unit_price')
+          .eq('order_id', orderData.parentOrderId);
+        
+        if (!parentError && parentData) {
+          parentOrderItems = parentData;
+        }
+      }
+
+      // Calculate totals using parent order prices (or fallback to $1)
+      const itemsWithPrices = items.map(item => {
+        const parentItem = parentOrderItems.find(pi => pi.sku === item.sku);
+        const unitPrice = parentItem?.unit_price || 1;
+        return {
+          ...item,
+          unitPrice,
+          itemTotal: item.quantity * unitPrice
+        };
+      });
+
+      const subtotal = itemsWithPrices.reduce((sum, item) => sum + item.itemTotal, 0);
+      const tax = subtotal * 0.08;
+      const total = subtotal + tax;
 
       // Create the pull & ship order
       const { data: order, error: orderError } = await supabase
@@ -575,15 +613,15 @@ const PullShip = () => {
       if (orderError) throw orderError;
 
       // Create order items
-      const orderItems = items.map(item => ({
+      const orderItems = itemsWithPrices.map(item => ({
         order_id: order.id,
         sku: item.sku,
         name: item.name,
         item_id: item.itemId,
         quantity: item.quantity,
         shipped_quantity: 0,
-        unit_price: 75,
-        total: item.quantity * 75
+        unit_price: item.unitPrice,
+        total: item.itemTotal
       }));
 
       const { error: itemsError } = await supabase
