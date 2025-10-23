@@ -60,7 +60,8 @@ const Invoices = () => {
       .from('invoices')
       .select(`
         *,
-        orders(order_number, customer_name, po_number)
+        orders(order_number, customer_name, po_number),
+        companies(name)
       `)
       .order('created_at', { ascending: false });
     
@@ -257,13 +258,14 @@ const Invoices = () => {
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
+            <div className="col-span-2">Company</div>
             <div className="col-span-1">Shipment</div>
             <div className="col-span-1">Type</div>
-            <div className="col-span-2">Amount</div>
+            <div className="col-span-1">Amount</div>
             <div className="col-span-1">PO Number</div>
             <div className="col-span-2">Due Date</div>
             <div className="col-span-1">Status</div>
-            <div className="col-span-2">Actions</div>
+            <div className="col-span-1">Actions</div>
           </div>
         </div>
 
@@ -295,6 +297,14 @@ const Invoices = () => {
                       </div>
                     )}
                   </div>
+                  <div className="col-span-2">
+                    <div className="font-medium text-sm">{invoice.companies?.name || 'N/A'}</div>
+                    {invoice.orders?.customer_name && (
+                      <div className="text-xs text-muted-foreground">
+                        {invoice.orders.customer_name}
+                      </div>
+                    )}
+                  </div>
                   <div className="col-span-1">
                     <Badge variant="secondary" className="text-xs">
                       #{invoice.shipment_number || 1}
@@ -305,7 +315,7 @@ const Invoices = () => {
                       {(invoice.invoice_type || 'full').charAt(0).toUpperCase() + (invoice.invoice_type || 'full').slice(1)}
                     </Badge>
                   </div>
-                  <div className="col-span-2 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
+                  <div className="col-span-1 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
                   <div className="col-span-1 text-sm">{invoice.orders?.po_number || 'N/A'}</div>
                   <div className="col-span-2 text-sm">
                     {invoice.due_date ? (
@@ -330,7 +340,7 @@ const Invoices = () => {
                       {invoice.status.replace('_', ' ').toUpperCase()}
                     </div>
                   </div>
-                  <div className="col-span-2 flex gap-1">
+                  <div className="col-span-1 flex gap-1">
                     <Button 
                       variant="ghost" 
                       size="sm" 
