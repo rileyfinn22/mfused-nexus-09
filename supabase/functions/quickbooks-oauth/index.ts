@@ -17,6 +17,72 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Handle GET request from QuickBooks OAuth callback
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
+    const realmId = url.searchParams.get('realmId');
+
+    if (!code || !state || !realmId) {
+      return new Response(
+        `<html><body><script>window.close();</script><p>Missing parameters. You can close this window.</p></body></html>`,
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html' } }
+      );
+    }
+
+    // Return HTML that will process the OAuth callback
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>QuickBooks Authorization</title>
+        </head>
+        <body>
+          <p>Processing QuickBooks authorization...</p>
+          <script>
+            (async () => {
+              try {
+                const response = await fetch(window.location.origin + window.location.pathname, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    code: '${code}',
+                    state: '${state}',
+                    realmId: '${realmId}'
+                  })
+                });
+
+                const result = await response.json();
+                
+                if (result.success && window.opener) {
+                  // Send message to parent window
+                  window.opener.postMessage({ 
+                    type: 'quickbooks-oauth-success',
+                    data: result 
+                  }, '*');
+                }
+                
+                // Close popup after short delay
+                setTimeout(() => window.close(), 500);
+              } catch (error) {
+                console.error('OAuth callback error:', error);
+                setTimeout(() => window.close(), 1000);
+              }
+            })();
+          </script>
+        </body>
+      </html>
+    `;
+
+    return new Response(html, {
+      headers: { ...corsHeaders, 'Content-Type': 'text/html' }
+    });
+  }
+
+  // Handle POST request with OAuth data
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

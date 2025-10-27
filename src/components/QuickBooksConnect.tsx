@@ -14,6 +14,21 @@ export const QuickBooksConnect = () => {
 
   useEffect(() => {
     checkConnection();
+
+    // Listen for OAuth success message from popup
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'quickbooks-oauth-success') {
+        setConnecting(false);
+        checkConnection();
+        toast({
+          title: "Connected",
+          description: "QuickBooks has been connected successfully",
+        });
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   const checkConnection = async () => {
@@ -69,7 +84,7 @@ export const QuickBooksConnect = () => {
       
       const clientId = initData.clientId;
       const scope = 'com.intuit.quickbooks.accounting';
-      const redirectUri = `${window.location.origin}/settings`;
+      const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quickbooks-oauth`;
       
       // Generate secure state parameter with company_id and random nonce
       const nonce = crypto.randomUUID();
