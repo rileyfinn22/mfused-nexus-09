@@ -108,18 +108,18 @@ serve(async (req) => {
 
       console.log('QuickBooks connected successfully');
 
-      // Redirect back to settings page with success message
-      const redirectUrl = new URL('/settings', supabaseUrl.replace('https://spxdyqdygsmzyngrqxni.supabase.co', 'https://6ffd6a59-9620-435f-8710-940540f7ab68.lovableproject.com'));
-      redirectUrl.searchParams.set('qb_connected', 'true');
-      redirectUrl.searchParams.set('realm_id', realmId);
-      
-      return new Response(null, {
-        status: 302,
-        headers: {
-          ...corsHeaders,
-          'Location': redirectUrl.toString()
+      // Return JSON success response
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'QuickBooks connected successfully',
+          realmId 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
         }
-      });
+      );
 
     } catch (error: any) {
       console.error('OAuth GET error:', error);

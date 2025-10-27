@@ -14,23 +14,6 @@ export const QuickBooksConnect = () => {
 
   useEffect(() => {
     checkConnection();
-
-    // Check for OAuth success in URL params
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('qb_connected') === 'true') {
-      const realmId = urlParams.get('realm_id');
-      setIsConnected(true);
-      if (realmId) setRealmId(realmId);
-      setConnecting(false);
-      
-      toast({
-        title: "Connected",
-        description: "QuickBooks has been connected successfully",
-      });
-      
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
   }, []);
 
   const checkConnection = async () => {
@@ -108,16 +91,13 @@ export const QuickBooksConnect = () => {
       // Open in popup window
       const popup = window.open(authUrl, 'QuickBooks OAuth', 'width=800,height=600');
       
-      // Listen for callback
+      // Poll to check when popup closes
       const checkPopup = setInterval(() => {
-        try {
-          if (popup?.closed) {
-            clearInterval(checkPopup);
-            setConnecting(false);
-            checkConnection(); // Refresh connection status
-          }
-        } catch (e) {
-          // Cross-origin error expected
+        if (popup?.closed) {
+          clearInterval(checkPopup);
+          setConnecting(false);
+          // Refresh connection status after popup closes
+          setTimeout(() => checkConnection(), 500);
         }
       }, 500);
 
