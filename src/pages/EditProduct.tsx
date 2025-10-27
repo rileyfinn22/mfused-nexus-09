@@ -303,14 +303,13 @@ const EditProduct = () => {
           <div className="space-y-2">
             <Label htmlFor="preferred_vendor">Preferred Vendor</Label>
             <Select
-              value={formData.preferred_vendor_id}
+              value={formData.preferred_vendor_id || undefined}
               onValueChange={(value) => setFormData({ ...formData, preferred_vendor_id: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select preferred vendor" />
+                <SelectValue placeholder="No preferred vendor" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No preferred vendor</SelectItem>
                 {vendors.map((vendor) => (
                   <SelectItem key={vendor.id} value={vendor.id}>
                     {vendor.name}
