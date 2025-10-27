@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertTriangle, Info, Package } from "lucide-react";
+import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 
 interface CreateShipmentInvoiceDialogProps {
   open: boolean;
@@ -23,6 +24,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
   const [shipmentQuantities, setShipmentQuantities] = useState<{[itemId: string]: number}>({});
   const [availableInventory, setAvailableInventory] = useState<{[sku: string]: any[]}>({});
   const [existingInvoices, setExistingInvoices] = useState<any[]>([]);
+  const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
 
   useEffect(() => {
     if (open && order) {
@@ -210,6 +212,12 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         title: "Shipment Created",
         description: `Invoice ${invoiceNumber} created successfully`
       });
+
+      // Auto-sync to QuickBooks if connected
+      const isConnected = await checkConnection();
+      if (isConnected) {
+        await syncInvoice(invoice.id);
+      }
 
       onSuccess();
       onOpenChange(false);

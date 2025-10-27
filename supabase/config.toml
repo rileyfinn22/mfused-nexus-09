@@ -5,3 +5,18 @@ verify_jwt = false
 
 [functions.send-packing-list]
 verify_jwt = false
+
+[functions.quickbooks-init-oauth]
+verify_jwt = true
+
+[functions.quickbooks-oauth]
+verify_jwt = false
+
+[functions.quickbooks-sync-product]
+verify_jwt = true
+
+[functions.quickbooks-sync-invoice]
+verify_jwt = true
+
+[functions.quickbooks-sync-vendor-po]
+verify_jwt = true

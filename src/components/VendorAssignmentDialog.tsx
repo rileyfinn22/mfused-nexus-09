@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle } from "lucide-react";
+import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 
 interface VendorAssignmentDialogProps {
   open: boolean;
@@ -41,6 +42,7 @@ export const VendorAssignmentDialog = ({
   const [bulkVendorId, setBulkVendorId] = useState<string>("");
   const [bulkCost, setBulkCost] = useState<string>("");
   const [freshOrderItems, setFreshOrderItems] = useState<any[]>([]);
+  const { syncVendorPO, checkConnection } = useQuickBooksAutoSync();
 
   useEffect(() => {
     if (open) {
@@ -294,6 +296,12 @@ export const VendorAssignmentDialog = ({
         title: "Success",
         description: "Vendor assigned and PO created"
       });
+
+      // Auto-sync to QuickBooks if connected
+      const isConnected = await checkConnection();
+      if (isConnected) {
+        await syncVendorPO(vendorPO.id);
+      }
     } catch (error: any) {
       console.error("Error assigning vendor:", error);
       toast({

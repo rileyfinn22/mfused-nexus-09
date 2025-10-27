@@ -7,7 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, Bell, Users, Save } from "lucide-react";
+import { Building2, Bell, Users, Save, Link2 } from "lucide-react";
+import { QuickBooksConnect } from "@/components/QuickBooksConnect";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -144,6 +145,10 @@ export default function Settings() {
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="h-4 w-4" />
             Notifications
+          </TabsTrigger>
+          <TabsTrigger value="integrations" className="gap-2">
+            <Link2 className="h-4 w-4" />
+            Integrations
           </TabsTrigger>
           <TabsTrigger value="team" className="gap-2">
             <Users className="h-4 w-4" />
@@ -282,6 +287,10 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="integrations" className="space-y-4">
+          <QuickBooksConnect />
         </TabsContent>
 
         <TabsContent value="team" className="space-y-4">

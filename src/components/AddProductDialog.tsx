@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Upload } from "lucide-react";
+import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 
 interface AddProductDialogProps {
   onProductAdded: () => void;
@@ -16,6 +17,7 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [vendors, setVendors] = useState<any[]>([]);
+  const { syncProduct, checkConnection } = useQuickBooksAutoSync();
   const [formData, setFormData] = useState({
     name: "",
     category: "",
@@ -134,6 +136,13 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
       }
 
       toast.success("Product added successfully");
+      
+      // Auto-sync to QuickBooks if connected
+      const isConnected = await checkConnection();
+      if (isConnected) {
+        await syncProduct(product.id);
+      }
+      
       setOpen(false);
       setFormData({ name: "", category: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "" });
       setImageFile(null);
