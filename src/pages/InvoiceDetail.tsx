@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, FileText, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +34,8 @@ const InvoiceDetail = () => {
   const [editedItems, setEditedItems] = useState<any[]>([]);
   const [inventoryAllocations, setInventoryAllocations] = useState<any[]>([]);
   const [relatedInvoices, setRelatedInvoices] = useState<any[]>([]);
+  const [syncingToQB, setSyncingToQB] = useState(false);
+  const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
 
   useEffect(() => {
     checkAdminStatus();
@@ -248,6 +251,41 @@ const InvoiceDetail = () => {
     );
   };
 
+  const handleSyncToQuickBooks = async () => {
+    if (!invoiceId) return;
+    
+    setSyncingToQB(true);
+    try {
+      const isConnected = await checkConnection();
+      if (!isConnected) {
+        toast({
+          title: "Not Connected",
+          description: "QuickBooks is not connected. Please connect in Settings.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      await syncInvoice(invoiceId);
+      
+      toast({
+        title: "Sync Initiated",
+        description: "Invoice sync to QuickBooks has started. Check back in a moment."
+      });
+
+      // Refresh invoice details to show updated sync status
+      setTimeout(() => fetchInvoiceDetails(), 2000);
+    } catch (error: any) {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync invoice to QuickBooks",
+        variant: "destructive"
+      });
+    } finally {
+      setSyncingToQB(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -315,6 +353,14 @@ const InvoiceDetail = () => {
                   </Button>
                   <Button variant="outline" onClick={() => navigate(`/orders/${invoice.order_id}`)}>
                     View Order
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleSyncToQuickBooks}
+                    disabled={syncingToQB || invoice.quickbooks_sync_status === 'synced'}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${syncingToQB ? 'animate-spin' : ''}`} />
+                    {invoice.quickbooks_sync_status === 'synced' ? 'Synced to QB' : 'Sync to QuickBooks'}
                   </Button>
                   <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
                     <Trash2 className="h-4 w-4 mr-2" />
