@@ -99,25 +99,44 @@ export default function Settings() {
 
     if (!code || !state || !realmId) return;
 
+    console.log('QuickBooks OAuth callback received:', { 
+      hasCode: !!code, 
+      hasState: !!state, 
+      hasRealmId: !!realmId 
+    });
+
     // Clear URL parameters
     window.history.replaceState({}, document.title, window.location.pathname);
 
     try {
       // Call the OAuth edge function to complete the connection
-      const { error } = await supabase.functions.invoke('quickbooks-oauth', {
+      console.log('Invoking quickbooks-oauth edge function...');
+      const { data, error } = await supabase.functions.invoke('quickbooks-oauth', {
         body: { code, state, realmId }
       });
 
-      if (error) throw error;
+      console.log('Edge function response:', { data, error });
 
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(`OAuth error: ${error.message || JSON.stringify(error)}`);
+      }
+
+      if (!data?.success) {
+        console.error('OAuth failed:', data);
+        throw new Error(data?.error || 'Failed to connect QuickBooks');
+      }
+
+      console.log('QuickBooks connected successfully');
       toast({
         title: "Connected",
         description: "QuickBooks has been connected successfully",
       });
     } catch (error: any) {
+      console.error('OAuth callback error:', error);
       toast({
         title: "Connection Failed",
-        description: error.message,
+        description: error.message || "Unable to connect to QuickBooks. Please try again.",
         variant: "destructive",
       });
     }
