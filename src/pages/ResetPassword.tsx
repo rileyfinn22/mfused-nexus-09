@@ -7,6 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Lock } from "lucide-react";
+import { z } from "zod";
+
+const passwordSchema = z.string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
+  .regex(/[a-z]/, 'Must contain at least one lowercase letter')
+  .regex(/[0-9]/, 'Must contain at least one number')
+  .regex(/[^A-Za-z0-9]/, 'Must contain at least one special character');
 
 export default function ResetPassword() {
   const [password, setPassword] = useState("");
@@ -44,10 +52,12 @@ export default function ResetPassword() {
       return;
     }
 
-    if (password.length < 6) {
+    // Validate password strength
+    const passwordValidation = passwordSchema.safeParse(password);
+    if (!passwordValidation.success) {
       toast({
-        title: "Password too short",
-        description: "Password must be at least 6 characters",
+        title: "Invalid Password",
+        description: passwordValidation.error.errors[0].message,
         variant: "destructive",
       });
       return;
@@ -108,9 +118,13 @@ export default function ResetPassword() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Min 8 chars, uppercase, number, special char"
                 required
+                minLength={8}
               />
+              <p className="text-xs text-muted-foreground">
+                Must contain at least 8 characters, including uppercase, lowercase, number, and special character
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
@@ -121,6 +135,7 @@ export default function ResetPassword() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                minLength={8}
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
