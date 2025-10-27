@@ -87,33 +87,7 @@ serve(async (req) => {
 
       const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
 
-      // Store access token in vault
-      const { data: accessSecretData, error: accessSecretError } = await supabase
-        .rpc('store_qb_token_encrypted', {
-          p_company_id: companyId,
-          p_token_type: 'access',
-          p_token_value: tokenData.access_token
-        });
-      
-      if (accessSecretError) {
-        console.error('Error storing access token:', accessSecretError);
-        throw new Error('Failed to store access token securely');
-      }
-
-      // Store refresh token in vault  
-      const { data: refreshSecretData, error: refreshSecretError } = await supabase
-        .rpc('store_qb_token_encrypted', {
-          p_company_id: companyId,
-          p_token_type: 'refresh',
-          p_token_value: tokenData.refresh_token
-        });
-      
-      if (refreshSecretError) {
-        console.error('Error storing refresh token:', refreshSecretError);
-        throw new Error('Failed to store refresh token securely');
-      }
-
-      // Store tokens in database with encryption references
+      // Store tokens in database
       const { error: upsertError } = await supabase
         .from('quickbooks_settings')
         .upsert({
@@ -121,8 +95,6 @@ serve(async (req) => {
           realm_id: realmId,
           access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token,
-          access_token_secret_id: accessSecretData,
-          refresh_token_secret_id: refreshSecretData,
           token_expires_at: expiresAt.toISOString(),
           is_connected: true,
         }, {
@@ -226,53 +198,14 @@ serve(async (req) => {
 
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
 
-    // Store tokens encrypted in vault
-    const { data: existingSettings } = await supabase
-      .from('quickbooks_settings')
-      .select('id')
-      .eq('company_id', companyId)
-      .single();
-
-    let accessTokenSecretId, refreshTokenSecretId;
-    
-    // Store access token in vault
-    const { data: accessSecretData, error: accessSecretError } = await supabase
-      .rpc('store_qb_token_encrypted', {
-        p_company_id: companyId,
-        p_token_type: 'access',
-        p_token_value: tokenData.access_token
-      });
-    
-    if (accessSecretError) {
-      console.error('Error storing access token:', accessSecretError);
-      throw new Error('Failed to store access token securely');
-    }
-    accessTokenSecretId = accessSecretData;
-
-    // Store refresh token in vault  
-    const { data: refreshSecretData, error: refreshSecretError } = await supabase
-      .rpc('store_qb_token_encrypted', {
-        p_company_id: companyId,
-        p_token_type: 'refresh',
-        p_token_value: tokenData.refresh_token
-      });
-    
-    if (refreshSecretError) {
-      console.error('Error storing refresh token:', refreshSecretError);
-      throw new Error('Failed to store refresh token securely');
-    }
-    refreshTokenSecretId = refreshSecretData;
-
-    // Store tokens in database with encryption references
+    // Store tokens in database
     const { error: upsertError } = await supabase
       .from('quickbooks_settings')
       .upsert({
         company_id: companyId,
         realm_id: realmId,
-        access_token: tokenData.access_token, // Keep temporarily for backwards compatibility
-        refresh_token: tokenData.refresh_token, // Keep temporarily for backwards compatibility
-        access_token_secret_id: accessTokenSecretId,
-        refresh_token_secret_id: refreshTokenSecretId,
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
         token_expires_at: expiresAt.toISOString(),
         is_connected: true,
       }, {
