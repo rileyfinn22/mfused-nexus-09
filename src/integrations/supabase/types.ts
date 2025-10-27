@@ -1019,34 +1019,40 @@ export type Database = {
       quickbooks_settings: {
         Row: {
           access_token: string | null
+          access_token_secret_id: string | null
           company_id: string
           created_at: string
           id: string
           is_connected: boolean | null
           realm_id: string
           refresh_token: string | null
+          refresh_token_secret_id: string | null
           token_expires_at: string | null
           updated_at: string
         }
         Insert: {
           access_token?: string | null
+          access_token_secret_id?: string | null
           company_id: string
           created_at?: string
           id?: string
           is_connected?: boolean | null
           realm_id: string
           refresh_token?: string | null
+          refresh_token_secret_id?: string | null
           token_expires_at?: string | null
           updated_at?: string
         }
         Update: {
           access_token?: string | null
+          access_token_secret_id?: string | null
           company_id?: string
           created_at?: string
           id?: string
           is_connected?: boolean | null
           realm_id?: string
           refresh_token?: string | null
+          refresh_token_secret_id?: string | null
           token_expires_at?: string | null
           updated_at?: string
         }
@@ -1380,6 +1386,10 @@ export type Database = {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
       }
+      get_qb_token_decrypted: {
+        Args: { p_company_id: string; p_token_type: string }
+        Returns: string
+      }
       get_user_company: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -1387,6 +1397,14 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      store_qb_token_encrypted: {
+        Args: {
+          p_company_id: string
+          p_token_type: string
+          p_token_value: string
+        }
+        Returns: string
       }
       user_in_company: {
         Args: { _company_id: string; _user_id: string }

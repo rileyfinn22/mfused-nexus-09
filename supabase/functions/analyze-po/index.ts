@@ -12,13 +12,44 @@ serve(async (req) => {
   }
 
   try {
+    // Extract and verify JWT token
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Create client with user's JWT for authentication
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
-    const { pdfPath, companyId, userId, filename, orderType = 'pull_ship' } = await req.json();
+    // Get authenticated user
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) {
+      throw new Error('Unauthorized: Invalid token');
+    }
+
+    // Create service client for operations that need elevated privileges
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { pdfPath, companyId, filename, orderType = 'pull_ship' } = await req.json();
+    
+    // Validate user has access to this company
+    const { data: userRole, error: roleError } = await supabase
+      .from('user_roles')
+      .select('company_id, role')
+      .eq('user_id', user.id)
+      .eq('company_id', companyId)
+      .single();
+
+    if (roleError || !userRole) {
+      throw new Error('Unauthorized: User does not have access to this company');
+    }
     console.log('Analyzing PO from path:', pdfPath, 'for order type:', orderType);
 
     // Download PDF from storage

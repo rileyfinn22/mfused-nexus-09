@@ -276,7 +276,6 @@ const CreateOrder = () => {
         body: { 
           pdfPath: fileName,
           companyId: companyId,
-          userId: user.id,
           filename: selectedFile.name,
           orderType: 'standard' // Explicitly set order type for Create Order page
         }

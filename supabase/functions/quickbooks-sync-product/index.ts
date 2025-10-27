@@ -26,11 +26,28 @@ async function refreshAccessToken(supabase: any, companyId: string, refreshToken
   const data = await response.json();
   const expiresAt = new Date(Date.now() + data.expires_in * 1000);
 
+  // Store new tokens encrypted in vault
+  const { data: accessSecretId } = await supabase
+    .rpc('store_qb_token_encrypted', {
+      p_company_id: companyId,
+      p_token_type: 'access',
+      p_token_value: data.access_token
+    });
+
+  const { data: refreshSecretId } = await supabase
+    .rpc('store_qb_token_encrypted', {
+      p_company_id: companyId,
+      p_token_type: 'refresh',
+      p_token_value: data.refresh_token
+    });
+
   await supabase
     .from('quickbooks_settings')
     .update({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
+      access_token: data.access_token, // Keep temporarily for backwards compatibility
+      refresh_token: data.refresh_token, // Keep temporarily for backwards compatibility
+      access_token_secret_id: accessSecretId,
+      refresh_token_secret_id: refreshSecretId,
       token_expires_at: expiresAt.toISOString(),
     })
     .eq('company_id', companyId);
@@ -63,7 +80,7 @@ serve(async (req) => {
       throw new Error('Product not found');
     }
 
-    // Get QuickBooks settings
+    // Get QuickBooks settings and decrypt tokens
     const { data: qbSettings, error: qbError } = await supabase
       .from('quickbooks_settings')
       .select('*')
@@ -74,12 +91,33 @@ serve(async (req) => {
       throw new Error('QuickBooks not connected');
     }
 
-    // Check if token needs refresh
+    // Decrypt tokens from vault (fallback to plain text for backwards compatibility)
     let accessToken = qbSettings.access_token;
+    let refreshToken = qbSettings.refresh_token;
+    
+    if (qbSettings.access_token_secret_id) {
+      const { data: decryptedAccess } = await supabase
+        .rpc('get_qb_token_decrypted', {
+          p_company_id: product.company_id,
+          p_token_type: 'access'
+        });
+      accessToken = decryptedAccess || accessToken;
+    }
+    
+    if (qbSettings.refresh_token_secret_id) {
+      const { data: decryptedRefresh } = await supabase
+        .rpc('get_qb_token_decrypted', {
+          p_company_id: product.company_id,
+          p_token_type: 'refresh'
+        });
+      refreshToken = decryptedRefresh || refreshToken;
+    }
+
+    // Check if token needs refresh
     const tokenExpiry = new Date(qbSettings.token_expires_at);
     if (tokenExpiry <= new Date()) {
       console.log('Refreshing access token...');
-      accessToken = await refreshAccessToken(supabase, product.company_id, qbSettings.refresh_token);
+      accessToken = await refreshAccessToken(supabase, product.company_id, refreshToken);
     }
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;

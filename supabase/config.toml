@@ -1,7 +1,7 @@
 project_id = "spxdyqdygsmzyngrqxni"
 
 [functions.analyze-po]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-packing-list]
 verify_jwt = false
