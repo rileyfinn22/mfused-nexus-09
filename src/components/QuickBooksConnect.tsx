@@ -15,20 +15,22 @@ export const QuickBooksConnect = () => {
   useEffect(() => {
     checkConnection();
 
-    // Listen for OAuth success message from popup
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'quickbooks-oauth-success') {
-        setConnecting(false);
-        checkConnection();
-        toast({
-          title: "Connected",
-          description: "QuickBooks has been connected successfully",
-        });
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    // Check for OAuth success in URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('qb_connected') === 'true') {
+      const realmId = urlParams.get('realm_id');
+      setIsConnected(true);
+      if (realmId) setRealmId(realmId);
+      setConnecting(false);
+      
+      toast({
+        title: "Connected",
+        description: "QuickBooks has been connected successfully",
+      });
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
   const checkConnection = async () => {

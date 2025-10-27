@@ -108,26 +108,17 @@ serve(async (req) => {
 
       console.log('QuickBooks connected successfully');
 
-      // Return HTML that closes popup and notifies parent
-      const html = `<!DOCTYPE html>
-<html>
-<head><title>Success</title></head>
-<body>
-  <p>QuickBooks connected successfully! Closing...</p>
-  <script>
-    if (window.opener) {
-      window.opener.postMessage({ 
-        type: 'quickbooks-oauth-success',
-        data: { success: true, realmId: '${realmId}' }
-      }, '*');
-    }
-    setTimeout(() => window.close(), 500);
-  </script>
-</body>
-</html>`;
-
-      return new Response(html, {
-        headers: { ...corsHeaders, 'Content-Type': 'text/html' }
+      // Redirect back to settings page with success message
+      const redirectUrl = new URL('/settings', supabaseUrl.replace('https://spxdyqdygsmzyngrqxni.supabase.co', 'https://6ffd6a59-9620-435f-8710-940540f7ab68.lovableproject.com'));
+      redirectUrl.searchParams.set('qb_connected', 'true');
+      redirectUrl.searchParams.set('realm_id', realmId);
+      
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          'Location': redirectUrl.toString()
+        }
       });
 
     } catch (error: any) {
