@@ -324,6 +324,9 @@ export type Database = {
           invoice_type: string | null
           notes: string | null
           order_id: string
+          quickbooks_id: string | null
+          quickbooks_sync_status: string | null
+          quickbooks_synced_at: string | null
           shipment_number: number | null
           shipping_cost: number | null
           status: string
@@ -344,6 +347,9 @@ export type Database = {
           invoice_type?: string | null
           notes?: string | null
           order_id: string
+          quickbooks_id?: string | null
+          quickbooks_sync_status?: string | null
+          quickbooks_synced_at?: string | null
           shipment_number?: number | null
           shipping_cost?: number | null
           status?: string
@@ -364,6 +370,9 @@ export type Database = {
           invoice_type?: string | null
           notes?: string | null
           order_id?: string
+          quickbooks_id?: string | null
+          quickbooks_sync_status?: string | null
+          quickbooks_synced_at?: string | null
           shipment_number?: number | null
           shipping_cost?: number | null
           status?: string
@@ -935,6 +944,9 @@ export type Database = {
           preferred_vendor_id: string | null
           price: number | null
           product_type: string | null
+          quickbooks_id: string | null
+          quickbooks_sync_status: string | null
+          quickbooks_synced_at: string | null
           state: string | null
           units_per_case: number | null
           updated_at: string
@@ -955,6 +967,9 @@ export type Database = {
           preferred_vendor_id?: string | null
           price?: number | null
           product_type?: string | null
+          quickbooks_id?: string | null
+          quickbooks_sync_status?: string | null
+          quickbooks_synced_at?: string | null
           state?: string | null
           units_per_case?: number | null
           updated_at?: string
@@ -975,6 +990,9 @@ export type Database = {
           preferred_vendor_id?: string | null
           price?: number | null
           product_type?: string | null
+          quickbooks_id?: string | null
+          quickbooks_sync_status?: string | null
+          quickbooks_synced_at?: string | null
           state?: string | null
           units_per_case?: number | null
           updated_at?: string
@@ -994,6 +1012,50 @@ export type Database = {
             columns: ["preferred_vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quickbooks_settings: {
+        Row: {
+          access_token: string | null
+          company_id: string
+          created_at: string
+          id: string
+          is_connected: boolean | null
+          realm_id: string
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          is_connected?: boolean | null
+          realm_id: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_connected?: boolean | null
+          realm_id?: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quickbooks_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1195,6 +1257,9 @@ export type Database = {
           order_date: string
           order_id: string
           po_number: string
+          quickbooks_id: string | null
+          quickbooks_sync_status: string | null
+          quickbooks_synced_at: string | null
           status: string
           total: number
           updated_at: string
@@ -1208,6 +1273,9 @@ export type Database = {
           order_date?: string
           order_id: string
           po_number: string
+          quickbooks_id?: string | null
+          quickbooks_sync_status?: string | null
+          quickbooks_synced_at?: string | null
           status?: string
           total?: number
           updated_at?: string
@@ -1221,6 +1289,9 @@ export type Database = {
           order_date?: string
           order_id?: string
           po_number?: string
+          quickbooks_id?: string | null
+          quickbooks_sync_status?: string | null
+          quickbooks_synced_at?: string | null
           status?: string
           total?: number
           updated_at?: string
