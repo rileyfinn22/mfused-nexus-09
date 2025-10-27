@@ -46,6 +46,23 @@ serve(async (req) => {
     if (!file) {
       throw new Error('No file uploaded');
     }
+    
+    // Validate file size (max 10MB)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error('File too large. Maximum size is 10MB');
+    }
+    
+    // Validate file type
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'text/csv'
+    ];
+    
+    if (!validTypes.includes(file.type)) {
+      throw new Error('Invalid file type. Only Excel (.xlsx, .xls) and CSV files are allowed');
+    }
 
     // Read file as array buffer for Excel parsing
     const arrayBuffer = await file.arrayBuffer();

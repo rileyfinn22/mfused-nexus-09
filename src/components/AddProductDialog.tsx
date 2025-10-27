@@ -8,6 +8,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Upload } from "lucide-react";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
+import { z } from "zod";
+
+const productSchema = z.object({
+  name: z.string().min(1, "Item name is required").max(200, "Name too long"),
+  category: z.string().min(1, "Category is required"),
+  description: z.string().max(500, "Description too long").optional(),
+  state: z.string().min(1, "State is required"),
+  cost: z.string().refine((val) => !val || !isNaN(parseFloat(val)), "Invalid cost").optional(),
+  price: z.string().refine((val) => !val || !isNaN(parseFloat(val)), "Invalid price").optional(),
+  preferred_vendor_id: z.string().optional(),
+  specs: z.string().max(200, "Specifications too long").optional()
+});
 
 interface AddProductDialogProps {
   onProductAdded: () => void;
@@ -55,6 +67,20 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate image file size (max 5MB)
+      const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+      if (file.size > MAX_IMAGE_SIZE) {
+        toast.error("Image too large. Maximum size is 5MB");
+        return;
+      }
+      
+      // Validate image type
+      const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+      if (!validImageTypes.includes(file.type)) {
+        toast.error("Invalid file type. Only JPEG, PNG, WebP, and GIF images are allowed");
+        return;
+      }
+      
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -66,6 +92,14 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate form data
+    const validation = productSchema.safeParse(formData);
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -179,6 +213,7 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
+              maxLength={200}
             />
           </div>
           <div className="space-y-2">
@@ -188,6 +223,7 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Product description"
+              maxLength={500}
             />
           </div>
           <div className="space-y-2">
@@ -277,6 +313,7 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
               value={formData.specs}
               onChange={(e) => setFormData({ ...formData, specs: e.target.value })}
               placeholder="e.g., 1g, 510 thread"
+              maxLength={200}
             />
           </div>
           <div className="space-y-2">
@@ -285,7 +322,7 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
               <Input
                 id="image"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
                 onChange={handleImageChange}
                 className="hidden"
               />
@@ -304,6 +341,7 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
                 />
               )}
             </div>
+            <p className="text-xs text-muted-foreground">Max 5MB. JPEG, PNG, WebP, or GIF</p>
           </div>
           <Button type="submit" disabled={loading} className="w-full">
             {loading ? "Adding..." : "Add Product"}
