@@ -108,18 +108,28 @@ serve(async (req) => {
 
       console.log('QuickBooks connected successfully');
 
-      // Return JSON success response
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'QuickBooks connected successfully',
-          realmId 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      );
+      // Return HTML that will close the popup window
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Success</title>
+</head>
+<body>
+  <p>QuickBooks connected successfully! This window will close automatically...</p>
+  <script>
+    window.close();
+  </script>
+</body>
+</html>`;
+
+      return new Response(html, { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'text/html; charset=utf-8' 
+        },
+        status: 200 
+      });
 
     } catch (error: any) {
       console.error('OAuth GET error:', error);
