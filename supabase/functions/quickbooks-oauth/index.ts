@@ -9,7 +9,7 @@ const corsHeaders = {
 interface OAuthCallbackRequest {
   code: string;
   realmId: string;
-  companyId: string;
+  state: string;
 }
 
 serve(async (req) => {
@@ -29,7 +29,23 @@ serve(async (req) => {
       throw new Error('QuickBooks credentials not configured');
     }
 
-    const { code, realmId, companyId }: OAuthCallbackRequest = await req.json();
+    const { code, realmId, state }: OAuthCallbackRequest = await req.json();
+
+    // Validate and decode state parameter
+    let companyId: string;
+    try {
+      const stateData = JSON.parse(atob(state));
+      companyId = stateData.companyId;
+      
+      // Validate state timestamp (prevent replay attacks - valid for 10 minutes)
+      const stateAge = Date.now() - stateData.timestamp;
+      if (stateAge > 10 * 60 * 1000) {
+        throw new Error('OAuth state expired');
+      }
+    } catch (error) {
+      console.error('Invalid state parameter:', error);
+      throw new Error('Invalid OAuth state parameter');
+    }
 
     console.log('Exchanging auth code for tokens...');
 

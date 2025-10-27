@@ -33,6 +33,7 @@ export default function Settings() {
 
   useEffect(() => {
     loadSettings();
+    handleOAuthCallback();
   }, []);
 
   const loadSettings = async () => {
@@ -84,6 +85,38 @@ export default function Settings() {
     } catch (error: any) {
       toast({
         title: "Error loading settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOAuthCallback = async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    const realmId = urlParams.get('realmId');
+
+    if (!code || !state || !realmId) return;
+
+    // Clear URL parameters
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    try {
+      // Call the OAuth edge function to complete the connection
+      const { error } = await supabase.functions.invoke('quickbooks-oauth', {
+        body: { code, state, realmId }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Connected",
+        description: "QuickBooks has been connected successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Connection Failed",
         description: error.message,
         variant: "destructive",
       });

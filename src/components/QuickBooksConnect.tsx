@@ -71,8 +71,13 @@ export const QuickBooksConnect = () => {
       const scope = 'com.intuit.quickbooks.accounting';
       const redirectUri = `${window.location.origin}/settings`;
       
-      // Generate state with company ID for CSRF protection
-      const state = `${Math.random().toString(36).substring(7)}_${userRole.company_id}`;
+      // Generate secure state parameter with company_id and random nonce
+      const nonce = crypto.randomUUID();
+      const state = btoa(JSON.stringify({
+        companyId: userRole.company_id,
+        nonce,
+        timestamp: Date.now()
+      }));
       sessionStorage.setItem('qb_oauth_state', state);
 
       // Build OAuth URL
@@ -81,7 +86,7 @@ export const QuickBooksConnect = () => {
         `scope=${scope}&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `response_type=code&` +
-        `state=${state}`;
+        `state=${encodeURIComponent(state)}`;
 
       // Open in popup window
       const popup = window.open(authUrl, 'QuickBooks OAuth', 'width=800,height=600');
