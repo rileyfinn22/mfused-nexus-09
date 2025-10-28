@@ -146,23 +146,52 @@ const InvoiceDetail = () => {
   };
 
   const handleDeleteInvoice = async () => {
-    const { error } = await supabase
-      .from('invoices')
-      .delete()
-      .eq('id', invoiceId);
+    try {
+      // If invoice is synced to QuickBooks, delete from QB first
+      if (invoice?.quickbooks_id) {
+        const isConnected = await checkConnection();
+        if (isConnected) {
+          const { error: qbError } = await supabase.functions.invoke('quickbooks-delete-invoice', {
+            body: { invoiceId }
+          });
 
-    if (error) {
+          if (qbError) {
+            console.error('QuickBooks deletion failed:', qbError);
+            toast({
+              title: "Warning",
+              description: "Failed to delete from QuickBooks, but will delete locally",
+              variant: "destructive"
+            });
+          }
+        }
+      }
+
+      // Delete from database
+      const { error } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', invoiceId);
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete invoice",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Invoice Deleted",
+          description: "Invoice has been deleted from both systems"
+        });
+        navigate('/invoices');
+      }
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
       toast({
         title: "Error",
-        description: "Failed to delete invoice",
+        description: "An error occurred while deleting the invoice",
         variant: "destructive"
       });
-    } else {
-      toast({
-        title: "Invoice Deleted",
-        description: "Invoice has been successfully deleted"
-      });
-      navigate('/invoices');
     }
   };
 
