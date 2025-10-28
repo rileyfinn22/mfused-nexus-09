@@ -215,7 +215,7 @@ serve(async (req) => {
       Line: lineItems,
       TxnDate: invoice.invoice_date.split('T')[0],
       DueDate: invoice.due_date ? invoice.due_date.split('T')[0] : undefined,
-      DocNumber: invoice.invoice_number,
+      DocNumber: invoice.invoice_number.substring(0, 21), // QuickBooks max 21 chars
       PrivateNote: invoice.notes || '',
       CustomerMemo: {
         value: invoice.orders?.memo || '',
