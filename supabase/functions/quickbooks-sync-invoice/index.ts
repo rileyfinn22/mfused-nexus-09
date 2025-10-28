@@ -69,7 +69,7 @@ serve(async (req) => {
 
     console.log('Syncing invoice:', invoiceId);
 
-    // Get invoice with items
+    // Get invoice with items and allocations
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .select(`
@@ -82,6 +82,20 @@ serve(async (req) => {
     if (invoiceError || !invoice) {
       throw new Error('Invoice not found');
     }
+
+    // Get inventory allocations for this invoice to determine actual shipped quantities
+    const { data: allocations } = await supabase
+      .from('inventory_allocations')
+      .select(`
+        *,
+        order_items(*)
+      `)
+      .eq('invoice_id', invoiceId)
+      .eq('status', 'allocated');
+
+    console.log('Invoice total from DB:', invoice.total);
+    console.log('Invoice type:', invoice.invoice_type);
+    console.log('Inventory allocations found:', allocations?.length || 0);
 
     // Get VibePKG's company_id (the vibe_admin's company that manages QuickBooks)
     const { data: vibeAdmin, error: vibeAdminError } = await supabase
@@ -181,22 +195,64 @@ serve(async (req) => {
       customerId = newCustomer.Customer.Id;
     }
 
-    // Build invoice line items
-    const lineItems = invoice.orders?.order_items?.map((item: any, index: number) => ({
-      DetailType: 'SalesItemLineDetail',
-      Amount: item.total,
-      SalesItemLineDetail: {
-        ItemRef: {
-          value: item.product_id ? '1' : '1', // Use QBO item ID if product is synced
-        },
-        Qty: item.quantity,
-        UnitPrice: item.unit_price,
-      },
-      Description: item.description || item.name,
-    })) || [];
+    // Build invoice line items using inventory allocations or shipped quantities
+    let lineItems = [];
+    let calculatedSubtotal = 0;
+
+    if (allocations && allocations.length > 0) {
+      // Use inventory allocations for line items
+      console.log('Using inventory allocations for line items');
+      lineItems = allocations.map((alloc: any) => {
+        const item = alloc.order_items;
+        const qty = alloc.quantity_allocated;
+        const amount = qty * item.unit_price;
+        calculatedSubtotal += amount;
+        
+        console.log(`Item: ${item.name}, Allocated Qty: ${qty}, Unit Price: ${item.unit_price}, Amount: ${amount}`);
+        
+        return {
+          DetailType: 'SalesItemLineDetail',
+          Amount: amount,
+          SalesItemLineDetail: {
+            ItemRef: {
+              value: '1', // Default item ID
+            },
+            Qty: qty,
+            UnitPrice: item.unit_price,
+          },
+          Description: item.description || item.name,
+        };
+      });
+    } else {
+      // Fallback: Use order items with shipped_quantity
+      console.log('No allocations found, using order items with shipped_quantity');
+      lineItems = invoice.orders?.order_items
+        ?.filter((item: any) => item.shipped_quantity > 0)
+        .map((item: any) => {
+          const qty = item.shipped_quantity;
+          const amount = qty * item.unit_price;
+          calculatedSubtotal += amount;
+          
+          console.log(`Item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${item.unit_price}, Amount: ${amount}`);
+          
+          return {
+            DetailType: 'SalesItemLineDetail',
+            Amount: amount,
+            SalesItemLineDetail: {
+              ItemRef: {
+                value: '1',
+              },
+              Qty: qty,
+              UnitPrice: item.unit_price,
+            },
+            Description: item.description || item.name,
+          };
+        }) || [];
+    }
 
     // Add shipping as a line item if present
     if (invoice.shipping_cost > 0) {
+      calculatedSubtotal += Number(invoice.shipping_cost);
       lineItems.push({
         DetailType: 'SalesItemLineDetail',
         Amount: invoice.shipping_cost,
@@ -205,6 +261,21 @@ serve(async (req) => {
           ItemRef: { value: '1' }, // Default shipping item
         },
       });
+    }
+
+    // Validate calculated total matches database total
+    const calculatedTotal = calculatedSubtotal + Number(invoice.tax || 0);
+    const dbTotal = Number(invoice.total);
+    
+    console.log('Calculated subtotal:', calculatedSubtotal);
+    console.log('Calculated total (with tax):', calculatedTotal);
+    console.log('Database total:', dbTotal);
+    console.log('Difference:', Math.abs(calculatedTotal - dbTotal));
+
+    if (Math.abs(calculatedTotal - dbTotal) > 0.01) {
+      console.warn('WARNING: Calculated total does not match database total!');
+      console.warn(`Calculated: ${calculatedTotal}, Database: ${dbTotal}, Diff: ${calculatedTotal - dbTotal}`);
+      // Don't throw error, but log the discrepancy for investigation
     }
 
     // Create invoice payload
