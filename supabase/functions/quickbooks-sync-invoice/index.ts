@@ -291,6 +291,18 @@ serve(async (req) => {
       CustomerMemo: {
         value: invoice.orders?.memo || '',
       },
+      BillAddr: {
+        Line1: invoice.orders?.billing_street || invoice.orders?.shipping_street || '',
+        City: invoice.orders?.billing_city || invoice.orders?.shipping_city || '',
+        CountrySubDivisionCode: invoice.orders?.billing_state || invoice.orders?.shipping_state || '',
+        PostalCode: invoice.orders?.billing_zip || invoice.orders?.shipping_zip || '',
+      },
+      ShipAddr: {
+        Line1: invoice.orders?.shipping_street || '',
+        City: invoice.orders?.shipping_city || '',
+        CountrySubDivisionCode: invoice.orders?.shipping_state || '',
+        PostalCode: invoice.orders?.shipping_zip || '',
+      },
     };
 
     let qbResponse;
