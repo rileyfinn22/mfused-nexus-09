@@ -10,6 +10,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertTriangle, Info, Package } from "lucide-react";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
+import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
 interface CreateShipmentInvoiceDialogProps {
   open: boolean;
@@ -131,8 +132,8 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       const invoiceType = (totalShipped + totalPreviouslyShipped >= totalOrdered) ? 'final' : 'partial';
       const billedPercentage = ((totalShipped + totalPreviouslyShipped) / totalOrdered) * 100;
 
-      // Create invoice
-      const invoiceNumber = `INV-${order.order_number}-${nextShipmentNumber}`;
+      // Create invoice with QB-compliant number
+      const invoiceNumber = generateInvoiceNumber(nextShipmentNumber);
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({

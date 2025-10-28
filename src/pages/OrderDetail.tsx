@@ -16,6 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
+import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 const OrderDetail = () => {
   const {
     orderId
@@ -363,7 +364,7 @@ const OrderDetail = () => {
 
       if (!existingInvoice) {
         // Create invoice with status "Final Review"
-        const invoiceNumber = `INV-${order.order_number}-${Date.now()}`;
+        const invoiceNumber = generateInvoiceNumber(1);
         const { error: invoiceError } = await supabase
           .from('invoices')
           .insert({

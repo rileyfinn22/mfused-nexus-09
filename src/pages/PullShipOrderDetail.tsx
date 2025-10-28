@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
 const PullShipOrderDetail = () => {
   const { orderId } = useParams();
@@ -457,8 +458,7 @@ const PullShipOrderDetail = () => {
           ? (existingInvoices[0].shipment_number || 0) + 1 
           : 1;
 
-        const baseInvoiceNumber = `INV-${parentOrder.order_number}`;
-        const invoiceNumber = `${baseInvoiceNumber}-${String(nextShipmentNumber).padStart(2, '0')}`;
+        const invoiceNumber = generateInvoiceNumber(nextShipmentNumber);
 
         // Calculate percentage of order
         const pullShipTotal = editedOrder.total || 0;

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { Search, Eye, CheckCircle, Clock, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
 const PullShipOrders = () => {
   const navigate = useNavigate();
@@ -152,8 +153,7 @@ const PullShipOrders = () => {
           ? (existingInvoices[0].shipment_number || 0) + 1 
           : 1;
 
-        const baseInvoiceNumber = `INV-${parentOrder.order_number}`;
-        const invoiceNumber = `${baseInvoiceNumber}-${String(nextShipmentNumber).padStart(2, '0')}`;
+        const invoiceNumber = generateInvoiceNumber(nextShipmentNumber);
 
         // Calculate percentage of order
         const pullShipTotal = order.total || 0;
