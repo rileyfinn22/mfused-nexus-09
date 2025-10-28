@@ -213,11 +213,8 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         description: `Invoice ${invoiceNumber} created successfully`
       });
 
-      // Auto-sync to QuickBooks if connected
-      const isConnected = await checkConnection();
-      if (isConnected) {
-        await syncInvoice(invoice.id);
-      }
+      // Note: Invoice will sync to QuickBooks when vibe_admin approves and sends to production
+      // Not auto-syncing on creation since approval is required first
 
       onSuccess();
       onOpenChange(false);

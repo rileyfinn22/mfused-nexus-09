@@ -83,11 +83,23 @@ serve(async (req) => {
       throw new Error('Invoice not found');
     }
 
-    // Get QuickBooks settings and decrypt tokens
+    // Get VibePKG's company_id (the vibe_admin's company that manages QuickBooks)
+    const { data: vibeAdmin, error: vibeAdminError } = await supabase
+      .from('user_roles')
+      .select('company_id')
+      .eq('role', 'vibe_admin')
+      .limit(1)
+      .single();
+
+    if (vibeAdminError || !vibeAdmin) {
+      throw new Error('VibePKG company not found');
+    }
+
+    // Get QuickBooks settings from VibePKG (not the customer's company)
     const { data: qbSettings, error: qbError } = await supabase
       .from('quickbooks_settings')
       .select('*')
-      .eq('company_id', invoice.company_id)
+      .eq('company_id', vibeAdmin.company_id)
       .single();
 
     if (qbError || !qbSettings || !qbSettings.is_connected) {
