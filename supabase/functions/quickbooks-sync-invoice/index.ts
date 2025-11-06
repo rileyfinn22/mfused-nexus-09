@@ -296,6 +296,14 @@ serve(async (req) => {
       });
     }
 
+    // Validate that we have at least one line item
+    if (lineItems.length === 0) {
+      console.error('No line items to sync. Invoice must have allocated inventory or shipped items.');
+      throw new Error('Cannot sync invoice to QuickBooks: No line items found. Invoice must have allocated inventory or shipped items before syncing.');
+    }
+
+    console.log(`Total line items: ${lineItems.length}`);
+
     // Validate calculated total matches database total
     const calculatedTotal = calculatedSubtotal + Number(invoice.tax || 0);
     const dbTotal = Number(invoice.total);
@@ -383,6 +391,11 @@ serve(async (req) => {
     if (!qbResponse.ok) {
       console.error('QuickBooks API error:', qbData);
       throw new Error(qbData.Fault?.Error?.[0]?.Message || 'QuickBooks API error');
+    }
+
+    if (!qbData.Invoice || !qbData.Invoice.Id) {
+      console.error('Invalid QuickBooks response - no Invoice object:', qbData);
+      throw new Error('QuickBooks returned an invalid response. The invoice may not have been created.');
     }
 
     const qbInvoiceId = qbData.Invoice.Id;
