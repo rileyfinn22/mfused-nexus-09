@@ -380,10 +380,8 @@ const InvoiceDetail = () => {
   );
   const displayTotal = displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0);
   
-  // Calculate what percentage of the order this invoice represents
-  const totalOrderQuantity = order?.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
-  const thisInvoiceQuantity = displayItems.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
-  const actualBilledPercentage = totalOrderQuantity > 0 ? (thisInvoiceQuantity / totalOrderQuantity * 100) : 0;
+  // Use the billed percentage from QuickBooks sync, or calculate from quantities as fallback
+  const billedPercentage = invoice?.billed_percentage || 100;
   const totalVendorCost = vendorPOs.reduce((sum, po) => sum + Number(po.total), 0);
   const totalProfit = displayTotal - totalVendorCost;
   const profitMargin = displayTotal > 0 ? ((totalProfit / displayTotal) * 100).toFixed(2) : '0.00';
@@ -495,13 +493,13 @@ const InvoiceDetail = () => {
                       Shipment #{invoice.shipment_number}
                     </span>
                     <span className={`px-3 py-1 rounded-md text-sm font-medium ${
-                      actualBilledPercentage < 100 ? 'bg-blue-500 text-white' :
+                      billedPercentage < 100 ? 'bg-blue-500 text-white' :
                       'bg-purple-500 text-white'
                     }`}>
-                      {actualBilledPercentage < 100 ? 'PARTIAL' : 'FULL'}
+                      {billedPercentage < 100 ? 'PARTIAL' : 'FULL'}
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      ({actualBilledPercentage.toFixed(1)}% of order billed)
+                      ({billedPercentage.toFixed(1)}% of order billed)
                     </span>
                     {(() => {
                       const totalShipped = order?.order_items?.reduce((sum: number, item: any) => 
@@ -688,7 +686,7 @@ const InvoiceDetail = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">{invoice.billed_percentage?.toFixed(1)}%</div>
+                      <div className="text-2xl font-bold text-primary">{billedPercentage.toFixed(1)}%</div>
                       <div className="text-xs text-muted-foreground">of order</div>
                     </div>
                   </div>
