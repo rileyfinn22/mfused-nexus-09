@@ -1407,6 +1407,7 @@ export type Database = {
       }
       vendors: {
         Row: {
+          category: string
           company_id: string
           contact_email: string | null
           contact_name: string | null
@@ -1421,6 +1422,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          category?: string
           company_id: string
           contact_email?: string | null
           contact_name?: string | null
@@ -1435,6 +1437,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          category?: string
           company_id?: string
           contact_email?: string | null
           contact_name?: string | null

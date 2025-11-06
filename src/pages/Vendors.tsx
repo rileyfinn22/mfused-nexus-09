@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Edit, Search, Building2, Mail } from "lucide-react";
@@ -26,7 +27,8 @@ const Vendors = () => {
     contact_name: "",
     contact_email: "",
     contact_phone: "",
-    notes: ""
+    notes: "",
+    category: "production" as "production" | "fulfillment"
   });
 
   useEffect(() => {
@@ -116,7 +118,8 @@ const Vendors = () => {
       contact_name: vendor.contact_name || "",
       contact_email: vendor.contact_email || "",
       contact_phone: vendor.contact_phone || "",
-      notes: vendor.notes || ""
+      notes: vendor.notes || "",
+      category: vendor.category || "production"
     });
     setDialogOpen(true);
   };
@@ -134,7 +137,8 @@ const Vendors = () => {
       contact_name: "",
       contact_email: "",
       contact_phone: "",
-      notes: ""
+      notes: "",
+      category: "production"
     });
   };
 
@@ -198,6 +202,21 @@ const Vendors = () => {
                   />
                 </div>
                 <div className="col-span-2">
+                  <Label>Category *</Label>
+                  <Select 
+                    value={formData.category} 
+                    onValueChange={(value: "production" | "fulfillment") => setFormData({...formData, category: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="production">Production</SelectItem>
+                      <SelectItem value="fulfillment">Fulfillment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2">
                   <Label>Notes</Label>
                   <Textarea
                     value={formData.notes}
@@ -234,6 +253,9 @@ const Vendors = () => {
                 <TableHead>Vendor Name</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Phone</TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -264,8 +286,8 @@ const Vendors = () => {
                     <TableCell>{vendor.contact_phone || '-'}</TableCell>
                     <TableCell className="max-w-xs truncate text-sm">{vendor.notes || '-'}</TableCell>
                     <TableCell>
-                      <Badge variant={vendor.is_fulfillment_vendor ? "default" : "outline"}>
-                        {vendor.is_fulfillment_vendor ? 'Fulfillment' : 'Production'}
+                      <Badge variant={vendor.category === 'fulfillment' ? "default" : "outline"}>
+                        {vendor.category === 'fulfillment' ? 'Fulfillment' : 'Production'}
                       </Badge>
                     </TableCell>
                     <TableCell>
