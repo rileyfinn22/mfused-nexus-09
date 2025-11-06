@@ -410,11 +410,11 @@ serve(async (req) => {
       });
     }
 
-    // If billing percentage is less than 100%, add a deposit/discount line
+    // If billing percentage is less than 100%, add a deposit/payment line
     if (billingPercentage < 100) {
       const depositPercentage = billingPercentage;
       const remainingPercentage = 100 - billingPercentage;
-      const discountAmount = -(calculatedSubtotal * (remainingPercentage / 100));
+      const discountAmount = calculatedSubtotal * (remainingPercentage / 100);
       
       console.log(`Adding deposit line: ${depositPercentage}% deposit, ${remainingPercentage}% remaining`);
       console.log(`Discount amount: ${discountAmount}`);
@@ -425,13 +425,10 @@ serve(async (req) => {
         Description: `${depositPercentage}% Deposit - Balance of ${remainingPercentage}% due upon completion`,
         DiscountLineDetail: {
           PercentBased: false,
-          DiscountAccountRef: {
-            value: '1', // Default discount account
-          },
         },
       });
       
-      calculatedSubtotal += discountAmount;
+      calculatedSubtotal -= discountAmount;
     }
 
     // Validate that we have at least one line item
