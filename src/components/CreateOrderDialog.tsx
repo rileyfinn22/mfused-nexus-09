@@ -48,6 +48,7 @@ interface Product {
 interface OrderItem {
   productId: string;
   quantity: number;
+  unit_price?: number;
 }
 
 export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: CreateOrderDialogProps) {
@@ -55,6 +56,8 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [sameAsBilling, setSameAsBilling] = useState(true);
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [tempPrice, setTempPrice] = useState<string>("");
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -119,6 +122,19 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
     }));
   };
 
+  const handlePriceClick = (productId: string, currentPrice: number) => {
+    setEditingPriceId(productId);
+    setTempPrice(currentPrice.toFixed(2));
+  };
+
+  const handlePriceBlur = (productId: string) => {
+    const newPrice = parseFloat(tempPrice) || 0;
+    setSelectedItems(selectedItems.map(item => 
+      item.productId === productId ? { ...item, unit_price: Math.max(0, newPrice) } : item
+    ));
+    setEditingPriceId(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -163,9 +179,8 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
       let subtotal = 0;
       for (const item of selectedItems) {
         const product = products.find(p => p.id === item.productId);
-        if (product && product.cost) {
-          subtotal += product.cost * item.quantity;
-        }
+        const price = item.unit_price ?? product?.cost ?? 0;
+        subtotal += price * item.quantity;
       }
 
       const tax = subtotal * 0.06;
@@ -214,7 +229,8 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
       // Create order items
       const orderItems = selectedItems.map(item => {
         const product = products.find(p => p.id === item.productId);
-        const itemTotal = (product?.cost || 0) * item.quantity;
+        const price = item.unit_price ?? product?.cost ?? 0;
+        const itemTotal = price * item.quantity;
         
         return {
           order_id: order.id,
@@ -225,7 +241,7 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
           description: product?.description || null,
           quantity: item.quantity,
           shipped_quantity: item.quantity,
-          unit_price: product?.cost || 0,
+          unit_price: price,
           total: itemTotal,
         };
       });
@@ -484,7 +500,8 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                       {selectedItems.map((item) => {
                         const product = products.find(p => p.id === item.productId);
                         if (!product) return null;
-                        const amount = (product.cost || 0) * item.quantity;
+                        const price = item.unit_price ?? product.cost ?? 0;
+                        const amount = price * item.quantity;
                         
                         return (
                           <TableRow key={item.productId}>
@@ -527,7 +544,30 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                                 </Button>
                               </div>
                             </TableCell>
-                            <TableCell className="text-right">${product.cost?.toFixed(2) || '0.00'}</TableCell>
+                            <TableCell className="text-right">
+                              {editingPriceId === item.productId ? (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={tempPrice}
+                                  onChange={(e) => setTempPrice(e.target.value)}
+                                  onBlur={() => handlePriceBlur(item.productId)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handlePriceBlur(item.productId);
+                                    if (e.key === 'Escape') setEditingPriceId(null);
+                                  }}
+                                  className="h-8 w-24 text-right"
+                                  autoFocus
+                                />
+                              ) : (
+                                <span 
+                                  className="cursor-pointer hover:bg-muted px-2 py-1 rounded inline-block"
+                                  onClick={() => handlePriceClick(item.productId, price)}
+                                >
+                                  ${price.toFixed(2)}
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell className="text-right font-medium">${amount.toFixed(2)}</TableCell>
                           </TableRow>
                         );
@@ -563,7 +603,8 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                         ${(() => {
                           const subtotal = selectedItems.reduce((sum, item) => {
                             const product = products.find(p => p.id === item.productId);
-                            return sum + ((product?.cost || 0) * item.quantity);
+                            const price = item.unit_price ?? product?.cost ?? 0;
+                            return sum + (price * item.quantity);
                           }, 0);
                           return subtotal.toFixed(2);
                         })()}
@@ -575,7 +616,8 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                         ${(() => {
                           const subtotal = selectedItems.reduce((sum, item) => {
                             const product = products.find(p => p.id === item.productId);
-                            return sum + ((product?.cost || 0) * item.quantity);
+                            const price = item.unit_price ?? product?.cost ?? 0;
+                            return sum + (price * item.quantity);
                           }, 0);
                           const tax = subtotal * 0.06;
                           return tax.toFixed(2);
@@ -589,7 +631,8 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                         ${(() => {
                           const subtotal = selectedItems.reduce((sum, item) => {
                             const product = products.find(p => p.id === item.productId);
-                            return sum + ((product?.cost || 0) * item.quantity);
+                            const price = item.unit_price ?? product?.cost ?? 0;
+                            return sum + (price * item.quantity);
                           }, 0);
                           const tax = subtotal * 0.06;
                           return (subtotal + tax).toFixed(2);

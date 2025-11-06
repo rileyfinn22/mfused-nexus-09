@@ -70,6 +70,8 @@ const CreateOrder = () => {
   const [showAddressDialog, setShowAddressDialog] = useState(false);
   const [editingQuantityId, setEditingQuantityId] = useState<string | null>(null);
   const [tempQuantity, setTempQuantity] = useState<string>("");
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [tempPrice, setTempPrice] = useState<string>("");
   const [showAddItemsDialog, setShowAddItemsDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [tempSelectedProducts, setTempSelectedProducts] = useState<string[]>([]);
@@ -444,6 +446,19 @@ const CreateOrder = () => {
       item.productId === productId ? { ...item, quantity: Math.max(1, newQty) } : item
     ));
     setEditingQuantityId(null);
+  };
+
+  const handlePriceClick = (productId: string, currentPrice: number) => {
+    setEditingPriceId(productId);
+    setTempPrice(currentPrice.toFixed(2));
+  };
+
+  const handlePriceBlur = (productId: string) => {
+    const newPrice = parseFloat(tempPrice) || 0;
+    setSelectedItems(selectedItems.map(item => 
+      item.productId === productId ? { ...item, unit_price: Math.max(0, newPrice) } : item
+    ));
+    setEditingPriceId(null);
   };
 
   const handleAddSelectedItems = () => {
@@ -1124,7 +1139,30 @@ const CreateOrder = () => {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">${price.toFixed(3)}</TableCell>
+                      <TableCell className="text-right">
+                        {editingPriceId === item.productId ? (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={tempPrice}
+                            onChange={(e) => setTempPrice(e.target.value)}
+                            onBlur={() => handlePriceBlur(item.productId)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handlePriceBlur(item.productId);
+                              if (e.key === 'Escape') setEditingPriceId(null);
+                            }}
+                            className="h-8 w-24 text-right"
+                            autoFocus
+                          />
+                        ) : (
+                          <span 
+                            className="cursor-pointer hover:bg-muted px-2 py-1 rounded inline-block"
+                            onClick={() => handlePriceClick(item.productId, price)}
+                          >
+                            ${price.toFixed(3)}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right font-medium">${amount.toFixed(3)}</TableCell>
                     </TableRow>
                   );
