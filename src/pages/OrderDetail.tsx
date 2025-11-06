@@ -24,7 +24,6 @@ const OrderDetail = () => {
   const navigate = useNavigate();
   const [vibeNotes, setVibeNotes] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
-  const [productionUpdate, setProductionUpdate] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [showVendorDialog, setShowVendorDialog] = useState(false);
@@ -306,14 +305,6 @@ const OrderDetail = () => {
       description: `Tracking number ${trackingNumber} has been added.`
     });
     setTrackingNumber("");
-  };
-  const handleAddProductionUpdate = () => {
-    if (!productionUpdate.trim()) return;
-    toast({
-      title: "Production Update Added",
-      description: "Production update has been logged."
-    });
-    setProductionUpdate("");
   };
 
   const handleOrderFinalized = async () => {
@@ -1130,27 +1121,27 @@ const OrderDetail = () => {
             </div>
           </div>
 
-          {/* Vibe Notes & Internal Management Section - Admin Only Editing */}
+          {/* Vibe Notes Section */}
           <div className="border-t border-table-border bg-muted/30 p-8">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Vibe Notes & Management</h2>
-              {isAdmin ? <Badge variant="default" className="text-xs">Admin</Badge> : <Badge variant="outline" className="text-xs">View Only</Badge>}
+              <h2 className="text-lg font-semibold">Vibe Notes</h2>
             </div>
             
-            {isAdmin && <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Vibe Notes */}
-                <div className="p-4 bg-background rounded-lg border border-table-border">
-                  <h3 className="font-medium text-sm mb-3">Add Vibe Note (Visible to Customer)</h3>
-                  <Textarea placeholder="Add a note visible to the customer..." value={vibeNotes} onChange={e => setVibeNotes(e.target.value)} rows={3} className="mb-2" />
-                  <Button onClick={handleAddVibeNote} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Vibe Note
-                  </Button>
-                </div>
+            <div className="mb-6">
+              {/* Vibe Notes - All Users Can Add */}
+              <div className="p-4 bg-background rounded-lg border border-table-border">
+                <h3 className="font-medium text-sm mb-3">Add Vibe Note</h3>
+                <Textarea placeholder="Add a note..." value={vibeNotes} onChange={e => setVibeNotes(e.target.value)} rows={3} className="mb-2" />
+                <Button onClick={handleAddVibeNote} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Note
+                </Button>
+              </div>
 
-                {/* Tracking */}
-                <div className="p-4 bg-background rounded-lg border border-table-border">
+              {/* Tracking - Admin Only */}
+              {isAdmin && (
+                <div className="p-4 bg-background rounded-lg border border-table-border mt-4">
                   <h3 className="font-medium text-sm mb-3">Tracking Information</h3>
                   <div className="space-y-2">
                     <Input placeholder="Enter tracking number..." value={trackingNumber} onChange={e => setTrackingNumber(e.target.value)} />
@@ -1164,31 +1155,12 @@ const OrderDetail = () => {
                       <p className="text-sm font-mono">{order.tracking_number}</p>
                     </div>}
                 </div>
-
-                {/* Production Updates */}
-                <div className="p-4 bg-background rounded-lg border border-table-border md:col-span-2">
-                  <h3 className="font-medium text-sm mb-3">Production Updates (Internal Only)</h3>
-                  <div className="space-y-2">
-                    <Textarea placeholder="Add internal production update..." value={productionUpdate} onChange={e => setProductionUpdate(e.target.value)} rows={3} />
-                    <Button onClick={handleAddProductionUpdate} size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Update
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Image Upload */}
-                <div className="md:col-span-2">
-                  <Button variant="outline" className="w-full md:w-auto">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Production Images
-                  </Button>
-                </div>
-              </div>}
+              )}
+            </div>
 
             {/* Display Vibe Notes (Visible to All) */}
             <div className="space-y-3">
-              <h3 className="font-medium text-sm">Customer-Visible Notes</h3>
+              <h3 className="font-medium text-sm">Notes</h3>
               {!order.vibeNotes || order.vibeNotes.length === 0 ? <p className="text-sm text-muted-foreground p-4 bg-background rounded border border-table-border">
                   No vibe notes yet
                 </p> : order.vibeNotes?.map((note: any, index: number) => <div key={index} className="p-4 bg-background rounded-lg border border-table-border">
