@@ -121,30 +121,35 @@ ANALYSIS INSTRUCTIONS:
 
 1. IDENTIFY THE TABLE STRUCTURE:
 Look at the column headers in the purchase order table. Common headers include:
-- Item/Item #/SKU: Usually contains the product code
-- Description: Product name or details
+- Item/Item #/SKU/Product Code: Contains the SKU NUMBER (alphanumeric code)
+- Description/Product Name/Item Name: Contains the PRODUCT NAME (text description)
 - Qty/Quantity: Numeric quantities
 - Rate/Unit Price/Price: The price per unit (THIS IS CRITICAL - extract as a decimal number)
 - Amount/Total: Total for that line
 
 2. FOR EACH LINE ITEM, EXTRACT:
-- item_id: The product code from the Item/SKU column (e.g., "PCK-00430-WA")
-- sku: Also use the product code
-- name: The product description/name
+- sku: The SKU NUMBER from the Item/SKU/Product Code column (e.g., "PCK-00430-WA" or "12345")
+- item_id: Same as sku
+- name: The PRODUCT NAME from the Description/Product Name column (e.g., "BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb")
 - quantity: The numeric quantity
 - unit_price: The rate/price per unit - MUST be a decimal number (e.g., 0.218, not "$0.218")
 
+IMPORTANT MATCHING RULES:
+- sku/item_id = The SKU CODE/NUMBER (will match to product's item_id in database)
+- name = The PRODUCT NAME/DESCRIPTION (will match to product's name in database)
+- These are often in SEPARATE columns in the PO table
+
 EXAMPLE:
-If you see:
-Item: PCK-00430-WABAG
+If you see a table row like:
+SKU: PCK-00430-WA
 Description: BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb
 Qty: 3000
 Rate: $0.218
 
 Extract as:
 {
-  "item_id": "PCK-00430-WABAG",
-  "sku": "PCK-00430-WABAG",
+  "item_id": "PCK-00430-WA",
+  "sku": "PCK-00430-WA",
   "name": "BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb",
   "quantity": 3000,
   "unit_price": 0.218
