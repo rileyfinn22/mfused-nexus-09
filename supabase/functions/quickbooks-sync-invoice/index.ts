@@ -176,11 +176,11 @@ serve(async (req) => {
     // Find or create customer in QuickBooks
     const customerName = invoice.orders?.customer_name || 'Unknown Customer';
     
-    // Escape single quotes for SQL query (replace ' with \')
-    const escapedCustomerName = customerName.replace(/'/g, "\\'");
+    console.log('Searching for customer:', customerName);
     
-    const customerSearchResponse = await fetch(
-      `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName='${escapedCustomerName}' MAXRESULTS 1&minorversion=65`,
+    // Strategy 1: Try exact match with LIKE operator (more forgiving than =)
+    let customerSearchResponse = await fetch(
+      `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName LIKE '${customerName.replace(/'/g, "\\'")}' MAXRESULTS 1&minorversion=65`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -188,9 +188,9 @@ serve(async (req) => {
         },
       }
     );
-    const customerSearchData = await customerSearchResponse.json();
+    let customerSearchData = await customerSearchResponse.json();
     
-    console.log('Customer search response:', JSON.stringify(customerSearchData, null, 2));
+    console.log('Initial search response:', JSON.stringify(customerSearchData, null, 2));
     
     if (!customerSearchResponse.ok) {
       console.error('Failed to search for customer:', customerSearchData);
@@ -202,7 +202,7 @@ serve(async (req) => {
       customerId = customerSearchData.QueryResponse.Customer[0].Id;
       console.log('Found existing customer:', customerId);
     } else {
-      console.log('No existing customer found, creating new customer');
+      console.log('No existing customer found, will create new customer');
       
       // Create new customer
       const customerPayload = {
@@ -230,32 +230,68 @@ serve(async (req) => {
       const newCustomer = await createCustomerResponse.json();
       
       if (!createCustomerResponse.ok || !newCustomer.Customer) {
-        // If it's a duplicate error, try searching again with a broader query
+        // If it's a duplicate error, the customer exists - do a more thorough search
         if (newCustomer.Fault?.Error?.[0]?.Message?.includes('Duplicate')) {
-          console.log('Duplicate error detected, searching again...');
+          console.log('Duplicate error detected, doing exhaustive search...');
           
-          // Try a broader search without exact match
-          const broadSearchResponse = await fetch(
-            `${qbApiUrl}/query?query=SELECT * FROM Customer MAXRESULTS 100&minorversion=65`,
-            {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Accept': 'application/json',
-              },
+          // Strategy 2: Search by email if available
+          if (invoice.orders?.customer_email) {
+            console.log('Trying search by email:', invoice.orders.customer_email);
+            const emailSearchResponse = await fetch(
+              `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE PrimaryEmailAddr='${invoice.orders.customer_email}' MAXRESULTS 1&minorversion=65`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json',
+                },
+              }
+            );
+            const emailSearchData = await emailSearchResponse.json();
+            
+            if (emailSearchData.QueryResponse?.Customer?.length > 0) {
+              customerId = emailSearchData.QueryResponse.Customer[0].Id;
+              console.log('Found customer by email:', customerId);
             }
-          );
-          const broadSearchData = await broadSearchResponse.json();
+          }
           
-          // Find customer by name match (case-insensitive)
-          const matchingCustomer = broadSearchData.QueryResponse?.Customer?.find(
-            (c: any) => c.DisplayName?.toLowerCase() === customerName.toLowerCase()
-          );
-          
-          if (matchingCustomer) {
-            customerId = matchingCustomer.Id;
-            console.log('Found matching customer in broad search:', customerId);
-          } else {
-            throw new Error(`Customer "${customerName}" appears to exist in QuickBooks but could not be found. Please check QuickBooks and try again.`);
+          // Strategy 3: Broad search with pagination
+          if (!customerId) {
+            console.log('Trying broad search with higher limit...');
+            const broadSearchResponse = await fetch(
+              `${qbApiUrl}/query?query=SELECT * FROM Customer MAXRESULTS 1000&minorversion=65`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json',
+                },
+              }
+            );
+            const broadSearchData = await broadSearchResponse.json();
+            
+            console.log(`Broad search returned ${broadSearchData.QueryResponse?.Customer?.length || 0} customers`);
+            
+            // Try multiple matching strategies
+            const customers = broadSearchData.QueryResponse?.Customer || [];
+            
+            // First try exact match (case-insensitive)
+            let matchingCustomer = customers.find(
+              (c: any) => c.DisplayName?.toLowerCase().trim() === customerName.toLowerCase().trim()
+            );
+            
+            // If no exact match, try contains
+            if (!matchingCustomer) {
+              matchingCustomer = customers.find(
+                (c: any) => c.DisplayName?.toLowerCase().includes(customerName.toLowerCase().trim())
+              );
+            }
+            
+            if (matchingCustomer) {
+              customerId = matchingCustomer.Id;
+              console.log('Found matching customer in broad search:', customerId, 'DisplayName:', matchingCustomer.DisplayName);
+            } else {
+              console.error('Could not find customer. Available customers:', customers.slice(0, 10).map((c: any) => c.DisplayName));
+              throw new Error(`Customer "${customerName}" exists in QuickBooks but could not be matched. This may be due to special characters or formatting. Please manually create an invoice in QuickBooks for this customer.`);
+            }
           }
         } else {
           console.error('Failed to create customer:', newCustomer);
@@ -263,6 +299,7 @@ serve(async (req) => {
         }
       } else {
         customerId = newCustomer.Customer.Id;
+        console.log('Created new customer:', customerId);
       }
     }
 
