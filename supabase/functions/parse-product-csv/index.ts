@@ -18,16 +18,17 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const systemPrompt = `You are a data extraction assistant. Parse CSV product data into a standardized format.
+const systemPrompt = `You are a data extraction assistant. Parse CSV product data into a standardized format.
 Extract the following fields from each row:
 - name (required): product name/title
+- state (optional): state code (CA, CO, MA, MI, NV, OR, WA) or "general" for non-state-specific items. Default to "general" if not specified.
 - item_id: SKU, product ID, item code, or similar identifier
 - description: product description, details, or notes
 - price: selling price (number only)
 - cost: cost price (number only)
 
 Be flexible with column names - understand variations like "Product Name", "product_name", "name", etc.
-If a field is missing or unclear, omit it from the output.`;
+If a field is missing or unclear, omit it from the output (except state, which should default to "general").`;
 
     const userPrompt = `Parse these CSV rows into standardized product objects:\n${JSON.stringify(csvRows, null, 2)}`;
 
@@ -58,6 +59,7 @@ If a field is missing or unclear, omit it from the output.`;
                       type: "object",
                       properties: {
                         name: { type: "string" },
+                        state: { type: "string" },
                         item_id: { type: "string" },
                         description: { type: "string" },
                         price: { type: "string" },

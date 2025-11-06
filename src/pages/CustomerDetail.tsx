@@ -54,6 +54,7 @@ const customerSchema = z.object({
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
+  state: z.string().trim().min(1, "State is required").max(50),
   item_id: z.string().trim().max(100).optional().or(z.literal("")),
   description: z.string().trim().max(1000).optional().or(z.literal("")),
   price: z.string().optional().or(z.literal("")),
@@ -79,6 +80,7 @@ const CustomerDetail = () => {
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
   const [productFormData, setProductFormData] = useState({
     name: "",
+    state: "",
     item_id: "",
     description: "",
     price: "",
@@ -294,6 +296,7 @@ const CustomerDetail = () => {
 
       const productData = {
         name: validated.name,
+        state: validated.state,
         item_id: validated.item_id || null,
         description: validated.description || null,
         price: validated.price ? parseFloat(validated.price) : null,
@@ -316,6 +319,7 @@ const CustomerDetail = () => {
       setShowCreateProductDialog(false);
       setProductFormData({
         name: "",
+        state: "",
         item_id: "",
         description: "",
         price: "",
@@ -428,6 +432,7 @@ const CustomerDetail = () => {
 
       const productsToCreate = csvData.map((row) => ({
         name: row.name,
+        state: row.state || "general",
         item_id: row.item_id || null,
         description: row.description || null,
         price: row.price ? parseFloat(row.price) : null,
@@ -465,9 +470,9 @@ const CustomerDetail = () => {
   };
 
   const downloadCsvTemplate = () => {
-    const template = "name,item_id,description,price,cost\n" +
-                     "Sample Product,SKU-001,Product description,10.99,5.50\n" +
-                     "Another Product,SKU-002,Another description,15.99,8.00";
+    const template = "name,state,item_id,description,price,cost\n" +
+                     "Sample Product,CA,SKU-001,Product description,10.99,5.50\n" +
+                     "Another Product,general,SKU-002,Another description,15.99,8.00";
     
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -868,6 +873,28 @@ const CustomerDetail = () => {
                 />
                 {productFormErrors.name && <p className="text-sm text-destructive mt-1">{productFormErrors.name}</p>}
               </div>
+              <div>
+                <Label htmlFor="product_state">State *</Label>
+                <Select
+                  value={productFormData.state}
+                  onValueChange={(value) => setProductFormData({ ...productFormData, state: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General (No State Specificity)</SelectItem>
+                    <SelectItem value="CA">California</SelectItem>
+                    <SelectItem value="CO">Colorado</SelectItem>
+                    <SelectItem value="MA">Massachusetts</SelectItem>
+                    <SelectItem value="MI">Michigan</SelectItem>
+                    <SelectItem value="NV">Nevada</SelectItem>
+                    <SelectItem value="OR">Oregon</SelectItem>
+                    <SelectItem value="WA">Washington</SelectItem>
+                  </SelectContent>
+                </Select>
+                {productFormErrors.state && <p className="text-sm text-destructive mt-1">{productFormErrors.state}</p>}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -918,6 +945,7 @@ const CustomerDetail = () => {
               setShowCreateProductDialog(false);
               setProductFormData({
                 name: "",
+                state: "",
                 item_id: "",
                 description: "",
                 price: "",
@@ -1012,6 +1040,7 @@ const CustomerDetail = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
+                        <TableHead>State</TableHead>
                         <TableHead>Item ID</TableHead>
                         <TableHead>Price</TableHead>
                         <TableHead>Cost</TableHead>
@@ -1021,6 +1050,9 @@ const CustomerDetail = () => {
                       {csvData.map((row, index) => (
                         <TableRow key={index}>
                           <TableCell className="font-medium">{row.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{row.state || "general"}</Badge>
+                          </TableCell>
                           <TableCell className="font-mono text-xs">{row.item_id || "-"}</TableCell>
                           <TableCell>{row.price ? `$${row.price}` : "-"}</TableCell>
                           <TableCell>{row.cost ? `$${row.cost}` : "-"}</TableCell>
