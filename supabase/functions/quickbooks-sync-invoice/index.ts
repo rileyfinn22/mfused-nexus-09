@@ -410,27 +410,6 @@ serve(async (req) => {
       });
     }
 
-    // If billing percentage is less than 100%, add a deposit/payment line
-    if (billingPercentage < 100) {
-      const depositPercentage = billingPercentage;
-      const remainingPercentage = 100 - billingPercentage;
-      const discountAmount = calculatedSubtotal * (remainingPercentage / 100);
-      
-      console.log(`Adding deposit line: ${depositPercentage}% deposit, ${remainingPercentage}% remaining`);
-      console.log(`Discount amount: ${discountAmount}`);
-      
-      lineItems.push({
-        DetailType: 'DiscountLineDetail',
-        Amount: discountAmount,
-        Description: `${depositPercentage}% Deposit - Balance of ${remainingPercentage}% due upon completion`,
-        DiscountLineDetail: {
-          PercentBased: false,
-        },
-      });
-      
-      calculatedSubtotal -= discountAmount;
-    }
-
     // Validate that we have at least one line item
     if (lineItems.length === 0) {
       console.error('No line items to sync. Invoice must have order items.');
@@ -454,8 +433,14 @@ serve(async (req) => {
       // Don't throw error, but log the discrepancy for investigation
     }
 
+    // Calculate deposit amount if billing percentage is less than 100%
+    const depositAmount = billingPercentage < 100 ? calculatedTotal * (billingPercentage / 100) : undefined;
+    if (depositAmount) {
+      console.log(`Applying ${billingPercentage}% deposit: $${depositAmount.toFixed(2)}`);
+    }
+
     // Create invoice payload
-    const invoicePayload = {
+    const invoicePayload: any = {
       CustomerRef: {
         value: customerId,
       },
@@ -480,6 +465,11 @@ serve(async (req) => {
         PostalCode: invoice.orders?.shipping_zip || '',
       },
     };
+
+    // Add deposit if applicable
+    if (depositAmount) {
+      invoicePayload.Deposit = depositAmount;
+    }
 
     let qbResponse;
     if (invoice.quickbooks_id) {
