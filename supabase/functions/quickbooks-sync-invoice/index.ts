@@ -186,15 +186,19 @@ serve(async (req) => {
     );
     const customerSearchData = await customerSearchResponse.json();
     
+    console.log('Customer search response:', JSON.stringify(customerSearchData, null, 2));
+    
     if (!customerSearchResponse.ok) {
       console.error('Failed to search for customer:', customerSearchData);
       throw new Error(customerSearchData.Fault?.Error?.[0]?.Message || 'Failed to search for customer in QuickBooks');
     }
     
     let customerId;
-    if (customerSearchData.QueryResponse?.Customer?.length > 0) {
+    if (customerSearchData.QueryResponse?.Customer?.length > 0 && customerSearchData.QueryResponse.Customer[0]?.Id) {
       customerId = customerSearchData.QueryResponse.Customer[0].Id;
+      console.log('Found existing customer:', customerId);
     } else {
+      console.log('No existing customer found, creating new customer');
       // Create new customer
       const customerPayload = {
         DisplayName: customerName,
