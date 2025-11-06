@@ -1082,6 +1082,7 @@ const CustomerDetail = () => {
               <div>
                 <Label htmlFor="edit_product_state">State *</Label>
                 <Select
+                  key={editingProduct?.id}
                   value={productFormData.state}
                   onValueChange={(value) => setProductFormData({ ...productFormData, state: value })}
                 >
@@ -1107,6 +1108,7 @@ const CustomerDetail = () => {
               <div>
                 <Label htmlFor="edit_product_item_id">Item ID / SKU</Label>
                 <Input
+                  key={`item-${editingProduct?.id}`}
                   id="edit_product_item_id"
                   value={productFormData.item_id}
                   onChange={(e) => setProductFormData({ ...productFormData, item_id: e.target.value })}
