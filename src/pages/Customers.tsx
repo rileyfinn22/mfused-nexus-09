@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +44,7 @@ const customerSchema = z.object({
 });
 
 const Customers = () => {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -289,7 +291,8 @@ const Customers = () => {
             filteredCustomers.map((customer) => (
               <div 
                 key={customer.id} 
-                className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
+                className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                onClick={() => navigate(`/customers/${customer.id}`)}
               >
                 <div className="col-span-3">
                   <div className="flex items-center gap-2">
@@ -340,7 +343,7 @@ const Customers = () => {
                     </Badge>
                   )}
                 </div>
-                <div className="col-span-1 flex gap-1">
+                <div className="col-span-1 flex gap-1" onClick={(e) => e.stopPropagation()}>
                   <Button 
                     variant="ghost" 
                     size="sm" 

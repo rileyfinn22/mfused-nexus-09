@@ -32,6 +32,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import Customers from "./pages/Customers";
+import CustomerDetail from "./pages/CustomerDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -72,6 +73,7 @@ const App = () => (
           <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
           <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
           <Route path="/customers" element={<DashboardLayout><Customers /></DashboardLayout>} />
+          <Route path="/customers/:customerId" element={<DashboardLayout><CustomerDetail /></DashboardLayout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
