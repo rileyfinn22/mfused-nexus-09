@@ -39,6 +39,8 @@ serve(async (req) => {
 
     const { pdfPath, companyId, filename, orderType = 'pull_ship' } = await req.json();
     
+    console.log(`Processing PO for company_id: ${companyId}`);
+    
     // Validate user has access to this company
     const { data: userRole, error: roleError } = await supabase
       .from('user_roles')
@@ -49,6 +51,8 @@ serve(async (req) => {
     if (roleError || !userRole) {
       throw new Error('Unauthorized: No user role found');
     }
+
+    console.log(`User role: ${userRole.role}, User's company: ${userRole.company_id}`);
 
     // Vibe admins have access to all companies, others must match company_id
     if (userRole.role !== 'vibe_admin' && userRole.company_id !== companyId) {
@@ -213,10 +217,22 @@ Return ONLY valid JSON:
     }
 
     console.log(`Found ${products?.length || 0} products for matching`);
+    if (products && products.length > 0) {
+      console.log('Sample products:', JSON.stringify(products.slice(0, 3), null, 2));
+    }
 
     // Function to find matching product by item_id
     const findMatchingProduct = (poItem: any) => {
-      if (!products || products.length === 0) return null;
+      if (!products || products.length === 0) {
+        console.log('No products available for matching');
+        return null;
+      }
+
+      console.log(`\nAttempting to match PO item:`, JSON.stringify({
+        item_id: poItem.item_id,
+        sku: poItem.sku,
+        name: poItem.name
+      }, null, 2));
 
       // Helper to normalize item_id by removing common suffixes
       const normalizeItemId = (id: string): string => {
@@ -231,11 +247,20 @@ Return ONLY valid JSON:
         return normalized;
       };
 
-      // Try exact match first
+      // Try exact match on item_id first
       if (poItem.item_id) {
         const match = products.find(p => p.item_id === poItem.item_id);
         if (match) {
-          console.log(`Exact match item_id "${poItem.item_id}" to product: ${match.name}`);
+          console.log(`✓ Exact item_id match: "${poItem.item_id}" -> product: ${match.name}`);
+          return match.id;
+        }
+      }
+
+      // Try exact match on SKU
+      if (poItem.sku && poItem.sku !== poItem.item_id) {
+        const match = products.find(p => p.item_id === poItem.sku);
+        if (match) {
+          console.log(`✓ Exact SKU match: "${poItem.sku}" -> product: ${match.name}`);
           return match.id;
         }
       }
@@ -243,34 +268,59 @@ Return ONLY valid JSON:
       // Try normalized match on item_id
       if (poItem.item_id) {
         const normalizedPoId = normalizeItemId(poItem.item_id);
-        console.log(`Trying normalized item_id: "${normalizedPoId}" from "${poItem.item_id}"`);
+        console.log(`  Trying normalized item_id: "${normalizedPoId}" (from "${poItem.item_id}")`);
         
         const match = products.find(p => {
           const normalizedProductId = normalizeItemId(p.item_id || '');
-          return normalizedProductId === normalizedPoId;
+          const matches = normalizedProductId === normalizedPoId;
+          if (matches) {
+            console.log(`  Comparing with product item_id: "${p.item_id}" (normalized: "${normalizedProductId}")`);
+          }
+          return matches;
         });
         
         if (match) {
-          console.log(`Normalized match "${normalizedPoId}" to product: ${match.name}`);
+          console.log(`✓ Normalized item_id match: "${normalizedPoId}" -> product: ${match.name}`);
           return match.id;
         }
       }
 
-      // Try matching by SKU
-      if (poItem.sku) {
+      // Try matching by SKU with normalization
+      if (poItem.sku && poItem.sku !== poItem.item_id) {
         const normalizedSku = normalizeItemId(poItem.sku);
+        console.log(`  Trying normalized SKU: "${normalizedSku}" (from "${poItem.sku}")`);
+        
         const match = products.find(p => {
           const normalizedProductId = normalizeItemId(p.item_id || '');
           return normalizedProductId === normalizedSku;
         });
         
         if (match) {
-          console.log(`Matched SKU "${poItem.sku}" (normalized: "${normalizedSku}") to product: ${match.name}`);
+          console.log(`✓ Normalized SKU match: "${normalizedSku}" -> product: ${match.name}`);
           return match.id;
         }
       }
 
-      console.log(`No match found for item_id: "${poItem.item_id}", sku: "${poItem.sku}"`);
+      // Try fuzzy name matching as last resort
+      if (poItem.name) {
+        const poNameLower = poItem.name.toLowerCase().trim();
+        const match = products.find(p => {
+          const productNameLower = (p.name || '').toLowerCase().trim();
+          // Check if names are very similar (at least 80% of words match)
+          const poWords = new Set(poNameLower.split(/\s+/));
+          const productWords = productNameLower.split(/\s+/);
+          const matchingWords = productWords.filter(w => poWords.has(w)).length;
+          const similarity = matchingWords / Math.max(poWords.size, productWords.length);
+          return similarity >= 0.8;
+        });
+        
+        if (match) {
+          console.log(`✓ Name similarity match: "${poItem.name}" -> product: ${match.name}`);
+          return match.id;
+        }
+      }
+
+      console.log(`✗ No match found for: item_id="${poItem.item_id}", sku="${poItem.sku}", name="${poItem.name}"`);
       return null;
     };
 
