@@ -21,7 +21,7 @@ import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 const STAGE_NAMES = [
   { value: 'production_proceeding_part_1', label: 'Production Proceeding (Part 1)', order: 1 },
   { value: 'production_proceeding_part_2', label: 'Production Proceeding (Part 2)', order: 2 },
-  { value: 'complete_qc', label: 'Complete/QC', order: 3 },
+  { value: 'complete_qc', label: 'Completed & QC', order: 3 },
   { value: 'shipped', label: 'Shipped', order: 4 },
   { value: 'delivered', label: 'Delivered', order: 5 },
 ];
@@ -1254,7 +1254,7 @@ const OrderDetail = () => {
                             {index + 1}
                           </div>
                           <div>
-                            <h3 className="font-medium capitalize">{stage.stage_name.replace(/_/g, ' ')}</h3>
+                            <h3 className="font-medium">{STAGE_NAMES.find(s => s.value === stage.stage_name)?.label || stage.stage_name.replace(/_/g, ' ')}</h3>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
