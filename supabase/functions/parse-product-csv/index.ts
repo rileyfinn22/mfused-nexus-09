@@ -11,11 +11,20 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Parsing CSV with AI...");
     const { csvRows } = await req.json();
+    console.log(`Received ${csvRows?.length || 0} CSV rows`);
+    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY is not configured");
       throw new Error("LOVABLE_API_KEY is not configured");
+    }
+    
+    if (!csvRows || csvRows.length === 0) {
+      console.error("No CSV rows provided");
+      throw new Error("No CSV rows provided");
     }
 
 const systemPrompt = `You are a data extraction assistant. Parse CSV product data into a standardized format.
@@ -32,6 +41,7 @@ If a field is missing or unclear, omit it from the output (except state, which s
 
     const userPrompt = `Parse these CSV rows into standardized product objects:\n${JSON.stringify(csvRows, null, 2)}`;
 
+    console.log("Calling AI Gateway...");
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -84,7 +94,11 @@ If a field is missing or unclear, omit it from the output (except state, which s
       }),
     });
 
+    console.log(`AI Gateway response status: ${response.status}`);
+    
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`AI Gateway error response: ${errorText}`);
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
@@ -101,13 +115,17 @@ If a field is missing or unclear, omit it from the output (except state, which s
     }
 
     const data = await response.json();
+    console.log("AI Gateway response received");
+    
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     
     if (!toolCall) {
+      console.error("No tool call in AI response:", JSON.stringify(data));
       throw new Error("No tool call in response");
     }
 
     const result = JSON.parse(toolCall.function.arguments);
+    console.log(`Successfully parsed ${result.products?.length || 0} products`);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
