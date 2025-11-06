@@ -19,12 +19,11 @@ import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceD
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
 const STAGE_NAMES = [
-  { value: 'material', order: 1 },
-  { value: 'print', order: 2 },
-  { value: 'convert', order: 3 },
-  { value: 'qc', order: 4 },
-  { value: 'shipped', order: 5 },
-  { value: 'delivered', order: 6 },
+  { value: 'production_proceeding_part_1', label: 'Production Proceeding (Part 1)', order: 1 },
+  { value: 'production_proceeding_part_2', label: 'Production Proceeding (Part 2)', order: 2 },
+  { value: 'complete_qc', label: 'Complete/QC', order: 3 },
+  { value: 'shipped', label: 'Shipped', order: 4 },
+  { value: 'delivered', label: 'Delivered', order: 5 },
 ];
 
 const OrderDetail = () => {
@@ -1261,7 +1260,7 @@ const OrderDetail = () => {
                             {index + 1}
                           </div>
                           <div>
-                            <h3 className="font-medium">{stage.stage_name}</h3>
+                            <h3 className="font-medium capitalize">{stage.stage_name.replace(/_/g, ' ')}</h3>
                             <p className="text-xs text-muted-foreground">
                               {stage.vendors?.name ? `Vendor: ${stage.vendors.name}` : 'No vendor assigned'}
                             </p>
