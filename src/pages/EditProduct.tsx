@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, FileImage, CheckCircle, Clock, Eye, Users, Building2 } from "lucide-react";
+import { ArrowLeft, FileImage, CheckCircle, Clock, Eye } from "lucide-react";
 
 const EditProduct = () => {
   const navigate = useNavigate();
@@ -371,124 +371,57 @@ const EditProduct = () => {
             {artworkFiles.length === 0 ? (
               <p className="text-sm text-muted-foreground">No artwork files found for SKU: {formData.item_id}</p>
             ) : (
-              <div className="grid grid-cols-2 gap-6">
-                {/* Customer Artwork */}
-                <div className="space-y-3">
-                  <h3 className="font-medium text-sm flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Customer Artwork
-                  </h3>
-                  {artworkFiles.filter(a => a.artwork_type === 'customer').length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No customer artwork uploaded</p>
-                  ) : (
-                    artworkFiles.filter(a => a.artwork_type === 'customer').map((artwork) => (
-                      <div
-                        key={artwork.id}
-                        className="flex items-center gap-3 p-3 border rounded-lg bg-background hover:bg-muted/50 transition-colors"
-                      >
-                        {artwork.preview_url ? (
-                          <img
-                            src={artwork.preview_url}
-                            alt={artwork.filename}
-                            className="w-12 h-12 object-cover rounded border"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center">
-                            <FileImage className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                        
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate">{artwork.filename}</p>
-                          <div className="flex items-center gap-1 mt-1">
-                            {artwork.is_approved ? (
-                              <Badge variant="default" className="text-[10px] h-5 bg-green-600 hover:bg-green-700">
-                                <CheckCircle className="h-2.5 w-2.5 mr-0.5" />
-                                Approved
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-[10px] h-5">
-                                <Clock className="h-2.5 w-2.5 mr-0.5" />
-                                Pending
-                              </Badge>
-                            )}
-                            <span className="text-[10px] text-muted-foreground">
-                              {new Date(artwork.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.open(artwork.artwork_url, '_blank')}
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
+              <div className="space-y-3">
+                {artworkFiles.map((artwork) => (
+                  <div
+                    key={artwork.id}
+                    className="flex items-center gap-3 p-4 border rounded-lg bg-background hover:bg-muted/50 transition-colors"
+                  >
+                    {artwork.preview_url ? (
+                      <img
+                        src={artwork.preview_url}
+                        alt={artwork.filename}
+                        className="w-16 h-16 object-cover rounded border"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-muted rounded border flex items-center justify-center">
+                        <FileImage className="h-8 w-8 text-muted-foreground" />
                       </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Vibe Proof */}
-                <div className="space-y-3">
-                  <h3 className="font-medium text-sm flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    Vibe Proof
-                  </h3>
-                  {artworkFiles.filter(a => a.artwork_type === 'vibe_proof').length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No Vibe proof uploaded</p>
-                  ) : (
-                    artworkFiles.filter(a => a.artwork_type === 'vibe_proof').map((artwork) => (
-                      <div
-                        key={artwork.id}
-                        className="flex items-center gap-3 p-3 border rounded-lg bg-background hover:bg-muted/50 transition-colors"
-                      >
-                        {artwork.preview_url ? (
-                          <img
-                            src={artwork.preview_url}
-                            alt={artwork.filename}
-                            className="w-12 h-12 object-cover rounded border"
-                          />
+                    )}
+                    
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{artwork.filename}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        {artwork.is_approved ? (
+                          <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Approved
+                          </Badge>
                         ) : (
-                          <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center">
-                            <FileImage className="h-6 w-6 text-muted-foreground" />
-                          </div>
+                          <Badge variant="secondary" className="text-xs">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Pending Approval
+                          </Badge>
                         )}
-                        
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate">{artwork.filename}</p>
-                          <div className="flex items-center gap-1 mt-1">
-                            {artwork.is_approved ? (
-                              <Badge variant="default" className="text-[10px] h-5 bg-green-600 hover:bg-green-700">
-                                <CheckCircle className="h-2.5 w-2.5 mr-0.5" />
-                                Approved
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-[10px] h-5">
-                                <Clock className="h-2.5 w-2.5 mr-0.5" />
-                                Pending
-                              </Badge>
-                            )}
-                            <span className="text-[10px] text-muted-foreground">
-                              {new Date(artwork.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.open(artwork.artwork_url, '_blank')}
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(artwork.created_at).toLocaleDateString()}
+                        </span>
                       </div>
-                    ))
-                  )}
-                </div>
+                      {artwork.notes && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{artwork.notes}</p>
+                      )}
+                    </div>
+                    
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(artwork.artwork_url, '_blank')}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
           </div>

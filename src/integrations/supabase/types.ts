@@ -18,7 +18,6 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
-          artwork_type: string
           artwork_url: string
           company_id: string
           created_at: string
@@ -33,7 +32,6 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
-          artwork_type?: string
           artwork_url: string
           company_id: string
           created_at?: string
@@ -48,7 +46,6 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
-          artwork_type?: string
           artwork_url?: string
           company_id?: string
           created_at?: string

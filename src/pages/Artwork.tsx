@@ -59,8 +59,7 @@ const Artwork = () => {
     sku: '',
     file: null as File | null,
     previewFile: null as File | null,
-    notes: '',
-    artworkType: 'customer' as 'customer' | 'vibe_proof'
+    notes: ''
   });
   const { toast } = useToast();
 
@@ -238,8 +237,7 @@ const Artwork = () => {
           filename: uploadData.file.name,
           notes: uploadData.notes,
           is_approved: false,
-          company_id: userRole.company_id,
-          artwork_type: uploadData.artworkType
+          company_id: userRole.company_id
         });
 
       if (insertError) throw insertError;
@@ -250,13 +248,7 @@ const Artwork = () => {
       });
 
       setUploadDialogOpen(false);
-      setUploadData({ 
-        sku: '', 
-        file: null, 
-        previewFile: null, 
-        notes: '',
-        artworkType: 'customer'
-      });
+      setUploadData({ sku: '', file: null, previewFile: null, notes: '' });
       fetchArtwork();
     } catch (error) {
       console.error('Error uploading artwork:', error);
@@ -595,26 +587,6 @@ const Artwork = () => {
                   onChange={(e) => setUploadData({...uploadData, notes: e.target.value})}
                   placeholder="Add any notes about this artwork..."
                 />
-              </div>
-              <div>
-                <Label htmlFor="artworkType">Artwork Type *</Label>
-                <Select
-                  value={uploadData.artworkType}
-                  onValueChange={(value: 'customer' | 'vibe_proof') => setUploadData({...uploadData, artworkType: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select artwork type" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover z-50">
-                    <SelectItem value="customer">Customer Artwork</SelectItem>
-                    <SelectItem value="vibe_proof">Vibe Proof</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Customer Artwork: Files uploaded by the customer
-                  <br />
-                  Vibe Proof: Files proofed/edited by Vibe
-                </p>
               </div>
               <Button onClick={handleUpload} className="w-full">Upload</Button>
             </div>
