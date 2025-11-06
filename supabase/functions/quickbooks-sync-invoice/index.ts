@@ -175,8 +175,12 @@ serve(async (req) => {
 
     // Find or create customer in QuickBooks
     const customerName = invoice.orders?.customer_name || 'Unknown Customer';
+    
+    // Escape single quotes for SQL query (replace ' with \')
+    const escapedCustomerName = customerName.replace(/'/g, "\\'");
+    
     const customerSearchResponse = await fetch(
-      `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName='${encodeURIComponent(customerName)}' MAXRESULTS 1&minorversion=65`,
+      `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName='${escapedCustomerName}' MAXRESULTS 1&minorversion=65`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -199,6 +203,7 @@ serve(async (req) => {
       console.log('Found existing customer:', customerId);
     } else {
       console.log('No existing customer found, creating new customer');
+      
       // Create new customer
       const customerPayload = {
         DisplayName: customerName,
@@ -225,11 +230,40 @@ serve(async (req) => {
       const newCustomer = await createCustomerResponse.json();
       
       if (!createCustomerResponse.ok || !newCustomer.Customer) {
-        console.error('Failed to create customer:', newCustomer);
-        throw new Error(newCustomer.Fault?.Error?.[0]?.Message || 'Failed to create customer in QuickBooks');
+        // If it's a duplicate error, try searching again with a broader query
+        if (newCustomer.Fault?.Error?.[0]?.Message?.includes('Duplicate')) {
+          console.log('Duplicate error detected, searching again...');
+          
+          // Try a broader search without exact match
+          const broadSearchResponse = await fetch(
+            `${qbApiUrl}/query?query=SELECT * FROM Customer MAXRESULTS 100&minorversion=65`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json',
+              },
+            }
+          );
+          const broadSearchData = await broadSearchResponse.json();
+          
+          // Find customer by name match (case-insensitive)
+          const matchingCustomer = broadSearchData.QueryResponse?.Customer?.find(
+            (c: any) => c.DisplayName?.toLowerCase() === customerName.toLowerCase()
+          );
+          
+          if (matchingCustomer) {
+            customerId = matchingCustomer.Id;
+            console.log('Found matching customer in broad search:', customerId);
+          } else {
+            throw new Error(`Customer "${customerName}" appears to exist in QuickBooks but could not be found. Please check QuickBooks and try again.`);
+          }
+        } else {
+          console.error('Failed to create customer:', newCustomer);
+          throw new Error(newCustomer.Fault?.Error?.[0]?.Message || 'Failed to create customer in QuickBooks');
+        }
+      } else {
+        customerId = newCustomer.Customer.Id;
       }
-      
-      customerId = newCustomer.Customer.Id;
     }
 
     // Build invoice line items using inventory allocations or shipped quantities
