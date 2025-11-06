@@ -397,13 +397,23 @@ const Artwork = () => {
       // Delete the file from storage
       const artworkPath = selectedFile.artwork_url.split('/artwork/')[1];
       if (artworkPath) {
-        await supabase.storage.from('artwork').remove([artworkPath]);
+        const { error: storageError } = await supabase.storage
+          .from('artwork')
+          .remove([artworkPath]);
+        if (storageError) {
+          console.error('Error deleting artwork file:', storageError);
+        }
       }
 
       if (selectedFile.preview_url) {
         const previewPath = selectedFile.preview_url.split('/artwork/')[1];
         if (previewPath) {
-          await supabase.storage.from('artwork').remove([previewPath]);
+          const { error: previewError } = await supabase.storage
+            .from('artwork')
+            .remove([previewPath]);
+          if (previewError) {
+            console.error('Error deleting preview file:', previewError);
+          }
         }
       }
 
@@ -413,21 +423,30 @@ const Artwork = () => {
         .delete()
         .eq('id', selectedFile.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database delete error:', error);
+        throw error;
+      }
+
+      // Close dialog and clear state first
+      setDeleteDialogOpen(false);
+      setSelectedFile(null);
+
+      // Force immediate state update by filtering out the deleted item
+      setArtworkFiles(prev => prev.filter(file => file.id !== selectedFile.id));
 
       toast({
         title: "Deleted",
         description: "Artwork file has been deleted",
       });
 
-      setDeleteDialogOpen(false);
-      setSelectedFile(null);
-      fetchArtwork();
+      // Then fetch fresh data
+      await fetchArtwork();
     } catch (error) {
       console.error('Error deleting artwork:', error);
       toast({
         title: "Error",
-        description: "Failed to delete artwork",
+        description: "Failed to delete artwork. Please try again.",
         variant: "destructive",
       });
     }
