@@ -311,10 +311,9 @@ serve(async (req) => {
       }
     }
 
-    // Build invoice line items using inventory allocations or shipped quantities
+    // Build invoice line items - always use full prices
     let lineItems = [];
     let calculatedSubtotal = 0;
-    const percentageMultiplier = billingPercentage / 100;
 
     if (allocations && allocations.length > 0) {
       // Use inventory allocations for line items
@@ -322,11 +321,11 @@ serve(async (req) => {
       lineItems = allocations.map((alloc: any) => {
         const item = alloc.order_items;
         const qty = alloc.quantity_allocated;
-        const unitPrice = item.unit_price * percentageMultiplier;
+        const unitPrice = item.unit_price; // Full price
         const amount = qty * unitPrice;
         calculatedSubtotal += amount;
         
-        console.log(`Item: ${item.name}, Allocated Qty: ${qty}, Unit Price (${billingPercentage}%): ${unitPrice}, Amount: ${amount}`);
+        console.log(`Item: ${item.name}, Allocated Qty: ${qty}, Unit Price: ${unitPrice}, Amount: ${amount}`);
         
         return {
           DetailType: 'SalesItemLineDetail',
@@ -338,11 +337,11 @@ serve(async (req) => {
             Qty: qty,
             UnitPrice: unitPrice,
           },
-          Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
+          Description: item.description || item.name,
         };
       });
     } else {
-      // Fallback: Use order items with shipped_quantity
+      // Fallback: Use order items with shipped_quantity or all items
       console.log('No allocations found, using order items with shipped_quantity');
       const shippedItems = invoice.orders?.order_items
         ?.filter((item: any) => item.shipped_quantity > 0) || [];
@@ -350,11 +349,11 @@ serve(async (req) => {
       if (shippedItems.length > 0) {
         lineItems = shippedItems.map((item: any) => {
           const qty = item.shipped_quantity;
-          const unitPrice = item.unit_price * percentageMultiplier;
+          const unitPrice = item.unit_price; // Full price
           const amount = qty * unitPrice;
           calculatedSubtotal += amount;
           
-          console.log(`Item: ${item.name}, Shipped Qty: ${qty}, Unit Price (${billingPercentage}%): ${unitPrice}, Amount: ${amount}`);
+          console.log(`Item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${unitPrice}, Amount: ${amount}`);
           
           return {
             DetailType: 'SalesItemLineDetail',
@@ -366,21 +365,20 @@ serve(async (req) => {
               Qty: qty,
               UnitPrice: unitPrice,
             },
-            Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
+            Description: item.description || item.name,
           };
         });
       } else {
         // Second fallback: Use all order items for deposit/pre-shipment billing
-        console.log('No shipped items, using all order items for deposit/pre-shipment billing');
-        console.log(`Applying billing percentage: ${billingPercentage}%`);
+        console.log('No shipped items, using all order items');
         
         lineItems = invoice.orders?.order_items?.map((item: any) => {
           const qty = item.quantity;
-          const unitPrice = item.unit_price * percentageMultiplier;
+          const unitPrice = item.unit_price; // Full price
           const amount = qty * unitPrice;
           calculatedSubtotal += amount;
           
-          console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price (${billingPercentage}%): ${unitPrice}, Amount: ${amount}`);
+          console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price: ${unitPrice}, Amount: ${amount}`);
           
           return {
             DetailType: 'SalesItemLineDetail',
@@ -392,24 +390,48 @@ serve(async (req) => {
               Qty: qty,
               UnitPrice: unitPrice,
             },
-            Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% deposit)` : ''}`,
+            Description: item.description || item.name,
           };
         }) || [];
       }
     }
 
-    // Add shipping as a line item if present (also apply percentage)
+    // Add shipping as a line item if present (full price)
     if (invoice.shipping_cost > 0) {
-      const shippingAmount = Number(invoice.shipping_cost) * percentageMultiplier;
+      const shippingAmount = Number(invoice.shipping_cost);
       calculatedSubtotal += shippingAmount;
       lineItems.push({
         DetailType: 'SalesItemLineDetail',
         Amount: shippingAmount,
-        Description: `Shipping${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
+        Description: 'Shipping',
         SalesItemLineDetail: {
           ItemRef: { value: '1' }, // Default shipping item
         },
       });
+    }
+
+    // If billing percentage is less than 100%, add a deposit/discount line
+    if (billingPercentage < 100) {
+      const depositPercentage = billingPercentage;
+      const remainingPercentage = 100 - billingPercentage;
+      const discountAmount = -(calculatedSubtotal * (remainingPercentage / 100));
+      
+      console.log(`Adding deposit line: ${depositPercentage}% deposit, ${remainingPercentage}% remaining`);
+      console.log(`Discount amount: ${discountAmount}`);
+      
+      lineItems.push({
+        DetailType: 'DiscountLineDetail',
+        Amount: discountAmount,
+        Description: `${depositPercentage}% Deposit - Balance of ${remainingPercentage}% due upon completion`,
+        DiscountLineDetail: {
+          PercentBased: false,
+          DiscountAccountRef: {
+            value: '1', // Default discount account
+          },
+        },
+      });
+      
+      calculatedSubtotal += discountAmount;
     }
 
     // Validate that we have at least one line item
