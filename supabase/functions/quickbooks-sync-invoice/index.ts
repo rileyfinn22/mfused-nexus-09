@@ -24,7 +24,18 @@ async function refreshAccessToken(supabase: any, companyId: string, refreshToken
   });
 
   const data = await response.json();
-  const expiresAt = new Date(Date.now() + data.expires_in * 1000);
+  
+  if (!response.ok) {
+    console.error('Token refresh failed:', data);
+    throw new Error(data.error_description || data.error || 'Failed to refresh access token');
+  }
+  
+  if (!data.access_token || !data.refresh_token || !data.expires_in) {
+    console.error('Invalid token response:', data);
+    throw new Error('Invalid token response from QuickBooks');
+  }
+  
+  const expiresAt = new Date(Date.now() + (data.expires_in * 1000));
 
   // Store new tokens encrypted in vault
   const { data: accessSecretId } = await supabase
@@ -143,8 +154,8 @@ serve(async (req) => {
     }
 
     // Check if token needs refresh
-    const tokenExpiry = new Date(qbSettings.token_expires_at);
-    if (tokenExpiry <= new Date()) {
+    const tokenExpiry = qbSettings.token_expires_at ? new Date(qbSettings.token_expires_at) : new Date(0);
+    if (!qbSettings.token_expires_at || tokenExpiry <= new Date()) {
       console.log('Refreshing access token...');
       accessToken = await refreshAccessToken(supabase, invoice.company_id, refreshToken);
     }
