@@ -323,23 +323,21 @@ serve(async (req) => {
         const qty = alloc.quantity_allocated;
         const unitPrice = item.unit_price;
         const fullAmount = qty * unitPrice;
-        // Apply billing percentage
-        const billedAmount = fullAmount * billingMultiplier;
-        calculatedSubtotal += billedAmount;
+        calculatedSubtotal += fullAmount; // Add full amount
         
-        console.log(`Item: ${item.name}, Allocated Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, Billed Amount: ${billedAmount}`);
+        console.log(`Item: ${item.name}, Allocated Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}`);
         
         return {
           DetailType: 'SalesItemLineDetail',
-          Amount: billedAmount,
+          Amount: fullAmount,
           SalesItemLineDetail: {
             ItemRef: {
               value: '1', // Default item ID
             },
             Qty: qty,
-            UnitPrice: unitPrice * billingMultiplier,
+            UnitPrice: unitPrice, // Full price
           },
-          Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
+          Description: item.description || item.name,
         };
       });
     } else {
@@ -353,23 +351,21 @@ serve(async (req) => {
           const qty = item.shipped_quantity;
           const unitPrice = item.unit_price;
           const fullAmount = qty * unitPrice;
-          // Apply billing percentage
-          const billedAmount = fullAmount * billingMultiplier;
-          calculatedSubtotal += billedAmount;
+          calculatedSubtotal += fullAmount;
           
-          console.log(`Item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, Billed Amount: ${billedAmount}`);
+          console.log(`Item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}`);
           
           return {
             DetailType: 'SalesItemLineDetail',
-            Amount: billedAmount,
+            Amount: fullAmount,
             SalesItemLineDetail: {
               ItemRef: {
                 value: '1',
               },
               Qty: qty,
-              UnitPrice: unitPrice * billingMultiplier,
+              UnitPrice: unitPrice,
             },
-            Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
+            Description: item.description || item.name,
           };
         });
       } else {
@@ -424,6 +420,26 @@ serve(async (req) => {
 
     console.log(`Total line items: ${lineItems.length}`);
 
+    // For partial billing, add a line item to subtract the unbilled portion
+    if (billingPercentage < 100) {
+      const unbilledPercentage = 100 - billingPercentage;
+      const unbilledAmount = -(calculatedSubtotal * (unbilledPercentage / 100));
+      
+      console.log(`Adding balance line: -${unbilledPercentage}% = $${Math.abs(unbilledAmount).toFixed(2)}`);
+      
+      lineItems.push({
+        DetailType: 'SalesItemLineDetail',
+        Amount: unbilledAmount,
+        Description: `Balance Due on Delivery (${unbilledPercentage}% of order)`,
+        SalesItemLineDetail: {
+          ItemRef: { value: '1' },
+        },
+      });
+      
+      // Adjust calculated subtotal for the balance line
+      calculatedSubtotal += unbilledAmount;
+    }
+
     // Validate calculated total matches database total
     const calculatedTotal = calculatedSubtotal + Number(invoice.tax || 0);
     const dbTotal = Number(invoice.total);
@@ -439,10 +455,9 @@ serve(async (req) => {
       // Don't throw error, but log the discrepancy for investigation
     }
 
-    // For partial billing, we'll apply the percentage to line item amounts
-    // (not using Deposit field as that's for recording payments already received)
-    const billingMultiplier = billingPercentage / 100;
-    console.log(`Billing percentage: ${billingPercentage}%, multiplier: ${billingMultiplier}`);
+    // For partial billing, we'll show full invoice then subtract the unbilled portion
+    // This way customers see the full order value with deposit clearly shown
+    console.log(`Billing ${billingPercentage}% now, ${100 - billingPercentage}% due later`);
 
     // Create invoice payload
     const invoicePayload: any = {
