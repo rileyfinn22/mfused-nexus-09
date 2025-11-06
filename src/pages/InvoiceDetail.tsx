@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
+import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +37,8 @@ const InvoiceDetail = () => {
   const [relatedInvoices, setRelatedInvoices] = useState<any[]>([]);
   const [syncingToQB, setSyncingToQB] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
 
   useEffect(() => {
@@ -142,6 +145,17 @@ const InvoiceDetail = () => {
     
     if (relatedData) {
       setRelatedInvoices(relatedData);
+    }
+
+    // Fetch payments for this invoice
+    const { data: paymentsData } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('invoice_id', invoiceId)
+      .order('payment_date', { ascending: false });
+    
+    if (paymentsData) {
+      setPayments(paymentsData);
     }
 
     setLoading(false);
@@ -423,6 +437,12 @@ const InvoiceDetail = () => {
                   </Button>
                 </>
               )}
+              {invoice.status !== 'paid' && (
+                <Button onClick={() => setShowPaymentDialog(true)}>
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Record Payment
+                </Button>
+              )}
             </>
           )}
           <Button onClick={() => {}}>
@@ -512,7 +532,12 @@ const InvoiceDetail = () => {
                 )}
               </div>
               <div className="text-right">
-                <span className="inline-block px-4 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary capitalize">
+                <span className={`inline-block px-4 py-1.5 rounded-full text-sm font-medium capitalize ${
+                  invoice.status === 'paid' ? 'bg-green-500/10 text-green-600' :
+                  invoice.status === 'partial' ? 'bg-blue-500/10 text-blue-600' :
+                  invoice.status === 'open' ? 'bg-orange-500/10 text-orange-600' :
+                  'bg-primary/10 text-primary'
+                }`}>
                   {invoice.status.replace('_', ' ')}
                 </span>
                 <div className="mt-4">
@@ -844,6 +869,79 @@ const InvoiceDetail = () => {
         </CardContent>
       </Card>
 
+      {/* Payment History */}
+      <Card className="shadow-lg">
+        <CardContent className="p-8">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-lg font-semibold">Payment History</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {payments.length} payment{payments.length !== 1 ? 's' : ''} recorded
+              </p>
+            </div>
+            <div className="text-right space-y-1">
+              <div>
+                <p className="text-xs text-muted-foreground">Invoice Total</p>
+                <p className="text-lg font-semibold">{formatCurrency(invoice.total)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Paid</p>
+                <p className="text-lg font-semibold text-success">{formatCurrency(invoice.total_paid || 0)}</p>
+              </div>
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground">Remaining Balance</p>
+                <p className="text-xl font-bold text-primary">
+                  {formatCurrency(invoice.total - (invoice.total_paid || 0))}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {payments.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {payments.map((payment) => (
+                  <TableRow key={payment.id}>
+                    <TableCell className="font-medium">
+                      {new Date(payment.payment_date).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {payment.payment_method.replace('_', ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {payment.reference_number || '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-success">
+                      {formatCurrency(payment.amount)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                      {payment.notes || '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No payments recorded yet</p>
+              <p className="text-sm mt-1">Click "Record Payment" to add a payment</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Attached Vendor POs - For Admin View */}
       {isVibeAdmin && vendorPOs.length > 0 && (
         <Card className="shadow-lg">
@@ -1038,6 +1136,14 @@ const InvoiceDetail = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Record Payment Dialog */}
+      <RecordPaymentDialog
+        open={showPaymentDialog}
+        onOpenChange={setShowPaymentDialog}
+        invoice={invoice}
+        onSuccess={fetchInvoiceDetails}
+      />
     </div>
   );
 };

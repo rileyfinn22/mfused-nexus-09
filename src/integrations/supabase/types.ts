@@ -400,6 +400,7 @@ export type Database = {
           subtotal: number
           tax: number
           total: number
+          total_paid: number | null
           updated_at: string
         }
         Insert: {
@@ -424,6 +425,7 @@ export type Database = {
           subtotal?: number
           tax?: number
           total?: number
+          total_paid?: number | null
           updated_at?: string
         }
         Update: {
@@ -448,6 +450,7 @@ export type Database = {
           subtotal?: number
           tax?: number
           total?: number
+          total_paid?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -802,6 +805,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          invoice_id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string
+          reference_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string
+          reference_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string
+          reference_number?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       po_submissions: {
         Row: {
