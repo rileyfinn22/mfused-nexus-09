@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import * as XLSX from 'https://cdn.skypack.dev/xlsx@0.18.5';
+import * as XLSX from 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
