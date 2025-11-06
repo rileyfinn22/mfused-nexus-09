@@ -11,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
+import { SyncToQuickBooksDialog } from "@/components/SyncToQuickBooksDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +40,7 @@ const InvoiceDetail = () => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [payments, setPayments] = useState<any[]>([]);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showSyncDialog, setShowSyncDialog] = useState(false);
   const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
 
   useEffect(() => {
@@ -296,7 +298,7 @@ const InvoiceDetail = () => {
     );
   };
 
-  const handleSyncToQuickBooks = async () => {
+  const handleSyncToQuickBooks = async (billingPercentage: number) => {
     if (!invoiceId) return;
     
     setSyncingToQB(true);
@@ -311,14 +313,25 @@ const InvoiceDetail = () => {
         return;
       }
 
-      await syncInvoice(invoiceId);
-      
-      toast({
-        title: "Sync Initiated",
-        description: "Invoice sync to QuickBooks has started. Check back in a moment."
+      // Call edge function with billing percentage
+      const { error } = await supabase.functions.invoke('quickbooks-sync-invoice', {
+        body: { 
+          invoiceId,
+          billingPercentage 
+        }
       });
 
-      // Refresh invoice details to show updated sync status
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Sync Successful",
+        description: `Invoice synced to QuickBooks with ${billingPercentage}% billing`
+      });
+
+      // Close dialog and refresh invoice details
+      setShowSyncDialog(false);
       setTimeout(() => fetchInvoiceDetails(), 2000);
     } catch (error: any) {
       toast({
@@ -425,11 +438,11 @@ const InvoiceDetail = () => {
                   </Button>
                   <Button 
                     variant="outline" 
-                    onClick={handleSyncToQuickBooks}
+                    onClick={() => setShowSyncDialog(true)}
                     disabled={syncingToQB || invoice.quickbooks_sync_status === 'synced'}
                   >
                     <RefreshCw className={`h-4 w-4 mr-2 ${syncingToQB ? 'animate-spin' : ''}`} />
-                    {invoice.quickbooks_sync_status === 'synced' ? 'Synced to QB' : 'Sync to QuickBooks'}
+                    {invoice.quickbooks_sync_status === 'synced' ? 'Synced to QB' : 'Bill in QuickBooks'}
                   </Button>
                   <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -1143,6 +1156,15 @@ const InvoiceDetail = () => {
         onOpenChange={setShowPaymentDialog}
         invoice={invoice}
         onSuccess={fetchInvoiceDetails}
+      />
+
+      {/* Sync to QuickBooks Dialog */}
+      <SyncToQuickBooksDialog
+        open={showSyncDialog}
+        onOpenChange={setShowSyncDialog}
+        invoice={invoice}
+        onSync={handleSyncToQuickBooks}
+        syncing={syncingToQB}
       />
     </div>
   );

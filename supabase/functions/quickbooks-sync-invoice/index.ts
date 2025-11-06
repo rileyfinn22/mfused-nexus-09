@@ -87,9 +87,9 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { invoiceId } = await req.json();
+    const { invoiceId, billingPercentage = 100 } = await req.json();
 
-    console.log('Syncing invoice:', invoiceId);
+    console.log('Syncing invoice:', invoiceId, 'with billing percentage:', billingPercentage);
 
     // Get invoice with items and allocations
     const { data: invoice, error: invoiceError } = await supabase
@@ -314,6 +314,7 @@ serve(async (req) => {
     // Build invoice line items using inventory allocations or shipped quantities
     let lineItems = [];
     let calculatedSubtotal = 0;
+    const percentageMultiplier = billingPercentage / 100;
 
     if (allocations && allocations.length > 0) {
       // Use inventory allocations for line items
@@ -321,10 +322,11 @@ serve(async (req) => {
       lineItems = allocations.map((alloc: any) => {
         const item = alloc.order_items;
         const qty = alloc.quantity_allocated;
-        const amount = qty * item.unit_price;
+        const unitPrice = item.unit_price * percentageMultiplier;
+        const amount = qty * unitPrice;
         calculatedSubtotal += amount;
         
-        console.log(`Item: ${item.name}, Allocated Qty: ${qty}, Unit Price: ${item.unit_price}, Amount: ${amount}`);
+        console.log(`Item: ${item.name}, Allocated Qty: ${qty}, Unit Price (${billingPercentage}%): ${unitPrice}, Amount: ${amount}`);
         
         return {
           DetailType: 'SalesItemLineDetail',
@@ -334,9 +336,9 @@ serve(async (req) => {
               value: '1', // Default item ID
             },
             Qty: qty,
-            UnitPrice: item.unit_price,
+            UnitPrice: unitPrice,
           },
-          Description: item.description || item.name,
+          Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
         };
       });
     } else {
@@ -348,37 +350,11 @@ serve(async (req) => {
       if (shippedItems.length > 0) {
         lineItems = shippedItems.map((item: any) => {
           const qty = item.shipped_quantity;
-          const amount = qty * item.unit_price;
-          calculatedSubtotal += amount;
-          
-          console.log(`Item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${item.unit_price}, Amount: ${amount}`);
-          
-          return {
-            DetailType: 'SalesItemLineDetail',
-            Amount: amount,
-            SalesItemLineDetail: {
-              ItemRef: {
-                value: '1',
-              },
-              Qty: qty,
-              UnitPrice: item.unit_price,
-            },
-            Description: item.description || item.name,
-          };
-        });
-      } else {
-        // Second fallback: Use all order items for deposit/pre-shipment billing
-        console.log('No shipped items, using all order items for deposit/pre-shipment billing');
-        const billedPercentage = Number(invoice.billed_percentage || 100) / 100;
-        console.log(`Applying billed percentage: ${billedPercentage * 100}%`);
-        
-        lineItems = invoice.orders?.order_items?.map((item: any) => {
-          const qty = item.quantity;
-          const unitPrice = item.unit_price * billedPercentage;
+          const unitPrice = item.unit_price * percentageMultiplier;
           const amount = qty * unitPrice;
           calculatedSubtotal += amount;
           
-          console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price (${billedPercentage * 100}%): ${unitPrice}, Amount: ${amount}`);
+          console.log(`Item: ${item.name}, Shipped Qty: ${qty}, Unit Price (${billingPercentage}%): ${unitPrice}, Amount: ${amount}`);
           
           return {
             DetailType: 'SalesItemLineDetail',
@@ -390,19 +366,46 @@ serve(async (req) => {
               Qty: qty,
               UnitPrice: unitPrice,
             },
-            Description: `${item.description || item.name}${billedPercentage < 1 ? ` (${billedPercentage * 100}% deposit)` : ''}`,
+            Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
+          };
+        });
+      } else {
+        // Second fallback: Use all order items for deposit/pre-shipment billing
+        console.log('No shipped items, using all order items for deposit/pre-shipment billing');
+        console.log(`Applying billing percentage: ${billingPercentage}%`);
+        
+        lineItems = invoice.orders?.order_items?.map((item: any) => {
+          const qty = item.quantity;
+          const unitPrice = item.unit_price * percentageMultiplier;
+          const amount = qty * unitPrice;
+          calculatedSubtotal += amount;
+          
+          console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price (${billingPercentage}%): ${unitPrice}, Amount: ${amount}`);
+          
+          return {
+            DetailType: 'SalesItemLineDetail',
+            Amount: amount,
+            SalesItemLineDetail: {
+              ItemRef: {
+                value: '1',
+              },
+              Qty: qty,
+              UnitPrice: unitPrice,
+            },
+            Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% deposit)` : ''}`,
           };
         }) || [];
       }
     }
 
-    // Add shipping as a line item if present
+    // Add shipping as a line item if present (also apply percentage)
     if (invoice.shipping_cost > 0) {
-      calculatedSubtotal += Number(invoice.shipping_cost);
+      const shippingAmount = Number(invoice.shipping_cost) * percentageMultiplier;
+      calculatedSubtotal += shippingAmount;
       lineItems.push({
         DetailType: 'SalesItemLineDetail',
-        Amount: invoice.shipping_cost,
-        Description: 'Shipping',
+        Amount: shippingAmount,
+        Description: `Shipping${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
         SalesItemLineDetail: {
           ItemRef: { value: '1' }, // Default shipping item
         },
