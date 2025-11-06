@@ -482,7 +482,20 @@ serve(async (req) => {
           'Accept': 'application/json',
         },
       });
+      
+      if (!getResponse.ok) {
+        const errorData = await getResponse.json();
+        console.error('Failed to fetch existing invoice:', errorData);
+        throw new Error(`Failed to fetch invoice from QuickBooks: ${errorData.Fault?.Error?.[0]?.Message || 'Unknown error'}`);
+      }
+      
       const currentInvoice = await getResponse.json();
+      console.log('Current invoice response:', JSON.stringify(currentInvoice).substring(0, 200));
+      
+      if (!currentInvoice?.Invoice?.SyncToken) {
+        console.error('Invalid invoice response:', currentInvoice);
+        throw new Error('Could not get SyncToken from QuickBooks invoice. Invoice may have been deleted.');
+      }
 
       qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=65`, {
         method: 'POST',
