@@ -175,40 +175,60 @@ serve(async (req) => {
 
     // Find or create customer in QuickBooks
     const customerName = invoice.orders?.customer_name || 'Unknown Customer';
+    const customerEmail = invoice.orders?.customer_email || '';
     
-    console.log('Searching for customer:', customerName);
-    
-    // Strategy 1: Try exact match with LIKE operator (more forgiving than =)
-    let customerSearchResponse = await fetch(
-      `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName LIKE '${customerName.replace(/'/g, "\\'")}' MAXRESULTS 1&minorversion=65`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-        },
-      }
-    );
-    let customerSearchData = await customerSearchResponse.json();
-    
-    console.log('Initial search response:', JSON.stringify(customerSearchData, null, 2));
-    
-    if (!customerSearchResponse.ok) {
-      console.error('Failed to search for customer:', customerSearchData);
-      throw new Error(customerSearchData.Fault?.Error?.[0]?.Message || 'Failed to search for customer in QuickBooks');
-    }
+    console.log('Looking for customer:', customerName, 'Email:', customerEmail);
     
     let customerId;
-    if (customerSearchData.QueryResponse?.Customer?.length > 0 && customerSearchData.QueryResponse.Customer[0]?.Id) {
-      customerId = customerSearchData.QueryResponse.Customer[0].Id;
-      console.log('Found existing customer:', customerId);
-    } else {
-      console.log('No existing customer found, will create new customer');
+    
+    // Strategy 1: Search by email if available (most reliable)
+    if (customerEmail) {
+      console.log('Searching by email...');
+      const emailSearchResponse = await fetch(
+        `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE PrimaryEmailAddr='${customerEmail}' MAXRESULTS 1&minorversion=65`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+      const emailSearchData = await emailSearchResponse.json();
       
-      // Create new customer
+      if (emailSearchData.QueryResponse?.Customer?.length > 0) {
+        customerId = emailSearchData.QueryResponse.Customer[0].Id;
+        console.log('Found customer by email:', customerId);
+      }
+    }
+    
+    // Strategy 2: Search by name if email search didn't find anything
+    if (!customerId) {
+      console.log('Searching by name...');
+      const nameSearchResponse = await fetch(
+        `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName='${customerName.replace(/'/g, "\\'")}' MAXRESULTS 1&minorversion=65`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+      const nameSearchData = await nameSearchResponse.json();
+      
+      if (nameSearchData.QueryResponse?.Customer?.length > 0) {
+        customerId = nameSearchData.QueryResponse.Customer[0].Id;
+        console.log('Found customer by name:', customerId);
+      }
+    }
+    
+    // Strategy 3: Create customer if not found
+    if (!customerId) {
+      console.log('Customer not found, creating new customer in QuickBooks...');
+      
       const customerPayload = {
         DisplayName: customerName,
-        PrimaryEmailAddr: { Address: invoice.orders?.customer_email || '' },
-        PrimaryPhone: { FreeFormNumber: invoice.orders?.customer_phone || '' },
+        PrimaryEmailAddr: customerEmail ? { Address: customerEmail } : undefined,
+        PrimaryPhone: invoice.orders?.customer_phone ? { FreeFormNumber: invoice.orders.customer_phone } : undefined,
         BillAddr: {
           Line1: invoice.orders?.billing_street || invoice.orders?.shipping_street || '',
           City: invoice.orders?.billing_city || invoice.orders?.shipping_city || '',
@@ -229,16 +249,15 @@ serve(async (req) => {
 
       const newCustomer = await createCustomerResponse.json();
       
-      if (!createCustomerResponse.ok || !newCustomer.Customer) {
-        // If it's a duplicate error, the customer exists - do a more thorough search
+      if (!createCustomerResponse.ok) {
+        // If duplicate error, customer was created by another process - search one more time
         if (newCustomer.Fault?.Error?.[0]?.Message?.includes('Duplicate')) {
-          console.log('Duplicate error detected, doing exhaustive search...');
+          console.log('Duplicate detected - customer was just created, searching again...');
           
-          // Strategy 2: Search by email if available
-          if (invoice.orders?.customer_email) {
-            console.log('Trying search by email:', invoice.orders.customer_email);
-            const emailSearchResponse = await fetch(
-              `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE PrimaryEmailAddr='${invoice.orders.customer_email}' MAXRESULTS 1&minorversion=65`,
+          // Try email search first
+          if (customerEmail) {
+            const retryEmailSearch = await fetch(
+              `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE PrimaryEmailAddr='${customerEmail}' MAXRESULTS 1&minorversion=65`,
               {
                 headers: {
                   'Authorization': `Bearer ${accessToken}`,
@@ -246,19 +265,18 @@ serve(async (req) => {
                 },
               }
             );
-            const emailSearchData = await emailSearchResponse.json();
+            const retryEmailData = await retryEmailSearch.json();
             
-            if (emailSearchData.QueryResponse?.Customer?.length > 0) {
-              customerId = emailSearchData.QueryResponse.Customer[0].Id;
-              console.log('Found customer by email:', customerId);
+            if (retryEmailData.QueryResponse?.Customer?.length > 0) {
+              customerId = retryEmailData.QueryResponse.Customer[0].Id;
+              console.log('Found customer on retry by email:', customerId);
             }
           }
           
-          // Strategy 3: Broad search with pagination
+          // If still not found, try broad name search
           if (!customerId) {
-            console.log('Trying broad search with higher limit...');
-            const broadSearchResponse = await fetch(
-              `${qbApiUrl}/query?query=SELECT * FROM Customer MAXRESULTS 1000&minorversion=65`,
+            const broadSearch = await fetch(
+              `${qbApiUrl}/query?query=SELECT * FROM Customer STARTPOSITION 1 MAXRESULTS 1000&minorversion=65`,
               {
                 headers: {
                   'Authorization': `Bearer ${accessToken}`,
@@ -266,32 +284,22 @@ serve(async (req) => {
                 },
               }
             );
-            const broadSearchData = await broadSearchResponse.json();
+            const broadData = await broadSearch.json();
+            const customers = broadData.QueryResponse?.Customer || [];
             
-            console.log(`Broad search returned ${broadSearchData.QueryResponse?.Customer?.length || 0} customers`);
-            
-            // Try multiple matching strategies
-            const customers = broadSearchData.QueryResponse?.Customer || [];
-            
-            // First try exact match (case-insensitive)
-            let matchingCustomer = customers.find(
+            // Case-insensitive name match
+            const match = customers.find(
               (c: any) => c.DisplayName?.toLowerCase().trim() === customerName.toLowerCase().trim()
             );
             
-            // If no exact match, try contains
-            if (!matchingCustomer) {
-              matchingCustomer = customers.find(
-                (c: any) => c.DisplayName?.toLowerCase().includes(customerName.toLowerCase().trim())
-              );
+            if (match) {
+              customerId = match.Id;
+              console.log('Found customer in broad search:', customerId);
             }
-            
-            if (matchingCustomer) {
-              customerId = matchingCustomer.Id;
-              console.log('Found matching customer in broad search:', customerId, 'DisplayName:', matchingCustomer.DisplayName);
-            } else {
-              console.error('Could not find customer. Available customers:', customers.slice(0, 10).map((c: any) => c.DisplayName));
-              throw new Error(`Customer "${customerName}" exists in QuickBooks but could not be matched. This may be due to special characters or formatting. Please manually create an invoice in QuickBooks for this customer.`);
-            }
+          }
+          
+          if (!customerId) {
+            throw new Error(`Customer "${customerName}" appears to exist in QuickBooks but cannot be located. Please check QuickBooks and ensure the customer name matches exactly.`);
           }
         } else {
           console.error('Failed to create customer:', newCustomer);
@@ -299,7 +307,7 @@ serve(async (req) => {
         }
       } else {
         customerId = newCustomer.Customer.Id;
-        console.log('Created new customer:', customerId);
+        console.log('Successfully created new customer:', customerId);
       }
     }
 
