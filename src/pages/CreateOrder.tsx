@@ -37,6 +37,7 @@ interface Product {
   cost: number | null;
   description: string | null;
   image_url: string | null;
+  customer_id: string | null;
 }
 
 interface OrderItem {
@@ -84,6 +85,8 @@ const CreateOrder = () => {
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -111,6 +114,7 @@ const CreateOrder = () => {
 
   useEffect(() => {
     fetchProducts();
+    fetchCustomers();
     if (isVibeAdmin) {
       fetchCompanies();
     }
@@ -326,6 +330,47 @@ const CreateOrder = () => {
     }
   };
 
+  const fetchCustomers = async () => {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .order('name');
+    
+    if (!error && data) {
+      setCustomers(data);
+    }
+  };
+
+  const handleCustomerSelect = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    
+    // Auto-populate customer info
+    const customer = customers.find(c => c.id === customerId);
+    if (customer) {
+      setFormData(prev => ({
+        ...prev,
+        customerName: customer.name,
+        customerEmail: customer.email || "",
+        customerPhone: customer.phone || "",
+        shippingName: customer.name,
+        shippingStreet: customer.shipping_street || customer.billing_street || "",
+        shippingCity: customer.shipping_city || customer.billing_city || "",
+        shippingState: customer.shipping_state || customer.billing_state || "",
+        shippingZip: customer.shipping_zip || customer.billing_zip || "",
+        billingName: customer.name,
+        billingStreet: customer.billing_street || "",
+        billingCity: customer.billing_city || "",
+        billingState: customer.billing_state || "",
+        billingZip: customer.billing_zip || "",
+      }));
+    }
+  };
+
+  // Filter products based on selected customer
+  const availableProducts = selectedCustomerId
+    ? products.filter(p => p.customer_id === selectedCustomerId)
+    : products;
+
   const fetchSavedAddresses = async () => {
     if (!isVibeAdmin) {
       const { data, error } = await supabase
@@ -480,7 +525,7 @@ const CreateOrder = () => {
     );
   };
 
-  const filteredProducts = products.filter(p => {
+  const filteredProducts = availableProducts.filter(p => {
     const alreadySelected = selectedItems.find(item => item.productId === p.id);
     if (alreadySelected) return false;
     
@@ -849,6 +894,27 @@ const CreateOrder = () => {
               </Dialog>
             </div>
             <div className="space-y-3">
+              {/* Customer Selection Dropdown */}
+              <div className="space-y-1">
+                <Label htmlFor="customer-select" className="text-xs">Select Customer *</Label>
+                <Select value={selectedCustomerId} onValueChange={handleCustomerSelect}>
+                  <SelectTrigger id="customer-select" className="h-9">
+                    <SelectValue placeholder="Choose a customer..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedCustomerId && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Only products linked to this customer will be available
+                  </p>
+                )}
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="customerName" className="text-xs">Name *</Label>
                 <Input
@@ -857,6 +923,7 @@ const CreateOrder = () => {
                   onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
                   required
                   className="h-9"
+                  disabled={!!selectedCustomerId}
                 />
               </div>
               <div className="space-y-1">
@@ -1174,9 +1241,14 @@ const CreateOrder = () => {
             <div className="border-t border-table-border p-3 bg-muted/20">
               <Dialog open={showAddItemsDialog} onOpenChange={setShowAddItemsDialog}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full" type="button">
+                  <Button 
+                    variant="outline" 
+                    className="w-full" 
+                    type="button"
+                    disabled={!selectedCustomerId}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Items
+                    {selectedCustomerId ? "Add Items" : "Select a customer first"}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
@@ -1222,10 +1294,14 @@ const CreateOrder = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredProducts.length === 0 ? (
+                         {filteredProducts.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                              {searchQuery ? "No products found matching your search" : "All products are already added"}
+                              {!selectedCustomerId 
+                                ? "Please select a customer first to see available products" 
+                                : searchQuery 
+                                  ? "No products found matching your search" 
+                                  : "No products available for this customer"}
                             </TableCell>
                           </TableRow>
                         ) : (
