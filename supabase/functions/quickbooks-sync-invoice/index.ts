@@ -525,9 +525,28 @@ serve(async (req) => {
 
     const qbInvoiceId = qbData.Invoice.Id;
     
-    // Create customer-facing payment link for QuickBooks invoices
-    // This links to the public invoice view where customers can pay
-    const qbPaymentLink = `https://c${qbSettings.realm_id}.qbo.intuit.com/invoice/${qbInvoiceId}`;
+    // Get payment link from QuickBooks API response
+    // QuickBooks returns InvoiceLink for customer payment page
+    let qbPaymentLink = qbData.Invoice.InvoiceLink || null;
+    
+    // If no InvoiceLink, fetch the invoice again with minorversion=73 to get the link
+    if (!qbPaymentLink) {
+      console.log('No InvoiceLink in response, fetching invoice details...');
+      const fetchResponse = await fetch(
+        `${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+      
+      if (fetchResponse.ok) {
+        const fetchData = await fetchResponse.json();
+        qbPaymentLink = fetchData.Invoice?.InvoiceLink || null;
+      }
+    }
     
     console.log('QuickBooks invoice ID:', qbInvoiceId);
     console.log('QuickBooks payment link:', qbPaymentLink);
