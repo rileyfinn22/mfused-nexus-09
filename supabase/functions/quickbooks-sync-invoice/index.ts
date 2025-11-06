@@ -321,23 +321,25 @@ serve(async (req) => {
       lineItems = allocations.map((alloc: any) => {
         const item = alloc.order_items;
         const qty = alloc.quantity_allocated;
-        const unitPrice = item.unit_price; // Full price
-        const amount = qty * unitPrice;
-        calculatedSubtotal += amount;
+        const unitPrice = item.unit_price;
+        const fullAmount = qty * unitPrice;
+        // Apply billing percentage
+        const billedAmount = fullAmount * billingMultiplier;
+        calculatedSubtotal += billedAmount;
         
-        console.log(`Item: ${item.name}, Allocated Qty: ${qty}, Unit Price: ${unitPrice}, Amount: ${amount}`);
+        console.log(`Item: ${item.name}, Allocated Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, Billed Amount: ${billedAmount}`);
         
         return {
           DetailType: 'SalesItemLineDetail',
-          Amount: amount,
+          Amount: billedAmount,
           SalesItemLineDetail: {
             ItemRef: {
               value: '1', // Default item ID
             },
             Qty: qty,
-            UnitPrice: unitPrice,
+            UnitPrice: unitPrice * billingMultiplier,
           },
-          Description: item.description || item.name,
+          Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
         };
       });
     } else {
@@ -349,23 +351,25 @@ serve(async (req) => {
       if (shippedItems.length > 0) {
         lineItems = shippedItems.map((item: any) => {
           const qty = item.shipped_quantity;
-          const unitPrice = item.unit_price; // Full price
-          const amount = qty * unitPrice;
-          calculatedSubtotal += amount;
+          const unitPrice = item.unit_price;
+          const fullAmount = qty * unitPrice;
+          // Apply billing percentage
+          const billedAmount = fullAmount * billingMultiplier;
+          calculatedSubtotal += billedAmount;
           
-          console.log(`Item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${unitPrice}, Amount: ${amount}`);
+          console.log(`Item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, Billed Amount: ${billedAmount}`);
           
           return {
             DetailType: 'SalesItemLineDetail',
-            Amount: amount,
+            Amount: billedAmount,
             SalesItemLineDetail: {
               ItemRef: {
                 value: '1',
               },
               Qty: qty,
-              UnitPrice: unitPrice,
+              UnitPrice: unitPrice * billingMultiplier,
             },
-            Description: item.description || item.name,
+            Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
           };
         });
       } else {
@@ -374,23 +378,25 @@ serve(async (req) => {
         
         lineItems = invoice.orders?.order_items?.map((item: any) => {
           const qty = item.quantity;
-          const unitPrice = item.unit_price; // Full price
-          const amount = qty * unitPrice;
-          calculatedSubtotal += amount;
+          const unitPrice = item.unit_price;
+          const fullAmount = qty * unitPrice;
+          // Apply billing percentage
+          const billedAmount = fullAmount * billingMultiplier;
+          calculatedSubtotal += billedAmount;
           
-          console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price: ${unitPrice}, Amount: ${amount}`);
+          console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, Billed Amount: ${billedAmount}`);
           
           return {
             DetailType: 'SalesItemLineDetail',
-            Amount: amount,
+            Amount: billedAmount,
             SalesItemLineDetail: {
               ItemRef: {
                 value: '1',
               },
               Qty: qty,
-              UnitPrice: unitPrice,
+              UnitPrice: unitPrice * billingMultiplier,
             },
-            Description: item.description || item.name,
+            Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
           };
         }) || [];
       }
@@ -433,11 +439,10 @@ serve(async (req) => {
       // Don't throw error, but log the discrepancy for investigation
     }
 
-    // Calculate deposit amount if billing percentage is less than 100%
-    const depositAmount = billingPercentage < 100 ? calculatedTotal * (billingPercentage / 100) : undefined;
-    if (depositAmount) {
-      console.log(`Applying ${billingPercentage}% deposit: $${depositAmount.toFixed(2)}`);
-    }
+    // For partial billing, we'll apply the percentage to line item amounts
+    // (not using Deposit field as that's for recording payments already received)
+    const billingMultiplier = billingPercentage / 100;
+    console.log(`Billing percentage: ${billingPercentage}%, multiplier: ${billingMultiplier}`);
 
     // Create invoice payload
     const invoicePayload: any = {
@@ -466,10 +471,8 @@ serve(async (req) => {
       },
     };
 
-    // Add deposit if applicable
-    if (depositAmount) {
-      invoicePayload.Deposit = depositAmount;
-    }
+    // Note: We don't use the Deposit field for partial billing
+    // Instead, we adjust the line item amounts to reflect the billing percentage
 
     let qbResponse;
     if (invoice.quickbooks_id) {
