@@ -465,9 +465,36 @@ const InvoiceDetail = () => {
                     </span>
                     {invoice.billed_percentage && (
                       <span className="text-sm text-muted-foreground">
-                        ({invoice.billed_percentage.toFixed(1)}% of order)
+                        ({invoice.billed_percentage.toFixed(1)}% billed)
                       </span>
                     )}
+                    {(() => {
+                      const totalShipped = order?.order_items?.reduce((sum: number, item: any) => 
+                        sum + (item.shipped_quantity || 0), 0) || 0;
+                      const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => 
+                        sum + item.quantity, 0) || 0;
+                      const shippedPercentage = totalOrdered > 0 ? (totalShipped / totalOrdered * 100) : 0;
+                      
+                      if (shippedPercentage === 0) {
+                        return (
+                          <span className="text-sm font-medium text-orange-600">
+                            Not Shipped Yet
+                          </span>
+                        );
+                      } else if (shippedPercentage < 100) {
+                        return (
+                          <span className="text-sm font-medium text-blue-600">
+                            {shippedPercentage.toFixed(1)}% Physically Shipped
+                          </span>
+                        );
+                      } else {
+                        return (
+                          <span className="text-sm font-medium text-green-600">
+                            Fully Shipped
+                          </span>
+                        );
+                      }
+                    })()}
                   </div>
                 )}
                 <p className="text-sm text-muted-foreground">
