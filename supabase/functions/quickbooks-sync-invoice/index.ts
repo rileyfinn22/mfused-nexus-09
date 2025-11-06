@@ -519,7 +519,7 @@ serve(async (req) => {
     console.log('QuickBooks invoice ID:', qbInvoiceId);
     console.log('QuickBooks payment link:', qbPaymentLink);
 
-    // Update invoice with QuickBooks ID and payment link
+    // Update invoice with QuickBooks ID, payment link, and billed percentage
     await supabase
       .from('invoices')
       .update({
@@ -527,6 +527,7 @@ serve(async (req) => {
         quickbooks_payment_link: qbPaymentLink,
         quickbooks_synced_at: new Date().toISOString(),
         quickbooks_sync_status: 'synced',
+        billed_percentage: billingPercentage,
       })
       .eq('id', invoiceId);
 
