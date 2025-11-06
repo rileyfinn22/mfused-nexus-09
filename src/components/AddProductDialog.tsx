@@ -22,9 +22,10 @@ const productSchema = z.object({
 
 interface AddProductDialogProps {
   onProductAdded: () => void;
+  selectedCompanyId?: string;
 }
 
-export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
+export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProductDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [vendors, setVendors] = useState<any[]>([]);
@@ -107,18 +108,23 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
 
       const { data: userRole } = await supabase
         .from('user_roles')
-        .select('company_id')
+        .select('company_id, role')
         .eq('user_id', user.id)
         .single();
 
       if (!userRole) throw new Error("No company associated");
+
+      // Use selectedCompanyId if provided (for vibe_admin), otherwise use user's company
+      const companyId = selectedCompanyId && userRole.role === 'vibe_admin' 
+        ? selectedCompanyId 
+        : userRole.company_id;
 
       let imageUrl = null;
 
       // Upload image if provided
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${userRole.company_id}/${Date.now()}.${fileExt}`;
+        const fileName = `${companyId}/${Date.now()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('product-images')
@@ -144,7 +150,7 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
           price: formData.price ? parseFloat(formData.price) : null,
           preferred_vendor_id: formData.preferred_vendor_id || null,
           image_url: imageUrl,
-          company_id: userRole.company_id
+          company_id: companyId
         })
         .select()
         .single();

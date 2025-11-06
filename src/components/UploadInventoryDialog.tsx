@@ -9,9 +9,10 @@ import { Upload } from "lucide-react";
 
 interface UploadInventoryDialogProps {
   onInventoryUploaded: () => void;
+  selectedCompanyId?: string;
 }
 
-export function UploadInventoryDialog({ onInventoryUploaded }: UploadInventoryDialogProps) {
+export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }: UploadInventoryDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -31,6 +32,11 @@ export function UploadInventoryDialog({ onInventoryUploaded }: UploadInventoryDi
     try {
       const formData = new FormData();
       formData.append('file', file);
+      
+      // Pass selected company ID if provided (for vibe_admin)
+      if (selectedCompanyId) {
+        formData.append('company_id', selectedCompanyId);
+      }
 
       const { data, error } = await supabase.functions.invoke('upload-inventory', {
         body: formData

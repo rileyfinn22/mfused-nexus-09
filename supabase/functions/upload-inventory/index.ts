@@ -29,10 +29,10 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    // Get user's company
+    // Get user's company and role
     const { data: userRole, error: roleError } = await supabaseClient
       .from('user_roles')
-      .select('company_id')
+      .select('company_id, role')
       .eq('user_id', user.id)
       .single();
 
@@ -42,6 +42,17 @@ serve(async (req) => {
 
     const formData = await req.formData();
     const file = formData.get('file') as File;
+    const requestedCompanyId = formData.get('company_id') as string | null;
+
+    // Determine which company to use
+    let companyId = userRole.company_id;
+    if (requestedCompanyId && userRole.role === 'vibe_admin') {
+      // Vibe admins can upload for any company
+      companyId = requestedCompanyId;
+      console.log(`Vibe admin uploading for company: ${companyId}`);
+    } else {
+      console.log(`User uploading for their own company: ${companyId}`);
+    }
 
     if (!file) {
       throw new Error('No file uploaded');
@@ -156,7 +167,7 @@ serve(async (req) => {
           const { data: existingProduct } = await supabaseClient
             .from('products')
             .select('id')
-            .eq('company_id', userRole.company_id)
+            .eq('company_id', companyId)
             .eq('item_id', itemId)
             .maybeSingle();
 
@@ -171,7 +182,7 @@ serve(async (req) => {
           const { data: existingProduct } = await supabaseClient
             .from('products')
             .select('id')
-            .eq('company_id', userRole.company_id)
+            .eq('company_id', companyId)
             .eq('name', sku)
             .maybeSingle();
 
@@ -183,7 +194,7 @@ serve(async (req) => {
             const { data: newProduct, error: productError } = await supabaseClient
               .from('products')
               .insert({
-                company_id: userRole.company_id,
+                company_id: companyId,
                 name: sku,
                 item_id: itemId, // Store the item_id for future matching
                 category: 'General',
@@ -203,7 +214,7 @@ serve(async (req) => {
       }
 
       inventoryItems.push({
-        company_id: userRole.company_id,
+        company_id: companyId,
         product_id: productId,
         sku: sku, // Keep the item name/description as SKU
         state: state,

@@ -354,7 +354,10 @@ const Products = () => {
             <Edit className="h-4 w-4 mr-2" />
             {isEditMode ? "Done" : "Edit"}
           </Button>
-          <AddProductDialog onProductAdded={fetchProducts} />
+          <AddProductDialog 
+            onProductAdded={fetchProducts} 
+            selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
+          />
         </div>
       </div>
 

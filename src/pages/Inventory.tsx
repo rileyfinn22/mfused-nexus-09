@@ -306,7 +306,10 @@ const Inventory = () => {
               {isEditMode ? "Done" : "Edit"}
             </Button>
           )}
-          <UploadInventoryDialog onInventoryUploaded={fetchInventory} />
+          <UploadInventoryDialog 
+            onInventoryUploaded={fetchInventory} 
+            selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
+          />
         </div>
       </div>
 
