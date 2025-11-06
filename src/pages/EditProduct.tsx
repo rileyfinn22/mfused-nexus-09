@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileImage, CheckCircle, Clock, Eye } from "lucide-react";
 
 const EditProduct = () => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const EditProduct = () => {
   const [saving, setSaving] = useState(false);
   const [availableStock, setAvailableStock] = useState<number>(0);
   const [vendors, setVendors] = useState<any[]>([]);
+  const [artworkFiles, setArtworkFiles] = useState<any[]>([]);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   
   const [formData, setFormData] = useState({
@@ -46,6 +48,15 @@ const EditProduct = () => {
       descriptionRef.current.style.height = descriptionRef.current.scrollHeight + 'px';
     }
   }, [formData.description]);
+
+  useEffect(() => {
+    // Fetch artwork files when item_id changes
+    if (formData.item_id) {
+      fetchArtworkFiles(formData.item_id);
+    } else {
+      setArtworkFiles([]);
+    }
+  }, [formData.item_id]);
 
   const fetchProduct = async () => {
     try {
@@ -105,6 +116,27 @@ const EditProduct = () => {
       setAvailableStock(total);
     } catch (error) {
       console.error('Error fetching inventory:', error);
+    }
+  };
+
+  const fetchArtworkFiles = async (itemId: string) => {
+    if (!itemId) {
+      setArtworkFiles([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('artwork_files')
+        .select('*')
+        .eq('sku', itemId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setArtworkFiles(data || []);
+    } catch (error) {
+      console.error('Error fetching artwork:', error);
+      setArtworkFiles([]);
     }
   };
 
@@ -309,7 +341,7 @@ const EditProduct = () => {
               <SelectTrigger>
                 <SelectValue placeholder="No preferred vendor" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-popover z-50">
                 {vendors.map((vendor) => (
                   <SelectItem key={vendor.id} value={vendor.id}>
                     {vendor.name}
@@ -320,6 +352,80 @@ const EditProduct = () => {
             <p className="text-xs text-muted-foreground">Auto-populates when creating orders (can be edited)</p>
           </div>
         </div>
+
+        {/* Artwork Files Section */}
+        {formData.item_id && (
+          <div className="space-y-4 bg-card p-6 rounded-lg border">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Artwork Files ({artworkFiles.length})</h2>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/artwork?search=${formData.item_id}`)}
+              >
+                View All Artwork
+              </Button>
+            </div>
+            
+            {artworkFiles.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No artwork files found for SKU: {formData.item_id}</p>
+            ) : (
+              <div className="space-y-3">
+                {artworkFiles.map((artwork) => (
+                  <div
+                    key={artwork.id}
+                    className="flex items-center gap-3 p-4 border rounded-lg bg-background hover:bg-muted/50 transition-colors"
+                  >
+                    {artwork.preview_url ? (
+                      <img
+                        src={artwork.preview_url}
+                        alt={artwork.filename}
+                        className="w-16 h-16 object-cover rounded border"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-muted rounded border flex items-center justify-center">
+                        <FileImage className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    )}
+                    
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{artwork.filename}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        {artwork.is_approved ? (
+                          <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Approved
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Pending Approval
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(artwork.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {artwork.notes && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{artwork.notes}</p>
+                      )}
+                    </div>
+                    
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(artwork.artwork_url, '_blank')}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex justify-end gap-4">

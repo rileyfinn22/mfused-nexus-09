@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -80,6 +80,8 @@ const CustomerDetail = () => {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<any[]>([]);
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
+  const [artworkFiles, setArtworkFiles] = useState<any[]>([]);
+  const [selectedArtworkFile, setSelectedArtworkFile] = useState<string>("");
   const [productFormData, setProductFormData] = useState({
     name: "",
     state: "",
@@ -350,7 +352,28 @@ const CustomerDetail = () => {
     }
   };
 
-  const handleEditProduct = (product: any) => {
+  const fetchArtworkForProduct = async (itemId: string) => {
+    if (!itemId) {
+      setArtworkFiles([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('artwork_files')
+        .select('*')
+        .eq('sku', itemId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setArtworkFiles(data || []);
+    } catch (error) {
+      console.error('Error fetching artwork:', error);
+      setArtworkFiles([]);
+    }
+  };
+
+  const handleEditProduct = async (product: any) => {
     console.log("=== EDITING PRODUCT ===");
     console.log("Full product object:", JSON.stringify(product, null, 2));
     console.log("Product state value:", product.state);
@@ -369,6 +392,13 @@ const CustomerDetail = () => {
     console.log("Form data being set:", formData);
     setProductFormData(formData);
     setProductFormErrors({});
+    setSelectedArtworkFile("");
+    
+    // Fetch artwork files for this product
+    if (product.item_id) {
+      await fetchArtworkForProduct(product.item_id);
+    }
+    
     setShowEditProductDialog(true);
   };
 
@@ -1252,6 +1282,75 @@ const CustomerDetail = () => {
                 rows={3}
               />
             </div>
+
+            {/* Artwork Files Section */}
+            {productFormData.item_id && (
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <Label>Artwork Files ({artworkFiles.length})</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/artwork?search=${productFormData.item_id}`)}
+                  >
+                    View All Artwork
+                  </Button>
+                </div>
+                
+                {artworkFiles.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No artwork files found for SKU: {productFormData.item_id}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {artworkFiles.map((artwork) => (
+                      <div
+                        key={artwork.id}
+                        className="flex items-center gap-3 p-3 border rounded-lg bg-background hover:bg-muted/50 transition-colors"
+                      >
+                        {artwork.preview_url ? (
+                          <img
+                            src={artwork.preview_url}
+                            alt={artwork.filename}
+                            className="w-12 h-12 object-cover rounded border"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center">
+                            <FileImage className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                        )}
+                        
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{artwork.filename}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {artwork.is_approved ? (
+                              <Badge variant="default" className="text-xs bg-green-600">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Approved
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Pending Approval
+                              </Badge>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(artwork.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(artwork.artwork_url, '_blank')}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter>
