@@ -10,6 +10,11 @@ async function refreshAccessToken(supabase: any, companyId: string, refreshToken
   const clientId = Deno.env.get('QUICKBOOKS_CLIENT_ID');
   const clientSecret = Deno.env.get('QUICKBOOKS_CLIENT_SECRET');
 
+  console.log('Attempting token refresh for company:', companyId);
+  console.log('Refresh token present:', !!refreshToken);
+  console.log('Client ID present:', !!clientId);
+  console.log('Client secret present:', !!clientSecret);
+
   const response = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
     method: 'POST',
     headers: {
@@ -23,14 +28,16 @@ async function refreshAccessToken(supabase: any, companyId: string, refreshToken
     }),
   });
 
+  console.log('QuickBooks refresh response status:', response.status);
   const data = await response.json();
+  console.log('QuickBooks refresh response data:', JSON.stringify(data));
   
   if (!response.ok) {
     console.error('Token refresh failed:', data);
     throw new Error(data.error_description || data.error || 'Failed to refresh access token');
   }
   
-  if (!data.access_token || !data.refresh_token || !data.expires_in) {
+  if (!data.access_token || !data.refresh_token || typeof data.expires_in !== 'number' || data.expires_in <= 0) {
     console.error('Invalid token response:', data);
     throw new Error('Invalid token response from QuickBooks');
   }
