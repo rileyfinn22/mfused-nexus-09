@@ -376,23 +376,21 @@ serve(async (req) => {
           const qty = item.quantity;
           const unitPrice = item.unit_price;
           const fullAmount = qty * unitPrice;
-          // Apply billing percentage
-          const billedAmount = fullAmount * billingMultiplier;
-          calculatedSubtotal += billedAmount;
+          calculatedSubtotal += fullAmount;
           
-          console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, Billed Amount: ${billedAmount}`);
+          console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}`);
           
           return {
             DetailType: 'SalesItemLineDetail',
-            Amount: billedAmount,
+            Amount: fullAmount,
             SalesItemLineDetail: {
               ItemRef: {
                 value: '1',
               },
               Qty: qty,
-              UnitPrice: unitPrice * billingMultiplier,
+              UnitPrice: unitPrice,
             },
-            Description: `${item.description || item.name}${billingPercentage < 100 ? ` (${billingPercentage}% billing)` : ''}`,
+            Description: item.description || item.name,
           };
         }) || [];
       }
