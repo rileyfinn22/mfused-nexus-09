@@ -17,6 +17,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
+
+const STAGE_NAMES = [
+  { value: 'Material', order: 1 },
+  { value: 'Print', order: 2 },
+  { value: 'Convert', order: 3 },
+  { value: 'QC', order: 4 },
+  { value: 'Shipped', order: 5 },
+  { value: 'Delivered', order: 6 },
+];
+
 const OrderDetail = () => {
   const {
     orderId
@@ -164,6 +174,37 @@ const OrderDetail = () => {
     
     if (data) {
       setInvoices(data);
+    }
+  };
+
+  const initializeStages = async () => {
+    try {
+      const stagesToCreate = STAGE_NAMES.map(stage => ({
+        order_id: orderId,
+        stage_name: stage.value,
+        sequence_order: stage.order,
+        status: 'pending'
+      }));
+
+      const { error } = await supabase
+        .from('production_stages')
+        .insert(stagesToCreate);
+
+      if (error) throw error;
+      
+      await fetchProductionStages();
+      
+      toast({
+        title: "Success",
+        description: "Production stages initialized successfully",
+      });
+    } catch (error: any) {
+      console.error('Error initializing stages:', error);
+      toast({
+        title: "Error",
+        description: "Failed to initialize stages",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1198,9 +1239,12 @@ const OrderDetail = () => {
               {productionStages.length === 0 ? (
                 <div className="text-center py-8 p-4 bg-background rounded-lg border border-table-border">
                   <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No production stages have been set up for this order yet.</p>
+                  <p className="text-sm text-muted-foreground mb-4">No production stages have been set up for this order yet.</p>
                   {isVibeAdmin && (
-                    <p className="text-xs text-muted-foreground mt-2">Go to production detail view to initialize stages.</p>
+                    <Button onClick={initializeStages}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Initialize Production Stages
+                    </Button>
                   )}
                 </div>
               ) : (
