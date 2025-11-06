@@ -653,6 +653,12 @@ const OrderDetail = () => {
               )}
             </>
           )}
+          {isVibeAdmin && (
+            <Button variant="outline" onClick={() => setShowVendorDialog(true)}>
+              <Package className="h-4 w-4 mr-2" />
+              Assign Vendors
+            </Button>
+          )}
           <Button variant="outline" onClick={handleDownloadPackingList}>
             <Download className="h-4 w-4 mr-2" />
             Packing List
