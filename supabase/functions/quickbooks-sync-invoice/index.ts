@@ -515,7 +515,11 @@ serve(async (req) => {
     }
 
     const qbInvoiceId = qbData.Invoice.Id;
-    const qbPaymentLink = qbData.Invoice.InvoiceLink || null;
+    
+    // Construct payment link - QuickBooks doesn't always return InvoiceLink in API response
+    // Use the standard QuickBooks customer view URL format
+    const qbPaymentLink = `https://app.qbo.intuit.com/app/invoice?txnId=${qbInvoiceId}`;
+    
     console.log('QuickBooks invoice ID:', qbInvoiceId);
     console.log('QuickBooks payment link:', qbPaymentLink);
 

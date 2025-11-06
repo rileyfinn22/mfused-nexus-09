@@ -437,10 +437,10 @@ const InvoiceDetail = () => {
                   <Button 
                     variant="outline" 
                     onClick={() => setShowSyncDialog(true)}
-                    disabled={syncingToQB || invoice.quickbooks_sync_status === 'synced'}
+                    disabled={syncingToQB}
                   >
                     <RefreshCw className={`h-4 w-4 mr-2 ${syncingToQB ? 'animate-spin' : ''}`} />
-                    {invoice.quickbooks_sync_status === 'synced' ? 'Synced to QB' : 'Bill in QuickBooks'}
+                    {invoice.quickbooks_sync_status === 'synced' ? 'Re-Bill in QuickBooks' : 'Bill in QuickBooks'}
                   </Button>
                   <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
                     <Trash2 className="h-4 w-4 mr-2" />
