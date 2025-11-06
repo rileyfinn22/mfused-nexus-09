@@ -51,12 +51,11 @@ interface Vendor {
 }
 
 const STAGE_NAMES = [
-  { value: 'material', label: 'Material', order: 1 },
-  { value: 'print', label: 'Print', order: 2 },
-  { value: 'convert', label: 'Convert', order: 3 },
-  { value: 'qc', label: 'QC', order: 4 },
-  { value: 'shipped', label: 'Shipped', order: 5 },
-  { value: 'delivered', label: 'Delivered', order: 6 },
+  { value: 'production_proceeding_part_1', label: 'Production Proceeding (Part 1)', order: 1 },
+  { value: 'production_proceeding_part_2', label: 'Production Proceeding (Part 2)', order: 2 },
+  { value: 'complete_qc', label: 'Complete/QC', order: 3 },
+  { value: 'shipped', label: 'Shipped', order: 4 },
+  { value: 'delivered', label: 'Delivered', order: 5 },
 ];
 
 export default function ProductionDetail() {
