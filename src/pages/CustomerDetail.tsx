@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -344,36 +344,61 @@ const CustomerDetail = () => {
     }
   };
 
-  const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCsvUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setCsvFile(file);
     setCsvErrors([]);
+    setUploadingBulk(true);
 
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
-        const errors: string[] = [];
-        const validData: any[] = [];
+      complete: async (results) => {
+        try {
+          // Use AI to intelligently parse the CSV data
+          const { data: parsed, error } = await supabase.functions.invoke('parse-product-csv', {
+            body: { csvRows: results.data }
+          });
 
-        results.data.forEach((row: any, index) => {
-          if (!row.name) {
-            errors.push(`Row ${index + 1}: Missing required field (name)`);
-          } else {
-            validData.push({
-              name: row.name,
-              item_id: row.item_id || row.sku || "",
-              description: row.description || "",
-              price: row.price || "",
-              cost: row.cost || "",
+          if (error) throw error;
+
+          setCsvData(parsed.products || []);
+          setCsvErrors(parsed.errors || []);
+          
+          if (parsed.products.length > 0) {
+            toast({
+              title: "CSV Parsed with AI",
+              description: `Successfully parsed ${parsed.products.length} products`,
             });
           }
-        });
+        } catch (error) {
+          console.error('AI parsing failed, falling back to simple parse:', error);
+          
+          // Fallback to simple parsing if AI fails
+          const errors: string[] = [];
+          const validData: any[] = [];
 
-        setCsvData(validData);
-        setCsvErrors(errors);
+          results.data.forEach((row: any, index) => {
+            if (!row.name) {
+              errors.push(`Row ${index + 1}: Missing required field (name)`);
+            } else {
+              validData.push({
+                name: row.name,
+                item_id: row.item_id || row.sku || "",
+                description: row.description || "",
+                price: row.price || "",
+                cost: row.cost || "",
+              });
+            }
+          });
+
+          setCsvData(validData);
+          setCsvErrors(errors);
+        } finally {
+          setUploadingBulk(false);
+        }
       },
       error: (error) => {
         toast({
@@ -381,6 +406,7 @@ const CustomerDetail = () => {
           description: error.message,
           variant: "destructive",
         });
+        setUploadingBulk(false);
       },
     });
   };
@@ -938,9 +964,16 @@ const CustomerDetail = () => {
                   type="file"
                   accept=".csv"
                   onChange={handleCsvUpload}
+                  disabled={uploadingBulk}
                   className="flex-1"
                 />
-                {csvFile && (
+                {uploadingBulk && (
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Parsing with AI...
+                  </Badge>
+                )}
+                {csvFile && !uploadingBulk && (
                   <Badge variant="outline" className="flex items-center gap-1">
                     <FileSpreadsheet className="h-3 w-3" />
                     {csvFile.name}
@@ -948,7 +981,7 @@ const CustomerDetail = () => {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Required columns: name | Optional: item_id, description, price, cost
+                AI will intelligently parse column names - they don't need to be exact. Works with variations like "Product Name", "name", "product_name", etc.
               </p>
             </div>
 
