@@ -10,7 +10,8 @@ import {
   Building2,
   Factory,
   Settings,
-  BarChart3
+  BarChart3,
+  Users
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -49,6 +50,7 @@ const vibeAdminNavigationItems = [
   { title: "Vendors", url: "/vendors", icon: Building2 },
   { title: "Vendor POs", url: "/vendor-pos", icon: FolderOpen },
   { title: "Invoices", url: "/invoices", icon: FileText },
+  { title: "Customers", url: "/customers", icon: Users },
   { title: "Products", url: "/products", icon: Package },
   { title: "Inventory", url: "/inventory", icon: Archive },
   { title: "Artwork", url: "/artwork", icon: Image },
