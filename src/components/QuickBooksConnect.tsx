@@ -11,6 +11,10 @@ export const QuickBooksConnect = () => {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [realmId, setRealmId] = useState<string | null>(null);
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<string | null>(null);
+  const [refreshTokenExpiresAt, setRefreshTokenExpiresAt] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     checkConnection();
@@ -38,6 +42,9 @@ export const QuickBooksConnect = () => {
       if (qbSettings?.is_connected) {
         setIsConnected(true);
         setRealmId(qbSettings.realm_id);
+        setTokenExpiresAt(qbSettings.token_expires_at);
+        setRefreshTokenExpiresAt(qbSettings.refresh_token_expires_at);
+        setLastError(qbSettings.last_error);
       }
     } catch (error) {
       console.error('Error checking QuickBooks connection:', error);
@@ -135,6 +142,9 @@ export const QuickBooksConnect = () => {
 
       setIsConnected(false);
       setRealmId(null);
+      setTokenExpiresAt(null);
+      setRefreshTokenExpiresAt(null);
+      setLastError(null);
       
       toast({
         title: "Disconnected",
@@ -147,6 +157,75 @@ export const QuickBooksConnect = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!userRole) throw new Error("No company found");
+
+      // Try to invoke the refresh function
+      const { error } = await supabase.functions.invoke('quickbooks-refresh-tokens');
+
+      if (error) throw error;
+
+      toast({
+        title: "Connection OK",
+        description: "QuickBooks connection is working properly"
+      });
+
+      // Refresh status
+      await checkConnection();
+    } catch (error: any) {
+      toast({
+        title: "Connection Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const getTokenStatus = () => {
+    if (!tokenExpiresAt) return { type: 'unknown', message: '' };
+    
+    const expiryDate = new Date(tokenExpiresAt);
+    const now = new Date();
+    const minutesUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60));
+    
+    if (minutesUntilExpiry < 0) {
+      return { type: 'expired', message: 'Access token expired' };
+    } else if (minutesUntilExpiry < 30) {
+      return { type: 'expiring', message: `Token expires in ${minutesUntilExpiry} minutes` };
+    }
+    
+    return { type: 'ok', message: 'Token is valid' };
+  };
+
+  const getRefreshTokenStatus = () => {
+    if (!refreshTokenExpiresAt) return { type: 'unknown', message: '' };
+    
+    const expiryDate = new Date(refreshTokenExpiresAt);
+    const now = new Date();
+    const daysUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilExpiry < 0) {
+      return { type: 'expired', message: 'Refresh token expired - reconnection required' };
+    } else if (daysUntilExpiry < 7) {
+      return { type: 'warning', message: `Refresh token expires in ${daysUntilExpiry} days` };
+    }
+    
+    return { type: 'ok', message: `Refresh token valid for ${daysUntilExpiry} days` };
   };
 
   if (loading) {
@@ -184,9 +263,45 @@ export const QuickBooksConnect = () => {
       <CardContent className="space-y-4">
         {isConnected ? (
           <div className="space-y-4">
-            <div className="bg-muted p-4 rounded">
-              <p className="text-sm font-medium mb-1">Connected Company ID</p>
-              <p className="text-xs text-muted-foreground font-mono">{realmId}</p>
+            {lastError && (
+              <div className="bg-destructive/10 border border-destructive/20 p-4 rounded">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-destructive">Connection Issue</p>
+                    <p className="text-xs text-destructive/80 mt-1">{lastError}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(() => {
+              const refreshStatus = getRefreshTokenStatus();
+              return refreshStatus.type === 'warning' || refreshStatus.type === 'expired' ? (
+                <div className="bg-warning/10 border border-warning/20 p-4 rounded">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-warning mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-warning">Action Required</p>
+                      <p className="text-xs text-warning/80 mt-1">{refreshStatus.message}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
+            <div className="bg-muted p-4 rounded space-y-3">
+              <div>
+                <p className="text-sm font-medium mb-1">Connected Company ID</p>
+                <p className="text-xs text-muted-foreground font-mono">{realmId}</p>
+              </div>
+              
+              {tokenExpiresAt && (
+                <div>
+                  <p className="text-sm font-medium mb-1">Token Status</p>
+                  <p className="text-xs text-muted-foreground">{getTokenStatus().message}</p>
+                </div>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -196,16 +311,29 @@ export const QuickBooksConnect = () => {
                 <li>✓ Invoices → Sales Invoices</li>
                 <li>✓ Vendor POs → Bills</li>
               </ul>
+              <p className="text-xs text-muted-foreground mt-2">
+                Tokens are automatically refreshed every 30 minutes
+              </p>
             </div>
 
-            <Button 
-              variant="destructive" 
-              onClick={handleDisconnect}
-              className="w-full"
-            >
-              <Unlink className="h-4 w-4 mr-2" />
-              Disconnect QuickBooks
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleTestConnection}
+                disabled={testing}
+                className="flex-1"
+              >
+                {testing ? 'Testing...' : 'Test Connection'}
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleDisconnect}
+                className="flex-1"
+              >
+                <Unlink className="h-4 w-4 mr-2" />
+                Disconnect
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">

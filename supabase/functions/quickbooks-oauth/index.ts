@@ -86,6 +86,7 @@ serve(async (req) => {
       console.log('Successfully obtained tokens');
 
       const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+      const refreshTokenExpiresAt = new Date(Date.now() + (tokenData.x_refresh_token_expires_in || 8726400) * 1000);
 
       // Store tokens in database
       const { error: upsertError } = await supabase
@@ -96,7 +97,10 @@ serve(async (req) => {
           access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token,
           token_expires_at: expiresAt.toISOString(),
+          refresh_token_expires_at: refreshTokenExpiresAt.toISOString(),
           is_connected: true,
+          last_error: null,
+          last_error_at: null,
         }, {
           onConflict: 'company_id'
         });
@@ -187,6 +191,7 @@ serve(async (req) => {
     console.log('Successfully obtained tokens');
 
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+    const refreshTokenExpiresAt = new Date(Date.now() + (tokenData.x_refresh_token_expires_in || 8726400) * 1000);
 
     // Store tokens in database
     const { error: upsertError } = await supabase
@@ -197,7 +202,10 @@ serve(async (req) => {
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         token_expires_at: expiresAt.toISOString(),
+        refresh_token_expires_at: refreshTokenExpiresAt.toISOString(),
         is_connected: true,
+        last_error: null,
+        last_error_at: null,
       }, {
         onConflict: 'company_id'
       });

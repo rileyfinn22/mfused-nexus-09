@@ -1027,8 +1027,11 @@ export type Database = {
           created_at: string
           id: string
           is_connected: boolean | null
+          last_error: string | null
+          last_error_at: string | null
           realm_id: string
           refresh_token: string | null
+          refresh_token_expires_at: string | null
           refresh_token_secret_id: string | null
           token_expires_at: string | null
           updated_at: string
@@ -1040,8 +1043,11 @@ export type Database = {
           created_at?: string
           id?: string
           is_connected?: boolean | null
+          last_error?: string | null
+          last_error_at?: string | null
           realm_id: string
           refresh_token?: string | null
+          refresh_token_expires_at?: string | null
           refresh_token_secret_id?: string | null
           token_expires_at?: string | null
           updated_at?: string
@@ -1053,8 +1059,11 @@ export type Database = {
           created_at?: string
           id?: string
           is_connected?: boolean | null
+          last_error?: string | null
+          last_error_at?: string | null
           realm_id?: string
           refresh_token?: string | null
+          refresh_token_expires_at?: string | null
           refresh_token_secret_id?: string | null
           token_expires_at?: string | null
           updated_at?: string

@@ -24,7 +24,19 @@ async function refreshAccessToken(supabase: any, companyId: string, refreshToken
   });
 
   const data = await response.json();
+  
+  if (!response.ok) {
+    console.error('Token refresh failed:', data);
+    throw new Error(data.error_description || data.error || 'Failed to refresh access token');
+  }
+  
+  if (!data.access_token || !data.refresh_token || typeof data.expires_in !== 'number' || data.expires_in <= 0) {
+    console.error('Invalid token response:', data);
+    throw new Error('Invalid token response from QuickBooks');
+  }
+  
   const expiresAt = new Date(Date.now() + data.expires_in * 1000);
+  const refreshTokenExpiresAt = new Date(Date.now() + (data.x_refresh_token_expires_in || 8726400) * 1000);
 
   // Store new tokens encrypted in vault
   const { data: accessSecretId } = await supabase
@@ -44,11 +56,14 @@ async function refreshAccessToken(supabase: any, companyId: string, refreshToken
   await supabase
     .from('quickbooks_settings')
     .update({
-      access_token: data.access_token, // Keep temporarily for backwards compatibility
-      refresh_token: data.refresh_token, // Keep temporarily for backwards compatibility
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
       access_token_secret_id: accessSecretId,
       refresh_token_secret_id: refreshSecretId,
       token_expires_at: expiresAt.toISOString(),
+      refresh_token_expires_at: refreshTokenExpiresAt.toISOString(),
+      last_error: null,
+      last_error_at: null,
     })
     .eq('company_id', companyId);
 
@@ -259,6 +274,12 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('Sync error:', error);
     
+    // Check if it's a token expiration error
+    const isTokenError = error.message?.includes('refresh') || error.message?.includes('token') || error.message?.includes('expired');
+    const errorMessage = isTokenError 
+      ? 'QuickBooks connection expired. Please reconnect in Settings.'
+      : error.message;
+    
     const { vendorPoId } = await req.json().catch(() => ({}));
     if (vendorPoId) {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -269,10 +290,29 @@ serve(async (req) => {
         .from('vendor_pos')
         .update({ quickbooks_sync_status: 'failed' })
         .eq('id', vendorPoId);
+      
+      // Update error in settings if it's a token issue
+      if (isTokenError) {
+        const { data: vendorPo } = await supabase
+          .from('vendor_pos')
+          .select('company_id')
+          .eq('id', vendorPoId)
+          .single();
+        
+        if (vendorPo) {
+          await supabase
+            .from('quickbooks_settings')
+            .update({
+              last_error: errorMessage,
+              last_error_at: new Date().toISOString(),
+            })
+            .eq('company_id', vendorPo.company_id);
+        }
+      }
     }
 
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500 
