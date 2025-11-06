@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -31,6 +31,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import Papa from "papaparse";
 import { z } from "zod";
 
 const customerSchema = z.object({
@@ -67,8 +71,13 @@ const CustomerDetail = () => {
   const [customerProducts, setCustomerProducts] = useState<any[]>([]);
   const [showAddProductDialog, setShowAddProductDialog] = useState(false);
   const [showCreateProductDialog, setShowCreateProductDialog] = useState(false);
+  const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [creatingProduct, setCreatingProduct] = useState(false);
+  const [uploadingBulk, setUploadingBulk] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvErrors, setCsvErrors] = useState<string[]>([]);
   const [productFormData, setProductFormData] = useState({
     name: "",
     category: "",
@@ -339,6 +348,116 @@ const CustomerDetail = () => {
     }
   };
 
+  const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setCsvFile(file);
+    setCsvErrors([]);
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const errors: string[] = [];
+        const validData: any[] = [];
+
+        results.data.forEach((row: any, index) => {
+          if (!row.name || !row.category) {
+            errors.push(`Row ${index + 1}: Missing required fields (name, category)`);
+          } else {
+            validData.push({
+              name: row.name,
+              category: row.category,
+              item_id: row.item_id || row.sku || "",
+              description: row.description || "",
+              price: row.price || "",
+              cost: row.cost || "",
+            });
+          }
+        });
+
+        setCsvData(validData);
+        setCsvErrors(errors);
+      },
+      error: (error) => {
+        toast({
+          title: "CSV Parse Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
+  };
+
+  const handleBulkCreate = async () => {
+    try {
+      setUploadingBulk(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!userRole) throw new Error("No company found");
+
+      const productsToCreate = csvData.map((row) => ({
+        name: row.name,
+        category: row.category,
+        item_id: row.item_id || null,
+        description: row.description || null,
+        price: row.price ? parseFloat(row.price) : null,
+        cost: row.cost ? parseFloat(row.cost) : null,
+        company_id: userRole.company_id,
+        customer_id: customerId,
+      }));
+
+      const { error } = await supabase
+        .from('products')
+        .insert(productsToCreate);
+
+      if (error) throw error;
+
+      toast({
+        title: "Products created",
+        description: `Successfully created ${csvData.length} products for ${customer.name}`,
+      });
+
+      setShowBulkUploadDialog(false);
+      setCsvFile(null);
+      setCsvData([]);
+      setCsvErrors([]);
+      fetchCustomerProducts();
+      fetchProducts();
+    } catch (error: any) {
+      toast({
+        title: "Error creating products",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingBulk(false);
+    }
+  };
+
+  const downloadCsvTemplate = () => {
+    const template = "name,category,item_id,description,price,cost\n" +
+                     "Sample Product,Merchandise,SKU-001,Product description,10.99,5.50\n" +
+                     "Another Product,Packaging,SKU-002,Another description,15.99,8.00";
+    
+    const blob = new Blob([template], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'product_template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   const availableProducts = products.filter(p => !p.customer_id || p.customer_id === customerId);
 
   if (loading) {
@@ -567,6 +686,10 @@ const CustomerDetail = () => {
                   <Button variant="outline" onClick={() => setShowAddProductDialog(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Link Existing
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowBulkUploadDialog(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Bulk Upload
                   </Button>
                   <Button onClick={() => setShowCreateProductDialog(true)}>
                     <Plus className="h-4 w-4 mr-2" />
@@ -808,6 +931,122 @@ const CustomerDetail = () => {
             </Button>
             <Button onClick={handleCreateProduct} disabled={creatingProduct}>
               {creatingProduct ? "Creating..." : "Create Product"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Upload Dialog */}
+      <Dialog open={showBulkUploadDialog} onOpenChange={setShowBulkUploadDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Bulk Upload Products for {customer.name}</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to create multiple products at once
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 flex-1 overflow-y-auto">
+            {/* Upload Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="csv-upload">Upload CSV File</Label>
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  onClick={downloadCsvTemplate}
+                  className="h-auto p-0"
+                >
+                  Download Template
+                </Button>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  id="csv-upload"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvUpload}
+                  className="flex-1"
+                />
+                {csvFile && (
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <FileSpreadsheet className="h-3 w-3" />
+                    {csvFile.name}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Required columns: name, category | Optional: item_id, description, price, cost
+              </p>
+            </div>
+
+            {/* Errors */}
+            {csvErrors.length > 0 && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <p className="font-semibold mb-1">Found {csvErrors.length} error(s):</p>
+                  <ul className="list-disc list-inside text-sm">
+                    {csvErrors.slice(0, 5).map((error, index) => (
+                      <li key={index}>{error}</li>
+                    ))}
+                    {csvErrors.length > 5 && (
+                      <li>... and {csvErrors.length - 5} more errors</li>
+                    )}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Preview */}
+            {csvData.length > 0 && (
+              <div className="space-y-2">
+                <Label>Preview ({csvData.length} products)</Label>
+                <ScrollArea className="h-[300px] border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Item ID</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>Cost</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {csvData.map((row, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{row.name}</TableCell>
+                          <TableCell>{row.category}</TableCell>
+                          <TableCell className="font-mono text-xs">{row.item_id || "-"}</TableCell>
+                          <TableCell>{row.price ? `$${row.price}` : "-"}</TableCell>
+                          <TableCell>{row.cost ? `$${row.cost}` : "-"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowBulkUploadDialog(false);
+                setCsvFile(null);
+                setCsvData([]);
+                setCsvErrors([]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkCreate}
+              disabled={uploadingBulk || csvData.length === 0 || csvErrors.length > 0}
+            >
+              {uploadingBulk ? "Creating..." : `Create ${csvData.length} Products`}
             </Button>
           </DialogFooter>
         </DialogContent>
