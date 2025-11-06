@@ -259,9 +259,11 @@ serve(async (req) => {
     } else {
       // Fallback: Use order items with shipped_quantity
       console.log('No allocations found, using order items with shipped_quantity');
-      lineItems = invoice.orders?.order_items
-        ?.filter((item: any) => item.shipped_quantity > 0)
-        .map((item: any) => {
+      const shippedItems = invoice.orders?.order_items
+        ?.filter((item: any) => item.shipped_quantity > 0) || [];
+      
+      if (shippedItems.length > 0) {
+        lineItems = shippedItems.map((item: any) => {
           const qty = item.shipped_quantity;
           const amount = qty * item.unit_price;
           calculatedSubtotal += amount;
@@ -280,7 +282,35 @@ serve(async (req) => {
             },
             Description: item.description || item.name,
           };
+        });
+      } else {
+        // Second fallback: Use all order items for deposit/pre-shipment billing
+        console.log('No shipped items, using all order items for deposit/pre-shipment billing');
+        const billedPercentage = Number(invoice.billed_percentage || 100) / 100;
+        console.log(`Applying billed percentage: ${billedPercentage * 100}%`);
+        
+        lineItems = invoice.orders?.order_items?.map((item: any) => {
+          const qty = item.quantity;
+          const unitPrice = item.unit_price * billedPercentage;
+          const amount = qty * unitPrice;
+          calculatedSubtotal += amount;
+          
+          console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price (${billedPercentage * 100}%): ${unitPrice}, Amount: ${amount}`);
+          
+          return {
+            DetailType: 'SalesItemLineDetail',
+            Amount: amount,
+            SalesItemLineDetail: {
+              ItemRef: {
+                value: '1',
+              },
+              Qty: qty,
+              UnitPrice: unitPrice,
+            },
+            Description: `${item.description || item.name}${billedPercentage < 1 ? ` (${billedPercentage * 100}% deposit)` : ''}`,
+          };
         }) || [];
+      }
     }
 
     // Add shipping as a line item if present
@@ -298,8 +328,8 @@ serve(async (req) => {
 
     // Validate that we have at least one line item
     if (lineItems.length === 0) {
-      console.error('No line items to sync. Invoice must have allocated inventory or shipped items.');
-      throw new Error('Cannot sync invoice to QuickBooks: No line items found. Invoice must have allocated inventory or shipped items before syncing.');
+      console.error('No line items to sync. Invoice must have order items.');
+      throw new Error('Cannot sync invoice to QuickBooks: No line items found. Order must have items before creating an invoice.');
     }
 
     console.log(`Total line items: ${lineItems.length}`);
