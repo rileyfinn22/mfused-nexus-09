@@ -19,12 +19,12 @@ import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceD
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
 const STAGE_NAMES = [
-  { value: 'Material', order: 1 },
-  { value: 'Print', order: 2 },
-  { value: 'Convert', order: 3 },
-  { value: 'QC', order: 4 },
-  { value: 'Shipped', order: 5 },
-  { value: 'Delivered', order: 6 },
+  { value: 'material', order: 1 },
+  { value: 'print', order: 2 },
+  { value: 'convert', order: 3 },
+  { value: 'qc', order: 4 },
+  { value: 'shipped', order: 5 },
+  { value: 'delivered', order: 6 },
 ];
 
 const OrderDetail = () => {
