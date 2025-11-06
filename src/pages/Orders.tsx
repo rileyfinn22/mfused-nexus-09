@@ -92,8 +92,22 @@ const Orders = () => {
     const { data, error } = await query;
     
     if (!error && data) {
-      // Fetch artwork approval status for all orders
+      // Fetch artwork approval status and production stages for all orders
       const ordersWithChecklist = await Promise.all(data.map(async (order) => {
+        // Fetch production stages for progress calculation
+        let productionProgress = 0;
+        if (order.status === 'in production') {
+          const { data: stages } = await supabase
+            .from('production_stages')
+            .select('status')
+            .eq('order_id', order.id);
+          
+          if (stages && stages.length > 0) {
+            const completedStages = stages.filter(s => s.status === 'completed').length;
+            productionProgress = Math.round((completedStages / stages.length) * 100);
+          }
+        }
+        
         if (order.order_items && order.order_items.length > 0) {
           const { data: artworkData } = await supabase
             .from('artwork_files')
@@ -107,13 +121,15 @@ const Orders = () => {
           return {
             ...order,
             artApproved: allApproved,
-            checklistComplete: allApproved && order.order_finalized && order.vibe_processed
+            checklistComplete: allApproved && order.order_finalized && order.vibe_processed,
+            productionProgress
           };
         }
         return {
           ...order,
           artApproved: false,
-          checklistComplete: false
+          checklistComplete: false,
+          productionProgress
         };
       }));
       
@@ -489,7 +505,10 @@ const Orders = () => {
                   No orders in production
                 </div>
               ) : productionOrders.map((order) => {
-                const progress = getProgressForStatus(order.status);
+                // Use actual production progress for "in production" orders, otherwise use status-based progress
+                const progress = order.status === 'in production' && order.productionProgress !== undefined 
+                  ? order.productionProgress 
+                  : getProgressForStatus(order.status);
                 const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
                 const orderTypeInfo = getOrderTypeDisplay(order.order_type);
                 const OrderIcon = orderTypeInfo.icon;
