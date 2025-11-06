@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -71,7 +71,9 @@ const CustomerDetail = () => {
   const [customerProducts, setCustomerProducts] = useState<any[]>([]);
   const [showAddProductDialog, setShowAddProductDialog] = useState(false);
   const [showCreateProductDialog, setShowCreateProductDialog] = useState(false);
+  const [showEditProductDialog, setShowEditProductDialog] = useState(false);
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [creatingProduct, setCreatingProduct] = useState(false);
   const [uploadingBulk, setUploadingBulk] = useState(false);
@@ -339,6 +341,81 @@ const CustomerDetail = () => {
       } else {
         toast({
           title: "Error creating product",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setCreatingProduct(false);
+    }
+  };
+
+  const handleEditProduct = (product: any) => {
+    setEditingProduct(product);
+    setProductFormData({
+      name: product.name || "",
+      state: product.state || "",
+      item_id: product.item_id || "",
+      description: product.description || "",
+      price: product.price?.toString() || "",
+      cost: product.cost?.toString() || "",
+    });
+    setProductFormErrors({});
+    setShowEditProductDialog(true);
+  };
+
+  const handleUpdateProduct = async () => {
+    try {
+      setCreatingProduct(true);
+      setProductFormErrors({});
+      
+      const validated = productSchema.parse(productFormData);
+
+      const productData = {
+        name: validated.name,
+        state: validated.state,
+        item_id: validated.item_id || null,
+        description: validated.description || null,
+        price: validated.price ? parseFloat(validated.price) : null,
+        cost: validated.cost ? parseFloat(validated.cost) : null,
+      };
+
+      const { error } = await supabase
+        .from('products')
+        .update(productData)
+        .eq('id', editingProduct.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Product updated",
+        description: `${validated.name} has been updated successfully`,
+      });
+
+      setShowEditProductDialog(false);
+      setEditingProduct(null);
+      setProductFormData({
+        name: "",
+        state: "",
+        item_id: "",
+        description: "",
+        price: "",
+        cost: "",
+      });
+      fetchCustomerProducts();
+      fetchProducts();
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        const errors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            errors[err.path[0] as string] = err.message;
+          }
+        });
+        setProductFormErrors(errors);
+      } else {
+        toast({
+          title: "Error updating product",
           description: error.message,
           variant: "destructive",
         });
@@ -757,17 +834,36 @@ const CustomerDetail = () => {
                                 {product.item_id}
                               </span>
                             )}
+                            {product.state && (
+                              <Badge variant="outline" className="text-xs">
+                                {product.state === 'general' ? 'General' : product.state}
+                              </Badge>
+                            )}
+                            {product.price && (
+                              <span className="text-xs text-muted-foreground">
+                                ${parseFloat(product.price).toFixed(2)}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveProduct(product.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditProduct(product)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveProduct(product.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -957,6 +1053,117 @@ const CustomerDetail = () => {
             </Button>
             <Button onClick={handleCreateProduct} disabled={creatingProduct}>
               {creatingProduct ? "Creating..." : "Create Product"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={showEditProductDialog} onOpenChange={setShowEditProductDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+            <DialogDescription>
+              Update product information
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit_product_name">Product Name *</Label>
+                <Input
+                  id="edit_product_name"
+                  value={productFormData.name}
+                  onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
+                />
+                {productFormErrors.name && <p className="text-sm text-destructive mt-1">{productFormErrors.name}</p>}
+              </div>
+              <div>
+                <Label htmlFor="edit_product_state">State *</Label>
+                <Select
+                  value={productFormData.state}
+                  onValueChange={(value) => setProductFormData({ ...productFormData, state: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General (No State Specificity)</SelectItem>
+                    <SelectItem value="CA">California</SelectItem>
+                    <SelectItem value="CO">Colorado</SelectItem>
+                    <SelectItem value="MA">Massachusetts</SelectItem>
+                    <SelectItem value="MI">Michigan</SelectItem>
+                    <SelectItem value="NV">Nevada</SelectItem>
+                    <SelectItem value="OR">Oregon</SelectItem>
+                    <SelectItem value="WA">Washington</SelectItem>
+                  </SelectContent>
+                </Select>
+                {productFormErrors.state && <p className="text-sm text-destructive mt-1">{productFormErrors.state}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit_product_item_id">Item ID / SKU</Label>
+                <Input
+                  id="edit_product_item_id"
+                  value={productFormData.item_id}
+                  onChange={(e) => setProductFormData({ ...productFormData, item_id: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit_product_price">Price</Label>
+                <Input
+                  id="edit_product_price"
+                  type="number"
+                  step="0.01"
+                  value={productFormData.price}
+                  onChange={(e) => setProductFormData({ ...productFormData, price: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit_product_cost">Cost</Label>
+              <Input
+                id="edit_product_cost"
+                type="number"
+                step="0.01"
+                value={productFormData.cost}
+                onChange={(e) => setProductFormData({ ...productFormData, cost: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit_product_description">Description</Label>
+              <Textarea
+                id="edit_product_description"
+                value={productFormData.description}
+                onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowEditProductDialog(false);
+              setEditingProduct(null);
+              setProductFormData({
+                name: "",
+                state: "",
+                item_id: "",
+                description: "",
+                price: "",
+                cost: "",
+              });
+              setProductFormErrors({});
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateProduct} disabled={creatingProduct}>
+              {creatingProduct ? "Updating..." : "Update Product"}
             </Button>
           </DialogFooter>
         </DialogContent>
