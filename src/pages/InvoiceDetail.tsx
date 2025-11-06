@@ -596,17 +596,74 @@ const InvoiceDetail = () => {
           {/* QuickBooks Payment Link */}
           {invoice.quickbooks_payment_link && (
             <div className="p-8 border-b bg-gradient-to-r from-green-500/10 to-emerald-500/5">
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-6">
                 <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
-                  <CheckCircle2 className="h-6 w-6 text-white" />
+                  <DollarSign className="h-6 w-6 text-white" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                    Payment Link Available
+                    Customer Payment Portal
                     <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20">
                       QuickBooks
                     </Badge>
                   </h3>
+                  
+                  {/* Payment Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="bg-background/50 border rounded-lg p-4">
+                      <div className="text-sm text-muted-foreground mb-1">Amount Due</div>
+                      <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+                        {formatCurrency(Number(invoice.total) - Number(invoice.total_paid || 0))}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        of {formatCurrency(Number(invoice.total))} total
+                      </div>
+                    </div>
+                    
+                    <div className="bg-background/50 border rounded-lg p-4">
+                      <div className="text-sm text-muted-foreground mb-1">Due Date</div>
+                      <div className="text-xl font-semibold">
+                        {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric' 
+                        }) : 'Upon Receipt'}
+                      </div>
+                    </div>
+                    
+                    <div className="bg-background/50 border rounded-lg p-4">
+                      <div className="text-sm text-muted-foreground mb-1">Payment Status</div>
+                      {(() => {
+                        const amountDue = Number(invoice.total) - Number(invoice.total_paid || 0);
+                        const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
+                        const today = new Date();
+                        const daysOverdue = dueDate ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+                        
+                        if (amountDue <= 0) {
+                          return <div className="text-xl font-semibold text-green-600">Paid in Full</div>;
+                        } else if (dueDate && daysOverdue > 0) {
+                          return (
+                            <>
+                              <div className="text-xl font-semibold text-red-600">Past Due</div>
+                              <div className="text-xs text-red-600 mt-1">{daysOverdue} days overdue</div>
+                            </>
+                          );
+                        } else if (dueDate) {
+                          return (
+                            <>
+                              <div className="text-xl font-semibold text-yellow-600">Open</div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {Math.abs(daysOverdue)} days remaining
+                              </div>
+                            </>
+                          );
+                        } else {
+                          return <div className="text-xl font-semibold">Open</div>;
+                        }
+                      })()}
+                    </div>
+                  </div>
+                  
                   <p className="text-sm text-muted-foreground mb-4">
                     Share this secure payment link with your customer to accept online payments through QuickBooks
                   </p>
