@@ -69,7 +69,6 @@ const Products = () => {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [companies, setCompanies] = useState<any[]>([]);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
-  const [customers, setCustomers] = useState<any[]>([]);
 
   useEffect(() => {
     checkRole();
@@ -80,7 +79,6 @@ const Products = () => {
       fetchProducts();
       fetchArtworkStatus();
       fetchArtworkThumbnails();
-      fetchCustomers();
       if (isVibeAdmin) {
         fetchCompanies();
       }
@@ -108,41 +106,6 @@ const Products = () => {
     
     if (!error && data) {
       setCompanies(data);
-    }
-  };
-
-  const fetchCustomers = async () => {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('id, name')
-      .order('name');
-    
-    if (!error && data) {
-      setCustomers(data);
-    }
-  };
-
-  const handleCustomerChange = async (productId: string, customerId: string | null) => {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .update({ customer_id: customerId || null })
-        .eq('id', productId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Customer updated",
-        description: "Product customer assignment has been updated",
-      });
-
-      fetchProducts();
-    } catch (error: any) {
-      toast({
-        title: "Error updating customer",
-        description: error.message,
-        variant: "destructive",
-      });
     }
   };
 
@@ -444,8 +407,7 @@ const Products = () => {
             <div className="col-span-1">Preview</div>
             <div className="col-span-2">Item</div>
             <div className="col-span-1">Category</div>
-            <div className="col-span-1">Customer</div>
-            <div className="col-span-1">State</div>
+            <div className="col-span-2">State</div>
             <div className="col-span-1">Cost</div>
             {!isEditMode && <div className="col-span-1">Actions</div>}
           </div>
@@ -506,25 +468,7 @@ const Products = () => {
                   </div>
                   <div className="col-span-2 text-sm font-medium">{product.name}</div>
                   <div className="col-span-1 text-sm">{product.category}</div>
-                  <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
-                    <Select
-                      value={product.customer_id || "none"}
-                      onValueChange={(value) => handleCustomerChange(product.id, value === "none" ? null : value)}
-                    >
-                      <SelectTrigger className="h-7 text-xs">
-                        <SelectValue placeholder="No customer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No customer</SelectItem>
-                        {customers.map((customer) => (
-                          <SelectItem key={customer.id} value={customer.id}>
-                            {customer.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-1">
+                  <div className="col-span-2">
                     <Badge variant="outline" className="text-xs">{product.state}</Badge>
                   </div>
                   <div className="col-span-1 text-sm font-medium">

@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { z } from "zod";
 
 const customerSchema = z.object({
@@ -47,6 +48,15 @@ const customerSchema = z.object({
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 
+const productSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200),
+  category: z.string().trim().min(1, "Category is required").max(100),
+  item_id: z.string().trim().max(100).optional().or(z.literal("")),
+  description: z.string().trim().max(1000).optional().or(z.literal("")),
+  price: z.string().optional().or(z.literal("")),
+  cost: z.string().optional().or(z.literal("")),
+});
+
 const CustomerDetail = () => {
   const { customerId } = useParams();
   const navigate = useNavigate();
@@ -56,7 +66,18 @@ const CustomerDetail = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [customerProducts, setCustomerProducts] = useState<any[]>([]);
   const [showAddProductDialog, setShowAddProductDialog] = useState(false);
+  const [showCreateProductDialog, setShowCreateProductDialog] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [creatingProduct, setCreatingProduct] = useState(false);
+  const [productFormData, setProductFormData] = useState({
+    name: "",
+    category: "",
+    item_id: "",
+    description: "",
+    price: "",
+    cost: "",
+  });
+  const [productFormErrors, setProductFormErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -244,6 +265,78 @@ const CustomerDetail = () => {
       }
       return newSet;
     });
+  };
+
+  const handleCreateProduct = async () => {
+    try {
+      setCreatingProduct(true);
+      setProductFormErrors({});
+      
+      const validated = productSchema.parse(productFormData);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!userRole) throw new Error("No company found");
+
+      const productData = {
+        name: validated.name,
+        category: validated.category,
+        item_id: validated.item_id || null,
+        description: validated.description || null,
+        price: validated.price ? parseFloat(validated.price) : null,
+        cost: validated.cost ? parseFloat(validated.cost) : null,
+        company_id: userRole.company_id,
+        customer_id: customerId,
+      };
+
+      const { error } = await supabase
+        .from('products')
+        .insert([productData]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Product created",
+        description: `${validated.name} has been created and linked to ${customer.name}`,
+      });
+
+      setShowCreateProductDialog(false);
+      setProductFormData({
+        name: "",
+        category: "",
+        item_id: "",
+        description: "",
+        price: "",
+        cost: "",
+      });
+      fetchCustomerProducts();
+      fetchProducts();
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        const errors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            errors[err.path[0] as string] = err.message;
+          }
+        });
+        setProductFormErrors(errors);
+      } else {
+        toast({
+          title: "Error creating product",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setCreatingProduct(false);
+    }
   };
 
   const availableProducts = products.filter(p => !p.customer_id || p.customer_id === customerId);
@@ -470,10 +563,16 @@ const CustomerDetail = () => {
                   <CardTitle>Linked Products</CardTitle>
                   <CardDescription>Products associated with {customer.name}</CardDescription>
                 </div>
-                <Button onClick={() => setShowAddProductDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Products
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setShowAddProductDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Link Existing
+                  </Button>
+                  <Button onClick={() => setShowCreateProductDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -602,6 +701,113 @@ const CustomerDetail = () => {
               disabled={selectedProducts.size === 0}
             >
               Add {selectedProducts.size} Product{selectedProducts.size !== 1 ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Product Dialog */}
+      <Dialog open={showCreateProductDialog} onOpenChange={setShowCreateProductDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create New Product for {customer.name}</DialogTitle>
+            <DialogDescription>
+              This product will be automatically linked to this customer
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="product_name">Product Name *</Label>
+                <Input
+                  id="product_name"
+                  value={productFormData.name}
+                  onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
+                />
+                {productFormErrors.name && <p className="text-sm text-destructive mt-1">{productFormErrors.name}</p>}
+              </div>
+              <div>
+                <Label htmlFor="product_category">Category *</Label>
+                <Select
+                  value={productFormData.category}
+                  onValueChange={(value) => setProductFormData({ ...productFormData, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Merchandise">Merchandise</SelectItem>
+                    <SelectItem value="Packaging">Packaging</SelectItem>
+                    <SelectItem value="Materials">Materials</SelectItem>
+                    <SelectItem value="Equipment">Equipment</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                {productFormErrors.category && <p className="text-sm text-destructive mt-1">{productFormErrors.category}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="product_item_id">Item ID / SKU</Label>
+                <Input
+                  id="product_item_id"
+                  value={productFormData.item_id}
+                  onChange={(e) => setProductFormData({ ...productFormData, item_id: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="product_price">Price</Label>
+                <Input
+                  id="product_price"
+                  type="number"
+                  step="0.01"
+                  value={productFormData.price}
+                  onChange={(e) => setProductFormData({ ...productFormData, price: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="product_cost">Cost</Label>
+              <Input
+                id="product_cost"
+                type="number"
+                step="0.01"
+                value={productFormData.cost}
+                onChange={(e) => setProductFormData({ ...productFormData, cost: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="product_description">Description</Label>
+              <Textarea
+                id="product_description"
+                value={productFormData.description}
+                onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowCreateProductDialog(false);
+              setProductFormData({
+                name: "",
+                category: "",
+                item_id: "",
+                description: "",
+                price: "",
+                cost: "",
+              });
+              setProductFormErrors({});
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateProduct} disabled={creatingProduct}>
+              {creatingProduct ? "Creating..." : "Create Product"}
             </Button>
           </DialogFooter>
         </DialogContent>
