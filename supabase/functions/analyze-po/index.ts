@@ -44,10 +44,14 @@ serve(async (req) => {
       .from('user_roles')
       .select('company_id, role')
       .eq('user_id', user.id)
-      .eq('company_id', companyId)
       .single();
 
     if (roleError || !userRole) {
+      throw new Error('Unauthorized: No user role found');
+    }
+
+    // Vibe admins have access to all companies, others must match company_id
+    if (userRole.role !== 'vibe_admin' && userRole.company_id !== companyId) {
       throw new Error('Unauthorized: User does not have access to this company');
     }
     console.log('Analyzing PO from path:', pdfPath, 'for order type:', orderType);
