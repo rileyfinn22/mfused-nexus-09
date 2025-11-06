@@ -23,7 +23,6 @@ const OrderDetail = () => {
   } = useParams();
   const navigate = useNavigate();
   const [vibeNotes, setVibeNotes] = useState("");
-  const [trackingNumber, setTrackingNumber] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [showVendorDialog, setShowVendorDialog] = useState(false);
@@ -297,14 +296,6 @@ const OrderDetail = () => {
       description: "Your note has been saved to the order."
     });
     setVibeNotes("");
-  };
-  const handleAddTracking = () => {
-    if (!trackingNumber.trim() || !isAdmin) return;
-    toast({
-      title: "Tracking Added",
-      description: `Tracking number ${trackingNumber} has been added.`
-    });
-    setTrackingNumber("");
   };
 
   const handleOrderFinalized = async () => {
@@ -1138,24 +1129,6 @@ const OrderDetail = () => {
                   Add Note
                 </Button>
               </div>
-
-              {/* Tracking - Admin Only */}
-              {isAdmin && (
-                <div className="p-4 bg-background rounded-lg border border-table-border mt-4">
-                  <h3 className="font-medium text-sm mb-3">Tracking Information</h3>
-                  <div className="space-y-2">
-                    <Input placeholder="Enter tracking number..." value={trackingNumber} onChange={e => setTrackingNumber(e.target.value)} />
-                    <Button onClick={handleAddTracking} size="sm" className="w-full">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Tracking
-                    </Button>
-                  </div>
-                  {order.tracking_number && <div className="mt-3 p-3 bg-muted/50 rounded">
-                      <p className="text-xs font-medium mb-1">Current Tracking</p>
-                      <p className="text-sm font-mono">{order.tracking_number}</p>
-                    </div>}
-                </div>
-              )}
             </div>
 
             {/* Display Vibe Notes (Visible to All) */}
