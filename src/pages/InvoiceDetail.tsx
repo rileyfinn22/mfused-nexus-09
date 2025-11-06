@@ -100,18 +100,19 @@ const InvoiceDetail = () => {
     if (allocationsData) {
       setInventoryAllocations(allocationsData);
       
-      // For partial invoices, use only the items that were allocated (pulled)
-      if (invoiceData.invoice_type === 'partial' && allocationsData.length > 0) {
-        const pulledItems = allocationsData.map((alloc: any) => ({
+      // ALWAYS use allocated items for display, regardless of invoice type
+      // This shows only what was actually included on THIS specific invoice
+      if (allocationsData.length > 0) {
+        const invoiceItems = allocationsData.map((alloc: any) => ({
           ...alloc.order_items,
           quantity: alloc.quantity_allocated, // Use allocated quantity as the quantity for this invoice
           shipped_quantity: alloc.quantity_allocated,
           total: alloc.quantity_allocated * (alloc.order_items?.unit_price || 0)
         }));
-        setEditedItems(pulledItems);
+        setEditedItems(invoiceItems);
       } else {
-        // For full invoices, use all order items
-        setEditedItems(invoiceData.orders?.order_items || []);
+        // No allocations yet - show empty or all items based on invoice type
+        setEditedItems(invoiceData.invoice_type === 'full' ? invoiceData.orders?.order_items || [] : []);
       }
     } else {
       setEditedItems(invoiceData.orders?.order_items || []);
@@ -345,13 +346,17 @@ const InvoiceDetail = () => {
     }
   };
 
-  // Calculate totals - always use editedItems which contains the correct items
-  // (pulled items for partial invoices, all items for full invoices)
+  // Calculate totals based on items actually on THIS invoice (from allocations)
   const displayItems = editedItems;
   const displaySubtotal = displayItems.reduce((sum: number, item: any) => 
     sum + (Number(item.quantity || item.shipped_quantity) * Number(item.unit_price)), 0
   );
   const displayTotal = displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0);
+  
+  // Calculate what percentage of the order this invoice represents
+  const totalOrderQuantity = order?.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
+  const thisInvoiceQuantity = displayItems.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+  const actualBilledPercentage = totalOrderQuantity > 0 ? (thisInvoiceQuantity / totalOrderQuantity * 100) : 0;
   const totalVendorCost = vendorPOs.reduce((sum, po) => sum + Number(po.total), 0);
   const totalProfit = displayTotal - totalVendorCost;
   const profitMargin = displayTotal > 0 ? ((totalProfit / displayTotal) * 100).toFixed(2) : '0.00';
@@ -457,17 +462,14 @@ const InvoiceDetail = () => {
                       Shipment #{invoice.shipment_number}
                     </span>
                     <span className={`px-3 py-1 rounded-md text-sm font-medium ${
-                      invoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
-                      invoice.invoice_type === 'final' ? 'bg-green-500 text-white' :
+                      actualBilledPercentage < 100 ? 'bg-blue-500 text-white' :
                       'bg-purple-500 text-white'
                     }`}>
-                      {invoice.invoice_type?.toUpperCase() || 'FULL'}
+                      {actualBilledPercentage < 100 ? 'PARTIAL' : 'FULL'}
                     </span>
-                    {invoice.billed_percentage && (
-                      <span className="text-sm text-muted-foreground">
-                        ({invoice.billed_percentage.toFixed(1)}% billed)
-                      </span>
-                    )}
+                    <span className="text-sm text-muted-foreground">
+                      ({actualBilledPercentage.toFixed(1)}% of order billed)
+                    </span>
                     {(() => {
                       const totalShipped = order?.order_items?.reduce((sum: number, item: any) => 
                         sum + (item.shipped_quantity || 0), 0) || 0;
