@@ -657,135 +657,162 @@ const Artwork = () => {
       </div>
 
       {/* Artwork Grid */}
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredFiles.map((file) => {
           const StatusIcon = getStatusIcon(file.is_approved);
           
           return (
-            <div key={file.id} className="bg-card border rounded-lg p-6">
-              <div className="flex items-start gap-4">
-                {/* Thumbnail Image */}
-                <div className="relative w-32 h-32 flex-shrink-0 bg-muted rounded-lg overflow-hidden border group">
-                  {file.preview_url ? (
-                    <img 
-                      src={file.preview_url} 
-                      alt={file.sku}
-                      className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => {
-                        setSelectedFile(file);
-                        setPreviewDialogOpen(true);
-                      }}
-                    />
-                  ) : file.artwork_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                    <img 
-                      src={file.artwork_url} 
-                      alt={file.sku}
-                      className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => {
-                        setSelectedFile(file);
-                        setPreviewDialogOpen(true);
-                      }}
-                    />
+            <div key={file.id} className="bg-card border rounded-lg overflow-hidden hover:shadow-lg transition-shadow group">
+              {/* Thumbnail Image */}
+              <div 
+                className="relative w-full aspect-square bg-muted overflow-hidden cursor-pointer"
+                onClick={() => {
+                  setSelectedFile(file);
+                  setPreviewDialogOpen(true);
+                }}
+              >
+                {file.preview_url ? (
+                  <img 
+                    src={file.preview_url} 
+                    alt={file.sku}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                ) : file.artwork_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                  <img 
+                    src={file.artwork_url} 
+                    alt={file.sku}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <FileImage className="h-16 w-16 text-muted-foreground" />
+                  </div>
+                )}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="absolute top-2 right-2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedFile(file);
+                    setEditThumbnailDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                
+                {/* Status Badge Overlay */}
+                <div className="absolute top-2 left-2">
+                  {file.is_approved ? (
+                    <Badge className="bg-green-600 text-white border-0">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Approved
+                    </Badge>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <FileImage className="h-8 w-8 text-muted-foreground" />
-                    </div>
+                    <Badge variant="secondary" className="bg-yellow-500/90 text-white border-0">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Pending
+                    </Badge>
                   )}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="absolute bottom-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedFile(file);
-                      setEditThumbnailDialogOpen(true);
-                    }}
-                  >
-                    <Edit className="h-3 w-3" />
-                  </Button>
+                </div>
+              </div>
+
+              {/* File Details */}
+              <div className="p-4 space-y-3">
+                <div>
+                  <h3 className="font-semibold text-base truncate" title={file.filename}>
+                    {file.filename}
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-mono mt-1">
+                    SKU: {file.sku}
+                  </p>
                 </div>
 
-                {/* File Details */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-lg">{file.filename}</h3>
-                    {file.is_approved ? (
-                      <span className="text-green-600 font-bold">✓ Approved</span>
-                    ) : (
-                      <Badge variant="secondary" className="text-warning">
-                        <StatusIcon className="h-3 w-3 mr-1" />
-                        Pending
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm mt-4">
-                    <div>
-                      <p className="text-muted-foreground">SKU</p>
-                      <p className="font-mono font-medium">{file.sku}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Uploaded</p>
-                      <p>{new Date(file.created_at).toLocaleDateString()}</p>
-                    </div>
-                    {file.is_approved && file.approved_at && (
-                      <div>
-                        <p className="text-muted-foreground">Approved Date</p>
-                        <p>{new Date(file.approved_at).toLocaleDateString()}</p>
-                      </div>
-                    )}
-                    {file.notes && (
-                      <div className="col-span-2">
-                        <p className="text-muted-foreground">Notes</p>
-                        <p className="whitespace-pre-wrap">{file.notes}</p>
-                      </div>
-                    )}
-                  </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    {new Date(file.created_at).toLocaleDateString()}
+                  </span>
+                  {file.is_approved && file.approved_at && (
+                    <span className="text-green-600">
+                      ✓ {new Date(file.approved_at).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
+
+                {file.notes && (
+                  <p className="text-xs text-muted-foreground line-clamp-2" title={file.notes}>
+                    {file.notes}
+                  </p>
+                )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 pt-2 border-t">
                   <Button 
-                    variant="ghost" 
+                    variant="outline" 
                     size="sm"
+                    className="flex-1"
                     onClick={() => handleDownload(file.artwork_url, file.filename)}
                   >
-                    <Download className="h-4 w-4" />
+                    <Download className="h-4 w-4 mr-1" />
+                    Download
                   </Button>
-                  {!file.is_approved && (
-                    <>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedFile(file);
-                          setApprovalDialogOpen(true);
-                        }}
-                      >
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedFile(file);
-                          setRejectDialogOpen(true);
-                        }}
-                      >
-                        <XCircle className="h-4 w-4 text-red-600" />
-                      </Button>
-                    </>
+                  {!file.is_approved ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="flex-1 text-green-600 hover:text-green-700 hover:bg-green-50"
+                      onClick={() => {
+                        setSelectedFile(file);
+                        setApprovalDialogOpen(true);
+                      }}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Approve
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        setSelectedFile(file);
+                        setPreviewDialogOpen(true);
+                      }}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
                   )}
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => {
-                      setSelectedFile(file);
-                      setDeleteDialogOpen(true);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
                 </div>
+
+                {!file.is_approved && (
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => {
+                        setSelectedFile(file);
+                        setRejectDialogOpen(true);
+                      }}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Reject
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="flex-1 text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        setSelectedFile(file);
+                        setDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           );
