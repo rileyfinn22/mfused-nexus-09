@@ -291,7 +291,7 @@ const OrderDetail = () => {
   };
 
   const handleAddVibeNote = () => {
-    if (!vibeNotes.trim() || !isAdmin) return;
+    if (!vibeNotes.trim()) return;
     toast({
       title: "Vibe Note Added",
       description: "Your note has been saved to the order."
@@ -299,7 +299,7 @@ const OrderDetail = () => {
     setVibeNotes("");
   };
   const handleAddTracking = () => {
-    if (!trackingNumber.trim()) return;
+    if (!trackingNumber.trim() || !isAdmin) return;
     toast({
       title: "Tracking Added",
       description: `Tracking number ${trackingNumber} has been added.`
