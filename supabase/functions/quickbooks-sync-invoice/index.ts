@@ -524,31 +524,14 @@ serve(async (req) => {
     }
 
     const qbInvoiceId = qbData.Invoice.Id;
+    const qbDocNumber = qbData.Invoice.DocNumber;
     
-    // Get payment link from QuickBooks API response
-    // QuickBooks returns InvoiceLink for customer payment page
-    let qbPaymentLink = qbData.Invoice.InvoiceLink || null;
-    
-    // If no InvoiceLink, fetch the invoice again with minorversion=73 to get the link
-    if (!qbPaymentLink) {
-      console.log('No InvoiceLink in response, fetching invoice details...');
-      const fetchResponse = await fetch(
-        `${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json',
-          },
-        }
-      );
-      
-      if (fetchResponse.ok) {
-        const fetchData = await fetchResponse.json();
-        qbPaymentLink = fetchData.Invoice?.InvoiceLink || null;
-      }
-    }
+    // Construct the customer-facing payment link using QuickBooks payment portal
+    // This links directly to where customers can pay the deposit
+    const qbPaymentLink = `https://c${qbSettings.realm_id}.qbo.intuit.com/invoice?txnId=${qbInvoiceId}`;
     
     console.log('QuickBooks invoice ID:', qbInvoiceId);
+    console.log('QuickBooks DocNumber:', qbDocNumber);
     console.log('QuickBooks payment link:', qbPaymentLink);
 
     // Update invoice with QuickBooks ID, payment link, and billed percentage
