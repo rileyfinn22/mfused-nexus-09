@@ -13,7 +13,8 @@ import {
   FileText,
   Package,
   Edit,
-  Trash2
+  Trash2,
+  Link2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -284,7 +285,18 @@ const Invoices = () => {
                   className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
                 >
                   <div className="col-span-2">
-                    <div className="font-medium font-mono text-sm">{invoice.invoice_number}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-medium font-mono text-sm">{invoice.invoice_number}</div>
+                      {invoice.quickbooks_payment_link && (
+                        <Badge 
+                          variant="outline" 
+                          className="bg-green-500/10 text-green-700 border-green-500/20 text-xs px-1.5 py-0"
+                          title="Payment link available"
+                        >
+                          <Link2 className="h-3 w-3" />
+                        </Badge>
+                      )}
+                    </div>
                     {invoice.orders?.order_number && (
                       <div className="text-xs text-muted-foreground">
                         Order: {invoice.orders.order_number}

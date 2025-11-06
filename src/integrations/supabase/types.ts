@@ -325,6 +325,7 @@ export type Database = {
           notes: string | null
           order_id: string
           quickbooks_id: string | null
+          quickbooks_payment_link: string | null
           quickbooks_sync_status: string | null
           quickbooks_synced_at: string | null
           shipment_number: number | null
@@ -348,6 +349,7 @@ export type Database = {
           notes?: string | null
           order_id: string
           quickbooks_id?: string | null
+          quickbooks_payment_link?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
           shipment_number?: number | null
@@ -371,6 +373,7 @@ export type Database = {
           notes?: string | null
           order_id?: string
           quickbooks_id?: string | null
+          quickbooks_payment_link?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
           shipment_number?: number | null

@@ -433,13 +433,16 @@ serve(async (req) => {
     }
 
     const qbInvoiceId = qbData.Invoice.Id;
+    const qbPaymentLink = qbData.Invoice.InvoiceLink || null;
     console.log('QuickBooks invoice ID:', qbInvoiceId);
+    console.log('QuickBooks payment link:', qbPaymentLink);
 
-    // Update invoice with QuickBooks ID
+    // Update invoice with QuickBooks ID and payment link
     await supabase
       .from('invoices')
       .update({
         quickbooks_id: qbInvoiceId,
+        quickbooks_payment_link: qbPaymentLink,
         quickbooks_synced_at: new Date().toISOString(),
         quickbooks_sync_status: 'synced',
       })

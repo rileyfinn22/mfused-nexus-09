@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
@@ -35,6 +35,7 @@ const InvoiceDetail = () => {
   const [inventoryAllocations, setInventoryAllocations] = useState<any[]>([]);
   const [relatedInvoices, setRelatedInvoices] = useState<any[]>([]);
   const [syncingToQB, setSyncingToQB] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
 
   useEffect(() => {
@@ -324,6 +325,26 @@ const InvoiceDetail = () => {
     }).format(amount);
   };
 
+  const handleCopyPaymentLink = async () => {
+    if (invoice?.quickbooks_payment_link) {
+      try {
+        await navigator.clipboard.writeText(invoice.quickbooks_payment_link);
+        setCopiedLink(true);
+        toast({
+          title: "Payment link copied",
+          description: "The payment link has been copied to your clipboard",
+        });
+        setTimeout(() => setCopiedLink(false), 2000);
+      } catch (error) {
+        toast({
+          title: "Failed to copy",
+          description: "Could not copy the payment link",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   // Calculate totals - always use editedItems which contains the correct items
   // (pulled items for partial invoices, all items for full invoices)
   const displayItems = editedItems;
@@ -506,6 +527,60 @@ const InvoiceDetail = () => {
               )}
             </div>
           </div>
+
+          {/* QuickBooks Payment Link */}
+          {invoice.quickbooks_payment_link && (
+            <div className="p-8 border-b bg-gradient-to-r from-green-500/10 to-emerald-500/5">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                    Payment Link Available
+                    <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20">
+                      QuickBooks
+                    </Badge>
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Share this secure payment link with your customer to accept online payments through QuickBooks
+                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex-1 min-w-[300px] bg-background border rounded-lg p-3 font-mono text-sm truncate">
+                      {invoice.quickbooks_payment_link}
+                    </div>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleCopyPaymentLink}
+                      className="gap-2"
+                    >
+                      {copiedLink ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4" />
+                          Copy Link
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(invoice.quickbooks_payment_link, '_blank')}
+                      className="gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Preview
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Shipment Timeline - Show all related invoices */}
           {relatedInvoices.length > 0 && (
