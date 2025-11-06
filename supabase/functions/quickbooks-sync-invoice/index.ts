@@ -526,13 +526,62 @@ serve(async (req) => {
     const qbInvoiceId = qbData.Invoice.Id;
     const qbDocNumber = qbData.Invoice.DocNumber;
     
-    // Construct the customer-facing payment link using QuickBooks payment portal
-    // This links directly to where customers can pay the deposit
-    const qbPaymentLink = `https://c${qbSettings.realm_id}.qbo.intuit.com/invoice?txnId=${qbInvoiceId}`;
+    // Get the customer-facing payment link from QuickBooks
+    // First try to get it from the response
+    let qbPaymentLink = qbData.Invoice.InvoiceLink || null;
+    
+    // If not in response, fetch the invoice with send endpoint to get the link
+    if (!qbPaymentLink) {
+      console.log('No InvoiceLink in response, fetching with send query...');
+      try {
+        const fetchResponse = await fetch(
+          `${qbApiUrl}/invoice/${qbInvoiceId}?include=invoiceLink`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+            },
+          }
+        );
+        
+        if (fetchResponse.ok) {
+          const fetchData = await fetchResponse.json();
+          qbPaymentLink = fetchData.Invoice?.InvoiceLink || null;
+          console.log('Fetched InvoiceLink:', qbPaymentLink);
+        }
+      } catch (e) {
+        console.log('Could not fetch invoice link:', e);
+      }
+    }
+    
+    // If still no link, try the send endpoint to generate one
+    if (!qbPaymentLink) {
+      console.log('Attempting to send invoice to generate link...');
+      try {
+        const sendResponse = await fetch(
+          `${qbApiUrl}/invoice/${qbInvoiceId}/send?sendTo=${encodeURIComponent(customerEmail || 'noreply@example.com')}`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+            },
+          }
+        );
+        
+        if (sendResponse.ok) {
+          const sendData = await sendResponse.json();
+          qbPaymentLink = sendData.Invoice?.InvoiceLink || null;
+          console.log('Generated InvoiceLink from send:', qbPaymentLink);
+        }
+      } catch (e) {
+        console.log('Could not generate invoice link via send:', e);
+      }
+    }
     
     console.log('QuickBooks invoice ID:', qbInvoiceId);
     console.log('QuickBooks DocNumber:', qbDocNumber);
-    console.log('QuickBooks payment link:', qbPaymentLink);
+    console.log('Final QuickBooks payment link:', qbPaymentLink);
 
     // Update invoice with QuickBooks ID, payment link, and billed percentage
     await supabase
