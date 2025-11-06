@@ -136,7 +136,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={8}
+                {...(isSignUp && { minLength: 8 })}
                 placeholder={isSignUp ? "Min 8 chars, uppercase, number, special char" : ""}
               />
               {isSignUp && (
