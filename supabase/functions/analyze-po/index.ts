@@ -345,6 +345,7 @@ Return ONLY valid JSON:
           quantity: quantity,
           unit_price: unitPrice, // PO price overrides product cost
           total: quantity * unitPrice,
+          shipped_quantity: 0, // Initialize as 0 for new orders
           item_id: item.sku || null
         };
       });
