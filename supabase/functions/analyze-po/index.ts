@@ -221,7 +221,7 @@ Return ONLY valid JSON:
       console.log('Sample products:', JSON.stringify(products.slice(0, 3), null, 2));
     }
 
-    // Function to find matching product by item_id
+    // Function to find matching product by item_id with improved matching
     const findMatchingProduct = (poItem: any) => {
       if (!products || products.length === 0) {
         console.log('No products available for matching');
@@ -234,93 +234,121 @@ Return ONLY valid JSON:
         name: poItem.name
       }, null, 2));
 
-      // Helper to normalize item_id by removing common suffixes
-      const normalizeItemId = (id: string): string => {
-        if (!id) return '';
-        // Remove "BAG" suffix if present (e.g., "PCK-00430-WABAG" -> "PCK-00430-WA")
-        let normalized = id.replace(/BAG$/i, '');
-        // If ends with state code like "-WA", extract just the base (e.g., "PCK-00430-WA" -> "PCK-00430")
-        const stateMatch = normalized.match(/^(.+?)-(WA|CA|OR|CO|NV|AZ|FL|TX|NY)$/i);
-        if (stateMatch) {
-          return stateMatch[1]; // Return just the base part
-        }
-        return normalized;
+      // Helper to normalize strings for better matching
+      const normalize = (str: string): string => {
+        if (!str) return '';
+        return str.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
       };
 
-      // Try exact match on item_id first
-      if (poItem.item_id) {
-        const match = products.find(p => p.item_id === poItem.item_id);
+      // Helper to extract base SKU (remove suffixes like BAG, state codes, etc)
+      const extractBaseSku = (id: string): string => {
+        if (!id) return '';
+        let cleaned = id.toUpperCase().trim();
+        // Remove common suffixes
+        cleaned = cleaned.replace(/BAG$/i, '').replace(/PKG$/i, '');
+        // Remove state codes at the end
+        cleaned = cleaned.replace(/-(WA|CA|OR|CO|NV|AZ|FL|TX|NY|MI|IL|MA|PA|OH|NC|GA|VA|MD|WI|MN|MO|TN|IN|SC|AL|LA|KY|OK|CT|UT|IA|NE|KS|NM|WV|ID|HI|ME|NH|RI|MT|DE|SD|ND|AK|VT|WY)$/i, '');
+        return cleaned;
+      };
+
+      const poItemId = poItem.item_id || '';
+      const poSku = poItem.sku || '';
+      const poName = poItem.name || '';
+
+      // Try exact match on item_id (case insensitive)
+      if (poItemId) {
+        const match = products.find(p => 
+          p.item_id && p.item_id.toLowerCase().trim() === poItemId.toLowerCase().trim()
+        );
         if (match) {
-          console.log(`✓ Exact item_id match: "${poItem.item_id}" -> product: ${match.name}`);
+          console.log(`✓ Exact item_id match: "${poItemId}" -> product: ${match.name}`);
           return match.id;
         }
       }
 
-      // Try exact match on SKU
-      if (poItem.sku && poItem.sku !== poItem.item_id) {
-        const match = products.find(p => p.item_id === poItem.sku);
+      // Try exact match on SKU (case insensitive)
+      if (poSku && poSku !== poItemId) {
+        const match = products.find(p => 
+          p.item_id && p.item_id.toLowerCase().trim() === poSku.toLowerCase().trim()
+        );
         if (match) {
-          console.log(`✓ Exact SKU match: "${poItem.sku}" -> product: ${match.name}`);
+          console.log(`✓ Exact SKU match: "${poSku}" -> product: ${match.name}`);
           return match.id;
         }
       }
 
-      // Try normalized match on item_id
-      if (poItem.item_id) {
-        const normalizedPoId = normalizeItemId(poItem.item_id);
-        console.log(`  Trying normalized item_id: "${normalizedPoId}" (from "${poItem.item_id}")`);
+      // Try normalized alphanumeric match
+      if (poItemId) {
+        const normalizedPoId = normalize(poItemId);
+        const match = products.find(p => 
+          p.item_id && normalize(p.item_id) === normalizedPoId
+        );
+        if (match) {
+          console.log(`✓ Normalized match: "${poItemId}" -> "${match.item_id}" (product: ${match.name})`);
+          return match.id;
+        }
+      }
+
+      // Try base SKU matching (removes suffixes)
+      if (poItemId) {
+        const basePoSku = extractBaseSku(poItemId);
+        console.log(`  Trying base SKU: "${basePoSku}" (from "${poItemId}")`);
         
         const match = products.find(p => {
-          const normalizedProductId = normalizeItemId(p.item_id || '');
-          const matches = normalizedProductId === normalizedPoId;
-          if (matches) {
-            console.log(`  Comparing with product item_id: "${p.item_id}" (normalized: "${normalizedProductId}")`);
+          if (!p.item_id) return false;
+          const baseProductSku = extractBaseSku(p.item_id);
+          return baseProductSku === basePoSku;
+        });
+        
+        if (match) {
+          console.log(`✓ Base SKU match: "${basePoSku}" -> "${match.item_id}" (product: ${match.name})`);
+          return match.id;
+        }
+      }
+
+      // Try partial/contains matching (if one contains the other)
+      if (poItemId) {
+        const poIdUpper = poItemId.toUpperCase().trim();
+        const match = products.find(p => {
+          if (!p.item_id) return false;
+          const prodIdUpper = p.item_id.toUpperCase().trim();
+          return prodIdUpper.includes(poIdUpper) || poIdUpper.includes(prodIdUpper);
+        });
+        
+        if (match) {
+          console.log(`✓ Partial match: "${poItemId}" <-> "${match.item_id}" (product: ${match.name})`);
+          return match.id;
+        }
+      }
+
+      // Try fuzzy name matching (relaxed threshold)
+      if (poName && poName.length > 5) {
+        const poNameNorm = normalize(poName);
+        const match = products.find(p => {
+          if (!p.name || p.name.length < 5) return false;
+          const productNameNorm = normalize(p.name);
+          
+          // Check if one name contains significant portion of the other
+          if (productNameNorm.includes(poNameNorm.slice(0, Math.min(15, poNameNorm.length))) ||
+              poNameNorm.includes(productNameNorm.slice(0, Math.min(15, productNameNorm.length)))) {
+            return true;
           }
-          return matches;
-        });
-        
-        if (match) {
-          console.log(`✓ Normalized item_id match: "${normalizedPoId}" -> product: ${match.name}`);
-          return match.id;
-        }
-      }
-
-      // Try matching by SKU with normalization
-      if (poItem.sku && poItem.sku !== poItem.item_id) {
-        const normalizedSku = normalizeItemId(poItem.sku);
-        console.log(`  Trying normalized SKU: "${normalizedSku}" (from "${poItem.sku}")`);
-        
-        const match = products.find(p => {
-          const normalizedProductId = normalizeItemId(p.item_id || '');
-          return normalizedProductId === normalizedSku;
-        });
-        
-        if (match) {
-          console.log(`✓ Normalized SKU match: "${normalizedSku}" -> product: ${match.name}`);
-          return match.id;
-        }
-      }
-
-      // Try fuzzy name matching as last resort
-      if (poItem.name) {
-        const poNameLower = poItem.name.toLowerCase().trim();
-        const match = products.find(p => {
-          const productNameLower = (p.name || '').toLowerCase().trim();
-          // Check if names are very similar (at least 80% of words match)
-          const poWords = new Set(poNameLower.split(/\s+/));
-          const productWords = productNameLower.split(/\s+/);
+          
+          // Word-based similarity (lowered to 60% threshold)
+          const poWords = new Set(poName.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+          const productWords = p.name.toLowerCase().split(/\s+/).filter(w => w.length > 2);
           const matchingWords = productWords.filter(w => poWords.has(w)).length;
           const similarity = matchingWords / Math.max(poWords.size, productWords.length);
-          return similarity >= 0.8;
+          return similarity >= 0.6;
         });
         
         if (match) {
-          console.log(`✓ Name similarity match: "${poItem.name}" -> product: ${match.name}`);
+          console.log(`✓ Fuzzy name match: "${poName}" -> product: ${match.name}`);
           return match.id;
         }
       }
 
-      console.log(`✗ No match found for: item_id="${poItem.item_id}", sku="${poItem.sku}", name="${poItem.name}"`);
+      console.log(`✗ No match found for: item_id="${poItemId}", sku="${poSku}", name="${poName}"`);
       return null;
     };
 
