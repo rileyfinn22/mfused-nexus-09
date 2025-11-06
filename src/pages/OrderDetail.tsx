@@ -653,12 +653,6 @@ const OrderDetail = () => {
               )}
             </>
           )}
-          {isVibeAdmin && order?.order_items && order.order_items.length > 0 && (
-            <Button onClick={() => setShowVendorDialog(true)}>
-              <Truck className="h-4 w-4 mr-2" />
-              Assign Vendors
-            </Button>
-          )}
           <Button variant="outline" onClick={handleDownloadPackingList}>
             <Download className="h-4 w-4 mr-2" />
             Packing List
@@ -1261,9 +1255,6 @@ const OrderDetail = () => {
                           </div>
                           <div>
                             <h3 className="font-medium capitalize">{stage.stage_name.replace(/_/g, ' ')}</h3>
-                            <p className="text-xs text-muted-foreground">
-                              {stage.vendors?.name ? `Vendor: ${stage.vendors.name}` : 'No vendor assigned'}
-                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1279,48 +1270,25 @@ const OrderDetail = () => {
 
                       {(isVibeAdmin || (isVendor && stage.vendor_id === vendorId)) && (
                         <div className="space-y-3 mt-3 pt-3 border-t border-table-border">
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <Label className="text-xs">Status</Label>
-                              <Select
-                                value={stage.status}
-                                onValueChange={(value) => {
-                                  setProductionStages(prev => 
-                                    prev.map(s => s.id === stage.id ? { ...s, status: value } : s)
-                                  );
-                                }}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="in_progress">In Progress</SelectItem>
-                                  <SelectItem value="completed">Completed</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            {isVibeAdmin && (
-                              <div>
-                                <Label className="text-xs">Assign Vendor</Label>
-                                <Select
-                                  value={stage.vendor_id || "none"}
-                                  onValueChange={(value) => handleAssignVendor(stage.id, value)}
-                                >
-                                  <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none">No vendor</SelectItem>
-                                    {vendors.map((vendor) => (
-                                      <SelectItem key={vendor.id} value={vendor.id}>
-                                        {vendor.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
+                          <div>
+                            <Label className="text-xs">Status</Label>
+                            <Select
+                              value={stage.status}
+                              onValueChange={(value) => {
+                                setProductionStages(prev => 
+                                  prev.map(s => s.id === stage.id ? { ...s, status: value } : s)
+                                );
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                           
                           <div>

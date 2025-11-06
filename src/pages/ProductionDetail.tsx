@@ -396,9 +396,6 @@ export default function ProductionDetail() {
                       {getStageIcon(stage.status)}
                       <div>
                         <CardTitle>{stageDef.label}</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          {stage.vendors?.name || 'No vendor assigned'}
-                        </p>
                       </div>
                     </div>
                     <div className="flex gap-2 items-center">
@@ -476,28 +473,6 @@ export default function ProductionDetail() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {isVibeAdmin && (
-                    <div className="mb-4">
-                      <Label>Assign Vendor</Label>
-                      <Select
-                        value={stage.vendor_id || "none"}
-                        onValueChange={(value) => handleAssignVendor(stage.id, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select vendor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No vendor</SelectItem>
-                          {vendors.map((vendor) => (
-                            <SelectItem key={vendor.id} value={vendor.id}>
-                              {vendor.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  
                   {stage.production_stage_updates.length > 0 && (
                     <div className="space-y-3 mt-4">
                       <h4 className="font-semibold text-sm">Updates:</h4>
