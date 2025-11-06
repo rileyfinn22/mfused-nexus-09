@@ -35,7 +35,6 @@ import { useToast } from "@/hooks/use-toast";
 interface Product {
   id: string;
   name: string;
-  category: string;
   description: string | null;
   state: string;
   cost: number | null;
@@ -145,7 +144,6 @@ const Products = () => {
           return {
             id: product.id,
             name: product.name,
-            category: product.category,
             description: product.description,
             state: product.state,
             cost: product.cost,
@@ -317,8 +315,7 @@ const Products = () => {
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchQuery.toLowerCase())
+    product.id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading) {
@@ -405,8 +402,7 @@ const Products = () => {
             <div className={isEditMode ? "col-span-1" : "col-span-1"}></div>
             <div className={isEditMode ? "col-span-1" : "col-span-2"}>Product ID</div>
             <div className="col-span-1">Preview</div>
-            <div className="col-span-2">Item</div>
-            <div className="col-span-1">Category</div>
+            <div className="col-span-3">Item</div>
             <div className="col-span-2">State</div>
             <div className="col-span-1">Cost</div>
             {!isEditMode && <div className="col-span-1">Actions</div>}
@@ -466,8 +462,7 @@ const Products = () => {
                       </div>
                     )}
                   </div>
-                  <div className="col-span-2 text-sm font-medium">{product.name}</div>
-                  <div className="col-span-1 text-sm">{product.category}</div>
+                  <div className="col-span-3 text-sm font-medium">{product.name}</div>
                   <div className="col-span-2">
                     <Badge variant="outline" className="text-xs">{product.state}</Badge>
                   </div>

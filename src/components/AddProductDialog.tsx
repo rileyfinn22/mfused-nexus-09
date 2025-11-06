@@ -12,7 +12,6 @@ import { z } from "zod";
 
 const productSchema = z.object({
   name: z.string().min(1, "Item name is required").max(200, "Name too long"),
-  category: z.string().min(1, "Category is required"),
   description: z.string().max(500, "Description too long").optional(),
   state: z.string().min(1, "State is required"),
   cost: z.string().refine((val) => !val || !isNaN(parseFloat(val)), "Invalid cost").optional(),
@@ -32,7 +31,6 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
   const { syncProduct, checkConnection } = useQuickBooksAutoSync();
   const [formData, setFormData] = useState({
     name: "",
-    category: "",
     description: "",
     state: "",
     cost: "",
@@ -140,7 +138,6 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
         .from('products')
         .insert({
           name: formData.name,
-          category: formData.category,
           description: formData.description || null,
           state: formData.state,
           cost: formData.cost ? parseFloat(formData.cost) : null,
@@ -178,7 +175,7 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
       }
       
       setOpen(false);
-      setFormData({ name: "", category: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "" });
+      setFormData({ name: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "" });
       setImageFile(null);
       setImagePreview(null);
       onProductAdded();
@@ -225,25 +222,6 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
               placeholder="Product description"
               maxLength={500}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
-            <Select
-              value={formData.category}
-              onValueChange={(value) => setFormData({ ...formData, category: value })}
-              required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Vape Cartridge">Vape Cartridge</SelectItem>
-                <SelectItem value="Disposable">Disposable</SelectItem>
-                <SelectItem value="Edible">Edible</SelectItem>
-                <SelectItem value="Flower">Flower</SelectItem>
-                <SelectItem value="Concentrate">Concentrate</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="state">State</Label>

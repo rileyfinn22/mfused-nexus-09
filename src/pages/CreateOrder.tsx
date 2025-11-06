@@ -33,7 +33,6 @@ interface Product {
   id: string;
   name: string;
   item_id: string | null;
-  category: string;
   cost: number | null;
   description: string | null;
   image_url: string | null;
@@ -534,8 +533,7 @@ const CreateOrder = () => {
     const search = searchQuery.toLowerCase();
     return (
       p.name.toLowerCase().includes(search) ||
-      p.item_id?.toLowerCase().includes(search) ||
-      p.category.toLowerCase().includes(search)
+      p.item_id?.toLowerCase().includes(search)
     );
   });
 
@@ -1319,7 +1317,6 @@ const CreateOrder = () => {
                               </TableCell>
                               <TableCell className="font-mono text-xs">{product.item_id || '-'}</TableCell>
                               <TableCell className="font-medium">{product.name}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{product.category}</TableCell>
                               <TableCell className="text-right">${product.cost?.toFixed(3) || '0.000'}</TableCell>
                             </TableRow>
                           ))

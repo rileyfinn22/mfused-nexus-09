@@ -54,7 +54,6 @@ const customerSchema = z.object({
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
-  category: z.string().trim().min(1, "Category is required").max(100),
   item_id: z.string().trim().max(100).optional().or(z.literal("")),
   description: z.string().trim().max(1000).optional().or(z.literal("")),
   price: z.string().optional().or(z.literal("")),
@@ -80,7 +79,6 @@ const CustomerDetail = () => {
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
   const [productFormData, setProductFormData] = useState({
     name: "",
-    category: "",
     item_id: "",
     description: "",
     price: "",
@@ -296,7 +294,6 @@ const CustomerDetail = () => {
 
       const productData = {
         name: validated.name,
-        category: validated.category,
         item_id: validated.item_id || null,
         description: validated.description || null,
         price: validated.price ? parseFloat(validated.price) : null,
@@ -319,7 +316,6 @@ const CustomerDetail = () => {
       setShowCreateProductDialog(false);
       setProductFormData({
         name: "",
-        category: "",
         item_id: "",
         description: "",
         price: "",
@@ -363,12 +359,11 @@ const CustomerDetail = () => {
         const validData: any[] = [];
 
         results.data.forEach((row: any, index) => {
-          if (!row.name || !row.category) {
-            errors.push(`Row ${index + 1}: Missing required fields (name, category)`);
+          if (!row.name) {
+            errors.push(`Row ${index + 1}: Missing required field (name)`);
           } else {
             validData.push({
               name: row.name,
-              category: row.category,
               item_id: row.item_id || row.sku || "",
               description: row.description || "",
               price: row.price || "",
@@ -407,7 +402,6 @@ const CustomerDetail = () => {
 
       const productsToCreate = csvData.map((row) => ({
         name: row.name,
-        category: row.category,
         item_id: row.item_id || null,
         description: row.description || null,
         price: row.price ? parseFloat(row.price) : null,
@@ -445,9 +439,9 @@ const CustomerDetail = () => {
   };
 
   const downloadCsvTemplate = () => {
-    const template = "name,category,item_id,description,price,cost\n" +
-                     "Sample Product,Merchandise,SKU-001,Product description,10.99,5.50\n" +
-                     "Another Product,Packaging,SKU-002,Another description,15.99,8.00";
+    const template = "name,item_id,description,price,cost\n" +
+                     "Sample Product,SKU-001,Product description,10.99,5.50\n" +
+                     "Another Product,SKU-002,Another description,15.99,8.00";
     
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -727,7 +721,6 @@ const CustomerDetail = () => {
                         <div>
                           <p className="font-medium">{product.name}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">{product.category}</Badge>
                             {product.item_id && (
                               <span className="text-xs text-muted-foreground font-mono">
                                 {product.item_id}
@@ -798,7 +791,6 @@ const CustomerDetail = () => {
                       <div className="flex-1">
                         <p className="font-medium">{product.name}</p>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs">{product.category}</Badge>
                           {product.item_id && (
                             <span className="text-xs text-muted-foreground font-mono">
                               {product.item_id}
@@ -850,25 +842,6 @@ const CustomerDetail = () => {
                 />
                 {productFormErrors.name && <p className="text-sm text-destructive mt-1">{productFormErrors.name}</p>}
               </div>
-              <div>
-                <Label htmlFor="product_category">Category *</Label>
-                <Select
-                  value={productFormData.category}
-                  onValueChange={(value) => setProductFormData({ ...productFormData, category: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Merchandise">Merchandise</SelectItem>
-                    <SelectItem value="Packaging">Packaging</SelectItem>
-                    <SelectItem value="Materials">Materials</SelectItem>
-                    <SelectItem value="Equipment">Equipment</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                {productFormErrors.category && <p className="text-sm text-destructive mt-1">{productFormErrors.category}</p>}
-              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -919,7 +892,6 @@ const CustomerDetail = () => {
               setShowCreateProductDialog(false);
               setProductFormData({
                 name: "",
-                category: "",
                 item_id: "",
                 description: "",
                 price: "",
@@ -976,7 +948,7 @@ const CustomerDetail = () => {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Required columns: name, category | Optional: item_id, description, price, cost
+                Required columns: name | Optional: item_id, description, price, cost
               </p>
             </div>
 
@@ -1007,7 +979,6 @@ const CustomerDetail = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>Category</TableHead>
                         <TableHead>Item ID</TableHead>
                         <TableHead>Price</TableHead>
                         <TableHead>Cost</TableHead>
@@ -1017,7 +988,6 @@ const CustomerDetail = () => {
                       {csvData.map((row, index) => (
                         <TableRow key={index}>
                           <TableCell className="font-medium">{row.name}</TableCell>
-                          <TableCell>{row.category}</TableCell>
                           <TableCell className="font-mono text-xs">{row.item_id || "-"}</TableCell>
                           <TableCell>{row.price ? `$${row.price}` : "-"}</TableCell>
                           <TableCell>{row.cost ? `$${row.cost}` : "-"}</TableCell>

@@ -1001,7 +1001,6 @@ export type Database = {
       products: {
         Row: {
           cases_per_pallet: number | null
-          category: string
           company_id: string
           cost: number | null
           created_at: string
@@ -1025,7 +1024,6 @@ export type Database = {
         }
         Insert: {
           cases_per_pallet?: number | null
-          category: string
           company_id: string
           cost?: number | null
           created_at?: string
@@ -1049,7 +1047,6 @@ export type Database = {
         }
         Update: {
           cases_per_pallet?: number | null
-          category?: string
           company_id?: string
           cost?: number | null
           created_at?: string
