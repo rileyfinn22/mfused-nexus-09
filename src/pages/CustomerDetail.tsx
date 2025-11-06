@@ -351,6 +351,10 @@ const CustomerDetail = () => {
   };
 
   const handleEditProduct = (product: any) => {
+    console.log("Editing product:", product);
+    console.log("Product state:", product.state);
+    console.log("Product item_id:", product.item_id);
+    
     setEditingProduct(product);
     setProductFormData({
       name: product.name || "",
@@ -1059,8 +1063,22 @@ const CustomerDetail = () => {
       </Dialog>
 
       {/* Edit Product Dialog */}
-      <Dialog open={showEditProductDialog} onOpenChange={setShowEditProductDialog}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={showEditProductDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowEditProductDialog(false);
+          setEditingProduct(null);
+          setProductFormData({
+            name: "",
+            state: "",
+            item_id: "",
+            description: "",
+            price: "",
+            cost: "",
+          });
+          setProductFormErrors({});
+        }
+      }}>
+        <DialogContent className="max-w-2xl" key={editingProduct?.id || 'new'}>
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
             <DialogDescription>
@@ -1082,11 +1100,10 @@ const CustomerDetail = () => {
               <div>
                 <Label htmlFor="edit_product_state">State *</Label>
                 <Select
-                  key={editingProduct?.id}
                   value={productFormData.state}
                   onValueChange={(value) => setProductFormData({ ...productFormData, state: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="edit_product_state">
                     <SelectValue placeholder="Select state" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1108,7 +1125,6 @@ const CustomerDetail = () => {
               <div>
                 <Label htmlFor="edit_product_item_id">Item ID / SKU</Label>
                 <Input
-                  key={`item-${editingProduct?.id}`}
                   id="edit_product_item_id"
                   value={productFormData.item_id}
                   onChange={(e) => setProductFormData({ ...productFormData, item_id: e.target.value })}
