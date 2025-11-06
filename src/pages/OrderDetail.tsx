@@ -289,13 +289,45 @@ const OrderDetail = () => {
     }
   };
 
-  const handleAddVibeNote = () => {
+  const handleAddVibeNote = async () => {
     if (!vibeNotes.trim()) return;
-    toast({
-      title: "Vibe Note Added",
-      description: "Your note has been saved to the order."
-    });
-    setVibeNotes("");
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Get current notes or initialize empty array
+    const currentNotes = order.vibenotes || [];
+    
+    // Create new note object
+    const newNote = {
+      author: user.email || 'Unknown',
+      date: new Date().toLocaleString(),
+      text: vibeNotes.trim()
+    };
+
+    // Add new note to the array
+    const updatedNotes = [...currentNotes, newNote];
+
+    // Update order in database
+    const { error } = await supabase
+      .from('orders')
+      .update({ vibenotes: updatedNotes })
+      .eq('id', orderId);
+
+    if (!error) {
+      toast({
+        title: "Vibe Note Added",
+        description: "Your note has been saved to the order."
+      });
+      setVibeNotes("");
+      fetchOrder(); // Refresh order to show new note
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to save note",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleOrderFinalized = async () => {
@@ -1134,9 +1166,9 @@ const OrderDetail = () => {
             {/* Display Vibe Notes (Visible to All) */}
             <div className="space-y-3">
               <h3 className="font-medium text-sm">Notes</h3>
-              {!order.vibeNotes || order.vibeNotes.length === 0 ? <p className="text-sm text-muted-foreground p-4 bg-background rounded border border-table-border">
+              {!order.vibenotes || order.vibenotes.length === 0 ? <p className="text-sm text-muted-foreground p-4 bg-background rounded border border-table-border">
                   No vibe notes yet
-                </p> : order.vibeNotes?.map((note: any, index: number) => <div key={index} className="p-4 bg-background rounded-lg border border-table-border">
+                </p> : order.vibenotes?.map((note: any, index: number) => <div key={index} className="p-4 bg-background rounded-lg border border-table-border">
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-xs font-medium text-primary">{note.author}</span>
                       <span className="text-xs text-muted-foreground">{note.date}</span>

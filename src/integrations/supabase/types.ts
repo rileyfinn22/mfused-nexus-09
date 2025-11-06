@@ -620,6 +620,7 @@ export type Database = {
           vibe_processed: boolean
           vibe_processed_at: string | null
           vibe_processed_by: string | null
+          vibenotes: Json | null
         }
         Insert: {
           billing_city?: string | null
@@ -663,6 +664,7 @@ export type Database = {
           vibe_processed?: boolean
           vibe_processed_at?: string | null
           vibe_processed_by?: string | null
+          vibenotes?: Json | null
         }
         Update: {
           billing_city?: string | null
@@ -706,6 +708,7 @@ export type Database = {
           vibe_processed?: boolean
           vibe_processed_at?: string | null
           vibe_processed_by?: string | null
+          vibenotes?: Json | null
         }
         Relationships: [
           {
