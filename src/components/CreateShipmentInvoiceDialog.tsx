@@ -78,7 +78,10 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
   const handleQuantityChange = (itemId: string, value: string) => {
     const numValue = parseInt(value) || 0;
     const item = order.order_items.find((i: any) => i.id === itemId);
-    const maxQuantity = item.quantity - (item.shipped_quantity || 0);
+    if (!item) return;
+    
+    // Allow shipping up to the total ordered quantity (for direct ship scenarios)
+    const maxQuantity = item.quantity;
     
     setShipmentQuantities(prev => ({
       ...prev,
@@ -468,11 +471,10 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                             <Input
                               type="number"
                               min="0"
-                              max={remaining}
-                              value={shipmentQuantities[item.id] || 0}
+                              max={item.quantity}
+                              value={shipmentQuantities[item.id] ?? remaining}
                               onChange={(e) => handleQuantityChange(item.id, e.target.value)}
                               className="w-20 text-right"
-                              disabled={remaining === 0}
                             />
                           </TableCell>
                           <TableCell className="text-right">

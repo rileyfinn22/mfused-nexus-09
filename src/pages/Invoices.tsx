@@ -380,8 +380,60 @@ const Invoices = () => {
                           title="Delete Invoice"
                           onClick={async (e) => {
                             e.stopPropagation();
-                            if (window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
+                            if (window.confirm('Are you sure you want to delete this invoice? Quantities will be restored.')) {
                               try {
+                                // Restore quantities and inventory before deleting
+                                // Only for shipment invoices, not deposit invoices
+                                if (invoice.invoice_type !== 'deposit') {
+                                  const { data: allocations } = await supabase
+                                    .from('inventory_allocations')
+                                    .select('*')
+                                    .eq('invoice_id', invoice.id);
+
+                                  if (allocations && allocations.length > 0) {
+                                    for (const allocation of allocations) {
+                                      // Restore inventory
+                                      const { data: currentInv } = await supabase
+                                        .from('inventory')
+                                        .select('available')
+                                        .eq('id', allocation.inventory_id)
+                                        .single();
+
+                                      if (currentInv) {
+                                        await supabase
+                                          .from('inventory')
+                                          .update({
+                                            available: currentInv.available + allocation.quantity_allocated
+                                          })
+                                          .eq('id', allocation.inventory_id);
+                                      }
+
+                                      // Restore order item shipped_quantity
+                                      const { data: currentItem } = await supabase
+                                        .from('order_items')
+                                        .select('shipped_quantity')
+                                        .eq('id', allocation.order_item_id)
+                                        .single();
+
+                                      if (currentItem) {
+                                        await supabase
+                                          .from('order_items')
+                                          .update({
+                                            shipped_quantity: Math.max(0, (currentItem.shipped_quantity || 0) - allocation.quantity_allocated)
+                                          })
+                                          .eq('id', allocation.order_item_id);
+                                      }
+
+                                      // Delete allocation
+                                      await supabase
+                                        .from('inventory_allocations')
+                                        .delete()
+                                        .eq('id', allocation.id);
+                                    }
+                                  }
+                                }
+
+                                // Delete invoice
                                 const { error } = await supabase
                                   .from('invoices')
                                   .delete()
@@ -397,7 +449,7 @@ const Invoices = () => {
                                 } else {
                                   toast({
                                     title: "Success",
-                                    description: "Invoice deleted successfully"
+                                    description: "Invoice deleted and quantities restored"
                                   });
                                   fetchInvoices();
                                 }
