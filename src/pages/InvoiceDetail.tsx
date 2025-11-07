@@ -613,10 +613,20 @@ const InvoiceDetail = () => {
                     <div className="bg-background/50 border rounded-lg p-4">
                       <div className="text-sm text-muted-foreground mb-1">Amount Due</div>
                       <div className="text-2xl font-bold text-green-700 dark:text-green-400">
-                        {formatCurrency(Number(invoice.total) - Number(invoice.total_paid || 0))}
+                        {(() => {
+                          const billedAmount = Number(invoice.total) * (Number(invoice.billed_percentage || 100) / 100);
+                          const amountDue = billedAmount - Number(invoice.total_paid || 0);
+                          return formatCurrency(amountDue);
+                        })()}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        of {formatCurrency(Number(invoice.total))} total
+                        {invoice.billed_percentage && invoice.billed_percentage < 100 ? (
+                          <>
+                            {invoice.billed_percentage}% deposit of {formatCurrency(Number(invoice.total))} total
+                          </>
+                        ) : (
+                          <>of {formatCurrency(Number(invoice.total))} total</>
+                        )}
                       </div>
                     </div>
                     
@@ -634,7 +644,8 @@ const InvoiceDetail = () => {
                     <div className="bg-background/50 border rounded-lg p-4">
                       <div className="text-sm text-muted-foreground mb-1">Payment Status</div>
                       {(() => {
-                        const amountDue = Number(invoice.total) - Number(invoice.total_paid || 0);
+                        const billedAmount = Number(invoice.total) * (Number(invoice.billed_percentage || 100) / 100);
+                        const amountDue = billedAmount - Number(invoice.total_paid || 0);
                         const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
                         const today = new Date();
                         const daysOverdue = dueDate ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
