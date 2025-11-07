@@ -577,7 +577,7 @@ serve(async (req) => {
           {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${currentAccessToken}`,
+              'Authorization': `Bearer ${accessToken}`,
               'Accept': 'application/json',
             },
           }
@@ -607,7 +607,7 @@ serve(async (req) => {
             {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${currentAccessToken}`,
+                'Authorization': `Bearer ${accessToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/octet-stream',
               },
@@ -626,7 +626,7 @@ serve(async (req) => {
               {
                 method: 'GET',
                 headers: {
-                  'Authorization': `Bearer ${currentAccessToken}`,
+                  'Authorization': `Bearer ${accessToken}`,
                   'Accept': 'application/json',
                 },
               }
