@@ -562,17 +562,44 @@ serve(async (req) => {
     // Log full invoice response to see all available fields
     console.log('Full QuickBooks Invoice Response:', JSON.stringify(qbData.Invoice, null, 2));
     
-    // Try multiple possible fields for the payment/invoice link
-    let qbPaymentLink = qbData.Invoice?.InvoiceLink || 
-                        qbData.Invoice?.CustomerMemo?.InvoiceLink ||
-                        qbData.Invoice?.BillEmail?.InvoiceLink ||
-                        null;
+    // Try to get the shareable invoice link by calling the QB API
+    // The shareable link is only available after "sending" the invoice
+    let qbPaymentLink = qbData.Invoice?.InvoiceLink || null;
     
-    // If no link from API, construct the QuickBooks invoice viewer URL
-    if (!qbPaymentLink && qbSettings.realm_id) {
-      // Construct the customer-facing invoice link
-      qbPaymentLink = `https://app.qbo.intuit.com/invoice?txnId=${qbInvoiceId}`;
-      console.log('Constructed QuickBooks invoice viewer link:', qbPaymentLink);
+    // If no link from the invoice object, try to generate one via the send endpoint
+    if (!qbPaymentLink) {
+      try {
+        console.log('Attempting to get shareable invoice link from QuickBooks...');
+        
+        // Query the invoice again to check for any additional fields
+        const invoiceQueryResponse = await fetch(
+          `${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${currentAccessToken}`,
+              'Accept': 'application/json',
+            },
+          }
+        );
+        
+        if (invoiceQueryResponse.ok) {
+          const invoiceQueryData = await invoiceQueryResponse.json();
+          console.log('Invoice query response:', JSON.stringify(invoiceQueryData.Invoice, null, 2));
+          
+          // Check for invoice link in query response
+          qbPaymentLink = invoiceQueryData.Invoice?.InvoiceLink || 
+                         invoiceQueryData.Invoice?.DeliveryInfo?.DeliveryType ||
+                         null;
+          
+          // If still no link, check if we can get it from EmailStatus or BillEmail
+          if (!qbPaymentLink && invoiceQueryData.Invoice?.BillEmail) {
+            console.log('Invoice has email delivery configured');
+          }
+        }
+      } catch (linkError) {
+        console.error('Error getting invoice link:', linkError);
+      }
     }
     
     console.log('QuickBooks invoice ID:', qbInvoiceId);
