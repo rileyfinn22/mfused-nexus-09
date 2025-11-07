@@ -390,6 +390,7 @@ export type Database = {
           invoice_type: string | null
           notes: string | null
           order_id: string
+          parent_invoice_id: string | null
           quickbooks_id: string | null
           quickbooks_payment_link: string | null
           quickbooks_sync_status: string | null
@@ -415,6 +416,7 @@ export type Database = {
           invoice_type?: string | null
           notes?: string | null
           order_id: string
+          parent_invoice_id?: string | null
           quickbooks_id?: string | null
           quickbooks_payment_link?: string | null
           quickbooks_sync_status?: string | null
@@ -440,6 +442,7 @@ export type Database = {
           invoice_type?: string | null
           notes?: string | null
           order_id?: string
+          parent_invoice_id?: string | null
           quickbooks_id?: string | null
           quickbooks_payment_link?: string | null
           quickbooks_sync_status?: string | null
@@ -466,6 +469,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_parent_invoice_id_fkey"
+            columns: ["parent_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
         ]

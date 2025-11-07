@@ -74,6 +74,7 @@ const Invoices = () => {
 
   const getInvoiceTypeColor = (type: string) => {
     switch (type) {
+      case 'deposit': return 'bg-orange-500 text-white';
       case 'partial': return 'bg-blue-500 text-white';
       case 'final': return 'bg-green-500 text-white';
       case 'full': return 'bg-purple-500 text-white';
@@ -294,6 +295,15 @@ const Invoices = () => {
                           title="Payment link available"
                         >
                           <Link2 className="h-3 w-3" />
+                        </Badge>
+                      )}
+                      {invoice.parent_invoice_id && (
+                        <Badge 
+                          variant="outline" 
+                          className="bg-blue-500/10 text-blue-700 border-blue-500/20 text-xs px-1.5 py-0"
+                          title="Linked to deposit invoice"
+                        >
+                          Linked
                         </Badge>
                       )}
                     </div>

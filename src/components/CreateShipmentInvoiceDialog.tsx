@@ -175,6 +175,9 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       const shipping = parseFloat(shippingCost) || 0;
       const total = subtotal + shipping;
 
+      // Find deposit invoice to link shipment invoices to
+      const depositInvoice = existingInvoices.find(inv => inv.invoice_type === 'deposit');
+      
       // Create invoice with QB-compliant number
       const invoiceNumber = generateInvoiceNumber(nextShipmentNumber);
       const { data: invoice, error: invoiceError } = await supabase
@@ -186,6 +189,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
           shipment_number: nextShipmentNumber,
           invoice_type: invoiceMode === 'deposit' ? 'deposit' : invoiceType,
           billed_percentage: billedPercentage,
+          parent_invoice_id: invoiceMode === 'shipment' && depositInvoice ? depositInvoice.id : null,
           status: 'open',
           subtotal,
           tax,
