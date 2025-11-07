@@ -597,6 +597,52 @@ serve(async (req) => {
             console.log('Invoice has email delivery configured');
           }
         }
+        
+        // If still no payment link, try to trigger link generation by "sending" the invoice
+        if (!qbPaymentLink) {
+          console.log('No payment link found, attempting to generate via send endpoint...');
+          
+          const sendResponse = await fetch(
+            `${qbApiUrl}/invoice/${qbInvoiceId}/send?sendTo=${encodeURIComponent(invoice.orders?.customer_email || 'noemail@example.com')}`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${currentAccessToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/octet-stream',
+              },
+            }
+          );
+          
+          if (sendResponse.ok) {
+            console.log('Invoice send triggered successfully');
+            
+            // Wait a moment for QB to process
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Query the invoice one more time to get the generated link
+            const finalQueryResponse = await fetch(
+              `${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`,
+              {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${currentAccessToken}`,
+                  'Accept': 'application/json',
+                },
+              }
+            );
+            
+            if (finalQueryResponse.ok) {
+              const finalInvoiceData = await finalQueryResponse.json();
+              console.log('Final invoice data after send:', JSON.stringify(finalInvoiceData.Invoice, null, 2));
+              qbPaymentLink = finalInvoiceData.Invoice?.InvoiceLink || null;
+              console.log('Payment link after send:', qbPaymentLink);
+            }
+          } else {
+            const sendError = await sendResponse.json();
+            console.error('Error sending invoice:', sendError);
+          }
+        }
       } catch (linkError) {
         console.error('Error getting invoice link:', linkError);
       }
