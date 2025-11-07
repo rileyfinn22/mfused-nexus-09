@@ -559,14 +559,27 @@ serve(async (req) => {
     const qbInvoiceId = qbData.Invoice.Id;
     const qbDocNumber = qbData.Invoice.DocNumber;
     
-    // QuickBooks only provides InvoiceLink if QuickBooks Payments is enabled
-    // Check if it exists in the response
-    const qbPaymentLink = qbData.Invoice?.InvoiceLink || null;
+    // Log full invoice response to see all available fields
+    console.log('Full QuickBooks Invoice Response:', JSON.stringify(qbData.Invoice, null, 2));
+    
+    // Try multiple possible fields for the payment/invoice link
+    let qbPaymentLink = qbData.Invoice?.InvoiceLink || 
+                        qbData.Invoice?.CustomerMemo?.InvoiceLink ||
+                        qbData.Invoice?.BillEmail?.InvoiceLink ||
+                        null;
+    
+    // If no link from API, construct the QuickBooks invoice viewer URL
+    if (!qbPaymentLink && qbSettings.realm_id) {
+      // Construct the customer-facing invoice link
+      qbPaymentLink = `https://app.qbo.intuit.com/invoice?txnId=${qbInvoiceId}`;
+      console.log('Constructed QuickBooks invoice viewer link:', qbPaymentLink);
+    }
     
     console.log('QuickBooks invoice ID:', qbInvoiceId);
     console.log('QuickBooks DocNumber:', qbDocNumber);
     console.log('QuickBooks payment link:', qbPaymentLink);
-    console.log('Note: Payment link requires QuickBooks Payments to be enabled');
+    console.log('AllowOnlinePayment:', qbData.Invoice?.AllowOnlinePayment);
+    console.log('AllowOnlineCreditCardPayment:', qbData.Invoice?.AllowOnlineCreditCardPayment);
     
     // Update invoice with QuickBooks info
     const { error: updateError } = await supabase
