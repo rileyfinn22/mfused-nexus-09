@@ -482,6 +482,10 @@ serve(async (req) => {
         CountrySubDivisionCode: invoice.orders?.shipping_state || '',
         PostalCode: invoice.orders?.shipping_zip || '',
       },
+      // Enable online payment options to get payment link
+      AllowOnlinePayment: true,
+      AllowOnlineCreditCardPayment: true,
+      AllowOnlineACHPayment: true,
     };
 
     // Note: We don't use the Deposit field for partial billing

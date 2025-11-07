@@ -594,7 +594,7 @@ const InvoiceDetail = () => {
           </div>
 
           {/* QuickBooks Payment Link */}
-          {invoice.quickbooks_payment_link && (
+          {invoice.quickbooks_id && (
             <div className="p-8 border-b bg-gradient-to-r from-green-500/10 to-emerald-500/5">
               <div className="flex items-start gap-6">
                 <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
@@ -664,41 +664,51 @@ const InvoiceDetail = () => {
                     </div>
                   </div>
                   
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Share this secure payment link with your customer to accept online payments through QuickBooks
-                  </p>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex-1 min-w-[300px] bg-background border rounded-lg p-3 font-mono text-sm truncate">
-                      {invoice.quickbooks_payment_link}
+                  {invoice.quickbooks_payment_link ? (
+                    <>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Share this secure payment link with your customer to accept online payments through QuickBooks
+                      </p>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex-1 min-w-[300px] bg-background border rounded-lg p-3 font-mono text-sm truncate">
+                          {invoice.quickbooks_payment_link}
+                        </div>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={handleCopyPaymentLink}
+                          className="gap-2"
+                        >
+                          {copiedLink ? (
+                            <>
+                              <CheckCircle2 className="h-4 w-4" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4" />
+                              Copy Link
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(invoice.quickbooks_payment_link, '_blank')}
+                          className="gap-2"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Preview
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                      <p className="text-sm text-muted-foreground">
+                        Payment link will be available after syncing. Click "Bill" above to sync this invoice to QuickBooks.
+                      </p>
                     </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={handleCopyPaymentLink}
-                      className="gap-2"
-                    >
-                      {copiedLink ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          Copy Link
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(invoice.quickbooks_payment_link, '_blank')}
-                      className="gap-2"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Preview
-                    </Button>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
