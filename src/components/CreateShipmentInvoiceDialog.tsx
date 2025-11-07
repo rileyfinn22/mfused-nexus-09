@@ -218,7 +218,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
             })
             .eq('id', item.id);
 
-          // Try to allocate from inventory if available (FIFO), but don't require it
+          // Try to allocate from inventory if available (FIFO)
           const inventoryLocations = availableInventory[item.sku] || [];
           let remainingToAllocate = quantityToShip;
           
@@ -228,7 +228,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
             const allocateQty = Math.min(remainingToAllocate, inv.available);
             if (allocateQty <= 0) continue;
             
-            // Create allocation record
+            // Create allocation record with inventory
             await supabase
               .from('inventory_allocations')
               .insert({
@@ -251,7 +251,19 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
             remainingToAllocate -= allocateQty;
           }
           
-          // Note: We allow creating invoices even without inventory (direct ship)
+          // For direct ship scenarios (no inventory), create allocation records without inventory_id
+          if (remainingToAllocate > 0) {
+            await supabase
+              .from('inventory_allocations')
+              .insert({
+                order_item_id: item.id,
+                inventory_id: null, // Direct ship - no inventory tracked
+                invoice_id: invoice.id,
+                quantity_allocated: remainingToAllocate,
+                allocated_by: user.id,
+                status: 'allocated'
+              });
+          }
         }
       }
 

@@ -195,23 +195,25 @@ const InvoiceDetail = () => {
 
         if (allocations && allocations.length > 0) {
           for (const allocation of allocations) {
-            // Restore inventory quantity
-            const { data: currentInv } = await supabase
-              .from('inventory')
-              .select('available')
-              .eq('id', allocation.inventory_id)
-              .single();
-
-            if (currentInv) {
-              await supabase
+            // Restore inventory quantity (only if this allocation has an inventory_id)
+            if (allocation.inventory_id) {
+              const { data: currentInv } = await supabase
                 .from('inventory')
-                .update({
-                  available: currentInv.available + allocation.quantity_allocated
-                })
-                .eq('id', allocation.inventory_id);
+                .select('available')
+                .eq('id', allocation.inventory_id)
+                .single();
+
+              if (currentInv) {
+                await supabase
+                  .from('inventory')
+                  .update({
+                    available: currentInv.available + allocation.quantity_allocated
+                  })
+                  .eq('id', allocation.inventory_id);
+              }
             }
 
-            // Restore order item shipped_quantity
+            // Always restore order item shipped_quantity
             const { data: currentItem } = await supabase
               .from('order_items')
               .select('shipped_quantity')

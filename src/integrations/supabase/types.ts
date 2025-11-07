@@ -325,7 +325,7 @@ export type Database = {
           allocated_by: string | null
           created_at: string
           id: string
-          inventory_id: string
+          inventory_id: string | null
           invoice_id: string
           order_item_id: string
           quantity_allocated: number
@@ -336,7 +336,7 @@ export type Database = {
           allocated_by?: string | null
           created_at?: string
           id?: string
-          inventory_id: string
+          inventory_id?: string | null
           invoice_id: string
           order_item_id: string
           quantity_allocated: number
@@ -347,7 +347,7 @@ export type Database = {
           allocated_by?: string | null
           created_at?: string
           id?: string
-          inventory_id?: string
+          inventory_id?: string | null
           invoice_id?: string
           order_item_id?: string
           quantity_allocated?: number
