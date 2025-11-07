@@ -157,6 +157,20 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
           sum + (item.shipped_quantity || 0), 0
         );
         invoiceType = (totalShipped + totalPreviouslyShipped >= totalOrdered) ? 'final' : 'partial';
+
+        // Deduct any deposit invoices from the shipment total
+        const depositInvoices = existingInvoices.filter(inv => inv.invoice_type === 'deposit');
+        const totalDepositPaid = depositInvoices.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
+        
+        // Calculate the deposit portion that applies to this shipment
+        const orderSubtotal = order.order_items.reduce((sum: number, item: any) => 
+          sum + (item.quantity * item.unit_price), 0
+        );
+        const depositPercentageOfOrder = orderSubtotal > 0 ? totalDepositPaid / orderSubtotal : 0;
+        const depositToDeduct = subtotal * depositPercentageOfOrder;
+        
+        // Subtract proportional deposit from this shipment
+        subtotal = Math.max(0, subtotal - depositToDeduct);
       }
 
       const tax = 0; // Tax removed - included in unit price
@@ -189,12 +203,11 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
 
       // Only allocate inventory for shipment invoices, not deposit invoices
       if (invoiceMode === 'shipment') {
-        // Create inventory allocations and update order items
+        // Update order items shipped quantities
         for (const item of itemsToShip) {
           const quantityToShip = shipmentQuantities[item.id];
           if (quantityToShip === 0) continue;
 
-          // Update order_items shipped_quantity
           await supabase
             .from('order_items')
             .update({
@@ -202,14 +215,15 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
             })
             .eq('id', item.id);
 
-          // Allocate from inventory (FIFO)
-          let remainingToAllocate = quantityToShip;
+          // Try to allocate from inventory if available (FIFO), but don't require it
           const inventoryLocations = availableInventory[item.sku] || [];
+          let remainingToAllocate = quantityToShip;
           
           for (const inv of inventoryLocations) {
             if (remainingToAllocate === 0) break;
             
             const allocateQty = Math.min(remainingToAllocate, inv.available);
+            if (allocateQty <= 0) continue;
             
             // Create allocation record
             await supabase
@@ -233,14 +247,8 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
 
             remainingToAllocate -= allocateQty;
           }
-
-          if (remainingToAllocate > 0) {
-            toast({
-              title: "Warning",
-              description: `Insufficient inventory for ${item.name}. Allocated ${quantityToShip - remainingToAllocate} of ${quantityToShip}`,
-              variant: "destructive"
-            });
-          }
+          
+          // Note: We allow creating invoices even without inventory (direct ship)
         }
       }
 
@@ -362,14 +370,27 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                   return toShip > 0 && availInv < toShip;
                 }) || [];
 
+                // Calculate deposit deduction
+                const depositInvoices = existingInvoices.filter(inv => inv.invoice_type === 'deposit');
+                const totalDepositPaid = depositInvoices.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
+
                 return (
                   <>
+                    {totalDepositPaid > 0 && (
+                      <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertDescription className="ml-2">
+                          <strong>Deposit Credit Applied:</strong> ${totalDepositPaid.toFixed(2)} will be deducted proportionally from this shipment.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
                     {inventoryIssues.length > 0 && (
-                      <Alert variant="destructive">
+                      <Alert>
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription className="ml-2">
-                          <strong>Insufficient Inventory:</strong> {inventoryIssues.length} item(s) don't have enough inventory. 
-                          The system will allocate what's available.
+                          <strong>Low/No Inventory:</strong> {inventoryIssues.length} item(s) don't have inventory. 
+                          Invoice will be created for direct ship (inventory allocation skipped).
                         </AlertDescription>
                       </Alert>
                     )}
@@ -427,7 +448,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                       <TableHead className="text-right">Shipped</TableHead>
                       <TableHead className="text-right">Remaining</TableHead>
                       <TableHead className="text-right">Ship Now</TableHead>
-                      <TableHead className="text-right">Available Inv</TableHead>
+                      <TableHead className="text-right">Inv Available</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
