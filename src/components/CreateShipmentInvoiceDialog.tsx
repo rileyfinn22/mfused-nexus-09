@@ -77,15 +77,10 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
 
   const handleQuantityChange = (itemId: string, value: string) => {
     const numValue = parseInt(value) || 0;
-    const item = order.order_items.find((i: any) => i.id === itemId);
-    if (!item) return;
-    
-    // Allow shipping up to the total ordered quantity (for direct ship scenarios)
-    const maxQuantity = item.quantity;
     
     setShipmentQuantities(prev => ({
       ...prev,
-      [itemId]: Math.min(Math.max(0, numValue), maxQuantity)
+      [itemId]: Math.max(0, numValue)
     }));
   };
 
@@ -461,7 +456,6 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                       <TableHead>SKU</TableHead>
                       <TableHead className="text-right">Ordered</TableHead>
                       <TableHead className="text-right">Shipped</TableHead>
-                      <TableHead className="text-right">Remaining</TableHead>
                       <TableHead className="text-right">Ship Now</TableHead>
                       <TableHead className="text-right">Inv Available</TableHead>
                     </TableRow>
@@ -478,12 +472,10 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                           <TableCell className="font-mono text-sm">{item.sku}</TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">{shipped}</TableCell>
-                          <TableCell className="text-right font-medium">{remaining}</TableCell>
                           <TableCell className="text-right">
                             <Input
                               type="number"
                               min="0"
-                              max={item.quantity}
                               value={shipmentQuantities[item.id] ?? remaining}
                               onChange={(e) => handleQuantityChange(item.id, e.target.value)}
                               className="w-20 text-right"
