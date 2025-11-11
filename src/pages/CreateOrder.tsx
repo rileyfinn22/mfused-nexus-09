@@ -931,11 +931,10 @@ const CreateOrder = () => {
                   onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
                   required
                   className="h-9"
-                  disabled={true}
-                  placeholder="Customer name from company"
+                  placeholder="Contact or ship-to name"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Customer name is set from {isVibeAdmin ? 'selected' : 'your'} company
+                  Defaults to company name, edit for ship-to contact
                 </p>
               </div>
               <div className="space-y-1">

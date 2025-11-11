@@ -91,12 +91,13 @@ serve(async (req) => {
 
     console.log('Syncing invoice:', invoiceId, 'with billing percentage:', billingPercentage);
 
-    // Get invoice with items and allocations
+    // Get invoice with items, allocations, and company info
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .select(`
         *,
-        orders(*, order_items(*))
+        orders(*, order_items(*)),
+        companies:company_id(name)
       `)
       .eq('id', invoiceId)
       .single();
@@ -173,11 +174,12 @@ serve(async (req) => {
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
 
-    // Find or create customer in QuickBooks
-    const customerName = invoice.orders?.customer_name || 'Unknown Customer';
+    // Find or create customer in QuickBooks using company name (not order customer_name)
+    const customerName = (invoice.companies as any)?.name || 'Unknown Customer';
     const customerEmail = invoice.orders?.customer_email || '';
     
-    console.log('Looking for customer:', customerName, 'Email:', customerEmail);
+    console.log('Looking for customer (company):', customerName, 'Email:', customerEmail);
+    console.log('Order customer_name (ship-to):', invoice.orders?.customer_name);
     
     let customerId;
     
