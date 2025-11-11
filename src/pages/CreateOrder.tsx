@@ -113,12 +113,60 @@ const CreateOrder = () => {
     fetchProducts();
     if (isVibeAdmin) {
       fetchCompanies();
+    } else {
+      loadUserCompanyInfo();
     }
     fetchSavedAddresses();
     if (orderId) {
       loadExistingOrder(orderId);
     }
   }, [orderId, isVibeAdmin]);
+
+  const loadUserCompanyInfo = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: userRole } = await supabase
+      .from('user_roles')
+      .select('company_id, companies(name)')
+      .eq('user_id', user.id)
+      .single();
+
+    if (userRole?.company_id && userRole.companies) {
+      const companyName = (userRole.companies as any).name;
+      setFormData(prev => ({
+        ...prev,
+        customerName: companyName,
+      }));
+      
+      // Load company addresses
+      const { data } = await supabase
+        .from('customer_addresses')
+        .select('*')
+        .eq('company_id', userRole.company_id)
+        .order('is_default', { ascending: false });
+      
+      if (data) {
+        const defaultShipping = data.find(a => a.address_type === 'shipping' && a.is_default) || 
+                                data.find(a => a.address_type === 'shipping');
+        
+        if (defaultShipping) {
+          setFormData(prev => ({
+            ...prev,
+            customerName: companyName,
+            customerEmail: defaultShipping.customer_email || "",
+            customerPhone: defaultShipping.customer_phone || "",
+            shippingName: defaultShipping.name,
+            shippingStreet: defaultShipping.street,
+            shippingCity: defaultShipping.city,
+            shippingState: defaultShipping.state,
+            shippingZip: defaultShipping.zip,
+          }));
+        }
+        setSavedAddresses(data);
+      }
+    }
+  };
 
   useEffect(() => {
     if (selectedCompanyId) {
@@ -883,14 +931,12 @@ const CreateOrder = () => {
                   onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
                   required
                   className="h-9"
-                  disabled={isVibeAdmin && !!selectedCompanyId}
-                  placeholder={isVibeAdmin ? "Select a company first" : "Enter customer name"}
+                  disabled={true}
+                  placeholder="Customer name from company"
                 />
-                {isVibeAdmin && selectedCompanyId && (
-                  <p className="text-xs text-muted-foreground">
-                    Customer name is set from selected company
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  Customer name is set from {isVibeAdmin ? 'selected' : 'your'} company
+                </p>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="customerEmail" className="text-xs">Email</Label>
