@@ -273,10 +273,11 @@ serve(async (req) => {
             }
           }
           
-          // If still not found, try broad name search
+          // If still not found, try fuzzy LIKE search
           if (!customerId) {
-            const broadSearch = await fetch(
-              `${qbApiUrl}/query?query=SELECT * FROM Customer STARTPOSITION 1 MAXRESULTS 1000&minorversion=65`,
+            console.log('Trying fuzzy LIKE search...');
+            const likeSearch = await fetch(
+              `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName LIKE '%${customerName.replace(/'/g, "\\'")}%' MAXRESULTS 10&minorversion=65`,
               {
                 headers: {
                   'Authorization': `Bearer ${accessToken}`,
@@ -284,17 +285,70 @@ serve(async (req) => {
                 },
               }
             );
-            const broadData = await broadSearch.json();
-            const customers = broadData.QueryResponse?.Customer || [];
+            const likeData = await likeSearch.json();
+            const likeCustomers = likeData.QueryResponse?.Customer || [];
+            
+            console.log(`LIKE search found ${likeCustomers.length} customers`);
+            if (likeCustomers.length > 0) {
+              likeCustomers.forEach((c: any) => console.log('  - ', c.DisplayName));
+            }
+            
+            // Find exact match (case-insensitive)
+            const exactMatch = likeCustomers.find(
+              (c: any) => c.DisplayName?.toLowerCase().trim() === customerName.toLowerCase().trim()
+            );
+            
+            if (exactMatch) {
+              customerId = exactMatch.Id;
+              console.log('Found exact match in LIKE results:', customerId, exactMatch.DisplayName);
+            } else if (likeCustomers.length === 1) {
+              // If only one result, use it
+              customerId = likeCustomers[0].Id;
+              console.log('Using single LIKE result:', customerId, likeCustomers[0].DisplayName);
+            }
+          }
+          
+          // If still not found, try paginated broad search
+          if (!customerId) {
+            console.log('Trying paginated broad search...');
+            let allCustomers: any[] = [];
+            let startPosition = 1;
+            const maxResults = 1000;
+            let hasMore = true;
+            
+            // Fetch customers in batches (max 3 batches = 3000 customers)
+            while (hasMore && allCustomers.length < 3000) {
+              const broadSearch = await fetch(
+                `${qbApiUrl}/query?query=SELECT * FROM Customer STARTPOSITION ${startPosition} MAXRESULTS ${maxResults}&minorversion=65`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json',
+                  },
+                }
+              );
+              const broadData = await broadSearch.json();
+              const customers = broadData.QueryResponse?.Customer || [];
+              
+              if (customers.length === 0) {
+                hasMore = false;
+              } else {
+                allCustomers = allCustomers.concat(customers);
+                startPosition += maxResults;
+                hasMore = customers.length === maxResults;
+              }
+            }
+            
+            console.log(`Broad search found ${allCustomers.length} total customers`);
             
             // Case-insensitive name match
-            const match = customers.find(
+            const match = allCustomers.find(
               (c: any) => c.DisplayName?.toLowerCase().trim() === customerName.toLowerCase().trim()
             );
             
             if (match) {
               customerId = match.Id;
-              console.log('Found customer in broad search:', customerId);
+              console.log('Found customer in broad search:', customerId, match.DisplayName);
             }
           }
           
