@@ -124,6 +124,24 @@ const Invoices = () => {
     return matchesSearch && matchesStatus && matchesCompany;
   });
 
+  // Group invoices by parent-child relationships
+  const groupedInvoices = filteredInvoices.reduce((acc, invoice) => {
+    if (!invoice.parent_invoice_id) {
+      // This is a parent invoice or standalone invoice
+      acc.push({
+        parent: invoice,
+        children: filteredInvoices.filter(inv => inv.parent_invoice_id === invoice.id)
+      });
+    }
+    return acc;
+  }, [] as Array<{ parent: any; children: any[] }>);
+
+  // Flatten for display purposes (parent then children)
+  const displayInvoices = groupedInvoices.flatMap(group => [
+    { invoice: group.parent, isParent: group.children.length > 0, isChild: false },
+    ...group.children.map(child => ({ invoice: child, isParent: false, isChild: true }))
+  ]);
+
   const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + Number(invoice.total), 0);
   const paidAmount = filteredInvoices.filter(inv => inv.status === 'paid').reduce((sum, invoice) => sum + Number(invoice.total), 0);
   const openAmount = filteredInvoices.filter(inv => inv.status === 'open').reduce((sum, invoice) => sum + Number(invoice.total), 0);
@@ -276,18 +294,26 @@ const Invoices = () => {
               No invoices found matching your criteria.
             </div>
           ) : (
-            filteredInvoices.map((invoice) => {
+            displayInvoices.map(({ invoice, isParent, isChild }) => {
               const StatusIcon = getStatusIcon(invoice.status);
               const daysUntilDue = invoice.due_date ? getDaysUntilDue(invoice.due_date) : null;
               
               return (
                 <div 
                   key={invoice.id} 
-                  className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
+                  className={`grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors ${
+                    isChild ? 'bg-muted/30 border-l-4 border-l-blue-500/50' : ''
+                  } ${isParent ? 'border-b-2 border-b-blue-500/20' : ''}`}
                 >
                   <div className="col-span-2">
                     <div className="flex items-center gap-2">
-                      <div className="font-medium font-mono text-sm">{invoice.invoice_number}</div>
+                      {isChild && (
+                        <div className="flex items-center text-muted-foreground mr-1">
+                          <div className="w-4 h-px bg-border mr-1"></div>
+                          <Package className="h-3 w-3" />
+                        </div>
+                      )}
+                      <div className={`font-medium font-mono text-sm ${isChild ? 'ml-2' : ''}`}>{invoice.invoice_number}</div>
                       {invoice.quickbooks_payment_link && (
                         <Badge 
                           variant="outline" 
