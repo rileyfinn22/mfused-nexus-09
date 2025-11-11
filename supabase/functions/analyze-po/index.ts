@@ -201,7 +201,15 @@ Return ONLY valid JSON:
     }
 
     const aiData = await aiResponse.json();
-    const extractedData = JSON.parse(aiData.choices[0].message.content);
+    
+    // Strip markdown code blocks if present
+    let content = aiData.choices[0].message.content;
+    console.log('Raw AI response:', content.substring(0, 200));
+    
+    // Remove markdown code blocks (```json ... ``` or ``` ... ```)
+    content = content.replace(/^```(?:json)?\s*\n/m, '').replace(/\n```\s*$/m, '');
+    
+    const extractedData = JSON.parse(content);
     console.log('Extracted data:', JSON.stringify(extractedData, null, 2));
     
     // Log first few items with prices
