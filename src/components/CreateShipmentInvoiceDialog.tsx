@@ -153,11 +153,15 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         
         // Calculate how much has already been billed (including deposits and previous shipments)
         const totalAlreadyBilled = existingInvoices.reduce((sum, inv) => {
-          if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
+          // Check for deposit by billed_percentage, not just invoice_type
+          if (inv.billed_percentage && inv.billed_percentage < 100) {
             // For deposits, calculate the actual amount
-            return sum + (parseFloat(inv.total || 0) * (parseFloat(inv.billed_percentage) / 100));
+            const depositAmt = parseFloat(inv.total || 0) * (parseFloat(inv.billed_percentage) / 100);
+            console.log(`Found deposit invoice ${inv.invoice_number}: ${inv.billed_percentage}% of ${inv.total} = ${depositAmt}`);
+            return sum + depositAmt;
           }
           // For shipment invoices, use the full total
+          console.log(`Found shipment invoice ${inv.invoice_number}: ${inv.total}`);
           return sum + parseFloat(inv.total || 0);
         }, 0);
         
