@@ -629,19 +629,25 @@ serve(async (req) => {
 
     const qbInvoiceId = qbData.Invoice.Id;
     const qbDocNumber = qbData.Invoice.DocNumber;
-    const qbRealmId = qbSettings.realm_id; // Extract realm ID for payment link construction
+    const qbRealmId = qbSettings.realm_id;
     
-    // Log full invoice response to see all available fields
+    console.log('QuickBooks Invoice ID:', qbInvoiceId);
+    console.log('QuickBooks Realm ID:', qbRealmId);
     console.log('Full QuickBooks Invoice Response:', JSON.stringify(qbData.Invoice, null, 2));
     
-    // QuickBooks provides payment links through the Invoice Link API
-    // First try to get from the invoice response
+    // QuickBooks customer-facing payment link
+    // The correct format for QuickBooks Online invoice links
     let qbPaymentLink = null;
     
     try {
-      console.log('Attempting to get shareable invoice link from QuickBooks...');
+      console.log('Constructing QuickBooks payment link...');
       
-      // Query the invoice to get delivery info and links
+      // QuickBooks Online uses this format for customer invoice viewing/payment
+      // Format: https://app.qbo.intuit.com/invoice?txnId={invoiceId}
+      qbPaymentLink = `https://app.qbo.intuit.com/invoice?txnId=${qbInvoiceId}`;
+      console.log('Constructed payment link:', qbPaymentLink);
+      
+      // Verify the invoice exists and is accessible by querying it
       const invoiceQueryResponse = await fetch(
         `${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`,
         {
@@ -655,33 +661,19 @@ serve(async (req) => {
       
       if (invoiceQueryResponse.ok) {
         const invoiceQueryData = await invoiceQueryResponse.json();
-        console.log('Invoice query response:', JSON.stringify(invoiceQueryData.Invoice, null, 2));
+        console.log('Invoice verified in QuickBooks');
+        console.log('AllowOnlinePayment:', invoiceQueryData.Invoice?.AllowOnlinePayment);
+        console.log('AllowOnlineCreditCardPayment:', invoiceQueryData.Invoice?.AllowOnlineCreditCardPayment);
         
-        // Try multiple possible locations for the payment link
-        qbPaymentLink = invoiceQueryData.Invoice?.InvoiceLink || null;
-        
-        // If no direct link, construct it from realm and invoice ID
-        // QuickBooks Commerce Network link format
-        if (!qbPaymentLink && qbRealmId) {
-          // The shareable link format for QuickBooks Online invoices
-          // This is the customer-facing payment portal URL
-          qbPaymentLink = `https://c${qbRealmId}.qbo.intuit.com/portal/app/CommerceNetwork/view/scs-${qbInvoiceId}`;
-          console.log('Constructed payment link:', qbPaymentLink);
-        }
-        
-        // Alternative: Check DeliveryInfo for email status link
-        if (!qbPaymentLink && invoiceQueryData.Invoice?.DeliveryInfo?.DeliveryType === 'Email') {
-          console.log('Invoice configured for email delivery, link will be in email');
-          // The link is sent via email, we can provide the QB portal URL
-          qbPaymentLink = `https://c${qbRealmId}.qbo.intuit.com/portal/home`;
+        // Check if QuickBooks provides its own link (rare but possible)
+        if (invoiceQueryData.Invoice?.InvoiceLink) {
+          qbPaymentLink = invoiceQueryData.Invoice.InvoiceLink;
+          console.log('Using QuickBooks provided link:', qbPaymentLink);
         }
       }
     } catch (linkError) {
-      console.error('Error getting invoice link:', linkError);
-      // Fallback: construct basic portal link
-      if (qbRealmId) {
-        qbPaymentLink = `https://c${qbRealmId}.qbo.intuit.com/portal/app/CommerceNetwork/view/scs-${qbInvoiceId}`;
-      }
+      console.error('Error constructing invoice link:', linkError);
+      // Keep the constructed link even if verification fails
     }
     
     console.log('QuickBooks invoice ID:', qbInvoiceId);
