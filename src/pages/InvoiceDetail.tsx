@@ -888,8 +888,28 @@ const InvoiceDetail = () => {
                     const allInvoicesForOrder = [...relatedInvoices, invoice];
                     const orderTotal = Number(order?.total || 0);
                     
-                    // Simply sum all invoice totals
-                    const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
+                    // Debug logging
+                    console.log('Order total:', orderTotal);
+                    console.log('All invoices:', allInvoicesForOrder.map(inv => ({
+                      number: inv.invoice_number,
+                      type: inv.invoice_type,
+                      total: inv.total,
+                      billed_percentage: inv.billed_percentage
+                    })));
+                    
+                    // For deposit invoices, only count the percentage that was actually billed
+                    // For other invoices, count the full amount
+                    const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
+                      if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
+                        const depositAmount = Number(inv.total || 0) * (Number(inv.billed_percentage) / 100);
+                        console.log(`Deposit invoice ${inv.invoice_number}: ${inv.billed_percentage}% of ${inv.total} = ${depositAmount}`);
+                        return sum + depositAmount;
+                      }
+                      console.log(`Invoice ${inv.invoice_number}: ${inv.total}`);
+                      return sum + Number(inv.total || 0);
+                    }, 0);
+                    
+                    console.log('Total billed amount:', totalBilledAmount);
                     
                     const actualPercentage = orderTotal > 0 ? (totalBilledAmount / orderTotal) * 100 : 0;
                     
@@ -905,10 +925,15 @@ const InvoiceDetail = () => {
                     const allInvoicesForOrder = [...relatedInvoices, invoice];
                     const orderTotal = Number(order?.total || 0);
                     
-                    const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
-                    const actualPercentage = orderTotal > 0 ? (totalBilledAmount / orderTotal) * 100 : 0;
+                    const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
+                      if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
+                        return sum + (Number(inv.total || 0) * (Number(inv.billed_percentage) / 100));
+                      }
+                      return sum + Number(inv.total || 0);
+                    }, 0);
                     
-                    return Math.min(100, actualPercentage); // Cap at 100% for display
+                    const actualPercentage = orderTotal > 0 ? (totalBilledAmount / orderTotal) * 100 : 0;
+                    return Math.min(100, actualPercentage);
                   })()} 
                   className="h-3" 
                 />
