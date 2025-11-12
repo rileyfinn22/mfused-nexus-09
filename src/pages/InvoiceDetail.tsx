@@ -41,6 +41,7 @@ const InvoiceDetail = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
+  const [refreshingLink, setRefreshingLink] = useState(false);
   const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
 
   useEffect(() => {
@@ -436,6 +437,48 @@ const InvoiceDetail = () => {
     }
   };
 
+  const handleRefreshPaymentLink = async () => {
+    if (!invoice?.quickbooks_id) return;
+    
+    setRefreshingLink(true);
+    try {
+      const isConnected = await checkConnection();
+      if (!isConnected) {
+        toast({
+          title: "Not Connected",
+          description: "QuickBooks is not connected",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Re-sync to get updated payment link
+      const { error } = await supabase.functions.invoke('quickbooks-sync-invoice', {
+        body: { 
+          invoiceId,
+          billingPercentage: invoice.billed_percentage || 100
+        }
+      });
+
+      if (error) throw error;
+      
+      toast({
+        title: "Link Updated",
+        description: "Payment link has been refreshed"
+      });
+      
+      setTimeout(() => fetchInvoiceDetails(), 1000);
+    } catch (error: any) {
+      toast({
+        title: "Refresh Failed",
+        description: error.message || "Failed to refresh payment link",
+        variant: "destructive"
+      });
+    } finally {
+      setRefreshingLink(false);
+    }
+  };
+
   // Calculate totals based on items actually on THIS invoice (from allocations)
   const displayItems = editedItems;
   const displaySubtotal = displayItems.reduce((sum: number, item: any) => 
@@ -777,10 +820,29 @@ const InvoiceDetail = () => {
                       </div>
                     </>
                   ) : invoice.quickbooks_id ? (
-                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
                       <p className="text-sm text-muted-foreground">
-                        Invoice synced to QuickBooks. Payment link can be accessed through the QuickBooks dashboard.
+                        Invoice synced to QuickBooks but payment link is not available yet.
                       </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefreshPaymentLink}
+                        disabled={refreshingLink}
+                        className="gap-2"
+                      >
+                        {refreshingLink ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Refreshing...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4" />
+                            Refresh Payment Link
+                          </>
+                        )}
+                      </Button>
                     </div>
                   ) : (
                     <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
