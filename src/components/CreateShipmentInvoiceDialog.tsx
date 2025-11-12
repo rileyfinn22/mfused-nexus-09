@@ -161,9 +161,12 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         console.log('Found deposit invoices:', depositInvoices);
         
         const totalDepositAmount = depositInvoices.reduce((sum, inv) => {
-          // For deposit invoices, use the actual amount paid (total)
-          const depositAmt = parseFloat(inv.total || 0);
-          console.log(`Deposit invoice ${inv.invoice_number}: $${depositAmt}`);
+          // For deposit invoices with billed_percentage, calculate actual deposit amount
+          let depositAmt = parseFloat(inv.total || 0);
+          if (inv.billed_percentage) {
+            depositAmt = depositAmt * (parseFloat(inv.billed_percentage) / 100);
+          }
+          console.log(`Deposit invoice ${inv.invoice_number}: ${inv.billed_percentage}% of ${inv.total} = $${depositAmt}`);
           return sum + depositAmt;
         }, 0);
         
