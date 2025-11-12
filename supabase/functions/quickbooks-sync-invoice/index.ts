@@ -629,6 +629,7 @@ serve(async (req) => {
 
     const qbInvoiceId = qbData.Invoice.Id;
     const qbDocNumber = qbData.Invoice.DocNumber;
+    const qbRealmId = qbSettings.realm_id; // Extract realm ID for payment link construction
     
     // Log full invoice response to see all available fields
     console.log('Full QuickBooks Invoice Response:', JSON.stringify(qbData.Invoice, null, 2));
