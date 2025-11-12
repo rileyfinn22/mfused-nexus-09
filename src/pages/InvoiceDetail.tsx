@@ -903,10 +903,11 @@ const InvoiceDetail = () => {
                       billed_percentage: inv.billed_percentage
                     })));
                     
-                    // For deposit invoices, only count the percentage that was actually billed
-                    // For other invoices, count the full amount
+                    // For deposit invoices (billed_percentage < 100), only count the percentage
+                    // For full shipment invoices, count the full amount
                     const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
-                      if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
+                      // Check if this is a deposit/partial payment (billed_percentage exists and < 100)
+                      if (inv.billed_percentage && inv.billed_percentage < 100) {
                         const depositAmount = Number(inv.total || 0) * (Number(inv.billed_percentage) / 100);
                         console.log(`Deposit invoice ${inv.invoice_number}: ${inv.billed_percentage}% of ${inv.total} = ${depositAmount}`);
                         return sum + depositAmount;
@@ -932,7 +933,8 @@ const InvoiceDetail = () => {
                     const orderTotal = Number(order?.total || 0);
                     
                     const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
-                      if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
+                      // Check if this is a deposit/partial payment (billed_percentage < 100)
+                      if (inv.billed_percentage && inv.billed_percentage < 100) {
                         return sum + (Number(inv.total || 0) * (Number(inv.billed_percentage) / 100));
                       }
                       return sum + Number(inv.total || 0);
