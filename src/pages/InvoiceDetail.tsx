@@ -65,7 +65,7 @@ const InvoiceDetail = () => {
   const fetchInvoiceDetails = async () => {
     setLoading(true);
     
-    // Fetch invoice with order details
+    // Fetch invoice with order details and company info
     const { data: invoiceData, error: invoiceError } = await supabase
       .from('invoices')
       .select(`
@@ -74,7 +74,8 @@ const InvoiceDetail = () => {
           *,
           order_items(*, shipped_quantity, quantity),
           parent_order:parent_order_id(id, order_number, order_type)
-        )
+        ),
+        companies:company_id(name)
       `)
       .eq('id', invoiceId)
       .single();
@@ -588,7 +589,7 @@ const InvoiceDetail = () => {
                   Order: {order?.order_number || 'N/A'}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Customer: {order?.customer_name || 'N/A'}
+                  Customer: {(invoice?.companies as any)?.name || 'N/A'}
                 </p>
                 {order?.po_number && (
                   <p className="text-sm text-muted-foreground">
