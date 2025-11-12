@@ -548,6 +548,16 @@ const InvoiceDetail = () => {
                     <RefreshCw className={`h-4 w-4 mr-2 ${syncingToQB ? 'animate-spin' : ''}`} />
                     {invoice.quickbooks_sync_status === 'synced' ? 'Re-Bill in QuickBooks' : 'Bill in QuickBooks'}
                   </Button>
+                  {invoice.quickbooks_id && (
+                    <Button 
+                      variant="outline" 
+                      onClick={handleRefreshPaymentLink}
+                      disabled={refreshingLink}
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${refreshingLink ? 'animate-spin' : ''}`} />
+                      {refreshingLink ? 'Getting Link...' : 'Get Payment Link'}
+                    </Button>
+                  )}
                   <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete
