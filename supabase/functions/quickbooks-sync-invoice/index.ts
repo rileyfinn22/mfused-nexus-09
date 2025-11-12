@@ -633,89 +633,53 @@ serve(async (req) => {
     // Log full invoice response to see all available fields
     console.log('Full QuickBooks Invoice Response:', JSON.stringify(qbData.Invoice, null, 2));
     
-    // Try to get the shareable invoice link by calling the QB API
-    // The shareable link is only available after "sending" the invoice
-    let qbPaymentLink = qbData.Invoice?.InvoiceLink || null;
+    // QuickBooks provides payment links through the Invoice Link API
+    // First try to get from the invoice response
+    let qbPaymentLink = null;
     
-    // If no link from the invoice object, try to generate one via the send endpoint
-    if (!qbPaymentLink) {
-      try {
-        console.log('Attempting to get shareable invoice link from QuickBooks...');
+    try {
+      console.log('Attempting to get shareable invoice link from QuickBooks...');
+      
+      // Query the invoice to get delivery info and links
+      const invoiceQueryResponse = await fetch(
+        `${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+      
+      if (invoiceQueryResponse.ok) {
+        const invoiceQueryData = await invoiceQueryResponse.json();
+        console.log('Invoice query response:', JSON.stringify(invoiceQueryData.Invoice, null, 2));
         
-        // Query the invoice again to check for any additional fields
-        const invoiceQueryResponse = await fetch(
-          `${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json',
-            },
-          }
-        );
+        // Try multiple possible locations for the payment link
+        qbPaymentLink = invoiceQueryData.Invoice?.InvoiceLink || null;
         
-        if (invoiceQueryResponse.ok) {
-          const invoiceQueryData = await invoiceQueryResponse.json();
-          console.log('Invoice query response:', JSON.stringify(invoiceQueryData.Invoice, null, 2));
-          
-          // Check for invoice link in query response
-          qbPaymentLink = invoiceQueryData.Invoice?.InvoiceLink || 
-                         invoiceQueryData.Invoice?.DeliveryInfo?.DeliveryType ||
-                         null;
-          
-          // If still no link, check if we can get it from EmailStatus or BillEmail
-          if (!qbPaymentLink && invoiceQueryData.Invoice?.BillEmail) {
-            console.log('Invoice has email delivery configured');
-          }
+        // If no direct link, construct it from realm and invoice ID
+        // QuickBooks Commerce Network link format
+        if (!qbPaymentLink && qbRealmId) {
+          // The shareable link format for QuickBooks Online invoices
+          // This is the customer-facing payment portal URL
+          qbPaymentLink = `https://c${qbRealmId}.qbo.intuit.com/portal/app/CommerceNetwork/view/scs-${qbInvoiceId}`;
+          console.log('Constructed payment link:', qbPaymentLink);
         }
         
-        // If still no payment link, try to trigger link generation by "sending" the invoice
-        if (!qbPaymentLink) {
-          console.log('No payment link found, attempting to generate via send endpoint...');
-          
-          const sendResponse = await fetch(
-            `${qbApiUrl}/invoice/${qbInvoiceId}/send?sendTo=${encodeURIComponent(invoice.orders?.customer_email || 'noemail@example.com')}`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Accept': 'application/json',
-                'Content-Type': 'application/octet-stream',
-              },
-            }
-          );
-          
-          if (sendResponse.ok) {
-            console.log('Invoice send triggered successfully');
-            
-            // Wait a moment for QB to process
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // Query the invoice one more time to get the generated link
-            const finalQueryResponse = await fetch(
-              `${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`,
-              {
-                method: 'GET',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json',
-                },
-              }
-            );
-            
-            if (finalQueryResponse.ok) {
-              const finalInvoiceData = await finalQueryResponse.json();
-              console.log('Final invoice data after send:', JSON.stringify(finalInvoiceData.Invoice, null, 2));
-              qbPaymentLink = finalInvoiceData.Invoice?.InvoiceLink || null;
-              console.log('Payment link after send:', qbPaymentLink);
-            }
-          } else {
-            const sendError = await sendResponse.json();
-            console.error('Error sending invoice:', sendError);
-          }
+        // Alternative: Check DeliveryInfo for email status link
+        if (!qbPaymentLink && invoiceQueryData.Invoice?.DeliveryInfo?.DeliveryType === 'Email') {
+          console.log('Invoice configured for email delivery, link will be in email');
+          // The link is sent via email, we can provide the QB portal URL
+          qbPaymentLink = `https://c${qbRealmId}.qbo.intuit.com/portal/home`;
         }
-      } catch (linkError) {
-        console.error('Error getting invoice link:', linkError);
+      }
+    } catch (linkError) {
+      console.error('Error getting invoice link:', linkError);
+      // Fallback: construct basic portal link
+      if (qbRealmId) {
+        qbPaymentLink = `https://c${qbRealmId}.qbo.intuit.com/portal/app/CommerceNetwork/view/scs-${qbInvoiceId}`;
       }
     }
     
