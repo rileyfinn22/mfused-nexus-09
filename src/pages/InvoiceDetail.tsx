@@ -886,16 +886,42 @@ const InvoiceDetail = () => {
                   <span className="text-sm font-medium">Total Billed Progress</span>
                   {(() => {
                     const allInvoicesForOrder = [...relatedInvoices, invoice];
-                    const totalBilled = allInvoicesForOrder.reduce((sum, i) => sum + (i.billed_percentage || 0), 0);
+                    const orderTotal = Number(order?.total || 0);
+                    
+                    // Calculate actual billed percentage based on dollar amounts, not the billed_percentage field
+                    const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
+                      // For deposit invoices, use the actual billed amount (total * billed_percentage)
+                      if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
+                        return sum + (Number(inv.total) * (inv.billed_percentage / 100));
+                      }
+                      // For shipment invoices, use the full invoice amount
+                      return sum + Number(inv.total);
+                    }, 0);
+                    
+                    const actualPercentage = orderTotal > 0 ? (totalBilledAmount / orderTotal) * 100 : 0;
+                    
                     return (
-                      <span className="text-sm font-semibold">{totalBilled.toFixed(1)}% of order complete</span>
+                      <span className="text-sm font-semibold">{actualPercentage.toFixed(1)}% of order complete</span>
                     );
                   })()}
                 </div>
                 <Progress 
                   value={(() => {
                     const allInvoicesForOrder = [...relatedInvoices, invoice];
-                    return allInvoicesForOrder.reduce((sum, i) => sum + (i.billed_percentage || 0), 0);
+                    const orderTotal = Number(order?.total || 0);
+                    
+                    // Calculate actual billed percentage based on dollar amounts
+                    const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
+                      // For deposit invoices, use the actual billed amount (total * billed_percentage)
+                      if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
+                        return sum + (Number(inv.total) * (inv.billed_percentage / 100));
+                      }
+                      // For shipment invoices, use the full invoice amount
+                      return sum + Number(inv.total);
+                    }, 0);
+                    
+                    const actualPercentage = orderTotal > 0 ? (totalBilledAmount / orderTotal) * 100 : 0;
+                    return Math.min(100, actualPercentage); // Cap at 100%
                   })()} 
                   className="h-3" 
                 />
