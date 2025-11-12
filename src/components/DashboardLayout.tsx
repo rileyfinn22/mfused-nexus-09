@@ -97,7 +97,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const checkAuth = async () => {
     try {
       console.log('Checking auth...');
-      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth check timeout')), 5000)
+      );
+      
+      const authPromise = supabase.auth.getUser();
+      const { data: { user } } = await Promise.race([authPromise, timeoutPromise]) as any;
       
       console.log('User:', user);
       
@@ -111,7 +118,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       await fetchCompanyName(user.id);
     } catch (error) {
       console.error('Auth check error:', error);
-      navigate('/login');
+      // Don't redirect on timeout, just stop loading
+      if (error instanceof Error && error.message === 'Auth check timeout') {
+        console.error('Auth check timed out - showing default state');
+      } else {
+        navigate('/login');
+      }
     } finally {
       console.log('Setting loading to false');
       setLoading(false);
