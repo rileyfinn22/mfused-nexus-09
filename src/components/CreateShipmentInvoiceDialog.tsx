@@ -137,10 +137,44 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         // Shipment invoice - based on quantities
         itemsToShip = order.order_items.filter((item: any) => shipmentQuantities[item.id] > 0);
         
+        // Calculate shipment value
         itemsToShip.forEach((item: any) => {
           const quantity = shipmentQuantities[item.id];
           subtotal += quantity * item.unit_price;
         });
+
+        // Calculate the ORIGINAL order total value
+        const orderSubtotal = order.order_items.reduce((sum: number, item: any) => 
+          sum + (item.quantity * item.unit_price), 0
+        );
+        
+        // Calculate how much has already been billed (including deposits)
+        const totalAlreadyBilled = existingInvoices.reduce((sum, inv) => {
+          if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
+            // For deposits, calculate the actual amount
+            return sum + (parseFloat(inv.total || 0) * (parseFloat(inv.billed_percentage) / 100));
+          }
+          // For shipment invoices, use the full total
+          return sum + parseFloat(inv.total || 0);
+        }, 0);
+        
+        console.log('Order original value:', orderSubtotal);
+        console.log('Total already billed:', totalAlreadyBilled);
+        console.log('Shipment value before cap:', subtotal);
+        
+        // Calculate remaining billable amount (can't exceed original order value)
+        const remainingBillable = Math.max(0, orderSubtotal - totalAlreadyBilled);
+        
+        // Cap the shipment invoice at the remaining billable amount
+        if (remainingBillable === 0) {
+          console.log('100% already billed - creating $0 shipment invoice');
+          subtotal = 0;
+        } else if (subtotal > remainingBillable) {
+          console.log(`Capping shipment at remaining billable: ${remainingBillable}`);
+          subtotal = remainingBillable;
+        }
+        
+        console.log('Final shipment subtotal:', subtotal);
 
         // Calculate percentage for shipment
         const totalShipped = itemsToShip.reduce((sum: number, item: any) => 
@@ -155,37 +189,6 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
           sum + (item.shipped_quantity || 0), 0
         );
         invoiceType = (totalShipped + totalPreviouslyShipped >= totalOrdered) ? 'final' : 'partial';
-
-        // Deduct any deposit invoices from the shipment total
-        const depositInvoices = existingInvoices.filter(inv => inv.invoice_type === 'deposit');
-        console.log('Found deposit invoices:', depositInvoices);
-        
-        const totalDepositAmount = depositInvoices.reduce((sum, inv) => {
-          // For deposit invoices with billed_percentage, calculate actual deposit amount
-          let depositAmt = parseFloat(inv.total || 0);
-          if (inv.billed_percentage) {
-            depositAmt = depositAmt * (parseFloat(inv.billed_percentage) / 100);
-          }
-          console.log(`Deposit invoice ${inv.invoice_number}: ${inv.billed_percentage}% of ${inv.total} = $${depositAmt}`);
-          return sum + depositAmt;
-        }, 0);
-        
-        console.log('Total deposit amount to deduct:', totalDepositAmount);
-        console.log('Shipment subtotal before deduction:', subtotal);
-        
-        // Calculate what percentage of the order this shipment represents
-        const orderSubtotal = order.order_items.reduce((sum: number, item: any) => 
-          sum + (item.quantity * item.unit_price), 0
-        );
-        const shipmentPercentOfOrder = orderSubtotal > 0 ? subtotal / orderSubtotal : 0;
-        
-        // Deduct the proportional amount of deposits that applies to this shipment
-        const depositToDeduct = totalDepositAmount * shipmentPercentOfOrder;
-        console.log(`Shipment is ${(shipmentPercentOfOrder * 100).toFixed(1)}% of order, deducting ${depositToDeduct} from deposits`);
-        
-        // Subtract proportional deposit from this shipment
-        subtotal = Math.max(0, subtotal - depositToDeduct);
-        console.log('Shipment subtotal after deposit deduction:', subtotal);
       }
 
       const tax = 0; // Tax removed - included in unit price
@@ -401,17 +404,45 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                   return toShip > 0 && availInv < toShip;
                 }) || [];
 
-                // Calculate deposit deduction
-                const depositInvoices = existingInvoices.filter(inv => inv.invoice_type === 'deposit');
-                const totalDepositPaid = depositInvoices.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
+                // Calculate how much has been billed vs order value
+                const orderSubtotal = order.order_items?.reduce((sum: number, item: any) => 
+                  sum + (item.quantity * item.unit_price), 0) || 0;
+                
+                const totalAlreadyBilled = existingInvoices.reduce((sum, inv) => {
+                  if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
+                    return sum + (parseFloat(inv.total || 0) * (parseFloat(inv.billed_percentage) / 100));
+                  }
+                  return sum + parseFloat(inv.total || 0);
+                }, 0);
+
+                const remainingBillable = Math.max(0, orderSubtotal - totalAlreadyBilled);
+                const billedPercentage = orderSubtotal > 0 ? (totalAlreadyBilled / orderSubtotal) * 100 : 0;
+
+                // Calculate this shipment value
+                const shipmentValue = order.order_items?.reduce((sum: number, item: any) => {
+                  const qty = shipmentQuantities[item.id] || 0;
+                  return sum + (qty * item.unit_price);
+                }, 0) || 0;
 
                 return (
                   <>
-                    {totalDepositPaid > 0 && (
+                    {billedPercentage >= 100 && (
+                      <Alert>
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription className="ml-2">
+                          <strong>Order 100% Billed:</strong> ${totalAlreadyBilled.toFixed(2)} of ${orderSubtotal.toFixed(2)} already billed. 
+                          This shipment will be created with $0.00 invoice amount (shipping overs).
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {billedPercentage < 100 && remainingBillable < shipmentValue && (
                       <Alert>
                         <Info className="h-4 w-4" />
                         <AlertDescription className="ml-2">
-                          <strong>Deposit Credit Applied:</strong> ${totalDepositPaid.toFixed(2)} will be deducted proportionally from this shipment.
+                          <strong>Billing Cap:</strong> Only ${remainingBillable.toFixed(2)} remaining to bill 
+                          (${totalAlreadyBilled.toFixed(2)} / ${orderSubtotal.toFixed(2)} already billed). 
+                          Invoice will be capped at this amount.
                         </AlertDescription>
                       </Alert>
                     )}
