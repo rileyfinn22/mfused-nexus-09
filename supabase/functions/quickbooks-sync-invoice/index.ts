@@ -92,18 +92,34 @@ serve(async (req) => {
     console.log('Syncing invoice:', invoiceId, 'with billing percentage:', billingPercentage);
 
     // Get invoice with items, allocations, and company info
+    // Get invoice with items and company info
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .select(`
         *,
         orders(*, order_items(*)),
-        companies:company_id(name, email)
+        companies:company_id(name, id)
       `)
       .eq('id', invoiceId)
       .single();
 
     if (invoiceError || !invoice) {
       throw new Error('Invoice not found');
+    }
+
+    // Get the company's primary user email from user_roles
+    const { data: companyUser } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('company_id', invoice.company_id)
+      .eq('role', 'company')
+      .limit(1)
+      .single();
+    
+    let companyEmail = '';
+    if (companyUser) {
+      const { data: userData } = await supabase.auth.admin.getUserById(companyUser.user_id);
+      companyEmail = userData?.user?.email || '';
     }
 
     // Get inventory allocations for this invoice to determine actual shipped quantities
@@ -176,7 +192,7 @@ serve(async (req) => {
 
     // Find or create customer in QuickBooks using company name and email
     const customerName = (invoice.companies as any)?.name || 'Unknown Customer';
-    const customerEmail = (invoice.companies as any)?.email || '';
+    const customerEmail = companyEmail || '';
     
     console.log('Looking for customer (company):', customerName, 'Email:', customerEmail);
     console.log('Order customer_name (ship-to):', invoice.orders?.customer_name);
