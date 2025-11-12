@@ -471,6 +471,12 @@ const Invoices = () => {
                                   }
                                 }
 
+                                // Delete any payments associated with this invoice
+                                await supabase
+                                  .from('payments')
+                                  .delete()
+                                  .eq('invoice_id', invoice.id);
+
                                 // Delete invoice
                                 const { error } = await supabase
                                   .from('invoices')

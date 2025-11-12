@@ -241,6 +241,12 @@ const InvoiceDetail = () => {
         }
       }
 
+      // Delete any payments associated with this invoice
+      await supabase
+        .from('payments')
+        .delete()
+        .eq('invoice_id', invoiceId);
+
       // Delete from database
       const { error } = await supabase
         .from('invoices')
