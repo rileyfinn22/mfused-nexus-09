@@ -906,8 +906,8 @@ const InvoiceDetail = () => {
                     // For deposit invoices, only count the percentage that was billed
                     // For shipment invoices, count the full invoice total (already adjusted for deposits)
                     const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
-                      // Only apply percentage calculation for deposit invoices
-                      if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
+                      // Check for deposit by billed_percentage < 100, not invoice_type
+                      if (inv.billed_percentage && inv.billed_percentage < 100) {
                         const depositAmount = Number(inv.total || 0) * (Number(inv.billed_percentage) / 100);
                         console.log(`Deposit invoice ${inv.invoice_number}: ${inv.billed_percentage}% of ${inv.total} = ${depositAmount}`);
                         return sum + depositAmount;
@@ -934,8 +934,8 @@ const InvoiceDetail = () => {
                     const orderTotal = Number(order?.total || 0);
                     
                     const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
-                      // Only apply percentage for deposit invoices
-                      if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
+                      // Check for deposit by billed_percentage < 100
+                      if (inv.billed_percentage && inv.billed_percentage < 100) {
                         return sum + (Number(inv.total || 0) * (Number(inv.billed_percentage) / 100));
                       }
                       // For shipment invoices, use full total
@@ -1046,7 +1046,9 @@ const InvoiceDetail = () => {
               const rawShipmentValue = displaySubtotal;
               
               // Find deposit invoices to calculate credit applied
-              const depositInvoices = relatedInvoices.filter(inv => inv.invoice_type === 'deposit');
+              const depositInvoices = relatedInvoices.filter(inv => 
+                inv.billed_percentage && inv.billed_percentage < 100
+              );
               
               if (depositInvoices.length === 0) {
                 return null; // No breakdown needed if no deposit
