@@ -503,10 +503,25 @@ serve(async (req) => {
     console.log('Database total:', dbTotal);
     console.log('Difference:', Math.abs(calculatedTotal - dbTotal));
 
-    if (Math.abs(calculatedTotal - dbTotal) > 0.01) {
-      console.warn('WARNING: Calculated total does not match database total!');
-      console.warn(`Calculated: ${calculatedTotal}, Database: ${dbTotal}, Diff: ${calculatedTotal - dbTotal}`);
-      // Don't throw error, but log the discrepancy for investigation
+    // If calculated total exceeds database total, add deposit credit line
+    if (calculatedTotal > dbTotal + 0.01) {
+      const depositCreditAmount = -(calculatedTotal - dbTotal);
+      console.log(`Adding deposit credit line: $${Math.abs(depositCreditAmount).toFixed(2)}`);
+      
+      lineItems.push({
+        DetailType: 'SalesItemLineDetail',
+        Amount: depositCreditAmount,
+        Description: 'Less: Deposit Credit Applied',
+        SalesItemLineDetail: {
+          ItemRef: { value: '1' },
+        },
+      });
+      
+      // Adjust calculated subtotal
+      calculatedSubtotal += depositCreditAmount;
+    } else if (Math.abs(calculatedTotal - dbTotal) > 0.01) {
+      console.warn('WARNING: Database total exceeds calculated total!');
+      console.warn(`Calculated: ${calculatedTotal}, Database: ${dbTotal}, Diff: ${dbTotal - calculatedTotal}`);
     }
 
     // For partial billing, we'll show full invoice then subtract the unbilled portion
