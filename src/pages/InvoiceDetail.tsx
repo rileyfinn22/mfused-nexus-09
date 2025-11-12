@@ -903,16 +903,17 @@ const InvoiceDetail = () => {
                       billed_percentage: inv.billed_percentage
                     })));
                     
-                    // For deposit invoices (billed_percentage < 100), only count the percentage
-                    // For full shipment invoices, count the full amount
+                    // For deposit invoices, only count the percentage that was billed
+                    // For shipment invoices, count the full invoice total (already adjusted for deposits)
                     const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
-                      // Check if this is a deposit/partial payment (billed_percentage exists and < 100)
-                      if (inv.billed_percentage && inv.billed_percentage < 100) {
+                      // Only apply percentage calculation for deposit invoices
+                      if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
                         const depositAmount = Number(inv.total || 0) * (Number(inv.billed_percentage) / 100);
                         console.log(`Deposit invoice ${inv.invoice_number}: ${inv.billed_percentage}% of ${inv.total} = ${depositAmount}`);
                         return sum + depositAmount;
                       }
-                      console.log(`Invoice ${inv.invoice_number}: ${inv.total}`);
+                      // For shipment invoices, use full total (already deducted deposits)
+                      console.log(`Shipment invoice ${inv.invoice_number}: ${inv.total}`);
                       return sum + Number(inv.total || 0);
                     }, 0);
                     
@@ -933,10 +934,11 @@ const InvoiceDetail = () => {
                     const orderTotal = Number(order?.total || 0);
                     
                     const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
-                      // Check if this is a deposit/partial payment (billed_percentage < 100)
-                      if (inv.billed_percentage && inv.billed_percentage < 100) {
+                      // Only apply percentage for deposit invoices
+                      if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
                         return sum + (Number(inv.total || 0) * (Number(inv.billed_percentage) / 100));
                       }
+                      // For shipment invoices, use full total
                       return sum + Number(inv.total || 0);
                     }, 0);
                     
