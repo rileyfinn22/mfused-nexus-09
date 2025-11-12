@@ -525,7 +525,10 @@ const Orders = () => {
                         {orderTypeInfo.label}
                       </Badge>
                     </div>
-                    <div className="col-span-2 text-sm">{order.po_number || '-'}</div>
+                    {isVibeAdmin && (
+                      <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
+                    )}
+                    <div className={isVibeAdmin ? "col-span-1 text-sm" : "col-span-2 text-sm"}>{order.po_number || '-'}</div>
                     <div className="col-span-1">
                       <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                     </div>
