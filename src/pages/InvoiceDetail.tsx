@@ -738,7 +738,7 @@ const InvoiceDetail = () => {
                     </div>
                   </div>
                   
-                  {invoice.quickbooks_payment_link ? (
+                  {invoice.quickbooks_payment_link && invoice.quickbooks_payment_link.startsWith('http') ? (
                     <>
                       <p className="text-sm text-muted-foreground mb-4">
                         Share this secure payment link with your customer to accept online payments through QuickBooks
@@ -776,6 +776,12 @@ const InvoiceDetail = () => {
                         </Button>
                       </div>
                     </>
+                  ) : invoice.quickbooks_id ? (
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                      <p className="text-sm text-muted-foreground">
+                        Invoice synced to QuickBooks. Payment link can be accessed through the QuickBooks dashboard.
+                      </p>
+                    </div>
                   ) : (
                     <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
                       <p className="text-sm text-muted-foreground">
@@ -827,8 +833,28 @@ const InvoiceDetail = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">{billedPercentage.toFixed(1)}%</div>
-                      <div className="text-xs text-muted-foreground">of order</div>
+                      {(() => {
+                        // Calculate what percentage of the TOTAL ORDER this invoice represents
+                        const orderTotal = Number(order?.total || 0);
+                        let invoiceContribution = 0;
+                        
+                        // If this is a deposit invoice, count only the percentage billed
+                        if (invoice.billed_percentage && invoice.billed_percentage < 100) {
+                          invoiceContribution = Number(invoice.total) * (invoice.billed_percentage / 100);
+                        } else {
+                          // For shipment invoices, use full total
+                          invoiceContribution = Number(invoice.total);
+                        }
+                        
+                        const percentOfOrder = orderTotal > 0 ? (invoiceContribution / orderTotal) * 100 : 0;
+                        
+                        return (
+                          <>
+                            <div className="text-2xl font-bold text-primary">{percentOfOrder.toFixed(1)}%</div>
+                            <div className="text-xs text-muted-foreground">of order</div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
