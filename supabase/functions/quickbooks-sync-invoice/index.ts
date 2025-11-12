@@ -633,47 +633,95 @@ serve(async (req) => {
     
     console.log('QuickBooks Invoice ID:', qbInvoiceId);
     console.log('QuickBooks Realm ID:', qbRealmId);
-    console.log('Full QuickBooks Invoice Response:', JSON.stringify(qbData.Invoice, null, 2));
     
     // QuickBooks customer-facing payment link
-    // The correct format for QuickBooks Online invoice links
+    // We need to "send" the invoice to generate the shareable link
     let qbPaymentLink = null;
     
     try {
-      console.log('Constructing QuickBooks payment link...');
+      console.log('Generating shareable payment link by sending invoice...');
       
-      // QuickBooks Online uses this format for customer invoice viewing/payment
-      // Format: https://app.qbo.intuit.com/invoice?txnId={invoiceId}
-      qbPaymentLink = `https://app.qbo.intuit.com/invoice?txnId=${qbInvoiceId}`;
-      console.log('Constructed payment link:', qbPaymentLink);
+      // First, ensure online payment is enabled on the invoice
+      const updatePayload = {
+        Id: qbInvoiceId,
+        SyncToken: qbData.Invoice.SyncToken,
+        sparse: true,
+        AllowOnlinePayment: true,
+        AllowOnlineCreditCardPayment: true,
+        AllowOnlineACHPayment: true,
+      };
       
-      // Verify the invoice exists and is accessible by querying it
-      const invoiceQueryResponse = await fetch(
-        `${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`,
+      const updateResponse = await fetch(`${qbApiUrl}/invoice?minorversion=73`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatePayload),
+      });
+      
+      if (updateResponse.ok) {
+        console.log('Online payment enabled on invoice');
+      }
+      
+      // Now send the invoice to generate the shareable link
+      // QuickBooks generates a unique link when you send an invoice
+      const customerEmail = invoice.orders?.customer_email || 'noemail@placeholder.com';
+      
+      const sendResponse = await fetch(
+        `${qbApiUrl}/invoice/${qbInvoiceId}/send?sendTo=${encodeURIComponent(customerEmail)}`,
         {
-          method: 'GET',
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json',
+            'Content-Type': 'application/octet-stream',
           },
         }
       );
       
-      if (invoiceQueryResponse.ok) {
-        const invoiceQueryData = await invoiceQueryResponse.json();
-        console.log('Invoice verified in QuickBooks');
-        console.log('AllowOnlinePayment:', invoiceQueryData.Invoice?.AllowOnlinePayment);
-        console.log('AllowOnlineCreditCardPayment:', invoiceQueryData.Invoice?.AllowOnlineCreditCardPayment);
+      if (sendResponse.ok) {
+        console.log('Invoice send triggered successfully');
         
-        // Check if QuickBooks provides its own link (rare but possible)
-        if (invoiceQueryData.Invoice?.InvoiceLink) {
-          qbPaymentLink = invoiceQueryData.Invoice.InvoiceLink;
-          console.log('Using QuickBooks provided link:', qbPaymentLink);
+        // Wait for QuickBooks to generate the link
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Query the invoice again to get the generated link
+        const queryResponse = await fetch(
+          `${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+            },
+          }
+        );
+        
+        if (queryResponse.ok) {
+          const invoiceData = await queryResponse.json();
+          console.log('Invoice data after send:', JSON.stringify(invoiceData.Invoice, null, 2));
+          
+          // The InvoiceLink field should now contain the shareable link
+          qbPaymentLink = invoiceData.Invoice?.InvoiceLink || null;
+          
+          if (qbPaymentLink) {
+            console.log('Payment link generated:', qbPaymentLink);
+          } else {
+            console.log('No payment link in response, invoice may need to be emailed to customer');
+            // Provide a note instead of a broken link
+            qbPaymentLink = 'Email';
+          }
         }
+      } else {
+        const sendError = await sendResponse.json();
+        console.error('Error sending invoice:', sendError);
+        qbPaymentLink = 'Email';
       }
     } catch (linkError) {
-      console.error('Error constructing invoice link:', linkError);
-      // Keep the constructed link even if verification fails
+      console.error('Error generating payment link:', linkError);
+      qbPaymentLink = 'Email';
     }
     
     console.log('QuickBooks invoice ID:', qbInvoiceId);
