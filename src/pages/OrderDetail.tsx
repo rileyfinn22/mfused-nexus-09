@@ -496,7 +496,6 @@ const OrderDetail = () => {
           .from('order_items')
           .update({
             quantity: item.quantity,
-            shipped_quantity: item.quantity,
             unit_price: item.unit_price,
             total: newTotal
           })
