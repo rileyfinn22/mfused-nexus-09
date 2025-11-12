@@ -418,8 +418,10 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                 }, 0) || 0;
                 
                 const totalAlreadyBilled = existingInvoices.reduce((sum, inv) => {
-                  if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
-                    return sum + (parseFloat(inv.total || 0) * (parseFloat(inv.billed_percentage) / 100));
+                  // Check for deposit by billed_percentage, not just invoice_type
+                  if (inv.billed_percentage && inv.billed_percentage < 100) {
+                    const depositAmt = parseFloat(inv.total || 0) * (parseFloat(inv.billed_percentage) / 100);
+                    return sum + depositAmt;
                   }
                   return sum + parseFloat(inv.total || 0);
                 }, 0);
