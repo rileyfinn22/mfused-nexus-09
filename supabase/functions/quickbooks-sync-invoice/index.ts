@@ -97,7 +97,7 @@ serve(async (req) => {
       .select(`
         *,
         orders(*, order_items(*)),
-        companies:company_id(name)
+        companies:company_id(name, email)
       `)
       .eq('id', invoiceId)
       .single();
@@ -174,9 +174,9 @@ serve(async (req) => {
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
 
-    // Find or create customer in QuickBooks using company name (not order customer_name)
+    // Find or create customer in QuickBooks using company name and email
     const customerName = (invoice.companies as any)?.name || 'Unknown Customer';
-    const customerEmail = invoice.orders?.customer_email || '';
+    const customerEmail = (invoice.companies as any)?.email || '';
     
     console.log('Looking for customer (company):', customerName, 'Email:', customerEmail);
     console.log('Order customer_name (ship-to):', invoice.orders?.customer_name);
