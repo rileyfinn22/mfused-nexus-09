@@ -1040,6 +1040,66 @@ const InvoiceDetail = () => {
               </TableBody>
             </Table>
 
+            {/* Billing Breakdown - Only for shipment invoices */}
+            {invoice.invoice_type !== 'deposit' && (() => {
+              // Calculate the raw shipment value (before deposit credit)
+              const rawShipmentValue = displaySubtotal;
+              
+              // Find deposit invoices to calculate credit applied
+              const depositInvoices = relatedInvoices.filter(inv => inv.invoice_type === 'deposit');
+              
+              if (depositInvoices.length === 0) {
+                return null; // No breakdown needed if no deposit
+              }
+              
+              // Calculate total deposit amount
+              const totalDepositAmount = depositInvoices.reduce((sum, inv) => {
+                if (inv.billed_percentage) {
+                  return sum + (Number(inv.total || 0) * (Number(inv.billed_percentage) / 100));
+                }
+                return sum + Number(inv.total || 0);
+              }, 0);
+              
+              // Calculate order subtotal for proportional credit
+              const orderSubtotal = order?.order_items?.reduce((sum: any, item: any) => 
+                sum + (item.quantity * item.unit_price), 0) || 0;
+              
+              // Calculate proportional deposit credit applied to this shipment
+              const depositCreditApplied = orderSubtotal > 0 
+                ? (rawShipmentValue / orderSubtotal) * totalDepositAmount 
+                : 0;
+              
+              const netBillAmount = invoice.total;
+              
+              return (
+                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-6">
+                  <h3 className="text-sm font-semibold mb-3 text-blue-900 dark:text-blue-100">
+                    Billing Breakdown
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Shipment Value</span>
+                      <span className="font-semibold">{formatCurrency(rawShipmentValue)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-orange-600 dark:text-orange-400">
+                      <span>Less: Deposit Credit Applied</span>
+                      <span className="font-semibold">-{formatCurrency(depositCreditApplied)}</span>
+                    </div>
+                    <div className="h-px bg-blue-200 dark:bg-blue-800 my-2"></div>
+                    <div className="flex justify-between">
+                      <span className="font-semibold text-blue-900 dark:text-blue-100">Net Bill Amount</span>
+                      <span className="text-lg font-bold text-blue-900 dark:text-blue-100">
+                        {formatCurrency(netBillAmount)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground italic mt-2">
+                      {depositInvoices[0]?.billed_percentage || 30}% deposit ({formatCurrency(totalDepositAmount)}) spread proportionally across all shipments
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Invoice Totals */}
             <div className="flex justify-end mt-8">
               <div className="space-y-2 w-80">
