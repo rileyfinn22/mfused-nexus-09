@@ -143,12 +143,15 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
           subtotal += quantity * item.unit_price;
         });
 
-        // Calculate the ORIGINAL order total value
-        const orderSubtotal = order.order_items.reduce((sum: number, item: any) => 
-          sum + (item.quantity * item.unit_price), 0
-        );
+        // Calculate the TOTAL SHIPPED value (including this shipment and previous shipments)
+        const totalShippedValue = order.order_items.reduce((sum: number, item: any) => {
+          const previouslyShipped = item.shipped_quantity || 0;
+          const thisShipment = shipmentQuantities[item.id] || 0;
+          const totalShipped = previouslyShipped + thisShipment;
+          return sum + (totalShipped * item.unit_price);
+        }, 0);
         
-        // Calculate how much has already been billed (including deposits)
+        // Calculate how much has already been billed (including deposits and previous shipments)
         const totalAlreadyBilled = existingInvoices.reduce((sum, inv) => {
           if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
             // For deposits, calculate the actual amount
@@ -158,16 +161,16 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
           return sum + parseFloat(inv.total || 0);
         }, 0);
         
-        console.log('Order original value:', orderSubtotal);
+        console.log('Total shipped value (incl. this shipment):', totalShippedValue);
         console.log('Total already billed:', totalAlreadyBilled);
         console.log('Shipment value before cap:', subtotal);
         
-        // Calculate remaining billable amount (can't exceed original order value)
-        const remainingBillable = Math.max(0, orderSubtotal - totalAlreadyBilled);
+        // Calculate remaining billable amount (can't exceed total shipped value)
+        const remainingBillable = Math.max(0, totalShippedValue - totalAlreadyBilled);
         
         // Cap the shipment invoice at the remaining billable amount
         if (remainingBillable === 0) {
-          console.log('100% already billed - creating $0 shipment invoice');
+          console.log('100% of shipped qty already billed - creating $0 shipment invoice');
           subtotal = 0;
         } else if (subtotal > remainingBillable) {
           console.log(`Capping shipment at remaining billable: ${remainingBillable}`);
@@ -404,9 +407,11 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                   return toShip > 0 && availInv < toShip;
                 }) || [];
 
-                // Calculate how much has been billed vs order value
-                const orderSubtotal = order.order_items?.reduce((sum: number, item: any) => 
-                  sum + (item.quantity * item.unit_price), 0) || 0;
+                // Calculate total shipped value vs billed
+                const totalShippedValue = order.order_items?.reduce((sum: number, item: any) => {
+                  const totalShipped = (item.shipped_quantity || 0) + (shipmentQuantities[item.id] || 0);
+                  return sum + (totalShipped * item.unit_price);
+                }, 0) || 0;
                 
                 const totalAlreadyBilled = existingInvoices.reduce((sum, inv) => {
                   if (inv.invoice_type === 'deposit' && inv.billed_percentage) {
@@ -415,8 +420,8 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                   return sum + parseFloat(inv.total || 0);
                 }, 0);
 
-                const remainingBillable = Math.max(0, orderSubtotal - totalAlreadyBilled);
-                const billedPercentage = orderSubtotal > 0 ? (totalAlreadyBilled / orderSubtotal) * 100 : 0;
+                const remainingBillable = Math.max(0, totalShippedValue - totalAlreadyBilled);
+                const billedPercentageOfShipped = totalShippedValue > 0 ? (totalAlreadyBilled / totalShippedValue) * 100 : 0;
 
                 // Calculate this shipment value
                 const shipmentValue = order.order_items?.reduce((sum: number, item: any) => {
@@ -426,22 +431,22 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
 
                 return (
                   <>
-                    {billedPercentage >= 100 && (
+                    {billedPercentageOfShipped >= 100 && (
                       <Alert>
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription className="ml-2">
-                          <strong>Order 100% Billed:</strong> ${totalAlreadyBilled.toFixed(2)} of ${orderSubtotal.toFixed(2)} already billed. 
-                          This shipment will be created with $0.00 invoice amount (shipping overs).
+                          <strong>100% of Shipped Qty Billed:</strong> ${totalAlreadyBilled.toFixed(2)} of ${totalShippedValue.toFixed(2)} shipped value already billed. 
+                          This shipment will be created with $0.00 invoice amount.
                         </AlertDescription>
                       </Alert>
                     )}
 
-                    {billedPercentage < 100 && remainingBillable < shipmentValue && (
+                    {billedPercentageOfShipped < 100 && remainingBillable < shipmentValue && (
                       <Alert>
                         <Info className="h-4 w-4" />
                         <AlertDescription className="ml-2">
                           <strong>Billing Cap:</strong> Only ${remainingBillable.toFixed(2)} remaining to bill 
-                          (${totalAlreadyBilled.toFixed(2)} / ${orderSubtotal.toFixed(2)} already billed). 
+                          (${totalAlreadyBilled.toFixed(2)} / ${totalShippedValue.toFixed(2)} of shipped value already billed). 
                           Invoice will be capped at this amount.
                         </AlertDescription>
                       </Alert>
