@@ -75,12 +75,13 @@ const InvoiceDetail = () => {
           order_items(*, shipped_quantity, quantity),
           parent_order:parent_order_id(id, order_number, order_type)
         ),
-        companies:company_id(name)
+        companies!company_id(name)
       `)
       .eq('id', invoiceId)
       .single();
 
     if (invoiceError || !invoiceData) {
+      console.error('Invoice fetch error:', invoiceError);
       toast({
         title: "Error",
         description: "Failed to load invoice",
@@ -90,6 +91,7 @@ const InvoiceDetail = () => {
       return;
     }
 
+    console.log('Fetched invoice with company:', invoiceData);
     setInvoice(invoiceData);
     setOrder(invoiceData.orders);
 
