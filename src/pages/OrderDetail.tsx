@@ -645,7 +645,11 @@ const OrderDetail = () => {
                   </Button>
                 </>
               ) : (
-                <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsEditMode(true)}
+                  disabled={!isVibeAdmin && (order.status === 'in production' || order.status === 'shipped' || order.status === 'delivered' || order.vibe_processed)}
+                >
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Order
                 </Button>
