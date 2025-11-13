@@ -149,6 +149,7 @@ const PullShipOrders = () => {
 
         if (invoicesError) throw invoicesError;
 
+        const isFirstInvoice = !existingInvoices || existingInvoices.length === 0;
         const nextShipmentNumber = existingInvoices && existingInvoices.length > 0 
           ? (existingInvoices[0].shipment_number || 0) + 1 
           : 1;
@@ -160,6 +161,10 @@ const PullShipOrders = () => {
         const blanketTotal = parentOrder.total || 1;
         const percentageOfOrder = (pullShipTotal / blanketTotal) * 100;
 
+        // First invoice for blanket order should be type "full" (represents the master contract)
+        // Subsequent invoices are "partial" (individual shipments)
+        const invoiceType = isFirstInvoice ? 'full' : 'partial';
+
         // Create invoice for this shipment
         const { data: invoiceData, error: invoiceError } = await supabase
           .from('invoices')
@@ -167,7 +172,7 @@ const PullShipOrders = () => {
             order_id: order.parent_order_id,
             company_id: order.company_id,
             invoice_number: invoiceNumber,
-            invoice_type: 'partial',
+            invoice_type: invoiceType,
             invoice_date: new Date().toISOString(),
             subtotal: order.subtotal || 0,
             tax: order.tax || 0,
