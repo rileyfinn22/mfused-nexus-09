@@ -82,31 +82,28 @@ const Invoices = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid': return 'text-success';
-      case 'open': return 'text-warning';
-      case 'partial': return 'text-info';
-      default: return 'text-muted-foreground';
-    }
+  const getStatusColor = (invoice: any) => {
+    if (invoice.status === 'paid') return 'text-success';
+    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'synced') return 'text-warning';
+    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'pending') return 'text-muted-foreground';
+    if (invoice.status === 'partial') return 'text-info';
+    return 'text-muted-foreground';
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid': return CheckCircle;
-      case 'open': return AlertTriangle;
-      case 'partial': return Clock;
-      default: return Clock;
-    }
+  const getStatusIcon = (invoice: any) => {
+    if (invoice.status === 'paid') return CheckCircle;
+    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'synced') return AlertTriangle;
+    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'pending') return Clock;
+    if (invoice.status === 'partial') return Clock;
+    return Clock;
   };
 
-  const getStatusDisplay = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid': return 'PAID';
-      case 'open': return 'DUE';
-      case 'partial': return 'PARTIAL';
-      default: return status.replace('_', ' ').toUpperCase();
-    }
+  const getStatusDisplay = (invoice: any) => {
+    if (invoice.status === 'paid') return 'PAID';
+    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'synced') return 'DUE';
+    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'pending') return 'PENDING SYNC';
+    if (invoice.status === 'partial') return 'PARTIAL';
+    return invoice.status.replace('_', ' ').toUpperCase();
   };
 
   const getDaysUntilDue = (dueDate: string) => {
@@ -155,7 +152,7 @@ const Invoices = () => {
 
   const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + Number(invoice.total), 0);
   const paidAmount = filteredInvoices.filter(inv => inv.status === 'paid').reduce((sum, invoice) => sum + Number(invoice.total), 0);
-  const openAmount = filteredInvoices.filter(inv => inv.status === 'open' || inv.status === 'partial').reduce((sum, invoice) => sum + Number(invoice.total), 0);
+  const openAmount = filteredInvoices.filter(inv => (inv.status === 'open' || inv.status === 'partial') && inv.quickbooks_sync_status === 'synced').reduce((sum, invoice) => sum + Number(invoice.total), 0);
 
   return (
     <div className="space-y-6">
@@ -306,7 +303,7 @@ const Invoices = () => {
             </div>
           ) : (
             displayInvoices.map(({ invoice, isParent, isChild }) => {
-              const StatusIcon = getStatusIcon(invoice.status);
+              const StatusIcon = getStatusIcon(invoice);
               const daysUntilDue = invoice.due_date ? getDaysUntilDue(invoice.due_date) : null;
               
               return (
@@ -387,10 +384,10 @@ const Invoices = () => {
                       <span className="text-muted-foreground">Not set</span>
                     )}
                   </div>
-                  <div className={`col-span-1 text-sm font-medium ${getStatusColor(invoice.status)}`}>
+                  <div className={`col-span-1 text-sm font-medium ${getStatusColor(invoice)}`}>
                     <div className="flex items-center gap-1">
                       <StatusIcon className="h-3 w-3" />
-                      {getStatusDisplay(invoice.status)}
+                      {getStatusDisplay(invoice)}
                     </div>
                   </div>
                   <div className="col-span-1 flex gap-1">
