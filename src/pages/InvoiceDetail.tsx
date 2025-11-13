@@ -479,6 +479,34 @@ const InvoiceDetail = () => {
     }
   };
 
+  const handleCloseInvoice = async () => {
+    if (!confirm('Mark this invoice as closed? This indicates the blanket order is complete.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('invoices')
+        .update({ status: 'closed' })
+        .eq('id', invoiceId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Invoice Closed",
+        description: "Invoice has been marked as closed"
+      });
+
+      fetchInvoiceDetails();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to close invoice",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Calculate totals based on items actually on THIS invoice (from allocations)
   const displayItems = editedItems;
   const displaySubtotal = displayItems.reduce((sum: number, item: any) => 
@@ -576,6 +604,16 @@ const InvoiceDetail = () => {
                   Record Payment
                 </Button>
               )}
+              {invoice.invoice_type === 'full' && invoice.status !== 'closed' && (
+                <Button 
+                  variant="outline"
+                  onClick={handleCloseInvoice}
+                  className="border-green-500 text-green-700 hover:bg-green-50"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Close Invoice
+                </Button>
+              )}
             </>
           )}
           <Button onClick={() => {}}>
@@ -663,6 +701,7 @@ const InvoiceDetail = () => {
                   invoice.status === 'paid' ? 'bg-green-500/10 text-green-600' :
                   invoice.status === 'partial' ? 'bg-blue-500/10 text-blue-600' :
                   invoice.status === 'open' ? 'bg-orange-500/10 text-orange-600' :
+                  invoice.status === 'closed' ? 'bg-gray-500/10 text-gray-600' :
                   'bg-primary/10 text-primary'
                 }`}>
                   {invoice.status.replace('_', ' ')}
@@ -955,13 +994,25 @@ const InvoiceDetail = () => {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Total Shipped Progress</span>
                   {(() => {
-                    const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
-                    const totalShipped = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0), 0) || 0;
-                    const actualPercentage = totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
-                    
-                    return (
-                      <span className="text-sm font-semibold">{actualPercentage.toFixed(1)}% ({totalShipped.toLocaleString()} / {totalOrdered.toLocaleString()} units)</span>
-                    );
+                    // For "full" invoices (blanket orders), show cumulative billed percentage from all partial invoices
+                    // For "partial" invoices, show actual shipped quantity progress
+                    if (invoice.invoice_type === 'full') {
+                      const totalBilledPercent = relatedInvoices
+                        .filter(inv => inv.invoice_type === 'partial')
+                        .reduce((sum, inv) => sum + (inv.billed_percentage || 0), 0);
+                      
+                      return (
+                        <span className="text-sm font-semibold">{totalBilledPercent.toFixed(1)}% (billed from partial invoices)</span>
+                      );
+                    } else {
+                      const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
+                      const totalShipped = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0), 0) || 0;
+                      const actualPercentage = totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
+                      
+                      return (
+                        <span className="text-sm font-semibold">{actualPercentage.toFixed(1)}% ({totalShipped.toLocaleString()} / {totalOrdered.toLocaleString()} units)</span>
+                      );
+                    }
                   })()}
                 </div>
                 <Progress 
