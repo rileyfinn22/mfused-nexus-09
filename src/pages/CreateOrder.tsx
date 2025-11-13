@@ -422,10 +422,14 @@ const CreateOrder = () => {
       .single();
 
     if (!error && order) {
-      if (order.status !== 'draft') {
+      // Check if order can be edited
+      const restrictedStatuses = ['in production', 'shipped', 'delivered'];
+      const isRestricted = restrictedStatuses.includes(order.status) || order.vibe_processed;
+      
+      if (!isVibeAdmin && isRestricted) {
         toast({
           title: "Cannot Edit",
-          description: "Only draft orders can be edited",
+          description: "This order has been approved for production and cannot be edited",
           variant: "destructive",
         });
         navigate('/orders');

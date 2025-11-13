@@ -160,6 +160,15 @@ const Orders = () => {
     setDeleteOrderId(orderId);
   };
 
+  const canEditOrder = (order: any) => {
+    // Vibe admins can always edit
+    if (isVibeAdmin) return true;
+    
+    // Can't edit if order is in production or later stages, or if vibe_processed
+    const restrictedStatuses = ['in production', 'shipped', 'delivered'];
+    return !restrictedStatuses.includes(order.status) && !order.vibe_processed;
+  };
+
   const getProgressForStatus = (status: string) => {
     switch (status.toLowerCase()) {
       case 'draft': return 0;
@@ -341,25 +350,29 @@ const Orders = () => {
                         {dueDate}
                       </div>
                       <div className="col-span-2 flex gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 w-6 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/edit/${order.id}`);
-                          }}
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                          onClick={(e) => confirmDelete(order.id, e)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        {canEditOrder(order) && (
+                          <>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/edit/${order.id}`);
+                              }}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                              onClick={(e) => confirmDelete(order.id, e)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   );
@@ -455,22 +468,26 @@ const Orders = () => {
                       {dueDate}
                     </div>
                     <div className="col-span-2 flex gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 w-6 p-0"
-                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                        onClick={(e) => confirmDelete(order.id, e)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      {canEditOrder(order) && (
+                        <>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 w-6 p-0"
+                            onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                            onClick={(e) => confirmDelete(order.id, e)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -544,22 +561,26 @@ const Orders = () => {
                       <Progress value={progress} className="h-1" />
                     </div>
                     <div className="col-span-2 flex gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 w-6 p-0"
-                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                        onClick={(e) => confirmDelete(order.id, e)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      {canEditOrder(order) && (
+                        <>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 w-6 p-0"
+                            onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                            onClick={(e) => confirmDelete(order.id, e)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
