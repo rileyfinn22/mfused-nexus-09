@@ -893,30 +893,6 @@ const InvoiceDetail = () => {
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      {(() => {
-                        // Calculate shipped percentage for THIS invoice based on allocations
-                        if (!inventoryAllocations || inventoryAllocations.length === 0) {
-                          return (
-                            <>
-                              <div className="text-2xl font-bold text-primary">-</div>
-                              <div className="text-xs text-muted-foreground">shipped</div>
-                            </>
-                          );
-                        }
-                        
-                        const invoiceShipped = inventoryAllocations.reduce((sum, alloc) => sum + Number(alloc.quantity_allocated || 0), 0);
-                        const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
-                        const percentShipped = totalOrdered > 0 ? (invoiceShipped / totalOrdered) * 100 : 0;
-                        
-                        return (
-                          <>
-                            <div className="text-2xl font-bold text-primary">{percentShipped.toFixed(1)}%</div>
-                            <div className="text-xs text-muted-foreground">shipped</div>
-                          </>
-                        );
-                      })()}
-                    </div>
                   </div>
                 </div>
 
