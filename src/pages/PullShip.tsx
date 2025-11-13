@@ -95,11 +95,20 @@ const PullShip = () => {
     }
 
     try {
+      // Only fetch orders that have a full invoice (not partial)
       const { data, error } = await supabase
         .from('orders')
-        .select('id, order_number, customer_name, total, created_at')
+        .select(`
+          id, 
+          order_number, 
+          customer_name, 
+          total, 
+          created_at,
+          invoices!inner(invoice_type)
+        `)
         .eq('company_id', companyId)
         .eq('order_type', 'standard')
+        .eq('invoices.invoice_type', 'full')
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -143,6 +152,7 @@ const PullShip = () => {
     
     setLoadingInventory(true);
     try {
+      console.log('Fetching inventory for state:', state, 'companyId:', companyId);
       const { data, error } = await supabase
         .from('inventory')
         .select('*, products(image_url, item_id, name)')
@@ -152,7 +162,16 @@ const PullShip = () => {
         .order('sku', { ascending: true });
 
       if (error) throw error;
+      console.log('Inventory fetched:', data?.length || 0, 'items');
       setInventory(data || []);
+      
+      if (!data || data.length === 0) {
+        toast({
+          title: "No inventory found",
+          description: `No available inventory found for state ${state}`,
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error('Error fetching inventory:', error);
       toast({
