@@ -44,6 +44,8 @@ interface InventoryItem {
   upload_timestamp?: string;
   products?: {
     image_url: string | null;
+    name: string;
+    item_id: string | null;
   };
 }
 
@@ -114,7 +116,7 @@ const Inventory = () => {
     try {
       let query = supabase
         .from('inventory')
-        .select('*, products(image_url)')
+        .select('*, products(image_url, name, item_id)')
         .order('created_at', { ascending: false });
 
       // Filter by company if not "all" and user is vibe_admin
@@ -524,7 +526,8 @@ const Inventory = () => {
               </div>
             )}
             <div className={isVibeAdmin && isEditMode ? "col-span-1" : "col-span-1"}>Preview</div>
-            <div className={isVibeAdmin && isEditMode ? "col-span-3" : "col-span-3"}>SKU</div>
+            <div className={isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"}>Product Name</div>
+            <div className={isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"}>SKU / Item #</div>
             <div className="col-span-1">State</div>
             <div 
               className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
@@ -538,13 +541,7 @@ const Inventory = () => {
             >
               In Prod {getSortIcon("in_production")}
             </div>
-            <div 
-              className="col-span-1 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
-              onClick={() => handleSort("redline")}
-            >
-              Redline {getSortIcon("redline")}
-            </div>
-            <div className="col-span-1">Status</div>
+            <div className="col-span-2">Status</div>
           </div>
         </div>
 
@@ -581,7 +578,10 @@ const Inventory = () => {
                     </div>
                   )}
                 </div>
-                <div className={`${isVibeAdmin && isEditMode ? "col-span-3" : "col-span-3"} font-mono text-sm font-medium flex items-center gap-2`}>
+                <div className={`${isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"} text-sm font-medium`}>
+                  {item.products?.name || '-'}
+                </div>
+                <div className={`${isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"} font-mono text-sm flex items-center gap-2`}>
                   <span 
                     className="break-words"
                     title={item.sku}
@@ -600,8 +600,7 @@ const Inventory = () => {
                   {item.available}
                 </div>
                 <div className="col-span-2 text-sm">{item.in_production}</div>
-                <div className="col-span-1 text-sm text-muted-foreground">{item.redline}</div>
-                <div className={`col-span-1 text-xs font-medium uppercase ${stockColor}`}>
+                <div className={`col-span-2 text-xs font-medium uppercase ${stockColor}`}>
                   {status}
                 </div>
               </div>
