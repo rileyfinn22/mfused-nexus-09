@@ -699,9 +699,7 @@ const InvoiceDetail = () => {
               <div className="text-right">
                 <span className={`inline-block px-4 py-1.5 rounded-full text-sm font-medium capitalize ${
                   invoice.status === 'paid' ? 'bg-green-500/10 text-green-600' :
-                  invoice.status === 'partial' ? 'bg-blue-500/10 text-blue-600' :
-                  invoice.status === 'open' ? 'bg-orange-500/10 text-orange-600' :
-                  invoice.status === 'closed' ? 'bg-gray-500/10 text-gray-600' :
+                  invoice.status === 'due' ? 'bg-orange-500/10 text-orange-600' :
                   'bg-primary/10 text-primary'
                 }`}>
                   {invoice.status.replace('_', ' ')}
@@ -915,7 +913,7 @@ const InvoiceDetail = () => {
                         }>
                           {invoice.invoice_type?.toUpperCase() || 'FULL'}
                         </Badge>
-                        <Badge variant="default">CURRENT</Badge>
+                        
                       </div>
                       <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
