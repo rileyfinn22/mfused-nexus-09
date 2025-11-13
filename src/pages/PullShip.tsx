@@ -404,30 +404,31 @@ const PullShip = () => {
     }
 
     try {
-      // Fetch invoice items with their SKUs and unit prices from the parent order's invoice
+      // Fetch order items with their SKUs and unit prices - need to join with products to get item_id
       const { data, error } = await supabase
-        .from('invoices')
+        .from('order_items')
         .select(`
-          id,
-          order_items!inner(
-            sku,
-            unit_price
-          )
+          sku,
+          unit_price,
+          product_id,
+          products!inner(item_id)
         `)
-        .eq('order_id', parentOrderId)
-        .eq('invoice_type', 'full')
-        .single();
+        .eq('order_id', parentOrderId);
 
       if (error) throw error;
 
-      // Create a map of SKU to unit price
+      // Create a map of product item_id (inventory SKU) to unit price
       const priceMap: Record<string, number> = {};
-      if (data?.order_items) {
-        data.order_items.forEach((item: any) => {
-          priceMap[item.sku] = item.unit_price;
+      if (data) {
+        data.forEach((item: any) => {
+          const inventorySku = item.products?.item_id;
+          if (inventorySku) {
+            priceMap[inventorySku] = item.unit_price;
+          }
         });
       }
 
+      console.log('Invoice item prices loaded:', priceMap);
       setInvoiceItemPrices(priceMap);
     } catch (error) {
       console.error('Error fetching invoice item prices:', error);
