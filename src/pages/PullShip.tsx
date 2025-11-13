@@ -619,22 +619,31 @@ const PullShip = () => {
       const orderNumber = `PS-${Date.now()}`;
 
       // Get parent order item prices if this is linked to a blanket order
-      let parentOrderItems: any[] = [];
+      let priceMap: Record<string, number> = {};
       if (orderData.parentOrderId) {
         const { data: parentData, error: parentError } = await supabase
           .from('order_items')
-          .select('sku, unit_price')
+          .select(`
+            sku,
+            unit_price,
+            product_id,
+            products!inner(item_id)
+          `)
           .eq('order_id', orderData.parentOrderId);
         
         if (!parentError && parentData) {
-          parentOrderItems = parentData;
+          parentData.forEach((item: any) => {
+            const inventorySku = item.products?.item_id;
+            if (inventorySku) {
+              priceMap[inventorySku] = item.unit_price;
+            }
+          });
         }
       }
 
       // Calculate totals using parent order prices (or fallback to $1)
       const itemsWithPrices = items.map(item => {
-        const parentItem = parentOrderItems.find(pi => pi.sku === item.sku);
-        const unitPrice = parentItem?.unit_price || 1;
+        const unitPrice = priceMap[item.itemId || ''] || 1;
         return {
           ...item,
           unitPrice,
