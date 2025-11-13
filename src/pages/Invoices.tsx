@@ -101,7 +101,7 @@ const Invoices = () => {
   const getStatusDisplay = (invoice: any) => {
     if (invoice.status === 'paid') return 'PAID';
     if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'synced') return 'DUE';
-    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'pending') return 'PENDING SYNC';
+    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'pending') return 'Pending Due';
     if (invoice.status === 'partial') return 'PARTIAL';
     return invoice.status.replace('_', ' ').toUpperCase();
   };
