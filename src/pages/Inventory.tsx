@@ -70,7 +70,6 @@ const Inventory = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [newInventory, setNewInventory] = useState({
     product_id: '',
-    state: '',
     available: 0,
     in_production: 0,
     redline: 0
@@ -279,7 +278,7 @@ const Inventory = () => {
 
       let query = supabase
         .from('products')
-        .select('id, name, item_id, company_id')
+        .select('id, name, item_id, company_id, state')
         .order('name');
 
       // Filter by company if we have one
@@ -295,17 +294,17 @@ const Inventory = () => {
   };
 
   const handleAddInventory = async () => {
-    if (!newInventory.product_id || !newInventory.state) {
+    if (!newInventory.product_id) {
       toast({
         title: "Missing fields",
-        description: "Please select a product and enter a state.",
+        description: "Please select a product.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      // Get the selected product with company_id
+      // Get the selected product with company_id and state
       const product = products.find(p => p.id === newInventory.product_id);
       if (!product) {
         toast({
@@ -328,11 +327,21 @@ const Inventory = () => {
         return;
       }
 
+      // Use the product's state
+      if (!product.state) {
+        toast({
+          title: "Error",
+          description: "Product does not have a state assigned.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('inventory')
         .insert({
           sku: product.item_id || product.name,
-          state: newInventory.state,
+          state: product.state,
           available: newInventory.available,
           in_production: newInventory.in_production,
           redline: newInventory.redline,
@@ -350,7 +359,6 @@ const Inventory = () => {
       setShowAddDialog(false);
       setNewInventory({
         product_id: '',
-        state: '',
         available: 0,
         in_production: 0,
         redline: 0
@@ -648,20 +656,11 @@ const Inventory = () => {
                   <SelectContent>
                     {products.map((product) => (
                       <SelectItem key={product.id} value={product.id}>
-                        {product.name} {product.item_id && `(${product.item_id})`}
+                        {product.name} {product.item_id && `(${product.item_id})`} {product.state && `- ${product.state}`}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>State</Label>
-                <Input
-                  value={newInventory.state}
-                  onChange={(e) => setNewInventory({...newInventory, state: e.target.value})}
-                  placeholder="e.g., NY, CA"
-                />
               </div>
 
               <div className="grid grid-cols-3 gap-4">
