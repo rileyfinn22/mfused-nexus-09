@@ -85,7 +85,8 @@ const Invoices = () => {
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'paid': return 'text-success';
-      case 'open': return 'text-primary';
+      case 'open': return 'text-warning';
+      case 'partial': return 'text-info';
       default: return 'text-muted-foreground';
     }
   };
@@ -93,8 +94,18 @@ const Invoices = () => {
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
       case 'paid': return CheckCircle;
-      case 'open': return Clock;
+      case 'open': return AlertTriangle;
+      case 'partial': return Clock;
       default: return Clock;
+    }
+  };
+
+  const getStatusDisplay = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'paid': return 'PAID';
+      case 'open': return 'DUE';
+      case 'partial': return 'PARTIAL';
+      default: return status.replace('_', ' ').toUpperCase();
     }
   };
 
@@ -144,7 +155,7 @@ const Invoices = () => {
 
   const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + Number(invoice.total), 0);
   const paidAmount = filteredInvoices.filter(inv => inv.status === 'paid').reduce((sum, invoice) => sum + Number(invoice.total), 0);
-  const openAmount = filteredInvoices.filter(inv => inv.status === 'open').reduce((sum, invoice) => sum + Number(invoice.total), 0);
+  const openAmount = filteredInvoices.filter(inv => inv.status === 'open' || inv.status === 'partial').reduce((sum, invoice) => sum + Number(invoice.total), 0);
 
   return (
     <div className="space-y-6">
@@ -379,7 +390,7 @@ const Invoices = () => {
                   <div className={`col-span-1 text-sm font-medium ${getStatusColor(invoice.status)}`}>
                     <div className="flex items-center gap-1">
                       <StatusIcon className="h-3 w-3" />
-                      {invoice.status.replace('_', ' ').toUpperCase()}
+                      {getStatusDisplay(invoice.status)}
                     </div>
                   </div>
                   <div className="col-span-1 flex gap-1">
