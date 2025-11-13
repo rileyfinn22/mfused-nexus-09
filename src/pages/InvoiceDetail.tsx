@@ -486,8 +486,14 @@ const InvoiceDetail = () => {
   );
   const displayTotal = displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0);
   
-  // Use the billed percentage from QuickBooks sync, or calculate from quantities as fallback
-  const billedPercentage = invoice?.billed_percentage || 100;
+  // Calculate shipped percentage from actual quantities
+  const calculateShippedPercentage = () => {
+    if (!order?.order_items) return 0;
+    const totalOrdered = order.order_items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+    const totalShipped = order.order_items.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0), 0);
+    return totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
+  };
+  const shippedPercentage = calculateShippedPercentage();
   const totalVendorCost = vendorPOs.reduce((sum, po) => sum + Number(po.total), 0);
   const totalProfit = displayTotal - totalVendorCost;
   const profitMargin = displayTotal > 0 ? ((totalProfit / displayTotal) * 100).toFixed(2) : '0.00';
@@ -608,14 +614,8 @@ const InvoiceDetail = () => {
                     <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md font-mono text-sm">
                       Shipment #{invoice.shipment_number}
                     </span>
-                    <span className={`px-3 py-1 rounded-md text-sm font-medium ${
-                      billedPercentage < 100 ? 'bg-blue-500 text-white' :
-                      'bg-purple-500 text-white'
-                    }`}>
-                      {billedPercentage < 100 ? 'PARTIAL' : 'FULL'}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      ({billedPercentage.toFixed(1)}% of order billed)
+                    <span className="px-3 py-1 rounded-md text-sm font-medium bg-purple-500 text-white">
+                      {invoice.invoice_type?.toUpperCase() || 'INVOICE'}
                     </span>
                     {(() => {
                       const totalShipped = order?.order_items?.reduce((sum: number, item: any) => 
@@ -729,20 +729,10 @@ const InvoiceDetail = () => {
                     <div className="bg-background/50 border rounded-lg p-4">
                       <div className="text-sm text-muted-foreground mb-1">Amount Due</div>
                       <div className="text-2xl font-bold text-green-700 dark:text-green-400">
-                        {(() => {
-                          const billedAmount = Number(invoice.total) * (Number(invoice.billed_percentage || 100) / 100);
-                          const amountDue = billedAmount - Number(invoice.total_paid || 0);
-                          return formatCurrency(amountDue);
-                        })()}
+                        {formatCurrency(Number(invoice.total) - Number(invoice.total_paid || 0))}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        {invoice.billed_percentage && invoice.billed_percentage < 100 ? (
-                          <>
-                            {invoice.billed_percentage}% deposit of {formatCurrency(Number(invoice.total))} total
-                          </>
-                        ) : (
-                          <>of {formatCurrency(Number(invoice.total))} total</>
-                        )}
+                        of {formatCurrency(Number(invoice.total))} total
                       </div>
                     </div>
                     
@@ -760,8 +750,7 @@ const InvoiceDetail = () => {
                     <div className="bg-background/50 border rounded-lg p-4">
                       <div className="text-sm text-muted-foreground mb-1">Payment Status</div>
                       {(() => {
-                        const billedAmount = Number(invoice.total) * (Number(invoice.billed_percentage || 100) / 100);
-                        const amountDue = billedAmount - Number(invoice.total_paid || 0);
+                        const amountDue = Number(invoice.total) - Number(invoice.total_paid || 0);
                         const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
                         const today = new Date();
                         const daysOverdue = dueDate ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
@@ -906,24 +895,24 @@ const InvoiceDetail = () => {
                     </div>
                     <div className="text-right">
                       {(() => {
-                        // Calculate what percentage of the TOTAL ORDER this invoice represents
-                        const orderTotal = Number(order?.total || 0);
-                        let invoiceContribution = 0;
-                        
-                        // If this is a deposit invoice, count only the percentage billed
-                        if (invoice.billed_percentage && invoice.billed_percentage < 100) {
-                          invoiceContribution = Number(invoice.total) * (invoice.billed_percentage / 100);
-                        } else {
-                          // For shipment invoices, use full total
-                          invoiceContribution = Number(invoice.total);
+                        // Calculate shipped percentage for THIS invoice based on allocations
+                        if (!inventoryAllocations || inventoryAllocations.length === 0) {
+                          return (
+                            <>
+                              <div className="text-2xl font-bold text-primary">-</div>
+                              <div className="text-xs text-muted-foreground">shipped</div>
+                            </>
+                          );
                         }
                         
-                        const percentOfOrder = orderTotal > 0 ? (invoiceContribution / orderTotal) * 100 : 0;
+                        const invoiceShipped = inventoryAllocations.reduce((sum, alloc) => sum + Number(alloc.quantity_allocated || 0), 0);
+                        const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
+                        const percentShipped = totalOrdered > 0 ? (invoiceShipped / totalOrdered) * 100 : 0;
                         
                         return (
                           <>
-                            <div className="text-2xl font-bold text-primary">{percentOfOrder.toFixed(1)}%</div>
-                            <div className="text-xs text-muted-foreground">of order</div>
+                            <div className="text-2xl font-bold text-primary">{percentShipped.toFixed(1)}%</div>
+                            <div className="text-xs text-muted-foreground">shipped</div>
                           </>
                         );
                       })()}
@@ -933,9 +922,6 @@ const InvoiceDetail = () => {
 
                 {/* Other invoices */}
                 {[...relatedInvoices].sort((a, b) => a.shipment_number - b.shipment_number).map((relInv, idx) => {
-                  const allInvoices = [...relatedInvoices, invoice].sort((a, b) => a.shipment_number - b.shipment_number);
-                  const upToThisShipment = allInvoices.slice(0, allInvoices.findIndex(i => i.id === relInv.id) + 1);
-                  const cumulativePercent = upToThisShipment.reduce((sum, i) => sum + (i.billed_percentage || 0), 0);
                   
                   return (
                     <div key={relInv.id} className="p-4 bg-background border border-table-border rounded-lg hover:border-primary/40 transition-colors">
@@ -975,8 +961,8 @@ const InvoiceDetail = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-lg font-semibold">{relInv.billed_percentage?.toFixed(1)}%</div>
-                          <div className="text-xs text-muted-foreground">Cumulative: {cumulativePercent.toFixed(1)}%</div>
+                          <div className="text-lg font-semibold">{formatCurrency(Number(relInv.total))}</div>
+                          <div className="text-xs text-muted-foreground">Invoice Total</div>
                         </div>
                       </div>
                     </div>
@@ -987,54 +973,22 @@ const InvoiceDetail = () => {
               {/* Overall Progress */}
               <div className="mt-6 p-4 bg-background rounded-lg border border-table-border">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium">Total Billed Progress</span>
+                  <span className="text-sm font-medium">Total Shipped Progress</span>
                   {(() => {
-                    const allInvoicesForOrder = [...relatedInvoices, invoice];
-                    const orderTotal = Number(order?.total || 0);
-                    
-                    // Debug logging
-                    console.log('Order total:', orderTotal);
-                    console.log('All invoices:', allInvoicesForOrder.map(inv => ({
-                      number: inv.invoice_number,
-                      type: inv.invoice_type,
-                      total: inv.total,
-                      billed_percentage: inv.billed_percentage
-                    })));
-                    
-                    // Sum all invoice totals - they already represent the correct amounts
-                    const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
-                      const invTotal = Number(inv.total || 0);
-                      console.log(`Invoice ${inv.invoice_number}: ${invTotal} (${inv.billed_percentage}% of order)`);
-                      return sum + invTotal;
-                    }, 0);
-                    
-                    console.log('Total billed amount:', totalBilledAmount);
-                    
-                    const actualPercentage = orderTotal > 0 ? (totalBilledAmount / orderTotal) * 100 : 0;
+                    const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
+                    const totalShipped = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0), 0) || 0;
+                    const actualPercentage = totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
                     
                     return (
-                      <span className="text-sm font-semibold">
-                        {actualPercentage.toFixed(1)}% of order ({formatCurrency(totalBilledAmount)} / {formatCurrency(orderTotal)})
-                      </span>
+                      <span className="text-sm font-semibold">{actualPercentage.toFixed(1)}% ({totalShipped.toLocaleString()} / {totalOrdered.toLocaleString()} units)</span>
                     );
                   })()}
                 </div>
                 <Progress 
                   value={(() => {
-                    const allInvoicesForOrder = [...relatedInvoices, invoice];
-                    const orderTotal = Number(order?.total || 0);
-                    
-                    const totalBilledAmount = allInvoicesForOrder.reduce((sum, inv) => {
-                      // Check for deposit by billed_percentage < 100
-                      if (inv.billed_percentage && inv.billed_percentage < 100) {
-                        return sum + (Number(inv.total || 0) * (Number(inv.billed_percentage) / 100));
-                      }
-                      // For shipment invoices, use full total
-                      return sum + Number(inv.total || 0);
-                    }, 0);
-                    
-                    const actualPercentage = orderTotal > 0 ? (totalBilledAmount / orderTotal) * 100 : 0;
-                    return Math.min(100, actualPercentage);
+                    const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
+                    const totalShipped = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0), 0) || 0;
+                    return totalOrdered > 0 ? Math.min(100, (totalShipped / totalOrdered) * 100) : 0;
                   })()} 
                   className="h-3" 
                 />
@@ -1132,13 +1086,13 @@ const InvoiceDetail = () => {
             </Table>
 
             {/* Billing Breakdown - Only for shipment invoices */}
-            {invoice.invoice_type !== 'deposit' && (() => {
+            {invoice.invoice_type !== 'deposit' && invoice.invoice_type !== 'full' && (() => {
               // Calculate the raw shipment value (before deposit credit)
               const rawShipmentValue = displaySubtotal;
               
-              // Find deposit invoices to calculate credit applied
+              // Find deposit invoices to calculate credit applied (identify by invoice_type)
               const depositInvoices = relatedInvoices.filter(inv => 
-                inv.billed_percentage && inv.billed_percentage < 100
+                inv.invoice_type === 'deposit' || inv.invoice_type === 'full'
               );
               
               if (depositInvoices.length === 0) {
@@ -1147,9 +1101,6 @@ const InvoiceDetail = () => {
               
               // Calculate total deposit amount
               const totalDepositAmount = depositInvoices.reduce((sum, inv) => {
-                if (inv.billed_percentage) {
-                  return sum + (Number(inv.total || 0) * (Number(inv.billed_percentage) / 100));
-                }
                 return sum + Number(inv.total || 0);
               }, 0);
               
@@ -1186,7 +1137,7 @@ const InvoiceDetail = () => {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground italic mt-2">
-                      {depositInvoices[0]?.billed_percentage || 30}% deposit ({formatCurrency(totalDepositAmount)}) spread proportionally across all shipments
+                      Deposit ({formatCurrency(totalDepositAmount)}) spread proportionally across all shipments
                     </p>
                   </div>
                 </div>
