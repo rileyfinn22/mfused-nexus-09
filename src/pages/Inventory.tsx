@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +23,8 @@ import {
   AlertTriangle,
   Trash2,
   Edit,
-  Download
+  Download,
+  Plus
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadInventoryDialog } from "@/components/UploadInventoryDialog";
@@ -63,6 +66,15 @@ const Inventory = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [newInventory, setNewInventory] = useState({
+    product_id: '',
+    state: '',
+    available: 0,
+    in_production: 0,
+    redline: 0
+  });
 
   useEffect(() => {
     checkAdminStatus();
@@ -75,6 +87,7 @@ const Inventory = () => {
       fetchArtworkThumbnails();
       if (isVibeAdmin) {
         fetchCompanies();
+        fetchProducts();
       }
     }
   }, [isVibeAdmin, companyFilter]);
@@ -238,6 +251,79 @@ const Inventory = () => {
     }
   };
 
+  const fetchProducts = async () => {
+    const { data } = await supabase
+      .from('products')
+      .select('id, name, item_id')
+      .order('name');
+    if (data) setProducts(data);
+  };
+
+  const handleAddInventory = async () => {
+    if (!newInventory.product_id || !newInventory.state) {
+      toast({
+        title: "Missing fields",
+        description: "Please select a product and enter a state.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Get the SKU from the selected product
+      const product = products.find(p => p.id === newInventory.product_id);
+      if (!product) return;
+
+      // Get company_id
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!userRole) return;
+
+      const { error } = await supabase
+        .from('inventory')
+        .insert({
+          sku: product.item_id || product.name,
+          state: newInventory.state,
+          available: newInventory.available,
+          in_production: newInventory.in_production,
+          redline: newInventory.redline,
+          product_id: newInventory.product_id,
+          company_id: companyFilter !== 'all' ? companyFilter : userRole.company_id
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Inventory added",
+        description: "Successfully added inventory item.",
+      });
+
+      setShowAddDialog(false);
+      setNewInventory({
+        product_id: '',
+        state: '',
+        available: 0,
+        in_production: 0,
+        redline: 0
+      });
+      fetchInventory();
+    } catch (error) {
+      console.error('Error adding inventory:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add inventory. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredAndSortedData = inventory
     .filter(item => {
       const matchesSearch = item.sku.toLowerCase().includes(searchQuery.toLowerCase());
@@ -281,7 +367,7 @@ const Inventory = () => {
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
-          {isAdmin && selectedItems.size > 0 && (
+          {isVibeAdmin && selectedItems.size > 0 && (
             <Button
               variant="destructive"
               size="sm"
@@ -291,7 +377,7 @@ const Inventory = () => {
               Delete ({selectedItems.size})
             </Button>
           )}
-          {isAdmin && (
+          {isVibeAdmin && (
             <Button
               variant="outline"
               size="sm"
@@ -306,10 +392,22 @@ const Inventory = () => {
               {isEditMode ? "Done" : "Edit"}
             </Button>
           )}
-          <UploadInventoryDialog 
-            onInventoryUploaded={fetchInventory} 
-            selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
-          />
+          {isVibeAdmin && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddDialog(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Inventory
+              </Button>
+              <UploadInventoryDialog 
+                onInventoryUploaded={fetchInventory} 
+                selectedCompanyId={companyFilter !== 'all' ? companyFilter : undefined}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -367,7 +465,7 @@ const Inventory = () => {
         {/* Table Header */}
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {isAdmin && isEditMode && (
+            {isVibeAdmin && isEditMode && (
               <div className="col-span-1 flex items-center">
                 <Checkbox
                   checked={selectedItems.size === filteredAndSortedData.length && filteredAndSortedData.length > 0}
@@ -375,8 +473,8 @@ const Inventory = () => {
                 />
               </div>
             )}
-            <div className={isAdmin && isEditMode ? "col-span-1" : "col-span-1"}>Preview</div>
-            <div className={isAdmin && isEditMode ? "col-span-3" : "col-span-3"}>SKU</div>
+            <div className={isVibeAdmin && isEditMode ? "col-span-1" : "col-span-1"}>Preview</div>
+            <div className={isVibeAdmin && isEditMode ? "col-span-3" : "col-span-3"}>SKU</div>
             <div className="col-span-1">State</div>
             <div 
               className="col-span-2 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
@@ -411,7 +509,7 @@ const Inventory = () => {
                 key={`${item.sku}-${item.state}`}
                 className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
               >
-                {isAdmin && isEditMode && (
+                {isVibeAdmin && isEditMode && (
                   <div className="col-span-1 flex items-center">
                     <Checkbox
                       checked={selectedItems.has(item.id)}
@@ -419,7 +517,7 @@ const Inventory = () => {
                     />
                   </div>
                 )}
-                <div className={isAdmin && isEditMode ? "col-span-1" : "col-span-1"}>
+                <div className={isVibeAdmin && isEditMode ? "col-span-1" : "col-span-1"}>
                   {artworkThumbnails[item.sku] || item.products?.image_url ? (
                     <img 
                       src={artworkThumbnails[item.sku] || item.products?.image_url} 
@@ -433,7 +531,7 @@ const Inventory = () => {
                     </div>
                   )}
                 </div>
-                <div className={`${isAdmin && isEditMode ? "col-span-3" : "col-span-3"} font-mono text-sm font-medium flex items-center gap-2`}>
+                <div className={`${isVibeAdmin && isEditMode ? "col-span-3" : "col-span-3"} font-mono text-sm font-medium flex items-center gap-2`}>
                   <span 
                     className="break-words"
                     title={item.sku}
@@ -483,9 +581,91 @@ const Inventory = () => {
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Add Inventory Dialog */}
+        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Inventory</DialogTitle>
+              <DialogDescription>
+                Manually add an inventory item for a product
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Product</Label>
+                <Select
+                  value={newInventory.product_id}
+                  onValueChange={(value) => setNewInventory({...newInventory, product_id: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.name} {product.item_id && `(${product.item_id})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>State</Label>
+                <Input
+                  value={newInventory.state}
+                  onChange={(e) => setNewInventory({...newInventory, state: e.target.value})}
+                  placeholder="e.g., NY, CA"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Available</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={newInventory.available}
+                    onChange={(e) => setNewInventory({...newInventory, available: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>In Production</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={newInventory.in_production}
+                    onChange={(e) => setNewInventory({...newInventory, in_production: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Redline</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={newInventory.redline}
+                    onChange={(e) => setNewInventory({...newInventory, redline: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAddInventory}>
+                  Add Inventory
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
   );
 };
 
