@@ -893,6 +893,10 @@ const InvoiceDetail = () => {
                         </div>
                       </div>
                     </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-primary">{formatCurrency(Number(invoice.total))}</div>
+                      <div className="text-xs text-muted-foreground">total</div>
+                    </div>
                   </div>
                 </div>
 
