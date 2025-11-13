@@ -20,6 +20,7 @@ import {
   Search, 
   Plus, 
   Edit,
+  Eye,
   CheckCircle,
   Trash2,
   Circle,
@@ -350,6 +351,18 @@ const Orders = () => {
                         {dueDate}
                       </div>
                       <div className="col-span-2 flex gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`);
+                          }}
+                          title="View Order"
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
                         {canEditOrder(order) && (
                           <>
                             <Button 
@@ -360,6 +373,7 @@ const Orders = () => {
                                 e.stopPropagation();
                                 navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/edit/${order.id}`);
                               }}
+                              title="Edit Order"
                             >
                               <Edit className="h-3 w-3" />
                             </Button>
@@ -368,6 +382,7 @@ const Orders = () => {
                               size="sm" 
                               className="h-6 w-6 p-0 text-destructive hover:text-destructive"
                               onClick={(e) => confirmDelete(order.id, e)}
+                              title="Delete Order"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -468,13 +483,23 @@ const Orders = () => {
                       {dueDate}
                     </div>
                     <div className="col-span-2 flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0"
+                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
+                        title="View Order"
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
                       {canEditOrder(order) && (
                         <>
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             className="h-6 w-6 p-0"
-                            onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
+                            onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/edit/${order.id}`)}
+                            title="Edit Order"
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
@@ -483,6 +508,7 @@ const Orders = () => {
                             size="sm" 
                             className="h-6 w-6 p-0 text-destructive hover:text-destructive"
                             onClick={(e) => confirmDelete(order.id, e)}
+                            title="Delete Order"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -561,13 +587,23 @@ const Orders = () => {
                       <Progress value={progress} className="h-1" />
                     </div>
                     <div className="col-span-2 flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0"
+                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
+                        title="View Order"
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
                       {canEditOrder(order) && (
                         <>
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             className="h-6 w-6 p-0"
-                            onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
+                            onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/edit/${order.id}`)}
+                            title="Edit Order"
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
@@ -576,6 +612,7 @@ const Orders = () => {
                             size="sm" 
                             className="h-6 w-6 p-0 text-destructive hover:text-destructive"
                             onClick={(e) => confirmDelete(order.id, e)}
+                            title="Delete Order"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
