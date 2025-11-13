@@ -60,6 +60,7 @@ const PullShip = () => {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [blanketOrders, setBlanketOrders] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [invoiceItemPrices, setInvoiceItemPrices] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchPullShipOrders();
@@ -392,7 +393,46 @@ const PullShip = () => {
     }));
     setInventory([]);
     setBlanketOrders([]);
+    setInvoiceItemPrices({});
     fetchBlanketOrders(companyId);
+  };
+
+  const fetchInvoiceItemPrices = async (parentOrderId: string) => {
+    if (!parentOrderId) {
+      setInvoiceItemPrices({});
+      return;
+    }
+
+    try {
+      // Fetch invoice items with their SKUs and unit prices from the parent order's invoice
+      const { data, error } = await supabase
+        .from('invoices')
+        .select(`
+          id,
+          order_items!inner(
+            sku,
+            unit_price
+          )
+        `)
+        .eq('order_id', parentOrderId)
+        .eq('invoice_type', 'full')
+        .single();
+
+      if (error) throw error;
+
+      // Create a map of SKU to unit price
+      const priceMap: Record<string, number> = {};
+      if (data?.order_items) {
+        data.order_items.forEach((item: any) => {
+          priceMap[item.sku] = item.unit_price;
+        });
+      }
+
+      setInvoiceItemPrices(priceMap);
+    } catch (error) {
+      console.error('Error fetching invoice item prices:', error);
+      setInvoiceItemPrices({});
+    }
   };
 
   const handleStateChange = (state: string) => {
@@ -686,6 +726,13 @@ const PullShip = () => {
 
   const handleInputChange = (field: string, value: string) => {
     setOrderData(prev => ({ ...prev, [field]: value }));
+    
+    // Fetch invoice item prices when parent order is selected
+    if (field === 'parentOrderId' && value) {
+      fetchInvoiceItemPrices(value);
+    } else if (field === 'parentOrderId' && !value) {
+      setInvoiceItemPrices({});
+    }
   };
 
   return (
@@ -982,13 +1029,18 @@ const PullShip = () => {
                   <div className="text-sm font-semibold text-primary">
                     Est. Value: ${(() => {
                       return Array.from(selectedSkus).reduce((sum, sku) => {
-                        const inventoryItem = inventory.find(item => item.sku === sku);
                         const quantity = skuQuantities[sku] || 1;
-                        const unitPrice = inventoryItem?.products?.cost || 1;
+                        // Use invoice price from parent order if available, otherwise fall back to product cost
+                        const unitPrice = invoiceItemPrices[sku] || 0;
                         return sum + (quantity * unitPrice);
                       }, 0).toFixed(2);
                     })()}
                   </div>
+                  {orderData.parentOrderId && Object.keys(invoiceItemPrices).length === 0 && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      No pricing data from linked invoice
+                    </div>
+                  )}
                 </div>
               </div>
             )}
