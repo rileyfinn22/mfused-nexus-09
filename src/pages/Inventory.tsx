@@ -87,8 +87,13 @@ const Inventory = () => {
       fetchArtworkThumbnails();
       if (isVibeAdmin) {
         fetchCompanies();
-        fetchProducts();
       }
+    }
+  }, [isVibeAdmin, companyFilter]);
+
+  useEffect(() => {
+    if (isVibeAdmin !== null && isVibeAdmin) {
+      fetchProducts();
     }
   }, [isVibeAdmin, companyFilter]);
 
@@ -252,11 +257,41 @@ const Inventory = () => {
   };
 
   const fetchProducts = async () => {
-    const { data } = await supabase
-      .from('products')
-      .select('id, name, item_id')
-      .order('name');
-    if (data) setProducts(data);
+    try {
+      // Get the appropriate company_id based on role
+      let targetCompanyId = companyFilter !== 'all' ? companyFilter : null;
+      
+      if (!isVibeAdmin) {
+        // For non-vibe admins, get their company
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: userRole } = await supabase
+          .from('user_roles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (userRole) {
+          targetCompanyId = userRole.company_id;
+        }
+      }
+
+      let query = supabase
+        .from('products')
+        .select('id, name, item_id, company_id')
+        .order('name');
+
+      // Filter by company if we have one
+      if (targetCompanyId) {
+        query = query.eq('company_id', targetCompanyId);
+      }
+
+      const { data } = await query;
+      if (data) setProducts(data);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
   };
 
   const handleAddInventory = async () => {
@@ -270,21 +305,28 @@ const Inventory = () => {
     }
 
     try {
-      // Get the SKU from the selected product
+      // Get the selected product with company_id
       const product = products.find(p => p.id === newInventory.product_id);
-      if (!product) return;
+      if (!product) {
+        toast({
+          title: "Error",
+          description: "Selected product not found.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      // Get company_id
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // Use the product's company_id to ensure proper correlation
+      const targetCompanyId = product.company_id;
 
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!userRole) return;
+      if (!targetCompanyId) {
+        toast({
+          title: "Error",
+          description: "Product is not associated with a company.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       const { error } = await supabase
         .from('inventory')
@@ -295,7 +337,7 @@ const Inventory = () => {
           in_production: newInventory.in_production,
           redline: newInventory.redline,
           product_id: newInventory.product_id,
-          company_id: companyFilter !== 'all' ? companyFilter : userRole.company_id
+          company_id: targetCompanyId
         });
 
       if (error) throw error;
