@@ -36,6 +36,7 @@ const InvoiceDetail = () => {
   const [editedItems, setEditedItems] = useState<any[]>([]);
   const [inventoryAllocations, setInventoryAllocations] = useState<any[]>([]);
   const [relatedInvoices, setRelatedInvoices] = useState<any[]>([]);
+  const [totalShippedAllInvoices, setTotalShippedAllInvoices] = useState(0);
   const [syncingToQB, setSyncingToQB] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [payments, setPayments] = useState<any[]>([]);
@@ -152,6 +153,23 @@ const InvoiceDetail = () => {
     if (relatedData) {
       setRelatedInvoices(relatedData);
     }
+
+    // Fetch ALL inventory allocations for ALL invoices connected to this order (for progress calculation)
+    const { data: allAllocations } = await supabase
+      .from('inventory_allocations')
+      .select(`
+        quantity_allocated,
+        invoice_id,
+        invoices!inner(order_id)
+      `)
+      .eq('invoices.order_id', invoiceData.order_id);
+    
+    // Calculate total shipped across all invoices for this order
+    const totalShippedAcrossAllInvoices = allAllocations?.reduce((sum, alloc) => 
+      sum + Number(alloc.quantity_allocated || 0), 0) || 0;
+    
+    setTotalShippedAllInvoices(totalShippedAcrossAllInvoices);
+    console.log('Total shipped across all invoices:', totalShippedAcrossAllInvoices);
 
     // Fetch payments for this invoice
     const { data: paymentsData } = await supabase
@@ -990,39 +1008,20 @@ const InvoiceDetail = () => {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Total Shipped Progress</span>
                   {(() => {
-                    // For "full" invoices (blanket orders), sum all shipped quantities from inventory allocations
-                    // For "partial" invoices, show actual shipped quantity progress from this invoice's allocations
-                    if (invoice.invoice_type === 'full') {
-                      const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
-                      // Calculate shipped from inventory allocations (more accurate than order_items shipped_quantity)
-                      const totalShipped = inventoryAllocations.reduce((sum: number, alloc: any) => sum + Number(alloc.quantity_allocated || 0), 0);
-                      const actualPercentage = totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
-                      
-                      return (
-                        <span className="text-sm font-semibold">{actualPercentage.toFixed(1)}% ({totalShipped.toLocaleString()} / {totalOrdered.toLocaleString()} units)</span>
-                      );
-                    } else {
-                      const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
-                      const totalShipped = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0), 0) || 0;
-                      const actualPercentage = totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
-                      
-                      return (
-                        <span className="text-sm font-semibold">{actualPercentage.toFixed(1)}% ({totalShipped.toLocaleString()} / {totalOrdered.toLocaleString()} units)</span>
-                      );
-                    }
+                    // Total ordered quantity from the parent order
+                    const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
+                    // Total shipped across ALL invoices for this order
+                    const actualPercentage = totalOrdered > 0 ? (totalShippedAllInvoices / totalOrdered) * 100 : 0;
+                    
+                    return (
+                      <span className="text-sm font-semibold">{actualPercentage.toFixed(1)}% ({totalShippedAllInvoices.toLocaleString()} / {totalOrdered.toLocaleString()} units)</span>
+                    );
                   })()}
                 </div>
                 <Progress 
                   value={(() => {
-                    if (invoice.invoice_type === 'full') {
-                      const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
-                      const totalShipped = inventoryAllocations.reduce((sum: number, alloc: any) => sum + Number(alloc.quantity_allocated || 0), 0);
-                      return totalOrdered > 0 ? Math.min(100, (totalShipped / totalOrdered) * 100) : 0;
-                    } else {
-                      const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
-                      const totalShipped = inventoryAllocations.reduce((sum: number, alloc: any) => sum + Number(alloc.quantity_allocated || 0), 0);
-                      return totalOrdered > 0 ? Math.min(100, (totalShipped / totalOrdered) * 100) : 0;
-                    }
+                    const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
+                    return totalOrdered > 0 ? Math.min(100, (totalShippedAllInvoices / totalOrdered) * 100) : 0;
                   })()} 
                   className="h-3" 
                 />
