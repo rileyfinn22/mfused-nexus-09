@@ -180,7 +180,7 @@ const PullShipOrders = () => {
             shipping_cost: order.shipping_cost || 0,
             shipment_number: nextShipmentNumber,
             billed_percentage: Number(percentageOfOrder.toFixed(2)),
-            status: 'draft',
+            status: 'open',
             notes: `Pull & Ship Order: ${orderNumber}`,
             created_by: user.id
           })
