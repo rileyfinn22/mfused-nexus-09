@@ -1121,7 +1121,6 @@ const OrderDetail = () => {
                                 <span className="font-mono text-sm font-medium">{invoice.invoice_number}</span>
                                 <Badge className={
                                   invoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
-                                  invoice.invoice_type === 'final' ? 'bg-green-500 text-white' :
                                   'bg-purple-500 text-white'
                                 }>
                                   {invoice.invoice_type?.toUpperCase() || 'FULL'}
