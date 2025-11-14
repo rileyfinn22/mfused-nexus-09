@@ -258,20 +258,6 @@ const Invoices = () => {
           <Badge className="bg-blue-500 text-white mr-2">Partial</Badge>
           {invoices.filter(inv => inv.invoice_type === 'partial').length}
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8"
-          onClick={() => {
-            const finalInvoices = invoices.filter(inv => inv.invoice_type === 'final');
-            if (finalInvoices.length === 0) {
-              toast({ title: "No Final Invoices", description: "No final invoices found" });
-            }
-          }}
-        >
-          <Badge className="bg-green-500 text-white mr-2">Final</Badge>
-          {invoices.filter(inv => inv.invoice_type === 'final').length}
-        </Button>
       </div>
 
       {/* Invoices Table */}

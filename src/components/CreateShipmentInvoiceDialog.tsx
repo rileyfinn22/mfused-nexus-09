@@ -192,10 +192,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         );
         billedPercentage = totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
         
-        const totalPreviouslyShipped = order.order_items.reduce((sum: number, item: any) => 
-          sum + (item.shipped_quantity || 0), 0
-        );
-        invoiceType = (totalShipped + totalPreviouslyShipped >= totalOrdered) ? 'final' : 'partial';
+        invoiceType = 'partial';
       }
 
       const tax = 0; // Tax removed - included in unit price
@@ -474,7 +471,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                         <AlertDescription className="ml-2">
                           <div className="space-y-1">
                             <p>
-                              <strong>This will be a {willBeFinal ? 'FINAL' : 'PARTIAL'} invoice</strong> 
+                              <strong>This will be a PARTIAL invoice</strong> 
                               {' '}(Shipment #{nextShipmentNumber})
                             </p>
                             <p className="text-sm">
