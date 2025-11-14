@@ -700,9 +700,9 @@ const InvoiceDetail = () => {
                 <span className={`inline-block px-4 py-1.5 rounded-full text-sm font-medium capitalize ${
                   invoice.status === 'paid' ? 'bg-green-500/10 text-green-600' :
                   invoice.status === 'due' ? 'bg-orange-500/10 text-orange-600' :
-                  'bg-primary/10 text-primary'
+                  'bg-blue-500/10 text-blue-600'
                 }`}>
-                  {invoice.status.replace('_', ' ')}
+                  {invoice.status === 'draft' || invoice.status === 'pending' ? 'Open' : invoice.status.replace('_', ' ')}
                 </span>
                 <div className="mt-4">
                   <p className="text-sm text-muted-foreground">Invoice Date</p>
@@ -922,7 +922,7 @@ const InvoiceDetail = () => {
                         </div>
                         <div>
                           <span className="text-muted-foreground">Status: </span>
-                          <span className="capitalize">{invoice.status.replace('_', ' ')}</span>
+                          <span className="capitalize">{invoice.status === 'draft' || invoice.status === 'pending' ? 'Open' : invoice.status.replace('_', ' ')}</span>
                         </div>
                         <div>
                           <span className="text-muted-foreground">Date: </span>
@@ -969,7 +969,7 @@ const InvoiceDetail = () => {
                             </div>
                             <div>
                               <span className="text-muted-foreground">Status: </span>
-                              <span className="capitalize">{relInv.status.replace('_', ' ')}</span>
+                              <span className="capitalize">{relInv.status === 'draft' || relInv.status === 'pending' ? 'Open' : relInv.status.replace('_', ' ')}</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Date: </span>
