@@ -990,18 +990,15 @@ const InvoiceDetail = () => {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Total Shipped Progress</span>
                   {(() => {
-                    // For "full" invoices (blanket orders), show cumulative billed percentage from all partial invoices
+                    // For "full" invoices (blanket orders), sum all shipped quantities from all partial invoices
                     // For "partial" invoices, show actual shipped quantity progress
                     if (invoice.invoice_type === 'full') {
-                      // Include current invoice's billed percentage plus all related partial invoices
-                      const currentBilled = invoice.billed_percentage || 0;
-                      const relatedBilled = relatedInvoices
-                        .filter(inv => inv.invoice_type === 'partial')
-                        .reduce((sum, inv) => sum + (inv.billed_percentage || 0), 0);
-                      const totalBilledPercent = currentBilled + relatedBilled;
+                      const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
+                      const totalShipped = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0), 0) || 0;
+                      const actualPercentage = totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
                       
                       return (
-                        <span className="text-sm font-semibold">{totalBilledPercent.toFixed(1)}%</span>
+                        <span className="text-sm font-semibold">{actualPercentage.toFixed(1)}% ({totalShipped.toLocaleString()} / {totalOrdered.toLocaleString()} units)</span>
                       );
                     } else {
                       const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
