@@ -993,12 +993,15 @@ const InvoiceDetail = () => {
                     // For "full" invoices (blanket orders), show cumulative billed percentage from all partial invoices
                     // For "partial" invoices, show actual shipped quantity progress
                     if (invoice.invoice_type === 'full') {
-                      const totalBilledPercent = relatedInvoices
+                      // Include current invoice's billed percentage plus all related partial invoices
+                      const currentBilled = invoice.billed_percentage || 0;
+                      const relatedBilled = relatedInvoices
                         .filter(inv => inv.invoice_type === 'partial')
                         .reduce((sum, inv) => sum + (inv.billed_percentage || 0), 0);
+                      const totalBilledPercent = currentBilled + relatedBilled;
                       
                       return (
-                        <span className="text-sm font-semibold">{totalBilledPercent.toFixed(1)}% (billed from partial invoices)</span>
+                        <span className="text-sm font-semibold">{totalBilledPercent.toFixed(1)}%</span>
                       );
                     } else {
                       const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
