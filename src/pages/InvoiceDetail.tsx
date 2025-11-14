@@ -990,11 +990,12 @@ const InvoiceDetail = () => {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Total Shipped Progress</span>
                   {(() => {
-                    // For "full" invoices (blanket orders), sum all shipped quantities from all partial invoices
-                    // For "partial" invoices, show actual shipped quantity progress
+                    // For "full" invoices (blanket orders), sum all shipped quantities from inventory allocations
+                    // For "partial" invoices, show actual shipped quantity progress from this invoice's allocations
                     if (invoice.invoice_type === 'full') {
                       const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
-                      const totalShipped = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0), 0) || 0;
+                      // Calculate shipped from inventory allocations (more accurate than order_items shipped_quantity)
+                      const totalShipped = inventoryAllocations.reduce((sum: number, alloc: any) => sum + Number(alloc.quantity_allocated || 0), 0);
                       const actualPercentage = totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
                       
                       return (
@@ -1013,9 +1014,15 @@ const InvoiceDetail = () => {
                 </div>
                 <Progress 
                   value={(() => {
-                    const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
-                    const totalShipped = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0), 0) || 0;
-                    return totalOrdered > 0 ? Math.min(100, (totalShipped / totalOrdered) * 100) : 0;
+                    if (invoice.invoice_type === 'full') {
+                      const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
+                      const totalShipped = inventoryAllocations.reduce((sum: number, alloc: any) => sum + Number(alloc.quantity_allocated || 0), 0);
+                      return totalOrdered > 0 ? Math.min(100, (totalShipped / totalOrdered) * 100) : 0;
+                    } else {
+                      const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
+                      const totalShipped = inventoryAllocations.reduce((sum: number, alloc: any) => sum + Number(alloc.quantity_allocated || 0), 0);
+                      return totalOrdered > 0 ? Math.min(100, (totalShipped / totalOrdered) * 100) : 0;
+                    }
                   })()} 
                   className="h-3" 
                 />
