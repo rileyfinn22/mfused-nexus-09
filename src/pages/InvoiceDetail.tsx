@@ -908,7 +908,6 @@ const InvoiceDetail = () => {
                         <span className="font-mono font-semibold">{invoice.invoice_number}</span>
                         <Badge className={
                           invoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
-                          invoice.invoice_type === 'final' ? 'bg-green-500 text-white' :
                           'bg-purple-500 text-white'
                         }>
                           {invoice.invoice_type?.toUpperCase() || 'FULL'}
@@ -956,7 +955,6 @@ const InvoiceDetail = () => {
                             </button>
                             <Badge className={
                               relInv.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
-                              relInv.invoice_type === 'final' ? 'bg-green-500 text-white' :
                               'bg-purple-500 text-white'
                             }>
                               {relInv.invoice_type?.toUpperCase() || 'FULL'}
@@ -1426,7 +1424,6 @@ const InvoiceDetail = () => {
                       <span className="font-mono text-sm">{relInvoice.invoice_number}</span>
                       <span className={`px-3 py-1 rounded-md text-xs font-medium ${
                         relInvoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
-                        relInvoice.invoice_type === 'final' ? 'bg-green-500 text-white' :
                         'bg-purple-500 text-white'
                       }`}>
                         {relInvoice.invoice_type?.toUpperCase()}
