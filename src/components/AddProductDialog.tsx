@@ -89,6 +89,12 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
     }
   };
 
+  const generateTempSKU = () => {
+    // Generate VB- followed by 5 random digits
+    const randomDigits = Math.floor(10000 + Math.random() * 90000);
+    return `VB-${randomDigits}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -139,6 +145,9 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
         imageUrl = publicUrl;
       }
 
+      // Generate temporary SKU if no item_id is provided
+      const tempSKU = generateTempSKU();
+
       // Create product
       const { data: product, error: productError } = await supabase
         .from('products')
@@ -150,6 +159,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
           price: formData.price ? parseFloat(formData.price) : null,
           preferred_vendor_id: formData.preferred_vendor_id || null,
           image_url: imageUrl,
+          item_id: tempSKU,
           company_id: companyId
         })
         .select()

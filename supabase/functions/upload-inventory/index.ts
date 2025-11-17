@@ -197,13 +197,16 @@ serve(async (req) => {
             productId = existingProduct.id;
             console.log(`Matched product by name "${sku}": ${existingProduct.id}`);
           } else {
+            // Generate temporary SKU if itemId is null (VB- + 5 random digits)
+            const finalItemId = itemId || `VB-${Math.floor(10000 + Math.random() * 90000)}`;
+            
             // Create new product with full SKU as item_id
             const { data: newProduct, error: productError } = await supabaseClient
               .from('products')
               .insert({
                 company_id: companyId,
                 name: sku,
-                item_id: itemId, // Store the full SKU with state (e.g., "PCK-00365-NY")
+                item_id: finalItemId, // Store the full SKU with state or temp VB- SKU
                 category: 'General'
               })
               .select('id')
@@ -214,7 +217,7 @@ serve(async (req) => {
               continue;
             }
             productId = newProduct.id;
-            console.log(`Created new product with item_id "${itemId}": ${productId}`);
+            console.log(`Created new product with item_id "${finalItemId}": ${productId}`);
           }
         }
       }
