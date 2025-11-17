@@ -1002,30 +1002,6 @@ const InvoiceDetail = () => {
                   );
                 })}
               </div>
-              
-              {/* Overall Progress */}
-              <div className="mt-6 p-4 bg-background rounded-lg border border-table-border">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium">Total Shipped Progress</span>
-                  {(() => {
-                    // Total ordered quantity from the parent order
-                    const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
-                    // Total shipped across ALL invoices for this order
-                    const actualPercentage = totalOrdered > 0 ? (totalShippedAllInvoices / totalOrdered) * 100 : 0;
-                    
-                    return (
-                      <span className="text-sm font-semibold">{actualPercentage.toFixed(1)}% ({totalShippedAllInvoices.toLocaleString()} / {totalOrdered.toLocaleString()} units)</span>
-                    );
-                  })()}
-                </div>
-                <Progress 
-                  value={(() => {
-                    const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
-                    return totalOrdered > 0 ? Math.min(100, (totalShippedAllInvoices / totalOrdered) * 100) : 0;
-                  })()} 
-                  className="h-3" 
-                />
-              </div>
             </div>
           )}
 

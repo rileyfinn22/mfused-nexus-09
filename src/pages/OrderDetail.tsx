@@ -909,25 +909,6 @@ const OrderDetail = () => {
                 
                 return (
                   <>
-                    {/* Overall Progress */}
-                    <div className="mb-6 p-4 bg-background rounded-lg border border-table-border">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">Overall Progress</span>
-                        <span className="text-sm text-muted-foreground">
-                          {totalShipped} of {totalOrdered} units shipped ({fulfillmentProgress.toFixed(1)}%)
-                        </span>
-                      </div>
-                      <Progress value={fulfillmentProgress} className="h-3" />
-                      <div className="flex justify-between mt-2">
-                        <Badge variant={totalShipped === 0 ? "secondary" : totalShipped < totalOrdered ? "outline" : "default"}>
-                          {totalShipped === 0 ? "Not Shipped" : totalShipped < totalOrdered ? "Partially Shipped" : "Fully Shipped"}
-                        </Badge>
-                        {invoices.length > 0 && (
-                          <span className="text-xs text-muted-foreground">{invoices.length} shipment(s) created</span>
-                        )}
-                      </div>
-                    </div>
-
                     {/* Item-by-Item Breakdown */}
                     <div className="border border-table-border rounded-lg overflow-hidden">
                       <Table>
