@@ -414,7 +414,8 @@ const Invoices = () => {
                               try {
                                 // Restore quantities and inventory before deleting
                                 // Only for shipment invoices, not deposit invoices
-                                if (invoice.invoice_type !== 'deposit') {
+                                const isDeposit = invoice.notes && invoice.notes.includes('deposit payment');
+                                if (!isDeposit) {
                                   const { data: allocations } = await supabase
                                     .from('inventory_allocations')
                                     .select('*')
