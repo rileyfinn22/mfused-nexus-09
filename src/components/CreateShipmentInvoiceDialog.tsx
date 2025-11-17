@@ -229,17 +229,25 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
 
       // Only allocate inventory for shipment invoices, not deposit invoices
       if (invoiceMode === 'shipment') {
-        // Update order items shipped quantities
+        // Update order items shipped quantities FIRST
         for (const item of itemsToShip) {
           const quantityToShip = shipmentQuantities[item.id];
           if (quantityToShip === 0) continue;
 
-          await supabase
+          const newShippedQty = (item.shipped_quantity || 0) + quantityToShip;
+          console.log(`Updating shipped_quantity for item ${item.id}: ${item.shipped_quantity || 0} + ${quantityToShip} = ${newShippedQty}`);
+          
+          const { error: updateError } = await supabase
             .from('order_items')
             .update({
-              shipped_quantity: (item.shipped_quantity || 0) + quantityToShip
+              shipped_quantity: newShippedQty
             })
             .eq('id', item.id);
+
+          if (updateError) {
+            console.error('Error updating shipped_quantity:', updateError);
+            throw updateError;
+          }
 
           // Try to allocate from inventory if available (FIFO)
           const inventoryLocations = availableInventory[item.sku] || [];
