@@ -832,10 +832,10 @@ const InvoiceDetail = () => {
                     <div className="bg-background/50 border rounded-lg p-4">
                       <div className="text-sm text-muted-foreground mb-1">Amount Due</div>
                       <div className="text-2xl font-bold text-green-700 dark:text-green-400">
-                        {formatCurrency(Number(invoice.total) - Number(invoice.total_paid || 0))}
+                        {formatCurrency(Number(displayTotal) - Number(invoice.total_paid || 0))}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        of {formatCurrency(Number(invoice.total))} total
+                        of {formatCurrency(Number(displayTotal))} total
                       </div>
                     </div>
                     
@@ -853,7 +853,7 @@ const InvoiceDetail = () => {
                     <div className="bg-background/50 border rounded-lg p-4">
                       <div className="text-sm text-muted-foreground mb-1">Payment Status</div>
                       {(() => {
-                        const amountDue = Number(invoice.total) - Number(invoice.total_paid || 0);
+                        const amountDue = Number(displayTotal) - Number(invoice.total_paid || 0);
                         const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
                         const today = new Date();
                         const daysOverdue = dueDate ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
@@ -1170,7 +1170,7 @@ const InvoiceDetail = () => {
                 ? (rawShipmentValue / orderSubtotal) * totalDepositAmount 
                 : 0;
               
-              const netBillAmount = invoice.total;
+              const netBillAmount = displayTotal;
               
               return (
                 <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-6">
@@ -1237,7 +1237,7 @@ const InvoiceDetail = () => {
             <div className="text-right space-y-1">
               <div>
                 <p className="text-xs text-muted-foreground">Invoice Total</p>
-                <p className="text-lg font-semibold">{formatCurrency(invoice.total)}</p>
+                <p className="text-lg font-semibold">{formatCurrency(displayTotal)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Paid</p>
@@ -1246,7 +1246,7 @@ const InvoiceDetail = () => {
               <div className="pt-2 border-t">
                 <p className="text-xs text-muted-foreground">Remaining Balance</p>
                 <p className="text-xl font-bold text-primary">
-                  {formatCurrency(invoice.total - (invoice.total_paid || 0))}
+                  {formatCurrency(displayTotal - (invoice.total_paid || 0))}
                 </p>
               </div>
             </div>
@@ -1333,8 +1333,8 @@ const InvoiceDetail = () => {
         </CardContent>
       </Card>
 
-      {/* Attached Vendor POs - For Admin View */}
-      {isVibeAdmin && vendorPOs.length > 0 && (
+      {/* Attached Vendor POs - For Admin View on Full Invoices Only */}
+      {isVibeAdmin && invoice?.invoice_type === 'full' && vendorPOs.length > 0 && (
         <Card className="shadow-lg">
           <CardContent className="p-8">
             <div className="flex justify-between items-center mb-6">
