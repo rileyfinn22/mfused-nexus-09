@@ -918,14 +918,12 @@ const OrderDetail = () => {
                             <TableHead>SKU</TableHead>
                             <TableHead className="text-right">Ordered</TableHead>
                             <TableHead className="text-right">Shipped</TableHead>
-                            <TableHead className="text-right">Remaining</TableHead>
                             <TableHead className="w-48">Progress</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {order.order_items?.map((item: any) => {
                             const shipped = item.shipped_quantity || 0;
-                            const remaining = item.quantity - shipped;
                             const itemProgress = (shipped / item.quantity) * 100;
                             
                             return (
@@ -934,11 +932,6 @@ const OrderDetail = () => {
                                 <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                                 <TableCell className="text-right">{item.quantity}</TableCell>
                                 <TableCell className="text-right font-medium">{shipped}</TableCell>
-                                <TableCell className="text-right">
-                                  <span className={remaining > 0 ? "text-warning" : "text-success"}>
-                                    {remaining}
-                                  </span>
-                                </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-2">
                                     <Progress value={itemProgress} className="h-2 flex-1" />
