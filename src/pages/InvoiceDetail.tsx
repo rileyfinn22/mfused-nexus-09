@@ -43,6 +43,7 @@ const InvoiceDetail = () => {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [refreshingLink, setRefreshingLink] = useState(false);
+  const [syncingPayment, setSyncingPayment] = useState<string | null>(null);
   const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
 
   useEffect(() => {
@@ -494,6 +495,53 @@ const InvoiceDetail = () => {
       });
     } finally {
       setRefreshingLink(false);
+    }
+  };
+
+  const handleSyncPayment = async (paymentId: string) => {
+    setSyncingPayment(paymentId);
+    try {
+      const isConnected = await checkConnection();
+      if (!isConnected) {
+        toast({
+          title: "Not Connected",
+          description: "QuickBooks is not connected. Please connect in Settings.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Check if invoice is synced first
+      if (!invoice?.quickbooks_id) {
+        toast({
+          title: "Invoice Not Synced",
+          description: "Please sync the invoice to QuickBooks first before syncing payments.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke('quickbooks-sync-payment', {
+        body: { paymentId }
+      });
+
+      if (error) throw error;
+      
+      toast({
+        title: "Payment Synced",
+        description: "Payment successfully synced to QuickBooks"
+      });
+      
+      // Refresh to show updated sync status
+      setTimeout(() => fetchInvoiceDetails(), 1000);
+    } catch (error: any) {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync payment to QuickBooks",
+        variant: "destructive"
+      });
+    } finally {
+      setSyncingPayment(null);
     }
   };
 
@@ -1213,6 +1261,7 @@ const InvoiceDetail = () => {
                   <TableHead>Reference</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead>Notes</TableHead>
+                  {isVibeAdmin && <TableHead>QuickBooks</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1235,6 +1284,41 @@ const InvoiceDetail = () => {
                     <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
                       {payment.notes || '-'}
                     </TableCell>
+                    {isVibeAdmin && (
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {payment.quickbooks_sync_status === 'synced' ? (
+                            <Badge variant="outline" className="bg-success/10 text-success border-success/20">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Synced
+                            </Badge>
+                          ) : payment.quickbooks_sync_status === 'error' ? (
+                            <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+                              Error
+                            </Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSyncPayment(payment.id)}
+                              disabled={syncingPayment === payment.id || !invoice?.quickbooks_id}
+                            >
+                              {syncingPayment === payment.id ? (
+                                <>
+                                  <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                                  Syncing...
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="h-3 w-3 mr-1" />
+                                  Sync
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
