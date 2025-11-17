@@ -1042,7 +1042,7 @@ const InvoiceDetail = () => {
                 {/* Child Invoices (deposits, shipments, etc.) */}
                 {(() => {
                   const childInvoices = [...relatedInvoices]
-                    .filter(inv => inv.shipment_number > 1)
+                    .filter(inv => inv.shipment_number > 1 && inv.id !== invoice.id) // Exclude current invoice from timeline
                     .sort((a, b) => a.shipment_number - b.shipment_number);
                   
                   if (childInvoices.length === 0) return null;
@@ -1050,13 +1050,11 @@ const InvoiceDetail = () => {
                   return (
                     <>
                       <div className="pl-8 border-l-2 border-muted space-y-3">
-                        <p className="text-sm font-semibold text-muted-foreground mb-3">Child Invoices</p>
+                        <p className="text-sm font-semibold text-muted-foreground mb-3">Other Child Invoices</p>
                         
                         {childInvoices.map((relInv) => {
-                          const isCurrentInvoice = relInv.id === invoice.id;
-                          
                           return (
-                            <div key={relInv.id} className={`p-4 rounded-lg border ${isCurrentInvoice ? 'bg-primary/10 border-primary border-2' : 'bg-background border-table-border hover:border-primary/40'} transition-colors`}>
+                            <div key={relInv.id} className="p-4 rounded-lg border bg-background border-table-border hover:border-primary/40 transition-colors">
                               <div className="flex items-start gap-4">
                                 <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center font-bold text-lg shrink-0">
                                   {relInv.shipment_number}
@@ -1064,8 +1062,8 @@ const InvoiceDetail = () => {
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-2">
                                     <button
-                                      onClick={() => isCurrentInvoice ? null : navigate(`/invoices/${relInv.id}`)}
-                                      className={`font-mono font-medium ${isCurrentInvoice ? '' : 'hover:text-primary underline'}`}
+                                      onClick={() => navigate(`/invoices/${relInv.id}`)}
+                                      className="font-mono font-medium hover:text-primary underline"
                                     >
                                       {relInv.invoice_number}
                                     </button>
@@ -1077,11 +1075,6 @@ const InvoiceDetail = () => {
                                       {(relInv.notes && relInv.notes.includes('deposit payment')) ? 'DEPOSIT' : 
                                        relInv.invoice_type?.toUpperCase() || 'SHIPMENT'}
                                     </Badge>
-                                    {isCurrentInvoice && (
-                                      <Badge variant="outline" className="bg-primary/10 border-primary">
-                                        Viewing Now
-                                      </Badge>
-                                    )}
                                   </div>
                                   <div className="grid grid-cols-3 gap-4 text-sm">
                                     <div>
