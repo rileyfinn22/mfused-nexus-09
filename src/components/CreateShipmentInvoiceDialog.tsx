@@ -179,7 +179,14 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       if (invoiceMode === 'deposit') {
         // Deposit invoice - calculate % of blanket invoice total
         const depositPct = parseFloat(depositPercentage) / 100;
+        console.log('Deposit calculation:', {
+          depositPercentage,
+          depositPct,
+          blanketTotal: blanketInvoice.total,
+          blanketTotalNumber: Number(blanketInvoice.total)
+        });
         subtotal = Number(blanketInvoice.total) * depositPct;
+        console.log('Calculated deposit subtotal:', subtotal);
         billedPercentage = parseFloat(depositPercentage);
         invoiceType = 'partial'; // Use 'partial' type for deposits (identified by billed_percentage)
         // Don't allocate any items for deposit invoice
