@@ -184,7 +184,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         const depositPct = parseFloat(depositPercentage) / 100;
         subtotal = orderSubtotal * depositPct;
         billedPercentage = parseFloat(depositPercentage);
-        invoiceType = 'deposit';
+        invoiceType = 'partial'; // Use 'partial' type for deposits (identified by billed_percentage)
         // Don't allocate any items for deposit invoice
       } else {
         // Shipment invoice - based on quantities
@@ -208,7 +208,8 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         const totalAlreadyBilled = existingInvoices
           .filter(inv => inv.invoice_type !== 'full') // Exclude blanket invoice
           .reduce((sum, inv) => {
-            if (inv.invoice_type === 'deposit') {
+            // Deposits are identified by notes containing "deposit payment"
+            if (inv.notes && inv.notes.includes('deposit payment')) {
               // For deposits, use the full total
               return sum + parseFloat(inv.total || 0);
             }

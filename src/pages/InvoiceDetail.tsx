@@ -211,7 +211,9 @@ const InvoiceDetail = () => {
 
       // Restore quantities and inventory before deleting
       // Only for shipment invoices, not deposit invoices
-      if (invoice?.invoice_type !== 'deposit') {
+      // Deposits are identified by notes containing "deposit payment"
+      const isDeposit = invoice?.notes && invoice.notes.includes('deposit payment');
+      if (!isDeposit) {
         // Fetch all allocations for this invoice
         const { data: allocations } = await supabase
           .from('inventory_allocations')
@@ -1068,11 +1070,12 @@ const InvoiceDetail = () => {
                                       {relInv.invoice_number}
                                     </button>
                                     <Badge className={
-                                      relInv.invoice_type === 'deposit' ? 'bg-yellow-500 text-white' :
+                                      (relInv.notes && relInv.notes.includes('deposit payment')) ? 'bg-yellow-500 text-white' :
                                       relInv.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
                                       'bg-purple-500 text-white'
                                     }>
-                                      {relInv.invoice_type?.toUpperCase() || 'SHIPMENT'}
+                                      {(relInv.notes && relInv.notes.includes('deposit payment')) ? 'DEPOSIT' : 
+                                       relInv.invoice_type?.toUpperCase() || 'SHIPMENT'}
                                     </Badge>
                                     {isCurrentInvoice && (
                                       <Badge variant="outline" className="bg-primary/10 border-primary">
@@ -1095,10 +1098,10 @@ const InvoiceDetail = () => {
                                     </div>
                                   </div>
                                 </div>
-                                <div className="text-right">
+                                  <div className="text-right">
                                   <div className="text-lg font-semibold">{formatCurrency(Number(relInv.total))}</div>
                                   <div className="text-xs text-muted-foreground">
-                                    {relInv.invoice_type === 'deposit' ? 'Deposit' : 'Shipment'}
+                                    {(relInv.notes && relInv.notes.includes('deposit payment')) ? 'Deposit' : 'Shipment'}
                                   </div>
                                 </div>
                               </div>
@@ -1232,7 +1235,7 @@ const InvoiceDetail = () => {
                       <span className="font-semibold">{formatCurrency(blanketTotal)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">This {invoice.invoice_type === 'deposit' ? 'Deposit' : 'Shipment'}</span>
+                      <span className="text-muted-foreground">This {(invoice.notes && invoice.notes.includes('deposit payment')) ? 'Deposit' : 'Shipment'}</span>
                       <span className="font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(thisInvoiceTotal)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
