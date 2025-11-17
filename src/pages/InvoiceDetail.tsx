@@ -963,97 +963,140 @@ const InvoiceDetail = () => {
             </div>
           )}
 
-          {/* Shipment Timeline - Show all related invoices */}
+          {/* Shipment Timeline - Show blanket invoice and all child invoices */}
           {relatedInvoices.length > 0 && (
             <div className="p-8 border-t bg-gradient-to-b from-primary/5 to-transparent">
-              <h2 className="text-lg font-semibold mb-4">Shipment Timeline for Order {order?.order_number}</h2>
+              <h2 className="text-lg font-semibold mb-4">Invoice Timeline for Order {order?.order_number}</h2>
               <div className="space-y-3">
-                {/* Current invoice first */}
-                <div className="p-4 bg-primary/10 border-2 border-primary rounded-lg">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg shrink-0">
-                      {invoice.shipment_number}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-mono font-semibold">{invoice.invoice_number}</span>
-                        <Badge className={
-                          invoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
-                          'bg-purple-500 text-white'
-                        }>
-                          {invoice.invoice_type?.toUpperCase() || 'FULL'}
-                        </Badge>
-                        
-                      </div>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Amount: </span>
-                          <span className="font-semibold">{formatCurrency(Number(invoice.total))}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Status: </span>
-                          <span className="capitalize">{invoice.status === 'draft' || invoice.status === 'pending' ? 'Open' : invoice.status.replace('_', ' ')}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Date: </span>
-                          <span>{new Date(invoice.created_at).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">{formatCurrency(Number(invoice.total))}</div>
-                      <div className="text-xs text-muted-foreground">total</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Other invoices */}
-                {[...relatedInvoices].sort((a, b) => a.shipment_number - b.shipment_number).map((relInv, idx) => {
+                {/* Blanket Invoice - Always show first */}
+                {(() => {
+                  const blanketInvoice = relatedInvoices.find(inv => inv.invoice_type === 'full' && inv.shipment_number === 1);
+                  const isCurrentBlanket = blanketInvoice?.id === invoice.id;
+                  
+                  if (!blanketInvoice) return null;
                   
                   return (
-                    <div key={relInv.id} className="p-4 bg-background border border-table-border rounded-lg hover:border-primary/40 transition-colors">
+                    <div className={`p-4 border-2 rounded-lg ${isCurrentBlanket ? 'bg-primary/10 border-primary' : 'bg-green-500/10 border-green-500/30'}`}>
                       <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center font-bold text-lg shrink-0">
-                          {relInv.shipment_number}
+                        <div className="w-12 h-12 rounded-full bg-green-600 text-white flex items-center justify-center font-bold text-lg shrink-0">
+                          <FileText className="h-6 w-6" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <button
-                              onClick={() => navigate(`/invoices/${relInv.id}`)}
-                              className="font-mono font-medium hover:text-primary underline"
+                              onClick={() => isCurrentBlanket ? null : navigate(`/invoices/${blanketInvoice.id}`)}
+                              className={`font-mono font-semibold ${isCurrentBlanket ? '' : 'hover:text-primary underline'}`}
                             >
-                              {relInv.invoice_number}
+                              {blanketInvoice.invoice_number}
                             </button>
-                            <Badge className={
-                              relInv.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
-                              'bg-purple-500 text-white'
-                            }>
-                              {relInv.invoice_type?.toUpperCase() || 'FULL'}
+                            <Badge className="bg-green-600 text-white">
+                              BLANKET INVOICE
                             </Badge>
+                            {isCurrentBlanket && (
+                              <Badge variant="outline" className="bg-primary/10 border-primary">
+                                Viewing Now
+                              </Badge>
+                            )}
                           </div>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Full order blanket invoice - All deposits and shipments bill against this total
+                          </p>
                           <div className="grid grid-cols-3 gap-4 text-sm">
                             <div>
                               <span className="text-muted-foreground">Amount: </span>
-                              <span className="font-semibold">{formatCurrency(Number(relInv.total))}</span>
+                              <span className="font-semibold">{formatCurrency(Number(blanketInvoice.total))}</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Status: </span>
-                              <span className="capitalize">{relInv.status === 'draft' || relInv.status === 'pending' ? 'Open' : relInv.status.replace('_', ' ')}</span>
+                              <span className="capitalize">{blanketInvoice.status === 'draft' || blanketInvoice.status === 'pending' ? 'Open' : blanketInvoice.status.replace('_', ' ')}</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Date: </span>
-                              <span>{new Date(relInv.created_at).toLocaleDateString()}</span>
+                              <span>{new Date(blanketInvoice.created_at).toLocaleDateString()}</span>
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-lg font-semibold">{formatCurrency(Number(relInv.total))}</div>
-                          <div className="text-xs text-muted-foreground">Invoice Total</div>
+                          <div className="text-2xl font-bold text-green-700">{formatCurrency(Number(blanketInvoice.total))}</div>
+                          <div className="text-xs text-muted-foreground">total</div>
                         </div>
                       </div>
                     </div>
                   );
-                })}
+                })()}
+
+                {/* Child Invoices (deposits, shipments, etc.) */}
+                {(() => {
+                  const childInvoices = [...relatedInvoices]
+                    .filter(inv => inv.shipment_number > 1)
+                    .sort((a, b) => a.shipment_number - b.shipment_number);
+                  
+                  if (childInvoices.length === 0) return null;
+                  
+                  return (
+                    <>
+                      <div className="pl-8 border-l-2 border-muted space-y-3">
+                        <p className="text-sm font-semibold text-muted-foreground mb-3">Child Invoices</p>
+                        
+                        {childInvoices.map((relInv) => {
+                          const isCurrentInvoice = relInv.id === invoice.id;
+                          
+                          return (
+                            <div key={relInv.id} className={`p-4 rounded-lg border ${isCurrentInvoice ? 'bg-primary/10 border-primary border-2' : 'bg-background border-table-border hover:border-primary/40'} transition-colors`}>
+                              <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center font-bold text-lg shrink-0">
+                                  {relInv.shipment_number}
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <button
+                                      onClick={() => isCurrentInvoice ? null : navigate(`/invoices/${relInv.id}`)}
+                                      className={`font-mono font-medium ${isCurrentInvoice ? '' : 'hover:text-primary underline'}`}
+                                    >
+                                      {relInv.invoice_number}
+                                    </button>
+                                    <Badge className={
+                                      relInv.invoice_type === 'deposit' ? 'bg-yellow-500 text-white' :
+                                      relInv.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
+                                      'bg-purple-500 text-white'
+                                    }>
+                                      {relInv.invoice_type?.toUpperCase() || 'SHIPMENT'}
+                                    </Badge>
+                                    {isCurrentInvoice && (
+                                      <Badge variant="outline" className="bg-primary/10 border-primary">
+                                        Viewing Now
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-4 text-sm">
+                                    <div>
+                                      <span className="text-muted-foreground">Amount: </span>
+                                      <span className="font-semibold">{formatCurrency(Number(relInv.total))}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Status: </span>
+                                      <span className="capitalize">{relInv.status === 'draft' || relInv.status === 'pending' ? 'Open' : relInv.status.replace('_', ' ')}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Date: </span>
+                                      <span>{new Date(relInv.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-lg font-semibold">{formatCurrency(Number(relInv.total))}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {relInv.invoice_type === 'deposit' ? 'Deposit' : 'Shipment'}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -1147,59 +1190,52 @@ const InvoiceDetail = () => {
               </TableBody>
             </Table>
 
-            {/* Billing Breakdown - Only for shipment invoices */}
-            {invoice.invoice_type !== 'deposit' && invoice.invoice_type !== 'full' && (() => {
-              // Calculate the raw shipment value (before deposit credit)
-              const rawShipmentValue = displaySubtotal;
-              
-              // Find deposit invoices to calculate credit applied (identify by invoice_type)
-              const depositInvoices = relatedInvoices.filter(inv => 
-                inv.invoice_type === 'deposit' || inv.invoice_type === 'full'
+            {/* Billing Breakdown - Only for child invoices (deposits and shipments) */}
+            {invoice.shipment_number > 1 && invoice.invoice_type !== 'full' && (() => {
+              // Find the blanket invoice
+              const blanketInvoice = relatedInvoices.find(inv => 
+                inv.invoice_type === 'full' && inv.shipment_number === 1
               );
               
-              if (depositInvoices.length === 0) {
-                return null; // No breakdown needed if no deposit
-              }
+              if (!blanketInvoice) return null;
               
-              // Calculate total deposit amount
-              const totalDepositAmount = depositInvoices.reduce((sum, inv) => {
-                return sum + Number(inv.total || 0);
-              }, 0);
+              const blanketTotal = Number(blanketInvoice.total || 0);
+              const thisInvoiceTotal = Number(invoice.total || 0);
               
-              // Calculate order subtotal for proportional credit
-              const orderSubtotal = order?.order_items?.reduce((sum: any, item: any) => 
-                sum + (item.quantity * item.unit_price), 0) || 0;
+              // Calculate total billed so far (excluding blanket, including this invoice)
+              const totalChildInvoicesBilled = relatedInvoices
+                .filter(inv => inv.shipment_number > 1)
+                .reduce((sum, inv) => sum + Number(inv.total || 0), 0);
               
-              // Calculate proportional deposit credit applied to this shipment
-              const depositCreditApplied = orderSubtotal > 0 
-                ? (rawShipmentValue / orderSubtotal) * totalDepositAmount 
-                : 0;
-              
-              const netBillAmount = displayTotal;
+              const remainingToBill = Math.max(0, blanketTotal - totalChildInvoicesBilled);
               
               return (
                 <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-6">
                   <h3 className="text-sm font-semibold mb-3 text-blue-900 dark:text-blue-100">
-                    Billing Breakdown
+                    Billing Against Blanket Invoice
                   </h3>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Shipment Value</span>
-                      <span className="font-semibold">{formatCurrency(rawShipmentValue)}</span>
+                      <span className="text-muted-foreground">Blanket Invoice Total</span>
+                      <span className="font-semibold">{formatCurrency(blanketTotal)}</span>
                     </div>
-                    <div className="flex justify-between text-sm text-orange-600 dark:text-orange-400">
-                      <span>Less: Deposit Credit Applied</span>
-                      <span className="font-semibold">-{formatCurrency(depositCreditApplied)}</span>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">This {invoice.invoice_type === 'deposit' ? 'Deposit' : 'Shipment'}</span>
+                      <span className="font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(thisInvoiceTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total Billed (All Child Invoices)</span>
+                      <span className="font-semibold">{formatCurrency(totalChildInvoicesBilled)}</span>
                     </div>
                     <div className="h-px bg-blue-200 dark:bg-blue-800 my-2"></div>
                     <div className="flex justify-between">
-                      <span className="font-semibold text-blue-900 dark:text-blue-100">Net Bill Amount</span>
+                      <span className="font-semibold text-blue-900 dark:text-blue-100">Remaining to Bill</span>
                       <span className="text-lg font-bold text-blue-900 dark:text-blue-100">
-                        {formatCurrency(netBillAmount)}
+                        {formatCurrency(remainingToBill)}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground italic mt-2">
-                      Deposit ({formatCurrency(totalDepositAmount)}) spread proportionally across all shipments
+                      All deposits and shipments bill against the blanket invoice total of {formatCurrency(blanketTotal)}
                     </p>
                   </div>
                 </div>

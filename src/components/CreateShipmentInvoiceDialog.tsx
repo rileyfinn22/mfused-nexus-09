@@ -90,6 +90,53 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // First, ensure a blanket invoice exists for this order
+      let blanketInvoice = existingInvoices.find(inv => inv.invoice_type === 'full' && inv.shipment_number === 1);
+      
+      if (!blanketInvoice) {
+        console.log('Creating main blanket invoice first...');
+        
+        // Calculate full order total
+        const orderSubtotal = order.order_items.reduce((sum: number, item: any) => 
+          sum + (item.quantity * item.unit_price), 0
+        );
+        const orderTotal = orderSubtotal; // No tax, included in unit price
+        
+        // Create the main blanket invoice
+        const blanketInvoiceNumber = generateInvoiceNumber(1);
+        const { data: newBlanketInvoice, error: blanketError } = await supabase
+          .from('invoices')
+          .insert({
+            company_id: order.company_id,
+            order_id: order.id,
+            invoice_number: blanketInvoiceNumber,
+            shipment_number: 1,
+            invoice_type: 'full',
+            billed_percentage: 100,
+            parent_invoice_id: null,
+            status: 'open',
+            subtotal: orderSubtotal,
+            tax: 0,
+            shipping_cost: 0,
+            total: orderTotal,
+            created_by: user.id,
+            notes: 'Main blanket invoice for full order'
+          })
+          .select()
+          .single();
+        
+        if (blanketError) throw blanketError;
+        blanketInvoice = newBlanketInvoice;
+        
+        // Refresh existing invoices list
+        await fetchExistingInvoices();
+        
+        toast({
+          title: "Blanket Invoice Created",
+          description: `Main invoice ${blanketInvoiceNumber} created for full order`,
+        });
+      }
+
       if (invoiceMode === 'shipment') {
         // Validate that at least one item has quantity > 0
         const totalToShip = Object.values(shipmentQuantities).reduce((sum, q) => sum + q, 0);
@@ -116,8 +163,11 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         }
       }
 
-      // Calculate next shipment number
-      const nextShipmentNumber = existingInvoices.length + 1;
+      // Calculate next shipment number (blanket is always 1, so child invoices start at 2)
+      const childInvoices = existingInvoices.filter(inv => inv.shipment_number > 1);
+      const nextShipmentNumber = childInvoices.length > 0 
+        ? Math.max(...childInvoices.map(inv => inv.shipment_number)) + 1 
+        : 2;
 
       let subtotal = 0;
       let itemsToShip: any[] = [];
@@ -132,6 +182,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         const depositPct = parseFloat(depositPercentage) / 100;
         subtotal = orderSubtotal * depositPct;
         billedPercentage = parseFloat(depositPercentage);
+        invoiceType = 'deposit';
         // Don't allocate any items for deposit invoice
       } else {
         // Shipment invoice - based on quantities
@@ -151,22 +202,20 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
           return sum + (totalShipped * item.unit_price);
         }, 0);
         
-        // Calculate how much has already been billed (including deposits and previous shipments)
-        const totalAlreadyBilled = existingInvoices.reduce((sum, inv) => {
-          // Check for deposit by billed_percentage, not just invoice_type
-          if (inv.billed_percentage && inv.billed_percentage < 100) {
-            // For deposits, calculate the actual amount
-            const depositAmt = parseFloat(inv.total || 0) * (parseFloat(inv.billed_percentage) / 100);
-            console.log(`Found deposit invoice ${inv.invoice_number}: ${inv.billed_percentage}% of ${inv.total} = ${depositAmt}`);
-            return sum + depositAmt;
-          }
-          // For shipment invoices, use the full total
-          console.log(`Found shipment invoice ${inv.invoice_number}: ${inv.total}`);
-          return sum + parseFloat(inv.total || 0);
-        }, 0);
+        // Calculate how much has already been billed (deposits and previous shipments, excluding blanket)
+        const totalAlreadyBilled = existingInvoices
+          .filter(inv => inv.invoice_type !== 'full') // Exclude blanket invoice
+          .reduce((sum, inv) => {
+            if (inv.invoice_type === 'deposit') {
+              // For deposits, use the full total
+              return sum + parseFloat(inv.total || 0);
+            }
+            // For shipment invoices, use the full total
+            return sum + parseFloat(inv.total || 0);
+          }, 0);
         
         console.log('Total shipped value (incl. this shipment):', totalShippedValue);
-        console.log('Total already billed:', totalAlreadyBilled);
+        console.log('Total already billed (excl. blanket):', totalAlreadyBilled);
         console.log('Shipment value before cap:', subtotal);
         
         // Calculate remaining billable amount (can't exceed total shipped value)
@@ -198,11 +247,8 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       const tax = 0; // Tax removed - included in unit price
       const shipping = parseFloat(shippingCost) || 0;
       const total = subtotal + shipping;
-
-      // Find deposit invoice to link shipment invoices to
-      const depositInvoice = existingInvoices.find(inv => inv.invoice_type === 'deposit');
       
-      // Create invoice with QB-compliant number
+      // Create child invoice linked to blanket invoice
       const invoiceNumber = generateInvoiceNumber(nextShipmentNumber);
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
@@ -211,9 +257,9 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
           order_id: order.id,
           invoice_number: invoiceNumber,
           shipment_number: nextShipmentNumber,
-          invoice_type: invoiceMode === 'deposit' ? 'deposit' : invoiceType,
+          invoice_type: invoiceType,
           billed_percentage: billedPercentage,
-          parent_invoice_id: invoiceMode === 'shipment' && depositInvoice ? depositInvoice.id : null,
+          parent_invoice_id: blanketInvoice.id, // Always link to blanket invoice
           status: 'open',
           subtotal,
           tax,
