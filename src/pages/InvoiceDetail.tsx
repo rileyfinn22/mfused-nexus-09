@@ -574,11 +574,16 @@ const InvoiceDetail = () => {
   };
 
   // Calculate totals based on items actually on THIS invoice (from allocations)
+  // For edit mode, recalculate. Otherwise use stored invoice.total
   const displayItems = editedItems;
-  const displaySubtotal = displayItems.reduce((sum: number, item: any) => 
-    sum + (Number(item.quantity || item.shipped_quantity) * Number(item.unit_price)), 0
-  );
-  const displayTotal = displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0);
+  const displaySubtotal = isEditMode 
+    ? displayItems.reduce((sum: number, item: any) => 
+        sum + (Number(item.quantity || item.shipped_quantity) * Number(item.unit_price)), 0
+      )
+    : Number(invoice?.subtotal || 0);
+  const displayTotal = isEditMode
+    ? displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0)
+    : Number(invoice?.total || 0);
   
   // Calculate shipped percentage from actual quantities
   const calculateShippedPercentage = () => {
