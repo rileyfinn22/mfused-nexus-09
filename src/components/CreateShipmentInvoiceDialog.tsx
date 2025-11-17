@@ -177,12 +177,9 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       let billedPercentage = 0;
 
       if (invoiceMode === 'deposit') {
-        // Deposit invoice - calculate % of order total
-        const orderSubtotal = order.order_items.reduce((sum: number, item: any) => 
-          sum + (item.quantity * item.unit_price), 0
-        );
+        // Deposit invoice - calculate % of blanket invoice total
         const depositPct = parseFloat(depositPercentage) / 100;
-        subtotal = orderSubtotal * depositPct;
+        subtotal = Number(blanketInvoice.total) * depositPct;
         billedPercentage = parseFloat(depositPercentage);
         invoiceType = 'partial'; // Use 'partial' type for deposits (identified by billed_percentage)
         // Don't allocate any items for deposit invoice
@@ -413,14 +410,14 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                     onChange={(e) => setDepositPercentage(e.target.value)}
                     className="w-32"
                   />
-                  <span className="text-sm text-muted-foreground">% of order total</span>
+                  <span className="text-sm text-muted-foreground">% of blanket invoice total</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Order Total: {(() => {
-                    const orderSubtotal = order.order_items?.reduce((sum: number, item: any) => 
-                      sum + (item.quantity * item.unit_price), 0) || 0;
-                    const depositAmount = orderSubtotal * (parseFloat(depositPercentage) / 100);
-                    return `$${orderSubtotal.toFixed(2)} → Deposit: $${depositAmount.toFixed(2)}`;
+                  Blanket Invoice Total: {(() => {
+                    const blanketInv = existingInvoices.find(inv => inv.invoice_type === 'full' && inv.shipment_number === 1);
+                    const blanketTotal = blanketInv ? Number(blanketInv.total) : 0;
+                    const depositAmount = blanketTotal * (parseFloat(depositPercentage) / 100);
+                    return `$${blanketTotal.toFixed(2)} → Deposit: $${depositAmount.toFixed(2)}`;
                   })()}
                 </p>
               </div>
