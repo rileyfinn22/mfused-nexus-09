@@ -149,6 +149,7 @@ const Products = () => {
             state: product.state,
             cost: product.cost,
             image_url: product.image_url,
+            item_id: product.item_id,
             sku: inventoryData?.sku,
             states: states || []
           };
