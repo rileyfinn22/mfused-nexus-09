@@ -245,7 +245,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       }
 
       const tax = 0; // Tax removed - included in unit price
-      const shipping = parseFloat(shippingCost) || 0;
+      const shipping = invoiceMode === 'deposit' ? 0 : (parseFloat(shippingCost) || 0);
       const total = subtotal + shipping;
       
       // Create child invoice linked to blanket invoice
@@ -425,22 +425,10 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  This invoice will bill {depositPercentage}% of the order total as a deposit/upfront payment. 
-                  No inventory will be allocated. Create additional shipment invoices as items are pulled/shipped.
+                  This invoice will bill {depositPercentage}% of the blanket invoice total as a deposit/upfront payment. 
+                  No inventory will be allocated. No shipping cost should be added to deposits.
                 </AlertDescription>
               </Alert>
-
-              <div>
-                <Label htmlFor="shipping-cost">Shipping Cost (Optional)</Label>
-                <Input
-                  id="shipping-cost"
-                  type="number"
-                  step="0.01"
-                  value={shippingCost}
-                  onChange={(e) => setShippingCost(e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
             </>
           ) : (
             <>
