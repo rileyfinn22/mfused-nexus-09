@@ -1333,8 +1333,8 @@ const InvoiceDetail = () => {
         </CardContent>
       </Card>
 
-      {/* Attached Vendor POs - For Admin View on Full Invoices Only */}
-      {isVibeAdmin && invoice?.invoice_type === 'full' && vendorPOs.length > 0 && (
+      {/* Attached Vendor POs - For Admin View on Full Invoices and Pull & Ship */}
+      {isVibeAdmin && (invoice?.invoice_type === 'full' || order?.order_type === 'pull_ship') && vendorPOs.length > 0 && (
         <Card className="shadow-lg">
           <CardContent className="p-8">
             <div className="flex justify-between items-center mb-6">
