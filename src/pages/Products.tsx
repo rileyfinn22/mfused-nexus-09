@@ -39,6 +39,7 @@ interface Product {
   state: string;
   cost: number | null;
   image_url: string | null;
+  item_id?: string | null;
   sku?: string;
   customer_id?: string | null;
   states: ProductState[];
@@ -440,7 +441,7 @@ const Products = () => {
                     )}
                   </div>
                   <div className={`${isEditMode ? "col-span-1" : "col-span-2"} font-medium font-mono text-xs flex items-center gap-2`}>
-                    {product.id.slice(0, 8)}...
+                    {product.item_id || `${product.id.slice(0, 8)}...`}
                     {product.sku && !hasApprovedArtwork(product.sku) && (
                       <AlertTriangle className="h-4 w-4 text-yellow-500" />
                     )}
