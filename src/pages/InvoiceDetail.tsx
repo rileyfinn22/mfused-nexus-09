@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
 import { SyncToQuickBooksDialog } from "@/components/SyncToQuickBooksDialog";
+import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +43,7 @@ const InvoiceDetail = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
+  const [showDepositDialog, setShowDepositDialog] = useState(false);
   const [refreshingLink, setRefreshingLink] = useState(false);
   const [syncingPayment, setSyncingPayment] = useState<string | null>(null);
   const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
@@ -673,6 +675,16 @@ const InvoiceDetail = () => {
                 <Button onClick={() => setShowPaymentDialog(true)}>
                   <DollarSign className="h-4 w-4 mr-2" />
                   Record Payment
+                </Button>
+              )}
+              {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && (
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowDepositDialog(true)}
+                  className="border-blue-500 text-blue-700 hover:bg-blue-50"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Bill Deposit
                 </Button>
               )}
               {invoice.invoice_type === 'full' && invoice.status !== 'closed' && (
@@ -1583,6 +1595,15 @@ const InvoiceDetail = () => {
         invoice={invoice}
         onSync={handleSyncToQuickBooks}
         syncing={syncingToQB}
+      />
+
+      {/* Create Deposit Invoice Dialog */}
+      <CreateShipmentInvoiceDialog
+        open={showDepositDialog}
+        onOpenChange={setShowDepositDialog}
+        order={order}
+        onSuccess={fetchInvoiceDetails}
+        initialMode="deposit"
       />
     </div>
   );

@@ -17,25 +17,27 @@ interface CreateShipmentInvoiceDialogProps {
   onOpenChange: (open: boolean) => void;
   order: any;
   onSuccess: () => void;
+  initialMode?: 'deposit' | 'shipment';
 }
 
-export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSuccess }: CreateShipmentInvoiceDialogProps) {
+export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSuccess, initialMode = 'shipment' }: CreateShipmentInvoiceDialogProps) {
   const [loading, setLoading] = useState(false);
   const [shippingCost, setShippingCost] = useState("0");
   const [shipmentQuantities, setShipmentQuantities] = useState<{[itemId: string]: number}>({});
   const [availableInventory, setAvailableInventory] = useState<{[sku: string]: any[]}>({});
   const [existingInvoices, setExistingInvoices] = useState<any[]>([]);
-  const [invoiceMode, setInvoiceMode] = useState<'deposit' | 'shipment'>('shipment');
+  const [invoiceMode, setInvoiceMode] = useState<'deposit' | 'shipment'>(initialMode);
   const [depositPercentage, setDepositPercentage] = useState("30");
   const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
 
   useEffect(() => {
     if (open && order) {
+      setInvoiceMode(initialMode);
       fetchExistingInvoices();
       fetchAvailableInventory();
       initializeQuantities();
     }
-  }, [open, order]);
+  }, [open, order, initialMode]);
 
   const fetchExistingInvoices = async () => {
     const { data } = await supabase
