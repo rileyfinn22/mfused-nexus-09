@@ -21,5 +21,8 @@ verify_jwt = true
 [functions.quickbooks-sync-vendor-po]
 verify_jwt = true
 
+[functions.quickbooks-sync-payment]
+verify_jwt = true
+
 [functions.quickbooks-refresh-tokens]
 verify_jwt = false

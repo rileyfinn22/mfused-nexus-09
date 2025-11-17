@@ -827,6 +827,9 @@ export type Database = {
           notes: string | null
           payment_date: string
           payment_method: string
+          quickbooks_id: string | null
+          quickbooks_sync_status: string | null
+          quickbooks_synced_at: string | null
           reference_number: string | null
           updated_at: string
         }
@@ -840,6 +843,9 @@ export type Database = {
           notes?: string | null
           payment_date?: string
           payment_method?: string
+          quickbooks_id?: string | null
+          quickbooks_sync_status?: string | null
+          quickbooks_synced_at?: string | null
           reference_number?: string | null
           updated_at?: string
         }
@@ -853,6 +859,9 @@ export type Database = {
           notes?: string | null
           payment_date?: string
           payment_method?: string
+          quickbooks_id?: string | null
+          quickbooks_sync_status?: string | null
+          quickbooks_synced_at?: string | null
           reference_number?: string | null
           updated_at?: string
         }
