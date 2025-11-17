@@ -109,16 +109,19 @@ serve(async (req) => {
       if (itemNumberRaw) {
         const itemNumberStr = String(itemNumberRaw);
         console.log('Processing Item #:', itemNumberStr);
-        // Check if it contains a dash (likely has state appended)
+        
+        // Use the full SKU (with state) as the item_id
+        itemId = itemNumberStr; // Full SKU like "PCK-00365-NY"
+        
+        // Still extract state for inventory table
         const lastDashIndex = itemNumberStr.lastIndexOf('-');
         if (lastDashIndex > 0 && itemNumberStr.length - lastDashIndex <= 3) {
-          // Likely format: PCK-00430-WA (state is 2-3 chars after last dash)
-          itemId = itemNumberStr.substring(0, lastDashIndex); // "PCK-00430"
-          state = itemNumberStr.substring(lastDashIndex + 1); // "WA"
-          console.log('Extracted from Item # - itemId:', itemId, 'state:', state);
+          const potentialState = itemNumberStr.substring(lastDashIndex + 1);
+          // Use the extracted state for inventory table
+          state = potentialState; // "NY"
+          console.log('Using full SKU as item_id:', itemId, 'with state:', state);
         } else {
-          // No state in item number, use as-is
-          itemId = itemNumberStr;
+          // No state in item number
           console.log('Using Item # as-is:', itemId);
         }
       }
@@ -127,14 +130,18 @@ serve(async (req) => {
       if (row['Item and State']) {
         const itemAndState = String(row['Item and State']);
         console.log('Parsing Item and State:', itemAndState);
-        // Split by last dash to separate item number from state
+        
+        // Use the full value as item_id
+        itemId = itemAndState; // Full SKU like "PCK-00365-NY"
+        
+        // Still extract state for inventory table
         const lastDashIndex = itemAndState.lastIndexOf('-');
         if (lastDashIndex > 0) {
-          itemId = itemAndState.substring(0, lastDashIndex); // "PCK-00430"
-          state = itemAndState.substring(lastDashIndex + 1); // "WA"
-          console.log('Extracted - itemId:', itemId, 'state:', state);
+          const potentialState = itemAndState.substring(lastDashIndex + 1);
+          state = potentialState; // "NY"
+          console.log('Using full SKU as item_id:', itemId, 'with state:', state);
         } else {
-          itemId = itemAndState;
+          console.log('Using Item and State value as-is:', itemId);
         }
       }
       
@@ -190,15 +197,14 @@ serve(async (req) => {
             productId = existingProduct.id;
             console.log(`Matched product by name "${sku}": ${existingProduct.id}`);
           } else {
-            // Create new product with item_id
+            // Create new product with full SKU as item_id
             const { data: newProduct, error: productError } = await supabaseClient
               .from('products')
               .insert({
                 company_id: companyId,
                 name: sku,
-                item_id: itemId, // Store the item_id for future matching
-                category: 'General',
-                state: state
+                item_id: itemId, // Store the full SKU with state (e.g., "PCK-00365-NY")
+                category: 'General'
               })
               .select('id')
               .single();
@@ -216,7 +222,7 @@ serve(async (req) => {
       inventoryItems.push({
         company_id: companyId,
         product_id: productId,
-        sku: sku, // Keep the item name/description as SKU
+        sku: itemId || sku, // Use full SKU with state (e.g., "PCK-00365-NY")
         state: state,
         available: available,
         in_production: inProduction,
