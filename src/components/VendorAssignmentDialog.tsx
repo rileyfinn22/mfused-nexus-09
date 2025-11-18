@@ -57,7 +57,8 @@ export const VendorAssignmentDialog = ({
     const { data, error } = await supabase
       .from('order_items')
       .select('*')
-      .eq('order_id', orderId);
+      .eq('order_id', orderId)
+      .not('product_id', 'is', null); // Only fetch items that have been matched to products
     
     console.log('Fetched order items:', data);
     console.log('Fetch error:', error);
