@@ -156,6 +156,19 @@ const Products = () => {
         })
       );
 
+      // Auto-assign temp SKUs to products without item_id
+      const productsToUpdate = productsWithStates.filter(p => !p.item_id);
+      if (productsToUpdate.length > 0) {
+        for (const product of productsToUpdate) {
+          const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
+          await supabase
+            .from('products')
+            .update({ item_id: tempSKU })
+            .eq('id', product.id);
+          product.item_id = tempSKU;
+        }
+      }
+      
       setProducts(productsWithStates);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -306,49 +319,6 @@ const Products = () => {
     }
   };
 
-  const handleAssignTempSKUs = async () => {
-    const productsToUpdate = products.filter(p => !p.item_id);
-    
-    if (productsToUpdate.length === 0) {
-      toast({
-        title: "All products have IDs",
-        description: "No products need temporary SKU assignment.",
-      });
-      return;
-    }
-
-    if (!window.confirm(`Assign temporary VB- SKUs to ${productsToUpdate.length} products without Product IDs?`)) {
-      return;
-    }
-
-    try {
-      // Update each product with a unique VB- SKU
-      for (const product of productsToUpdate) {
-        const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
-        
-        const { error } = await supabase
-          .from('products')
-          .update({ item_id: tempSKU })
-          .eq('id', product.id);
-
-        if (error) throw error;
-      }
-
-      toast({
-        title: "SKUs assigned",
-        description: `Assigned temporary SKUs to ${productsToUpdate.length} products.`,
-      });
-      
-      fetchProducts();
-    } catch (error) {
-      console.error('Error assigning SKUs:', error);
-      toast({
-        title: "Error",
-        description: "Failed to assign temporary SKUs.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -418,12 +388,6 @@ const Products = () => {
             className="pl-10"
           />
         </div>
-        {products.some(p => !p.item_id) && (
-          <Button variant="outline" onClick={handleAssignTempSKUs} size="sm">
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Assign Missing IDs ({products.filter(p => !p.item_id).length})
-          </Button>
-        )}
         {isVibeAdmin && (
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
             <SelectTrigger className="w-full sm:w-48">
