@@ -325,13 +325,11 @@ const PullShip = () => {
     
     // Totals
     const subtotal = items.reduce((sum, item) => sum + (item.quantity * (item.unitPrice || 1)), 0);
-    const tax = subtotal * 0.08; // 8% tax
-    const total = subtotal + tax;
+    const total = subtotal; // No tax for pull & ship orders
     
     const finalY = (doc as any).lastAutoTable.finalY + 20;
     doc.text(`Subtotal: $${subtotal.toFixed(2)}`, 130, finalY);
-    doc.text(`Tax (8%): $${tax.toFixed(2)}`, 130, finalY + 10);
-    doc.text(`Total: $${total.toFixed(2)}`, 130, finalY + 20);
+    doc.text(`Total: $${total.toFixed(2)}`, 130, finalY + 10);
     
     return doc;
   };
@@ -653,8 +651,8 @@ const PullShip = () => {
       });
 
       const subtotal = itemsWithPrices.reduce((sum, item) => sum + item.itemTotal, 0);
-      const tax = subtotal * 0.08;
-      const total = subtotal + tax;
+      const tax = 0; // No tax for pull & ship orders
+      const total = subtotal;
 
       // Create the pull & ship order
       const { data: order, error: orderError } = await supabase
