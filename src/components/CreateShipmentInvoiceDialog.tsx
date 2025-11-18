@@ -481,58 +481,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                   return sum + (qty * item.unit_price);
                 }, 0) || 0;
 
-                return (
-                  <>
-                    {billedPercentageOfShipped >= 100 && (
-                      <Alert>
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertDescription className="ml-2">
-                          <strong>100% of Shipped Qty Billed:</strong> ${totalAlreadyBilled.toFixed(2)} of ${totalShippedValue.toFixed(2)} shipped value already billed. 
-                          This shipment will be created with $0.00 invoice amount.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
-                    {billedPercentageOfShipped < 100 && remainingBillable < shipmentValue && (
-                      <Alert>
-                        <Info className="h-4 w-4" />
-                        <AlertDescription className="ml-2">
-                          <strong>Billing Cap:</strong> Only ${remainingBillable.toFixed(2)} remaining to bill 
-                          (${totalAlreadyBilled.toFixed(2)} / ${totalShippedValue.toFixed(2)} of shipped value already billed). 
-                          Invoice will be capped at this amount.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
-                    {inventoryIssues.length > 0 && (
-                      <Alert>
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertDescription className="ml-2">
-                          <strong>Low/No Inventory:</strong> {inventoryIssues.length} item(s) don't have inventory. 
-                          Invoice will be created for direct ship (inventory allocation skipped).
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
-                    {totalToShip > 0 && (
-                      <Alert>
-                        <Info className="h-4 w-4" />
-                        <AlertDescription className="ml-2">
-                          <div className="space-y-1">
-                            <p>
-                              <strong>This will be a PARTIAL invoice</strong> 
-                              {' '}(Shipment #{nextShipmentNumber})
-                            </p>
-                            <p className="text-sm">
-                              Shipping {totalToShip} units ({projectedPercentage}% of order total) • 
-                              {' '}{afterThisShipment} of {totalOrdered} units will be shipped after this shipment
-                            </p>
-                          </div>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </>
-                );
+                return null;
               })()}
 
               {existingInvoices.length > 0 && (
