@@ -1097,9 +1097,17 @@ const InvoiceDetail = () => {
                       <span className="font-semibold">{formatCurrency(blanketTotal)}</span>
                     </div>
                     
-                    {/* List all child invoices */}
+                    {/* List all invoices including blanket */}
                     <div className="mt-3 mb-2">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Child Invoices Billed:</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">All Invoices:</p>
+                      
+                      {/* Show blanket invoice first */}
+                      <div className="flex justify-between text-sm py-1 text-muted-foreground">
+                        <span>{blanketInvoice.invoice_number} - Blanket Invoice</span>
+                        <span>{formatCurrency(blanketTotal)}</span>
+                      </div>
+                      
+                      {/* Then show all child invoices */}
                       {relatedInvoices
                         .filter(inv => inv.shipment_number > 1)
                         .sort((a, b) => a.shipment_number - b.shipment_number)
