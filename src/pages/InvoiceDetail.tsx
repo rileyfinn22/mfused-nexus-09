@@ -1096,13 +1096,29 @@ const InvoiceDetail = () => {
                       <span className="text-muted-foreground">Blanket Invoice Total</span>
                       <span className="font-semibold">{formatCurrency(blanketTotal)}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">This {(invoice.notes && invoice.notes.includes('deposit payment')) ? 'Deposit' : 'Shipment'}</span>
-                      <span className="font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(thisInvoiceTotal)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Total Billed (All Child Invoices)</span>
-                      <span className="font-semibold">{formatCurrency(totalChildInvoicesBilled)}</span>
+                    
+                    {/* List all child invoices */}
+                    <div className="mt-3 mb-2">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Child Invoices Billed:</p>
+                      {relatedInvoices
+                        .filter(inv => inv.shipment_number > 1)
+                        .sort((a, b) => a.shipment_number - b.shipment_number)
+                        .map(inv => {
+                          const isCurrentInvoice = inv.id === invoice.id;
+                          return (
+                            <div 
+                              key={inv.id} 
+                              className={`flex justify-between text-sm py-1 ${isCurrentInvoice ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-muted-foreground'}`}
+                            >
+                              <span>
+                                {inv.invoice_number}
+                                {isCurrentInvoice && ' (This Invoice)'}
+                                {inv.notes && inv.notes.includes('deposit') && ' - Deposit'}
+                              </span>
+                              <span>{formatCurrency(Number(inv.total || 0))}</span>
+                            </div>
+                          );
+                        })}
                     </div>
                     <div className="h-px bg-blue-200 dark:bg-blue-800 my-2"></div>
                     <div className="flex justify-between">
