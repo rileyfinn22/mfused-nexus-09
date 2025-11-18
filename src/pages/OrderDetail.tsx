@@ -915,7 +915,7 @@ const OrderDetail = () => {
                         <TableHeader>
                           <TableRow className="bg-table-header">
                             <TableHead>Item</TableHead>
-                            <TableHead>SKU</TableHead>
+                            <TableHead>Item #</TableHead>
                             <TableHead className="text-right">Ordered</TableHead>
                             <TableHead className="text-right">Shipped</TableHead>
                             <TableHead className="w-48">Progress</TableHead>
@@ -929,7 +929,7 @@ const OrderDetail = () => {
                             return (
                               <TableRow key={item.id}>
                                 <TableCell className="font-medium">{item.name}</TableCell>
-                                <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                                <TableCell className="font-mono text-xs">{item.item_id}</TableCell>
                                 <TableCell className="text-right">{item.quantity}</TableCell>
                                 <TableCell className="text-right font-medium">{shipped}</TableCell>
                                 <TableCell>
