@@ -105,7 +105,8 @@ const PullShip = () => {
           customer_name, 
           total, 
           created_at,
-          invoices!inner(invoice_type)
+          invoices!inner(invoice_type),
+          companies!company_id(name)
         `)
         .eq('company_id', companyId)
         .eq('order_type', 'standard')
@@ -840,7 +841,7 @@ const PullShip = () => {
                             <SelectItem value="none">None (standalone order)</SelectItem>
                             {blanketOrders.map(order => (
                               <SelectItem key={order.id} value={order.id}>
-                                {order.order_number} - {order.customer_name} (${order.total?.toFixed(2)})
+                                {order.order_number} - {order.companies?.name || order.customer_name} (${order.total?.toFixed(2)})
                               </SelectItem>
                             ))}
                           </SelectContent>
