@@ -1153,6 +1153,21 @@ const InvoiceDetail = () => {
               </p>
             </div>
             <div className="text-right space-y-1">
+              {/* Show blanket invoice total for child invoices */}
+              {invoice.shipment_number > 1 && invoice.invoice_type !== 'full' && (() => {
+                const blanketInvoice = relatedInvoices.find(inv => 
+                  inv.invoice_type === 'full' && inv.shipment_number === 1
+                );
+                if (blanketInvoice) {
+                  return (
+                    <div className="pb-2 mb-2 border-b border-blue-200 dark:border-blue-700">
+                      <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Blanket Invoice Total</p>
+                      <p className="text-lg font-semibold text-blue-900 dark:text-blue-100">{formatCurrency(Number(blanketInvoice.total || 0))}</p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               <div>
                 <p className="text-xs text-muted-foreground">Invoice Total</p>
                 <p className="text-lg font-semibold">{formatCurrency(displayTotal)}</p>
