@@ -1078,11 +1078,12 @@ const InvoiceDetail = () => {
               const blanketTotal = Number(blanketInvoice.total || 0);
               const thisInvoiceTotal = Number(invoice.total || 0);
               
-              // Calculate total billed so far (excluding blanket, including this invoice)
-              const totalChildInvoicesBilled = relatedInvoices
+              // Calculate total billed so far (excluding blanket, including this invoice and all other child invoices)
+              const otherChildInvoicesBilled = relatedInvoices
                 .filter(inv => inv.shipment_number > 1)
                 .reduce((sum, inv) => sum + Number(inv.total || 0), 0);
               
+              const totalChildInvoicesBilled = otherChildInvoicesBilled + thisInvoiceTotal;
               const remainingToBill = Math.max(0, blanketTotal - totalChildInvoicesBilled);
               
               return (
