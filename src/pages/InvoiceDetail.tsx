@@ -1092,22 +1092,15 @@ const InvoiceDetail = () => {
                     Billing Against Blanket Invoice
                   </h3>
                   <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
+                    {/* Show blanket invoice */}
+                    <div className="flex justify-between text-sm pb-2 border-b border-blue-200 dark:border-blue-800">
                       <span className="text-muted-foreground">Blanket Invoice Total</span>
                       <span className="font-semibold">{formatCurrency(blanketTotal)}</span>
                     </div>
                     
-                    {/* List all invoices including blanket */}
-                    <div className="mt-3 mb-2">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">All Invoices:</p>
-                      
-                      {/* Show blanket invoice first */}
-                      <div className="flex justify-between text-sm py-1 text-muted-foreground">
-                        <span>{blanketInvoice.invoice_number} - Blanket Invoice</span>
-                        <span>{formatCurrency(blanketTotal)}</span>
-                      </div>
-                      
-                      {/* Then show all child invoices */}
+                    {/* List partial invoices */}
+                    <div className="mt-3">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Partial Invoices:</p>
                       {relatedInvoices
                         .filter(inv => inv.shipment_number > 1)
                         .sort((a, b) => a.shipment_number - b.shipment_number)
