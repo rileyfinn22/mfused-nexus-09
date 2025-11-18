@@ -679,7 +679,7 @@ const OrderDetail = () => {
           open={showVendorDialog}
           onOpenChange={setShowVendorDialog}
           orderId={orderId || ''}
-          orderItems={order.order_items}
+          orderItems={order.order_items.filter((item: any) => item.product_id !== null)}
           onSuccess={fetchOrder}
         />
       )}
