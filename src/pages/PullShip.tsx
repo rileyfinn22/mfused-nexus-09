@@ -879,7 +879,7 @@ const PullShip = () => {
                   <div className="relative max-w-md">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by SKU..."
+                      placeholder="Search by item # or product name..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-10"
@@ -892,7 +892,7 @@ const PullShip = () => {
                   <div className="bg-table-header border-b border-table-border">
                     <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       <div className="col-span-1">Select</div>
-                      <div className="col-span-4">SKU</div>
+                      <div className="col-span-4">Item # / Product</div>
                       <div className="col-span-2">Available</div>
                       <div className="col-span-2">Reserved</div>
                       <div className="col-span-2">In Production</div>
@@ -911,7 +911,11 @@ const PullShip = () => {
                       </div>
                     ) : (
                       inventory
-                        .filter(item => item.sku.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .filter(item => 
+                          item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          item.products?.item_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          item.products?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+                        )
                         .map((item) => {
                           const status = getStockStatus(item.available, item.redline);
                           const stockColor = getStockColor(status);
@@ -929,7 +933,10 @@ const PullShip = () => {
                                   className="h-4 w-4"
                                 />
                               </div>
-                              <div className="col-span-4 font-mono text-sm font-medium">{item.sku}</div>
+                              <div className="col-span-4 text-sm">
+                                <div className="font-medium">{item.products?.item_id || item.sku}</div>
+                                <div className="text-xs text-muted-foreground">{item.products?.name || 'No name'}</div>
+                              </div>
                               <div className="col-span-2 font-semibold text-sm flex items-center gap-1">
                                 {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
                                 {item.available}
