@@ -502,7 +502,11 @@ const PullShipOrderDetail = () => {
           for (const pullItem of editedOrder.order_items) {
             // Find matching item in parent order by SKU
             const parentItem = parentOrder.order_items?.find(
-              (pi: any) => pi.sku === pullItem.sku
+              (pi: any) => {
+                const parentKey = pi.item_id || pi.sku;
+                const pullKey = pullItem.item_id || pullItem.sku;
+                return parentKey && pullKey && parentKey === pullKey;
+              }
             );
 
             if (parentItem) {

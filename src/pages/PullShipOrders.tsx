@@ -195,9 +195,13 @@ const PullShipOrders = () => {
         // Update order items shipped_quantity based on pull & ship order items
         if (order.order_items && order.order_items.length > 0) {
           for (const pullItem of order.order_items) {
-            // Find matching item in parent order by SKU
+            // Find matching item in parent order by item_id first (packaging code), then SKU
             const parentItem = parentOrder.order_items?.find(
-              (pi: any) => pi.sku === pullItem.sku
+              (pi: any) => {
+                const parentKey = pi.item_id || pi.sku;
+                const pullKey = pullItem.item_id || pullItem.sku;
+                return parentKey && pullKey && parentKey === pullKey;
+              }
             );
 
             if (parentItem) {
