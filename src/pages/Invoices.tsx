@@ -148,25 +148,14 @@ const Invoices = () => {
     return children.some(child => child.status === 'open' || child.status === 'pending');
   };
 
-  const handleStatusChange = async (invoiceId: string, newStatus: string) => {
+  const handleDescriptionChange = async (invoiceId: string, description: string) => {
     const { error } = await supabase
       .from("invoices")
-      .update({ status: newStatus })
+      .update({ description })
       .eq("id", invoiceId);
 
     if (error) {
-      console.error("Error updating invoice status:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update invoice status",
-        variant: "destructive"
-      });
-    } else {
-      toast({
-        title: "Status Updated",
-        description: "Invoice status successfully updated"
-      });
-      fetchInvoices();
+      console.error("Error updating invoice description:", error);
     }
   };
 
@@ -324,12 +313,12 @@ const Invoices = () => {
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
+            <div className="col-span-2">Description</div>
             <div className="col-span-2">Company</div>
             <div className="col-span-1">Shipment</div>
             <div className="col-span-1">Type</div>
             <div className="col-span-1">Amount</div>
             <div className="col-span-1">PO Number</div>
-            <div className="col-span-2">Due Date</div>
             <div className="col-span-1">Status</div>
             <div className="col-span-1">Actions</div>
           </div>
@@ -352,7 +341,7 @@ const Invoices = () => {
               const isExpanded = expandedInvoices.has(invoice.id);
               const showOverdueAlert = isParent && hasChildren && hasOverdueChildren(invoice.id);
               const showDueStatus = isParent && hasChildren && hasDueChildren(invoice.id);
-              const displayStatus = showDueStatus ? 'open' : invoice.status;
+              const displayStatus = showDueStatus ? 'DUE' : getStatusDisplay(invoice);
               
               return (
                 <div 
@@ -422,6 +411,20 @@ const Invoices = () => {
                     )}
                   </div>
                   <div className="col-span-2">
+                    <Input
+                      type="text"
+                      value={invoice.description || ''}
+                      onChange={(e) => {
+                        setInvoices(prev => prev.map(inv => 
+                          inv.id === invoice.id ? { ...inv, description: e.target.value } : inv
+                        ));
+                      }}
+                      onBlur={(e) => handleDescriptionChange(invoice.id, e.target.value)}
+                      placeholder="Add description..."
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="col-span-2">
                     <div className="font-medium text-sm">{invoice.companies?.name || 'N/A'}</div>
                     {invoice.orders?.customer_name && (
                       <div className="text-xs text-muted-foreground">
@@ -441,38 +444,11 @@ const Invoices = () => {
                   </div>
                   <div className="col-span-1 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
                   <div className="col-span-1 text-sm">{invoice.orders?.po_number || 'N/A'}</div>
-                  <div className="col-span-2 text-sm">
-                    {invoice.due_date ? (
-                      <div className={
-                        invoice.status === 'overdue' ? 'text-danger' : 
-                        daysUntilDue && daysUntilDue <= 7 ? 'text-warning' : 'text-foreground'
-                      }>
-                        {new Date(invoice.due_date).toLocaleDateString()}
-                        {invoice.status !== 'paid' && daysUntilDue !== null && (
-                          <div className="text-xs text-muted-foreground">
-                            {daysUntilDue > 0 ? `${daysUntilDue}d remaining` : `${Math.abs(daysUntilDue)}d overdue`}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">Not set</span>
-                    )}
-                  </div>
-                  <div className="col-span-1">
-                    <Select
-                      value={displayStatus}
-                      onValueChange={(newStatus) => handleStatusChange(invoice.id, newStatus)}
-                    >
-                      <SelectTrigger className="h-8 w-full text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50 bg-background">
-                        <SelectItem value="pending">PENDING DUE</SelectItem>
-                        <SelectItem value="open">DUE</SelectItem>
-                        <SelectItem value="paid">PAID</SelectItem>
-                        <SelectItem value="closed">CLOSED</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="col-span-1 text-sm font-medium">
+                    <div className="flex items-center gap-1">
+                      <StatusIcon className="h-3 w-3" />
+                      {displayStatus}
+                    </div>
                   </div>
                   <div className="col-span-1 flex gap-1">
                     <Button 
