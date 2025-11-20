@@ -1067,35 +1067,60 @@ const InvoiceDetail = () => {
             </Table>
 
             {/* Billing Breakdown - Only for child invoices (deposits and shipments) */}
-            {invoice.shipment_number > 1 && invoice.invoice_type !== 'full' && (() => {
-              // Find the blanket invoice
-              const blanketInvoice = relatedInvoices.find(inv => 
-                inv.invoice_type === 'full' && inv.shipment_number === 1
-              );
+
+            {/* Invoice Totals */}
+            <div className="flex justify-end mt-8">
+              <div className="space-y-2 w-80">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-semibold">{formatCurrency(displaySubtotal)}</span>
+                </div>
+                <div className="h-px bg-border my-2"></div>
+                <div className="flex justify-between">
+                  <span className="text-lg font-semibold">Total</span>
+                  <span className="text-2xl font-bold">{formatCurrency(displayTotal)}</span>
+                </div>
+                {isEditMode && (
+                  <p className="text-xs text-muted-foreground italic mt-2">
+                    Totals will be saved when you click "Save Changes"
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Payment History */}
+      <Card className="shadow-lg">
+        <CardContent className="p-8">
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-4">Payment History</h2>
+            
+            {/* Billing Against Blanket Invoice */}
+            {(() => {
+              const isPartialInvoice = invoice.shipment_number > 1 && invoice.invoice_type !== 'full';
+              const blanketInvoice = isPartialInvoice 
+                ? relatedInvoices.find(inv => 
+                    inv.invoice_type === 'full' && inv.shipment_number === 1
+                  )
+                : null;
               
               if (!blanketInvoice) return null;
               
               const blanketTotal = Number(blanketInvoice.total || 0);
-              const thisInvoiceTotal = Number(invoice.total || 0);
-              
-              // Calculate total billed so far (excluding blanket, including this invoice and all other child invoices)
-              const otherChildInvoicesBilled = relatedInvoices
+              const partialInvoicesSums = relatedInvoices
                 .filter(inv => inv.shipment_number > 1)
                 .reduce((sum, inv) => sum + Number(inv.total || 0), 0);
-              
-              const totalChildInvoicesBilled = otherChildInvoicesBilled + thisInvoiceTotal;
-              const remainingToBill = Math.max(0, blanketTotal - totalChildInvoicesBilled);
-              
+              const remainingToBill = blanketTotal - partialInvoicesSums;
+
               return (
-                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-6">
-                  <h3 className="text-sm font-semibold mb-3 text-blue-900 dark:text-blue-100">
-                    Billing Against Blanket Invoice
-                  </h3>
-                  <div className="space-y-2">
-                    {/* Show blanket invoice */}
-                    <div className="flex justify-between text-sm pb-2 border-b border-blue-200 dark:border-blue-800">
-                      <span className="text-muted-foreground">Blanket Invoice Total</span>
-                      <span className="font-semibold">{formatCurrency(blanketTotal)}</span>
+                <div className="mb-6 p-6 bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h3 className="text-base font-semibold mb-4 text-blue-900 dark:text-blue-100">Billing Against Blanket Invoice</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between pb-2 border-b border-blue-200 dark:border-blue-700">
+                      <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Blanket Invoice Total</span>
+                      <span className="text-lg font-bold text-blue-900 dark:text-blue-100">{formatCurrency(blanketTotal)}</span>
                     </div>
                     
                     {/* List partial invoices */}
@@ -1135,37 +1160,11 @@ const InvoiceDetail = () => {
                 </div>
               );
             })()}
-
-            {/* Invoice Totals */}
-            <div className="flex justify-end mt-8">
-              <div className="space-y-2 w-80">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-semibold">{formatCurrency(displaySubtotal)}</span>
-                </div>
-                <div className="h-px bg-border my-2"></div>
-                <div className="flex justify-between">
-                  <span className="text-lg font-semibold">Total</span>
-                  <span className="text-2xl font-bold">{formatCurrency(displayTotal)}</span>
-                </div>
-                {isEditMode && (
-                  <p className="text-xs text-muted-foreground italic mt-2">
-                    Totals will be saved when you click "Save Changes"
-                  </p>
-                )}
-              </div>
-            </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Payment History */}
-      <Card className="shadow-lg">
-        <CardContent className="p-8">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h2 className="text-lg font-semibold">Payment History</h2>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground">
                 {payments.length} payment{payments.length !== 1 ? 's' : ''} recorded
               </p>
             </div>
