@@ -35,8 +35,6 @@ const Invoices = () => {
   const [loading, setLoading] = useState(true);
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
 
-  const [payments, setPayments] = useState<Map<string, number>>(new Map());
-
   useEffect(() => {
     checkRole();
   }, []);
@@ -74,22 +72,6 @@ const Invoices = () => {
     
     if (data) {
       setInvoices(data);
-      
-      // Fetch all payments for all invoices
-      const { data: paymentsData } = await supabase
-        .from('payments')
-        .select('invoice_id, amount')
-        .in('invoice_id', data.map(inv => inv.id));
-      
-      if (paymentsData) {
-        // Create a map of invoice_id -> total payments
-        const paymentsMap = new Map<string, number>();
-        paymentsData.forEach(payment => {
-          const current = paymentsMap.get(payment.invoice_id) || 0;
-          paymentsMap.set(payment.invoice_id, current + Number(payment.amount));
-        });
-        setPayments(paymentsMap);
-      }
     }
     setLoading(false);
   };
@@ -330,12 +312,13 @@ const Invoices = () => {
       <div className="border border-table-border rounded">
         {/* Table Header */}
         <div className="bg-table-header border-b border-table-border">
-          <div className="grid grid-cols-11 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-2">Description</div>
             <div className="col-span-2">Company</div>
             <div className="col-span-1">Shipment</div>
             <div className="col-span-1">Type</div>
+            <div className="col-span-1">Amount</div>
             <div className="col-span-1">PO Number</div>
             <div className="col-span-1">Status</div>
             <div className="col-span-1">Actions</div>
@@ -361,30 +344,10 @@ const Invoices = () => {
               const showDueStatus = isParent && hasChildren && hasDueChildren(invoice.id);
               const displayStatus = showDueStatus ? 'DUE' : getStatusDisplay(invoice);
               
-              // Calculate balance for open blanket invoices
-              const isBlanketInvoice = invoice.invoice_type === 'full' && invoice.shipment_number === 1;
-              const isOpen = invoice.status === 'open' || invoice.status === 'final_review';
-              let balanceDue = null;
-              
-              if (isBlanketInvoice && isOpen) {
-                // Get all invoices for this order
-                const relatedInvoices = invoices.filter(inv => 
-                  inv.order_id === invoice.order_id && inv.id !== invoice.id
-                );
-                
-                // Calculate total payments from all related invoices
-                let totalPayments = 0;
-                [invoice, ...relatedInvoices].forEach(inv => {
-                  totalPayments += payments.get(inv.id) || 0;
-                });
-                
-                balanceDue = Number(invoice.total) - totalPayments;
-              }
-              
               return (
                 <div 
                   key={invoice.id} 
-                  className={`grid grid-cols-11 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors ${
+                  className={`grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors ${
                     isChild ? 'bg-muted/30 border-l-4 border-l-blue-500/50' : ''
                   } ${isParent ? 'border-b-2 border-b-blue-500/20' : ''}`}
                 >
@@ -480,22 +443,16 @@ const Invoices = () => {
                       {(invoice.invoice_type || 'full').charAt(0).toUpperCase() + (invoice.invoice_type || 'full').slice(1)}
                     </Badge>
                   </div>
+                  <div className="col-span-1 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
                   <div className="col-span-1 text-sm">{invoice.orders?.po_number || 'N/A'}</div>
                   <div className="col-span-1 text-sm font-medium">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1">
-                        <StatusIcon className={`h-3 w-3 ${getStatusColor(displayStatus, showDueStatus)}`} />
-                        <span className={getStatusColor(displayStatus, showDueStatus)}>{displayStatus}</span>
-                        {showDueStatus && hasChildren && (
-                          <span title="Contains due partial invoices">
-                            <AlertCircle className="h-3 w-3 text-red-600 dark:text-red-400 ml-1" />
-                          </span>
-                        )}
-                      </div>
-                      {balanceDue !== null && (
-                        <div className="text-xs font-bold text-red-600 dark:text-red-400">
-                          Due: {formatCurrency(balanceDue)}
-                        </div>
+                    <div className="flex items-center gap-1">
+                      <StatusIcon className={`h-3 w-3 ${getStatusColor(displayStatus, showDueStatus)}`} />
+                      <span className={getStatusColor(displayStatus, showDueStatus)}>{displayStatus}</span>
+                      {showDueStatus && hasChildren && (
+                        <span title="Contains due partial invoices">
+                          <AlertCircle className="h-3 w-3 text-red-600 dark:text-red-400 ml-1" />
+                        </span>
                       )}
                     </div>
                   </div>
