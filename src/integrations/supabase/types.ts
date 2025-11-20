@@ -687,6 +687,7 @@ export type Database = {
           order_type: string
           parent_order_id: string | null
           po_number: string | null
+          po_pdf_path: string | null
           shipping_city: string
           shipping_cost: number | null
           shipping_name: string
@@ -732,6 +733,7 @@ export type Database = {
           order_type?: string
           parent_order_id?: string | null
           po_number?: string | null
+          po_pdf_path?: string | null
           shipping_city: string
           shipping_cost?: number | null
           shipping_name: string
@@ -777,6 +779,7 @@ export type Database = {
           order_type?: string
           parent_order_id?: string | null
           po_number?: string | null
+          po_pdf_path?: string | null
           shipping_city?: string
           shipping_cost?: number | null
           shipping_name?: string

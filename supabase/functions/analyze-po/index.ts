@@ -409,6 +409,7 @@ Return ONLY valid JSON:
         order_number: orderNumber,
         order_type: orderType,
         po_number: extractedData.po_number || null,
+        po_pdf_path: pdfPath,
         customer_name: extractedData.customer_name || 'Unknown Customer',
         customer_email: extractedData.customer_email || null,
         customer_phone: extractedData.customer_phone || null,
