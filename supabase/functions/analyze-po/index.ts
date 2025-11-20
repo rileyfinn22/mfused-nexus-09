@@ -239,6 +239,8 @@ Return ONLY valid JSON:
       console.log(`✓ FOUND PCK-00046-WA in fetched products:`, targetProduct);
     } else {
       console.log(`✗ PCK-00046-WA NOT in fetched products list`);
+    }
+    
     if (products && products.length > 0) {
       console.log('Sample products:', JSON.stringify(products.slice(0, 3), null, 2));
     }
