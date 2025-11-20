@@ -445,7 +445,7 @@ const PullShipOrderDetail = () => {
 
         if (parentError) throw parentError;
 
-        // Get existing invoices for the parent order to determine next shipment number
+        // Get existing invoices for the parent order
         const { data: existingInvoices, error: invoicesError } = await supabase
           .from('invoices')
           .select('id, invoice_number, shipment_number, billed_percentage, invoice_type')
@@ -454,10 +454,50 @@ const PullShipOrderDetail = () => {
 
         if (invoicesError) throw invoicesError;
 
-        const isFirstInvoice = !existingInvoices || existingInvoices.length === 0;
-        const nextShipmentNumber = existingInvoices && existingInvoices.length > 0 
-          ? (existingInvoices[0].shipment_number || 0) + 1 
-          : 1;
+        // Ensure a blanket invoice exists (type 'full', shipment 1)
+        let blanketInvoice = existingInvoices?.find(inv => inv.invoice_type === 'full' && inv.shipment_number === 1);
+        
+        if (!blanketInvoice) {
+          // Create the main blanket invoice first
+          const blanketInvoiceNumber = generateInvoiceNumber(1);
+          const blanketTotal = parentOrder.total || 0;
+          
+          const { data: newBlanketInvoice, error: blanketError } = await supabase
+            .from('invoices')
+            .insert({
+              order_id: order.parent_order_id,
+              company_id: order.company_id,
+              invoice_number: blanketInvoiceNumber,
+              invoice_type: 'full',
+              invoice_date: new Date().toISOString(),
+              subtotal: parentOrder.subtotal || 0,
+              tax: 0,
+              total: blanketTotal,
+              shipping_cost: 0,
+              shipment_number: 1,
+              billed_percentage: 100,
+              parent_invoice_id: null,
+              status: 'open',
+              notes: 'Main blanket invoice for full order',
+              created_by: user.id
+            })
+            .select()
+            .single();
+          
+          if (blanketError) throw blanketError;
+          blanketInvoice = newBlanketInvoice;
+          
+          toast({
+            title: "Blanket Invoice Created",
+            description: `Main invoice ${blanketInvoiceNumber} created for full order`,
+          });
+        }
+
+        // Calculate next shipment number (blanket is always 1, so child invoices start at 2)
+        const childInvoices = existingInvoices?.filter(inv => inv.shipment_number > 1) || [];
+        const nextShipmentNumber = childInvoices.length > 0 
+          ? Math.max(...childInvoices.map(inv => inv.shipment_number)) + 1 
+          : 2;
 
         const invoiceNumber = generateInvoiceNumber(nextShipmentNumber);
 
@@ -466,18 +506,14 @@ const PullShipOrderDetail = () => {
         const blanketTotal = parentOrder.total || 1;
         const percentageOfOrder = (pullShipTotal / blanketTotal) * 100;
 
-        // First invoice for blanket order should be type "full" (represents the master contract)
-        // Subsequent invoices are "partial" (individual shipments)
-        const invoiceType = isFirstInvoice ? 'full' : 'partial';
-
-        // Create invoice for this shipment
+        // Create invoice for this shipment linked to blanket
         const { data: invoiceData, error: invoiceError } = await supabase
           .from('invoices')
           .insert({
             order_id: order.parent_order_id,
             company_id: order.company_id,
             invoice_number: invoiceNumber,
-            invoice_type: invoiceType,
+            invoice_type: 'partial',
             invoice_date: new Date().toISOString(),
             subtotal: editedOrder.subtotal || 0,
             tax: editedOrder.tax || 0,
@@ -485,6 +521,7 @@ const PullShipOrderDetail = () => {
             shipping_cost: editedOrder.shipping_cost || 0,
             shipment_number: nextShipmentNumber,
             billed_percentage: Number(percentageOfOrder.toFixed(2)),
+            parent_invoice_id: blanketInvoice.id, // Link to blanket invoice
             status: 'draft',
             notes: `Pull & Ship Order: ${order.order_number}`,
             created_by: user.id
