@@ -1374,48 +1374,65 @@ const InvoiceDetail = () => {
         </Card>
       )}
 
-      {/* Inventory Allocations - For Admin View */}
-      {isVibeAdmin && inventoryAllocations.length > 0 && (
+      {/* Inventory Allocations - For Admin View - Only show if there's actual inventory tracked */}
+      {isVibeAdmin && inventoryAllocations.length > 0 && inventoryAllocations.some((a: any) => a.inventory_id !== null) && (
         <Card className="shadow-lg">
           <CardContent className="p-8">
             <h2 className="text-lg font-semibold mb-4">Inventory Allocations</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Inventory pulled for this shipment from various locations
+              Inventory pulled for this shipment from warehouse locations
             </p>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Item</TableHead>
-                  <TableHead>SKU</TableHead>
+                  <TableHead>Inventory SKU</TableHead>
                   <TableHead>Location (State)</TableHead>
                   <TableHead className="text-right">Qty Allocated</TableHead>
+                  <TableHead className="text-right">Available Before</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Allocated Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inventoryAllocations.map((allocation: any) => (
-                  <TableRow key={allocation.id}>
-                    <TableCell className="font-medium">{allocation.order_items?.name}</TableCell>
-                    <TableCell className="font-mono text-xs">{allocation.order_items?.sku}</TableCell>
-                    <TableCell>{allocation.inventory?.state}</TableCell>
-                    <TableCell className="text-right font-semibold">{allocation.quantity_allocated}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        allocation.status === 'shipped' ? 'bg-green-500/10 text-green-600' :
-                        allocation.status === 'picked' ? 'bg-blue-500/10 text-blue-600' :
-                        'bg-gray-500/10 text-gray-600'
-                      }`}>
-                        {allocation.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(allocation.allocated_at).toLocaleDateString()}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {inventoryAllocations
+                  .filter((allocation: any) => allocation.inventory_id !== null)
+                  .map((allocation: any) => (
+                    <TableRow key={allocation.id}>
+                      <TableCell className="font-medium">{allocation.order_items?.name}</TableCell>
+                      <TableCell className="font-mono text-xs">{allocation.inventory?.sku || allocation.order_items?.sku}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{allocation.inventory?.state || 'N/A'}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">{allocation.quantity_allocated}</TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground">
+                        {allocation.inventory?.available !== undefined 
+                          ? allocation.inventory.available + allocation.quantity_allocated 
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={
+                          allocation.status === 'shipped' ? 'bg-success/10 text-success border-success/20' :
+                          allocation.status === 'picked' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                          'bg-muted'
+                        }>
+                          {allocation.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(allocation.allocated_at).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
               </TableBody>
             </Table>
+            {inventoryAllocations.some((a: any) => a.inventory_id === null) && (
+              <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <p className="text-sm text-blue-600">
+                  <strong>Note:</strong> Some items in this shipment were direct-shipped (not pulled from inventory) and are not shown above.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
