@@ -14,7 +14,10 @@ import {
   Package,
   Edit,
   Trash2,
-  Link2
+  Link2,
+  ChevronDown,
+  ChevronRight,
+  AlertCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -30,6 +33,7 @@ const Invoices = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     checkRole();
@@ -114,6 +118,31 @@ const Invoices = () => {
     return diffDays;
   };
 
+  const toggleExpanded = (invoiceId: string) => {
+    setExpandedInvoices(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(invoiceId)) {
+        newSet.delete(invoiceId);
+      } else {
+        newSet.add(invoiceId);
+      }
+      return newSet;
+    });
+  };
+
+  const hasOverdueChildren = (parentId: string) => {
+    const children = invoices.filter(inv => inv.parent_invoice_id === parentId);
+    return children.some(child => {
+      if (child.status === 'open' || child.status === 'pending') {
+        if (child.due_date) {
+          const daysUntilDue = getDaysUntilDue(child.due_date);
+          return daysUntilDue < 0;
+        }
+      }
+      return false;
+    });
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -132,23 +161,25 @@ const Invoices = () => {
     return matchesSearch && matchesStatus && matchesCompany;
   });
 
-  // Group invoices by parent-child relationships
-  const groupedInvoices = filteredInvoices.reduce((acc, invoice) => {
-    if (!invoice.parent_invoice_id) {
-      // This is a parent invoice or standalone invoice
-      acc.push({
-        parent: invoice,
-        children: filteredInvoices.filter(inv => inv.parent_invoice_id === invoice.id)
-      });
-    }
-    return acc;
-  }, [] as Array<{ parent: any; children: any[] }>);
+  // Group related invoices (blanket + partials)
+  const invoiceGroups = filteredInvoices
+    .filter(inv => !inv.parent_invoice_id) // Only parent invoices
+    .map(parent => ({
+      parent,
+      children: filteredInvoices.filter(inv => inv.parent_invoice_id === parent.id)
+    }));
 
-  // Flatten for display purposes (parent then children)
-  const displayInvoices = groupedInvoices.flatMap(group => [
-    { invoice: group.parent, isParent: group.children.length > 0, isChild: false },
-    ...group.children.map(child => ({ invoice: child, isParent: false, isChild: true }))
-  ]);
+  // Create display list based on expansion state
+  const displayInvoices = invoiceGroups.flatMap(group => {
+    const items = [{ invoice: group.parent, isParent: true, isChild: false, hasChildren: group.children.length > 0 }];
+    
+    // Only show children if parent is expanded
+    if (expandedInvoices.has(group.parent.id)) {
+      items.push(...group.children.map(child => ({ invoice: child, isParent: false, isChild: true, hasChildren: false })));
+    }
+    
+    return items;
+  });
 
   const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + Number(invoice.total), 0);
   const paidAmount = filteredInvoices.filter(inv => inv.status === 'paid').reduce((sum, invoice) => sum + Number(invoice.total), 0);
@@ -288,9 +319,11 @@ const Invoices = () => {
               No invoices found matching your criteria.
             </div>
           ) : (
-            displayInvoices.map(({ invoice, isParent, isChild }) => {
+            displayInvoices.map(({ invoice, isParent, isChild, hasChildren }) => {
               const StatusIcon = getStatusIcon(invoice);
               const daysUntilDue = invoice.due_date ? getDaysUntilDue(invoice.due_date) : null;
+              const isExpanded = expandedInvoices.has(invoice.id);
+              const showOverdueAlert = isParent && hasChildren && hasOverdueChildren(invoice.id);
               
               return (
                 <div 
@@ -301,13 +334,39 @@ const Invoices = () => {
                 >
                   <div className="col-span-2">
                     <div className="flex items-center gap-2">
+                      {isParent && hasChildren && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpanded(invoice.id);
+                          }}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-primary" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      )}
                       {isChild && (
                         <div className="flex items-center text-muted-foreground mr-1">
                           <div className="w-4 h-px bg-border mr-1"></div>
                           <Package className="h-3 w-3" />
                         </div>
                       )}
-                      <div className={`font-medium font-mono text-sm ${isChild ? 'ml-2' : ''}`}>{invoice.invoice_number}</div>
+                      <div className={`font-medium font-mono text-sm ${isChild ? 'ml-2' : ''} ${!isParent || !hasChildren ? 'ml-8' : ''}`}>{invoice.invoice_number}</div>
+                      {showOverdueAlert && (
+                        <Badge 
+                          variant="outline" 
+                          className="bg-red-500/10 text-red-700 border-red-500/20 text-xs px-1.5 py-0 animate-pulse"
+                          title="Contains overdue invoices"
+                        >
+                          <AlertCircle className="h-3 w-3" />
+                        </Badge>
+                      )}
                       {invoice.quickbooks_payment_link && (
                         <Badge 
                           variant="outline" 
