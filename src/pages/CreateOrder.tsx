@@ -810,7 +810,7 @@ const CreateOrder = () => {
         return {
           order_id: order.id,
           product_id: item.productId,
-          sku: `SKU-${product?.id.substring(0, 8)}`,
+          sku: product?.item_id || `SKU-${product?.id.substring(0, 8)}`, // Use product's actual SKU (item_id) if available
           item_id: product?.item_id || null,
           name: product?.name || "",
           description: product?.description || null,
