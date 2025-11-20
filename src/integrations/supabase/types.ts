@@ -383,6 +383,7 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          description: string | null
           due_date: string | null
           id: string
           invoice_date: string
@@ -409,6 +410,7 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
+          description?: string | null
           due_date?: string | null
           id?: string
           invoice_date?: string
@@ -435,6 +437,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          description?: string | null
           due_date?: string | null
           id?: string
           invoice_date?: string
@@ -671,6 +674,7 @@ export type Database = {
           customer_email: string | null
           customer_name: string
           customer_phone: string | null
+          description: string | null
           due_date: string | null
           fulfillment_vendor_id: string | null
           id: string
@@ -715,6 +719,7 @@ export type Database = {
           customer_email?: string | null
           customer_name: string
           customer_phone?: string | null
+          description?: string | null
           due_date?: string | null
           fulfillment_vendor_id?: string | null
           id?: string
@@ -759,6 +764,7 @@ export type Database = {
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string | null
+          description?: string | null
           due_date?: string | null
           fulfillment_vendor_id?: string | null
           id?: string

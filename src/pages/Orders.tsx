@@ -67,6 +67,17 @@ const Orders = () => {
     setIsVibeAdmin(userRole?.role === 'vibe_admin');
   };
 
+  const handleDescriptionChange = async (orderId: string, description: string) => {
+    const { error } = await supabase
+      .from("orders")
+      .update({ description })
+      .eq("id", orderId);
+
+    if (error) {
+      console.error("Error updating order description:", error);
+    }
+  };
+
   const fetchCompanies = async () => {
     const { data, error } = await supabase
       .from('companies')
@@ -336,8 +347,22 @@ const Orders = () => {
                           {orderTypeInfo.label}
                         </Badge>
                       </div>
+                      <div className="col-span-2">
+                        <Input
+                          type="text"
+                          value={order.description || ''}
+                          onChange={(e) => {
+                            setOrders(prev => prev.map(o => 
+                              o.id === order.id ? { ...o, description: e.target.value } : o
+                            ));
+                          }}
+                          onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
+                          placeholder="Add description..."
+                          className="h-8 text-xs"
+                        />
+                      </div>
                       {isVibeAdmin && (
-                        <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
+                        <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
                       )}
                       <div className={isVibeAdmin ? "col-span-1 text-sm" : "col-span-2 text-sm"}>{order.po_number || '-'}</div>
                       <div className="col-span-1">
@@ -401,19 +426,20 @@ const Orders = () => {
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Pending Orders - Awaiting Production</h2>
           <div className="border border-table-border rounded">
-            <div className="bg-table-header border-b border-table-border">
-              <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                <div className="col-span-2">Order # / Type</div>
-                {isVibeAdmin && <div className="col-span-1">Company</div>}
-                <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
-                <div className="col-span-1">State</div>
-                <div className="col-span-1">Total</div>
-                <div className="col-span-1">Status</div>
-                <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>Checklist</div>
-                <div className="col-span-1">Due Date</div>
-                <div className="col-span-2">Actions</div>
+              <div className="bg-table-header border-b border-table-border">
+                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <div className="col-span-2">Order # / Type</div>
+                  <div className="col-span-2">Description</div>
+                  {isVibeAdmin && <div className="col-span-1">Company</div>}
+                  <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
+                  <div className="col-span-1">State</div>
+                  <div className="col-span-1">Total</div>
+                  <div className="col-span-1">Status</div>
+                  <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>Checklist</div>
+                  <div className="col-span-1">Due Date</div>
+                  <div className="col-span-2">Actions</div>
+                </div>
               </div>
-            </div>
             <div className="divide-y divide-table-border">
               {loading ? (
                 <div className="text-center py-12 text-muted-foreground">
@@ -439,6 +465,20 @@ const Orders = () => {
                         <OrderIcon className="h-3 w-3" />
                         {orderTypeInfo.label}
                       </Badge>
+                    </div>
+                    <div className="col-span-2">
+                      <Input
+                        type="text"
+                        value={order.description || ''}
+                        onChange={(e) => {
+                          setOrders(prev => prev.map(o => 
+                            o.id === order.id ? { ...o, description: e.target.value } : o
+                          ));
+                        }}
+                        onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
+                        placeholder="Add description..."
+                        className="h-8 text-xs"
+                      />
                     </div>
                     {isVibeAdmin && (
                       <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
@@ -529,6 +569,7 @@ const Orders = () => {
             <div className="bg-table-header border-b border-table-border">
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-2">Order # / Type</div>
+                <div className="col-span-2">Description</div>
                 {isVibeAdmin && <div className="col-span-1">Company</div>}
                 <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
                 <div className="col-span-1">State</div>
@@ -567,6 +608,20 @@ const Orders = () => {
                         <OrderIcon className="h-3 w-3" />
                         {orderTypeInfo.label}
                       </Badge>
+                    </div>
+                    <div className="col-span-2">
+                      <Input
+                        type="text"
+                        value={order.description || ''}
+                        onChange={(e) => {
+                          setOrders(prev => prev.map(o => 
+                            o.id === order.id ? { ...o, description: e.target.value } : o
+                          ));
+                        }}
+                        onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
+                        placeholder="Add description..."
+                        className="h-8 text-xs"
+                      />
                     </div>
                     {isVibeAdmin && (
                       <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
