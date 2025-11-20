@@ -201,21 +201,33 @@ const PullShipOrders = () => {
             );
 
             if (parentItem) {
-              // Calculate total shipped quantity from ALL sources (pull & ship orders + regular shipping invoices)
-              // Get all inventory allocations for this parent order item (includes both pull & ship and regular shipments)
-              const { data: allAllocations } = await supabase
-                .from('inventory_allocations')
-                .select('quantity_allocated')
-                .eq('order_item_id', parentItem.id);
+              // Calculate total shipped from ALL invoices for this parent order (by SKU)
+              // Get all invoices for the parent order (excluding the blanket 'full' invoice)
+              const { data: allInvoices } = await supabase
+                .from('invoices')
+                .select('id')
+                .eq('order_id', order.parent_order_id)
+                .neq('invoice_type', 'full');
               
-              const totalShippedForSku = allAllocations 
-                ? allAllocations.reduce((sum, alloc) => sum + (alloc.quantity_allocated || 0), 0)
-                : 0;
-              
-              await supabase
-                .from('order_items')
-                .update({ shipped_quantity: totalShippedForSku })
-                .eq('id', parentItem.id);
+              if (allInvoices && allInvoices.length > 0) {
+                const invoiceIds = allInvoices.map(inv => inv.id);
+                
+                // Get all allocations for these invoices matching this SKU
+                const { data: allocations } = await supabase
+                  .from('inventory_allocations')
+                  .select('quantity_allocated, order_items!inner(sku)')
+                  .in('invoice_id', invoiceIds)
+                  .eq('order_items.sku', pullItem.sku);
+                
+                const totalShippedForSku = allocations
+                  ? allocations.reduce((sum, alloc) => sum + (alloc.quantity_allocated || 0), 0)
+                  : 0;
+                
+                await supabase
+                  .from('order_items')
+                  .update({ shipped_quantity: totalShippedForSku })
+                  .eq('id', parentItem.id);
+              }
             }
           }
 
@@ -355,21 +367,31 @@ const PullShipOrders = () => {
 
         if (parentItems) {
           for (const parentItem of parentItems) {
-            // Calculate total shipped for this SKU from ALL allocations (pull & ship + regular shipments)
-            const { data: allAllocations } = await supabase
-              .from('inventory_allocations')
-              .select('quantity_allocated')
-              .eq('order_item_id', parentItem.id);
+            // Calculate total shipped from ALL invoices by matching SKU
+            const { data: allInvoices } = await supabase
+              .from('invoices')
+              .select('id')
+              .eq('order_id', orderData.parent_order_id)
+              .neq('invoice_type', 'full');
             
-            const totalShipped = allAllocations 
-              ? allAllocations.reduce((sum, alloc) => sum + (alloc.quantity_allocated || 0), 0)
-              : 0;
+            if (allInvoices && allInvoices.length > 0) {
+              const invoiceIds = allInvoices.map(inv => inv.id);
+              
+              const { data: allocations } = await supabase
+                .from('inventory_allocations')
+                .select('quantity_allocated, order_items!inner(sku)')
+                .in('invoice_id', invoiceIds)
+                .eq('order_items.sku', parentItem.sku);
+              
+              const totalShipped = allocations
+                ? allocations.reduce((sum, alloc) => sum + (alloc.quantity_allocated || 0), 0)
+                : 0;
 
-            // Update parent order item shipped quantity
-            await supabase
-              .from('order_items')
-              .update({ shipped_quantity: totalShipped })
-              .eq('id', parentItem.id);
+              await supabase
+                .from('order_items')
+                .update({ shipped_quantity: totalShipped })
+                .eq('id', parentItem.id);
+            }
           }
         }
 
