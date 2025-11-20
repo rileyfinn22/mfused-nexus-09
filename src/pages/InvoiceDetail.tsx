@@ -13,19 +13,11 @@ import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
 import { SyncToQuickBooksDialog } from "@/components/SyncToQuickBooksDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 const InvoiceDetail = () => {
-  const { invoiceId } = useParams();
+  const {
+    invoiceId
+  } = useParams();
   const navigate = useNavigate();
   const [invoice, setInvoice] = useState<any>(null);
   const [order, setOrder] = useState<any>(null);
@@ -46,34 +38,37 @@ const InvoiceDetail = () => {
   const [showDepositDialog, setShowDepositDialog] = useState(false);
   const [refreshingLink, setRefreshingLink] = useState(false);
   const [syncingPayment, setSyncingPayment] = useState<string | null>(null);
-  const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
-
+  const {
+    syncInvoice,
+    checkConnection
+  } = useQuickBooksAutoSync();
   useEffect(() => {
     checkAdminStatus();
     if (invoiceId) {
       fetchInvoiceDetails();
     }
   }, [invoiceId]);
-
   const checkAdminStatus = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: {
+        user
+      }
+    } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
+      const {
+        data
+      } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
       setIsVibeAdmin(data?.role === 'vibe_admin');
     }
   };
-
   const fetchInvoiceDetails = async () => {
     setLoading(true);
-    
+
     // Fetch invoice with order details and company info
-    const { data: invoiceData, error: invoiceError } = await supabase
-      .from('invoices')
-      .select(`
+    const {
+      data: invoiceData,
+      error: invoiceError
+    } = await supabase.from('invoices').select(`
         *,
         orders(
           *,
@@ -81,10 +76,7 @@ const InvoiceDetail = () => {
           parent_order:parent_order_id(id, order_number, order_type)
         ),
         companies!company_id(name)
-      `)
-      .eq('id', invoiceId)
-      .single();
-
+      `).eq('id', invoiceId).single();
     if (invoiceError || !invoiceData) {
       console.error('Invoice fetch error:', invoiceError);
       toast({
@@ -95,30 +87,28 @@ const InvoiceDetail = () => {
       setLoading(false);
       return;
     }
-
     console.log('Fetched invoice with company:', invoiceData);
     setInvoice(invoiceData);
     setOrder(invoiceData.orders);
 
     // Fetch inventory allocations for this invoice to get actual pulled items
-    const { data: allocationsData } = await supabase
-      .from('inventory_allocations')
-      .select(`
+    const {
+      data: allocationsData
+    } = await supabase.from('inventory_allocations').select(`
         *,
         order_items(id, name, sku, unit_price, quantity, shipped_quantity, item_id, description),
         inventory(state, available)
-      `)
-      .eq('invoice_id', invoiceId);
-    
+      `).eq('invoice_id', invoiceId);
     if (allocationsData) {
       setInventoryAllocations(allocationsData);
-      
+
       // ALWAYS use allocated items for display, regardless of invoice type
       // This shows only what was actually included on THIS specific invoice
       if (allocationsData.length > 0) {
         const invoiceItems = allocationsData.map((alloc: any) => ({
           ...alloc.order_items,
-          quantity: alloc.quantity_allocated, // Use allocated quantity as the quantity for this invoice
+          quantity: alloc.quantity_allocated,
+          // Use allocated quantity as the quantity for this invoice
           shipped_quantity: alloc.quantity_allocated,
           total: alloc.quantity_allocated * (alloc.order_items?.unit_price || 0)
         }));
@@ -132,72 +122,63 @@ const InvoiceDetail = () => {
     }
 
     // Fetch vendor POs for this order
-    const { data: vendorPOData } = await supabase
-      .from('vendor_pos')
-      .select(`
+    const {
+      data: vendorPOData
+    } = await supabase.from('vendor_pos').select(`
         *,
         vendors(name, contact_name, contact_email),
         vendor_po_items(*)
-      `)
-      .eq('order_id', invoiceData.order_id);
-
+      `).eq('order_id', invoiceData.order_id);
     if (vendorPOData) {
       setVendorPOs(vendorPOData);
     }
 
     // Fetch related invoices for the same order
-    const { data: relatedData } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('order_id', invoiceData.order_id)
-      .neq('id', invoiceId)
-      .order('shipment_number');
-    
+    const {
+      data: relatedData
+    } = await supabase.from('invoices').select('*').eq('order_id', invoiceData.order_id).neq('id', invoiceId).order('shipment_number');
     if (relatedData) {
       setRelatedInvoices(relatedData);
     }
 
     // Fetch ALL inventory allocations for ALL invoices connected to this order (for progress calculation)
-    const { data: allAllocations } = await supabase
-      .from('inventory_allocations')
-      .select(`
+    const {
+      data: allAllocations
+    } = await supabase.from('inventory_allocations').select(`
         quantity_allocated,
         invoice_id,
         invoices!inner(order_id)
-      `)
-      .eq('invoices.order_id', invoiceData.order_id);
-    
+      `).eq('invoices.order_id', invoiceData.order_id);
+
     // Calculate total shipped across all invoices for this order
-    const totalShippedAcrossAllInvoices = allAllocations?.reduce((sum, alloc) => 
-      sum + Number(alloc.quantity_allocated || 0), 0) || 0;
-    
+    const totalShippedAcrossAllInvoices = allAllocations?.reduce((sum, alloc) => sum + Number(alloc.quantity_allocated || 0), 0) || 0;
     setTotalShippedAllInvoices(totalShippedAcrossAllInvoices);
     console.log('Total shipped across all invoices:', totalShippedAcrossAllInvoices);
 
     // Fetch payments for this invoice
-    const { data: paymentsData } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('invoice_id', invoiceId)
-      .order('payment_date', { ascending: false });
-    
+    const {
+      data: paymentsData
+    } = await supabase.from('payments').select('*').eq('invoice_id', invoiceId).order('payment_date', {
+      ascending: false
+    });
     if (paymentsData) {
       setPayments(paymentsData);
     }
-
     setLoading(false);
   };
-
   const handleDeleteInvoice = async () => {
     try {
       // If invoice is synced to QuickBooks, delete from QB first
       if (invoice?.quickbooks_id) {
         const isConnected = await checkConnection();
         if (isConnected) {
-          const { error: qbError } = await supabase.functions.invoke('quickbooks-delete-invoice', {
-            body: { invoiceId }
+          const {
+            error: qbError
+          } = await supabase.functions.invoke('quickbooks-delete-invoice', {
+            body: {
+              invoiceId
+            }
           });
-
           if (qbError) {
             console.error('QuickBooks deletion failed:', qbError);
             toast({
@@ -215,68 +196,46 @@ const InvoiceDetail = () => {
       const isDeposit = invoice?.notes && invoice.notes.includes('deposit payment');
       if (!isDeposit) {
         // Fetch all allocations for this invoice
-        const { data: allocations } = await supabase
-          .from('inventory_allocations')
-          .select('*')
-          .eq('invoice_id', invoiceId);
-
+        const {
+          data: allocations
+        } = await supabase.from('inventory_allocations').select('*').eq('invoice_id', invoiceId);
         if (allocations && allocations.length > 0) {
           for (const allocation of allocations) {
             // Restore inventory quantity (only if this allocation has an inventory_id)
             if (allocation.inventory_id) {
-              const { data: currentInv } = await supabase
-                .from('inventory')
-                .select('available')
-                .eq('id', allocation.inventory_id)
-                .single();
-
+              const {
+                data: currentInv
+              } = await supabase.from('inventory').select('available').eq('id', allocation.inventory_id).single();
               if (currentInv) {
-                await supabase
-                  .from('inventory')
-                  .update({
-                    available: currentInv.available + allocation.quantity_allocated
-                  })
-                  .eq('id', allocation.inventory_id);
+                await supabase.from('inventory').update({
+                  available: currentInv.available + allocation.quantity_allocated
+                }).eq('id', allocation.inventory_id);
               }
             }
 
             // Always restore order item shipped_quantity
-            const { data: currentItem } = await supabase
-              .from('order_items')
-              .select('shipped_quantity')
-              .eq('id', allocation.order_item_id)
-              .single();
-
+            const {
+              data: currentItem
+            } = await supabase.from('order_items').select('shipped_quantity').eq('id', allocation.order_item_id).single();
             if (currentItem) {
-              await supabase
-                .from('order_items')
-                .update({
-                  shipped_quantity: Math.max(0, (currentItem.shipped_quantity || 0) - allocation.quantity_allocated)
-                })
-                .eq('id', allocation.order_item_id);
+              await supabase.from('order_items').update({
+                shipped_quantity: Math.max(0, (currentItem.shipped_quantity || 0) - allocation.quantity_allocated)
+              }).eq('id', allocation.order_item_id);
             }
 
             // Delete the allocation record
-            await supabase
-              .from('inventory_allocations')
-              .delete()
-              .eq('id', allocation.id);
+            await supabase.from('inventory_allocations').delete().eq('id', allocation.id);
           }
         }
       }
 
       // Delete any payments associated with this invoice
-      await supabase
-        .from('payments')
-        .delete()
-        .eq('invoice_id', invoiceId);
+      await supabase.from('payments').delete().eq('invoice_id', invoiceId);
 
       // Delete from database
-      const { error } = await supabase
-        .from('invoices')
-        .delete()
-        .eq('id', invoiceId);
-
+      const {
+        error
+      } = await supabase.from('invoices').delete().eq('id', invoiceId);
       if (error) {
         toast({
           title: "Error",
@@ -299,58 +258,46 @@ const InvoiceDetail = () => {
       });
     }
   };
-
   const handleSaveQuantities = async () => {
     try {
       // Update each order item
       for (const item of editedItems) {
         const newTotal = Number(item.shipped_quantity) * Number(item.unit_price);
-        
-        const { error } = await supabase
-          .from('order_items')
-          .update({
-            shipped_quantity: item.shipped_quantity,
-            unit_price: item.unit_price,
-            total: newTotal
-          })
-          .eq('id', item.id);
-
+        const {
+          error
+        } = await supabase.from('order_items').update({
+          shipped_quantity: item.shipped_quantity,
+          unit_price: item.unit_price,
+          total: newTotal
+        }).eq('id', item.id);
         if (error) throw error;
       }
 
       // Recalculate order totals
-      const newSubtotal = editedItems.reduce((sum, item) => 
-        sum + (Number(item.shipped_quantity) * Number(item.unit_price)), 0
-      );
+      const newSubtotal = editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity) * Number(item.unit_price), 0);
       const newTotal = newSubtotal + Number(invoice.tax);
 
       // Update order totals
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({
-          subtotal: newSubtotal,
-          total: newTotal
-        })
-        .eq('id', invoice.order_id);
-
+      const {
+        error: orderError
+      } = await supabase.from('orders').update({
+        subtotal: newSubtotal,
+        total: newTotal
+      }).eq('id', invoice.order_id);
       if (orderError) throw orderError;
 
       // Update invoice totals
-      const { error: invoiceError } = await supabase
-        .from('invoices')
-        .update({
-          subtotal: newSubtotal,
-          total: newTotal
-        })
-        .eq('id', invoiceId);
-
+      const {
+        error: invoiceError
+      } = await supabase.from('invoices').update({
+        subtotal: newSubtotal,
+        total: newTotal
+      }).eq('id', invoiceId);
       if (invoiceError) throw invoiceError;
-
       toast({
         title: "Success",
         description: "Prices and quantities updated successfully"
       });
-
       setIsEditMode(false);
       fetchInvoiceDetails();
     } catch (error: any) {
@@ -362,32 +309,24 @@ const InvoiceDetail = () => {
       });
     }
   };
-
   const handlePriceChange = (itemId: string, newPrice: number) => {
-    setEditedItems(items =>
-      items.map(item =>
-        item.id === itemId
-          ? { ...item, unit_price: newPrice, total: Number(item.shipped_quantity) * newPrice }
-          : item
-      )
-    );
+    setEditedItems(items => items.map(item => item.id === itemId ? {
+      ...item,
+      unit_price: newPrice,
+      total: Number(item.shipped_quantity) * newPrice
+    } : item));
   };
-
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity < 0) return;
-    
-    setEditedItems(items =>
-      items.map(item =>
-        item.id === itemId
-          ? { ...item, quantity: newQuantity, shipped_quantity: newQuantity, total: newQuantity * Number(item.unit_price) }
-          : item
-      )
-    );
+    setEditedItems(items => items.map(item => item.id === itemId ? {
+      ...item,
+      quantity: newQuantity,
+      shipped_quantity: newQuantity,
+      total: newQuantity * Number(item.unit_price)
+    } : item));
   };
-
   const handleSyncToQuickBooks = async (billingPercentage: number) => {
     if (!invoiceId) return;
-    
     setSyncingToQB(true);
     try {
       const isConnected = await checkConnection();
@@ -401,17 +340,17 @@ const InvoiceDetail = () => {
       }
 
       // Call edge function with billing percentage
-      const { error } = await supabase.functions.invoke('quickbooks-sync-invoice', {
-        body: { 
+      const {
+        error
+      } = await supabase.functions.invoke('quickbooks-sync-invoice', {
+        body: {
           invoiceId,
-          billingPercentage 
+          billingPercentage
         }
       });
-
       if (error) {
         throw error;
       }
-      
       toast({
         title: "Sync Successful",
         description: `Invoice synced to QuickBooks with ${billingPercentage}% billing`
@@ -430,16 +369,14 @@ const InvoiceDetail = () => {
       setSyncingToQB(false);
     }
   };
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(amount);
   };
-
   const handleCopyPaymentLink = async () => {
     if (invoice?.quickbooks_payment_link) {
       try {
@@ -447,22 +384,20 @@ const InvoiceDetail = () => {
         setCopiedLink(true);
         toast({
           title: "Payment link copied",
-          description: "The payment link has been copied to your clipboard",
+          description: "The payment link has been copied to your clipboard"
         });
         setTimeout(() => setCopiedLink(false), 2000);
       } catch (error) {
         toast({
           title: "Failed to copy",
           description: "Could not copy the payment link",
-          variant: "destructive",
+          variant: "destructive"
         });
       }
     }
   };
-
   const handleRefreshPaymentLink = async () => {
     if (!invoice?.quickbooks_id) return;
-    
     setRefreshingLink(true);
     try {
       const isConnected = await checkConnection();
@@ -476,20 +411,19 @@ const InvoiceDetail = () => {
       }
 
       // Re-sync to get updated payment link
-      const { error } = await supabase.functions.invoke('quickbooks-sync-invoice', {
-        body: { 
+      const {
+        error
+      } = await supabase.functions.invoke('quickbooks-sync-invoice', {
+        body: {
           invoiceId,
           billingPercentage: invoice.billed_percentage || 100
         }
       });
-
       if (error) throw error;
-      
       toast({
         title: "Link Updated",
         description: "Payment link has been refreshed"
       });
-      
       setTimeout(() => fetchInvoiceDetails(), 1000);
     } catch (error: any) {
       toast({
@@ -501,7 +435,6 @@ const InvoiceDetail = () => {
       setRefreshingLink(false);
     }
   };
-
   const handleSyncPayment = async (paymentId: string) => {
     setSyncingPayment(paymentId);
     try {
@@ -524,18 +457,19 @@ const InvoiceDetail = () => {
         });
         return;
       }
-
-      const { error } = await supabase.functions.invoke('quickbooks-sync-payment', {
-        body: { paymentId }
+      const {
+        error
+      } = await supabase.functions.invoke('quickbooks-sync-payment', {
+        body: {
+          paymentId
+        }
       });
-
       if (error) throw error;
-      
       toast({
         title: "Payment Synced",
         description: "Payment successfully synced to QuickBooks"
       });
-      
+
       // Refresh to show updated sync status
       setTimeout(() => fetchInvoiceDetails(), 1000);
     } catch (error: any) {
@@ -548,25 +482,21 @@ const InvoiceDetail = () => {
       setSyncingPayment(null);
     }
   };
-
   const handleCloseInvoice = async () => {
     if (!confirm('Mark this invoice as closed? This indicates the blanket order is complete.')) {
       return;
     }
-
     try {
-      const { error } = await supabase
-        .from('invoices')
-        .update({ status: 'closed' })
-        .eq('id', invoiceId);
-
+      const {
+        error
+      } = await supabase.from('invoices').update({
+        status: 'closed'
+      }).eq('id', invoiceId);
       if (error) throw error;
-
       toast({
         title: "Invoice Closed",
         description: "Invoice has been marked as closed"
       });
-
       fetchInvoiceDetails();
     } catch (error: any) {
       toast({
@@ -580,45 +510,31 @@ const InvoiceDetail = () => {
   // Calculate totals based on items actually on THIS invoice (from allocations)
   // For edit mode, recalculate. Otherwise use stored invoice.total
   const displayItems = editedItems;
-  const displaySubtotal = isEditMode 
-    ? displayItems.reduce((sum: number, item: any) => 
-        sum + (Number(item.quantity || item.shipped_quantity) * Number(item.unit_price)), 0
-      )
-    : Number(invoice?.subtotal || 0);
-  const displayTotal = isEditMode
-    ? displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0)
-    : Number(invoice?.total || 0);
-  
+  const displaySubtotal = isEditMode ? displayItems.reduce((sum: number, item: any) => sum + Number(item.quantity || item.shipped_quantity) * Number(item.unit_price), 0) : Number(invoice?.subtotal || 0);
+  const displayTotal = isEditMode ? displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0) : Number(invoice?.total || 0);
+
   // Calculate shipped percentage from actual quantities
   const calculateShippedPercentage = () => {
     if (!order?.order_items) return 0;
     const totalOrdered = order.order_items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
     const totalShipped = order.order_items.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0), 0);
-    return totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
+    return totalOrdered > 0 ? totalShipped / totalOrdered * 100 : 0;
   };
   const shippedPercentage = calculateShippedPercentage();
   const totalVendorCost = vendorPOs.reduce((sum, po) => sum + Number(po.total), 0);
   const totalProfit = displayTotal - totalVendorCost;
-  const profitMargin = displayTotal > 0 ? ((totalProfit / displayTotal) * 100).toFixed(2) : '0.00';
-
+  const profitMargin = displayTotal > 0 ? (totalProfit / displayTotal * 100).toFixed(2) : '0.00';
   if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto py-12 text-center">
+    return <div className="max-w-7xl mx-auto py-12 text-center">
         <p className="text-muted-foreground">Loading invoice...</p>
-      </div>
-    );
+      </div>;
   }
-
   if (!invoice) {
-    return (
-      <div className="max-w-7xl mx-auto py-12 text-center">
+    return <div className="max-w-7xl mx-auto py-12 text-center">
         <p className="text-muted-foreground">Invoice not found</p>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="max-w-7xl mx-auto space-y-6">
+  return <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => navigate("/invoices")}>
@@ -626,22 +542,18 @@ const InvoiceDetail = () => {
           Back to Invoices
         </Button>
         <div className="flex gap-3">
-          {isVibeAdmin && (
-            <>
-              {isEditMode ? (
-                <>
+          {isVibeAdmin && <>
+              {isEditMode ? <>
                   <Button variant="outline" onClick={() => {
-                    setIsEditMode(false);
-                    setEditedItems(order?.order_items || []);
-                  }}>
+              setIsEditMode(false);
+              setEditedItems(order?.order_items || []);
+            }}>
                     Cancel
                   </Button>
                   <Button onClick={handleSaveQuantities}>
                     Save Changes
                   </Button>
-                </>
-              ) : (
-                <>
+                </> : <>
                   <Button variant="outline" onClick={() => setIsEditMode(true)}>
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Items
@@ -649,58 +561,32 @@ const InvoiceDetail = () => {
                   <Button variant="outline" onClick={() => navigate(`/orders/${invoice.order_id}`)}>
                     View Order
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowSyncDialog(true)}
-                    disabled={syncingToQB}
-                  >
+                  <Button variant="outline" onClick={() => setShowSyncDialog(true)} disabled={syncingToQB}>
                     <RefreshCw className={`h-4 w-4 mr-2 ${syncingToQB ? 'animate-spin' : ''}`} />
                     {invoice.quickbooks_sync_status === 'synced' ? 'Re-Bill in QuickBooks' : 'Bill in QuickBooks'}
                   </Button>
-                  {invoice.quickbooks_id && (
-                    <Button 
-                      variant="outline" 
-                      onClick={handleRefreshPaymentLink}
-                      disabled={refreshingLink}
-                    >
+                  {invoice.quickbooks_id && <Button variant="outline" onClick={handleRefreshPaymentLink} disabled={refreshingLink}>
                       <RefreshCw className={`h-4 w-4 mr-2 ${refreshingLink ? 'animate-spin' : ''}`} />
                       {refreshingLink ? 'Getting Link...' : 'Get Payment Link'}
-                    </Button>
-                  )}
+                    </Button>}
                   <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete
                   </Button>
-                </>
-              )}
-              {invoice.status !== 'paid' && (
-                <Button onClick={() => setShowPaymentDialog(true)}>
+                </>}
+              {invoice.status !== 'paid' && <Button onClick={() => setShowPaymentDialog(true)}>
                   <DollarSign className="h-4 w-4 mr-2" />
                   Record Payment
-                </Button>
-              )}
-              {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && (
-                <Button 
-                  variant="outline"
-                  onClick={() => setShowDepositDialog(true)}
-                  className="border-blue-500 text-blue-700 hover:bg-blue-50"
-                >
+                </Button>}
+              {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button variant="outline" onClick={() => setShowDepositDialog(true)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
                   <DollarSign className="h-4 w-4 mr-2" />
                   Bill Deposit
-                </Button>
-              )}
-              {invoice.invoice_type === 'full' && invoice.status !== 'closed' && (
-                <Button 
-                  variant="outline"
-                  onClick={handleCloseInvoice}
-                  className="border-green-500 text-green-700 hover:bg-green-50"
-                >
+                </Button>}
+              {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleCloseInvoice} className="border-green-500 text-green-700 hover:bg-green-50">
                   <CheckCircle2 className="h-4 w-4 mr-2" />
                   Close Invoice
-                </Button>
-              )}
-            </>
-          )}
+                </Button>}
+            </>}
           <Button onClick={() => {}}>
             <Download className="h-4 w-4 mr-2" />
             Download PDF
@@ -713,27 +599,20 @@ const InvoiceDetail = () => {
         <CardContent className="p-0">
           <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-table-border p-8">
             {/* Parent Order Link for Pull & Ship */}
-            {order?.order_type === 'pull_ship' && order?.parent_order && (
-              <div className="mb-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+            {order?.order_type === 'pull_ship' && order?.parent_order && <div className="mb-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
                 <p className="text-sm font-medium mb-1">Pull & Ship Invoice - Linked to Production Order:</p>
-                <Button 
-                  variant="link" 
-                  className="p-0 h-auto font-mono text-blue-600"
-                  onClick={() => navigate(`/orders/${order.parent_order.id}`)}
-                >
+                <Button variant="link" className="p-0 h-auto font-mono text-blue-600" onClick={() => navigate(`/orders/${order.parent_order.id}`)}>
                   {order.parent_order.order_number}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-1">
                   This invoice bills against inventory from the production order above
                 </p>
-              </div>
-            )}
+              </div>}
             
             <div className="flex justify-between items-start">
               <div>
                 <h1 className="text-3xl font-bold mb-2">{invoice.invoice_number}</h1>
-                {invoice.shipment_number && (
-                  <div className="flex items-center gap-2 mb-2">
+                {invoice.shipment_number && <div className="flex items-center gap-2 mb-2">
                     <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md font-mono text-sm">
                       Shipment #{invoice.shipment_number}
                     </span>
@@ -741,64 +620,46 @@ const InvoiceDetail = () => {
                       {invoice.invoice_type?.toUpperCase() || 'INVOICE'}
                     </span>
                     {(() => {
-                      const totalShipped = order?.order_items?.reduce((sum: number, item: any) => 
-                        sum + (item.shipped_quantity || 0), 0) || 0;
-                      const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => 
-                        sum + item.quantity, 0) || 0;
-                      const shippedPercentage = totalOrdered > 0 ? (totalShipped / totalOrdered * 100) : 0;
-                      
-                      if (shippedPercentage === 0) {
-                        return (
-                          <span className="text-sm font-medium text-orange-600">
+                  const totalShipped = order?.order_items?.reduce((sum: number, item: any) => sum + (item.shipped_quantity || 0), 0) || 0;
+                  const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
+                  const shippedPercentage = totalOrdered > 0 ? totalShipped / totalOrdered * 100 : 0;
+                  if (shippedPercentage === 0) {
+                    return <span className="text-sm font-medium text-orange-600">
                             Not Shipped Yet
-                          </span>
-                        );
-                      } else if (shippedPercentage < 100) {
-                        return (
-                          <span className="text-sm font-medium text-blue-600">
+                          </span>;
+                  } else if (shippedPercentage < 100) {
+                    return <span className="text-sm font-medium text-blue-600">
                             {shippedPercentage.toFixed(1)}% Physically Shipped
-                          </span>
-                        );
-                      } else {
-                        return (
-                          <span className="text-sm font-medium text-green-600">
+                          </span>;
+                  } else {
+                    return <span className="text-sm font-medium text-green-600">
                             Fully Shipped
-                          </span>
-                        );
-                      }
-                    })()}
-                  </div>
-                )}
+                          </span>;
+                  }
+                })()}
+                  </div>}
                 <p className="text-sm text-muted-foreground">
                   Order: {order?.order_number || 'N/A'}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Customer: {(invoice?.companies as any)?.name || 'N/A'}
                 </p>
-                {order?.po_number && (
-                  <p className="text-sm text-muted-foreground">
+                {order?.po_number && <p className="text-sm text-muted-foreground">
                     Customer PO: {order.po_number}
-                  </p>
-                )}
+                  </p>}
               </div>
               <div className="text-right">
-                <span className={`inline-block px-4 py-1.5 rounded-full text-sm font-medium capitalize ${
-                  invoice.status === 'paid' ? 'bg-green-500/10 text-green-600' :
-                  invoice.status === 'due' ? 'bg-orange-500/10 text-orange-600' :
-                  'bg-blue-500/10 text-blue-600'
-                }`}>
+                <span className={`inline-block px-4 py-1.5 rounded-full text-sm font-medium capitalize ${invoice.status === 'paid' ? 'bg-green-500/10 text-green-600' : invoice.status === 'due' ? 'bg-orange-500/10 text-orange-600' : 'bg-blue-500/10 text-blue-600'}`}>
                   {invoice.status === 'draft' || invoice.status === 'pending' ? 'Open' : invoice.status.replace('_', ' ')}
                 </span>
                 <div className="mt-4">
                   <p className="text-sm text-muted-foreground">Invoice Date</p>
                   <p className="font-medium">{new Date(invoice.invoice_date).toLocaleDateString()}</p>
                 </div>
-                {invoice.due_date && (
-                  <div className="mt-2">
+                {invoice.due_date && <div className="mt-2">
                     <p className="text-sm text-muted-foreground">Due Date</p>
                     <p className="font-medium">{new Date(invoice.due_date).toLocaleDateString()}</p>
-                  </div>
-                )}
+                  </div>}
               </div>
             </div>
           </div>
@@ -816,8 +677,7 @@ const InvoiceDetail = () => {
                   </p>
                 </div>
               </div>
-              {order?.billing_name && (
-                <div>
+              {order?.billing_name && <div>
                   <h3 className="text-sm font-semibold mb-3">Bill To</h3>
                   <div className="text-sm space-y-1">
                     <p className="font-medium">{order?.billing_name}</p>
@@ -826,14 +686,12 @@ const InvoiceDetail = () => {
                       {order?.billing_city}, {order?.billing_state} {order?.billing_zip}
                     </p>
                   </div>
-                </div>
-              )}
+                </div>}
             </div>
           </div>
 
           {/* QuickBooks Payment Link */}
-          {invoice.quickbooks_id && (
-            <div className="p-8 border-b bg-gradient-to-r from-green-500/10 to-emerald-500/5">
+          {invoice.quickbooks_id && <div className="p-8 border-b bg-gradient-to-r from-green-500/10 to-emerald-500/5">
               <div className="flex items-start gap-6">
                 <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
                   <DollarSign className="h-6 w-6 text-white" />
@@ -861,49 +719,43 @@ const InvoiceDetail = () => {
                     <div className="bg-background/50 border rounded-lg p-4">
                       <div className="text-sm text-muted-foreground mb-1">Due Date</div>
                       <div className="text-xl font-semibold">
-                        {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric', 
-                          year: 'numeric' 
-                        }) : 'Upon Receipt'}
+                        {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    }) : 'Upon Receipt'}
                       </div>
                     </div>
                     
                     <div className="bg-background/50 border rounded-lg p-4">
                       <div className="text-sm text-muted-foreground mb-1">Payment Status</div>
                       {(() => {
-                        const amountDue = Number(displayTotal) - Number(invoice.total_paid || 0);
-                        const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
-                        const today = new Date();
-                        const daysOverdue = dueDate ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-                        
-                        if (amountDue <= 0) {
-                          return <div className="text-xl font-semibold text-green-600">Paid in Full</div>;
-                        } else if (dueDate && daysOverdue > 0) {
-                          return (
-                            <>
+                    const amountDue = Number(displayTotal) - Number(invoice.total_paid || 0);
+                    const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
+                    const today = new Date();
+                    const daysOverdue = dueDate ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+                    if (amountDue <= 0) {
+                      return <div className="text-xl font-semibold text-green-600">Paid in Full</div>;
+                    } else if (dueDate && daysOverdue > 0) {
+                      return <>
                               <div className="text-xl font-semibold text-red-600">Past Due</div>
                               <div className="text-xs text-red-600 mt-1">{daysOverdue} days overdue</div>
-                            </>
-                          );
-                        } else if (dueDate) {
-                          return (
-                            <>
+                            </>;
+                    } else if (dueDate) {
+                      return <>
                               <div className="text-xl font-semibold text-yellow-600">Open</div>
                               <div className="text-xs text-muted-foreground mt-1">
                                 {Math.abs(daysOverdue)} days remaining
                               </div>
-                            </>
-                          );
-                        } else {
-                          return <div className="text-xl font-semibold">Open</div>;
-                        }
-                      })()}
+                            </>;
+                    } else {
+                      return <div className="text-xl font-semibold">Open</div>;
+                    }
+                  })()}
                     </div>
                   </div>
                   
-                  {invoice.quickbooks_payment_link && invoice.quickbooks_payment_link.startsWith('http') ? (
-                    <>
+                  {invoice.quickbooks_payment_link && invoice.quickbooks_payment_link.startsWith('http') ? <>
                       <p className="text-sm text-muted-foreground mb-4">
                         Share this secure payment link with your customer to accept online payments through QuickBooks
                       </p>
@@ -911,86 +763,52 @@ const InvoiceDetail = () => {
                         <div className="flex-1 min-w-[300px] bg-background border rounded-lg p-3 font-mono text-sm truncate">
                           {invoice.quickbooks_payment_link}
                         </div>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={handleCopyPaymentLink}
-                          className="gap-2"
-                        >
-                          {copiedLink ? (
-                            <>
+                        <Button variant="default" size="sm" onClick={handleCopyPaymentLink} className="gap-2">
+                          {copiedLink ? <>
                               <CheckCircle2 className="h-4 w-4" />
                               Copied!
-                            </>
-                          ) : (
-                            <>
+                            </> : <>
                               <Copy className="h-4 w-4" />
                               Copy Link
-                            </>
-                          )}
+                            </>}
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(invoice.quickbooks_payment_link, '_blank')}
-                          className="gap-2"
-                        >
+                        <Button variant="outline" size="sm" onClick={() => window.open(invoice.quickbooks_payment_link, '_blank')} className="gap-2">
                           <ExternalLink className="h-4 w-4" />
                           Preview
                         </Button>
                       </div>
-                    </>
-                  ) : invoice.quickbooks_id ? (
-                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
+                    </> : invoice.quickbooks_id ? <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
                       <p className="text-sm text-muted-foreground">
                         Invoice synced to QuickBooks but payment link is not available yet.
                       </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRefreshPaymentLink}
-                        disabled={refreshingLink}
-                        className="gap-2"
-                      >
-                        {refreshingLink ? (
-                          <>
+                      <Button variant="outline" size="sm" onClick={handleRefreshPaymentLink} disabled={refreshingLink} className="gap-2">
+                        {refreshingLink ? <>
                             <RefreshCw className="h-4 w-4 animate-spin" />
                             Refreshing...
-                          </>
-                        ) : (
-                          <>
+                          </> : <>
                             <RefreshCw className="h-4 w-4" />
                             Refresh Payment Link
-                          </>
-                        )}
+                          </>}
                       </Button>
-                    </div>
-                  ) : (
-                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                    </div> : <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
                       <p className="text-sm text-muted-foreground">
                         Payment link will be available after syncing. Click "Bill" above to sync this invoice to QuickBooks.
                       </p>
-                    </div>
-                  )}
+                    </div>}
                 </div>
               </div>
-            </div>
-          )}
+            </div>}
 
           {/* Order Items - Main Invoice View */}
           <div className="p-8">
             <h2 className="text-lg font-semibold mb-4">
               Order Items
-              {invoice?.invoice_type === 'partial' && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {invoice?.invoice_type === 'partial' && <span className="ml-2 text-sm font-normal text-muted-foreground">
                   (Items in this shipment only)
-                </span>
-              )}
-              {isEditMode && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                </span>}
+              {isEditMode && <span className="ml-2 text-sm font-normal text-muted-foreground">
                   (Editing Mode - Adjust quantities and prices as needed)
-                </span>
-              )}
+                </span>}
             </h2>
             <Table>
               <TableHeader>
@@ -1008,20 +826,14 @@ const InvoiceDetail = () => {
               </TableHeader>
               <TableBody>
                 {displayItems.map((item: any) => {
-                  // For blanket (full) invoices, show the original order quantity and actual shipped quantity from DB
-                  // For partial invoices, show only the items in this shipment
-                  const orderedQty = invoice?.invoice_type === 'partial' 
-                    ? (item.quantity || 0) 
-                    : (order?.order_items?.find((oi: any) => oi.sku === item.sku)?.quantity || item.quantity);
-                  
-                  // For blanket invoices, get the real shipped_quantity from order_items
-                  // For partial invoices, show the quantity in this shipment
-                  const shippedQty = invoice?.invoice_type === 'partial'
-                    ? (item.quantity || 0)
-                    : (order?.order_items?.find((oi: any) => oi.sku === item.sku)?.shipped_quantity || 0);
-                  
-                  return (
-                    <TableRow key={item.id}>
+                // For blanket (full) invoices, show the original order quantity and actual shipped quantity from DB
+                // For partial invoices, show only the items in this shipment
+                const orderedQty = invoice?.invoice_type === 'partial' ? item.quantity || 0 : order?.order_items?.find((oi: any) => oi.sku === item.sku)?.quantity || item.quantity;
+
+                // For blanket invoices, get the real shipped_quantity from order_items
+                // For partial invoices, show the quantity in this shipment
+                const shippedQty = invoice?.invoice_type === 'partial' ? item.quantity || 0 : order?.order_items?.find((oi: any) => oi.sku === item.sku)?.shipped_quantity || 0;
+                return <TableRow key={item.id}>
                       <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                       <TableCell className="font-medium">{item.name}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
@@ -1031,38 +843,16 @@ const InvoiceDetail = () => {
                         {orderedQty}
                       </TableCell>
                       <TableCell className="text-center">
-                        {isEditMode ? (
-                          <Input
-                            type="number"
-                            min="0"
-                            value={shippedQty}
-                            onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 0)}
-                            className="w-24 text-center"
-                          />
-                        ) : (
-                          shippedQty
-                        )}
+                        {isEditMode ? <Input type="number" min="0" value={shippedQty} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" /> : shippedQty}
                       </TableCell>
                       <TableCell className="text-right">
-                        {isEditMode ? (
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.unit_price}
-                            onChange={(e) => handlePriceChange(item.id, parseFloat(e.target.value) || 0)}
-                            className="w-28 text-right"
-                          />
-                        ) : (
-                          formatCurrency(Number(item.unit_price))
-                        )}
+                        {isEditMode ? <Input type="number" step="0.01" min="0" value={item.unit_price} onChange={e => handlePriceChange(item.id, parseFloat(e.target.value) || 0)} className="w-28 text-right" /> : formatCurrency(Number(item.unit_price))}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
                         {formatCurrency(shippedQty * Number(item.unit_price))}
                       </TableCell>
-                    </TableRow>
-                  );
-                })}
+                    </TableRow>;
+              })}
               </TableBody>
             </Table>
 
@@ -1080,11 +870,9 @@ const InvoiceDetail = () => {
                   <span className="text-lg font-semibold">Total</span>
                   <span className="text-2xl font-bold">{formatCurrency(displayTotal)}</span>
                 </div>
-                {isEditMode && (
-                  <p className="text-xs text-muted-foreground italic mt-2">
+                {isEditMode && <p className="text-xs text-muted-foreground italic mt-2">
                     Totals will be saved when you click "Save Changes"
-                  </p>
-                )}
+                  </p>}
               </div>
             </div>
           </div>
@@ -1099,22 +887,12 @@ const InvoiceDetail = () => {
             
             {/* Billing Against Blanket Invoice */}
             {(() => {
-              const isPartialInvoice = invoice.shipment_number > 1 && invoice.invoice_type !== 'full';
-              const blanketInvoice = isPartialInvoice 
-                ? relatedInvoices.find(inv => 
-                    inv.invoice_type === 'full' && inv.shipment_number === 1
-                  )
-                : null;
-              
-              if (!blanketInvoice) return null;
-              
-              const blanketTotal = Number(blanketInvoice.total || 0);
-              const totalBilled = relatedInvoices
-                .filter(inv => inv.shipment_number > 1)
-                .reduce((sum, inv) => sum + Number(inv.total || 0), 0);
-
-              return (
-                <div className="mb-6 p-6 bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            const isPartialInvoice = invoice.shipment_number > 1 && invoice.invoice_type !== 'full';
+            const blanketInvoice = isPartialInvoice ? relatedInvoices.find(inv => inv.invoice_type === 'full' && inv.shipment_number === 1) : null;
+            if (!blanketInvoice) return null;
+            const blanketTotal = Number(blanketInvoice.total || 0);
+            const totalBilled = relatedInvoices.filter(inv => inv.shipment_number > 1).reduce((sum, inv) => sum + Number(inv.total || 0), 0);
+            return <div className="mb-6 p-6 bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <h3 className="text-base font-semibold mb-4 text-blue-900 dark:text-blue-100">Billing Against Blanket Invoice</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between pb-2 border-b border-blue-200 dark:border-blue-700">
@@ -1125,25 +903,17 @@ const InvoiceDetail = () => {
                     {/* List partial invoices */}
                     <div className="mt-3">
                       <p className="text-xs font-medium text-muted-foreground mb-2">Partial Invoices:</p>
-                      {relatedInvoices
-                        .filter(inv => inv.shipment_number > 1)
-                        .sort((a, b) => a.shipment_number - b.shipment_number)
-                        .map(inv => {
-                          const isCurrentInvoice = inv.id === invoice.id;
-                          return (
-                            <div 
-                              key={inv.id} 
-                              className={`flex justify-between text-sm py-1 ${isCurrentInvoice ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-muted-foreground'}`}
-                            >
+                      {relatedInvoices.filter(inv => inv.shipment_number > 1).sort((a, b) => a.shipment_number - b.shipment_number).map(inv => {
+                    const isCurrentInvoice = inv.id === invoice.id;
+                    return <div key={inv.id} className={`flex justify-between text-sm py-1 ${isCurrentInvoice ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-muted-foreground'}`}>
                               <span>
                                 {inv.invoice_number}
                                 {isCurrentInvoice && ' (This Invoice)'}
                                 {inv.notes && inv.notes.includes('deposit') && ' - Deposit'}
                               </span>
                               <span>{formatCurrency(Number(inv.total || 0))}</span>
-                            </div>
-                          );
-                        })}
+                            </div>;
+                  })}
                     </div>
                     <div className="h-px bg-blue-200 dark:bg-blue-800 my-2"></div>
                     <div className="flex justify-between">
@@ -1152,13 +922,10 @@ const InvoiceDetail = () => {
                         {formatCurrency(totalBilled)}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground italic mt-2">
-                      All deposits and shipments bill against the blanket invoice total of {formatCurrency(blanketTotal)}
-                    </p>
+                    
                   </div>
-                </div>
-              );
-            })()}
+                </div>;
+          })()}
           </div>
 
           <div className="flex justify-between items-center mb-6">
@@ -1170,19 +937,12 @@ const InvoiceDetail = () => {
             <div className="text-right space-y-1">
               {/* Show blanket invoice total for child invoices */}
               {invoice.shipment_number > 1 && invoice.invoice_type !== 'full' && (() => {
-                const blanketInvoice = relatedInvoices.find(inv => 
-                  inv.invoice_type === 'full' && inv.shipment_number === 1
-                );
-                if (blanketInvoice) {
-                  return (
-                    <div className="pb-2 mb-2 border-b border-blue-200 dark:border-blue-700">
-                      <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Blanket Invoice Total</p>
-                      <p className="text-lg font-semibold text-blue-900 dark:text-blue-100">{formatCurrency(Number(blanketInvoice.total || 0))}</p>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
+              const blanketInvoice = relatedInvoices.find(inv => inv.invoice_type === 'full' && inv.shipment_number === 1);
+              if (blanketInvoice) {
+                return;
+              }
+              return null;
+            })()}
               <div>
                 <p className="text-xs text-muted-foreground">Invoice Total</p>
                 <p className="text-lg font-semibold">{formatCurrency(displayTotal)}</p>
@@ -1200,8 +960,7 @@ const InvoiceDetail = () => {
             </div>
           </div>
 
-          {payments.length > 0 ? (
-            <Table>
+          {payments.length > 0 ? <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
@@ -1213,8 +972,7 @@ const InvoiceDetail = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payments.map((payment) => (
-                  <TableRow key={payment.id}>
+                {payments.map(payment => <TableRow key={payment.id}>
                     <TableCell className="font-medium">
                       {new Date(payment.payment_date).toLocaleDateString()}
                     </TableCell>
@@ -1232,58 +990,36 @@ const InvoiceDetail = () => {
                     <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
                       {payment.notes || '-'}
                     </TableCell>
-                    {isVibeAdmin && (
-                      <TableCell>
+                    {isVibeAdmin && <TableCell>
                         <div className="flex items-center gap-2">
-                          {payment.quickbooks_sync_status === 'synced' ? (
-                            <Badge variant="outline" className="bg-success/10 text-success border-success/20">
+                          {payment.quickbooks_sync_status === 'synced' ? <Badge variant="outline" className="bg-success/10 text-success border-success/20">
                               <CheckCircle2 className="h-3 w-3 mr-1" />
                               Synced
-                            </Badge>
-                          ) : payment.quickbooks_sync_status === 'error' ? (
-                            <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+                            </Badge> : payment.quickbooks_sync_status === 'error' ? <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
                               Error
-                            </Badge>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleSyncPayment(payment.id)}
-                              disabled={syncingPayment === payment.id || !invoice?.quickbooks_id}
-                            >
-                              {syncingPayment === payment.id ? (
-                                <>
+                            </Badge> : <Button size="sm" variant="outline" onClick={() => handleSyncPayment(payment.id)} disabled={syncingPayment === payment.id || !invoice?.quickbooks_id}>
+                              {syncingPayment === payment.id ? <>
                                   <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
                                   Syncing...
-                                </>
-                              ) : (
-                                <>
+                                </> : <>
                                   <RefreshCw className="h-3 w-3 mr-1" />
                                   Sync
-                                </>
-                              )}
-                            </Button>
-                          )}
+                                </>}
+                            </Button>}
                         </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
+                      </TableCell>}
+                  </TableRow>)}
               </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
+            </Table> : <div className="text-center py-8 text-muted-foreground">
               <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p>No payments recorded yet</p>
               <p className="text-sm mt-1">Click "Record Payment" to add a payment</p>
-            </div>
-          )}
+            </div>}
         </CardContent>
       </Card>
 
       {/* Attached Vendor POs - For Admin View on Full Invoices and Pull & Ship */}
-      {isVibeAdmin && (invoice?.invoice_type === 'full' || order?.order_type === 'pull_ship') && vendorPOs.length > 0 && (
-        <Card className="shadow-lg">
+      {isVibeAdmin && (invoice?.invoice_type === 'full' || order?.order_type === 'pull_ship') && vendorPOs.length > 0 && <Card className="shadow-lg">
           <CardContent className="p-8">
             <div className="flex justify-between items-center mb-6">
               <div>
@@ -1299,8 +1035,7 @@ const InvoiceDetail = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {vendorPOs.map((po) => (
-                <Card key={po.id} className="border hover:border-primary/50 transition-colors">
+              {vendorPOs.map(po => <Card key={po.id} className="border hover:border-primary/50 transition-colors">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -1314,22 +1049,16 @@ const InvoiceDetail = () => {
                     <h3 className="font-semibold mb-1">{po.vendors?.name || 'Unknown Vendor'}</h3>
                     <p className="text-xs text-muted-foreground mb-1">PO: {po.po_number}</p>
                     
-                    {po.expected_delivery_date && (
-                      <p className="text-xs text-muted-foreground mb-3">
+                    {po.expected_delivery_date && <p className="text-xs text-muted-foreground mb-3">
                         Delivery: {new Date(po.expected_delivery_date).toLocaleDateString()}
-                      </p>
-                    )}
+                      </p>}
                     
                     <div className="flex justify-between items-center pt-3 border-t">
                       <div>
                         <p className="text-xs text-muted-foreground">PO Total</p>
                         <p className="text-lg font-bold">{formatCurrency(Number(po.total))}</p>
                       </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate(`/vendor-pos/${po.id}`)}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/vendor-pos/${po.id}`)}>
                         <FileText className="h-3 w-3 mr-1" />
                         View
                       </Button>
@@ -1339,8 +1068,7 @@ const InvoiceDetail = () => {
                       {po.vendor_po_items?.length || 0} item{po.vendor_po_items?.length !== 1 ? 's' : ''}
                     </div>
                   </CardContent>
-                </Card>
-              ))}
+                </Card>)}
             </div>
 
             {/* Profit Summary */}
@@ -1369,12 +1097,10 @@ const InvoiceDetail = () => {
               </div>
             </div>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
 
       {/* Inventory Allocations - For Admin View - Only show if there's actual inventory tracked */}
-      {isVibeAdmin && inventoryAllocations.length > 0 && inventoryAllocations.some((a: any) => a.inventory_id !== null) && (
-        <Card className="shadow-lg">
+      {isVibeAdmin && inventoryAllocations.length > 0 && inventoryAllocations.some((a: any) => a.inventory_id !== null) && <Card className="shadow-lg">
           <CardContent className="p-8">
             <h2 className="text-lg font-semibold mb-4">Inventory Allocations</h2>
             <p className="text-sm text-muted-foreground mb-4">
@@ -1393,10 +1119,7 @@ const InvoiceDetail = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inventoryAllocations
-                  .filter((allocation: any) => allocation.inventory_id !== null)
-                  .map((allocation: any) => (
-                    <TableRow key={allocation.id}>
+                {inventoryAllocations.filter((allocation: any) => allocation.inventory_id !== null).map((allocation: any) => <TableRow key={allocation.id}>
                       <TableCell className="font-medium">{allocation.order_items?.name}</TableCell>
                       <TableCell className="font-mono text-xs">{allocation.inventory?.sku || allocation.order_items?.sku}</TableCell>
                       <TableCell>
@@ -1404,59 +1127,40 @@ const InvoiceDetail = () => {
                       </TableCell>
                       <TableCell className="text-right font-semibold">{allocation.quantity_allocated}</TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">
-                        {allocation.inventory?.available !== undefined 
-                          ? allocation.inventory.available + allocation.quantity_allocated 
-                          : '-'}
+                        {allocation.inventory?.available !== undefined ? allocation.inventory.available + allocation.quantity_allocated : '-'}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={
-                          allocation.status === 'shipped' ? 'bg-success/10 text-success border-success/20' :
-                          allocation.status === 'picked' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
-                          'bg-muted'
-                        }>
+                        <Badge variant="outline" className={allocation.status === 'shipped' ? 'bg-success/10 text-success border-success/20' : allocation.status === 'picked' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : 'bg-muted'}>
                           {allocation.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {new Date(allocation.allocated_at).toLocaleDateString()}
                       </TableCell>
-                    </TableRow>
-                  ))}
+                    </TableRow>)}
               </TableBody>
             </Table>
-            {inventoryAllocations.some((a: any) => a.inventory_id === null) && (
-              <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            {inventoryAllocations.some((a: any) => a.inventory_id === null) && <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                 <p className="text-sm text-blue-600">
                   <strong>Note:</strong> Some items in this shipment were direct-shipped (not pulled from inventory) and are not shown above.
                 </p>
-              </div>
-            )}
+              </div>}
           </CardContent>
-        </Card>
-      )}
+        </Card>}
 
       {/* Related Invoices - For Multiple Shipments */}
-      {relatedInvoices.length > 0 && (
-        <Card className="shadow-lg">
+      {relatedInvoices.length > 0 && <Card className="shadow-lg">
           <CardContent className="p-8">
             <h2 className="text-lg font-semibold mb-4">Other Shipments for This Order</h2>
             <div className="space-y-3">
-              {relatedInvoices.map((relInvoice: any) => (
-                <div 
-                  key={relInvoice.id}
-                  className="p-4 bg-muted/30 rounded-lg border border-table-border hover:border-primary/40 transition-colors cursor-pointer"
-                  onClick={() => navigate(`/invoices/${relInvoice.id}`)}
-                >
+              {relatedInvoices.map((relInvoice: any) => <div key={relInvoice.id} className="p-4 bg-muted/30 rounded-lg border border-table-border hover:border-primary/40 transition-colors cursor-pointer" onClick={() => navigate(`/invoices/${relInvoice.id}`)}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md font-mono text-sm">
                         Shipment #{relInvoice.shipment_number}
                       </span>
                       <span className="font-mono text-sm">{relInvoice.invoice_number}</span>
-                      <span className={`px-3 py-1 rounded-md text-xs font-medium ${
-                        relInvoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
-                        'bg-purple-500 text-white'
-                      }`}>
+                      <span className={`px-3 py-1 rounded-md text-xs font-medium ${relInvoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' : 'bg-purple-500 text-white'}`}>
                         {relInvoice.invoice_type?.toUpperCase()}
                       </span>
                     </div>
@@ -1467,12 +1171,10 @@ const InvoiceDetail = () => {
                       </p>
                     </div>
                   </div>
-                </div>
-              ))}
+                </div>)}
             </div>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -1493,32 +1195,13 @@ const InvoiceDetail = () => {
       </AlertDialog>
 
       {/* Record Payment Dialog */}
-      <RecordPaymentDialog
-        open={showPaymentDialog}
-        onOpenChange={setShowPaymentDialog}
-        invoice={invoice}
-        onSuccess={fetchInvoiceDetails}
-      />
+      <RecordPaymentDialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog} invoice={invoice} onSuccess={fetchInvoiceDetails} />
 
       {/* Sync to QuickBooks Dialog */}
-      <SyncToQuickBooksDialog
-        open={showSyncDialog}
-        onOpenChange={setShowSyncDialog}
-        invoice={invoice}
-        onSync={handleSyncToQuickBooks}
-        syncing={syncingToQB}
-      />
+      <SyncToQuickBooksDialog open={showSyncDialog} onOpenChange={setShowSyncDialog} invoice={invoice} onSync={handleSyncToQuickBooks} syncing={syncingToQB} />
 
       {/* Create Deposit Invoice Dialog */}
-      <CreateShipmentInvoiceDialog
-        open={showDepositDialog}
-        onOpenChange={setShowDepositDialog}
-        order={order}
-        onSuccess={fetchInvoiceDetails}
-        initialMode="deposit"
-      />
-    </div>
-  );
+      <CreateShipmentInvoiceDialog open={showDepositDialog} onOpenChange={setShowDepositDialog} order={order} onSuccess={fetchInvoiceDetails} initialMode="deposit" />
+    </div>;
 };
-
 export default InvoiceDetail;
