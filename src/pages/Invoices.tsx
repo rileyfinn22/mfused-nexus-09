@@ -198,8 +198,6 @@ const Invoices = () => {
     return items;
   });
 
-  const paidAmount = filteredInvoices.filter(inv => inv.status === 'paid').reduce((sum, invoice) => sum + Number(invoice.total), 0);
-  
   // Calculate open amount for blanket invoices minus paid down amounts from partials
   const blanketInvoices = filteredInvoices.filter(inv => 
     (!inv.invoice_type || inv.invoice_type === 'full') && 
@@ -217,6 +215,21 @@ const Invoices = () => {
     const remaining = Number(blanketInvoice.total) - totalPaidOnPartials;
     return sum + remaining;
   }, 0);
+
+  // Calculate DUE amount for blanket invoices that are synced (DUE status)
+  const dueAmount = blanketInvoices
+    .filter(inv => inv.quickbooks_sync_status === 'synced')
+    .reduce((sum, blanketInvoice) => {
+      // Get all partial invoices for this blanket
+      const partialInvoices = invoices.filter(inv => inv.parent_invoice_id === blanketInvoice.id);
+      // Sum up total_paid from all partials
+      const totalPaidOnPartials = partialInvoices.reduce((paidSum, partial) => 
+        paidSum + (Number(partial.total_paid) || 0), 0
+      );
+      // Blanket total minus paid on partials
+      const remaining = Number(blanketInvoice.total) - totalPaidOnPartials;
+      return sum + remaining;
+    }, 0);
 
   return (
     <div className="space-y-6">
@@ -239,8 +252,8 @@ const Invoices = () => {
           <p className="text-2xl font-semibold mt-1 text-primary">{formatCurrency(openAmount)}</p>
         </div>
         <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Paid Amount</p>
-          <p className="text-2xl font-semibold mt-1 text-success">{formatCurrency(paidAmount)}</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">DUE Amount</p>
+          <p className="text-2xl font-semibold mt-1 text-red-600 dark:text-red-400">{formatCurrency(dueAmount)}</p>
         </div>
       </div>
 
