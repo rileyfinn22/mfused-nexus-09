@@ -198,9 +198,15 @@ const Invoices = () => {
     return items;
   });
 
-  const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + Number(invoice.total), 0);
   const paidAmount = filteredInvoices.filter(inv => inv.status === 'paid').reduce((sum, invoice) => sum + Number(invoice.total), 0);
-  const openAmount = filteredInvoices.filter(inv => (inv.status === 'open' || inv.status === 'partial') && inv.quickbooks_sync_status === 'synced').reduce((sum, invoice) => sum + Number(invoice.total), 0);
+  
+  // Calculate open amount for blanket invoices minus paid down amounts
+  const openAmount = filteredInvoices
+    .filter(inv => (!inv.invoice_type || inv.invoice_type === 'full') && (inv.status === 'open' || inv.status === 'partial'))
+    .reduce((sum, invoice) => {
+      const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
+      return sum + remaining;
+    }, 0);
 
   return (
     <div className="space-y-6">
@@ -217,11 +223,7 @@ const Invoices = () => {
       </div>
 
       {/* Summary Row */}
-      <div className="grid grid-cols-3 gap-6">
-        <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Amount</p>
-          <p className="text-2xl font-semibold mt-1">{formatCurrency(totalAmount)}</p>
-        </div>
+      <div className="grid grid-cols-2 gap-6">
         <div className="bg-table-row border border-table-border rounded p-4">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Invoices</p>
           <p className="text-2xl font-semibold mt-1 text-primary">{formatCurrency(openAmount)}</p>
