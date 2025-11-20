@@ -369,7 +369,7 @@ const CreateOrder = () => {
         });
         
         // Navigate to the created draft order so URL reflects which order is being edited
-        navigate(`/orders/create/${functionData.orderId}`);
+        navigate(`/orders/edit/${functionData.orderId}`);
       }
 
       setAnalyzing(false);
