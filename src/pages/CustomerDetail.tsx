@@ -298,6 +298,19 @@ const CustomerDetail = () => {
 
       if (!userRole) throw new Error("No company found");
 
+      // Check if item_id already exists
+      if (validated.item_id) {
+        const { data: existingProduct } = await supabase
+          .from('products')
+          .select('id, name')
+          .eq('item_id', validated.item_id)
+          .single();
+
+        if (existingProduct) {
+          throw new Error(`Item ID "${validated.item_id}" already exists for product: ${existingProduct.name}`);
+        }
+      }
+
       const productData = {
         name: validated.name,
         state: validated.state,
@@ -544,6 +557,23 @@ const CustomerDetail = () => {
         .single();
 
       if (!userRole) throw new Error("No company found");
+
+      // Check for duplicate item_ids in CSV
+      const itemIds = csvData
+        .map(row => row.item_id)
+        .filter(id => id); // Remove empty values
+
+      if (itemIds.length > 0) {
+        const { data: existingProducts } = await supabase
+          .from('products')
+          .select('item_id, name')
+          .in('item_id', itemIds);
+
+        if (existingProducts && existingProducts.length > 0) {
+          const duplicates = existingProducts.map(p => `"${p.item_id}" (${p.name})`).join(', ');
+          throw new Error(`The following Item IDs already exist: ${duplicates}`);
+        }
+      }
 
       const productsToCreate = csvData.map((row) => ({
         name: row.name,
