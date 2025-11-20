@@ -84,6 +84,8 @@ const CreateOrder = () => {
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [matchingProductId, setMatchingProductId] = useState<Record<string, string>>({});
+  const [searchQueryForMatch, setSearchQueryForMatch] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -502,6 +504,81 @@ const CreateOrder = () => {
     } else {
       setSelectedItems([...selectedItems, { productId, quantity: 1 }]);
     }
+  };
+
+  const handleAddUnmatchedAsProduct = async (unmatchedItem: any) => {
+    if (!selectedCompanyId) {
+      toast({
+        title: "Error",
+        description: "Please select a company first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data: newProduct, error } = await supabase
+        .from('products')
+        .insert({
+          name: unmatchedItem.name,
+          item_id: unmatchedItem.sku,
+          description: unmatchedItem.description,
+          cost: unmatchedItem.unit_price,
+          company_id: selectedCompanyId,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add to products list
+      setProducts([...products, newProduct]);
+
+      // Add to selected items with PO price
+      setSelectedItems([...selectedItems, {
+        productId: newProduct.id,
+        quantity: unmatchedItem.quantity,
+        unit_price: unmatchedItem.unit_price,
+      }]);
+
+      // Remove from unmatched
+      setUnmatchedPoItems(unmatchedPoItems.filter(item => item.id !== unmatchedItem.id));
+
+      toast({
+        title: "Product Added",
+        description: `${newProduct.name} has been added to your catalog and order`,
+      });
+    } catch (error) {
+      console.error('Error adding product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add product to catalog",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMatchUnmatchedItem = (unmatchedItem: any, productId: string) => {
+    if (!productId) return;
+
+    // Add to selected items with PO price
+    setSelectedItems([...selectedItems, {
+      productId: productId,
+      quantity: unmatchedItem.quantity,
+      unit_price: unmatchedItem.unit_price,
+    }]);
+
+    // Remove from unmatched
+    setUnmatchedPoItems(unmatchedPoItems.filter(item => item.id !== unmatchedItem.id));
+
+    // Clear search
+    setMatchingProductId({ ...matchingProductId, [unmatchedItem.id]: "" });
+    setSearchQueryForMatch({ ...searchQueryForMatch, [unmatchedItem.id]: "" });
+
+    toast({
+      title: "Item Matched",
+      description: "Product has been added to the order",
+    });
   };
 
   const handleQuantityChange = (productId: string, change: number) => {
@@ -1117,18 +1194,77 @@ const CreateOrder = () => {
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Unit Price</TableHead>
                       <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="w-[300px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {unmatchedPoItems.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell className="text-right">{item.quantity}</TableCell>
-                        <TableCell className="text-right">${Number(item.unit_price).toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-medium">${Number(item.total).toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {unmatchedPoItems.map((item) => {
+                      const itemSearchQuery = searchQueryForMatch[item.id] || "";
+                      const filteredProductsForItem = filteredProducts.filter(p => 
+                        p.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) ||
+                        (p.item_id && p.item_id.toLowerCase().includes(itemSearchQuery.toLowerCase()))
+                      );
+
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell className="text-right">{item.quantity}</TableCell>
+                          <TableCell className="text-right">${Number(item.unit_price).toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-medium">${Number(item.total).toFixed(2)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAddUnmatchedAsProduct(item)}
+                                className="whitespace-nowrap"
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add to Catalog
+                              </Button>
+                              <div className="flex items-center gap-1 flex-1">
+                                <div className="relative flex-1">
+                                  <Input
+                                    type="text"
+                                    placeholder="Search products..."
+                                    value={itemSearchQuery}
+                                    onChange={(e) => setSearchQueryForMatch({
+                                      ...searchQueryForMatch,
+                                      [item.id]: e.target.value
+                                    })}
+                                    className="h-8 pr-8"
+                                  />
+                                  <Search className="absolute right-2 top-2 h-4 w-4 text-muted-foreground" />
+                                </div>
+                                <Select
+                                  value={matchingProductId[item.id] || ""}
+                                  onValueChange={(value) => {
+                                    setMatchingProductId({ ...matchingProductId, [item.id]: value });
+                                    handleMatchUnmatchedItem(item, value);
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 w-[120px]">
+                                    <SelectValue placeholder="Match..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {filteredProductsForItem.slice(0, 10).map((product) => (
+                                      <SelectItem key={product.id} value={product.id}>
+                                        {product.item_id || product.name}
+                                      </SelectItem>
+                                    ))}
+                                    {filteredProductsForItem.length === 0 && (
+                                      <div className="p-2 text-sm text-muted-foreground">No products found</div>
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
