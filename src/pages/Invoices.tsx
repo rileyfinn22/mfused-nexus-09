@@ -143,6 +143,33 @@ const Invoices = () => {
     });
   };
 
+  const hasDueChildren = (parentId: string) => {
+    const children = invoices.filter(inv => inv.parent_invoice_id === parentId);
+    return children.some(child => child.status === 'open' || child.status === 'pending');
+  };
+
+  const handleStatusChange = async (invoiceId: string, newStatus: string) => {
+    const { error } = await supabase
+      .from("invoices")
+      .update({ status: newStatus })
+      .eq("id", invoiceId);
+
+    if (error) {
+      console.error("Error updating invoice status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update invoice status",
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Status Updated",
+        description: "Invoice status successfully updated"
+      });
+      fetchInvoices();
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -324,6 +351,8 @@ const Invoices = () => {
               const daysUntilDue = invoice.due_date ? getDaysUntilDue(invoice.due_date) : null;
               const isExpanded = expandedInvoices.has(invoice.id);
               const showOverdueAlert = isParent && hasChildren && hasOverdueChildren(invoice.id);
+              const showDueStatus = isParent && hasChildren && hasDueChildren(invoice.id);
+              const displayStatus = showDueStatus ? 'open' : invoice.status;
               
               return (
                 <div 
@@ -429,11 +458,21 @@ const Invoices = () => {
                       <span className="text-muted-foreground">Not set</span>
                     )}
                   </div>
-                  <div className={`col-span-1 text-sm font-medium ${getStatusColor(invoice)}`}>
-                    <div className="flex items-center gap-1">
-                      <StatusIcon className="h-3 w-3" />
-                      {getStatusDisplay(invoice)}
-                    </div>
+                  <div className="col-span-1">
+                    <Select
+                      value={displayStatus}
+                      onValueChange={(newStatus) => handleStatusChange(invoice.id, newStatus)}
+                    >
+                      <SelectTrigger className="h-8 w-full text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background">
+                        <SelectItem value="pending">PENDING DUE</SelectItem>
+                        <SelectItem value="open">DUE</SelectItem>
+                        <SelectItem value="paid">PAID</SelectItem>
+                        <SelectItem value="closed">CLOSED</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="col-span-1 flex gap-1">
                     <Button 
