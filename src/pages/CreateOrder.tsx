@@ -368,8 +368,8 @@ const CreateOrder = () => {
           description: "Order details loaded below - review and edit before saving",
         });
         
-        // Load the created order
-        await loadExistingOrder(functionData.orderId);
+        // Navigate to the created draft order so URL reflects which order is being edited
+        navigate(`/orders/create/${functionData.orderId}`);
       }
 
       setAnalyzing(false);
