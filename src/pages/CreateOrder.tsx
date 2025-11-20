@@ -44,7 +44,6 @@ interface Product {
 }
 
 interface OrderItem {
-  id: string; // Unique identifier for each order item
   productId: string;
   quantity: number;
   unit_price?: number; // Preserve PO prices
@@ -464,7 +463,6 @@ const CreateOrder = () => {
       const items = order.order_items
         .filter((item: any) => item.product_id !== null) // Only load items with matching products
         .map((item: any) => ({
-          id: item.id, // Use the database order_item id
           productId: item.product_id,
           quantity: item.quantity,
           unit_price: item.unit_price, // Preserve PO prices
@@ -500,11 +498,12 @@ const CreateOrder = () => {
   };
 
   const handleProductToggle = (productId: string) => {
-    setSelectedItems([...selectedItems, { id: crypto.randomUUID(), productId, quantity: 1 }]);
-  };
-
-  const handleRemoveItem = (itemId: string) => {
-    setSelectedItems(selectedItems.filter(item => item.id !== itemId));
+    const exists = selectedItems.find(item => item.productId === productId);
+    if (exists) {
+      setSelectedItems(selectedItems.filter(item => item.productId !== productId));
+    } else {
+      setSelectedItems([...selectedItems, { productId, quantity: 1 }]);
+    }
   };
 
   const handleAddUnmatchedAsProduct = async (unmatchedItem: any) => {
@@ -537,7 +536,6 @@ const CreateOrder = () => {
 
       // Add to selected items with PO price
       setSelectedItems([...selectedItems, {
-        id: crypto.randomUUID(),
         productId: newProduct.id,
         quantity: unmatchedItem.quantity,
         unit_price: unmatchedItem.unit_price,
@@ -565,7 +563,6 @@ const CreateOrder = () => {
 
     // Add to selected items with PO price
     setSelectedItems([...selectedItems, {
-      id: crypto.randomUUID(),
       productId: productId,
       quantity: unmatchedItem.quantity,
       unit_price: unmatchedItem.unit_price,
@@ -584,9 +581,9 @@ const CreateOrder = () => {
     });
   };
 
-  const handleQuantityChange = (itemId: string, change: number) => {
+  const handleQuantityChange = (productId: string, change: number) => {
     setSelectedItems(selectedItems.map(item => {
-      if (item.id === itemId) {
+      if (item.productId === productId) {
         const newQuantity = Math.max(1, item.quantity + change);
         return { ...item, quantity: newQuantity };
       }
@@ -594,35 +591,34 @@ const CreateOrder = () => {
     }));
   };
 
-  const handleQuantityClick = (itemId: string, currentQuantity: number) => {
-    setEditingQuantityId(itemId);
+  const handleQuantityClick = (productId: string, currentQuantity: number) => {
+    setEditingQuantityId(productId);
     setTempQuantity(currentQuantity.toString());
   };
 
-  const handleQuantityBlur = (itemId: string) => {
+  const handleQuantityBlur = (productId: string) => {
     const newQty = parseInt(tempQuantity) || 1;
     setSelectedItems(selectedItems.map(item => 
-      item.id === itemId ? { ...item, quantity: Math.max(1, newQty) } : item
+      item.productId === productId ? { ...item, quantity: Math.max(1, newQty) } : item
     ));
     setEditingQuantityId(null);
   };
 
-  const handlePriceClick = (itemId: string, currentPrice: number) => {
-    setEditingPriceId(itemId);
+  const handlePriceClick = (productId: string, currentPrice: number) => {
+    setEditingPriceId(productId);
     setTempPrice(currentPrice.toFixed(2));
   };
 
-  const handlePriceBlur = (itemId: string) => {
+  const handlePriceBlur = (productId: string) => {
     const newPrice = parseFloat(tempPrice) || 0;
     setSelectedItems(selectedItems.map(item => 
-      item.id === itemId ? { ...item, unit_price: Math.max(0, newPrice) } : item
+      item.productId === productId ? { ...item, unit_price: Math.max(0, newPrice) } : item
     ));
     setEditingPriceId(null);
   };
 
   const handleAddSelectedItems = () => {
     const newItems = tempSelectedProducts.map(productId => ({
-      id: crypto.randomUUID(),
       productId,
       quantity: 1
     }));
@@ -1314,14 +1310,14 @@ const CreateOrder = () => {
                   const amount = price * item.quantity;
                   
                   return (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.productId}>
                       <TableCell>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 text-destructive"
-                          onClick={() => handleRemoveItem(item.id)}
+                          onClick={() => handleProductToggle(item.productId)}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -1332,14 +1328,14 @@ const CreateOrder = () => {
                         {product.description}
                       </TableCell>
                       <TableCell>
-                        {editingQuantityId === item.id ? (
+                        {editingQuantityId === item.productId ? (
                           <Input
                             type="number"
                             value={tempQuantity}
                             onChange={(e) => setTempQuantity(e.target.value)}
-                            onBlur={() => handleQuantityBlur(item.id)}
+                            onBlur={() => handleQuantityBlur(item.productId)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleQuantityBlur(item.id);
+                              if (e.key === 'Enter') handleQuantityBlur(item.productId);
                               if (e.key === 'Escape') setEditingQuantityId(null);
                             }}
                             className="h-8 w-20 text-center"
@@ -1352,13 +1348,13 @@ const CreateOrder = () => {
                               variant="outline"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              onClick={() => handleQuantityChange(item.id, -1)}
+                              onClick={() => handleQuantityChange(item.productId, -1)}
                             >
                               <Minus className="h-3 w-3" />
                             </Button>
                             <span 
                               className="w-12 text-center font-medium cursor-pointer hover:bg-muted px-2 py-1 rounded"
-                              onClick={() => handleQuantityClick(item.id, item.quantity)}
+                              onClick={() => handleQuantityClick(item.productId, item.quantity)}
                             >
                               {item.quantity}
                             </span>
@@ -1367,7 +1363,7 @@ const CreateOrder = () => {
                               variant="outline"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              onClick={() => handleQuantityChange(item.id, 1)}
+                              onClick={() => handleQuantityChange(item.productId, 1)}
                             >
                               <Plus className="h-3 w-3" />
                             </Button>
@@ -1375,15 +1371,15 @@ const CreateOrder = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {editingPriceId === item.id ? (
+                        {editingPriceId === item.productId ? (
                           <Input
                             type="number"
                             step="0.01"
                             value={tempPrice}
                             onChange={(e) => setTempPrice(e.target.value)}
-                            onBlur={() => handlePriceBlur(item.id)}
+                            onBlur={() => handlePriceBlur(item.productId)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') handlePriceBlur(item.id);
+                              if (e.key === 'Enter') handlePriceBlur(item.productId);
                               if (e.key === 'Escape') setEditingPriceId(null);
                             }}
                             className="h-8 w-24 text-right"
@@ -1392,7 +1388,7 @@ const CreateOrder = () => {
                         ) : (
                           <span 
                             className="cursor-pointer hover:bg-muted px-2 py-1 rounded inline-block"
-                            onClick={() => handlePriceClick(item.id, price)}
+                            onClick={() => handlePriceClick(item.productId, price)}
                           >
                             ${price.toFixed(3)}
                           </span>
