@@ -1216,12 +1216,19 @@ const OrderDetail = () => {
                       <Button
                         variant="outline"
                         onClick={async () => {
-                          const { data } = await supabase.storage
+                          const { data, error } = await supabase.storage
                             .from('po-documents')
                             .createSignedUrl(order.po_pdf_path, 3600);
                           
                           if (data?.signedUrl) {
-                            window.open(data.signedUrl, '_blank');
+                            // Use location.href instead of window.open to avoid popup blockers
+                            const link = document.createElement('a');
+                            link.href = data.signedUrl;
+                            link.target = '_blank';
+                            link.rel = 'noopener noreferrer';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
                           } else {
                             toast({
                               title: "Error",
