@@ -1109,10 +1109,9 @@ const InvoiceDetail = () => {
               if (!blanketInvoice) return null;
               
               const blanketTotal = Number(blanketInvoice.total || 0);
-              const partialInvoicesSums = relatedInvoices
+              const totalBilled = relatedInvoices
                 .filter(inv => inv.shipment_number > 1)
                 .reduce((sum, inv) => sum + Number(inv.total || 0), 0);
-              const remainingToBill = blanketTotal - partialInvoicesSums;
 
               return (
                 <div className="mb-6 p-6 bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -1148,9 +1147,9 @@ const InvoiceDetail = () => {
                     </div>
                     <div className="h-px bg-blue-200 dark:bg-blue-800 my-2"></div>
                     <div className="flex justify-between">
-                      <span className="font-semibold text-blue-900 dark:text-blue-100">Remaining to Bill</span>
+                      <span className="font-semibold text-blue-900 dark:text-blue-100">Total Billed</span>
                       <span className="text-lg font-bold text-blue-900 dark:text-blue-100">
-                        {formatCurrency(remainingToBill)}
+                        {formatCurrency(totalBilled)}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground italic mt-2">
