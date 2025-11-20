@@ -201,29 +201,16 @@ const PullShipOrders = () => {
             );
 
             if (parentItem) {
-              // Get total shipped quantity from all approved pull & ship orders for this SKU
-              const { data: allPullOrders } = await supabase
-                .from('orders')
-                .select('id')
-                .eq('parent_order_id', order.parent_order_id)
-                .eq('order_type', 'pull_ship')
-                .eq('vibe_approved', true);
-
-              let totalShippedForSku = 0;
+              // Calculate total shipped quantity from ALL sources (pull & ship orders + regular shipping invoices)
+              // Get all inventory allocations for this parent order item (includes both pull & ship and regular shipments)
+              const { data: allAllocations } = await supabase
+                .from('inventory_allocations')
+                .select('quantity_allocated')
+                .eq('order_item_id', parentItem.id);
               
-              if (allPullOrders && allPullOrders.length > 0) {
-                const pullOrderIds = allPullOrders.map(po => po.id);
-                
-                const { data: allPullItems } = await supabase
-                  .from('order_items')
-                  .select('quantity')
-                  .in('order_id', pullOrderIds)
-                  .eq('sku', pullItem.sku);
-                
-                if (allPullItems) {
-                  totalShippedForSku = allPullItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-                }
-              }
+              const totalShippedForSku = allAllocations 
+                ? allAllocations.reduce((sum, alloc) => sum + (alloc.quantity_allocated || 0), 0)
+                : 0;
               
               await supabase
                 .from('order_items')
@@ -360,14 +347,6 @@ const PullShipOrders = () => {
 
       // If this was an approved pull & ship order with a parent, recalculate parent's shipped quantities
       if (orderData.parent_order_id && orderData.vibe_approved) {
-        // Get all remaining approved pull & ship orders for this parent
-        const { data: remainingOrders } = await supabase
-          .from('orders')
-          .select('id')
-          .eq('parent_order_id', orderData.parent_order_id)
-          .eq('order_type', 'pull_ship')
-          .eq('vibe_approved', true);
-
         // Get parent order items
         const { data: parentItems } = await supabase
           .from('order_items')
@@ -376,20 +355,15 @@ const PullShipOrders = () => {
 
         if (parentItems) {
           for (const parentItem of parentItems) {
-            // Calculate total shipped for this SKU from remaining PS orders
-            let totalShipped = 0;
+            // Calculate total shipped for this SKU from ALL allocations (pull & ship + regular shipments)
+            const { data: allAllocations } = await supabase
+              .from('inventory_allocations')
+              .select('quantity_allocated')
+              .eq('order_item_id', parentItem.id);
             
-            if (remainingOrders && remainingOrders.length > 0) {
-              const { data: pullItems } = await supabase
-                .from('order_items')
-                .select('quantity')
-                .in('order_id', remainingOrders.map(o => o.id))
-                .eq('sku', parentItem.sku);
-              
-              if (pullItems) {
-                totalShipped = pullItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-              }
-            }
+            const totalShipped = allAllocations 
+              ? allAllocations.reduce((sum, alloc) => sum + (alloc.quantity_allocated || 0), 0)
+              : 0;
 
             // Update parent order item shipped quantity
             await supabase
