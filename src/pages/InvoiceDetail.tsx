@@ -41,6 +41,7 @@ const InvoiceDetail = () => {
   const [showDepositDialog, setShowDepositDialog] = useState(false);
   const [refreshingLink, setRefreshingLink] = useState(false);
   const [syncingPayment, setSyncingPayment] = useState<string | null>(null);
+  const [showPaymentPortal, setShowPaymentPortal] = useState(false);
   const {
     syncInvoice,
     checkConnection
@@ -725,113 +726,133 @@ const InvoiceDetail = () => {
           </div>
 
           {/* QuickBooks Payment Link */}
-          {invoice.quickbooks_id && <div className="p-8 border-b bg-gradient-to-r from-green-500/10 to-emerald-500/5">
-              <div className="flex items-start gap-6">
-                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
-                  <DollarSign className="h-6 w-6 text-white" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                    Customer Payment Portal
-                    <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20">
-                      QuickBooks
-                    </Badge>
-                  </h3>
-                  
-                  {/* Payment Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div className="bg-background/50 border rounded-lg p-4">
-                      <div className="text-sm text-muted-foreground mb-1">Amount Due</div>
-                      <div className="text-2xl font-bold text-green-700 dark:text-green-400">
-                        {formatCurrency(Number(displayTotal) - Number(invoice.total_paid || 0))}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        of {formatCurrency(Number(displayTotal))} total
-                      </div>
-                    </div>
-                    
-                    <div className="bg-background/50 border rounded-lg p-4">
-                      <div className="text-sm text-muted-foreground mb-1">Due Date</div>
-                      <div className="text-xl font-semibold">
-                        {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric'
-                    }) : 'Upon Receipt'}
-                      </div>
-                    </div>
-                    
-                    <div className="bg-background/50 border rounded-lg p-4">
-                      <div className="text-sm text-muted-foreground mb-1">Payment Status</div>
-                      {(() => {
-                    const amountDue = Number(displayTotal) - Number(invoice.total_paid || 0);
-                    const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
-                    const today = new Date();
-                    const daysOverdue = dueDate ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-                    if (amountDue <= 0) {
-                      return <div className="text-xl font-semibold text-green-600">Paid in Full</div>;
-                    } else if (dueDate && daysOverdue > 0) {
-                      return <>
-                              <div className="text-xl font-semibold text-red-600">Past Due</div>
-                              <div className="text-xs text-red-600 mt-1">{daysOverdue} days overdue</div>
-                            </>;
-                    } else if (dueDate) {
-                      return <>
-                              <div className="text-xl font-semibold text-yellow-600">Open</div>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {Math.abs(daysOverdue)} days remaining
-                              </div>
-                            </>;
-                    } else {
-                      return <div className="text-xl font-semibold">Open</div>;
-                    }
-                  })()}
-                    </div>
+          {invoice.quickbooks_id && (
+            showPaymentPortal ? (
+              <div className="p-8 border-b bg-gradient-to-r from-green-500/10 to-emerald-500/5">
+                <div className="flex items-start gap-6">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                    <DollarSign className="h-6 w-6 text-white" />
                   </div>
-                  
-                  {invoice.quickbooks_payment_link && invoice.quickbooks_payment_link.startsWith('http') ? <>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Share this secure payment link with your customer to accept online payments through QuickBooks
-                      </p>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex-1 min-w-[300px] bg-background border rounded-lg p-3 font-mono text-sm truncate">
-                          {invoice.quickbooks_payment_link}
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        Customer Payment Portal
+                        <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20">
+                          QuickBooks
+                        </Badge>
+                      </h3>
+                      <Button variant="ghost" size="sm" onClick={() => setShowPaymentPortal(false)}>
+                        Close
+                      </Button>
+                    </div>
+                    
+                    {/* Payment Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div className="bg-background/50 border rounded-lg p-4">
+                        <div className="text-sm text-muted-foreground mb-1">Amount Due</div>
+                        <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+                          {formatCurrency(Number(displayTotal) - Number(invoice.total_paid || 0))}
                         </div>
-                        <Button variant="default" size="sm" onClick={handleCopyPaymentLink} className="gap-2">
-                          {copiedLink ? <>
-                              <CheckCircle2 className="h-4 w-4" />
-                              Copied!
+                        <div className="text-xs text-muted-foreground mt-1">
+                          of {formatCurrency(Number(displayTotal))} total
+                        </div>
+                      </div>
+                      
+                      <div className="bg-background/50 border rounded-lg p-4">
+                        <div className="text-sm text-muted-foreground mb-1">Due Date</div>
+                        <div className="text-xl font-semibold">
+                          {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      }) : 'Upon Receipt'}
+                        </div>
+                      </div>
+                      
+                      <div className="bg-background/50 border rounded-lg p-4">
+                        <div className="text-sm text-muted-foreground mb-1">Payment Status</div>
+                        {(() => {
+                      const amountDue = Number(displayTotal) - Number(invoice.total_paid || 0);
+                      const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
+                      const today = new Date();
+                      const daysOverdue = dueDate ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+                      if (amountDue <= 0) {
+                        return <div className="text-xl font-semibold text-green-600">Paid in Full</div>;
+                      } else if (dueDate && daysOverdue > 0) {
+                        return <>
+                                <div className="text-xl font-semibold text-red-600">Past Due</div>
+                                <div className="text-xs text-red-600 mt-1">{daysOverdue} days overdue</div>
+                              </>;
+                      } else if (dueDate) {
+                        return <>
+                                <div className="text-xl font-semibold text-yellow-600">Open</div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {Math.abs(daysOverdue)} days remaining
+                                </div>
+                              </>;
+                      } else {
+                        return <div className="text-xl font-semibold">Open</div>;
+                      }
+                    })()}
+                      </div>
+                    </div>
+                    
+                    {invoice.quickbooks_payment_link && invoice.quickbooks_payment_link.startsWith('http') ? <>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Share this secure payment link with your customer to accept online payments through QuickBooks
+                        </p>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <div className="flex-1 min-w-[300px] bg-background border rounded-lg p-3 font-mono text-sm truncate">
+                            {invoice.quickbooks_payment_link}
+                          </div>
+                          <Button variant="default" size="sm" onClick={handleCopyPaymentLink} className="gap-2">
+                            {copiedLink ? <>
+                                <CheckCircle2 className="h-4 w-4" />
+                                Copied!
+                              </> : <>
+                                <Copy className="h-4 w-4" />
+                                Copy Link
+                              </>}
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => window.open(invoice.quickbooks_payment_link, '_blank')} className="gap-2">
+                            <ExternalLink className="h-4 w-4" />
+                            Preview
+                          </Button>
+                        </div>
+                      </> : invoice.quickbooks_id ? <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Invoice synced to QuickBooks but payment link is not available yet.
+                        </p>
+                        <Button variant="outline" size="sm" onClick={handleRefreshPaymentLink} disabled={refreshingLink} className="gap-2">
+                          {refreshingLink ? <>
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                              Refreshing...
                             </> : <>
-                              <Copy className="h-4 w-4" />
-                              Copy Link
+                              <RefreshCw className="h-4 w-4" />
+                              Refresh Payment Link
                             </>}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => window.open(invoice.quickbooks_payment_link, '_blank')} className="gap-2">
-                          <ExternalLink className="h-4 w-4" />
-                          Preview
-                        </Button>
-                      </div>
-                    </> : invoice.quickbooks_id ? <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
-                      <p className="text-sm text-muted-foreground">
-                        Invoice synced to QuickBooks but payment link is not available yet.
-                      </p>
-                      <Button variant="outline" size="sm" onClick={handleRefreshPaymentLink} disabled={refreshingLink} className="gap-2">
-                        {refreshingLink ? <>
-                            <RefreshCw className="h-4 w-4 animate-spin" />
-                            Refreshing...
-                          </> : <>
-                            <RefreshCw className="h-4 w-4" />
-                            Refresh Payment Link
-                          </>}
-                      </Button>
-                    </div> : <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
-                      <p className="text-sm text-muted-foreground">
-                        Payment link will be available after syncing. Click "Bill" above to sync this invoice to QuickBooks.
-                      </p>
-                    </div>}
+                      </div> : <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                        <p className="text-sm text-muted-foreground">
+                          Payment link will be available after syncing. Click "Bill" above to sync this invoice to QuickBooks.
+                        </p>
+                      </div>}
+                  </div>
                 </div>
               </div>
-            </div>}
+            ) : (
+              <div className="p-8 border-b">
+                <Button 
+                  onClick={() => setShowPaymentPortal(true)}
+                  className="gap-2"
+                  variant="outline"
+                >
+                  <DollarSign className="h-4 w-4" />
+                  Get Payment Link
+                </Button>
+              </div>
+            )
+          )}
 
           {/* Order Items - Main Invoice View */}
           <div className="p-8">
