@@ -86,11 +86,12 @@ const Invoices = () => {
     }
   };
 
-  const getStatusColor = (invoice: any) => {
-    if (invoice.status === 'paid') return 'text-success';
-    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'synced') return 'text-warning';
-    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'pending') return 'text-muted-foreground';
-    if (invoice.status === 'partial') return 'text-info';
+  const getStatusColor = (status: string, isDue?: boolean) => {
+    if (status === 'PAID') return 'text-green-600 dark:text-green-400';
+    if (isDue || status === 'DUE') return 'text-red-600 dark:text-red-400';
+    if (status === 'Pending Due') return 'text-yellow-600 dark:text-yellow-400';
+    if (status === 'PARTIAL') return 'text-blue-600 dark:text-blue-400';
+    if (status === 'CLOSED') return 'text-gray-600 dark:text-gray-400';
     return 'text-muted-foreground';
   };
 
@@ -446,8 +447,13 @@ const Invoices = () => {
                   <div className="col-span-1 text-sm">{invoice.orders?.po_number || 'N/A'}</div>
                   <div className="col-span-1 text-sm font-medium">
                     <div className="flex items-center gap-1">
-                      <StatusIcon className="h-3 w-3" />
-                      {displayStatus}
+                      <StatusIcon className={`h-3 w-3 ${getStatusColor(displayStatus, showDueStatus)}`} />
+                      <span className={getStatusColor(displayStatus, showDueStatus)}>{displayStatus}</span>
+                      {showDueStatus && hasChildren && (
+                        <span title="Contains due partial invoices">
+                          <AlertCircle className="h-3 w-3 text-red-600 dark:text-red-400 ml-1" />
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="col-span-1 flex gap-1">
