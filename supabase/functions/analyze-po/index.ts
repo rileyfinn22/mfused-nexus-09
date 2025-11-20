@@ -351,47 +351,8 @@ Return ONLY valid JSON:
         }
       }
 
-      // Try partial/contains matching (if one contains the other)
-      if (poItemId) {
-        const poIdUpper = poItemId.toUpperCase().trim();
-        const match = products.find(p => {
-          if (!p.item_id) return false;
-          const prodIdUpper = p.item_id.toUpperCase().trim();
-          return prodIdUpper.includes(poIdUpper) || poIdUpper.includes(prodIdUpper);
-        });
-        
-        if (match) {
-          console.log(`✓ Partial match: "${poItemId}" <-> "${match.item_id}" (product: ${match.name})`);
-          return match.id;
-        }
-      }
-
-      // Try fuzzy name matching (relaxed threshold)
-      if (poName && poName.length > 5) {
-        const poNameNorm = normalize(poName);
-        const match = products.find(p => {
-          if (!p.name || p.name.length < 5) return false;
-          const productNameNorm = normalize(p.name);
-          
-          // Check if one name contains significant portion of the other
-          if (productNameNorm.includes(poNameNorm.slice(0, Math.min(15, poNameNorm.length))) ||
-              poNameNorm.includes(productNameNorm.slice(0, Math.min(15, productNameNorm.length)))) {
-            return true;
-          }
-          
-          // Word-based similarity (lowered to 60% threshold)
-          const poWords = new Set(poName.toLowerCase().split(/\s+/).filter(w => w.length > 2));
-          const productWords = p.name.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-          const matchingWords = productWords.filter(w => poWords.has(w)).length;
-          const similarity = matchingWords / Math.max(poWords.size, productWords.length);
-          return similarity >= 0.6;
-        });
-        
-        if (match) {
-          console.log(`✓ Fuzzy name match: "${poName}" -> product: ${match.name}`);
-          return match.id;
-        }
-      }
+      // Removed overly aggressive partial and fuzzy matching to prevent incorrect product matches
+      // Only exact, normalized, and base SKU matches are used now
 
       console.log(`✗ No match found for: item_id="${poItemId}", sku="${poSku}", name="${poName}"`);
       return null;
