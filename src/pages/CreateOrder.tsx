@@ -40,6 +40,7 @@ interface Product {
   description: string | null;
   image_url: string | null;
   customer_id: string | null;
+  company_id: string;
 }
 
 interface OrderItem {
@@ -399,11 +400,7 @@ const CreateOrder = () => {
 
   // Filter products based on selected company (for vibe admins) or show all (for regular users)
   const availableProducts = isVibeAdmin && selectedCompanyId
-    ? products.filter(p => {
-        // Find the company's customers and filter products by customer_id
-        const company = companies.find(c => c.id === selectedCompanyId);
-        return p.customer_id === selectedCompanyId || !p.customer_id; // Include products with no customer_id or matching customer_id
-      })
+    ? products.filter(p => p.company_id === selectedCompanyId)
     : products;
 
   const fetchSavedAddresses = async () => {
@@ -1203,9 +1200,7 @@ const CreateOrder = () => {
                   <TableBody>
                     {unmatchedPoItems.map((item) => {
                       // Only show products from the selected company
-                      const companyFilteredProducts = isVibeAdmin && selectedCompanyId
-                        ? products.filter(p => p.customer_id === selectedCompanyId || !p.customer_id)
-                        : products;
+                      const companyFilteredProducts = availableProducts;
 
                       const selectedProduct = companyFilteredProducts.find(p => p.id === matchingProductId[item.id]);
 
