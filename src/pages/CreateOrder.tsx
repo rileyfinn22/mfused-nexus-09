@@ -9,10 +9,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { cn } from "@/lib/utils";
 
 const orderSchema = z.object({
   customerName: z.string().trim().min(1, "Customer name is required").max(200),
@@ -85,7 +88,7 @@ const CreateOrder = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [matchingProductId, setMatchingProductId] = useState<Record<string, string>>({});
-  const [searchQueryForMatch, setSearchQueryForMatch] = useState<Record<string, string>>({});
+  const [openCombobox, setOpenCombobox] = useState<Record<string, boolean>>({});
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -571,9 +574,9 @@ const CreateOrder = () => {
     // Remove from unmatched
     setUnmatchedPoItems(unmatchedPoItems.filter(item => item.id !== unmatchedItem.id));
 
-    // Clear search
+    // Clear selection and close popover
     setMatchingProductId({ ...matchingProductId, [unmatchedItem.id]: "" });
-    setSearchQueryForMatch({ ...searchQueryForMatch, [unmatchedItem.id]: "" });
+    setOpenCombobox({ ...openCombobox, [unmatchedItem.id]: false });
 
     toast({
       title: "Item Matched",
@@ -1199,11 +1202,12 @@ const CreateOrder = () => {
                   </TableHeader>
                   <TableBody>
                     {unmatchedPoItems.map((item) => {
-                      const itemSearchQuery = searchQueryForMatch[item.id] || "";
-                      const filteredProductsForItem = filteredProducts.filter(p => 
-                        p.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) ||
-                        (p.item_id && p.item_id.toLowerCase().includes(itemSearchQuery.toLowerCase()))
-                      );
+                      // Only show products from the selected company
+                      const companyFilteredProducts = isVibeAdmin && selectedCompanyId
+                        ? products.filter(p => p.customer_id === selectedCompanyId || !p.customer_id)
+                        : products;
+
+                      const selectedProduct = companyFilteredProducts.find(p => p.id === matchingProductId[item.id]);
 
                       return (
                         <TableRow key={item.id}>
@@ -1224,42 +1228,56 @@ const CreateOrder = () => {
                                 <Plus className="h-3 w-3 mr-1" />
                                 Add to Catalog
                               </Button>
-                              <div className="flex items-center gap-1 flex-1">
-                                <div className="relative flex-1">
-                                  <Input
-                                    type="text"
-                                    placeholder="Search products..."
-                                    value={itemSearchQuery}
-                                    onChange={(e) => setSearchQueryForMatch({
-                                      ...searchQueryForMatch,
-                                      [item.id]: e.target.value
-                                    })}
-                                    className="h-8 pr-8"
-                                  />
-                                  <Search className="absolute right-2 top-2 h-4 w-4 text-muted-foreground" />
-                                </div>
-                                <Select
-                                  value={matchingProductId[item.id] || ""}
-                                  onValueChange={(value) => {
-                                    setMatchingProductId({ ...matchingProductId, [item.id]: value });
-                                    handleMatchUnmatchedItem(item, value);
-                                  }}
-                                >
-                                  <SelectTrigger className="h-8 w-[120px]">
-                                    <SelectValue placeholder="Match..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {filteredProductsForItem.slice(0, 10).map((product) => (
-                                      <SelectItem key={product.id} value={product.id}>
-                                        {product.item_id || product.name}
-                                      </SelectItem>
-                                    ))}
-                                    {filteredProductsForItem.length === 0 && (
-                                      <div className="p-2 text-sm text-muted-foreground">No products found</div>
-                                    )}
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                              <Popover 
+                                open={openCombobox[item.id]} 
+                                onOpenChange={(open) => setOpenCombobox({ ...openCombobox, [item.id]: open })}
+                              >
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={openCombobox[item.id]}
+                                    className="w-[200px] justify-between h-8"
+                                  >
+                                    {selectedProduct ? (selectedProduct.item_id || selectedProduct.name) : "Match to product..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[300px] p-0 bg-popover z-50" align="start">
+                                  <Command className="bg-popover">
+                                    <CommandInput placeholder="Search products..." className="h-9" />
+                                    <CommandList>
+                                      <CommandEmpty>No products found.</CommandEmpty>
+                                      <CommandGroup>
+                                        {companyFilteredProducts.map((product) => (
+                                          <CommandItem
+                                            key={product.id}
+                                            value={`${product.item_id || ''} ${product.name}`}
+                                            onSelect={() => {
+                                              setMatchingProductId({ ...matchingProductId, [item.id]: product.id });
+                                              handleMatchUnmatchedItem(item, product.id);
+                                            }}
+                                            className="cursor-pointer"
+                                          >
+                                            <Check
+                                              className={cn(
+                                                "mr-2 h-4 w-4",
+                                                matchingProductId[item.id] === product.id ? "opacity-100" : "opacity-0"
+                                              )}
+                                            />
+                                            <div className="flex flex-col">
+                                              <span className="font-medium">{product.name}</span>
+                                              {product.item_id && (
+                                                <span className="text-xs text-muted-foreground font-mono">{product.item_id}</span>
+                                              )}
+                                            </div>
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
                             </div>
                           </TableCell>
                         </TableRow>
