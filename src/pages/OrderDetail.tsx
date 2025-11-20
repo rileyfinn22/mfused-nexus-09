@@ -1216,19 +1216,20 @@ const OrderDetail = () => {
                       <Button
                         variant="outline"
                         onClick={async () => {
+                          const fileName =
+                            typeof order.po_pdf_path === "string"
+                              ? order.po_pdf_path.split("/").pop() || "purchase-order.pdf"
+                              : "purchase-order.pdf";
+
                           const { data, error } = await supabase.storage
-                            .from('po-documents')
-                            .createSignedUrl(order.po_pdf_path, 3600);
-                          
+                            .from("po-documents")
+                            .createSignedUrl(order.po_pdf_path, 3600, {
+                              download: fileName,
+                            });
+
                           if (data?.signedUrl) {
-                            // Use location.href instead of window.open to avoid popup blockers
-                            const link = document.createElement('a');
-                            link.href = data.signedUrl;
-                            link.target = '_blank';
-                            link.rel = 'noopener noreferrer';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
+                            // Navigate directly to the signed URL to trigger a download
+                            window.location.href = data.signedUrl;
                           } else {
                             toast({
                               title: "Error",
@@ -1239,7 +1240,7 @@ const OrderDetail = () => {
                         }}
                       >
                         <FileText className="h-4 w-4 mr-2" />
-                        View PO
+                        Download PO
                       </Button>
                     </div>
                   </div>
