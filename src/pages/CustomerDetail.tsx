@@ -563,6 +563,19 @@ const CustomerDetail = () => {
         .map(row => row.item_id)
         .filter(id => id); // Remove empty values
 
+      // Check for duplicates within the CSV itself
+      const idCounts: Record<string, number> = {};
+      for (const id of itemIds) {
+        idCounts[id] = (idCounts[id] || 0) + 1;
+      }
+      const duplicateIdsInCsv = Object.entries(idCounts)
+        .filter(([, count]) => count > 1)
+        .map(([id, count]) => `"${id}" (appears ${count} times in CSV)`);
+
+      if (duplicateIdsInCsv.length > 0) {
+        throw new Error(`Duplicate Item IDs in CSV: ${duplicateIdsInCsv.join(', ')}`);
+      }
+
       if (itemIds.length > 0) {
         const { data: existingProducts } = await supabase
           .from('products')
