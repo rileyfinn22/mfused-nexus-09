@@ -318,7 +318,7 @@ const CustomerDetail = () => {
         description: validated.description || null,
         price: validated.price ? parseFloat(validated.price) : null,
         cost: validated.cost ? parseFloat(validated.cost) : null,
-        company_id: userRole.company_id,
+        company_id: customer.company_id,
         customer_id: customerId,
       };
 
@@ -595,7 +595,7 @@ const CustomerDetail = () => {
         description: row.description || null,
         price: row.price ? parseFloat(row.price) : null,
         cost: row.cost ? parseFloat(row.cost) : null,
-        company_id: userRole.company_id,
+        company_id: customer.company_id,
         customer_id: customerId,
       }));
 
