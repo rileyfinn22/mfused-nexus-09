@@ -216,9 +216,12 @@ const Invoices = () => {
     return sum + remaining;
   }, 0);
 
-  // Calculate DUE amount for blanket invoices that are synced (DUE status)
+  // Calculate DUE amount for blanket invoices that are synced and open/partial
   const dueAmount = blanketInvoices
-    .filter(inv => inv.quickbooks_sync_status === 'synced')
+    .filter(inv => 
+      inv.quickbooks_sync_status === 'synced' && 
+      (inv.status === 'open' || inv.status === 'partial')
+    )
     .reduce((sum, blanketInvoice) => {
       // Get all partial invoices for this blanket
       const partialInvoices = invoices.filter(inv => inv.parent_invoice_id === blanketInvoice.id);
