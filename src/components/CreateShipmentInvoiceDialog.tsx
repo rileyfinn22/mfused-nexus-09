@@ -194,59 +194,62 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         // Shipment invoice - based on quantities
         itemsToShip = order.order_items.filter((item: any) => shipmentQuantities[item.id] > 0);
         
-        // Calculate shipment value
-        itemsToShip.forEach((item: any) => {
-          const quantity = shipmentQuantities[item.id];
-          subtotal += quantity * item.unit_price;
-        });
-
-        // Calculate the TOTAL SHIPPED value (including this shipment and previous shipments)
-        const totalShippedValue = order.order_items.reduce((sum: number, item: any) => {
-          const previouslyShipped = item.shipped_quantity || 0;
-          const thisShipment = shipmentQuantities[item.id] || 0;
-          const totalShipped = previouslyShipped + thisShipment;
-          return sum + (totalShipped * item.unit_price);
-        }, 0);
-        
         // Calculate how much has already been billed (deposits and previous shipments, excluding blanket)
         const totalAlreadyBilled = existingInvoices
           .filter(inv => inv.invoice_type !== 'full') // Exclude blanket invoice
-          .reduce((sum, inv) => {
-            // Deposits are identified by notes containing "deposit payment"
-            if (inv.notes && inv.notes.includes('deposit payment')) {
-              // For deposits, use the full total
-              return sum + parseFloat(inv.total || 0);
-            }
-            // For shipment invoices, use the full total
-            return sum + parseFloat(inv.total || 0);
-          }, 0);
+          .reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
         
-        console.log('Total shipped value (incl. this shipment):', totalShippedValue);
-        console.log('Total already billed (excl. blanket):', totalAlreadyBilled);
-        console.log('Shipment value before cap:', subtotal);
+        const blanketTotal = Number(blanketInvoice.total);
+        const remainingBlanketAmount = Math.max(0, blanketTotal - totalAlreadyBilled);
         
-        // Calculate remaining billable amount (can't exceed total shipped value)
-        const remainingBillable = Math.max(0, totalShippedValue - totalAlreadyBilled);
+        console.log('Blanket total:', blanketTotal);
+        console.log('Total already billed (deposits + shipments):', totalAlreadyBilled);
+        console.log('Remaining blanket amount:', remainingBlanketAmount);
         
-        // Cap the shipment invoice at the remaining billable amount
-        if (remainingBillable === 0) {
-          console.log('100% of shipped qty already billed - creating $0 shipment invoice');
-          subtotal = 0;
-        } else if (subtotal > remainingBillable) {
-          console.log(`Capping shipment at remaining billable: ${remainingBillable}`);
-          subtotal = remainingBillable;
+        // Calculate billing for this shipment with proper handling of overs
+        let baseSubtotal = 0; // Amount within original order (subject to blanket cap)
+        let oversSubtotal = 0; // Amount for overs (always billed in full)
+        
+        itemsToShip.forEach((item: any) => {
+          const shipQty = shipmentQuantities[item.id];
+          const originalOrderQty = item.quantity;
+          const previouslyShipped = item.shipped_quantity || 0;
+          const totalWillBeShipped = previouslyShipped + shipQty;
+          
+          // Determine overs: quantities beyond original order
+          const oversQty = Math.max(0, totalWillBeShipped - originalOrderQty);
+          // Base quantities: within original order limits
+          const baseQty = shipQty - oversQty;
+          
+          console.log(`Item ${item.sku}: shipQty=${shipQty}, originalQty=${originalOrderQty}, previousShipped=${previouslyShipped}, baseQty=${baseQty}, oversQty=${oversQty}`);
+          
+          // Overs are always billed in full
+          oversSubtotal += oversQty * item.unit_price;
+          // Base quantities are subject to blanket cap
+          baseSubtotal += baseQty * item.unit_price;
+        });
+        
+        console.log('Base subtotal (subject to cap):', baseSubtotal);
+        console.log('Overs subtotal (always full):', oversSubtotal);
+        
+        // Apply blanket cap only to base quantities
+        let billedBaseSubtotal = baseSubtotal;
+        if (baseSubtotal > remainingBlanketAmount) {
+          console.log(`Capping base subtotal from ${baseSubtotal} to ${remainingBlanketAmount}`);
+          billedBaseSubtotal = remainingBlanketAmount;
         }
         
-        console.log('Final shipment subtotal:', subtotal);
+        // Total = capped base + full overs
+        subtotal = billedBaseSubtotal + oversSubtotal;
+        console.log('Final shipment subtotal (base + overs):', subtotal);
 
-        // Calculate percentage for shipment
-        const totalShipped = itemsToShip.reduce((sum: number, item: any) => 
-          sum + shipmentQuantities[item.id], 0
+
+        // Calculate percentage for shipment based on dollar amount billed vs full value
+        const fullShipmentValue = itemsToShip.reduce((sum: number, item: any) => 
+          sum + (shipmentQuantities[item.id] * item.unit_price), 0
         );
-        const totalOrdered = order.order_items.reduce((sum: number, item: any) => 
-          sum + item.quantity, 0
-        );
-        billedPercentage = totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
+        billedPercentage = fullShipmentValue > 0 ? (subtotal / fullShipmentValue) * 100 : 100;
+        console.log('Billed percentage:', billedPercentage, '% (subtotal:', subtotal, '/ full value:', fullShipmentValue, ')');
         
         invoiceType = 'partial';
       }

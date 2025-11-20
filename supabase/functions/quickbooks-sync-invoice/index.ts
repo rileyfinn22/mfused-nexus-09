@@ -495,12 +495,18 @@ serve(async (req) => {
       const unbilledPercentage = 100 - billingPercentage;
       const unbilledAmount = -(calculatedSubtotal * (unbilledPercentage / 100));
       
-      console.log(`Adding balance line: -${unbilledPercentage}% = $${Math.abs(unbilledAmount).toFixed(2)}`);
+      console.log(`Adding credit line: -${unbilledPercentage}% = $${Math.abs(unbilledAmount).toFixed(2)}`);
+      
+      // Determine description based on invoice type
+      const isDeposit = invoice.notes && invoice.notes.includes('deposit payment');
+      const creditDescription = isDeposit 
+        ? `Balance Due on Delivery (${unbilledPercentage}% of order)`
+        : `Credit Applied (Deposit/Previous Payments)`;
       
       lineItems.push({
         DetailType: 'SalesItemLineDetail',
         Amount: unbilledAmount,
-        Description: `Balance Due on Delivery (${unbilledPercentage}% of order)`,
+        Description: creditDescription,
         SalesItemLineDetail: {
           ItemRef: { value: '1' },
         },
