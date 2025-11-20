@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,11 +15,13 @@ import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
 import { SyncToQuickBooksDialog } from "@/components/SyncToQuickBooksDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useQueryClient } from "@tanstack/react-query";
 const InvoiceDetail = () => {
   const {
     invoiceId
   } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [invoice, setInvoice] = useState<any>(null);
   const [order, setOrder] = useState<any>(null);
   const [vendorPOs, setVendorPOs] = useState<any[]>([]);
@@ -649,9 +652,40 @@ const InvoiceDetail = () => {
                   </p>}
               </div>
               <div className="text-right">
-                <span className={`inline-block px-4 py-1.5 rounded-full text-sm font-medium capitalize ${invoice.status === 'paid' ? 'bg-green-500/10 text-green-600' : invoice.status === 'due' ? 'bg-orange-500/10 text-orange-600' : 'bg-blue-500/10 text-blue-600'}`}>
-                  {invoice.status === 'draft' || invoice.status === 'pending' ? 'Open' : invoice.status.replace('_', ' ')}
-                </span>
+                <Select
+                  value={invoice.status}
+                  onValueChange={async (newStatus) => {
+                    const { error } = await supabase
+                      .from("invoices")
+                      .update({ status: newStatus })
+                      .eq("id", invoice.id);
+
+                    if (error) {
+                      console.error("Error updating invoice status:", error);
+                      toast({
+                        title: "Error",
+                        description: "Failed to update invoice status",
+                        variant: "destructive"
+                      });
+                    } else {
+                      toast({
+                        title: "Status Updated",
+                        description: "Invoice status successfully updated"
+                      });
+                      fetchInvoiceDetails();
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">PENDING DUE</SelectItem>
+                    <SelectItem value="open">DUE</SelectItem>
+                    <SelectItem value="paid">PAID</SelectItem>
+                    <SelectItem value="closed">CLOSED</SelectItem>
+                  </SelectContent>
+                </Select>
                 <div className="mt-4">
                   <p className="text-sm text-muted-foreground">Invoice Date</p>
                   <p className="font-medium">{new Date(invoice.invoice_date).toLocaleDateString()}</p>
