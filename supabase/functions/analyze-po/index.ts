@@ -221,12 +221,20 @@ Return ONLY valid JSON:
 
     // Fetch products to try matching SKUs and names (include customer_id for customer-specific SKU matching)
     console.log(`\n========== FETCHING PRODUCTS ==========`);
-    console.log(`Querying products with company_id: ${companyId}`);
-    
-    const { data: products, error: productsError } = await supabase
+    console.log(`Requested company_id for order: ${companyId}`);
+    console.log(`User role: ${userRole.role}, user company_id: ${userRole.company_id}`);
+
+    let productsQuery = supabase
       .from('products')
-      .select('id, item_id, name, customer_id')
-      .eq('company_id', companyId);
+      .select('id, item_id, name, customer_id, company_id');
+
+    // For non–vibe admins, scope products to the order's company.
+    // Vibe admins can match across all products (needed for shared SKU catalog like WA bags).
+    if (userRole.role !== 'vibe_admin') {
+      productsQuery = productsQuery.eq('company_id', companyId);
+    }
+
+    const { data: products, error: productsError } = await productsQuery;
 
     if (productsError) {
       console.error('Error fetching products:', productsError);
@@ -236,7 +244,7 @@ Return ONLY valid JSON:
     console.log(`Looking specifically for PCK-00046-WA...`);
     const targetProduct = products?.find(p => p.item_id === 'PCK-00046-WA');
     if (targetProduct) {
-      console.log(`✓ FOUND PCK-00046-WA in fetched products:`, targetProduct);
+      console.log(`✓ FOUND PCK-00046-WA in fetched products (company_id=${targetProduct.company_id}):`, targetProduct);
     } else {
       console.log(`✗ PCK-00046-WA NOT in fetched products list`);
     }
