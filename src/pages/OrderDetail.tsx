@@ -1197,35 +1197,46 @@ const OrderDetail = () => {
           {/* Purchase Order Attachment */}
           {order.po_pdf_path && (
             <div className="border-t border-table-border bg-muted/30 p-8">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-6 w-6 text-primary" />
-                  <div>
-                    <h2 className="text-lg font-semibold mb-1">Purchase Order Attachment</h2>
-                    <p className="text-sm text-muted-foreground">Original PO used to create this order</p>
+              <div className="flex items-center gap-6">
+                {/* PDF Thumbnail */}
+                <div className="flex-shrink-0">
+                  <div className="w-24 h-32 rounded-lg border-2 border-border bg-background flex items-center justify-center shadow-sm hover:shadow-md transition-shadow">
+                    <FileText className="h-12 w-12 text-primary" />
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={async () => {
-                    const { data } = await supabase.storage
-                      .from('po-documents')
-                      .createSignedUrl(order.po_pdf_path, 3600);
-                    
-                    if (data?.signedUrl) {
-                      window.open(data.signedUrl, '_blank');
-                    } else {
-                      toast({
-                        title: "Error",
-                        description: "Failed to load PDF",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  View PDF
-                </Button>
+                
+                {/* PO Details */}
+                <div className="flex-1">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold mb-1">Purchase Order</h2>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Original PO document used to create this order
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          const { data } = await supabase.storage
+                            .from('po-documents')
+                            .createSignedUrl(order.po_pdf_path, 3600);
+                          
+                          if (data?.signedUrl) {
+                            window.open(data.signedUrl, '_blank');
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: "Failed to load PO",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        View PO
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
