@@ -159,12 +159,36 @@ const InvoiceDetail = () => {
     setTotalShippedAllInvoices(totalShippedAcrossAllInvoices);
     console.log('Total shipped across all invoices:', totalShippedAcrossAllInvoices);
 
-    // Fetch payments for this invoice
-    const {
-      data: paymentsData
-    } = await supabase.from('payments').select('*').eq('invoice_id', invoiceId).order('payment_date', {
-      ascending: false
-    });
+    // Fetch payments - if this is a blanket invoice (full type, shipment 1), get all payments from partial invoices
+    const isBlanketInvoice = invoiceData.invoice_type === 'full' && invoiceData.shipment_number === 1;
+    
+    let paymentsData;
+    if (isBlanketInvoice && relatedData && relatedData.length > 0) {
+      // Get all invoice IDs for this order (including this one)
+      const allInvoiceIds = [invoiceId, ...relatedData.map(inv => inv.id)];
+      
+      // Fetch all payments for all invoices
+      const { data: allPayments } = await supabase
+        .from('payments')
+        .select(`
+          *,
+          invoices!inner(invoice_number, invoice_type, shipment_number)
+        `)
+        .in('invoice_id', allInvoiceIds)
+        .order('payment_date', { ascending: false });
+      
+      paymentsData = allPayments;
+    } else {
+      // Regular invoice - only show payments for this invoice
+      const { data: singleInvoicePayments } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('invoice_id', invoiceId)
+        .order('payment_date', { ascending: false });
+      
+      paymentsData = singleInvoicePayments;
+    }
+    
     if (paymentsData) {
       setPayments(paymentsData);
     }
@@ -989,36 +1013,51 @@ const InvoiceDetail = () => {
                 {payments.length} payment{payments.length !== 1 ? 's' : ''} recorded
               </p>
             </div>
-            <div className="text-right space-y-1">
-              {/* Show blanket invoice total for child invoices */}
-              {invoice.shipment_number > 1 && invoice.invoice_type !== 'full' && (() => {
-              const blanketInvoice = relatedInvoices.find(inv => inv.invoice_type === 'full' && inv.shipment_number === 1);
-              if (blanketInvoice) {
-                return;
-              }
-              return null;
-            })()}
-              <div>
-                <p className="text-xs text-muted-foreground">Invoice Total</p>
-                <p className="text-lg font-semibold">{formatCurrency(displayTotal)}</p>
+            
+            {/* For Blanket Invoices - Show three totals */}
+            {invoice.invoice_type === 'full' && invoice.shipment_number === 1 ? (
+              <div className="text-right space-y-2">
+                <div className="grid grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Blanket Invoice Total</p>
+                    <p className="text-lg font-semibold">{formatCurrency(Number(invoice.total || 0))}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Shipped Invoice Total</p>
+                    <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                      {formatCurrency(relatedInvoices
+                        .filter(inv => inv.shipment_number > 1)
+                        .reduce((sum, inv) => sum + Number(inv.total || 0), 0)
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Paid Total</p>
+                    <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                      {formatCurrency(payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0))}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Paid</p>
-                <p className="text-lg font-semibold text-success">{formatCurrency(invoice.total_paid || 0)}</p>
+            ) : (
+              <div className="text-right space-y-1">
+                <div>
+                  <p className="text-xs text-muted-foreground">Invoice Total</p>
+                  <p className="text-lg font-semibold">{formatCurrency(displayTotal)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Paid</p>
+                  <p className="text-lg font-semibold text-success">{formatCurrency(invoice.total_paid || 0)}</p>
+                </div>
               </div>
-              <div className="pt-2 border-t">
-                <p className="text-xs text-muted-foreground">Remaining Balance</p>
-                <p className="text-xl font-bold text-primary">
-                  {formatCurrency(displayTotal - (invoice.total_paid || 0))}
-                </p>
-              </div>
-            </div>
+            )}
           </div>
 
           {payments.length > 0 ? <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
+                  {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <TableHead>Invoice</TableHead>}
                   <TableHead>Method</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
@@ -1031,6 +1070,11 @@ const InvoiceDetail = () => {
                     <TableCell className="font-medium">
                       {new Date(payment.payment_date).toLocaleDateString()}
                     </TableCell>
+                    {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && (
+                      <TableCell className="font-mono text-xs">
+                        {payment.invoices?.invoice_number || '-'}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Badge variant="outline" className="capitalize">
                         {payment.payment_method.replace('_', ' ')}
