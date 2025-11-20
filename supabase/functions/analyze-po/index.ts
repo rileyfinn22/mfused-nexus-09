@@ -225,7 +225,7 @@ Return ONLY valid JSON:
     
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id, item_id, name, customer_id')
+      .select('id, item_id, name, customer_id, preferred_vendor_id, cost')
       .eq('company_id', companyId);
 
     if (productsError) {
@@ -253,6 +253,7 @@ Return ONLY valid JSON:
     }
 
     // Function to find matching product by item_id with improved matching
+    // Returns the full product object (not just ID) so we can access vendor_id, cost, etc.
     const findMatchingProduct = (poItem: any) => {
       if (!products || products.length === 0) {
         console.log('No products available for matching');
@@ -299,7 +300,7 @@ Return ONLY valid JSON:
         );
         if (match) {
           console.log(`✓ Customer-specific SKU match: "${poItemId}" for customer ${customerId} -> product: ${match.name}`);
-          return match.id;
+          return match;
         }
       }
 
@@ -315,7 +316,7 @@ Return ONLY valid JSON:
         });
         if (match) {
           console.log(`✓ EXACT MATCH FOUND: "${poItemId}" -> product: ${match.name} (item_id: ${match.item_id})`);
-          return match.id;
+          return match;
         }
         console.log(`✗ No exact item_id match found for: "${poItemId}"`);
       }
@@ -327,7 +328,7 @@ Return ONLY valid JSON:
         );
         if (match) {
           console.log(`✓ Exact SKU match: "${poSku}" -> product: ${match.name}`);
-          return match.id;
+          return match;
         }
       }
 
@@ -347,7 +348,7 @@ Return ONLY valid JSON:
         });
         if (match) {
           console.log(`✓ NORMALIZED MATCH FOUND: "${poItemId}" -> "${match.item_id}" (product: ${match.name})`);
-          return match.id;
+          return match;
         }
         console.log(`✗ No normalized match found for: "${poItemId}"`);
       }
@@ -370,7 +371,7 @@ Return ONLY valid JSON:
         
         if (match) {
           console.log(`✓ BASE SKU MATCH FOUND: "${basePoSku}" -> "${match.item_id}" (product: ${match.name})`);
-          return match.id;
+          return match;
         }
         console.log(`✗ No base SKU match found for: "${poItemId}"`);
       }
@@ -442,7 +443,7 @@ Return ONLY valid JSON:
     // Create order items with product matching
     if (extractedData.items && Array.isArray(extractedData.items)) {
       const orderItems = extractedData.items.map((item: any) => {
-        const matchedProductId = findMatchingProduct(item);
+        const matchedProduct = findMatchingProduct(item);
         
         // ALWAYS use PO unit_price, never pull from product cost
         const unitPrice = item.unit_price || 0;
@@ -450,9 +451,10 @@ Return ONLY valid JSON:
         
         console.log(`Item "${item.name}": unit_price=${item.unit_price}, type=${typeof item.unit_price}`);
         
-        return {
+        // If product matched, use its full identity including vendor assignment
+        const orderItem: any = {
           order_id: order.id,
-          product_id: matchedProductId, // Will be null if no match found
+          product_id: matchedProduct?.id || null,
           sku: item.sku || 'UNKNOWN',
           name: item.name || item.description || 'Unknown Item',
           description: item.description || null,
@@ -462,6 +464,15 @@ Return ONLY valid JSON:
           shipped_quantity: 0, // Initialize as 0 for new orders
           item_id: item.sku || null
         };
+        
+        // If product has a preferred vendor, assign it to the order item
+        if (matchedProduct?.preferred_vendor_id) {
+          orderItem.vendor_id = matchedProduct.preferred_vendor_id;
+          orderItem.vendor_cost = matchedProduct.cost || null;
+          console.log(`✓ Assigned vendor ${matchedProduct.preferred_vendor_id} to item "${item.name}"`);
+        }
+        
+        return orderItem;
       });
 
       console.log(`Creating ${orderItems.length} order items, ${orderItems.filter(i => i.product_id).length} matched to products`);
