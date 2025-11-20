@@ -163,21 +163,45 @@ const InvoiceDetail = () => {
     const isBlanketInvoice = invoiceData.invoice_type === 'full' && invoiceData.shipment_number === 1;
     
     let paymentsData;
-    if (isBlanketInvoice && relatedData && relatedData.length > 0) {
-      // Get all invoice IDs for this order (including this one)
-      const allInvoiceIds = [invoiceId, ...relatedData.map(inv => inv.id)];
+    if (isBlanketInvoice) {
+      // Get all invoice IDs for this order (including this one and all related)
+      const allInvoiceIds = [invoiceId];
+      if (relatedData && relatedData.length > 0) {
+        allInvoiceIds.push(...relatedData.map(inv => inv.id));
+      }
       
-      // Fetch all payments for all invoices
-      const { data: allPayments } = await supabase
+      console.log('Fetching payments for blanket invoice, all IDs:', allInvoiceIds);
+      
+      // Fetch all payments for all invoices with invoice details
+      const { data: allPayments, error: paymentsError } = await supabase
         .from('payments')
-        .select(`
-          *,
-          invoices!inner(invoice_number, invoice_type, shipment_number)
-        `)
+        .select('*')
         .in('invoice_id', allInvoiceIds)
         .order('payment_date', { ascending: false });
       
-      paymentsData = allPayments;
+      if (paymentsError) {
+        console.error('Error fetching payments:', paymentsError);
+      }
+      
+      // Add invoice info to each payment manually
+      if (allPayments) {
+        const paymentsWithInvoices = allPayments.map(payment => {
+          const relatedInvoice = relatedData?.find(inv => inv.id === payment.invoice_id);
+          return {
+            ...payment,
+            invoices: relatedInvoice ? {
+              invoice_number: relatedInvoice.invoice_number,
+              invoice_type: relatedInvoice.invoice_type,
+              shipment_number: relatedInvoice.shipment_number
+            } : (payment.invoice_id === invoiceId ? {
+              invoice_number: invoiceData.invoice_number,
+              invoice_type: invoiceData.invoice_type,
+              shipment_number: invoiceData.shipment_number
+            } : null)
+          };
+        });
+        paymentsData = paymentsWithInvoices;
+      }
     } else {
       // Regular invoice - only show payments for this invoice
       const { data: singleInvoicePayments } = await supabase
@@ -190,6 +214,7 @@ const InvoiceDetail = () => {
     }
     
     if (paymentsData) {
+      console.log('Setting payments:', paymentsData);
       setPayments(paymentsData);
     }
     setLoading(false);
