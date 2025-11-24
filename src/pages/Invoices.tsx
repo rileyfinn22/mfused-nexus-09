@@ -146,7 +146,9 @@ const Invoices = () => {
 
   const hasDueChildren = (parentId: string) => {
     const children = invoices.filter(inv => inv.parent_invoice_id === parentId);
-    return children.some(child => child.status === 'open' || child.status === 'pending');
+    return children.some(child => 
+      child.status === 'open' && child.quickbooks_sync_status === 'synced'
+    );
   };
 
   const handleDescriptionChange = async (invoiceId: string, description: string) => {
