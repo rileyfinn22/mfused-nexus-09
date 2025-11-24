@@ -107,6 +107,30 @@ serve(async (req) => {
       throw new Error('Invoice not found');
     }
 
+    // Check if this is a deposit or partial invoice that should be synced as a payment
+    const isDepositOrPartial = (invoice.invoice_type === 'deposit' || invoice.invoice_type === 'partial') && invoice.parent_invoice_id;
+    
+    if (isDepositOrPartial) {
+      console.log('This is a deposit/partial invoice - syncing as payment to parent invoice');
+      
+      // Get parent invoice to find its QuickBooks ID
+      const { data: parentInvoice, error: parentError } = await supabase
+        .from('invoices')
+        .select('quickbooks_id, invoice_number')
+        .eq('id', invoice.parent_invoice_id)
+        .single();
+      
+      if (parentError || !parentInvoice) {
+        throw new Error('Parent invoice not found');
+      }
+      
+      if (!parentInvoice.quickbooks_id) {
+        throw new Error('Parent invoice must be synced to QuickBooks first. Please sync invoice ' + parentInvoice.invoice_number);
+      }
+      
+      console.log('Parent invoice QB ID:', parentInvoice.quickbooks_id);
+    }
+
     // Get the company's primary user email from user_roles
     const { data: companyUser } = await supabase
       .from('user_roles')
