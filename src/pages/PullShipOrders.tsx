@@ -154,7 +154,11 @@ const PullShipOrders = () => {
           ? (existingInvoices[0].shipment_number || 0) + 1 
           : 1;
 
-        const invoiceNumber = generateInvoiceNumber(nextShipmentNumber);
+        // Get next sequential invoice number
+        const { count: invoiceCount } = await supabase
+          .from('invoices')
+          .select('*', { count: 'exact', head: true });
+        const invoiceNumber = generateInvoiceNumber((invoiceCount || 0) + 1);
 
         // Calculate percentage of order
         const pullShipTotal = order.total || 0;

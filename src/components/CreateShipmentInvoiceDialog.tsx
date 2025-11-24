@@ -104,8 +104,11 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         );
         const orderTotal = orderSubtotal; // No tax, included in unit price
         
-        // Create the main blanket invoice
-        const blanketInvoiceNumber = generateInvoiceNumber(1);
+        // Create the main blanket invoice - get next sequence number
+        const { count: invoiceCount } = await supabase
+          .from('invoices')
+          .select('*', { count: 'exact', head: true });
+        const blanketInvoiceNumber = generateInvoiceNumber((invoiceCount || 0) + 1);
         const { data: newBlanketInvoice, error: blanketError } = await supabase
           .from('invoices')
           .insert({
@@ -258,8 +261,11 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       const shipping = invoiceMode === 'deposit' ? 0 : (parseFloat(shippingCost) || 0);
       const total = subtotal + shipping;
       
-      // Create child invoice linked to blanket invoice
-      const invoiceNumber = generateInvoiceNumber(nextShipmentNumber);
+      // Create child invoice linked to blanket invoice - get next sequence number
+      const { count: invoiceCount } = await supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true });
+      const invoiceNumber = generateInvoiceNumber((invoiceCount || 0) + 1);
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
