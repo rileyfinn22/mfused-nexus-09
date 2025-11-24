@@ -1121,7 +1121,9 @@ const InvoiceDetail = () => {
                               Synced
                             </Badge> : payment.quickbooks_sync_status === 'error' ? <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
                               Error
-                            </Badge> : <Button size="sm" variant="outline" onClick={() => handleSyncPayment(payment.id)} disabled={syncingPayment === payment.id || !invoice?.quickbooks_id}>
+                            </Badge> : !invoice?.quickbooks_id ? <Badge variant="outline" className="bg-muted text-muted-foreground">
+                              Invoice not synced
+                            </Badge> : <Button size="sm" variant="outline" onClick={() => handleSyncPayment(payment.id)} disabled={syncingPayment === payment.id}>
                               {syncingPayment === payment.id ? <>
                                   <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
                                   Syncing...
