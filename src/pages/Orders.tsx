@@ -244,7 +244,9 @@ const Orders = () => {
     ['pending', 'pending_pull'].includes(o.status.toLowerCase())
   );
   const productionOrders = filteredOrders.filter(o => 
-    !['draft', 'pending', 'pending_pull'].includes(o.status.toLowerCase())
+    !['draft', 'pending', 'pending_pull'].includes(o.status.toLowerCase()) &&
+    o.order_type !== 'pull_ship' &&
+    !o.parent_order_id  // Exclude child orders from blanket orders
   );
 
   return (
