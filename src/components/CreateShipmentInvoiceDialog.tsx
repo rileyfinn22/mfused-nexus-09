@@ -10,7 +10,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertTriangle, Info, Package } from "lucide-react";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
-import { generateInvoiceNumber } from "@/lib/invoiceUtils";
+import { generateInvoiceNumber, generatePartialInvoiceNumber } from "@/lib/invoiceUtils";
 
 interface CreateShipmentInvoiceDialogProps {
   open: boolean;
@@ -264,8 +264,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       // Create child invoice linked to blanket invoice - use parent number with suffix
       // Partial invoices use format: {parent_invoice_number}-{shipment_number-1}
       // e.g., 10707-01, 10707-02, etc.
-      const shipmentSuffix = String(nextShipmentNumber - 1).padStart(2, '0');
-      const invoiceNumber = `${blanketInvoice.invoice_number}-${shipmentSuffix}`;
+      const invoiceNumber = generatePartialInvoiceNumber(blanketInvoice.invoice_number, nextShipmentNumber);
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({

@@ -183,7 +183,9 @@ const Invoices = () => {
     .filter(inv => !inv.parent_invoice_id) // Only parent invoices
     .map(parent => ({
       parent,
-      children: filteredInvoices.filter(inv => inv.parent_invoice_id === parent.id)
+      children: filteredInvoices
+        .filter(inv => inv.parent_invoice_id === parent.id)
+        .sort((a, b) => (a.shipment_number || 0) - (b.shipment_number || 0)) // Sort children by shipment number
     }));
 
   // Create display list based on expansion state
