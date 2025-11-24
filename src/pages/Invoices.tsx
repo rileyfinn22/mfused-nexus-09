@@ -198,27 +198,23 @@ const Invoices = () => {
     return items;
   });
 
-  // Calculate open amount - total of all open/partial invoices minus what's been paid
-  const blanketInvoices = filteredInvoices.filter(inv => 
-    (!inv.invoice_type || inv.invoice_type === 'full') && 
-    (inv.status === 'open' || inv.status === 'partial')
+  // Calculate open amount - all invoices (full and partial) with open/partial status
+  const openInvoices = filteredInvoices.filter(inv => 
+    inv.status === 'open' || inv.status === 'partial'
   );
   
-  const openAmount = blanketInvoices.reduce((sum, blanketInvoice) => {
+  const openAmount = openInvoices.reduce((sum, invoice) => {
     // Calculate remaining amount: total minus what's been paid on this invoice
-    const remaining = Number(blanketInvoice.total) - (Number(blanketInvoice.total_paid) || 0);
+    const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
     return sum + remaining;
   }, 0);
 
-  // Calculate DUE amount for blanket invoices that are synced and open/partial
-  const dueAmount = blanketInvoices
-    .filter(inv => 
-      inv.quickbooks_sync_status === 'synced' && 
-      (inv.status === 'open' || inv.status === 'partial')
-    )
-    .reduce((sum, blanketInvoice) => {
+  // Calculate DUE amount - all invoices that are synced to QuickBooks and have open/partial status
+  const dueAmount = openInvoices
+    .filter(inv => inv.quickbooks_sync_status === 'synced')
+    .reduce((sum, invoice) => {
       // Calculate remaining amount: total minus what's been paid on this invoice
-      const remaining = Number(blanketInvoice.total) - (Number(blanketInvoice.total_paid) || 0);
+      const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
       return sum + remaining;
     }, 0);
 
