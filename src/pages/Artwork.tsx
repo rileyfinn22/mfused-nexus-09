@@ -145,19 +145,42 @@ const Artwork = () => {
 
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('sku, products(name)')
-        .order('sku');
+      let query = supabase
+        .from('products')
+        .select('item_id, name, company_id')
+        .order('name');
+
+      // Filter by company if not vibe_admin or if vibe_admin has selected a specific company
+      if (!isVibeAdmin) {
+        // Regular users only see their company's products
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: userRole } = await supabase
+            .from('user_roles')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (userRole?.company_id) {
+            query = query.eq('company_id', userRole.company_id);
+          }
+        }
+      } else if (companyFilter !== 'all') {
+        // Vibe admin with company filter selected
+        query = query.eq('company_id', companyFilter);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       
-      // Remove duplicates and create unique product list
-      const uniqueProducts = Array.from(
-        new Map(data?.map(item => [item.sku, item])).values()
-      );
+      // Map to the format expected by the rest of the component
+      const mappedProducts = data?.map(item => ({
+        sku: item.item_id,
+        products: { name: item.name }
+      })) || [];
       
-      setProducts(uniqueProducts || []);
+      setProducts(mappedProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
     }
