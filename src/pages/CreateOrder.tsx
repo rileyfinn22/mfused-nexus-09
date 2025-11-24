@@ -760,12 +760,13 @@ const CreateOrder = () => {
         // Delete existing order items
         await supabase.from('order_items').delete().eq('order_id', orderId);
       } else {
-        // Create new order
+        // Create new order with sequential number starting from 10700
         const { count } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true });
         
-        orderNumber = `ORD-${String((count || 0) + 1).padStart(3, '0')}-${Date.now()}`;
+        const orderNum = 10699 + ((count || 0) + 1);
+        orderNumber = String(orderNum);
 
         const { data: newOrder, error: orderError } = await supabase
           .from('orders')

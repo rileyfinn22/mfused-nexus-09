@@ -614,8 +614,12 @@ const PullShip = () => {
         };
       });
 
-      // Generate order number
-      const orderNumber = `PS-${Date.now()}`;
+      // Generate order number - sequential starting from 10700
+      const { count } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true });
+      const orderNum = 10699 + ((count || 0) + 1);
+      const orderNumber = String(orderNum);
 
       // Get parent order item prices if this is linked to a blanket order
       let priceMap: Record<string, number> = {};
