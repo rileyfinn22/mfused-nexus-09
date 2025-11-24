@@ -81,11 +81,15 @@ const Vendors = () => {
     if (editingVendor) {
       const { error } = await supabase
         .from('vendors')
-        .update(formData)
+        .update({
+          ...formData,
+          is_fulfillment_vendor: formData.category === 'fulfillment'
+        })
         .eq('id', editingVendor.id);
       
       if (error) {
-        toast({ title: "Error", description: "Failed to update vendor", variant: "destructive" });
+        console.error("Vendor update error:", error);
+        toast({ title: "Error", description: error.message || "Failed to update vendor", variant: "destructive" });
       } else {
         toast({ title: "Success", description: "Vendor updated successfully" });
         fetchVendors();
@@ -94,7 +98,11 @@ const Vendors = () => {
     } else {
       const { error } = await supabase
         .from('vendors')
-        .insert({ ...formData, company_id: userRole.company_id });
+        .insert({ 
+          ...formData, 
+          company_id: userRole.company_id,
+          is_fulfillment_vendor: formData.category === 'fulfillment'
+        });
       
       if (error) {
         console.error("Vendor creation error:", error);
