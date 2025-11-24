@@ -79,7 +79,7 @@ export default function Production() {
       let ordersData: any[] = [];
 
       if (isVendor && vendorId) {
-        // Vendors: get orders where they have assigned stages
+        // Vendors: get orders where they have assigned stages (exclude pull_ship)
         const { data: stages, error: stagesError } = await supabase
           .from('production_stages')
           .select('order_id')
@@ -107,13 +107,15 @@ export default function Production() {
             `)
             .in('id', orderIds)
             .eq('status', 'in production')
+            .neq('order_type', 'pull_ship')
+            .is('parent_order_id', null)
             .order('order_date', { ascending: false });
 
           if (error) throw error;
           ordersData = data || [];
         }
       } else {
-        // Admin/Customer: get all production orders
+        // Admin/Customer: get all production orders (exclude pull_ship and child orders)
         const { data, error } = await supabase
           .from('orders')
           .select(`
@@ -130,6 +132,8 @@ export default function Production() {
             )
           `)
           .eq('status', 'in production')
+          .neq('order_type', 'pull_ship')
+          .is('parent_order_id', null)
           .order('order_date', { ascending: false });
 
         if (error) throw error;
