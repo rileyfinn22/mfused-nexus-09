@@ -404,7 +404,7 @@ const Invoices = () => {
                           <Package className="h-3 w-3" />
                         </div>
                       )}
-                      <div className={`font-medium font-mono text-sm ${isChild ? 'ml-2' : ''} ${!isParent || !hasChildren ? 'ml-8' : ''}`}>{invoice.invoice_number}</div>
+                      <div className={`font-medium font-mono text-base ${isChild ? 'ml-2' : ''} ${!isParent || !hasChildren ? 'ml-8' : ''}`}>{invoice.invoice_number}</div>
                       {showOverdueAlert && (
                         <Badge 
                           variant="outline" 

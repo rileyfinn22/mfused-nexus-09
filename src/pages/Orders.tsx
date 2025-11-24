@@ -462,9 +462,9 @@ const Orders = () => {
                     className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
                   >
                     <div className="col-span-2 space-y-1">
-                      <div className="font-medium font-mono text-sm">{order.order_number}</div>
-                      <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-1 w-fit`}>
-                        <OrderIcon className="h-3 w-3" />
+                      <div className="font-medium font-mono text-base">{order.order_number}</div>
+                      <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit text-xs px-1.5 py-0`}>
+                        <OrderIcon className="h-2.5 w-2.5" />
                         {orderTypeInfo.label}
                       </Badge>
                     </div>
@@ -605,9 +605,9 @@ const Orders = () => {
                     className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
                   >
                     <div className="col-span-2 space-y-1">
-                      <div className="font-medium font-mono text-sm">{order.order_number}</div>
-                      <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-1 w-fit`}>
-                        <OrderIcon className="h-3 w-3" />
+                      <div className="font-medium font-mono text-base">{order.order_number}</div>
+                      <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit text-xs px-1.5 py-0`}>
+                        <OrderIcon className="h-2.5 w-2.5" />
                         {orderTypeInfo.label}
                       </Badge>
                     </div>
