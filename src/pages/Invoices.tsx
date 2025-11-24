@@ -198,21 +198,15 @@ const Invoices = () => {
     return items;
   });
 
-  // Calculate open amount for blanket invoices minus paid down amounts from partials
+  // Calculate open amount - total of all open/partial invoices minus what's been paid
   const blanketInvoices = filteredInvoices.filter(inv => 
     (!inv.invoice_type || inv.invoice_type === 'full') && 
     (inv.status === 'open' || inv.status === 'partial')
   );
   
   const openAmount = blanketInvoices.reduce((sum, blanketInvoice) => {
-    // Get all partial invoices for this blanket
-    const partialInvoices = invoices.filter(inv => inv.parent_invoice_id === blanketInvoice.id);
-    // Sum up total_paid from all partials
-    const totalPaidOnPartials = partialInvoices.reduce((paidSum, partial) => 
-      paidSum + (Number(partial.total_paid) || 0), 0
-    );
-    // Blanket total minus paid on partials
-    const remaining = Number(blanketInvoice.total) - totalPaidOnPartials;
+    // Calculate remaining amount: total minus what's been paid on this invoice
+    const remaining = Number(blanketInvoice.total) - (Number(blanketInvoice.total_paid) || 0);
     return sum + remaining;
   }, 0);
 
@@ -223,14 +217,8 @@ const Invoices = () => {
       (inv.status === 'open' || inv.status === 'partial')
     )
     .reduce((sum, blanketInvoice) => {
-      // Get all partial invoices for this blanket
-      const partialInvoices = invoices.filter(inv => inv.parent_invoice_id === blanketInvoice.id);
-      // Sum up total_paid from all partials
-      const totalPaidOnPartials = partialInvoices.reduce((paidSum, partial) => 
-        paidSum + (Number(partial.total_paid) || 0), 0
-      );
-      // Blanket total minus paid on partials
-      const remaining = Number(blanketInvoice.total) - totalPaidOnPartials;
+      // Calculate remaining amount: total minus what's been paid on this invoice
+      const remaining = Number(blanketInvoice.total) - (Number(blanketInvoice.total_paid) || 0);
       return sum + remaining;
     }, 0);
 
