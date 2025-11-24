@@ -211,9 +211,10 @@ const Invoices = () => {
     return sum + remaining;
   }, 0);
 
-  // Calculate DUE amount - all invoices that are synced to QuickBooks and have open/partial status
+  // Calculate DUE amount - partial invoices that are synced to QuickBooks with open/partial status
+  // Exclude blanket invoices (invoice_type === 'full') as they're placeholders
   const dueAmount = openInvoices
-    .filter(inv => inv.quickbooks_sync_status === 'synced')
+    .filter(inv => inv.quickbooks_sync_status === 'synced' && inv.invoice_type !== 'full')
     .reduce((sum, invoice) => {
       // Calculate remaining amount: total minus what's been paid on this invoice
       const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
