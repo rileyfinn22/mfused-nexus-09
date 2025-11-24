@@ -261,11 +261,11 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       const shipping = invoiceMode === 'deposit' ? 0 : (parseFloat(shippingCost) || 0);
       const total = subtotal + shipping;
       
-      // Create child invoice linked to blanket invoice - get next sequence number
-      const { count: invoiceCount } = await supabase
-        .from('invoices')
-        .select('*', { count: 'exact', head: true });
-      const invoiceNumber = generateInvoiceNumber((invoiceCount || 0) + 1);
+      // Create child invoice linked to blanket invoice - use parent number with suffix
+      // Partial invoices use format: {parent_invoice_number}-{shipment_number-1}
+      // e.g., 10707-01, 10707-02, etc.
+      const shipmentSuffix = String(nextShipmentNumber - 1).padStart(2, '0');
+      const invoiceNumber = `${blanketInvoice.invoice_number}-${shipmentSuffix}`;
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
