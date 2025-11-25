@@ -85,7 +85,8 @@ const VendorPODetail = () => {
     const { data: itemsData } = await supabase
       .from('vendor_po_items')
       .select('*')
-      .eq('vendor_po_id', poId);
+      .eq('vendor_po_id', poId)
+      .order('created_at', { ascending: true });
 
     if (itemsData) {
       setPOItems(itemsData);
