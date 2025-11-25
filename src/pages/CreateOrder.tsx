@@ -90,6 +90,7 @@ const CreateOrder = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [matchingProductId, setMatchingProductId] = useState<Record<string, string>>({});
   const [openCombobox, setOpenCombobox] = useState<Record<string, boolean>>({});
+  const [currentCustomerId, setCurrentCustomerId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -127,6 +128,26 @@ const CreateOrder = () => {
       loadExistingOrder(orderId);
     }
   }, [orderId, isVibeAdmin]);
+
+  // Fetch customer ID when customer name changes
+  useEffect(() => {
+    const fetchCustomerId = async () => {
+      if (!formData.customerName) {
+        setCurrentCustomerId(null);
+        return;
+      }
+      
+      const { data } = await supabase
+        .from('customers')
+        .select('id')
+        .ilike('name', formData.customerName)
+        .maybeSingle();
+      
+      setCurrentCustomerId(data?.id || null);
+    };
+    
+    fetchCustomerId();
+  }, [formData.customerName]);
 
   const loadUserCompanyInfo = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -399,9 +420,16 @@ const CreateOrder = () => {
   };
 
   // Filter products based on selected company (for vibe admins) or show all (for regular users)
+  // Also include products with matching customer_id regardless of company
   const availableProducts = isVibeAdmin && selectedCompanyId
-    ? products.filter(p => p.company_id === selectedCompanyId)
-    : products;
+    ? products.filter(p => 
+        p.company_id === selectedCompanyId || 
+        (currentCustomerId && p.customer_id === currentCustomerId)
+      )
+    : products.filter(p => 
+        !p.customer_id || 
+        (currentCustomerId && p.customer_id === currentCustomerId)
+      );
 
   const fetchSavedAddresses = async () => {
     if (!isVibeAdmin) {
