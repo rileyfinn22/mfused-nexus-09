@@ -420,11 +420,16 @@ const CustomerDetail = () => {
   };
 
   const handleUpdateProduct = async () => {
+    console.log("=== UPDATING PRODUCT ===");
+    console.log("Form data:", productFormData);
+    console.log("Editing product ID:", editingProduct?.id);
+    
     try {
       setCreatingProduct(true);
       setProductFormErrors({});
       
       const validated = productSchema.parse(productFormData);
+      console.log("Validated data:", validated);
 
       const productData = {
         name: validated.name,
@@ -434,11 +439,15 @@ const CustomerDetail = () => {
         price: validated.price ? parseFloat(validated.price) : null,
         cost: validated.cost ? parseFloat(validated.cost) : null,
       };
+      console.log("Product data to update:", productData);
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('products')
         .update(productData)
-        .eq('id', editingProduct.id);
+        .eq('id', editingProduct.id)
+        .select();
+
+      console.log("Update result:", { data, error });
 
       if (error) throw error;
 
