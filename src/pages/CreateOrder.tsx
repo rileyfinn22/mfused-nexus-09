@@ -90,7 +90,6 @@ const CreateOrder = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [matchingProductId, setMatchingProductId] = useState<Record<string, string>>({});
   const [openCombobox, setOpenCombobox] = useState<Record<string, boolean>>({});
-  const [currentCustomerId, setCurrentCustomerId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -128,46 +127,6 @@ const CreateOrder = () => {
       loadExistingOrder(orderId);
     }
   }, [orderId, isVibeAdmin]);
-
-  // Fetch customer ID when customer name changes, matching by company
-  useEffect(() => {
-    const fetchCustomerId = async () => {
-      if (!formData.customerName) {
-        setCurrentCustomerId(null);
-        return;
-      }
-      
-      // Get company ID context
-      let companyId = selectedCompanyId;
-      if (!isVibeAdmin) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: userRole } = await supabase
-            .from('user_roles')
-            .select('company_id')
-            .eq('user_id', user.id)
-            .single();
-          companyId = userRole?.company_id || '';
-        }
-      }
-      
-      if (!companyId) {
-        setCurrentCustomerId(null);
-        return;
-      }
-      
-      const { data } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('company_id', companyId)
-        .ilike('name', formData.customerName)
-        .maybeSingle();
-      
-      setCurrentCustomerId(data?.id || null);
-    };
-    
-    fetchCustomerId();
-  }, [formData.customerName, selectedCompanyId, isVibeAdmin]);
 
   const loadUserCompanyInfo = async () => {
     const { data: { user } } = await supabase.auth.getUser();
