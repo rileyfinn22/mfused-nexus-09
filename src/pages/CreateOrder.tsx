@@ -90,7 +90,6 @@ const CreateOrder = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [matchingProductId, setMatchingProductId] = useState<Record<string, string>>({});
   const [openCombobox, setOpenCombobox] = useState<Record<string, boolean>>({});
-  const [currentCustomerId, setCurrentCustomerId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -129,45 +128,32 @@ const CreateOrder = () => {
     }
   }, [orderId, isVibeAdmin]);
 
-  // Fetch customer ID when customer name changes, matching by company
+  // Customer name = Company name - look up the company by name
   useEffect(() => {
-    const fetchCustomerId = async () => {
+    const fetchCompanyByCustomerName = async () => {
       if (!formData.customerName) {
-        setCurrentCustomerId(null);
+        setSelectedCompanyId('');
         return;
       }
       
-      // Get company ID context
-      let companyId = selectedCompanyId;
-      if (!isVibeAdmin) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: userRole } = await supabase
-            .from('user_roles')
-            .select('company_id')
-            .eq('user_id', user.id)
-            .single();
-          companyId = userRole?.company_id || '';
-        }
-      }
-      
-      if (!companyId) {
-        setCurrentCustomerId(null);
+      // Don't auto-change if vibe admin manually selected a company
+      if (isVibeAdmin && selectedCompanyId) {
         return;
       }
       
       const { data } = await supabase
-        .from('customers')
+        .from('companies')
         .select('id')
-        .eq('company_id', companyId)
         .ilike('name', formData.customerName)
         .maybeSingle();
       
-      setCurrentCustomerId(data?.id || null);
+      if (data?.id) {
+        setSelectedCompanyId(data.id);
+      }
     };
     
-    fetchCustomerId();
-  }, [formData.customerName, selectedCompanyId, isVibeAdmin]);
+    fetchCompanyByCustomerName();
+  }, [formData.customerName, isVibeAdmin]);
 
   const loadUserCompanyInfo = async () => {
     const { data: { user } } = await supabase.auth.getUser();
