@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -91,6 +91,7 @@ const CustomerDetail = () => {
     cost: "",
   });
   const [productFormErrors, setProductFormErrors] = useState<Record<string, string>>({});
+  const [productSearchQuery, setProductSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -880,17 +881,36 @@ const CustomerDetail = () => {
                   </Button>
                 </div>
               </div>
+              <div className="relative mt-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search products by name or item ID..."
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </CardHeader>
             <CardContent>
-              {customerProducts.length === 0 ? (
+              {customerProducts.filter(product => {
+                const query = productSearchQuery.toLowerCase();
+                return product.name.toLowerCase().includes(query) ||
+                       product.item_id?.toLowerCase().includes(query) ||
+                       product.description?.toLowerCase().includes(query);
+              }).length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No products linked yet</p>
-                  <p className="text-sm mt-2">Click "Add Products" to get started</p>
+                  <p>{productSearchQuery ? 'No products match your search' : 'No products linked yet'}</p>
+                  <p className="text-sm mt-2">{productSearchQuery ? 'Try a different search term' : 'Click "Add Products" to get started'}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {customerProducts.map((product) => (
+                  {customerProducts.filter(product => {
+                    const query = productSearchQuery.toLowerCase();
+                    return product.name.toLowerCase().includes(query) ||
+                           product.item_id?.toLowerCase().includes(query) ||
+                           product.description?.toLowerCase().includes(query);
+                  }).map((product) => (
                     <div
                       key={product.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
