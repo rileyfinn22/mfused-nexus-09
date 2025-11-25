@@ -129,7 +129,7 @@ const CreateOrder = () => {
     }
   }, [orderId, isVibeAdmin]);
 
-  // Fetch customer ID when customer name changes
+  // Fetch customer ID when customer name changes, matching by company
   useEffect(() => {
     const fetchCustomerId = async () => {
       if (!formData.customerName) {
@@ -137,9 +137,29 @@ const CreateOrder = () => {
         return;
       }
       
+      // Get company ID context
+      let companyId = selectedCompanyId;
+      if (!isVibeAdmin) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: userRole } = await supabase
+            .from('user_roles')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single();
+          companyId = userRole?.company_id || '';
+        }
+      }
+      
+      if (!companyId) {
+        setCurrentCustomerId(null);
+        return;
+      }
+      
       const { data } = await supabase
         .from('customers')
         .select('id')
+        .eq('company_id', companyId)
         .ilike('name', formData.customerName)
         .maybeSingle();
       
@@ -147,7 +167,7 @@ const CreateOrder = () => {
     };
     
     fetchCustomerId();
-  }, [formData.customerName]);
+  }, [formData.customerName, selectedCompanyId, isVibeAdmin]);
 
   const loadUserCompanyInfo = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -419,17 +439,10 @@ const CreateOrder = () => {
     }
   };
 
-  // Filter products based on selected company (for vibe admins) or show all (for regular users)
-  // Also include products with matching customer_id regardless of company
+  // Filter products based on company context - customer-specific products only show if customer belongs to same company
   const availableProducts = isVibeAdmin && selectedCompanyId
-    ? products.filter(p => 
-        p.company_id === selectedCompanyId || 
-        (currentCustomerId && p.customer_id === currentCustomerId)
-      )
-    : products.filter(p => 
-        !p.customer_id || 
-        (currentCustomerId && p.customer_id === currentCustomerId)
-      );
+    ? products.filter(p => p.company_id === selectedCompanyId)
+    : products;
 
   const fetchSavedAddresses = async () => {
     if (!isVibeAdmin) {
