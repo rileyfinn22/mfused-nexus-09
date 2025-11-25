@@ -106,8 +106,25 @@ serve(async (req) => {
       .eq('company_id', vendorPo.company_id)
       .single();
 
+    // If QuickBooks not connected, update status and skip sync gracefully
     if (qbError || !qbSettings || !qbSettings.is_connected) {
-      throw new Error('QuickBooks not connected');
+      console.log('QuickBooks not connected, skipping sync');
+      
+      await supabase
+        .from('vendor_pos')
+        .update({ 
+          quickbooks_sync_status: 'not_connected',
+        })
+        .eq('id', vendorPoId);
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          skipped: true, 
+          reason: 'QuickBooks not connected' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Decrypt tokens from vault (fallback to plain text for backwards compatibility)
