@@ -202,10 +202,24 @@ const Invoices = () => {
     return items;
   });
 
-  // Calculate open amount - all invoices (full and partial) with open/partial status
-  const openInvoices = filteredInvoices.filter(inv => 
-    inv.status === 'open' || inv.status === 'partial'
-  );
+  // Calculate open amount - only count partial invoices OR full invoices without children
+  // This avoids double-counting parent invoices and their partial children
+  const openInvoices = filteredInvoices.filter(inv => {
+    const hasOpenOrPartialStatus = inv.status === 'open' || inv.status === 'partial';
+    if (!hasOpenOrPartialStatus) return false;
+    
+    // If it's a partial invoice, always count it
+    if (inv.invoice_type === 'partial') return true;
+    
+    // If it's a full invoice, only count it if it has no children
+    if (inv.invoice_type === 'full') {
+      const hasChildren = filteredInvoices.some(child => child.parent_invoice_id === inv.id);
+      return !hasChildren;
+    }
+    
+    // For any other invoice type, count it
+    return true;
+  });
   
   const openAmount = openInvoices.reduce((sum, invoice) => {
     // Calculate remaining amount: total minus what's been paid on this invoice
