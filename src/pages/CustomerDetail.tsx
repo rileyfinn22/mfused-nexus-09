@@ -421,15 +421,16 @@ const CustomerDetail = () => {
 
   const handleUpdateProduct = async () => {
     console.log("=== UPDATING PRODUCT ===");
-    console.log("Form data:", productFormData);
+    console.log("Form data:", JSON.stringify(productFormData, null, 2));
     console.log("Editing product ID:", editingProduct?.id);
     
     try {
       setCreatingProduct(true);
       setProductFormErrors({});
       
+      console.log("Validating form data...");
       const validated = productSchema.parse(productFormData);
-      console.log("Validated data:", validated);
+      console.log("Validated data:", JSON.stringify(validated, null, 2));
 
       const productData = {
         name: validated.name,
@@ -439,7 +440,7 @@ const CustomerDetail = () => {
         price: validated.price ? parseFloat(validated.price) : null,
         cost: validated.cost ? parseFloat(validated.cost) : null,
       };
-      console.log("Product data to update:", productData);
+      console.log("Product data to update:", JSON.stringify(productData, null, 2));
 
       const { data, error } = await supabase
         .from('products')
@@ -447,7 +448,8 @@ const CustomerDetail = () => {
         .eq('id', editingProduct.id)
         .select();
 
-      console.log("Update result:", { data, error });
+      console.log("Update result - data:", data);
+      console.log("Update result - error:", error);
 
       if (error) throw error;
 
@@ -470,7 +472,9 @@ const CustomerDetail = () => {
       fetchCustomerProducts();
       fetchProducts();
     } catch (error: any) {
+      console.error("Error in handleUpdateProduct:", error);
       if (error instanceof z.ZodError) {
+        console.log("Validation errors:", error.errors);
         const errors: Record<string, string> = {};
         error.errors.forEach((err) => {
           if (err.path[0]) {
