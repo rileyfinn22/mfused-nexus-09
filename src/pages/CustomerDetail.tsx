@@ -451,7 +451,18 @@ const CustomerDetail = () => {
       console.log("Update result - data:", data);
       console.log("Update result - error:", error);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Database error:", error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        const permissionError = new Error("Update failed - no rows returned. This usually means RLS policies are blocking the update or the product doesn't exist.");
+        console.error(permissionError);
+        throw permissionError;
+      }
+
+      console.log("Update successful! Updated product:", data[0]);
 
       toast({
         title: "Product updated",
