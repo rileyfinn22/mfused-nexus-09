@@ -92,7 +92,12 @@ const OrderDetail = () => {
     const {
       data,
       error
-    } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).single();
+    } = await supabase
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('id', orderId)
+      .order('created_at', { ascending: true, foreignTable: 'order_items' })
+      .single();
     if (!error && data) {
       setOrder(data);
       setEditedOrder(data);
