@@ -144,8 +144,17 @@ const InvoiceDetail = () => {
         *,
         vendors(name, contact_name, contact_email),
         vendor_po_items(*)
-      `).eq('order_id', invoiceData.order_id);
+      `).eq('order_id', invoiceData.order_id).order('created_at', { ascending: true });
+    
+    // Sort vendor_po_items by created_at for each PO
     if (vendorPOData) {
+      vendorPOData.forEach(po => {
+        if (po.vendor_po_items) {
+          po.vendor_po_items.sort((a, b) => 
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        }
+      });
       setVendorPOs(vendorPOData);
     }
 
