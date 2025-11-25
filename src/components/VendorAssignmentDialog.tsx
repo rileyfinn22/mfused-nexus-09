@@ -58,7 +58,7 @@ export const VendorAssignmentDialog = ({
       .from('order_items')
       .select('*')
       .eq('order_id', orderId)
-      .not('product_id', 'is', null); // Only fetch items that have been matched to products
+      .order('created_at', { ascending: true }); // Get all items in consistent order
     
     console.log('Fetched order items:', data);
     console.log('Fetch error:', error);
@@ -143,7 +143,44 @@ export const VendorAssignmentDialog = ({
 
       if (!order) throw new Error("Order not found");
 
-      // Update order item with vendor info
+      // Check if item was previously assigned to a different vendor
+      const oldVendorId = item.vendor_id;
+      const isVendorChange = oldVendorId && oldVendorId !== assignment.vendorId;
+
+      // Remove from old vendor's PO if vendor changed
+      if (isVendorChange) {
+        // Find and delete old vendor PO item
+        const { data: oldPOItem } = await supabase
+          .from('vendor_po_items')
+          .select('id, vendor_po_id, total')
+          .eq('order_item_id', itemId)
+          .maybeSingle();
+
+        if (oldPOItem) {
+          // Delete the old PO item
+          await supabase
+            .from('vendor_po_items')
+            .delete()
+            .eq('id', oldPOItem.id);
+
+          // Update old vendor PO total
+          const { data: oldPO } = await supabase
+            .from('vendor_pos')
+            .select('total')
+            .eq('id', oldPOItem.vendor_po_id)
+            .single();
+
+          if (oldPO) {
+            const newOldTotal = Number(oldPO.total) - Number(oldPOItem.total);
+            await supabase
+              .from('vendor_pos')
+              .update({ total: Math.max(0, newOldTotal) })
+              .eq('id', oldPOItem.vendor_po_id);
+          }
+        }
+      }
+
+      // Update order item with new vendor info
       const { error: itemError } = await supabase
         .from('order_items')
         .update({
@@ -166,10 +203,12 @@ export const VendorAssignmentDialog = ({
         .eq('vendor_id', assignment.vendorId)
         .maybeSingle();
 
+      const newItemTotal = parseFloat(assignment.vendorCost) * item.quantity;
+
       if (existingPO) {
         vendorPO = existingPO;
         
-        // Check if this item already has a vendor PO item entry
+        // Check if this item already has a vendor PO item entry for this vendor
         const { data: existingPOItem } = await supabase
           .from('vendor_po_items')
           .select('*')
@@ -177,14 +216,11 @@ export const VendorAssignmentDialog = ({
           .eq('order_item_id', itemId)
           .maybeSingle();
 
-        let totalAdjustment;
         if (existingPOItem) {
-          // Item already exists, calculate the difference
+          // Update existing item - recalculate adjustment
           const oldItemTotal = Number(existingPOItem.total);
-          const newItemTotal = parseFloat(assignment.vendorCost) * item.quantity;
-          totalAdjustment = newItemTotal - oldItemTotal;
+          const totalAdjustment = newItemTotal - oldItemTotal;
           
-          // Update the existing PO item
           await supabase
             .from('vendor_po_items')
             .update({
@@ -192,11 +228,15 @@ export const VendorAssignmentDialog = ({
               total: newItemTotal
             })
             .eq('id', existingPOItem.id);
+
+          // Update PO total
+          const newTotal = Number(existingPO.total) + totalAdjustment;
+          await supabase
+            .from('vendor_pos')
+            .update({ total: newTotal })
+            .eq('id', existingPO.id);
         } else {
-          // New item, just add to total
-          totalAdjustment = parseFloat(assignment.vendorCost) * item.quantity;
-          
-        // Create new vendor PO item
+          // Create new PO item for this vendor
           await supabase
             .from('vendor_po_items')
             .insert({
@@ -208,16 +248,16 @@ export const VendorAssignmentDialog = ({
               quantity: item.quantity,
               shipped_quantity: item.quantity,
               unit_cost: parseFloat(assignment.vendorCost),
-              total: parseFloat(assignment.vendorCost) * item.quantity
+              total: newItemTotal
             } as any);
+
+          // Update PO total
+          const newTotal = Number(existingPO.total) + newItemTotal;
+          await supabase
+            .from('vendor_pos')
+            .update({ total: newTotal })
+            .eq('id', existingPO.id);
         }
-        
-        // Update PO total
-        const newTotal = Number(existingPO.total) + totalAdjustment;
-        await supabase
-          .from('vendor_pos')
-          .update({ total: newTotal })
-          .eq('id', existingPO.id);
       } else {
         // Create new vendor PO
         const poNumber = generatePONumber();
@@ -228,7 +268,7 @@ export const VendorAssignmentDialog = ({
             order_id: orderId,
             vendor_id: assignment.vendorId,
             po_number: poNumber,
-            total: parseFloat(assignment.vendorCost) * item.quantity,
+            total: newItemTotal,
             status: 'draft'
           })
           .select()
@@ -249,38 +289,10 @@ export const VendorAssignmentDialog = ({
             quantity: item.quantity,
             shipped_quantity: item.quantity,
             unit_cost: parseFloat(assignment.vendorCost),
-            total: parseFloat(assignment.vendorCost) * item.quantity
+            total: newItemTotal
           } as any);
       }
 
-      // Update invoice if it exists
-      const { data: invoice } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('order_id', orderId)
-        .maybeSingle();
-
-      if (invoice) {
-        // Recalculate invoice totals including vendor costs
-        const { data: allItems } = await supabase
-          .from('order_items')
-          .select('*')
-          .eq('order_id', orderId);
-
-        if (allItems) {
-          const totalCOG = allItems.reduce((sum, i) => {
-            return sum + (i.vendor_cost ? Number(i.vendor_cost) * i.quantity : 0);
-          }, 0);
-          
-          await supabase
-            .from('invoices')
-            .update({ 
-              subtotal: invoice.subtotal,
-              total: invoice.total
-            })
-            .eq('id', invoice.id);
-        }
-      }
 
       // Mark as assigned and save PO info
       setAssignments(prev => ({
@@ -293,9 +305,12 @@ export const VendorAssignmentDialog = ({
         }
       }));
 
+      // Refetch order items to show updated vendor assignments
+      await refetchOrderItems();
+
       toast({
         title: "Success",
-        description: "Vendor assigned and PO created"
+        description: "Vendor assigned and PO updated"
       });
 
       // Auto-sync to QuickBooks if connected
@@ -385,7 +400,41 @@ export const VendorAssignmentDialog = ({
       const items = freshOrderItems.length > 0 ? freshOrderItems : orderItems;
       for (const itemId of Array.from(selectedItems)) {
         const item = items.find(i => i.id === itemId);
-        if (!item || assignments[itemId]?.assigned) continue;
+        if (!item) continue;
+
+        // Check if item was previously assigned to a different vendor
+        const oldVendorId = item.vendor_id;
+        const isVendorChange = oldVendorId && oldVendorId !== bulkVendorId;
+
+        // Remove from old vendor's PO if vendor changed
+        if (isVendorChange) {
+          const { data: oldPOItem } = await supabase
+            .from('vendor_po_items')
+            .select('id, vendor_po_id, total')
+            .eq('order_item_id', itemId)
+            .maybeSingle();
+
+          if (oldPOItem) {
+            await supabase
+              .from('vendor_po_items')
+              .delete()
+              .eq('id', oldPOItem.id);
+
+            const { data: oldPO } = await supabase
+              .from('vendor_pos')
+              .select('total')
+              .eq('id', oldPOItem.vendor_po_id)
+              .single();
+
+            if (oldPO) {
+              const newOldTotal = Number(oldPO.total) - Number(oldPOItem.total);
+              await supabase
+                .from('vendor_pos')
+                .update({ total: Math.max(0, newOldTotal) })
+                .eq('id', oldPOItem.vendor_po_id);
+            }
+          }
+        }
 
         // Update order item with vendor info
         await supabase
@@ -405,14 +454,59 @@ export const VendorAssignmentDialog = ({
           .eq('vendor_id', bulkVendorId)
           .maybeSingle();
 
+        const newItemTotal = parseFloat(bulkCost) * item.quantity;
+
         if (existingPO) {
           vendorPO = existingPO;
-          // Update total
-          const newTotal = Number(existingPO.total) + (parseFloat(bulkCost) * item.quantity);
-          await supabase
-            .from('vendor_pos')
-            .update({ total: newTotal })
-            .eq('id', existingPO.id);
+          
+          // Check if this item already has a PO item for this vendor
+          const { data: existingPOItem } = await supabase
+            .from('vendor_po_items')
+            .select('*')
+            .eq('vendor_po_id', existingPO.id)
+            .eq('order_item_id', itemId)
+            .maybeSingle();
+
+          if (existingPOItem) {
+            // Update existing item
+            const oldItemTotal = Number(existingPOItem.total);
+            const totalAdjustment = newItemTotal - oldItemTotal;
+            
+            await supabase
+              .from('vendor_po_items')
+              .update({
+                unit_cost: parseFloat(bulkCost),
+                total: newItemTotal
+              })
+              .eq('id', existingPOItem.id);
+
+            const newTotal = Number(existingPO.total) + totalAdjustment;
+            await supabase
+              .from('vendor_pos')
+              .update({ total: newTotal })
+              .eq('id', existingPO.id);
+          } else {
+            // Create new PO item
+            await supabase
+              .from('vendor_po_items')
+              .insert({
+                vendor_po_id: vendorPO.id,
+                order_item_id: itemId,
+                sku: item.sku,
+                name: item.name,
+                description: item.description || null,
+                quantity: item.quantity,
+                shipped_quantity: item.quantity,
+                unit_cost: parseFloat(bulkCost),
+                total: newItemTotal
+              } as any);
+
+            const newTotal = Number(existingPO.total) + newItemTotal;
+            await supabase
+              .from('vendor_pos')
+              .update({ total: newTotal })
+              .eq('id', existingPO.id);
+          }
         } else {
           // Create new vendor PO
           const poNumber = generatePONumber();
@@ -423,7 +517,7 @@ export const VendorAssignmentDialog = ({
               order_id: orderId,
               vendor_id: bulkVendorId,
               po_number: poNumber,
-              total: parseFloat(bulkCost) * item.quantity,
+              total: newItemTotal,
               status: 'draft'
             })
             .select()
@@ -431,22 +525,22 @@ export const VendorAssignmentDialog = ({
 
           if (poError) throw poError;
           vendorPO = newPO;
-        }
 
-        // Create vendor PO item
-        await supabase
-          .from('vendor_po_items')
-          .insert({
-            vendor_po_id: vendorPO.id,
-            order_item_id: itemId,
-            sku: item.sku,
-            name: item.name,
-            description: item.description || null,
-            quantity: item.quantity,
-            shipped_quantity: item.quantity,
-            unit_cost: parseFloat(bulkCost),
-            total: parseFloat(bulkCost) * item.quantity
-          } as any);
+          // Create vendor PO item
+          await supabase
+            .from('vendor_po_items')
+            .insert({
+              vendor_po_id: vendorPO.id,
+              order_item_id: itemId,
+              sku: item.sku,
+              name: item.name,
+              description: item.description || null,
+              quantity: item.quantity,
+              shipped_quantity: item.quantity,
+              unit_cost: parseFloat(bulkCost),
+              total: newItemTotal
+            } as any);
+        }
 
         // Mark as assigned
         setAssignments(prev => ({
@@ -454,10 +548,15 @@ export const VendorAssignmentDialog = ({
           [itemId]: { 
             vendorId: bulkVendorId,
             vendorCost: bulkCost,
-            assigned: true 
+            assigned: true,
+            vendorPoId: vendorPO.id,
+            vendorPoNumber: vendorPO.po_number
           }
         }));
       }
+
+      // Refetch order items to show updated vendor assignments
+      await refetchOrderItems();
 
       // Clear selections and bulk fields
       setSelectedItems(new Set());
@@ -466,7 +565,7 @@ export const VendorAssignmentDialog = ({
 
       toast({
         title: "Success",
-        description: `Assigned vendor to ${selectedItems.size} product(s)`
+        description: `Assigned vendor to ${selectedItems.size} product(s) and updated POs`
       });
     } catch (error: any) {
       console.error("Error bulk assigning vendor:", error);
