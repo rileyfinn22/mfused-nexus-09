@@ -15,6 +15,10 @@ import autoTable from "jspdf-autotable";
 const VendorPODetail = () => {
   const { poId } = useParams();
   const navigate = useNavigate();
+  
+  // Get returnTo parameter from URL to navigate back properly
+  const searchParams = new URLSearchParams(window.location.search);
+  const returnTo = searchParams.get('returnTo') || '/vendor-pos';
   const [po, setPO] = useState<any>(null);
   const [poItems, setPOItems] = useState<any[]>([]);
   const [vendor, setVendor] = useState<any>(null);
@@ -252,9 +256,9 @@ const VendorPODetail = () => {
     <div className="max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/vendor-pos")}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(returnTo)}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Vendor POs
+          Back
         </Button>
         <div className="flex gap-3">
           {isAdmin && (
