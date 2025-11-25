@@ -766,6 +766,7 @@ const CreateOrder = () => {
 
       let order;
       let orderNumber = existingOrderNumber;
+      let existingItemsMap: Map<string, any> | null = null;
 
       if (orderId) {
         // Update existing order
@@ -800,8 +801,16 @@ const CreateOrder = () => {
         if (orderError) throw orderError;
         order = updatedOrder;
 
-        // Delete existing order items
-        await supabase.from('order_items').delete().eq('order_id', orderId);
+        // Fetch existing order items to preserve vendor assignments
+        const { data: existingItems } = await supabase
+          .from('order_items')
+          .select('*')
+          .eq('order_id', orderId);
+
+        // Track which existing items are still in the order
+        existingItemsMap = new Map(
+          (existingItems || []).map(item => [item.product_id, item])
+        );
       } else {
         // Create new order with sequential number starting from 10700
         const { count } = await supabase
@@ -845,31 +854,86 @@ const CreateOrder = () => {
         order = newOrder;
       }
 
-      const orderItems = selectedItems.map(item => {
-        const product = products.find(p => p.id === item.productId);
-        // Use stored unit_price if available (from PO), otherwise use product cost
-        const price = item.unit_price ?? product?.cost ?? 0;
-        const itemTotal = price * item.quantity;
+      if (orderId && existingItemsMap) {
+        // Update existing items and add new ones, preserving vendor assignments
+        for (const item of selectedItems) {
+          const product = products.find(p => p.id === item.productId);
+          const price = item.unit_price ?? product?.cost ?? 0;
+          const itemTotal = price * item.quantity;
+          
+          const existingItem = existingItemsMap.get(item.productId);
+          
+          if (existingItem) {
+            // Update existing item, preserving vendor data and shipped_quantity
+            await supabase
+              .from('order_items')
+              .update({
+                quantity: item.quantity,
+                unit_price: price,
+                total: itemTotal,
+                sku: product?.item_id || existingItem.sku,
+                item_id: product?.item_id || existingItem.item_id,
+                name: product?.name || existingItem.name,
+                description: product?.description || existingItem.description,
+              })
+              .eq('id', existingItem.id);
+            
+            // Remove from map so we know it's been handled
+            existingItemsMap.delete(item.productId);
+          } else {
+            // Insert new item
+            await supabase
+              .from('order_items')
+              .insert({
+                order_id: order.id,
+                product_id: item.productId,
+                sku: product?.item_id || `SKU-${product?.id.substring(0, 8)}`,
+                item_id: product?.item_id || null,
+                name: product?.name || "",
+                description: product?.description || null,
+                quantity: item.quantity,
+                shipped_quantity: 0,
+                unit_price: price,
+                total: itemTotal,
+              });
+          }
+        }
         
-        return {
-          order_id: order.id,
-          product_id: item.productId,
-          sku: product?.item_id || `SKU-${product?.id.substring(0, 8)}`, // Use product's actual SKU (item_id) if available
-          item_id: product?.item_id || null,
-          name: product?.name || "",
-          description: product?.description || null,
-          quantity: item.quantity,
-          shipped_quantity: 0, // Start at 0, will be updated when invoiced or Pull & Ship orders approved
-          unit_price: price,
-          total: itemTotal,
-        };
-      });
+        // Delete items that are no longer in the order
+        const itemsToDelete = Array.from(existingItemsMap.values());
+        if (itemsToDelete.length > 0) {
+          await supabase
+            .from('order_items')
+            .delete()
+            .in('id', itemsToDelete.map(i => i.id));
+        }
+      } else {
+        // New order - insert all items
+        const orderItems = selectedItems.map(item => {
+          const product = products.find(p => p.id === item.productId);
+          const price = item.unit_price ?? product?.cost ?? 0;
+          const itemTotal = price * item.quantity;
+          
+          return {
+            order_id: order.id,
+            product_id: item.productId,
+            sku: product?.item_id || `SKU-${product?.id.substring(0, 8)}`,
+            item_id: product?.item_id || null,
+            name: product?.name || "",
+            description: product?.description || null,
+            quantity: item.quantity,
+            shipped_quantity: 0,
+            unit_price: price,
+            total: itemTotal,
+          };
+        });
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(orderItems);
 
-      if (itemsError) throw itemsError;
+        if (itemsError) throw itemsError;
+      }
 
       const actionText = orderId 
         ? (isDraft ? "updated as draft" : "updated")
