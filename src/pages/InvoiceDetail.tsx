@@ -72,7 +72,9 @@ const InvoiceDetail = () => {
     const {
       data: invoiceData,
       error: invoiceError
-    } = await supabase.from('invoices').select(`
+    } = await supabase
+      .from('invoices')
+      .select(`
         *,
         orders(
           *,
@@ -80,7 +82,10 @@ const InvoiceDetail = () => {
           parent_order:parent_order_id(id, order_number, order_type)
         ),
         companies!company_id(name)
-      `).eq('id', invoiceId).single();
+      `)
+      .eq('id', invoiceId)
+      .order('created_at', { ascending: true, foreignTable: 'orders.order_items' })
+      .single();
     if (invoiceError || !invoiceData) {
       console.error('Invoice fetch error:', invoiceError);
       toast({
@@ -98,11 +103,16 @@ const InvoiceDetail = () => {
     // Fetch inventory allocations for this invoice to get actual pulled items
     const {
       data: allocationsData
-    } = await supabase.from('inventory_allocations').select(`
+    } = await supabase
+      .from('inventory_allocations')
+      .select(`
         *,
         order_items(id, name, sku, unit_price, quantity, shipped_quantity, item_id, description),
         inventory(state, available)
-      `).eq('invoice_id', invoiceId);
+      `)
+      .eq('invoice_id', invoiceId)
+      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: true, foreignTable: 'order_items' });
     if (allocationsData) {
       setInventoryAllocations(allocationsData);
 
