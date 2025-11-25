@@ -73,7 +73,9 @@ const CustomerDetail = () => {
   const [showCreateProductDialog, setShowCreateProductDialog] = useState(false);
   const [showEditProductDialog, setShowEditProductDialog] = useState(false);
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
+  const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [creatingProduct, setCreatingProduct] = useState(false);
   const [uploadingBulk, setUploadingBulk] = useState(false);
@@ -395,6 +397,7 @@ const CustomerDetail = () => {
     console.log("Product item_id type:", typeof product.item_id);
     
     setEditingProduct(product);
+    setHasUnsavedChanges(false);
     const formData = {
       name: product.name || "",
       state: product.state || "general",
@@ -446,6 +449,7 @@ const CustomerDetail = () => {
 
       setShowEditProductDialog(false);
       setEditingProduct(null);
+      setHasUnsavedChanges(false);
       setProductFormData({
         name: "",
         state: "",
@@ -1204,9 +1208,12 @@ const CustomerDetail = () => {
 
       {/* Edit Product Dialog */}
       <Dialog open={showEditProductDialog} onOpenChange={(open) => {
-        if (!open) {
+        if (!open && hasUnsavedChanges) {
+          setShowUnsavedChangesDialog(true);
+        } else if (!open) {
           setShowEditProductDialog(false);
           setEditingProduct(null);
+          setHasUnsavedChanges(false);
           setProductFormData({
             name: "",
             state: "",
@@ -1233,7 +1240,10 @@ const CustomerDetail = () => {
                 <Input
                   id="edit_product_name"
                   value={productFormData.name}
-                  onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
+                  onChange={(e) => {
+                    setProductFormData({ ...productFormData, name: e.target.value });
+                    setHasUnsavedChanges(true);
+                  }}
                 />
                 {productFormErrors.name && <p className="text-sm text-destructive mt-1">{productFormErrors.name}</p>}
               </div>
@@ -1241,7 +1251,10 @@ const CustomerDetail = () => {
                 <Label htmlFor="edit_product_state">State *</Label>
                 <Select
                   value={productFormData.state}
-                  onValueChange={(value) => setProductFormData({ ...productFormData, state: value })}
+                  onValueChange={(value) => {
+                    setProductFormData({ ...productFormData, state: value });
+                    setHasUnsavedChanges(true);
+                  }}
                 >
                   <SelectTrigger id="edit_product_state">
                     <SelectValue placeholder="Select state" />
@@ -1310,7 +1323,10 @@ const CustomerDetail = () => {
                 <Input
                   id="edit_product_item_id"
                   value={productFormData.item_id}
-                  onChange={(e) => setProductFormData({ ...productFormData, item_id: e.target.value })}
+                  onChange={(e) => {
+                    setProductFormData({ ...productFormData, item_id: e.target.value });
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </div>
               <div>
@@ -1320,7 +1336,10 @@ const CustomerDetail = () => {
                   type="number"
                   step="0.01"
                   value={productFormData.price}
-                  onChange={(e) => setProductFormData({ ...productFormData, price: e.target.value })}
+                  onChange={(e) => {
+                    setProductFormData({ ...productFormData, price: e.target.value });
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </div>
             </div>
@@ -1332,7 +1351,10 @@ const CustomerDetail = () => {
                 type="number"
                 step="0.01"
                 value={productFormData.cost}
-                onChange={(e) => setProductFormData({ ...productFormData, cost: e.target.value })}
+                onChange={(e) => {
+                  setProductFormData({ ...productFormData, cost: e.target.value });
+                  setHasUnsavedChanges(true);
+                }}
               />
             </div>
 
@@ -1341,7 +1363,10 @@ const CustomerDetail = () => {
               <Textarea
                 id="edit_product_description"
                 value={productFormData.description}
-                onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
+                onChange={(e) => {
+                  setProductFormData({ ...productFormData, description: e.target.value });
+                  setHasUnsavedChanges(true);
+                }}
                 rows={3}
               />
             </div>
@@ -1418,8 +1443,49 @@ const CustomerDetail = () => {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => {
+              if (hasUnsavedChanges) {
+                setShowUnsavedChangesDialog(true);
+              } else {
+                setShowEditProductDialog(false);
+                setEditingProduct(null);
+                setProductFormData({
+                  name: "",
+                  state: "",
+                  item_id: "",
+                  description: "",
+                  price: "",
+                  cost: "",
+                });
+                setProductFormErrors({});
+              }
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateProduct} disabled={creatingProduct}>
+              {creatingProduct ? "Updating..." : "Update Product"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unsaved Changes Dialog */}
+      <AlertDialog open={showUnsavedChangesDialog} onOpenChange={setShowUnsavedChangesDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Are you sure you want to close without saving?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowUnsavedChangesDialog(false)}>
+              Continue Editing
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setShowUnsavedChangesDialog(false);
               setShowEditProductDialog(false);
               setEditingProduct(null);
+              setHasUnsavedChanges(false);
               setProductFormData({
                 name: "",
                 state: "",
@@ -1430,14 +1496,11 @@ const CustomerDetail = () => {
               });
               setProductFormErrors({});
             }}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdateProduct} disabled={creatingProduct}>
-              {creatingProduct ? "Updating..." : "Update Product"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              Discard Changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Bulk Upload Dialog */}
       <Dialog open={showBulkUploadDialog} onOpenChange={setShowBulkUploadDialog}>
