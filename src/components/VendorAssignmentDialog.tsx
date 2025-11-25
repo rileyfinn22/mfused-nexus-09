@@ -58,14 +58,27 @@ export const VendorAssignmentDialog = ({
       .from('order_items')
       .select('*')
       .eq('order_id', orderId)
-      .order('created_at', { ascending: true }); // Get all items in consistent order
+      .order('created_at', { ascending: true }); // Maintain consistent order by creation time
     
     console.log('Fetched order items:', data);
     console.log('Fetch error:', error);
     
     if (data) {
-      setFreshOrderItems(data);
-      loadExistingAssignments(data);
+      // Sort to match the original orderItems order to prevent scrambling
+      const sortedData = data.sort((a, b) => {
+        const indexA = orderItems.findIndex(item => item.id === a.id);
+        const indexB = orderItems.findIndex(item => item.id === b.id);
+        // If both found in original orderItems, use that order
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        // If only one found, prioritize it
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        // Otherwise maintain database order
+        return 0;
+      });
+      
+      setFreshOrderItems(sortedData);
+      loadExistingAssignments(sortedData);
     }
   };
 
