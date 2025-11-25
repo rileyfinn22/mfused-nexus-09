@@ -871,9 +871,13 @@ const CreateOrder = () => {
 
       if (itemsError) throw itemsError;
 
+      const actionText = orderId 
+        ? (isDraft ? "updated as draft" : "updated")
+        : (isDraft ? "saved as draft" : "placed");
+      
       toast({
-        title: isDraft ? "Draft Saved" : "Order Placed",
-        description: `Order ${orderNumber} has been ${isDraft ? 'saved as draft' : 'placed'} successfully`,
+        title: orderId ? (isDraft ? "Draft Updated" : "Order Updated") : (isDraft ? "Draft Saved" : "Order Placed"),
+        description: `Order ${orderNumber} has been ${actionText} successfully`,
       });
 
       navigate(`/orders/${order.id}`);
@@ -917,11 +921,11 @@ const CreateOrder = () => {
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => saveOrder(true)} disabled={loading}>
               <Save className="h-4 w-4 mr-2" />
-              Save Draft
+              {orderId ? "Update Draft" : "Save Draft"}
             </Button>
             <Button onClick={() => saveOrder(false)} disabled={loading}>
               <Send className="h-4 w-4 mr-2" />
-              {loading ? "Placing..." : "Place Order"}
+              {loading ? (orderId ? "Updating..." : "Placing...") : (orderId ? "Update Order" : "Place Order")}
             </Button>
           </div>
         </div>
