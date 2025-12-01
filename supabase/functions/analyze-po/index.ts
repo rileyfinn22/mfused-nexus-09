@@ -225,7 +225,7 @@ Return ONLY valid JSON:
     
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id, item_id, name, customer_id, preferred_vendor_id, cost')
+      .select('id, item_id, name, description, customer_id, preferred_vendor_id, cost')
       .eq('company_id', companyId);
 
     if (productsError) {
@@ -457,12 +457,12 @@ Return ONLY valid JSON:
           product_id: matchedProduct?.id || null,
           sku: item.sku || 'UNKNOWN',
           name: item.name || item.description || 'Unknown Item',
-          description: item.description || null,
+          description: matchedProduct?.description || item.description || null,
           quantity: quantity,
           unit_price: unitPrice, // PO price overrides product cost
           total: quantity * unitPrice,
           shipped_quantity: 0, // Initialize as 0 for new orders
-          item_id: item.sku || null
+          item_id: matchedProduct?.item_id || item.sku || null
         };
         
         // If product has a preferred vendor, assign it to the order item
