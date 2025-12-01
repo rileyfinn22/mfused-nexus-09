@@ -4,8 +4,8 @@
  * This is ONLY used for blanket/full invoices. Partial invoices use the parent number with a suffix.
  */
 export function generateInvoiceNumber(sequenceNumber: number): string {
-  // Start from 10700 and increment
-  const invoiceNum = 10699 + sequenceNumber;
+  // Start from 10701 and increment
+  const invoiceNum = 10700 + sequenceNumber;
   return String(invoiceNum);
 }
 

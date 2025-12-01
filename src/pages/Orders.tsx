@@ -94,6 +94,7 @@ const Orders = () => {
     let query = supabase
       .from('orders')
       .select('*, order_items(*), companies(name)')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     // Filter by company if not "all" and user is vibe_admin
@@ -153,16 +154,36 @@ const Orders = () => {
   const handleDeleteOrder = async () => {
     if (!deleteOrderId) return;
 
-    const { error } = await supabase
-      .from('orders')
-      .delete()
-      .eq('id', deleteOrderId);
+    try {
+      // Get all invoices for this order
+      const { data: invoices } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('order_id', deleteOrderId)
+        .is('deleted_at', null);
 
-    if (error) {
-      console.error('Error deleting order:', error);
-      alert('Failed to delete order');
-    } else {
+      // Soft delete all related invoices (this will trigger inventory restoration via existing logic)
+      if (invoices && invoices.length > 0) {
+        const { error: invoiceError } = await supabase
+          .from('invoices')
+          .update({ deleted_at: new Date().toISOString() })
+          .in('id', invoices.map(inv => inv.id));
+
+        if (invoiceError) throw invoiceError;
+      }
+
+      // Soft delete the order
+      const { error } = await supabase
+        .from('orders')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', deleteOrderId);
+
+      if (error) throw error;
+
       fetchOrders();
+    } catch (error: any) {
+      console.error('Error deleting order:', error);
+      alert(`Failed to delete order: ${error.message}`);
     }
     setDeleteOrderId(null);
   };

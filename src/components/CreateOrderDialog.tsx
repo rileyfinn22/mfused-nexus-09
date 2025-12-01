@@ -185,12 +185,12 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
       const tax = subtotal * 0.06;
       const total = subtotal + tax;
 
-      // Generate order number
+      // Generate order number - start from 10701 like invoices
       const { count } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true });
       
-      const orderNumber = `ORD-${String((count || 0) + 1).padStart(3, '0')}`;
+      const orderNumber = String(10700 + ((count || 0) + 1));
 
       // Create order
       const { data: order, error: orderError } = await supabase
