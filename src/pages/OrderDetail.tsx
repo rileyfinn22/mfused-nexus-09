@@ -505,7 +505,10 @@ const OrderDetail = () => {
           .update({
             quantity: item.quantity,
             unit_price: item.unit_price,
-            total: newTotal
+            total: newTotal,
+            description: item.description,
+            item_id: item.item_id,
+            name: item.name
           })
           .eq('id', item.id);
 
