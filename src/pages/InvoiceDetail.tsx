@@ -265,18 +265,15 @@ const InvoiceDetail = () => {
         }
       }
 
-      // Restore quantities and inventory before deleting
-      // Only for shipment invoices, not deposit invoices
-      // Deposits are identified by notes containing "deposit payment"
+      // Restore quantities and inventory (but keep allocation records for audit trail)
       const isDeposit = invoice?.notes && invoice.notes.includes('deposit payment');
       if (!isDeposit) {
-        // Fetch all allocations for this invoice
         const {
           data: allocations
         } = await supabase.from('inventory_allocations').select('*').eq('invoice_id', invoiceId);
         if (allocations && allocations.length > 0) {
           for (const allocation of allocations) {
-            // Restore inventory quantity (only if this allocation has an inventory_id)
+            // Restore inventory quantity
             if (allocation.inventory_id) {
               const {
                 data: currentInv
@@ -288,7 +285,7 @@ const InvoiceDetail = () => {
               }
             }
 
-            // Always restore order item shipped_quantity
+            // Restore order item shipped_quantity
             const {
               data: currentItem
             } = await supabase.from('order_items').select('shipped_quantity').eq('id', allocation.order_item_id).single();
@@ -297,17 +294,12 @@ const InvoiceDetail = () => {
                 shipped_quantity: Math.max(0, (currentItem.shipped_quantity || 0) - allocation.quantity_allocated)
               }).eq('id', allocation.order_item_id);
             }
-
-            // Delete the allocation record
-            await supabase.from('inventory_allocations').delete().eq('id', allocation.id);
+            // DON'T delete allocation - keep it for audit trail
           }
         }
       }
 
-      // Don't delete payments or allocations - just soft delete the invoice
-      // This preserves the full history for the audit log
-      
-      // Soft delete from database instead of hard delete
+      // Soft delete the invoice (keeps all related records intact)
       const {
         error
       } = await supabase.from('invoices').update({ 
@@ -322,7 +314,7 @@ const InvoiceDetail = () => {
       } else {
         toast({
           title: "Invoice Deleted",
-          description: "Invoice deleted and quantities restored"
+          description: "Invoice moved to archive and quantities restored. You can recover it from the deleted archive."
         });
         navigate('/invoices');
       }
