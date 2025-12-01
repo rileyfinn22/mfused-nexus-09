@@ -707,6 +707,7 @@ export type Database = {
           customer_email: string | null
           customer_name: string
           customer_phone: string | null
+          deleted_at: string | null
           description: string | null
           due_date: string | null
           fulfillment_vendor_id: string | null
@@ -753,6 +754,7 @@ export type Database = {
           customer_email?: string | null
           customer_name: string
           customer_phone?: string | null
+          deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           fulfillment_vendor_id?: string | null
@@ -799,6 +801,7 @@ export type Database = {
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string | null
+          deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           fulfillment_vendor_id?: string | null
