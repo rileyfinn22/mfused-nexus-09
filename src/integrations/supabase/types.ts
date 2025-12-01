@@ -377,12 +377,51 @@ export type Database = {
           },
         ]
       }
+      invoice_audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          changes: Json | null
+          id: string
+          invoice_id: string
+          notes: string | null
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          changes?: Json | null
+          id?: string
+          invoice_id: string
+          notes?: string | null
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          changes?: Json | null
+          id?: string
+          invoice_id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_audit_log_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           billed_percentage: number | null
           company_id: string
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           description: string | null
           due_date: string | null
           id: string
@@ -410,6 +449,7 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
@@ -437,6 +477,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           id?: string

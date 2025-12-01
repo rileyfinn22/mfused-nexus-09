@@ -68,6 +68,7 @@ const Invoices = () => {
         orders(order_number, customer_name, po_number),
         companies(name)
       `)
+      .is('deleted_at', null) // Only show non-deleted invoices
       .order('created_at', { ascending: false });
     
     if (data) {
@@ -245,10 +246,16 @@ const Invoices = () => {
           <h1 className="text-2xl font-semibold">Invoices & Billing</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage invoices, track payments, and monitor due dates</p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => exportToCSV(filteredInvoices, 'invoices')}>
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => navigate('/invoices/deleted')}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Deleted Archive
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => exportToCSV(filteredInvoices, 'invoices')}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Summary Row */}
@@ -577,16 +584,13 @@ const Invoices = () => {
                                   }
                                 }
 
-                                // Delete any payments associated with this invoice
-                                await supabase
-                                  .from('payments')
-                                  .delete()
-                                  .eq('invoice_id', invoice.id);
-
-                                // Delete invoice
+                                // Don't delete payments or allocations - just soft delete the invoice
+                                // This preserves the full history for the audit log
+                                
+                                // Soft delete invoice instead of hard delete
                                 const { error } = await supabase
                                   .from('invoices')
-                                  .delete()
+                                  .update({ deleted_at: new Date().toISOString() })
                                   .eq('id', invoice.id);
                                 
                                 if (error) {
@@ -599,7 +603,7 @@ const Invoices = () => {
                                 } else {
                                   toast({
                                     title: "Success",
-                                    description: "Invoice deleted and quantities restored"
+                                    description: "Invoice moved to deleted archive. Quantities have been restored and you can restore the invoice from the archive."
                                   });
                                   fetchInvoices();
                                 }

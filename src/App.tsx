@@ -14,6 +14,7 @@ import OrderDetail from "./pages/OrderDetail";
 import CreateOrder from "./pages/CreateOrder";
 import Invoices from "./pages/Invoices";
 import InvoiceDetail from "./pages/InvoiceDetail";
+import DeletedInvoices from "./pages/DeletedInvoices";
 import Artwork from "./pages/Artwork";
 import RejectedArchive from "./pages/RejectedArchive";
 import PullShip from "./pages/PullShip";
@@ -58,6 +59,7 @@ const App = () => (
           <Route path="/orders/edit/:orderId" element={<DashboardLayout><CreateOrder /></DashboardLayout>} />
           <Route path="/orders/:orderId" element={<DashboardLayout><OrderDetail /></DashboardLayout>} />
           <Route path="/invoices" element={<DashboardLayout><Invoices /></DashboardLayout>} />
+          <Route path="/invoices/deleted" element={<DashboardLayout><DeletedInvoices /></DashboardLayout>} />
           <Route path="/invoices/:invoiceId" element={<DashboardLayout><InvoiceDetail /></DashboardLayout>} />
           <Route path="/artwork" element={<DashboardLayout><Artwork /></DashboardLayout>} />
           <Route path="/artwork/rejected" element={<DashboardLayout><RejectedArchive /></DashboardLayout>} />
