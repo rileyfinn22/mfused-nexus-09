@@ -405,15 +405,7 @@ export type Database = {
           invoice_id?: string
           notes?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_audit_log_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       invoices: {
         Row: {
