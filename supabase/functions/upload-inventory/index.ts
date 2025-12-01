@@ -167,19 +167,21 @@ serve(async (req) => {
 
       // Find or create product by item_id (preferred) or SKU/name
       let productId = row['product_id'];
+      let existingProductData = null;
       
       if (!productId) {
         // Try to find existing product by item_id first (most reliable)
         if (itemId) {
           const { data: existingProduct } = await supabaseClient
             .from('products')
-            .select('id')
+            .select('id, item_id, description')
             .eq('company_id', companyId)
             .eq('item_id', itemId)
             .maybeSingle();
 
           if (existingProduct) {
             productId = existingProduct.id;
+            existingProductData = existingProduct;
             console.log(`Matched product by item_id "${itemId}": ${existingProduct.id}`);
           }
         }
@@ -188,13 +190,14 @@ serve(async (req) => {
         if (!productId) {
           const { data: existingProduct } = await supabaseClient
             .from('products')
-            .select('id')
+            .select('id, item_id, description')
             .eq('company_id', companyId)
             .eq('name', sku)
             .maybeSingle();
 
           if (existingProduct) {
             productId = existingProduct.id;
+            existingProductData = existingProduct;
             console.log(`Matched product by name "${sku}": ${existingProduct.id}`);
           } else {
             // Generate temporary SKU if itemId is null (VB- + 5 random digits)
@@ -209,7 +212,7 @@ serve(async (req) => {
                 item_id: finalItemId, // Store the full SKU with state or temp VB- SKU
                 category: 'General'
               })
-              .select('id')
+              .select('id, item_id, description')
               .single();
 
             if (productError) {
@@ -217,15 +220,19 @@ serve(async (req) => {
               continue;
             }
             productId = newProduct.id;
+            existingProductData = newProduct;
             console.log(`Created new product with item_id "${finalItemId}": ${productId}`);
           }
         }
       }
+      
+      // Use existing product's item_id if available (takes precedence over CSV data)
+      const finalSkuForInventory = existingProductData?.item_id || itemId || sku;
 
       inventoryItems.push({
         company_id: companyId,
         product_id: productId,
-        sku: itemId || sku, // Use full SKU with state (e.g., "PCK-00365-NY")
+        sku: finalSkuForInventory, // Use existing product's item_id if available
         state: state,
         available: available,
         in_production: inProduction,
