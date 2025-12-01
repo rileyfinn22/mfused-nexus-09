@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Upload } from "lucide-react";
@@ -16,6 +17,48 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<string>(selectedCompanyId || "");
+
+  useEffect(() => {
+    checkVibeAdmin();
+  }, []);
+
+  useEffect(() => {
+    if (isVibeAdmin && open) {
+      fetchCompanies();
+    }
+  }, [isVibeAdmin, open]);
+
+  useEffect(() => {
+    setSelectedCompany(selectedCompanyId || "");
+  }, [selectedCompanyId]);
+
+  const checkVibeAdmin = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: userRole } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    setIsVibeAdmin(userRole?.role === 'vibe_admin');
+  };
+
+  const fetchCompanies = async () => {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('id, name')
+      .order('name');
+
+    if (!error && data) {
+      // Filter out VibePKG from the list
+      setCompanies(data.filter(c => c.name !== 'VibePKG'));
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -27,15 +70,21 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
     e.preventDefault();
     if (!file) return;
 
+    // Require company selection for vibe_admin
+    if (isVibeAdmin && !selectedCompany) {
+      toast.error("Please select a company before uploading");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const formData = new FormData();
       formData.append('file', file);
       
-      // Pass selected company ID if provided (for vibe_admin)
-      if (selectedCompanyId) {
-        formData.append('company_id', selectedCompanyId);
+      // Pass selected company ID (for vibe_admin)
+      if (selectedCompany) {
+        formData.append('company_id', selectedCompany);
       }
 
       const { data, error } = await supabase.functions.invoke('upload-inventory', {
@@ -72,6 +121,23 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
             </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isVibeAdmin && (
+            <div className="space-y-2">
+              <Label htmlFor="company">Company *</Label>
+              <Select value={selectedCompany} onValueChange={setSelectedCompany} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="file">Select File</Label>
             <Input
@@ -82,7 +148,11 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
               required
             />
           </div>
-          <Button type="submit" disabled={loading || !file} className="w-full">
+          <Button 
+            type="submit" 
+            disabled={loading || !file || (isVibeAdmin && !selectedCompany)} 
+            className="w-full"
+          >
             {loading ? "Uploading..." : "Upload Inventory"}
           </Button>
         </form>
