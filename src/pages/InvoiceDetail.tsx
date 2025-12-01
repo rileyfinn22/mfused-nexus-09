@@ -14,6 +14,7 @@ import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
 import { SyncToQuickBooksDialog } from "@/components/SyncToQuickBooksDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
+import { InvoiceAuditLog } from "@/components/InvoiceAuditLog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
@@ -303,13 +304,15 @@ const InvoiceDetail = () => {
         }
       }
 
-      // Delete any payments associated with this invoice
-      await supabase.from('payments').delete().eq('invoice_id', invoiceId);
-
-      // Delete from database
+      // Don't delete payments or allocations - just soft delete the invoice
+      // This preserves the full history for the audit log
+      
+      // Soft delete from database instead of hard delete
       const {
         error
-      } = await supabase.from('invoices').delete().eq('id', invoiceId);
+      } = await supabase.from('invoices').update({ 
+        deleted_at: new Date().toISOString() 
+      }).eq('id', invoiceId);
       if (error) {
         toast({
           title: "Error",
@@ -1383,13 +1386,22 @@ const InvoiceDetail = () => {
           </CardContent>
         </Card>}
 
+      {/* Audit Log */}
+      {invoice && (
+        <Card className="shadow-lg">
+          <CardContent className="p-8">
+            <InvoiceAuditLog invoiceId={invoice.id} />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Invoice?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this invoice? This action cannot be undone.
+              This will move the invoice to the deleted archive. Quantities will be restored and you can recover the invoice later if needed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
