@@ -418,8 +418,13 @@ Return ONLY valid JSON:
       return null;
     };
 
-    // Generate order number
-    const orderNumber = `ORD-${Date.now()}`;
+    // Generate sequential order number like CreateOrder does
+    const { count } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true });
+    
+    const orderNum = 10699 + ((count || 0) + 1);
+    const orderNumber = String(orderNum);
 
     // Calculate totals - no tax for pull_ship orders
     let subtotal = 0;
