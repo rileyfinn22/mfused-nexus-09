@@ -376,6 +376,36 @@ Return ONLY valid JSON:
         console.log(`✗ No base SKU match found for: "${poItemId}"`);
       }
 
+      // STEP 6: Try exact name match as fallback (important for products without item_id)
+      if (poName) {
+        console.log(`\n[STEP 6] Trying exact name match for: "${poName}"`);
+        const match = products.find(p => 
+          p.name && p.name.toLowerCase().trim() === poName.toLowerCase().trim()
+        );
+        if (match) {
+          console.log(`✓ EXACT NAME MATCH FOUND: "${poName}" -> product ID: ${match.id}`);
+          return match;
+        }
+        console.log(`✗ No exact name match found for: "${poName}"`);
+      }
+
+      // STEP 7: Try normalized name match (remove special chars)
+      if (poName) {
+        console.log(`\n[STEP 7] Trying normalized name match for: "${poName}"`);
+        const normalizedPoName = normalize(poName);
+        console.log(`  Normalized PO name: "${normalizedPoName}"`);
+        const match = products.find(p => {
+          if (!p.name) return false;
+          const normalizedProductName = normalize(p.name);
+          return normalizedProductName === normalizedPoName;
+        });
+        if (match) {
+          console.log(`✓ NORMALIZED NAME MATCH FOUND: "${poName}" -> "${match.name}"`);
+          return match;
+        }
+        console.log(`✗ No normalized name match found for: "${poName}"`);
+      }
+
       // Removed overly aggressive partial and fuzzy matching to prevent incorrect product matches
       // Only exact, normalized, and base SKU matches are used now
 
