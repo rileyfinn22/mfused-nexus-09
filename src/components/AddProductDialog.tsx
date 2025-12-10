@@ -23,18 +23,15 @@ const productSchema = z.object({
 interface AddProductDialogProps {
   onProductAdded: () => void;
   selectedCompanyId?: string;
-  selectedCustomerId?: string;
 }
 
-export function AddProductDialog({ onProductAdded, selectedCompanyId, selectedCustomerId }: AddProductDialogProps) {
+export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProductDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [vendors, setVendors] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companyId, setCompanyId] = useState<string>(selectedCompanyId || "");
-  const [customerId, setCustomerId] = useState<string>(selectedCustomerId || "");
   const { syncProduct, checkConnection } = useQuickBooksAutoSync();
   const [formData, setFormData] = useState({
     name: "",
@@ -59,16 +56,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId, selectedCu
     if (selectedCompanyId) {
       setCompanyId(selectedCompanyId);
     }
-    if (selectedCustomerId) {
-      setCustomerId(selectedCustomerId);
-    }
-  }, [selectedCompanyId, selectedCustomerId]);
-
-  useEffect(() => {
-    if (isVibeAdmin && companyId) {
-      fetchCustomersForCompany(companyId);
-    }
-  }, [isVibeAdmin, companyId]);
+  }, [selectedCompanyId]);
 
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -99,20 +87,6 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId, selectedCu
     }
   };
 
-  const fetchCustomersForCompany = async (compId: string) => {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('id, name')
-      .eq('company_id', compId)
-      .eq('is_active', true)
-      .order('name');
-
-    if (!error && data) {
-      setCustomers(data);
-    } else {
-      setCustomers([]);
-    }
-  };
 
   const fetchVendors = async () => {
     try {
@@ -234,8 +208,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId, selectedCu
           preferred_vendor_id: formData.preferred_vendor_id || null,
           image_url: imageUrl,
           item_id: tempSKU,
-          company_id: finalCompanyId,
-          customer_id: customerId || null
+          company_id: finalCompanyId
         })
         .select()
         .single();
@@ -269,9 +242,8 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId, selectedCu
       setFormData({ name: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "" });
       setImageFile(null);
       setImagePreview(null);
-      // Reset company/customer only if not pre-selected
+      // Reset company only if not pre-selected
       if (!selectedCompanyId) setCompanyId("");
-      if (!selectedCustomerId) setCustomerId("");
       onProductAdded();
     } catch (error) {
       console.error('Error adding product:', error);
@@ -303,10 +275,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId, selectedCu
               <Label htmlFor="company">Company <span className="text-destructive">*</span></Label>
               <Select
                 value={companyId}
-                onValueChange={(value) => {
-                  setCompanyId(value);
-                  setCustomerId(""); // Reset customer when company changes
-                }}
+                onValueChange={setCompanyId}
                 required
               >
                 <SelectTrigger>
@@ -316,29 +285,6 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId, selectedCu
                   {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Customer selection (optional) */}
-          {isVibeAdmin && companyId && customers.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="customer">Customer (Optional)</Label>
-              <Select
-                value={customerId}
-                onValueChange={setCustomerId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="No specific customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">No specific customer</SelectItem>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

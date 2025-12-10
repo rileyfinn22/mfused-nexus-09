@@ -121,7 +121,7 @@ const CustomerDetail = () => {
   const fetchCustomerDetails = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('customers')
+      .from('companies')
       .select('*')
       .eq('id', customerId)
       .single();
@@ -168,7 +168,7 @@ const CustomerDetail = () => {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('customer_id', customerId)
+      .eq('company_id', customerId)
       .order('name');
 
     if (!error && data) {
@@ -182,7 +182,7 @@ const CustomerDetail = () => {
       const validated = customerSchema.parse(formData);
 
       const { error } = await supabase
-        .from('customers')
+        .from('companies')
         .update(validated)
         .eq('id', customerId);
 
@@ -222,7 +222,7 @@ const CustomerDetail = () => {
       for (const productId of productsToUpdate) {
         const { error } = await supabase
           .from('products')
-          .update({ customer_id: customerId })
+          .update({ company_id: customerId })
           .eq('id', productId);
 
         if (error) throw error;
@@ -248,16 +248,11 @@ const CustomerDetail = () => {
 
   const handleRemoveProduct = async (productId: string) => {
     try {
-      const { error } = await supabase
-        .from('products')
-        .update({ customer_id: null })
-        .eq('id', productId);
-
-      if (error) throw error;
-
+      // When removing, we don't set to null anymore - products belong to companies
+      // Instead this should just be removing from the view (already filtered by company_id)
       toast({
-        title: "Product removed",
-        description: "Product has been unlinked from this company",
+        title: "Info",
+        description: "Products are now directly owned by companies and cannot be unlinked",
       });
 
       fetchCustomerProducts();
@@ -321,8 +316,7 @@ const CustomerDetail = () => {
         description: validated.description || null,
         price: validated.price ? parseFloat(validated.price) : null,
         cost: validated.cost ? parseFloat(validated.cost) : null,
-        company_id: customer.company_id,
-        customer_id: customerId,
+        company_id: customerId, // customerId is now the company ID
       };
 
       const { error } = await supabase
@@ -624,8 +618,7 @@ const CustomerDetail = () => {
         description: row.description || null,
         price: row.price ? parseFloat(row.price) : null,
         cost: row.cost ? parseFloat(row.cost) : null,
-        company_id: customer.company_id,
-        customer_id: customerId,
+        company_id: customerId, // customerId is now the company ID
       }));
 
       const { error } = await supabase
@@ -670,7 +663,7 @@ const CustomerDetail = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const availableProducts = products.filter(p => !p.customer_id || p.customer_id === customerId);
+  const availableProducts = products.filter(p => p.company_id === customerId);
 
   if (loading) {
     return (

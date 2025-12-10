@@ -75,7 +75,7 @@ const Customers = () => {
   const fetchCustomers = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('customers')
+      .from('companies')
       .select('*')
       .order('name');
     
@@ -163,7 +163,7 @@ const Customers = () => {
 
       if (editingCustomer) {
         const { error } = await supabase
-          .from('customers')
+          .from('companies')
           .update(customerData)
           .eq('id', editingCustomer.id);
 
@@ -175,7 +175,7 @@ const Customers = () => {
         });
       } else {
         const { error } = await supabase
-          .from('customers')
+          .from('companies')
           .insert([customerData]);
 
         if (error) throw error;
@@ -212,7 +212,7 @@ const Customers = () => {
 
     try {
       const { error } = await supabase
-        .from('customers')
+        .from('companies')
         .delete()
         .eq('id', deletingCustomer.id);
 

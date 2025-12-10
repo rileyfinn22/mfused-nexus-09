@@ -39,14 +39,12 @@ interface Product {
   cost: number | null;
   description: string | null;
   image_url: string | null;
-  customer_id: string | null;
   company_id: string;
 }
 
-interface Customer {
+interface Company {
   id: string;
   name: string;
-  company_id: string;
 }
 
 interface OrderItem {
@@ -73,7 +71,7 @@ const CreateOrder = () => {
   const navigate = useNavigate();
   const { orderId } = useParams();
   const [products, setProducts] = useState<Product[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [sameAsBilling, setSameAsBilling] = useState(true);
@@ -397,53 +395,31 @@ const CreateOrder = () => {
   const fetchProducts = async () => {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('id, name, item_id, cost, description, image_url, company_id')
       .order('name');
     
     if (!error && data) {
       setProducts(data);
     }
 
-    // Also fetch customers to match names
-    const { data: customersData } = await supabase
-      .from('customers')
-      .select('id, name, company_id');
+    // Also fetch all companies for reference
+    const { data: companiesData } = await supabase
+      .from('companies')
+      .select('id, name');
     
-    if (customersData) {
-      setCustomers(customersData);
+    if (companiesData) {
+      setAllCompanies(companiesData);
     }
   };
 
-  // Filter products: show products where company matches OR customer name matches the order's company/customer name
+  // Filter products: show products where company matches
   const availableProducts = (() => {
     if (isVibeAdmin && selectedCompanyId) {
-      // Get the company name for matching
-      const selectedCompany = companies.find(c => c.id === selectedCompanyId);
-      const companyName = selectedCompany?.name || formData.customerName;
-      
-      return products.filter(p => {
-        // Show if product's company matches
-        if (p.company_id === selectedCompanyId) return true;
-        
-        // Show if product has a customer whose name matches the company/order customer name
-        if (p.customer_id) {
-          const productCustomer = customers.find(c => c.id === p.customer_id);
-          if (productCustomer && productCustomer.name === companyName) return true;
-        }
-        
-        return false;
-      });
+      return products.filter(p => p.company_id === selectedCompanyId);
     }
     
-    // For non-admin users, show all products (filtered by RLS) + customer name matching
-    return products.filter(p => {
-      // Always show products without customer_id
-      if (!p.customer_id) return true;
-      
-      // Show if customer name matches the order's customer name
-      const productCustomer = customers.find(c => c.id === p.customer_id);
-      return productCustomer && productCustomer.name === formData.customerName;
-    });
+    // For non-admin users, show all products (filtered by RLS)
+    return products;
   })();
 
   const fetchSavedAddresses = async () => {

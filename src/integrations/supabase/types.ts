@@ -72,21 +72,60 @@ export type Database = {
       }
       companies: {
         Row: {
+          billing_city: string | null
+          billing_state: string | null
+          billing_street: string | null
+          billing_zip: string | null
           created_at: string
+          email: string | null
           id: string
+          is_active: boolean
           name: string
+          notes: string | null
+          phone: string | null
+          quickbooks_id: string | null
+          shipping_city: string | null
+          shipping_state: string | null
+          shipping_street: string | null
+          shipping_zip: string | null
           updated_at: string
         }
         Insert: {
+          billing_city?: string | null
+          billing_state?: string | null
+          billing_street?: string | null
+          billing_zip?: string | null
           created_at?: string
+          email?: string | null
           id?: string
+          is_active?: boolean
           name: string
+          notes?: string | null
+          phone?: string | null
+          quickbooks_id?: string | null
+          shipping_city?: string | null
+          shipping_state?: string | null
+          shipping_street?: string | null
+          shipping_zip?: string | null
           updated_at?: string
         }
         Update: {
+          billing_city?: string | null
+          billing_state?: string | null
+          billing_street?: string | null
+          billing_zip?: string | null
           created_at?: string
+          email?: string | null
           id?: string
+          is_active?: boolean
           name?: string
+          notes?: string | null
+          phone?: string | null
+          quickbooks_id?: string | null
+          shipping_city?: string | null
+          shipping_state?: string | null
+          shipping_street?: string | null
+          shipping_zip?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -190,69 +229,6 @@ export type Database = {
           street?: string
           updated_at?: string
           zip?: string
-        }
-        Relationships: []
-      }
-      customers: {
-        Row: {
-          billing_city: string | null
-          billing_state: string | null
-          billing_street: string | null
-          billing_zip: string | null
-          company_id: string
-          created_at: string
-          email: string | null
-          id: string
-          is_active: boolean
-          name: string
-          notes: string | null
-          phone: string | null
-          quickbooks_id: string | null
-          shipping_city: string | null
-          shipping_state: string | null
-          shipping_street: string | null
-          shipping_zip: string | null
-          updated_at: string
-        }
-        Insert: {
-          billing_city?: string | null
-          billing_state?: string | null
-          billing_street?: string | null
-          billing_zip?: string | null
-          company_id: string
-          created_at?: string
-          email?: string | null
-          id?: string
-          is_active?: boolean
-          name: string
-          notes?: string | null
-          phone?: string | null
-          quickbooks_id?: string | null
-          shipping_city?: string | null
-          shipping_state?: string | null
-          shipping_street?: string | null
-          shipping_zip?: string | null
-          updated_at?: string
-        }
-        Update: {
-          billing_city?: string | null
-          billing_state?: string | null
-          billing_street?: string | null
-          billing_zip?: string | null
-          company_id?: string
-          created_at?: string
-          email?: string | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          notes?: string | null
-          phone?: string | null
-          quickbooks_id?: string | null
-          shipping_city?: string | null
-          shipping_state?: string | null
-          shipping_street?: string | null
-          shipping_zip?: string | null
-          updated_at?: string
         }
         Relationships: []
       }
@@ -1124,7 +1100,6 @@ export type Database = {
           company_id: string
           cost: number | null
           created_at: string
-          customer_id: string | null
           description: string | null
           id: string
           image_url: string | null
@@ -1147,7 +1122,6 @@ export type Database = {
           company_id: string
           cost?: number | null
           created_at?: string
-          customer_id?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
@@ -1170,7 +1144,6 @@ export type Database = {
           company_id?: string
           cost?: number | null
           created_at?: string
-          customer_id?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
@@ -1194,13 +1167,6 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "products_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
           {
