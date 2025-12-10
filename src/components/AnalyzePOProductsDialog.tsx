@@ -204,22 +204,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     setImporting(true);
 
     try {
-      // Find or create customer if customer_name exists
-      let customerId: string | null = null;
-      if (customerName) {
-        const { data: existingCustomer } = await supabase
-          .from('customers')
-          .select('id')
-          .eq('company_id', companyId)
-          .ilike('name', customerName)
-          .maybeSingle();
-
-        if (existingCustomer) {
-          customerId = existingCustomer.id;
-        }
-      }
-
-      // Create products
+      // Create products - no customer_id needed since products belong to companies now
       const productsToInsert = selectedProducts.map(p => ({
         company_id: companyId,
         item_id: p.item_id || null,
@@ -228,7 +213,6 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
         state: p.state || null,
         cost: p.cost || null,
         product_type: p.product_type || null,
-        customer_id: customerId,
       }));
 
       const { error } = await supabase.from('products').insert(productsToInsert);

@@ -219,13 +219,13 @@ Return ONLY valid JSON:
       console.log('Unit price value:', extractedData.items[0].unit_price);
     }
 
-    // Fetch products to try matching SKUs and names (include customer_id for customer-specific SKU matching)
+    // Fetch products to try matching SKUs and names
     console.log(`\n========== FETCHING PRODUCTS ==========`);
     console.log(`Querying products with company_id: ${companyId}`);
     
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id, item_id, name, description, customer_id, preferred_vendor_id, cost')
+      .select('id, item_id, name, description, preferred_vendor_id, cost')
       .eq('company_id', companyId);
 
     if (productsError) {
@@ -233,24 +233,6 @@ Return ONLY valid JSON:
     }
 
     console.log(`Found ${products?.length || 0} products for matching`);
-
-    // Get customer info from extracted data for customer-specific matching
-    const customerName = extractedData.customer_name;
-    let customerId: string | null = null;
-    
-    if (customerName) {
-      const { data: customer } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('company_id', companyId)
-        .ilike('name', customerName)
-        .maybeSingle();
-      
-      if (customer) {
-        customerId = customer.id;
-        console.log(`Found customer ID: ${customerId} for customer: ${customerName}`);
-      }
-    }
 
     // Function to find matching product by item_id with improved matching
     // Returns the full product object (not just ID) so we can access vendor_id, cost, etc.
@@ -264,8 +246,7 @@ Return ONLY valid JSON:
       console.log(`PO Item Details:`, JSON.stringify({
         item_id: poItem.item_id,
         sku: poItem.sku,
-        name: poItem.name,
-        customer_id: customerId
+        name: poItem.name
       }, null, 2));
       console.log(`Total products in database: ${products.length}`);
       console.log(`First 5 product item_ids:`, products.slice(0, 5).map(p => p.item_id));
@@ -290,19 +271,6 @@ Return ONLY valid JSON:
       const poItemId = poItem.item_id || '';
       const poSku = poItem.sku || '';
       const poName = poItem.name || '';
-
-      // PRIORITY 1: Try customer-specific SKU match first (if customer found)
-      if (customerId && poItemId) {
-        const match = products.find(p => 
-          p.customer_id === customerId &&
-          p.item_id && 
-          p.item_id.toLowerCase().trim() === poItemId.toLowerCase().trim()
-        );
-        if (match) {
-          console.log(`✓ Customer-specific SKU match: "${poItemId}" for customer ${customerId} -> product: ${match.name}`);
-          return match;
-        }
-      }
 
       // Try exact match on item_id (case insensitive)
       if (poItemId) {

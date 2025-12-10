@@ -41,7 +41,6 @@ interface Product {
   image_url: string | null;
   item_id?: string | null;
   sku?: string;
-  customer_id?: string | null;
   states: ProductState[];
 }
 
