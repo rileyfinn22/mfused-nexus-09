@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
@@ -19,18 +20,16 @@ import {
   ChevronDown, 
   ChevronRight, 
   Search, 
-  Eye, 
-  Download, 
-  Truck,
-  Image,
   Plus,
   AlertTriangle,
   Edit,
-  Trash2
+  Trash2,
+  Package
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AddProductDialog } from "@/components/AddProductDialog";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface Product {
   id: string;
@@ -116,7 +115,6 @@ const Products = () => {
         .select('*, product_states(*)')
         .order('created_at', { ascending: false });
 
-      // Filter by company if not "all" and user is vibe_admin
       if (isVibeAdmin && companyFilter !== 'all') {
         query = query.eq('company_id', companyFilter);
       }
@@ -134,7 +132,6 @@ const Products = () => {
 
           if (statesError) throw statesError;
 
-          // Get SKU from inventory table
           const { data: inventoryData } = await supabase
             .from('inventory')
             .select('sku')
@@ -156,7 +153,6 @@ const Products = () => {
         })
       );
 
-      // Auto-assign temp SKUs to products without item_id
       const productsToUpdate = productsWithStates.filter(p => !p.item_id);
       if (productsToUpdate.length > 0) {
         for (const product of productsToUpdate) {
@@ -185,7 +181,6 @@ const Products = () => {
 
       if (error) throw error;
 
-      // Create a map of SKU to approval status
       const statusMap: Record<string, boolean> = {};
       data?.forEach(artwork => {
         if (!statusMap[artwork.sku] || artwork.is_approved) {
@@ -207,7 +202,6 @@ const Products = () => {
 
       if (error) throw error;
 
-      // Create a map of SKU to thumbnail URL
       const thumbnailMap: Record<string, string> = {};
       data?.forEach(artwork => {
         if (!thumbnailMap[artwork.sku]) {
@@ -265,38 +259,14 @@ const Products = () => {
   const handleDeleteConfirm = async () => {
     const idsToDelete = productToDelete ? [productToDelete] : Array.from(selectedProducts);
     
-    console.log('Deleting products:', idsToDelete);
-    
-    if (idsToDelete.length === 0) {
-      console.log('No products to delete');
-      return;
-    }
+    if (idsToDelete.length === 0) return;
 
     try {
-      // Delete related records first for all selected products
       for (const id of idsToDelete) {
-        console.log('Deleting product:', id);
-        
-        await supabase
-          .from('product_states')
-          .delete()
-          .eq('product_id', id);
-
-        await supabase
-          .from('inventory')
-          .delete()
-          .eq('product_id', id);
-
-        // Delete the product
-        const { error } = await supabase
-          .from('products')
-          .delete()
-          .eq('id', id);
-
-        if (error) {
-          console.error('Error deleting product:', error);
-          throw error;
-        }
+        await supabase.from('product_states').delete().eq('product_id', id);
+        await supabase.from('inventory').delete().eq('product_id', id);
+        const { error } = await supabase.from('products').delete().eq('id', id);
+        if (error) throw error;
       }
 
       toast({
@@ -319,7 +289,6 @@ const Products = () => {
     }
   };
 
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'text-success';
@@ -335,25 +304,25 @@ const Products = () => {
   );
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-table-border pb-4">
+      {/* Page Header */}
+      <div className="page-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Product Catalog</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage SKUs and state-specific packaging requirements</p>
+          <h1 className="page-title">Product Catalog</h1>
+          <p className="page-subtitle">Manage SKUs and state-specific packaging requirements</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           {selectedProducts.size > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDeleteSelected}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
+            <Button variant="destructive" size="sm" onClick={handleDeleteSelected}>
+              <Trash2 className="h-4 w-4 mr-1.5" />
               Delete ({selectedProducts.size})
             </Button>
           )}
@@ -362,12 +331,10 @@ const Products = () => {
             size="sm"
             onClick={() => {
               setIsEditMode(!isEditMode);
-              if (isEditMode) {
-                setSelectedProducts(new Set());
-              }
+              if (isEditMode) setSelectedProducts(new Set());
             }}
           >
-            <Edit className="h-4 w-4 mr-2" />
+            <Edit className="h-4 w-4 mr-1.5" />
             {isEditMode ? "Done" : "Edit"}
           </Button>
           <AddProductDialog 
@@ -377,20 +344,20 @@ const Products = () => {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
+      {/* Filters */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search products..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-9"
           />
         </div>
         {isVibeAdmin && (
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="w-48">
               <SelectValue placeholder="Company" />
             </SelectTrigger>
             <SelectContent>
@@ -406,10 +373,10 @@ const Products = () => {
       </div>
 
       {/* Products Table */}
-      <div className="border border-table-border rounded">
+      <Card className="overflow-hidden">
         {/* Table Header */}
-        <div className="bg-table-header border-b border-table-border">
-          <div className="grid grid-cols-10 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <div className="bg-muted/50 border-b border-border px-4 py-3">
+          <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             {isEditMode && (
               <div className="col-span-1 flex items-center">
                 <Checkbox
@@ -418,10 +385,10 @@ const Products = () => {
                 />
               </div>
             )}
-            <div className={isEditMode ? "col-span-1" : "col-span-1"}></div>
-            <div className={isEditMode ? "col-span-1" : "col-span-2"}>Product ID</div>
+            <div className={cn("flex items-center", isEditMode ? "col-span-1" : "col-span-1")}></div>
+            <div className={cn(isEditMode ? "col-span-2" : "col-span-2")}>Product ID</div>
             <div className="col-span-1">Preview</div>
-            <div className="col-span-3">Item</div>
+            <div className="col-span-4">Name</div>
             <div className="col-span-2">State</div>
             <div className="col-span-1">Cost</div>
             {!isEditMode && <div className="col-span-1">Actions</div>}
@@ -429,153 +396,124 @@ const Products = () => {
         </div>
 
         {/* Table Body */}
-        <div className="divide-y divide-table-border">
-          {filteredProducts.map((product) => {
-            const isExpanded = expandedProducts.includes(product.id);
-            
-            return (
-              <div key={product.id}>
-                {/* Parent Row */}
-                <div 
-                  className="grid grid-cols-10 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
-                  onClick={() => toggleExpanded(product.id)}
-                >
-                  {isEditMode && (
-                    <div className="col-span-1 flex items-center" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selectedProducts.has(product.id)}
-                        onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
-                      />
+        <div className="divide-y divide-border">
+          {filteredProducts.length === 0 ? (
+            <div className="empty-state py-16">
+              <Package className="h-12 w-12 mb-4 text-muted-foreground/50" />
+              <p className="font-medium">No products found</p>
+              <p className="text-sm">Add your first product to get started.</p>
+            </div>
+          ) : (
+            filteredProducts.map((product) => {
+              const isExpanded = expandedProducts.includes(product.id);
+              
+              return (
+                <div key={product.id}>
+                  <div 
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/30 transition-colors cursor-pointer items-center"
+                    onClick={() => toggleExpanded(product.id)}
+                  >
+                    {isEditMode && (
+                      <div className="col-span-1 flex items-center" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedProducts.has(product.id)}
+                          onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
+                        />
+                      </div>
+                    )}
+                    <div className={cn("flex items-center", isEditMode ? "col-span-1" : "col-span-1")}>
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      )}
                     </div>
-                  )}
-                  <div className={`${isEditMode ? "col-span-1" : "col-span-1"} flex items-center`}>
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className={`${isEditMode ? "col-span-1" : "col-span-2"} font-medium font-mono text-xs flex items-center gap-2`}>
-                    {product.item_id || `${product.id.slice(0, 8)}...`}
-                    {product.sku && !hasApprovedArtwork(product.sku) && (
-                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                    )}
-                  </div>
-                  <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
-                    {product.sku && (artworkThumbnails[product.sku] || product.image_url) ? (
-                      <img 
-                        src={artworkThumbnails[product.sku] || product.image_url} 
-                        alt={product.name}
-                        className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.sku)}`)}
-                      />
-                    ) : product.image_url ? (
-                      <img 
-                        src={product.image_url} 
-                        alt={product.name}
-                        className="w-12 h-12 object-cover rounded border"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center text-xs text-muted-foreground">
-                        No preview
+                    <div className={cn("font-mono text-xs flex items-center gap-2", isEditMode ? "col-span-2" : "col-span-2")}>
+                      <span className="truncate">{product.item_id || `${product.id.slice(0, 8)}...`}</span>
+                      {product.sku && !hasApprovedArtwork(product.sku) && (
+                        <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />
+                      )}
+                    </div>
+                    <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
+                      {product.sku && (artworkThumbnails[product.sku] || product.image_url) ? (
+                        <img 
+                          src={artworkThumbnails[product.sku] || product.image_url} 
+                          alt={product.name}
+                          className="w-10 h-10 object-cover rounded-md border border-border cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.sku)}`)}
+                        />
+                      ) : product.image_url ? (
+                        <img 
+                          src={product.image_url} 
+                          alt={product.name}
+                          className="w-10 h-10 object-cover rounded-md border border-border"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 bg-muted rounded-md border border-border flex items-center justify-center">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="col-span-4">
+                      <span className="text-sm font-medium truncate block">{product.name}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <Badge variant="outline" className="text-xs">{product.state}</Badge>
+                    </div>
+                    <div className="col-span-1 text-sm font-medium">
+                      {product.cost ? `$${product.cost.toFixed(3)}` : '—'}
+                    </div>
+                    {!isEditMode && (
+                      <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => navigate(`/products/edit/${product.id}`)}
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-muted-foreground hover:text-danger"
+                          onClick={() => handleDeleteClick(product.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     )}
                   </div>
-                  <div className="col-span-3 text-sm font-medium">{product.name}</div>
-                  <div className="col-span-2">
-                    <Badge variant="outline" className="text-xs">{product.state}</Badge>
-                  </div>
-                  <div className="col-span-1 text-sm font-medium">
-                    {product.cost ? `$${product.cost.toFixed(3)}` : '-'}
-                  </div>
-                  {!isEditMode && (
-                    <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 w-6 p-0"
-                        onClick={() => navigate(`/products/edit/${product.id}`)}
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                        onClick={() => handleDeleteClick(product.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+
+                  {/* Expanded State Details */}
+                  {isExpanded && product.states.length > 0 && (
+                    <div className="bg-muted/30 border-t border-border">
+                      <div className="px-8 py-3 space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">State Variants</p>
+                        {product.states.map((state) => (
+                          <div key={state.id} className="flex items-center gap-4 text-sm py-1.5">
+                            <Badge variant="outline" className="text-xs min-w-[40px] justify-center">{state.state}</Badge>
+                            <span className={cn("text-xs font-medium", getStatusColor(state.status))}>{state.status}</span>
+                            {state.specs && <span className="text-xs text-muted-foreground">{state.specs}</span>}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
-
-                {/* Expanded State Rows */}
-                {isExpanded && (
-                  <div className="bg-table-row">
-                    {/* Sub-header */}
-                    <div className="bg-table-header border-t border-b border-table-border">
-                      <div className="grid grid-cols-12 gap-4 px-8 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        <div className="col-span-1">State</div>
-                        <div className="col-span-4">Specifications</div>
-                        <div className="col-span-3">Artwork</div>
-                        <div className="col-span-2">Status</div>
-                        <div className="col-span-2">Actions</div>
-                      </div>
-                    </div>
-                    {/* State Version Rows */}
-                    {product.states.map((stateVersion, index) => (
-                      <div 
-                        key={stateVersion.state} 
-                        className={`grid grid-cols-12 gap-4 px-8 py-2 hover:bg-table-row-hover transition-colors text-sm ${
-                          index !== product.states.length - 1 ? 'border-b border-table-border/30' : ''
-                        }`}
-                      >
-                        <div className="col-span-1">
-                          <Badge variant="outline" className="text-xs">{stateVersion.state}</Badge>
-                        </div>
-                        <div className="col-span-4 text-muted-foreground">{stateVersion.specs || '-'}</div>
-                        <div className="col-span-3 flex items-center gap-1 font-mono text-xs">
-                          <Image className="h-3 w-3 text-muted-foreground" />
-                          {stateVersion.artwork_status}
-                        </div>
-                        <div className={`col-span-2 font-medium uppercase ${getStatusColor(stateVersion.status)}`}>
-                          {stateVersion.status}
-                        </div>
-                        <div className="col-span-2 flex items-center gap-1">
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                            <Download className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                            <Truck className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
-      </div>
+      </Card>
 
-      {filteredProducts.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          No products found matching your search criteria.
-        </div>
-      )}
-
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete selected products?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Product(s)</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete {productToDelete ? '1 product' : `${selectedProducts.size} products`} and all associated data including inventory records and state-specific configurations. This action cannot be undone.
+              Are you sure you want to delete {selectedProducts.size} product(s)? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
