@@ -418,12 +418,20 @@ Return ONLY valid JSON:
       return null;
     };
 
-    // Generate sequential order number like CreateOrder does
-    const { count } = await supabase
+    // Generate sequential order number by finding the max existing order number
+    const { data: maxOrderData } = await supabase
       .from('orders')
-      .select('*', { count: 'exact', head: true });
+      .select('order_number')
+      .order('order_number', { ascending: false })
+      .limit(1);
     
-    const orderNum = 10699 + ((count || 0) + 1);
+    let orderNum = 10700; // Default starting number
+    if (maxOrderData && maxOrderData.length > 0) {
+      const maxNum = parseInt(maxOrderData[0].order_number, 10);
+      if (!isNaN(maxNum)) {
+        orderNum = maxNum + 1;
+      }
+    }
     const orderNumber = String(orderNum);
 
     // Calculate totals - no tax for pull_ship orders
