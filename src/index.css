@@ -2,70 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* Modern SaaS Invoice Management Design System
+   Clean, professional dark theme with refined shadows and subtle accents
+   All colors in HSL format
 */
 
 @layer base {
   :root {
-    /* MFUSED Enterprise Dark Theme */
-    --background: 218 25% 6%;
+    /* Core background palette - deep, refined navy */
+    --background: 222 47% 6%;
     --foreground: 210 40% 98%;
 
-    --card: 218 20% 8%;
+    /* Cards - elevated surfaces with subtle distinction */
+    --card: 222 41% 9%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 218 20% 10%;
+    /* Popovers - slightly elevated above cards */
+    --popover: 222 41% 11%;
     --popover-foreground: 210 40% 98%;
 
+    /* Primary - vibrant blue for CTAs */
     --primary: 217 91% 60%;
-    --primary-foreground: 218 25% 6%;
+    --primary-foreground: 222 47% 6%;
 
-    --secondary: 218 15% 12%;
+    /* Secondary - subtle elevated surfaces */
+    --secondary: 222 30% 14%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 218 15% 10%;
-    --muted-foreground: 215 20% 65%;
+    /* Muted - background for inputs and subtle elements */
+    --muted: 222 30% 12%;
+    --muted-foreground: 215 20% 55%;
 
-    --accent: 218 15% 14%;
+    /* Accent - hover states and highlights */
+    --accent: 222 30% 16%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 75% 60%;
+    /* Destructive - errors and warnings */
+    --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 218 15% 15%;
-    --input: 218 15% 12%;
+    /* Borders and inputs */
+    --border: 222 30% 18%;
+    --input: 222 30% 14%;
     --ring: 217 91% 60%;
 
-    --radius: 0.25rem;
+    /* Modern radius for SaaS feel */
+    --radius: 0.625rem;
 
-    /* Enterprise status colors */
-    --success: 142 76% 36%;
+    /* Status colors - consistent and readable */
+    --success: 142 71% 45%;
     --success-foreground: 210 40% 98%;
-    --warning: 45 93% 47%;
-    --warning-foreground: 218 25% 6%;
-    --danger: 0 75% 60%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 6%;
+    --danger: 0 72% 51%;
     --danger-foreground: 210 40% 98%;
+    --info: 199 89% 48%;
+    --info-foreground: 210 40% 98%;
 
-    /* Enterprise table styling */
-    --table-header: 218 20% 10%;
-    --table-row: 218 15% 8%;
-    --table-row-hover: 218 15% 12%;
-    --table-border: 218 15% 18%;
-
-    /* Sidebar theme */
-    --sidebar-background: 218 30% 4%;
-    --sidebar-foreground: 215 20% 75%;
+    /* Sidebar - distinct dark panel */
+    --sidebar-background: 222 47% 5%;
+    --sidebar-foreground: 215 20% 65%;
     --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 218 25% 6%;
-    --sidebar-accent: 218 15% 8%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 222 30% 12%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 218 15% 10%;
+    --sidebar-border: 222 30% 14%;
     --sidebar-ring: 217 91% 60%;
 
-    /* Minimal shadows for enterprise look */
-    --shadow-sm: 0 1px 2px 0 hsl(218 25% 4% / 0.3);
-    --shadow-enterprise: 0 1px 3px 0 hsl(218 25% 4% / 0.4);
+    /* Chart colors for data visualization */
+    --chart-1: 217 91% 60%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 280 67% 60%;
+    --chart-5: 0 72% 51%;
   }
 }
 
@@ -75,6 +84,129 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* Modern utility classes */
+@layer utilities {
+  /* Gradient backgrounds */
+  .bg-gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(217 91% 50%) 100%);
+  }
+
+  .bg-gradient-subtle {
+    background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%);
+  }
+
+  /* Card hover states */
+  .card-hover {
+    @apply transition-all duration-200 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5;
+  }
+
+  /* Smooth focus states */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 focus:ring-offset-background;
+  }
+
+  /* Status badges */
+  .status-success {
+    @apply bg-success/15 text-success border-success/30;
+  }
+
+  .status-warning {
+    @apply bg-warning/15 text-warning border-warning/30;
+  }
+
+  .status-danger {
+    @apply bg-danger/15 text-danger border-danger/30;
+  }
+
+  .status-info {
+    @apply bg-info/15 text-info border-info/30;
+  }
+
+  /* Smooth animations */
+  .animate-in-smooth {
+    animation: fadeInUp 0.3s ease-out forwards;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Page header styling */
+  .page-header {
+    @apply mb-6 pb-6 border-b border-border;
+  }
+
+  .page-title {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+
+  /* Data table styling */
+  .data-table {
+    @apply rounded-lg border border-border overflow-hidden;
+  }
+
+  .data-table-header {
+    @apply bg-muted/50 border-b border-border;
+  }
+
+  .data-table-row {
+    @apply border-b border-border last:border-0 transition-colors hover:bg-accent/50;
+  }
+
+  /* Metric cards */
+  .metric-card {
+    @apply p-5 rounded-xl border border-border bg-card card-hover;
+  }
+
+  .metric-label {
+    @apply text-xs font-medium text-muted-foreground uppercase tracking-wider;
+  }
+
+  .metric-value {
+    @apply text-2xl font-semibold mt-1;
+  }
+
+  .metric-change {
+    @apply text-xs mt-2 flex items-center gap-1;
+  }
+
+  /* Empty states */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 text-center text-muted-foreground;
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 3px;
   }
 }
