@@ -1,0 +1,179 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
+
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) {
+      throw new Error('Unauthorized: Invalid token');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const formData = await req.formData();
+    const file = formData.get('file') as File;
+    const companyId = formData.get('company_id') as string;
+
+    if (!file) {
+      throw new Error('No file provided');
+    }
+
+    console.log(`Analyzing PO for products, company_id: ${companyId}, file: ${file.name}`);
+
+    // Validate user has access to this company
+    const { data: userRole, error: roleError } = await supabase
+      .from('user_roles')
+      .select('company_id, role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (roleError || !userRole) {
+      throw new Error('Unauthorized: No user role found');
+    }
+
+    if (userRole.role !== 'vibe_admin' && userRole.company_id !== companyId) {
+      throw new Error('Unauthorized: User does not have access to this company');
+    }
+
+    // Read file content
+    const arrayBuffer = await file.arrayBuffer();
+    
+    // Use pdf-parse library to extract text
+    console.log('Extracting text from PDF...');
+    const pdfParse = (await import('npm:pdf-parse@1.1.1')).default;
+    
+    let extractedText = '';
+    try {
+      const pdfData = await pdfParse(new Uint8Array(arrayBuffer));
+      extractedText = pdfData.text;
+      console.log('Successfully extracted text, length:', extractedText.length);
+    } catch (parseError) {
+      console.error('PDF parse error:', parseError);
+      throw new Error('Failed to parse PDF. Please ensure it is a valid PDF file.');
+    }
+
+    // Analyze with Lovable AI to extract products
+    console.log('Sending to AI for product extraction...');
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${lovableApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert at analyzing purchase orders and extracting product information.'
+          },
+          {
+            role: 'user',
+            content: `Analyze this purchase order and extract ALL product/item information. For each product found, extract:
+
+1. item_id/sku: The SKU or product code (e.g., "PCK-00430-WA", "12345")
+2. name: The product name/description
+3. description: Additional description if available
+4. state: The US state code if mentioned (e.g., "WA", "CA", "OR") - often embedded in SKU or mentioned separately
+5. cost: The unit price/rate as a decimal number
+6. product_type: Infer from context (e.g., "packaging", "label", "bag", "box", "jar", etc.)
+
+IMPORTANT:
+- Extract ALL line items from the PO
+- If state is embedded in SKU (like PCK-00430-WA), extract it as "WA"
+- cost should be a number (e.g., 0.218), not a formatted string
+- Be thorough - don't miss any products
+
+PURCHASE ORDER TEXT:
+${extractedText}
+
+Return ONLY valid JSON in this format:
+{
+  "products": [
+    {
+      "item_id": "SKU-CODE",
+      "name": "Product Name",
+      "description": "Optional description",
+      "state": "XX or null",
+      "cost": 0.00,
+      "product_type": "packaging"
+    }
+  ],
+  "customer_name": "Customer/Vendor name from PO"
+}`
+          }
+        ],
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      if (aiResponse.status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limits exceeded, please try again later." }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (aiResponse.status === 402) {
+        return new Response(JSON.stringify({ error: "Payment required, please add funds to your workspace." }), {
+          status: 402,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const errorText = await aiResponse.text();
+      console.error('AI API error:', aiResponse.status, errorText);
+      throw new Error('Failed to analyze with AI');
+    }
+
+    const aiData = await aiResponse.json();
+    let content = aiData.choices[0].message.content;
+    console.log('Raw AI response:', content.substring(0, 500));
+    
+    // Remove markdown code blocks if present
+    content = content.replace(/^```(?:json)?\s*\n/m, '').replace(/\n```\s*$/m, '');
+    
+    const extractedData = JSON.parse(content);
+    console.log('Extracted products count:', extractedData.products?.length || 0);
+
+    return new Response(JSON.stringify({
+      success: true,
+      products: extractedData.products || [],
+      customer_name: extractedData.customer_name || null,
+      filename: file.name
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Error in analyze-po-products:', error);
+    return new Response(JSON.stringify({ 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
