@@ -81,7 +81,7 @@ const Customers = () => {
     
     if (error) {
       toast({
-        title: "Error loading customers",
+        title: "Error loading companies",
         description: error.message,
         variant: "destructive",
       });
@@ -170,8 +170,8 @@ const Customers = () => {
         if (error) throw error;
 
         toast({
-          title: "Customer updated",
-          description: "Customer information has been updated successfully.",
+          title: "Company updated",
+          description: "Company information has been updated successfully.",
         });
       } else {
         const { error } = await supabase
@@ -181,8 +181,8 @@ const Customers = () => {
         if (error) throw error;
 
         toast({
-          title: "Customer created",
-          description: "New customer has been created successfully.",
+          title: "Company created",
+          description: "New company has been created successfully.",
         });
       }
 
@@ -199,7 +199,7 @@ const Customers = () => {
         setFormErrors(errors);
       } else {
         toast({
-          title: "Error saving customer",
+          title: "Error saving company",
           description: error.message,
           variant: "destructive",
         });
@@ -219,15 +219,15 @@ const Customers = () => {
       if (error) throw error;
 
       toast({
-        title: "Customer deleted",
-        description: "Customer has been deleted successfully.",
+        title: "Company deleted",
+        description: "Company has been deleted successfully.",
       });
 
       setShowDeleteDialog(false);
       fetchCustomers();
     } catch (error: any) {
       toast({
-        title: "Error deleting customer",
+        title: "Error deleting company",
         description: error.message,
         variant: "destructive",
       });
@@ -244,12 +244,12 @@ const Customers = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Customers</h1>
-          <p className="text-muted-foreground mt-1">Manage your customer contacts and information</p>
+          <h1 className="text-3xl font-bold">Companies</h1>
+          <p className="text-muted-foreground mt-1">Manage your company accounts and information</p>
         </div>
         <Button onClick={() => handleOpenDialog()}>
           <Plus className="h-4 w-4 mr-2" />
-          Add Customer
+          Add Company
         </Button>
       </div>
 
@@ -258,7 +258,7 @@ const Customers = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder="Search customers..."
+            placeholder="Search companies..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -270,7 +270,7 @@ const Customers = () => {
       <div className="border border-table-border rounded">
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div className="col-span-3">Customer Name</div>
+            <div className="col-span-3">Company Name</div>
             <div className="col-span-3">Contact</div>
             <div className="col-span-3">Billing Address</div>
             <div className="col-span-2">QuickBooks</div>
@@ -281,11 +281,11 @@ const Customers = () => {
         <div className="divide-y divide-table-border">
           {loading ? (
             <div className="text-center py-12 text-muted-foreground">
-              Loading customers...
+              Loading companies...
             </div>
           ) : filteredCustomers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              No customers found. Create your first customer to get started.
+              No companies found. Create your first company to get started.
             </div>
           ) : (
             filteredCustomers.map((customer) => (
@@ -374,9 +374,9 @@ const Customers = () => {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add Customer'}</DialogTitle>
+            <DialogTitle>{editingCustomer ? 'Edit Company' : 'Add Company'}</DialogTitle>
             <DialogDescription>
-              {editingCustomer ? 'Update customer information' : 'Create a new customer contact'}
+              {editingCustomer ? 'Update company information' : 'Create a new company account'}
             </DialogDescription>
           </DialogHeader>
 
@@ -386,12 +386,12 @@ const Customers = () => {
               <h3 className="font-semibold">Basic Information</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <Label htmlFor="name">Customer Name *</Label>
+                  <Label htmlFor="name">Company Name *</Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Common Citizen"
+                    placeholder="Company Name"
                   />
                   {formErrors.name && <p className="text-sm text-destructive mt-1">{formErrors.name}</p>}
                 </div>
@@ -524,7 +524,7 @@ const Customers = () => {
               Cancel
             </Button>
             <Button onClick={handleSave}>
-              {editingCustomer ? 'Update Customer' : 'Create Customer'}
+              {editingCustomer ? 'Update Company' : 'Create Company'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -534,7 +534,7 @@ const Customers = () => {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Customer?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Company?</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete "{deletingCustomer?.name}"? This action cannot be undone.
             </AlertDialogDescription>

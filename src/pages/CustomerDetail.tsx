@@ -128,7 +128,7 @@ const CustomerDetail = () => {
 
     if (error) {
       toast({
-        title: "Error loading customer",
+        title: "Error loading company",
         description: error.message,
         variant: "destructive",
       });
@@ -189,8 +189,8 @@ const CustomerDetail = () => {
       if (error) throw error;
 
       toast({
-        title: "Customer updated",
-        description: "Customer information has been saved successfully.",
+        title: "Company updated",
+        description: "Company information has been saved successfully.",
       });
 
       fetchCustomerDetails();
@@ -205,7 +205,7 @@ const CustomerDetail = () => {
         setFormErrors(errors);
       } else {
         toast({
-          title: "Error saving customer",
+          title: "Error saving company",
           description: error.message,
           variant: "destructive",
         });
@@ -257,7 +257,7 @@ const CustomerDetail = () => {
 
       toast({
         title: "Product removed",
-        description: "Product has been unlinked from this customer",
+        description: "Product has been unlinked from this company",
       });
 
       fetchCustomerProducts();
@@ -699,7 +699,7 @@ const CustomerDetail = () => {
           </Button>
           <div>
             <h1 className="text-3xl font-bold">{customer.name}</h1>
-            <p className="text-muted-foreground mt-1">Manage customer information, contacts, and products</p>
+            <p className="text-muted-foreground mt-1">Manage company information, contacts, and products</p>
           </div>
         </div>
         <Button onClick={handleSave} disabled={saving}>
@@ -739,12 +739,12 @@ const CustomerDetail = () => {
           <Card>
             <CardHeader>
               <CardTitle>Contact Information</CardTitle>
-              <CardDescription>Primary contact details for this customer</CardDescription>
+              <CardDescription>Primary contact details for this company</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <Label htmlFor="name">Customer Name *</Label>
+                  <Label htmlFor="name">Company Name *</Label>
                   <Input
                     id="name"
                     value={formData.name}

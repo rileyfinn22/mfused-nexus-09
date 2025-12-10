@@ -51,7 +51,7 @@ const vibeAdminNavigationItems = [
   { title: "Vendors", url: "/vendors", icon: Building2 },
   { title: "Vendor POs", url: "/vendor-pos", icon: FolderOpen },
   { title: "Invoices", url: "/invoices", icon: FileText },
-  { title: "Customers", url: "/customers", icon: Users },
+  { title: "Companies", url: "/customers", icon: Building2 },
   { title: "Products", url: "/products", icon: Package },
   { title: "Inventory", url: "/inventory", icon: Archive },
   { title: "Artwork", url: "/artwork", icon: Image },
