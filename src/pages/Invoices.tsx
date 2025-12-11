@@ -208,7 +208,7 @@ const Invoices = () => {
     return items;
   });
 
-  // Calculate open amount - total of all blanket (full) invoices minus payments
+  // Calculate open amount - total of all blanket (full) invoices minus all payments (including child invoices)
   const openAmount = filteredInvoices
     .filter(inv => {
       // Only count blanket/full invoices that are not fully paid
@@ -218,8 +218,15 @@ const Invoices = () => {
       return isBlanket && isNotPaid;
     })
     .reduce((sum, invoice) => {
-      // Calculate remaining amount: total minus what's been paid on this invoice
-      const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
+      // Get all child invoices for this parent
+      const childInvoices = invoices.filter(inv => inv.parent_invoice_id === invoice.id);
+      // Sum payments on parent and all children
+      const parentPaid = Number(invoice.total_paid) || 0;
+      const childrenPaid = childInvoices.reduce((childSum, child) => 
+        childSum + (Number(child.total_paid) || 0), 0);
+      const totalPaid = parentPaid + childrenPaid;
+      // Calculate remaining amount: parent total minus all payments
+      const remaining = Number(invoice.total) - totalPaid;
       return sum + remaining;
     }, 0);
 
