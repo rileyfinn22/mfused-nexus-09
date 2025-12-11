@@ -87,29 +87,30 @@ const Invoices = () => {
     }
   };
 
-  const getStatusColor = (status: string, isDue?: boolean) => {
+  const getStatusColor = (status: string) => {
     if (status === 'PAID') return 'text-green-600 dark:text-green-400';
-    if (isDue || status === 'DUE') return 'text-red-600 dark:text-red-400';
-    if (status === 'Pending Due') return 'text-yellow-600 dark:text-yellow-400';
-    if (status === 'PARTIAL') return 'text-blue-600 dark:text-blue-400';
-    if (status === 'CLOSED') return 'text-gray-600 dark:text-gray-400';
+    if (status === 'DUE') return 'text-red-600 dark:text-red-400';
+    if (status === 'OPEN') return 'text-yellow-600 dark:text-yellow-400';
     return 'text-muted-foreground';
   };
 
   const getStatusIcon = (invoice: any) => {
-    if (invoice.status === 'paid') return CheckCircle;
-    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'synced') return AlertTriangle;
-    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'pending') return Clock;
-    if (invoice.status === 'partial') return Clock;
+    const status = getStatusDisplay(invoice);
+    if (status === 'PAID') return CheckCircle;
+    if (status === 'DUE') return AlertTriangle;
     return Clock;
   };
 
   const getStatusDisplay = (invoice: any) => {
     if (invoice.status === 'paid') return 'PAID';
-    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'synced') return 'DUE';
-    if (invoice.status === 'open' && invoice.quickbooks_sync_status === 'pending') return 'Pending Due';
-    if (invoice.status === 'partial') return 'PARTIAL';
-    return invoice.status.replace('_', ' ').toUpperCase();
+    
+    // Not paid - check if past due
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isPastDue = invoice.due_date && new Date(invoice.due_date) <= today;
+    
+    if (isPastDue) return 'DUE';
+    return 'OPEN';
   };
 
   const getDaysUntilDue = (dueDate: string) => {
@@ -508,13 +509,8 @@ const Invoices = () => {
                   <div className="col-span-1 text-sm">{invoice.orders?.po_number || 'N/A'}</div>
                   <div className="col-span-1 text-sm font-medium">
                     <div className="flex items-center gap-1">
-                      <StatusIcon className={`h-3 w-3 ${getStatusColor(displayStatus, showDueStatus)}`} />
-                      <span className={getStatusColor(displayStatus, showDueStatus)}>{displayStatus}</span>
-                      {showDueStatus && hasChildren && (
-                        <span title="Contains due partial invoices">
-                          <AlertCircle className="h-3 w-3 text-red-600 dark:text-red-400 ml-1" />
-                        </span>
-                      )}
+                      <StatusIcon className={`h-3 w-3 ${getStatusColor(displayStatus)}`} />
+                      <span className={getStatusColor(displayStatus)}>{displayStatus}</span>
                     </div>
                   </div>
                   <div className="col-span-1 flex gap-1">
