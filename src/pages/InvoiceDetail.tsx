@@ -869,30 +869,43 @@ const InvoiceDetail = () => {
                       </div>
                       
                       <div className="bg-background/50 border rounded-lg p-4">
-                        <div className="text-sm text-muted-foreground mb-1">Payment Status</div>
-                        {(() => {
-                      const amountDue = Number(displayTotal) - Number(invoice.total_paid || 0);
-                      const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
-                      const today = new Date();
-                      const daysOverdue = dueDate ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-                      if (amountDue <= 0) {
-                        return <div className="text-xl font-semibold text-green-600">Paid in Full</div>;
-                      } else if (dueDate && daysOverdue > 0) {
-                        return <>
-                                <div className="text-xl font-semibold text-red-600">Past Due</div>
-                                <div className="text-xs text-red-600 mt-1">{daysOverdue} days overdue</div>
-                              </>;
-                      } else if (dueDate) {
-                        return <>
-                                <div className="text-xl font-semibold text-yellow-600">Open</div>
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  {Math.abs(daysOverdue)} days remaining
-                                </div>
-                              </>;
-                      } else {
-                        return <div className="text-xl font-semibold">Open</div>;
-                      }
-                    })()}
+                        <div className="text-sm text-muted-foreground mb-1">Status</div>
+                        <Select
+                          value={invoice.status}
+                          onValueChange={async (value) => {
+                            const { error } = await supabase
+                              .from('invoices')
+                              .update({ status: value })
+                              .eq('id', invoice.id);
+                            
+                            if (error) {
+                              toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+                            } else {
+                              setInvoice({ ...invoice, status: value });
+                              toast({ title: "Status updated" });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-full text-xl font-semibold h-auto py-1">
+                            <SelectValue>
+                              {invoice.status === 'paid' && <span className="text-green-600">PAID</span>}
+                              {invoice.status === 'open' && <span className="text-yellow-600">OPEN</span>}
+                              {invoice.status === 'due' && <span className="text-red-600">DUE</span>}
+                              {!['paid', 'open', 'due'].includes(invoice.status) && <span>{invoice.status?.toUpperCase()}</span>}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="open">
+                              <span className="text-yellow-600 font-medium">OPEN</span>
+                            </SelectItem>
+                            <SelectItem value="due">
+                              <span className="text-red-600 font-medium">DUE</span>
+                            </SelectItem>
+                            <SelectItem value="paid">
+                              <span className="text-green-600 font-medium">PAID</span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     
