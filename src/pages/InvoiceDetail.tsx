@@ -7,7 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
@@ -825,13 +829,43 @@ const InvoiceDetail = () => {
                       
                       <div className="bg-background/50 border rounded-lg p-4">
                         <div className="text-sm text-muted-foreground mb-1">Due Date</div>
-                        <div className="text-xl font-semibold">
-                          {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      }) : 'Upon Receipt'}
-                        </div>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-semibold text-xl h-auto py-1",
+                                !invoice.due_date && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {invoice.due_date ? format(new Date(invoice.due_date), "MMM d, yyyy") : "Set Due Date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={invoice.due_date ? new Date(invoice.due_date) : undefined}
+                              onSelect={async (date) => {
+                                if (date) {
+                                  const { error } = await supabase
+                                    .from('invoices')
+                                    .update({ due_date: date.toISOString() })
+                                    .eq('id', invoice.id);
+                                  
+                                  if (error) {
+                                    toast({ title: "Error", description: "Failed to update due date", variant: "destructive" });
+                                  } else {
+                                    setInvoice({ ...invoice, due_date: date.toISOString() });
+                                    toast({ title: "Due date updated" });
+                                  }
+                                }
+                              }}
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       
                       <div className="bg-background/50 border rounded-lg p-4">
