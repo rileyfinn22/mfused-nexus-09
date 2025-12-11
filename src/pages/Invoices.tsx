@@ -176,7 +176,27 @@ const Invoices = () => {
     const matchesSearch = invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          invoice.orders?.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          invoice.orders?.customer_name?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || invoice.status.toLowerCase() === statusFilter;
+    
+    // Status filter logic
+    let matchesStatus = true;
+    if (statusFilter === "paid") {
+      matchesStatus = invoice.status === 'paid';
+    } else if (statusFilter === "due") {
+      // Due = not paid and past due date
+      const isNotPaid = invoice.status !== 'paid';
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isPastDue = invoice.due_date && new Date(invoice.due_date) <= today;
+      matchesStatus = isNotPaid && isPastDue;
+    } else if (statusFilter === "open") {
+      // Open = not paid and not past due
+      const isNotPaid = invoice.status !== 'paid';
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isPastDue = invoice.due_date && new Date(invoice.due_date) <= today;
+      matchesStatus = isNotPaid && !isPastDue;
+    }
+    
     const matchesCompany = companyFilter === "all" || invoice.company_id === companyFilter;
     return matchesSearch && matchesStatus && matchesCompany;
   });
@@ -303,6 +323,7 @@ const Invoices = () => {
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="open">Open</SelectItem>
+            <SelectItem value="due">Due</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
           </SelectContent>
         </Select>
