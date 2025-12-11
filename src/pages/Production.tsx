@@ -174,8 +174,20 @@ export default function Production() {
 
   const calculateProgress = (stages: any[]) => {
     if (stages.length === 0) return 0;
-    const completedStages = stages.filter(s => s.status === 'completed').length;
-    return Math.round((completedStages / stages.length) * 100);
+    // Each stage contributes 20% max: 10% for in_progress, 20% for completed
+    const maxPerStage = 100 / stages.length;
+    const progressPerStage = maxPerStage / 2; // Half for in_progress, full for completed
+    
+    let totalProgress = 0;
+    stages.forEach(stage => {
+      if (stage.status === 'completed') {
+        totalProgress += maxPerStage; // Full 20% (or proportional amount)
+      } else if (stage.status === 'in_progress') {
+        totalProgress += progressPerStage; // Half = 10% (or proportional amount)
+      }
+    });
+    
+    return Math.round(totalProgress);
   };
 
   const filteredOrders = orders.filter(order =>

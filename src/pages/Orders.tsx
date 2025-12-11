@@ -116,8 +116,19 @@ const Orders = () => {
             .eq('order_id', order.id);
           
           if (stages && stages.length > 0) {
-            const completedStages = stages.filter(s => s.status === 'completed').length;
-            productionProgress = Math.round((completedStages / stages.length) * 100);
+            // Each stage contributes proportionally: 10% for in_progress, 20% for completed
+            const maxPerStage = 100 / stages.length;
+            const progressPerStage = maxPerStage / 2;
+            
+            let totalProgress = 0;
+            stages.forEach(s => {
+              if (s.status === 'completed') {
+                totalProgress += maxPerStage;
+              } else if (s.status === 'in_progress') {
+                totalProgress += progressPerStage;
+              }
+            });
+            productionProgress = Math.round(totalProgress);
           }
         }
         
