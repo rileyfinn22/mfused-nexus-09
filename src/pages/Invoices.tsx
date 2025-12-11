@@ -103,13 +103,7 @@ const Invoices = () => {
 
   const getStatusDisplay = (invoice: any) => {
     if (invoice.status === 'paid') return 'PAID';
-    
-    // Not paid - check if past due
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const isPastDue = invoice.due_date && new Date(invoice.due_date) <= today;
-    
-    if (isPastDue) return 'DUE';
+    if (invoice.status === 'due') return 'DUE';
     return 'OPEN';
   };
 
@@ -178,24 +172,14 @@ const Invoices = () => {
                          invoice.orders?.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          invoice.orders?.customer_name?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    // Status filter logic
+    // Status filter logic - now uses the actual status field
     let matchesStatus = true;
     if (statusFilter === "paid") {
       matchesStatus = invoice.status === 'paid';
     } else if (statusFilter === "due") {
-      // Due = not paid and past due date
-      const isNotPaid = invoice.status !== 'paid';
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const isPastDue = invoice.due_date && new Date(invoice.due_date) <= today;
-      matchesStatus = isNotPaid && isPastDue;
+      matchesStatus = invoice.status === 'due';
     } else if (statusFilter === "open") {
-      // Open = not paid and not past due
-      const isNotPaid = invoice.status !== 'paid';
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const isPastDue = invoice.due_date && new Date(invoice.due_date) <= today;
-      matchesStatus = isNotPaid && !isPastDue;
+      matchesStatus = invoice.status === 'open';
     }
     
     const matchesCompany = companyFilter === "all" || invoice.company_id === companyFilter;
@@ -239,22 +223,9 @@ const Invoices = () => {
       return sum + remaining;
     }, 0);
 
-  // Calculate DUE amount - sum of all invoices (partial or blanket) that are past due
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
+  // Calculate DUE amount - sum of all invoices with status = 'due'
   const dueAmount = filteredInvoices
-    .filter(inv => {
-      // Must have open or partial status (not fully paid)
-      const hasOpenOrPartialStatus = inv.status === 'open' || inv.status === 'partial';
-      if (!hasOpenOrPartialStatus) return false;
-      
-      // Must have a due date that has passed
-      if (!inv.due_date) return false;
-      const dueDate = new Date(inv.due_date);
-      dueDate.setHours(0, 0, 0, 0);
-      return dueDate <= today;
-    })
+    .filter(inv => inv.status === 'due')
     .reduce((sum, invoice) => {
       // Calculate remaining amount: total minus what's been paid on this invoice
       const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
