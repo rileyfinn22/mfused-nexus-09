@@ -208,8 +208,9 @@ const Invoices = () => {
     .filter(inv => {
       // Only count blanket/full invoices that are not fully paid
       const isBlanket = inv.invoice_type === 'full' || !inv.invoice_type;
-      const hasOpenOrPartialStatus = inv.status === 'open' || inv.status === 'partial';
-      return isBlanket && hasOpenOrPartialStatus;
+      // Include open, partial, final_review, and any non-paid status
+      const isNotPaid = inv.status !== 'paid';
+      return isBlanket && isNotPaid;
     })
     .reduce((sum, invoice) => {
       // Calculate remaining amount: total minus what's been paid on this invoice
