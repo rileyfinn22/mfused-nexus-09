@@ -750,10 +750,9 @@ const InvoiceDetail = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending">PENDING DUE</SelectItem>
-                    <SelectItem value="open">DUE</SelectItem>
+                    <SelectItem value="open">OPEN</SelectItem>
+                    <SelectItem value="due">DUE</SelectItem>
                     <SelectItem value="paid">PAID</SelectItem>
-                    <SelectItem value="closed">CLOSED</SelectItem>
                   </SelectContent>
                 </Select>
                 <div className="mt-4">
