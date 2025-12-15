@@ -210,8 +210,15 @@ const CreateOrder = () => {
   };
 
   const loadCompanyAddresses = async () => {
-    // Get the selected company details
-    const selectedCompany = companies.find(c => c.id === selectedCompanyId);
+    // Get the selected company details with full address info
+    const { data: companyData } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', selectedCompanyId)
+      .single();
+    
+    const selectedCompany = companyData;
+    const companyName = selectedCompany?.name || '';
     
     const { data, error } = await supabase
       .from('customer_addresses')
@@ -219,33 +226,37 @@ const CreateOrder = () => {
       .eq('company_id', selectedCompanyId)
       .order('is_default', { ascending: false });
     
-    if (!error && data) {
-      // Auto-fill with default addresses or first addresses
+    if (!error && data && data.length > 0) {
+      // Auto-fill with default addresses or first addresses from customer_addresses
       const defaultShipping = data.find(a => a.address_type === 'shipping' && a.is_default) || 
                               data.find(a => a.address_type === 'shipping');
       const defaultBilling = data.find(a => a.address_type === 'billing' && a.is_default) || 
                              data.find(a => a.address_type === 'billing');
-
-      // Set customer name to company name
-      const companyName = selectedCompany?.name || '';
       
       if (defaultShipping) {
         setFormData(prev => ({
           ...prev,
-          customerName: companyName, // Use company name as customer name
-          customerEmail: defaultShipping.customer_email || "",
-          customerPhone: defaultShipping.customer_phone || "",
+          customerName: companyName,
+          customerEmail: defaultShipping.customer_email || selectedCompany?.email || "",
+          customerPhone: defaultShipping.customer_phone || selectedCompany?.phone || "",
           shippingName: defaultShipping.name,
           shippingStreet: defaultShipping.street,
           shippingCity: defaultShipping.city,
           shippingState: defaultShipping.state,
           shippingZip: defaultShipping.zip,
         }));
-      } else {
-        // If no saved address, just set customer name
+      } else if (selectedCompany) {
+        // Fall back to company shipping address
         setFormData(prev => ({
           ...prev,
           customerName: companyName,
+          customerEmail: selectedCompany.email || "",
+          customerPhone: selectedCompany.phone || "",
+          shippingName: companyName,
+          shippingStreet: selectedCompany.shipping_street || "",
+          shippingCity: selectedCompany.shipping_city || "",
+          shippingState: selectedCompany.shipping_state || "",
+          shippingZip: selectedCompany.shipping_zip || "",
         }));
       }
 
@@ -258,15 +269,38 @@ const CreateOrder = () => {
           billingState: defaultBilling.state,
           billingZip: defaultBilling.zip,
         }));
+      } else if (selectedCompany && !sameAsBilling) {
+        // Fall back to company billing address
+        setFormData(prev => ({
+          ...prev,
+          billingName: companyName,
+          billingStreet: selectedCompany.billing_street || "",
+          billingCity: selectedCompany.billing_city || "",
+          billingState: selectedCompany.billing_state || "",
+          billingZip: selectedCompany.billing_zip || "",
+        }));
       }
 
       setSavedAddresses(data);
     } else if (selectedCompany) {
-      // No saved addresses, just set company name as customer name
+      // No saved customer addresses, use company address info directly
       setFormData(prev => ({
         ...prev,
-        customerName: selectedCompany.name,
+        customerName: companyName,
+        customerEmail: selectedCompany.email || "",
+        customerPhone: selectedCompany.phone || "",
+        shippingName: companyName,
+        shippingStreet: selectedCompany.shipping_street || "",
+        shippingCity: selectedCompany.shipping_city || "",
+        shippingState: selectedCompany.shipping_state || "",
+        shippingZip: selectedCompany.shipping_zip || "",
+        billingName: sameAsBilling ? "" : companyName,
+        billingStreet: sameAsBilling ? "" : (selectedCompany.billing_street || ""),
+        billingCity: sameAsBilling ? "" : (selectedCompany.billing_city || ""),
+        billingState: sameAsBilling ? "" : (selectedCompany.billing_state || ""),
+        billingZip: sameAsBilling ? "" : (selectedCompany.billing_zip || ""),
       }));
+      setSavedAddresses([]);
     }
   };
 
