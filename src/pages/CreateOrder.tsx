@@ -822,12 +822,17 @@ const CreateOrder = () => {
           (existingItems || []).map(item => [item.product_id, item])
         );
       } else {
-        // Create new order with sequential number starting from 10700
-        const { count } = await supabase
+        // Create new order with sequential number - get max existing order number
+        const { data: maxOrderData } = await supabase
           .from('orders')
-          .select('*', { count: 'exact', head: true });
+          .select('order_number')
+          .order('order_number', { ascending: false })
+          .limit(1)
+          .single();
         
-        const orderNum = 10699 + ((count || 0) + 1);
+        // Parse the max order number and increment, or start at 10700
+        const maxOrderNum = maxOrderData ? parseInt(maxOrderData.order_number, 10) : 10699;
+        const orderNum = (isNaN(maxOrderNum) ? 10699 : maxOrderNum) + 1;
         orderNumber = String(orderNum);
 
         const { data: newOrder, error: orderError } = await supabase
