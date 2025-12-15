@@ -294,11 +294,12 @@ const CreateOrder = () => {
         shippingCity: selectedCompany.shipping_city || "",
         shippingState: selectedCompany.shipping_state || "",
         shippingZip: selectedCompany.shipping_zip || "",
-        billingName: sameAsBilling ? "" : companyName,
-        billingStreet: sameAsBilling ? "" : (selectedCompany.billing_street || ""),
-        billingCity: sameAsBilling ? "" : (selectedCompany.billing_city || ""),
-        billingState: sameAsBilling ? "" : (selectedCompany.billing_state || ""),
-        billingZip: sameAsBilling ? "" : (selectedCompany.billing_zip || ""),
+        // Always load billing address - it will be hidden if sameAsBilling is checked
+        billingName: companyName,
+        billingStreet: selectedCompany.billing_street || "",
+        billingCity: selectedCompany.billing_city || "",
+        billingState: selectedCompany.billing_state || "",
+        billingZip: selectedCompany.billing_zip || "",
       }));
       setSavedAddresses([]);
     }
