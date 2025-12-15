@@ -137,16 +137,7 @@ const Customers = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!userRole) throw new Error("No company associated");
-
       const customerData = {
-        company_id: userRole.company_id,
         name: validated.name,
         email: validated.email || null,
         phone: validated.phone || null,
