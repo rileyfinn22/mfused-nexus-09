@@ -234,10 +234,10 @@ export default function Production() {
 
         <div className="border border-table-border rounded">
           <div className="bg-table-header border-b border-table-border">
-            <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider`}>
               <div className="col-span-2">Order #</div>
               {isVibeAdmin && <div className="col-span-2">Company</div>}
-              <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Customer</div>
+              <div className="col-span-2">Customer</div>
               <div className="col-span-1">PO #</div>
               <div className="col-span-1">State</div>
               <div className="col-span-1">Total</div>
@@ -259,15 +259,15 @@ export default function Production() {
               filteredOrders.map((order) => (
                 <div
                   key={order.id}
-                  className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                  className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer`}
                   onClick={() => navigate(`/orders/${order.id}`)}
                 >
                   <div className="col-span-2 font-medium font-mono text-sm">{order.order_number}</div>
                   {isVibeAdmin && (
-                    <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
+                    <div className="col-span-2 text-sm font-medium truncate">{order.companies?.name || '-'}</div>
                   )}
-                  <div className={isVibeAdmin ? "col-span-2 text-sm" : "col-span-3 text-sm"}>{order.customer_name}</div>
-                  <div className="col-span-1 text-sm">{order.po_number || '-'}</div>
+                  <div className="col-span-2 text-sm truncate">{order.customer_name}</div>
+                  <div className="col-span-1 text-sm truncate">{order.po_number || '-'}</div>
                   <div className="col-span-1">
                     <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                   </div>
