@@ -235,14 +235,14 @@ export default function Production() {
         <div className="border border-table-border rounded">
           <div className="bg-table-header border-b border-table-border">
             <div className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider`}>
-              <div className="col-span-2">Order #</div>
-              {isVibeAdmin && <div className="col-span-2">Company</div>}
-              <div className="col-span-2">Customer</div>
-              <div className="col-span-1">PO #</div>
-              <div className="col-span-1">State</div>
-              <div className="col-span-1">Total</div>
-              <div className="col-span-2">Progress</div>
-              <div className="col-span-1">Order Date</div>
+              <div className="col-span-2 text-left">Order #</div>
+              {isVibeAdmin && <div className="col-span-2 text-left">Company</div>}
+              <div className="col-span-2 text-left">Customer</div>
+              <div className="col-span-1 text-left">PO #</div>
+              <div className="col-span-1 text-left">State</div>
+              <div className="col-span-1 text-left">Total</div>
+              <div className="col-span-2 text-left">Progress</div>
+              <div className="col-span-1 text-left">Order Date</div>
             </div>
           </div>
           <div className="divide-y divide-table-border">
@@ -262,17 +262,17 @@ export default function Production() {
                   className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer`}
                   onClick={() => navigate(`/orders/${order.id}`)}
                 >
-                  <div className="col-span-2 font-medium font-mono text-sm">{order.order_number}</div>
+                  <div className="col-span-2 text-left font-medium font-mono text-sm">{order.order_number}</div>
                   {isVibeAdmin && (
-                    <div className="col-span-2 text-sm font-medium truncate">{order.companies?.name || '-'}</div>
+                    <div className="col-span-2 text-left text-sm font-medium truncate">{order.companies?.name || '-'}</div>
                   )}
-                  <div className="col-span-2 text-sm truncate">{order.customer_name}</div>
-                  <div className="col-span-1 text-sm truncate">{order.po_number || '-'}</div>
-                  <div className="col-span-1">
+                  <div className="col-span-2 text-left text-sm truncate">{order.customer_name}</div>
+                  <div className="col-span-1 text-left text-sm truncate">{order.po_number || '-'}</div>
+                  <div className="col-span-1 text-left">
                     <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                   </div>
-                  <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
-                  <div className="col-span-2">
+                  <div className="col-span-1 text-left text-sm">${order.total?.toFixed(2)}</div>
+                  <div className="col-span-2 text-left">
                     <div className="flex items-center gap-2">
                       <Progress value={order.production_progress || 0} className="h-2 flex-1" />
                       <span className="text-xs font-medium text-muted-foreground w-8">
@@ -280,7 +280,7 @@ export default function Production() {
                       </span>
                     </div>
                   </div>
-                  <div className="col-span-1 text-sm text-muted-foreground">
+                  <div className="col-span-1 text-left text-sm text-muted-foreground">
                     {new Date(order.order_date).toLocaleDateString()}
                   </div>
                 </div>
