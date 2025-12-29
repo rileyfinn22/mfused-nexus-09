@@ -130,6 +130,56 @@ export type Database = {
         }
         Relationships: []
       }
+      company_invitations: {
+        Row: {
+          accepted_at: string | null
+          company_id: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invitation_token: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          company_id: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invitation_token?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          company_id?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invitation_token?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_invitations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_settings: {
         Row: {
           address_city: string | null
@@ -1552,6 +1602,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_company_invitation: {
+        Args: { invitation_token_param: string; user_email: string }
+        Returns: Json
+      }
       accept_vendor_invitation: {
         Args: { invitation_token_param: string; user_email: string }
         Returns: Json
@@ -1559,6 +1613,15 @@ export type Database = {
       can_view_child_order: {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
+      }
+      get_invitation_details: {
+        Args: { token_param: string }
+        Returns: {
+          company_name: string
+          email: string
+          expires_at: string
+          role: Database["public"]["Enums"]["app_role"]
+        }[]
       }
       get_qb_token_decrypted: {
         Args: { p_company_id: string; p_token_type: string }
