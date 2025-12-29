@@ -261,25 +261,46 @@ const CustomerDetail = () => {
     try {
       setDeletingProduct(true);
       
-      // Check if product is used in order_items
-      const { data: orderItems, error: orderItemsCheckError } = await supabase
+      // Check if product is used in non-draft orders (shipped, completed, etc.)
+      const { data: activeOrderItems, error: orderItemsCheckError } = await supabase
         .from('order_items')
-        .select('id')
+        .select('id, orders!inner(status)')
         .eq('product_id', productToDelete.id)
-        .limit(1);
+        .not('orders.status', 'eq', 'draft');
 
       if (orderItemsCheckError) {
         console.error('Error checking order items:', orderItemsCheckError);
       }
 
-      if (orderItems && orderItems.length > 0) {
-        toast({
-          title: "Cannot delete product",
-          description: "This product is used in existing orders. Remove it from orders first or archive it instead.",
-          variant: "destructive",
-        });
-        setDeletingProduct(false);
-        return;
+      if (activeOrderItems && activeOrderItems.length > 0) {
+        // Set product_id to null for historical order items instead of blocking
+        const { error: updateError } = await supabase
+          .from('order_items')
+          .update({ product_id: null })
+          .eq('product_id', productToDelete.id);
+        
+        if (updateError) {
+          console.error('Error unlinking order items:', updateError);
+        }
+      }
+
+      // Delete order items from draft orders
+      const { data: draftOrderItems } = await supabase
+        .from('order_items')
+        .select('id, orders!inner(status)')
+        .eq('product_id', productToDelete.id)
+        .eq('orders.status', 'draft');
+
+      if (draftOrderItems && draftOrderItems.length > 0) {
+        const draftItemIds = draftOrderItems.map(item => item.id);
+        const { error: deleteItemsError } = await supabase
+          .from('order_items')
+          .delete()
+          .in('id', draftItemIds);
+        
+        if (deleteItemsError) {
+          console.error('Error deleting draft order items:', deleteItemsError);
+        }
       }
 
       // Delete related inventory records
