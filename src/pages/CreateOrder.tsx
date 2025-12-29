@@ -85,7 +85,7 @@ const CreateOrder = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [tempSelectedProducts, setTempSelectedProducts] = useState<string[]>([]);
   const [existingOrderNumber, setExistingOrderNumber] = useState<string | null>(null);
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  
   const [unmatchedPoItems, setUnmatchedPoItems] = useState<any[]>([]);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
@@ -713,14 +713,6 @@ const CreateOrder = () => {
       return;
     }
 
-    if (!isDraft && !termsAccepted) {
-      toast({
-        title: "Terms Required",
-        description: "Please accept the terms and conditions to place the order",
-        variant: "destructive",
-      });
-      return;
-    }
 
     try {
       orderSchema.parse(formData);
@@ -1684,53 +1676,17 @@ const CreateOrder = () => {
             />
           </div>
 
-          {/* Terms and Conditions */}
-          <div className="bg-muted/30 backdrop-blur rounded-lg p-6 border border-table-border space-y-4">
-            <h3 className="text-sm font-semibold uppercase text-muted-foreground">Terms and Conditions</h3>
-            <div className="space-y-3 text-sm text-muted-foreground max-h-64 overflow-y-auto pr-2">
-              <div>
-                <h4 className="font-semibold text-foreground mb-1">1. Payment Terms</h4>
-                <p>Payment is due according to the terms specified above. Late payments may incur additional fees. All prices are in USD unless otherwise specified.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-foreground mb-1">2. Order Acceptance</h4>
-                <p>All orders are subject to acceptance and availability. We reserve the right to refuse or cancel any order for any reason, including product availability, errors in pricing, or credit issues.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-foreground mb-1">3. Shipping and Delivery</h4>
-                <p>Delivery dates are estimates only. We are not liable for delays in delivery. Risk of loss passes to the buyer upon delivery to the carrier. Shipping charges are non-refundable.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-foreground mb-1">4. Returns and Cancellations</h4>
-                <p>Custom orders cannot be cancelled once production has begun. Standard items may be returned within 30 days in original condition. Restocking fees may apply. Customer is responsible for return shipping costs.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-foreground mb-1">5. Quality and Inspection</h4>
-                <p>Products are inspected before shipment. Claims for defects must be made within 7 days of receipt. Our liability is limited to replacement or refund of defective products.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-foreground mb-1">6. Artwork and Proofs</h4>
-                <p>Customer is responsible for approving artwork proofs. Once approved, we are not liable for errors in customer-provided content. Changes after approval may incur additional charges.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-foreground mb-1">7. Limitation of Liability</h4>
-                <p>Our liability is limited to the purchase price of the products. We are not liable for indirect, incidental, or consequential damages.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-foreground mb-1">8. Force Majeure</h4>
-                <p>We are not liable for delays or failure to perform due to circumstances beyond our reasonable control, including natural disasters, labor disputes, or supply chain disruptions.</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 pt-4 border-t border-table-border">
-              <Checkbox
-                id="termsAccepted"
-                checked={termsAccepted}
-                onCheckedChange={(checked) => setTermsAccepted(checked as boolean)}
-              />
-              <Label htmlFor="termsAccepted" className="text-sm cursor-pointer leading-relaxed">
-                I have read and agree to the terms and conditions outlined above. I understand that by placing this order, I am entering into a binding agreement.
-              </Label>
-            </div>
+          {/* Terms */}
+          <div className="space-y-2">
+            <Label htmlFor="orderTerms">Terms</Label>
+            <Textarea
+              id="orderTerms"
+              value={formData.terms}
+              onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
+              rows={4}
+              placeholder="Enter order terms..."
+              className="resize-y"
+            />
           </div>
         </div>
       </div>
