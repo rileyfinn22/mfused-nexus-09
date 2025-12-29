@@ -261,7 +261,38 @@ const CustomerDetail = () => {
     try {
       setDeletingProduct(true);
       
-      // First delete related product_states
+      // Check if product is used in order_items
+      const { data: orderItems, error: orderItemsCheckError } = await supabase
+        .from('order_items')
+        .select('id')
+        .eq('product_id', productToDelete.id)
+        .limit(1);
+
+      if (orderItemsCheckError) {
+        console.error('Error checking order items:', orderItemsCheckError);
+      }
+
+      if (orderItems && orderItems.length > 0) {
+        toast({
+          title: "Cannot delete product",
+          description: "This product is used in existing orders. Remove it from orders first or archive it instead.",
+          variant: "destructive",
+        });
+        setDeletingProduct(false);
+        return;
+      }
+
+      // Delete related inventory records
+      const { error: inventoryError } = await supabase
+        .from('inventory')
+        .delete()
+        .eq('product_id', productToDelete.id);
+
+      if (inventoryError) {
+        console.error('Error deleting inventory:', inventoryError);
+      }
+
+      // Delete related product_states
       const { error: statesError } = await supabase
         .from('product_states')
         .delete()
