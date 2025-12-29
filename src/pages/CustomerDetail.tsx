@@ -246,23 +246,56 @@ const CustomerDetail = () => {
     }
   };
 
-  const handleRemoveProduct = async (productId: string) => {
+  const [showDeleteProductDialog, setShowDeleteProductDialog] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<any>(null);
+  const [deletingProduct, setDeletingProduct] = useState(false);
+
+  const handleDeleteProductClick = (product: any) => {
+    setProductToDelete(product);
+    setShowDeleteProductDialog(true);
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    
     try {
-      // When removing, we don't set to null anymore - products belong to companies
-      // Instead this should just be removing from the view (already filtered by company_id)
+      setDeletingProduct(true);
+      
+      // First delete related product_states
+      const { error: statesError } = await supabase
+        .from('product_states')
+        .delete()
+        .eq('product_id', productToDelete.id);
+
+      if (statesError) {
+        console.error('Error deleting product states:', statesError);
+      }
+
+      // Then delete the product
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productToDelete.id);
+
+      if (error) throw error;
+
       toast({
-        title: "Info",
-        description: "Products are now directly owned by companies and cannot be unlinked",
+        title: "Product deleted",
+        description: `${productToDelete.name} has been deleted successfully`,
       });
 
+      setShowDeleteProductDialog(false);
+      setProductToDelete(null);
       fetchCustomerProducts();
       fetchProducts();
     } catch (error: any) {
       toast({
-        title: "Error removing product",
+        title: "Error deleting product",
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setDeletingProduct(false);
     }
   };
 
@@ -980,7 +1013,7 @@ const CustomerDetail = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRemoveProduct(product.id)}
+                          onClick={() => handleDeleteProductClick(product)}
                           className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -1643,6 +1676,29 @@ const CustomerDetail = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Product Confirmation Dialog */}
+      <AlertDialog open={showDeleteProductDialog} onOpenChange={setShowDeleteProductDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone.
+              This will also remove any associated product states and artwork files.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setProductToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProduct}
+              disabled={deletingProduct}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingProduct ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
