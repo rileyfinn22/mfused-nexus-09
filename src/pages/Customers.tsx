@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit, Trash2, Building2 } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Building2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { InviteCompanyUserDialog } from "@/components/InviteCompanyUserDialog";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +51,9 @@ const Customers = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [selectedCompanyForInvite, setSelectedCompanyForInvite] = useState<string | undefined>();
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<any>(null);
   const [formData, setFormData] = useState({
@@ -70,7 +74,19 @@ const Customers = () => {
 
   useEffect(() => {
     fetchCustomers();
+    checkVibeAdmin();
   }, []);
+
+  const checkVibeAdmin = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase.rpc('has_role', { 
+        _user_id: user.id, 
+        _role: 'vibe_admin' 
+      });
+      setIsVibeAdmin(data === true);
+    }
+  };
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -238,10 +254,18 @@ const Customers = () => {
           <h1 className="text-3xl font-bold">Companies</h1>
           <p className="text-muted-foreground mt-1">Manage your company accounts and information</p>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Company
-        </Button>
+        <div className="flex gap-2">
+          {isVibeAdmin && (
+            <Button variant="outline" onClick={() => setShowInviteDialog(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Invite User
+            </Button>
+          )}
+          <Button onClick={() => handleOpenDialog()}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Company
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -538,6 +562,13 @@ const Customers = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Invite User Dialog */}
+      <InviteCompanyUserDialog
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+        preselectedCompanyId={selectedCompanyForInvite}
+      />
     </div>
   );
 };
