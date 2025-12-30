@@ -111,21 +111,13 @@ const Quotes = () => {
       if (!isVibeAdmin) {
         filteredData = filteredData.filter(quote => {
           // Hide vendor-related internal statuses from customers
-          const internalStatuses = ['vendor_pending', 'vendor_received'];
-          if (internalStatuses.includes(quote.status)) {
+          // Show "in_progress", "vendor_pending", "vendor_received" as "In Review" 
+          // but don't filter them out entirely - they're still the customer's quote
+          const hiddenStatuses = ['draft'];
+          if (hiddenStatuses.includes(quote.status)) {
             return false;
           }
-          
-          // Customer can see:
-          // 1. Quote requests they made (no parent_quote_id, any customer-visible status)
-          // 2. Official quote responses sent to them (has parent_quote_id, status is sent/approved/rejected)
-          if (!quote.parent_quote_id) {
-            // This is an original request - customer can see it
-            return true;
-          } else {
-            // This is a response quote - only show if it's been officially sent
-            return ['sent', 'approved', 'rejected'].includes(quote.status);
-          }
+          return true;
         });
       }
       
@@ -146,6 +138,7 @@ const Quotes = () => {
       case 'draft': return <FileText className="h-4 w-4" />;
       case 'sent': return <Send className="h-4 w-4" />;
       case 'pending_review': return <Clock className="h-4 w-4" />;
+      case 'in_progress': return <Clock className="h-4 w-4" />;
       case 'vendor_pending': return <Truck className="h-4 w-4" />;
       case 'vendor_received': return <CheckCircle className="h-4 w-4" />;
       case 'approved': return <CheckCircle className="h-4 w-4" />;
@@ -160,8 +153,9 @@ const Quotes = () => {
       case 'draft': return 'bg-muted text-muted-foreground';
       case 'sent': return 'bg-primary/10 text-primary';
       case 'pending_review': return 'bg-warning/10 text-warning';
+      case 'in_progress': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
       case 'vendor_pending': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
-      case 'vendor_received': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+      case 'vendor_received': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400';
       case 'approved': return 'bg-success/10 text-success';
       case 'rejected': return 'bg-danger/10 text-danger';
       case 'expired': return 'bg-muted text-muted-foreground';
@@ -174,6 +168,9 @@ const Quotes = () => {
     if (!isAdmin) {
       switch (status) {
         case 'pending_review': return 'Requested';
+        case 'in_progress': return 'In Review';
+        case 'vendor_pending': return 'In Review';
+        case 'vendor_received': return 'In Review';
         case 'sent': return 'Quote Received';
         case 'approved': return 'Approved';
         case 'rejected': return 'Rejected';
@@ -184,9 +181,14 @@ const Quotes = () => {
       }
     }
     // Admin status labels
-    return status.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+    switch (status) {
+      case 'in_progress': return 'Working on Quote';
+      case 'vendor_pending': return 'Sent to Vendor';
+      case 'vendor_received': return 'Vendor Received';
+      default: return status.split('_').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -268,7 +270,8 @@ const Quotes = () => {
             <SelectItem value="all">All Statuses</SelectItem>
             {isVibeAdmin && <SelectItem value="draft">Draft</SelectItem>}
             <SelectItem value="pending_review">{isVibeAdmin ? "Pending Review" : "Requested"}</SelectItem>
-            {isVibeAdmin && <SelectItem value="vendor_pending">Vendor Pending</SelectItem>}
+            {isVibeAdmin && <SelectItem value="in_progress">Working on Quote</SelectItem>}
+            {isVibeAdmin && <SelectItem value="vendor_pending">Sent to Vendor</SelectItem>}
             {isVibeAdmin && <SelectItem value="vendor_received">Vendor Received</SelectItem>}
             <SelectItem value="sent">{isVibeAdmin ? "Sent to Customer" : "Quote Received"}</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
@@ -320,15 +323,11 @@ const Quotes = () => {
                         <Badge variant="outline" className={getStatusColor(quote.status)}>
                           {formatStatus(quote.status, isVibeAdmin)}
                         </Badge>
-                        {/* Show quote type for customers */}
-                        {!isVibeAdmin && (
+                        {/* Show quote type for customers - only if pending */}
+                        {!isVibeAdmin && quote.status === 'pending_review' && (
                           <Badge variant="secondary" className="text-xs">
-                            {quote.parent_quote_id ? "Official Quote" : "Quote Request"}
+                            Quote Request
                           </Badge>
-                        )}
-                        {/* Show quote type for admins */}
-                        {isVibeAdmin && quote.parent_quote_id && (
-                          <Badge variant="secondary" className="text-xs">Response</Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">

@@ -17,6 +17,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft,
   Send,
   CheckCircle,
@@ -34,7 +41,8 @@ import {
   ChevronDown,
   ChevronRight,
   Truck,
-  Clock
+  Clock,
+  PlayCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -100,14 +108,6 @@ interface Quote {
   vendor?: { name: string };
 }
 
-interface ResponseQuote {
-  id: string;
-  quote_number: string;
-  status: string;
-  total: number;
-  created_at: string;
-}
-
 const QuoteDetail = () => {
   const { quoteId } = useParams();
   const navigate = useNavigate();
@@ -118,7 +118,6 @@ const QuoteDetail = () => {
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [responseQuote, setResponseQuote] = useState<ResponseQuote | null>(null);
   const [showVendorDialog, setShowVendorDialog] = useState(false);
 
   useEffect(() => {
@@ -161,17 +160,6 @@ const QuoteDetail = () => {
         price_breaks: Array.isArray(item.price_breaks) ? (item.price_breaks as unknown as PriceBreak[]) : [],
         selected_tier: item.selected_tier ?? null
       })));
-
-      // Check if there's a response quote linked to this request
-      const { data: responseData } = await supabase
-        .from('quotes')
-        .select('id, quote_number, status, total, created_at')
-        .eq('parent_quote_id', quoteId)
-        .single();
-
-      if (responseData) {
-        setResponseQuote(responseData);
-      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -249,8 +237,9 @@ const QuoteDetail = () => {
       case 'draft': return 'bg-muted text-muted-foreground';
       case 'sent': return 'bg-primary/10 text-primary';
       case 'pending_review': return 'bg-warning/10 text-warning';
+      case 'in_progress': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
       case 'vendor_pending': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
-      case 'vendor_received': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+      case 'vendor_received': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400';
       case 'approved': return 'bg-success/10 text-success';
       case 'rejected': return 'bg-danger/10 text-danger';
       case 'expired': return 'bg-muted text-muted-foreground';
@@ -263,6 +252,9 @@ const QuoteDetail = () => {
     if (!isAdmin) {
       switch (status) {
         case 'pending_review': return 'Requested';
+        case 'in_progress': return 'In Review';
+        case 'vendor_pending': return 'In Review';
+        case 'vendor_received': return 'In Review';
         case 'sent': return 'Quote Received';
         case 'approved': return 'Approved';
         case 'rejected': return 'Rejected';
@@ -273,9 +265,49 @@ const QuoteDetail = () => {
       }
     }
     // Admin status labels
-    return status.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+    switch (status) {
+      case 'in_progress': return 'Working on Quote';
+      case 'vendor_pending': return 'Sent to Vendor';
+      case 'vendor_received': return 'Vendor Response Received';
+      default: return status.split('_').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    setActionLoading('status');
+    try {
+      const updates: any = { status: newStatus };
+      
+      if (newStatus === 'vendor_pending') {
+        updates.vendor_sent_at = new Date().toISOString();
+      } else if (newStatus === 'vendor_received') {
+        updates.vendor_response_received_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('quotes')
+        .update(updates)
+        .eq('id', quoteId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Quote status updated",
+      });
+
+      fetchQuote();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -302,56 +334,30 @@ const QuoteDetail = () => {
     );
   }
 
-  // For customers: can only edit their own quote requests while still pending
-  // For vibe admin: can ONLY edit response quotes (quotes with parent_quote_id) that are drafts
-  // Vibe admins should NOT edit customer's original request - they create a response quote instead
-  const isCustomerRequest = !quote.parent_quote_id; // Original request from customer
-  const isResponseQuote = !!quote.parent_quote_id; // Response quote created by vibe admin
-  
+  // Vibe admin can edit any quote that's not already sent/approved/rejected
+  // Customer can only edit their own pending_review quotes
   const canEdit = isVibeAdmin 
-    ? (isResponseQuote && (quote.status === 'draft' || quote.status === 'vendor_pending' || quote.status === 'vendor_received')) // Vibe admin can edit their response drafts or while working with vendors
-    : (isCustomerRequest && quote.status === 'pending_review'); // Customers can only edit pending requests
+    ? !['sent', 'approved', 'rejected'].includes(quote.status)
+    : (quote.status === 'pending_review');
   
-  const canSend = isVibeAdmin && (quote.status === 'draft' || quote.status === 'vendor_received') && items.length > 0 && isResponseQuote;
+  // Vibe admin can send quote to customer when it has items and is ready
+  const canSend = isVibeAdmin && ['pending_review', 'in_progress', 'vendor_received'].includes(quote.status) && items.length > 0;
   const canApprove = !isVibeAdmin && quote.status === 'sent';
   const canReject = !isVibeAdmin && quote.status === 'sent';
-  const canRespond = isVibeAdmin && isCustomerRequest && quote.status === 'pending_review' && !responseQuote;
-  // Send to Vendor is now on the RESPONSE quote (vibe admin's quote for customer), not the original request
-  const canSendToVendor = isVibeAdmin && isResponseQuote && (quote.status === 'draft') && !quote.vendor_id;
-  const canMarkVendorReceived = isVibeAdmin && isResponseQuote && quote.status === 'vendor_pending';
+  
+  // Send to Vendor available when vibe admin is working on the quote
+  const canSendToVendor = isVibeAdmin && ['pending_review', 'in_progress'].includes(quote.status) && !quote.vendor_id;
+  
+  // Status dropdown available for vibe admins on quotes they're working on
+  const showStatusDropdown = isVibeAdmin && !['sent', 'approved', 'rejected'].includes(quote.status);
+  
+  // Delete available for customers (pending_review only) and vibe admins (any non-final status)
+  const canDelete = isVibeAdmin 
+    ? !['approved'].includes(quote.status) // Vibe can delete anything except approved
+    : (quote.status === 'pending_review'); // Customer can only delete their pending requests
 
   const handleDownloadPDF = () => {
     generateQuotePDF(quote, items);
-  };
-
-  const handleMarkVendorReceived = async () => {
-    setActionLoading('vendor_received');
-    try {
-      const { error } = await supabase
-        .from('quotes')
-        .update({
-          vendor_response_received_at: new Date().toISOString(),
-          status: 'vendor_received'
-        })
-        .eq('id', quoteId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Vendor response marked as received",
-      });
-
-      fetchQuote();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setActionLoading(null);
-    }
   };
 
   // Check if any items have price breaks
@@ -372,14 +378,9 @@ const QuoteDetail = () => {
               <Badge className={getStatusColor(quote.status)}>
                 {formatStatus(quote.status, isVibeAdmin)}
               </Badge>
-              {/* Show quote type indicator */}
-              {!isVibeAdmin && (
-                <Badge variant="outline" className="text-xs">
-                  {quote.parent_quote_id ? "Official Quote" : "Quote Request"}
-                </Badge>
-              )}
-              {isVibeAdmin && quote.parent_quote_id && (
-                <Badge variant="outline" className="text-xs">Response Quote</Badge>
+              {/* Show quote type indicator for customers */}
+              {!isVibeAdmin && quote.status === 'pending_review' && (
+                <Badge variant="outline" className="text-xs">Quote Request</Badge>
               )}
             </div>
             <p className="page-subtitle">
@@ -388,19 +389,30 @@ const QuoteDetail = () => {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Status Dropdown for Vibe Admins */}
+          {showStatusDropdown && (
+            <Select 
+              value={quote.status} 
+              onValueChange={handleStatusChange}
+              disabled={actionLoading === 'status'}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending_review">Pending Review</SelectItem>
+                <SelectItem value="in_progress">Working on Quote</SelectItem>
+                <SelectItem value="vendor_pending">Sent to Vendor</SelectItem>
+                <SelectItem value="vendor_received">Vendor Response Received</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          
           {canEdit && (
             <Button variant="outline" onClick={() => navigate(`/quotes/edit/${quote.id}`)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
-            </Button>
-          )}
-          {canRespond && (
-            <Button 
-              onClick={() => navigate(`/quotes/respond/${quote.id}`)}
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Create Quote for Customer
             </Button>
           )}
           {canSend && (
@@ -444,11 +456,6 @@ const QuoteDetail = () => {
               Reject
             </Button>
           )}
-          {canEdit && (
-            <Button variant="ghost" size="icon" onClick={() => setShowDeleteDialog(true)}>
-              <Trash2 className="h-4 w-4 text-danger" />
-            </Button>
-          )}
           <Button variant="outline" onClick={handleDownloadPDF}>
             <Download className="h-4 w-4 mr-2" />
             PDF
@@ -459,18 +466,9 @@ const QuoteDetail = () => {
               Send to Vendor
             </Button>
           )}
-          {canMarkVendorReceived && (
-            <Button 
-              variant="outline"
-              onClick={handleMarkVendorReceived}
-              disabled={actionLoading === 'vendor_received'}
-            >
-              {actionLoading === 'vendor_received' ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <CheckCircle className="h-4 w-4 mr-2" />
-              )}
-              Mark Vendor Quote Received
+          {canDelete && (
+            <Button variant="ghost" size="icon" onClick={() => setShowDeleteDialog(true)}>
+              <Trash2 className="h-4 w-4 text-danger" />
             </Button>
           )}
         </div>
@@ -713,60 +711,68 @@ const QuoteDetail = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Original Request (if this is a response quote - vibe admin only) */}
-          {isVibeAdmin && quote.parent_quote_id && (
-            <Card className="border-warning/50">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-warning" />
-                  Original Customer Request
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => navigate(`/quotes/${quote.parent_quote_id}`)}
-                >
-                  View Original Request
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Response Quote (if this is a request with a response) */}
-          {/* For customers: only show if response is sent/approved/rejected */}
-          {/* For admins: always show if exists */}
-          {responseQuote && (isVibeAdmin || ["sent", "approved", "rejected"].includes(responseQuote.status)) && (
+          {/* Workflow Status (Vibe Admin only) */}
+          {isVibeAdmin && !['sent', 'approved', 'rejected'].includes(quote.status) && (
             <Card className="border-primary/50">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-primary" />
-                  {isVibeAdmin ? "Your Quote Response" : "Official Quote"}
+                  <PlayCircle className="h-4 w-4 text-primary" />
+                  Quote Workflow
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Quote Number</span>
-                  <span className="font-medium">{responseQuote.quote_number}</span>
+                <div className="space-y-2 text-sm">
+                  <div className={cn(
+                    "flex items-center gap-2 p-2 rounded",
+                    quote.status === 'pending_review' && "bg-warning/10 font-medium"
+                  )}>
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      quote.status === 'pending_review' ? "bg-warning" : "bg-muted"
+                    )} />
+                    Pending Review
+                  </div>
+                  <div className={cn(
+                    "flex items-center gap-2 p-2 rounded",
+                    quote.status === 'in_progress' && "bg-blue-100 dark:bg-blue-900/30 font-medium"
+                  )}>
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      quote.status === 'in_progress' ? "bg-blue-500" : "bg-muted"
+                    )} />
+                    Working on Quote
+                  </div>
+                  <div className={cn(
+                    "flex items-center gap-2 p-2 rounded",
+                    quote.status === 'vendor_pending' && "bg-orange-100 dark:bg-orange-900/30 font-medium"
+                  )}>
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      quote.status === 'vendor_pending' ? "bg-orange-500" : "bg-muted"
+                    )} />
+                    Sent to Vendor
+                    {quote.vendor_sent_at && (
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {new Date(quote.vendor_sent_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                  <div className={cn(
+                    "flex items-center gap-2 p-2 rounded",
+                    quote.status === 'vendor_received' && "bg-cyan-100 dark:bg-cyan-900/30 font-medium"
+                  )}>
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      quote.status === 'vendor_received' ? "bg-cyan-500" : "bg-muted"
+                    )} />
+                    Vendor Response Received
+                    {quote.vendor_response_received_at && (
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {new Date(quote.vendor_response_received_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Status</span>
-                  <Badge className={getStatusColor(responseQuote.status)}>
-                    {formatStatus(responseQuote.status, isVibeAdmin)}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total</span>
-                  <span className="font-semibold">{formatCurrency(responseQuote.total)}</span>
-                </div>
-                <Button 
-                  variant="outline" 
-                  className="w-full mt-2"
-                  onClick={() => navigate(`/quotes/${responseQuote.id}`)}
-                >
-                  View {isVibeAdmin ? "Quote Response" : "Official Quote"}
-                </Button>
               </CardContent>
             </Card>
           )}
