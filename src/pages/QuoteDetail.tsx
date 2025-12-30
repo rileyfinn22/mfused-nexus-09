@@ -32,7 +32,9 @@ import {
   Mail,
   Calendar,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Truck,
+  Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -41,6 +43,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { generateQuotePDF } from "@/lib/quoteUtils";
+import { SendToVendorDialog } from "@/components/SendToVendorDialog";
 
 interface PriceBreak {
   qty: number;
@@ -89,6 +93,11 @@ interface Quote {
   created_at: string;
   parent_quote_id: string | null;
   company?: { name: string };
+  vendor_id: string | null;
+  vendor_sent_at: string | null;
+  vendor_response_received_at: string | null;
+  vendor_quote_notes: string | null;
+  vendor?: { name: string };
 }
 
 interface ResponseQuote {
@@ -110,6 +119,7 @@ const QuoteDetail = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [responseQuote, setResponseQuote] = useState<ResponseQuote | null>(null);
+  const [showVendorDialog, setShowVendorDialog] = useState(false);
 
   useEffect(() => {
     checkRole();
@@ -132,7 +142,7 @@ const QuoteDetail = () => {
     try {
       const { data: quoteData, error: quoteError } = await supabase
         .from('quotes')
-        .select('*, company:companies(name)')
+        .select('*, company:companies(name), vendor:vendors(name)')
         .eq('id', quoteId)
         .single();
 
@@ -239,6 +249,8 @@ const QuoteDetail = () => {
       case 'draft': return 'bg-muted text-muted-foreground';
       case 'sent': return 'bg-primary/10 text-primary';
       case 'pending_review': return 'bg-warning/10 text-warning';
+      case 'vendor_pending': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
+      case 'vendor_received': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
       case 'approved': return 'bg-success/10 text-success';
       case 'rejected': return 'bg-danger/10 text-danger';
       case 'expired': return 'bg-muted text-muted-foreground';
@@ -281,6 +293,46 @@ const QuoteDetail = () => {
   const canApprove = !isVibeAdmin && quote.status === 'sent';
   const canReject = !isVibeAdmin && quote.status === 'sent';
   const canRespond = isVibeAdmin && quote.status === 'pending_review' && !responseQuote;
+  const canSendToVendor = isVibeAdmin && (quote.status === 'pending_review' || quote.status === 'draft') && !quote.vendor_id;
+  const canMarkVendorReceived = isVibeAdmin && quote.status === 'vendor_pending';
+
+  const handleDownloadPDF = () => {
+    generateQuotePDF(quote, items);
+  };
+
+  const handleMarkVendorReceived = async () => {
+    setActionLoading('vendor_received');
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({
+          vendor_response_received_at: new Date().toISOString(),
+          status: 'vendor_received'
+        })
+        .eq('id', quoteId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Vendor response marked as received",
+      });
+
+      fetchQuote();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Check if any items have price breaks
+  const hasAnyPriceBreaks = items.some(item => item.price_breaks && item.price_breaks.length > 0);
+
 
   return (
     <div className="space-y-6">
@@ -364,6 +416,30 @@ const QuoteDetail = () => {
               <Trash2 className="h-4 w-4 text-danger" />
             </Button>
           )}
+          <Button variant="outline" onClick={handleDownloadPDF}>
+            <Download className="h-4 w-4 mr-2" />
+            PDF
+          </Button>
+          {canSendToVendor && (
+            <Button variant="outline" onClick={() => setShowVendorDialog(true)}>
+              <Truck className="h-4 w-4 mr-2" />
+              Send to Vendor
+            </Button>
+          )}
+          {canMarkVendorReceived && (
+            <Button 
+              variant="outline"
+              onClick={handleMarkVendorReceived}
+              disabled={actionLoading === 'vendor_received'}
+            >
+              {actionLoading === 'vendor_received' ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-2" />
+              )}
+              Mark Vendor Quote Received
+            </Button>
+          )}
         </div>
       </div>
 
@@ -443,14 +519,14 @@ const QuoteDetail = () => {
                     const formatQty = (qty: number) => qty.toLocaleString();
                     
                     return (
-                      <Collapsible key={item.id}>
+                      <Collapsible key={item.id} defaultOpen={hasPriceBreaks}>
                         <div className="grid grid-cols-12 gap-4 text-sm items-center">
-                          <div className="col-span-4">
+                          <div className={hasPriceBreaks ? "col-span-10" : "col-span-4"}>
                             <div className="flex items-center gap-2">
                               {hasPriceBreaks && (
                                 <CollapsibleTrigger asChild>
                                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                    <ChevronRight className="h-4 w-4 transition-transform data-[state=open]:rotate-90" />
+                                    <ChevronDown className="h-4 w-4 transition-transform data-[state=closed]:rotate-[-90deg]" />
                                   </Button>
                                 </CollapsibleTrigger>
                               )}
@@ -467,38 +543,46 @@ const QuoteDetail = () => {
                               </div>
                             </div>
                           </div>
-                          <div className="col-span-2">
-                            {item.state && (
-                              <Badge variant="outline">{item.state}</Badge>
-                            )}
-                          </div>
-                          <div className="col-span-2 text-right">{item.quantity}</div>
-                          <div className="col-span-2 text-right">
-                            {formatCurrency(item.unit_price)}
-                            {item.selected_tier !== null && hasPriceBreaks && (
-                              <div className="text-xs text-muted-foreground">
-                                (Tier {item.selected_tier + 1})
+                          {hasPriceBreaks ? (
+                            <div className="col-span-2">
+                              {item.state && (
+                                <Badge variant="outline">{item.state}</Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              <div className="col-span-2">
+                                {item.state && (
+                                  <Badge variant="outline">{item.state}</Badge>
+                                )}
                               </div>
-                            )}
-                          </div>
-                          <div className="col-span-2 text-right font-medium">{formatCurrency(item.total)}</div>
+                              <div className="col-span-2 text-right">{item.quantity.toLocaleString()}</div>
+                              <div className="col-span-2 text-right">{formatCurrency(item.unit_price)}</div>
+                              <div className="col-span-2 text-right font-medium">{formatCurrency(item.total)}</div>
+                            </>
+                          )}
                         </div>
                         
                         {hasPriceBreaks && (
                           <CollapsibleContent>
                             <div className="ml-8 mt-2 mb-3 p-3 bg-muted/50 rounded-md">
-                              <p className="text-xs font-medium text-muted-foreground mb-2">Price Tiers</p>
+                              <div className="grid grid-cols-3 gap-4 text-xs font-medium text-muted-foreground border-b pb-2 mb-2">
+                                <div>Quantity</div>
+                                <div className="text-right">Unit Price</div>
+                                <div className="text-right">Total</div>
+                              </div>
                               <div className="space-y-1">
                                 {item.price_breaks.map((pb, idx) => (
                                   <div 
                                     key={idx} 
                                     className={cn(
-                                      "flex justify-between text-sm px-2 py-1 rounded",
+                                      "grid grid-cols-3 gap-4 text-sm px-2 py-1.5 rounded",
                                       item.selected_tier === idx && "bg-primary/10 text-primary font-medium"
                                     )}
                                   >
-                                    <span>Qty {formatQty(pb.qty)}</span>
-                                    <span>{formatCurrency(pb.unit_price)} / unit = {formatCurrency(pb.qty * pb.unit_price)}</span>
+                                    <span>{formatQty(pb.qty)} units</span>
+                                    <span className="text-right">{formatCurrency(pb.unit_price)}</span>
+                                    <span className="text-right font-medium">{formatCurrency(pb.qty * pb.unit_price)}</span>
                                   </div>
                                 ))}
                               </div>
@@ -508,30 +592,39 @@ const QuoteDetail = () => {
                       </Collapsible>
                     );
                   })}
-                  <Separator />
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span>{formatCurrency(quote.subtotal)}</span>
-                    </div>
-                    {quote.shipping_cost > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Shipping</span>
-                        <span>{formatCurrency(quote.shipping_cost)}</span>
+                  {!hasAnyPriceBreaks && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Subtotal</span>
+                          <span>{formatCurrency(quote.subtotal)}</span>
+                        </div>
+                        {quote.shipping_cost > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Shipping</span>
+                            <span>{formatCurrency(quote.shipping_cost)}</span>
+                          </div>
+                        )}
+                        {quote.tax > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Tax</span>
+                            <span>{formatCurrency(quote.tax)}</span>
+                          </div>
+                        )}
+                        <Separator />
+                        <div className="flex justify-between font-semibold text-lg">
+                          <span>Total</span>
+                          <span>{formatCurrency(quote.total)}</span>
+                        </div>
                       </div>
-                    )}
-                    {quote.tax > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Tax</span>
-                        <span>{formatCurrency(quote.tax)}</span>
-                      </div>
-                    )}
-                    <Separator />
-                    <div className="flex justify-between font-semibold text-lg">
-                      <span>Total</span>
-                      <span>{formatCurrency(quote.total)}</span>
+                    </>
+                  )}
+                  {hasAnyPriceBreaks && (
+                    <div className="text-sm text-muted-foreground italic mt-4 text-center">
+                      * Pricing shown per tier. Final total depends on quantity selected.
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -649,6 +742,57 @@ const QuoteDetail = () => {
             </CardContent>
           </Card>
 
+          {/* Vendor Status (Vibe Admin only) */}
+          {isVibeAdmin && quote.vendor_id && (
+            <Card className="border-orange-500/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-orange-500" />
+                  Vendor Quote Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Vendor</span>
+                  <span className="font-medium">{quote.vendor?.name || 'Unknown'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Sent</span>
+                  <span className="font-medium">
+                    {quote.vendor_sent_at 
+                      ? new Date(quote.vendor_sent_at).toLocaleDateString() 
+                      : '-'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Response</span>
+                  <span className="font-medium">
+                    {quote.vendor_response_received_at ? (
+                      <span className="flex items-center gap-1 text-success">
+                        <CheckCircle className="h-3 w-3" />
+                        Received {new Date(quote.vendor_response_received_at).toLocaleDateString()}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-warning">
+                        <Clock className="h-3 w-3" />
+                        Pending
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {quote.vendor_quote_notes && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Notes</p>
+                      <p className="text-sm">{quote.vendor_quote_notes}</p>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Internal Notes (Vibe Admin only) */}
           {isVibeAdmin && quote.internal_notes && (
             <Card>
@@ -692,6 +836,14 @@ const QuoteDetail = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Send to Vendor Dialog */}
+      <SendToVendorDialog
+        open={showVendorDialog}
+        onOpenChange={setShowVendorDialog}
+        quoteId={quote.id}
+        onSent={fetchQuote}
+      />
     </div>
   );
 };

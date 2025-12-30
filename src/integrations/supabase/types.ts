@@ -1383,6 +1383,10 @@ export type Database = {
           uploaded_file_url: string | null
           uploaded_filename: string | null
           valid_until: string | null
+          vendor_id: string | null
+          vendor_quote_notes: string | null
+          vendor_response_received_at: string | null
+          vendor_sent_at: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -1416,6 +1420,10 @@ export type Database = {
           uploaded_file_url?: string | null
           uploaded_filename?: string | null
           valid_until?: string | null
+          vendor_id?: string | null
+          vendor_quote_notes?: string | null
+          vendor_response_received_at?: string | null
+          vendor_sent_at?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -1449,6 +1457,10 @@ export type Database = {
           uploaded_file_url?: string | null
           uploaded_filename?: string | null
           valid_until?: string | null
+          vendor_id?: string | null
+          vendor_quote_notes?: string | null
+          vendor_response_received_at?: string | null
+          vendor_sent_at?: string | null
         }
         Relationships: [
           {
@@ -1463,6 +1475,13 @@ export type Database = {
             columns: ["parent_quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]
