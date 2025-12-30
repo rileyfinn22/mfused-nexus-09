@@ -1,12 +1,15 @@
 /**
- * Generates a simple sequential invoice number starting from 10700
- * Format: 10700, 10701, 10702, etc.
- * This is ONLY used for blanket/full invoices. Partial invoices use the parent number with a suffix.
+ * Generates an invoice number based on the order number
+ * For the first invoice on an order, just use the order number
+ * For additional shipments, use ORDER_NUMBER-01, ORDER_NUMBER-02, etc.
  */
-export function generateInvoiceNumber(sequenceNumber: number): string {
-  // Start from 10701 and increment
-  const invoiceNum = 10700 + sequenceNumber;
-  return String(invoiceNum);
+export function generateInvoiceNumber(orderNumber: string, shipmentNumber: number = 1): string {
+  if (shipmentNumber <= 1) {
+    return orderNumber;
+  }
+  // Shipment 2 = -01, Shipment 3 = -02, etc.
+  const suffix = String(shipmentNumber - 1).padStart(2, '0');
+  return `${orderNumber}-${suffix}`;
 }
 
 /**
