@@ -626,8 +626,8 @@ const OrderDetail = () => {
     ? subtotal + Number(order.tax || 0)
     : (order.total || 0);
   return <div className="max-w-7xl mx-auto">
-      {/* Process Order Banner for Pending Orders */}
-      {isVibeAdmin && (order.status === 'pending' || order.status === 'pending_pull') && (
+      {/* Process Order Banner for Draft/Pending Orders */}
+      {isVibeAdmin && (order.status === 'draft' || order.status === 'pending' || order.status === 'pending_pull') && (
         <div className="mb-6 p-4 bg-blue-500/10 border-2 border-blue-500 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -739,7 +739,7 @@ const OrderDetail = () => {
                   {orderFinalized ? "Order approved by customer" : "Pending customer approval"}
                 </p>
               </div>
-              {!orderFinalized && order?.status === 'pending' && (
+              {!orderFinalized && (order?.status === 'draft' || order?.status === 'pending') && (
                 <Button size="sm" onClick={handleOrderFinalized}>
                   Approve Order
                 </Button>
