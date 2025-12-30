@@ -43,8 +43,7 @@ import {
 } from "@/components/ui/collapsible";
 
 interface PriceBreak {
-  min_qty: number;
-  max_qty: number | null;
+  qty: number;
   unit_price: number;
 }
 
@@ -441,10 +440,7 @@ const QuoteDetail = () => {
                   </div>
                   {items.map((item) => {
                     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
-                    const formatPriceBreakRange = (pb: PriceBreak) => {
-                      if (pb.max_qty === null) return `${pb.min_qty}+`;
-                      return `${pb.min_qty}-${pb.max_qty}`;
-                    };
+                    const formatQty = (qty: number) => qty.toLocaleString();
                     
                     return (
                       <Collapsible key={item.id}>
@@ -501,8 +497,8 @@ const QuoteDetail = () => {
                                       item.selected_tier === idx && "bg-primary/10 text-primary font-medium"
                                     )}
                                   >
-                                    <span>Qty {formatPriceBreakRange(pb)}</span>
-                                    <span>{formatCurrency(pb.unit_price)} / unit</span>
+                                    <span>Qty {formatQty(pb.qty)}</span>
+                                    <span>{formatCurrency(pb.unit_price)} / unit = {formatCurrency(pb.qty * pb.unit_price)}</span>
                                   </div>
                                 ))}
                               </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -44,8 +44,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 interface PriceBreak {
-  min_qty: number;
-  max_qty: number | null;
+  qty: number;
   unit_price: number;
 }
 
@@ -119,6 +118,11 @@ const CreateQuote = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [tempSelectedProducts, setTempSelectedProducts] = useState<string[]>([]);
   
+  // Add single product with price breaks dialog
+  const [showAddProductWithPriceBreaks, setShowAddProductWithPriceBreaks] = useState(false);
+  const [selectedProductForPriceBreaks, setSelectedProductForPriceBreaks] = useState<Product | null>(null);
+  const [tempPriceBreaks, setTempPriceBreaks] = useState<PriceBreak[]>([]);
+  
   // Custom item dialog state
   const [showCustomItemDialog, setShowCustomItemDialog] = useState(false);
   const [customItem, setCustomItem] = useState({
@@ -127,7 +131,8 @@ const CreateQuote = () => {
     description: "",
     state: "",
     quantity: 1,
-    unit_price: 0
+    unit_price: 0,
+    price_breaks: [] as PriceBreak[]
   });
 
   useEffect(() => {
@@ -454,13 +459,84 @@ const CreateQuote = () => {
       unit_price: customItem.unit_price,
       total: customItem.quantity * customItem.unit_price,
       isCustom: true,
-      price_breaks: [],
+      price_breaks: customItem.price_breaks,
       selected_tier: null,
       isExpanded: false
     };
     setItems([...items, newItem]);
-    setCustomItem({ sku: "", name: "", description: "", state: "", quantity: 1, unit_price: 0 });
+    setCustomItem({ sku: "", name: "", description: "", state: "", quantity: 1, unit_price: 0, price_breaks: [] });
     setShowCustomItemDialog(false);
+  };
+
+  const openProductWithPriceBreaks = (product: Product) => {
+    setSelectedProductForPriceBreaks(product);
+    setTempPriceBreaks([{ qty: 10000, unit_price: product.price || 0 }]);
+    setShowAddProductWithPriceBreaks(true);
+    setShowAddItemsDialog(false);
+  };
+
+  const handleAddProductWithPriceBreaks = () => {
+    if (!selectedProductForPriceBreaks) return;
+    
+    const firstTier = tempPriceBreaks[0];
+    const newItem: QuoteItem = {
+      product_id: selectedProductForPriceBreaks.id,
+      sku: selectedProductForPriceBreaks.item_id || "",
+      name: selectedProductForPriceBreaks.name,
+      description: "",
+      state: "",
+      quantity: firstTier?.qty || 1,
+      unit_price: firstTier?.unit_price || selectedProductForPriceBreaks.price || 0,
+      total: (firstTier?.qty || 1) * (firstTier?.unit_price || selectedProductForPriceBreaks.price || 0),
+      price_breaks: tempPriceBreaks,
+      selected_tier: 0,
+      isExpanded: false
+    };
+    
+    setItems([...items, newItem]);
+    setShowAddProductWithPriceBreaks(false);
+    setSelectedProductForPriceBreaks(null);
+    setTempPriceBreaks([]);
+  };
+
+  const addTempPriceBreak = () => {
+    const lastBreak = tempPriceBreaks[tempPriceBreaks.length - 1];
+    const newQty = lastBreak ? lastBreak.qty * 2 : 10000;
+    setTempPriceBreaks([...tempPriceBreaks, { qty: newQty, unit_price: lastBreak?.unit_price || 0 }]);
+  };
+
+  const updateTempPriceBreak = (index: number, field: keyof PriceBreak, value: number) => {
+    const newBreaks = [...tempPriceBreaks];
+    newBreaks[index] = { ...newBreaks[index], [field]: value };
+    newBreaks.sort((a, b) => a.qty - b.qty);
+    setTempPriceBreaks(newBreaks);
+  };
+
+  const removeTempPriceBreak = (index: number) => {
+    setTempPriceBreaks(tempPriceBreaks.filter((_, i) => i !== index));
+  };
+
+  const addCustomItemPriceBreak = () => {
+    const lastBreak = customItem.price_breaks[customItem.price_breaks.length - 1];
+    const newQty = lastBreak ? lastBreak.qty * 2 : 10000;
+    setCustomItem({
+      ...customItem,
+      price_breaks: [...customItem.price_breaks, { qty: newQty, unit_price: customItem.unit_price }]
+    });
+  };
+
+  const updateCustomItemPriceBreak = (index: number, field: keyof PriceBreak, value: number) => {
+    const newBreaks = [...customItem.price_breaks];
+    newBreaks[index] = { ...newBreaks[index], [field]: value };
+    newBreaks.sort((a, b) => a.qty - b.qty);
+    setCustomItem({ ...customItem, price_breaks: newBreaks });
+  };
+
+  const removeCustomItemPriceBreak = (index: number) => {
+    setCustomItem({
+      ...customItem,
+      price_breaks: customItem.price_breaks.filter((_, i) => i !== index)
+    });
   };
 
   const toggleItemExpanded = (index: number) => {
@@ -472,23 +548,24 @@ const CreateQuote = () => {
   const addPriceBreak = (index: number) => {
     const newItems = [...items];
     const lastBreak = newItems[index].price_breaks[newItems[index].price_breaks.length - 1];
-    const newMinQty = lastBreak ? (lastBreak.max_qty || lastBreak.min_qty) + 1 : 1;
+    const newQty = lastBreak ? lastBreak.qty * 2 : 10000;
     
     newItems[index].price_breaks.push({
-      min_qty: newMinQty,
-      max_qty: null,
+      qty: newQty,
       unit_price: newItems[index].unit_price
     });
     newItems[index].isExpanded = true;
     setItems(newItems);
   };
 
-  const updatePriceBreak = (itemIndex: number, breakIndex: number, field: keyof PriceBreak, value: number | null) => {
+  const updatePriceBreak = (itemIndex: number, breakIndex: number, field: keyof PriceBreak, value: number) => {
     const newItems = [...items];
     newItems[itemIndex].price_breaks[breakIndex] = {
       ...newItems[itemIndex].price_breaks[breakIndex],
       [field]: value
     };
+    // Sort price breaks by qty
+    newItems[itemIndex].price_breaks.sort((a, b) => a.qty - b.qty);
     setItems(newItems);
   };
 
@@ -503,16 +580,13 @@ const CreateQuote = () => {
     const tier = newItems[itemIndex].price_breaks[tierIndex];
     newItems[itemIndex].selected_tier = tierIndex;
     newItems[itemIndex].unit_price = tier.unit_price;
-    newItems[itemIndex].quantity = tier.min_qty;
-    newItems[itemIndex].total = tier.min_qty * tier.unit_price;
+    newItems[itemIndex].quantity = tier.qty;
+    newItems[itemIndex].total = tier.qty * tier.unit_price;
     setItems(newItems);
   };
 
-  const formatPriceBreakRange = (priceBreak: PriceBreak) => {
-    if (priceBreak.max_qty === null) {
-      return `${priceBreak.min_qty}+`;
-    }
-    return `${priceBreak.min_qty}-${priceBreak.max_qty}`;
+  const formatQty = (qty: number) => {
+    return qty.toLocaleString();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -828,7 +902,7 @@ const CreateQuote = () => {
                       </TableHeader>
                       <TableBody>
                         {items.map((item, index) => (
-                          <Collapsible key={index} open={item.isExpanded} onOpenChange={() => toggleItemExpanded(index)}>
+                          <React.Fragment key={index}>
                             <TableRow className={item.isExpanded ? "border-b-0" : ""}>
                               <TableCell>
                                 <div className="flex items-center gap-1">
@@ -846,20 +920,19 @@ const CreateQuote = () => {
                               <TableCell className="font-mono text-xs">{item.sku || '-'}</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  <CollapsibleTrigger asChild>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-6 w-6 p-0"
-                                      type="button"
-                                    >
-                                      {item.isExpanded ? (
-                                        <ChevronDown className="h-4 w-4" />
-                                      ) : (
-                                        <ChevronRight className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </CollapsibleTrigger>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-6 w-6 p-0"
+                                    type="button"
+                                    onClick={() => toggleItemExpanded(index)}
+                                  >
+                                    {item.isExpanded ? (
+                                      <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4" />
+                                    )}
+                                  </Button>
                                   <div>
                                     <p className="font-medium">{item.name}</p>
                                     <div className="flex items-center gap-2">
@@ -922,7 +995,7 @@ const CreateQuote = () => {
                                 {formatCurrency(item.total)}
                               </TableCell>
                             </TableRow>
-                            <CollapsibleContent asChild>
+                            {item.isExpanded && (
                               <TableRow className="bg-muted/30 hover:bg-muted/30">
                                 <TableCell colSpan={6} className="p-4">
                                   <div className="space-y-3">
@@ -955,22 +1028,13 @@ const CreateQuote = () => {
                                             }`}
                                           >
                                             <div className="flex items-center gap-2 flex-1">
-                                              <Label className="text-xs w-10">From</Label>
+                                              <Label className="text-xs w-8">Qty</Label>
                                               <Input
                                                 type="number"
                                                 min="1"
-                                                value={priceBreak.min_qty}
-                                                onChange={(e) => updatePriceBreak(index, breakIndex, 'min_qty', parseInt(e.target.value) || 1)}
-                                                className="h-8 w-20"
-                                              />
-                                              <Label className="text-xs w-6">To</Label>
-                                              <Input
-                                                type="number"
-                                                min={priceBreak.min_qty}
-                                                value={priceBreak.max_qty || ''}
-                                                onChange={(e) => updatePriceBreak(index, breakIndex, 'max_qty', e.target.value ? parseInt(e.target.value) : null)}
-                                                placeholder="∞"
-                                                className="h-8 w-20"
+                                                value={priceBreak.qty}
+                                                onChange={(e) => updatePriceBreak(index, breakIndex, 'qty', parseInt(e.target.value) || 1)}
+                                                className="h-8 w-28"
                                               />
                                               <Label className="text-xs w-10">Price</Label>
                                               <div className="relative">
@@ -984,6 +1048,9 @@ const CreateQuote = () => {
                                                   className="h-8 w-24 pl-5"
                                                 />
                                               </div>
+                                              <span className="text-xs text-muted-foreground">
+                                                = {formatCurrency(priceBreak.qty * priceBreak.unit_price)}
+                                              </span>
                                             </div>
                                             <Button
                                               type="button"
@@ -1012,7 +1079,7 @@ const CreateQuote = () => {
                                         <p className="text-muted-foreground">
                                           Summary: {item.price_breaks.map((pb, i) => (
                                             <span key={i} className={item.selected_tier === i ? 'text-primary font-medium' : ''}>
-                                              {formatPriceBreakRange(pb)}: {formatCurrency(pb.unit_price)}
+                                              {formatQty(pb.qty)}: {formatCurrency(pb.unit_price)}
                                               {i < item.price_breaks.length - 1 ? ' | ' : ''}
                                             </span>
                                           ))}
@@ -1022,8 +1089,8 @@ const CreateQuote = () => {
                                   </div>
                                 </TableCell>
                               </TableRow>
-                            </CollapsibleContent>
-                          </Collapsible>
+                            )}
+                          </React.Fragment>
                         ))}
                       </TableBody>
                     </Table>
@@ -1080,12 +1147,13 @@ const CreateQuote = () => {
                               <TableHead>SKU</TableHead>
                               <TableHead>Product</TableHead>
                               <TableHead className="text-right">Price</TableHead>
+                              <TableHead className="w-28"></TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {filteredProducts.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                                   {!companyId
                                     ? "Please select a company first to see available products" 
                                     : searchQuery 
@@ -1097,18 +1165,30 @@ const CreateQuote = () => {
                               filteredProducts.map((product) => (
                                 <TableRow 
                                   key={product.id}
-                                  className="cursor-pointer hover:bg-muted/50"
-                                  onClick={() => toggleProductSelection(product.id)}
+                                  className="hover:bg-muted/50"
                                 >
-                                  <TableCell>
+                                  <TableCell onClick={() => toggleProductSelection(product.id)} className="cursor-pointer">
                                     <Checkbox
                                       checked={tempSelectedProducts.includes(product.id)}
                                       onCheckedChange={() => toggleProductSelection(product.id)}
                                     />
                                   </TableCell>
-                                  <TableCell className="font-mono text-xs">{product.item_id || '-'}</TableCell>
-                                  <TableCell className="font-medium">{product.name}</TableCell>
+                                  <TableCell onClick={() => toggleProductSelection(product.id)} className="font-mono text-xs cursor-pointer">{product.item_id || '-'}</TableCell>
+                                  <TableCell onClick={() => toggleProductSelection(product.id)} className="font-medium cursor-pointer">{product.name}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(product.price || 0)}</TableCell>
+                                  <TableCell>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openProductWithPriceBreaks(product);
+                                      }}
+                                    >
+                                      + Price Tiers
+                                    </Button>
+                                  </TableCell>
                                 </TableRow>
                               ))
                             )}
@@ -1218,6 +1298,60 @@ const CreateQuote = () => {
                             />
                           </div>
                         </div>
+                        
+                        {/* Price Breaks for Custom Item */}
+                        <div className="space-y-3 pt-3 border-t">
+                          <div className="flex items-center justify-between">
+                            <Label>Price Tiers (optional)</Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={addCustomItemPriceBreak}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add Tier
+                            </Button>
+                          </div>
+                          
+                          {customItem.price_breaks.length > 0 && (
+                            <div className="space-y-2">
+                              {customItem.price_breaks.map((priceBreak, index) => (
+                                <div 
+                                  key={index} 
+                                  className="flex items-center gap-2 p-2 rounded-md border"
+                                >
+                                  <Label className="text-xs w-8">Qty</Label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={priceBreak.qty}
+                                    onChange={(e) => updateCustomItemPriceBreak(index, 'qty', parseInt(e.target.value) || 1)}
+                                    className="h-8 w-24"
+                                  />
+                                  <Label className="text-xs w-8">Price</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={priceBreak.unit_price}
+                                    onChange={(e) => updateCustomItemPriceBreak(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                    className="h-8 w-20"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-destructive"
+                                    onClick={() => removeCustomItemPriceBreak(index)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex justify-end gap-2 pt-4">
@@ -1225,7 +1359,7 @@ const CreateQuote = () => {
                           variant="outline" 
                           onClick={() => {
                             setShowCustomItemDialog(false);
-                            setCustomItem({ sku: "", name: "", description: "", state: "", quantity: 1, unit_price: 0 });
+                            setCustomItem({ sku: "", name: "", description: "", state: "", quantity: 1, unit_price: 0, price_breaks: [] });
                           }}
                           type="button"
                         >
@@ -1237,6 +1371,114 @@ const CreateQuote = () => {
                           type="button"
                         >
                           Add Item
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Add Product with Price Breaks Dialog */}
+                  <Dialog open={showAddProductWithPriceBreaks} onOpenChange={setShowAddProductWithPriceBreaks}>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Add Product with Price Tiers</DialogTitle>
+                        <DialogDescription>
+                          Configure price tiers for {selectedProductForPriceBreaks?.name}
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                          <div>
+                            <p className="font-medium">{selectedProductForPriceBreaks?.name}</p>
+                            <p className="text-sm text-muted-foreground font-mono">{selectedProductForPriceBreaks?.item_id || '-'}</p>
+                          </div>
+                          <p className="text-sm">Base Price: {formatCurrency(selectedProductForPriceBreaks?.price || 0)}</p>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label>Price Tiers</Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={addTempPriceBreak}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add Tier
+                            </Button>
+                          </div>
+                          
+                          {tempPriceBreaks.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                              No price tiers defined. Add at least one tier.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {tempPriceBreaks.map((priceBreak, index) => (
+                                <div 
+                                  key={index} 
+                                  className="flex items-center gap-3 p-2 rounded-md border"
+                                >
+                                  <div className="flex items-center gap-2 flex-1">
+                                    <Label className="text-xs w-8">Qty</Label>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={priceBreak.qty}
+                                      onChange={(e) => updateTempPriceBreak(index, 'qty', parseInt(e.target.value) || 1)}
+                                      className="h-8 w-28"
+                                    />
+                                    <Label className="text-xs w-10">Price</Label>
+                                    <div className="relative">
+                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={priceBreak.unit_price}
+                                        onChange={(e) => updateTempPriceBreak(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                        className="h-8 w-24 pl-5"
+                                      />
+                                    </div>
+                                    <span className="text-sm text-muted-foreground">
+                                      = {formatCurrency(priceBreak.qty * priceBreak.unit_price)}
+                                    </span>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-destructive"
+                                    onClick={() => removeTempPriceBreak(index)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-4 border-t">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            setShowAddProductWithPriceBreaks(false);
+                            setSelectedProductForPriceBreaks(null);
+                            setTempPriceBreaks([]);
+                          }}
+                          type="button"
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={handleAddProductWithPriceBreaks}
+                          disabled={tempPriceBreaks.length === 0}
+                          type="button"
+                        >
+                          Add to Quote
                         </Button>
                       </div>
                     </DialogContent>
