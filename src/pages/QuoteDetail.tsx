@@ -302,18 +302,21 @@ const QuoteDetail = () => {
     );
   }
 
-  // For customers: can only edit their own quote requests (pending_review, no parent)
-  // For vibe admin: can edit drafts and pending_review quotes
-  const isCustomerRequest = quote.status === 'pending_review' && !quote.parent_quote_id;
-  const canEdit = isVibeAdmin 
-    ? (quote.status === 'draft' || quote.status === 'pending_review' || quote.status === 'vendor_received')
-    : (isCustomerRequest); // Customers can only edit their pending requests
+  // For customers: can only edit their own quote requests while still pending
+  // For vibe admin: can ONLY edit response quotes (quotes with parent_quote_id) that are drafts
+  // Vibe admins should NOT edit customer's original request - they create a response quote instead
+  const isCustomerRequest = !quote.parent_quote_id; // Original request from customer
+  const isResponseQuote = !!quote.parent_quote_id; // Response quote created by vibe admin
   
-  const canSend = isVibeAdmin && quote.status === 'draft' && items.length > 0 && quote.parent_quote_id;
+  const canEdit = isVibeAdmin 
+    ? (isResponseQuote && (quote.status === 'draft')) // Vibe admin can only edit their response drafts
+    : (isCustomerRequest && quote.status === 'pending_review'); // Customers can only edit pending requests
+  
+  const canSend = isVibeAdmin && quote.status === 'draft' && items.length > 0 && isResponseQuote;
   const canApprove = !isVibeAdmin && quote.status === 'sent';
   const canReject = !isVibeAdmin && quote.status === 'sent';
-  const canRespond = isVibeAdmin && (quote.status === 'pending_review' || quote.status === 'vendor_received') && !responseQuote;
-  const canSendToVendor = isVibeAdmin && (quote.status === 'pending_review' || quote.status === 'draft') && !quote.vendor_id;
+  const canRespond = isVibeAdmin && isCustomerRequest && (quote.status === 'pending_review' || quote.status === 'vendor_received') && !responseQuote;
+  const canSendToVendor = isVibeAdmin && isCustomerRequest && (quote.status === 'pending_review') && !quote.vendor_id;
   const canMarkVendorReceived = isVibeAdmin && quote.status === 'vendor_pending';
 
   const handleDownloadPDF = () => {
