@@ -133,7 +133,11 @@ const Quotes = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string, forCustomer: boolean = false) => {
+    // For customers, internal workflow statuses should show as "In Review" icon
+    if (forCustomer && ['in_progress', 'vendor_pending', 'vendor_received'].includes(status)) {
+      return <Clock className="h-4 w-4" />;
+    }
     switch (status) {
       case 'draft': return <FileText className="h-4 w-4" />;
       case 'sent': return <Send className="h-4 w-4" />;
@@ -148,7 +152,11 @@ const Quotes = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, forCustomer: boolean = false) => {
+    // For customers, internal workflow statuses should show as "In Review" style
+    if (forCustomer && ['in_progress', 'vendor_pending', 'vendor_received'].includes(status)) {
+      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+    }
     switch (status) {
       case 'draft': return 'bg-muted text-muted-foreground';
       case 'sent': return 'bg-primary/10 text-primary';
@@ -313,14 +321,14 @@ const Quotes = () => {
                   <div className="flex items-center gap-4 min-w-0 flex-1">
                     <div className={cn(
                       "p-2 rounded-lg",
-                      getStatusColor(quote.status)
+                      getStatusColor(quote.status, !isVibeAdmin)
                     )}>
-                      {getStatusIcon(quote.status)}
+                      {getStatusIcon(quote.status, !isVibeAdmin)}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono font-semibold">{quote.quote_number}</span>
-                        <Badge variant="outline" className={getStatusColor(quote.status)}>
+                        <Badge variant="outline" className={getStatusColor(quote.status, !isVibeAdmin)}>
                           {formatStatus(quote.status, isVibeAdmin)}
                         </Badge>
                         {/* Show quote type for customers - only if pending */}

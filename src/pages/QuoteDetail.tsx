@@ -233,7 +233,11 @@ const QuoteDetail = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, forCustomer: boolean = false) => {
+    // For customers, internal workflow statuses should show as "In Review" style
+    if (forCustomer && ['in_progress', 'vendor_pending', 'vendor_received'].includes(status)) {
+      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+    }
     switch (status) {
       case 'draft': return 'bg-muted text-muted-foreground';
       case 'sent': return 'bg-primary/10 text-primary';
@@ -376,7 +380,7 @@ const QuoteDetail = () => {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="page-title">{quote.quote_number}</h1>
-              <Badge className={getStatusColor(quote.status)}>
+              <Badge className={getStatusColor(quote.status, !isVibeAdmin)}>
                 {formatStatus(quote.status, isVibeAdmin)}
               </Badge>
               {/* Show quote type indicator for customers */}
