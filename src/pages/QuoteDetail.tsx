@@ -258,7 +258,21 @@ const QuoteDetail = () => {
     }
   };
 
-  const formatStatus = (status: string) => {
+  const formatStatus = (status: string, isAdmin: boolean = false) => {
+    // Customer-friendly status labels
+    if (!isAdmin) {
+      switch (status) {
+        case 'pending_review': return 'Requested';
+        case 'sent': return 'Quote Received';
+        case 'approved': return 'Approved';
+        case 'rejected': return 'Rejected';
+        case 'expired': return 'Expired';
+        default: return status.split('_').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+      }
+    }
+    // Admin status labels
     return status.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
@@ -288,11 +302,17 @@ const QuoteDetail = () => {
     );
   }
 
-  const canEdit = quote.status === 'draft' || quote.status === 'pending_review';
-  const canSend = isVibeAdmin && quote.status === 'draft' && items.length > 0;
+  // For customers: can only edit their own quote requests (pending_review, no parent)
+  // For vibe admin: can edit drafts and pending_review quotes
+  const isCustomerRequest = quote.status === 'pending_review' && !quote.parent_quote_id;
+  const canEdit = isVibeAdmin 
+    ? (quote.status === 'draft' || quote.status === 'pending_review' || quote.status === 'vendor_received')
+    : (isCustomerRequest); // Customers can only edit their pending requests
+  
+  const canSend = isVibeAdmin && quote.status === 'draft' && items.length > 0 && quote.parent_quote_id;
   const canApprove = !isVibeAdmin && quote.status === 'sent';
   const canReject = !isVibeAdmin && quote.status === 'sent';
-  const canRespond = isVibeAdmin && quote.status === 'pending_review' && !responseQuote;
+  const canRespond = isVibeAdmin && (quote.status === 'pending_review' || quote.status === 'vendor_received') && !responseQuote;
   const canSendToVendor = isVibeAdmin && (quote.status === 'pending_review' || quote.status === 'draft') && !quote.vendor_id;
   const canMarkVendorReceived = isVibeAdmin && quote.status === 'vendor_pending';
 
@@ -346,8 +366,17 @@ const QuoteDetail = () => {
             <div className="flex items-center gap-3">
               <h1 className="page-title">{quote.quote_number}</h1>
               <Badge className={getStatusColor(quote.status)}>
-                {formatStatus(quote.status)}
+                {formatStatus(quote.status, isVibeAdmin)}
               </Badge>
+              {/* Show quote type indicator */}
+              {!isVibeAdmin && (
+                <Badge variant="outline" className="text-xs">
+                  {quote.parent_quote_id ? "Official Quote" : "Quote Request"}
+                </Badge>
+              )}
+              {isVibeAdmin && quote.parent_quote_id && (
+                <Badge variant="outline" className="text-xs">Response Quote</Badge>
+              )}
             </div>
             <p className="page-subtitle">
               Created {new Date(quote.created_at).toLocaleDateString()}
@@ -669,12 +698,14 @@ const QuoteDetail = () => {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Response Quote (if this is a request with a response) */}
-          {responseQuote && (
+          {/* For customers: only show if response is sent/approved/rejected */}
+          {/* For admins: always show if exists */}
+          {responseQuote && (isVibeAdmin || ['sent', 'approved', 'rejected'].includes(responseQuote.status)) && (
             <Card className="border-primary/50">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <FileText className="h-4 w-4 text-primary" />
-                  Response Quote
+                  {isVibeAdmin ? "Response Quote" : "Official Quote"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -685,7 +716,7 @@ const QuoteDetail = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Status</span>
                   <Badge className={getStatusColor(responseQuote.status)}>
-                    {formatStatus(responseQuote.status)}
+                    {formatStatus(responseQuote.status, isVibeAdmin)}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
@@ -697,7 +728,7 @@ const QuoteDetail = () => {
                   className="w-full mt-2"
                   onClick={() => navigate(`/quotes/${responseQuote.id}`)}
                 >
-                  View Response Quote
+                  View {isVibeAdmin ? "Response Quote" : "Official Quote"}
                 </Button>
               </CardContent>
             </Card>
