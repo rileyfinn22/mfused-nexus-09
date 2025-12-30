@@ -22,7 +22,8 @@ import {
   Send,
   Loader2,
   Building2,
-  Calendar
+  Calendar,
+  Truck
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ interface Quote {
   valid_until: string | null;
   created_at: string;
   company?: { name: string };
+  parent_quote_id?: string | null;
 }
 
 interface Company {
@@ -99,7 +101,35 @@ const Quotes = () => {
       const { data, error } = await query;
 
       if (error) throw error;
-      setQuotes(data || []);
+      
+      // For non-admin users (customers), filter out internal workflow quotes
+      // Customers should only see:
+      // - Their own requests (pending_review, where parent_quote_id is null)
+      // - Official responses sent to them (sent, approved, rejected - where parent_quote_id is NOT null)
+      // - Their own drafts
+      let filteredData = data || [];
+      if (!isVibeAdmin) {
+        filteredData = filteredData.filter(quote => {
+          // Hide vendor-related internal statuses from customers
+          const internalStatuses = ['vendor_pending', 'vendor_received'];
+          if (internalStatuses.includes(quote.status)) {
+            return false;
+          }
+          
+          // Customer can see:
+          // 1. Quote requests they made (no parent_quote_id, any customer-visible status)
+          // 2. Official quote responses sent to them (has parent_quote_id, status is sent/approved/rejected)
+          if (!quote.parent_quote_id) {
+            // This is an original request - customer can see it
+            return true;
+          } else {
+            // This is a response quote - only show if it's been officially sent
+            return ['sent', 'approved', 'rejected'].includes(quote.status);
+          }
+        });
+      }
+      
+      setQuotes(filteredData);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -116,6 +146,8 @@ const Quotes = () => {
       case 'draft': return <FileText className="h-4 w-4" />;
       case 'sent': return <Send className="h-4 w-4" />;
       case 'pending_review': return <Clock className="h-4 w-4" />;
+      case 'vendor_pending': return <Truck className="h-4 w-4" />;
+      case 'vendor_received': return <CheckCircle className="h-4 w-4" />;
       case 'approved': return <CheckCircle className="h-4 w-4" />;
       case 'rejected': return <XCircle className="h-4 w-4" />;
       case 'expired': return <Calendar className="h-4 w-4" />;
@@ -128,6 +160,8 @@ const Quotes = () => {
       case 'draft': return 'bg-muted text-muted-foreground';
       case 'sent': return 'bg-primary/10 text-primary';
       case 'pending_review': return 'bg-warning/10 text-warning';
+      case 'vendor_pending': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
+      case 'vendor_received': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
       case 'approved': return 'bg-success/10 text-success';
       case 'rejected': return 'bg-danger/10 text-danger';
       case 'expired': return 'bg-muted text-muted-foreground';
@@ -135,7 +169,21 @@ const Quotes = () => {
     }
   };
 
-  const formatStatus = (status: string) => {
+  const formatStatus = (status: string, isAdmin: boolean = false) => {
+    // Customer-friendly status labels
+    if (!isAdmin) {
+      switch (status) {
+        case 'pending_review': return 'Requested';
+        case 'sent': return 'Quote Received';
+        case 'approved': return 'Approved';
+        case 'rejected': return 'Rejected';
+        case 'expired': return 'Expired';
+        default: return status.split('_').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+      }
+    }
+    // Admin status labels
     return status.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
@@ -173,9 +221,11 @@ const Quotes = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="page-title">Quotes</h1>
+          <h1 className="page-title">{isVibeAdmin ? "Quotes" : "My Quotes"}</h1>
           <p className="page-subtitle">
-            {isVibeAdmin ? "Manage and send pricing quotes to customers" : "Request and view quotes"}
+            {isVibeAdmin 
+              ? "Manage quote requests and send pricing to customers" 
+              : "View your quote requests and official quotes"}
           </p>
         </div>
         <Button onClick={() => navigate('/quotes/create')}>
@@ -216,9 +266,11 @@ const Quotes = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="sent">Sent</SelectItem>
-            <SelectItem value="pending_review">Pending Review</SelectItem>
+            {isVibeAdmin && <SelectItem value="draft">Draft</SelectItem>}
+            <SelectItem value="pending_review">{isVibeAdmin ? "Pending Review" : "Requested"}</SelectItem>
+            {isVibeAdmin && <SelectItem value="vendor_pending">Vendor Pending</SelectItem>}
+            {isVibeAdmin && <SelectItem value="vendor_received">Vendor Received</SelectItem>}
+            <SelectItem value="sent">{isVibeAdmin ? "Sent to Customer" : "Quote Received"}</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
             <SelectItem value="expired">Expired</SelectItem>
@@ -263,11 +315,21 @@ const Quotes = () => {
                       {getStatusIcon(quote.status)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono font-semibold">{quote.quote_number}</span>
                         <Badge variant="outline" className={getStatusColor(quote.status)}>
-                          {formatStatus(quote.status)}
+                          {formatStatus(quote.status, isVibeAdmin)}
                         </Badge>
+                        {/* Show quote type for customers */}
+                        {!isVibeAdmin && (
+                          <Badge variant="secondary" className="text-xs">
+                            {quote.parent_quote_id ? "Official Quote" : "Quote Request"}
+                          </Badge>
+                        )}
+                        {/* Show quote type for admins */}
+                        {isVibeAdmin && quote.parent_quote_id && (
+                          <Badge variant="secondary" className="text-xs">Response</Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                         <span className="flex items-center gap-1">
