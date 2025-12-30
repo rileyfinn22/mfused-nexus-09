@@ -15,18 +15,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Eye, FileText, Trash2 } from "lucide-react";
+import { Search, Eye, FileText, Trash2, Plus, Receipt } from "lucide-react";
+import { CreateExpensePODialog } from "@/components/CreateExpensePODialog";
 
 const VendorPOs = () => {
   const navigate = useNavigate();
   const [pos, setPOs] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [poToDelete, setPOToDelete] = useState<any>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [showExpenseDialog, setShowExpenseDialog] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -42,7 +52,7 @@ const VendorPOs = () => {
         .eq('user_id', user.id)
         .single();
       const role = data?.role as string;
-      setIsAdmin(role === 'admin' || role === 'vibe_admin');
+      setIsVibeAdmin(role === 'vibe_admin');
     }
   };
 
@@ -50,7 +60,7 @@ const VendorPOs = () => {
     setLoading(true);
     const { data, error } = await (supabase as any)
       .from('vendor_pos')
-      .select('*, vendors(name), orders(order_number)')
+      .select('*, vendors(name), orders(order_number), customer_company:companies!vendor_pos_customer_company_id_fkey(name)')
       .order('created_at', { ascending: false });
     
     if (!error && data) {
@@ -115,28 +125,52 @@ const VendorPOs = () => {
     }
   };
 
-  const filteredPOs = pos.filter(po => 
-    po.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (po.vendors?.name && po.vendors.name.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredPOs = pos.filter(po => {
+    const matchesSearch = po.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (po.vendors?.name && po.vendors.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesType = typeFilter === "all" || 
+      (typeFilter === "expense" && po.po_type === "expense") ||
+      (typeFilter === "production" && (po.po_type === "production" || !po.po_type));
+    
+    return matchesSearch && matchesType;
+  });
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center border-b border-table-border pb-4">
         <div>
           <h1 className="text-2xl font-semibold">Vendor Purchase Orders</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage purchase orders to vendors</p>
+          <p className="text-sm text-muted-foreground mt-1">Manage purchase orders and expenses to vendors</p>
         </div>
+        {isVibeAdmin && (
+          <Button onClick={() => setShowExpenseDialog(true)}>
+            <Receipt className="h-4 w-4 mr-2" />
+            Create Expense PO
+          </Button>
+        )}
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search POs..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      <div className="flex gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search POs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="production">Production</SelectItem>
+            <SelectItem value="expense">Expense</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
@@ -145,10 +179,10 @@ const VendorPOs = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>PO Number</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Vendor</TableHead>
-                <TableHead>Customer Order</TableHead>
-                <TableHead>Order Date</TableHead>
-                <TableHead>Expected Delivery</TableHead>
+                <TableHead>Customer/Order</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -172,18 +206,25 @@ const VendorPOs = () => {
                 filteredPOs.map((po) => (
                   <TableRow key={po.id}>
                     <TableCell className="font-medium">{po.po_number}</TableCell>
+                    <TableCell>
+                      <Badge variant={po.po_type === 'expense' ? 'secondary' : 'outline'}>
+                        {po.po_type === 'expense' ? 'Expense' : 'Production'}
+                      </Badge>
+                      {po.expense_category && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          ({po.expense_category})
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>{po.vendors?.name || 'Unassigned'}</TableCell>
                     <TableCell>
-                      {po.orders?.order_number || '-'}
+                      {po.po_type === 'expense' 
+                        ? (po.customer_company?.name || '-')
+                        : (po.orders?.order_number || '-')
+                      }
                     </TableCell>
                     <TableCell>
                       {new Date(po.order_date).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {po.expected_delivery_date 
-                        ? new Date(po.expected_delivery_date).toLocaleDateString()
-                        : '-'
-                      }
                     </TableCell>
                     <TableCell>${po.total?.toFixed(2) || '0.00'}</TableCell>
                     <TableCell>
@@ -200,7 +241,7 @@ const VendorPOs = () => {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {isAdmin && (
+                        {isVibeAdmin && (
                           <Button 
                             variant="ghost" 
                             size="sm"
@@ -237,6 +278,13 @@ const VendorPOs = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Expense PO Dialog */}
+      <CreateExpensePODialog 
+        open={showExpenseDialog} 
+        onOpenChange={setShowExpenseDialog}
+        onCreated={fetchVendorPOs}
+      />
     </div>
   );
 };

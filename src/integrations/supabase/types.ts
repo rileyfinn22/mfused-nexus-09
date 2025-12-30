@@ -1678,11 +1678,15 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string
+          customer_company_id: string | null
+          description: string | null
           expected_delivery_date: string | null
+          expense_category: string | null
           id: string
           order_date: string
-          order_id: string
+          order_id: string | null
           po_number: string
+          po_type: string
           quickbooks_id: string | null
           quickbooks_sync_status: string | null
           quickbooks_synced_at: string | null
@@ -1694,11 +1698,15 @@ export type Database = {
         Insert: {
           company_id: string
           created_at?: string
+          customer_company_id?: string | null
+          description?: string | null
           expected_delivery_date?: string | null
+          expense_category?: string | null
           id?: string
           order_date?: string
-          order_id: string
+          order_id?: string | null
           po_number: string
+          po_type?: string
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
@@ -1710,11 +1718,15 @@ export type Database = {
         Update: {
           company_id?: string
           created_at?: string
+          customer_company_id?: string | null
+          description?: string | null
           expected_delivery_date?: string | null
+          expense_category?: string | null
           id?: string
           order_date?: string
-          order_id?: string
+          order_id?: string | null
           po_number?: string
+          po_type?: string
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
@@ -1724,6 +1736,13 @@ export type Database = {
           vendor_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "vendor_pos_customer_company_id_fkey"
+            columns: ["customer_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "vendor_pos_order_id_fkey"
             columns: ["order_id"]
