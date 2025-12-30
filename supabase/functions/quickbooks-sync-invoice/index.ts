@@ -750,9 +750,11 @@ serve(async (req) => {
     // Instead, we adjust the line item amounts to reflect the billing percentage
 
     let qbResponse;
+    let shouldCreateNew = !invoice.quickbooks_id;
+    
     if (invoice.quickbooks_id) {
-      // Update existing invoice
-      console.log('Updating existing QuickBooks invoice:', invoice.quickbooks_id);
+      // Try to update existing invoice
+      console.log('Attempting to update existing QuickBooks invoice:', invoice.quickbooks_id);
       
       const getResponse = await fetch(`${qbApiUrl}/invoice/${invoice.quickbooks_id}`, {
         headers: {
@@ -763,32 +765,46 @@ serve(async (req) => {
       
       if (!getResponse.ok) {
         const errorData = await getResponse.json();
-        console.error('Failed to fetch existing invoice:', errorData);
-        throw new Error(`Failed to fetch invoice from QuickBooks: ${errorData.Fault?.Error?.[0]?.Message || 'Unknown error'}`);
+        console.warn('Invoice not found in QuickBooks (may have been deleted):', errorData);
+        
+        // Clear the stale quickbooks_id and create a new invoice instead
+        console.log('Clearing stale quickbooks_id and will create new invoice');
+        await supabase
+          .from('invoices')
+          .update({ quickbooks_id: null, quickbooks_sync_status: 'pending' })
+          .eq('id', invoiceId);
+        
+        shouldCreateNew = true;
+      } else {
+        const currentInvoice = await getResponse.json();
+        console.log('Current invoice response:', JSON.stringify(currentInvoice).substring(0, 200));
+        
+        if (!currentInvoice?.Invoice?.SyncToken) {
+          console.warn('Invalid invoice response, will create new:', currentInvoice);
+          await supabase
+            .from('invoices')
+            .update({ quickbooks_id: null, quickbooks_sync_status: 'pending' })
+            .eq('id', invoiceId);
+          shouldCreateNew = true;
+        } else {
+          qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=65`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ...invoicePayload,
+              Id: invoice.quickbooks_id,
+              SyncToken: currentInvoice.Invoice.SyncToken,
+            }),
+          });
+        }
       }
-      
-      const currentInvoice = await getResponse.json();
-      console.log('Current invoice response:', JSON.stringify(currentInvoice).substring(0, 200));
-      
-      if (!currentInvoice?.Invoice?.SyncToken) {
-        console.error('Invalid invoice response:', currentInvoice);
-        throw new Error('Could not get SyncToken from QuickBooks invoice. Invoice may have been deleted.');
-      }
-
-      qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=65`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...invoicePayload,
-          Id: invoice.quickbooks_id,
-          SyncToken: currentInvoice.Invoice.SyncToken,
-        }),
-      });
-    } else {
+    }
+    
+    if (shouldCreateNew) {
       // First check if an invoice with this DocNumber already exists in QuickBooks
       const docNumber = invoice.invoice_number.substring(0, 21);
       console.log('Checking if invoice exists with DocNumber:', docNumber);
