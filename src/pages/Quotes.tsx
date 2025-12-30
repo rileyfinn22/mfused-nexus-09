@@ -1,0 +1,304 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Plus,
+  Search,
+  FileText,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Send,
+  Loader2,
+  Building2,
+  Calendar
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+
+interface Quote {
+  id: string;
+  quote_number: string;
+  customer_name: string;
+  customer_email: string | null;
+  company_id: string;
+  status: string;
+  total: number;
+  valid_until: string | null;
+  created_at: string;
+  company?: { name: string };
+}
+
+interface Company {
+  id: string;
+  name: string;
+}
+
+const Quotes = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+
+  useEffect(() => {
+    checkRole();
+  }, []);
+
+  useEffect(() => {
+    if (isVibeAdmin !== undefined) {
+      fetchQuotes();
+      if (isVibeAdmin) {
+        fetchCompanies();
+      }
+    }
+  }, [isVibeAdmin]);
+
+  const checkRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      setIsVibeAdmin(data?.role === 'vibe_admin');
+    }
+  };
+
+  const fetchCompanies = async () => {
+    const { data } = await supabase
+      .from('companies')
+      .select('id, name')
+      .order('name');
+    setCompanies(data || []);
+  };
+
+  const fetchQuotes = async () => {
+    try {
+      let query = supabase
+        .from('quotes')
+        .select('*, company:companies(name)')
+        .order('created_at', { ascending: false });
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setQuotes(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'draft': return <FileText className="h-4 w-4" />;
+      case 'sent': return <Send className="h-4 w-4" />;
+      case 'pending_review': return <Clock className="h-4 w-4" />;
+      case 'approved': return <CheckCircle className="h-4 w-4" />;
+      case 'rejected': return <XCircle className="h-4 w-4" />;
+      case 'expired': return <Calendar className="h-4 w-4" />;
+      default: return <FileText className="h-4 w-4" />;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'draft': return 'bg-muted text-muted-foreground';
+      case 'sent': return 'bg-primary/10 text-primary';
+      case 'pending_review': return 'bg-warning/10 text-warning';
+      case 'approved': return 'bg-success/10 text-success';
+      case 'rejected': return 'bg-danger/10 text-danger';
+      case 'expired': return 'bg-muted text-muted-foreground';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const formatStatus = (status: string) => {
+    return status.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(value);
+  };
+
+  const filteredQuotes = quotes.filter(quote => {
+    const matchesSearch = 
+      quote.quote_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      quote.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (quote.customer_email?.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
+    const matchesCompany = companyFilter === 'all' || quote.company_id === companyFilter;
+    
+    return matchesSearch && matchesStatus && matchesCompany;
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="page-title">Quotes</h1>
+          <p className="page-subtitle">
+            {isVibeAdmin ? "Manage and send pricing quotes to customers" : "Request and view quotes"}
+          </p>
+        </div>
+        <Button onClick={() => navigate('/quotes/create')}>
+          <Plus className="h-4 w-4 mr-2" />
+          {isVibeAdmin ? "Create Quote" : "Request Quote"}
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search quotes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        {isVibeAdmin && (
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="All Companies" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Companies</SelectItem>
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={company.id}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="All Statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="sent">Sent</SelectItem>
+            <SelectItem value="pending_review">Pending Review</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="expired">Expired</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Quotes List */}
+      {filteredQuotes.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No quotes found</h3>
+            <p className="text-muted-foreground text-center mb-4">
+              {searchQuery || statusFilter !== 'all' || companyFilter !== 'all'
+                ? "Try adjusting your filters"
+                : isVibeAdmin 
+                  ? "Create your first quote to send pricing to customers"
+                  : "Request a quote to get started"}
+            </p>
+            <Button onClick={() => navigate('/quotes/create')}>
+              <Plus className="h-4 w-4 mr-2" />
+              {isVibeAdmin ? "Create Quote" : "Request Quote"}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filteredQuotes.map((quote) => (
+            <Card 
+              key={quote.id} 
+              className="card-hover cursor-pointer"
+              onClick={() => navigate(`/quotes/${quote.id}`)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <div className={cn(
+                      "p-2 rounded-lg",
+                      getStatusColor(quote.status)
+                    )}>
+                      {getStatusIcon(quote.status)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-semibold">{quote.quote_number}</span>
+                        <Badge variant="outline" className={getStatusColor(quote.status)}>
+                          {formatStatus(quote.status)}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                        <span className="flex items-center gap-1">
+                          <Building2 className="h-3 w-3" />
+                          {quote.customer_name}
+                        </span>
+                        {isVibeAdmin && quote.company && (
+                          <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                            {quote.company.name}
+                          </span>
+                        )}
+                        <span>{new Date(quote.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold">{formatCurrency(quote.total)}</div>
+                    {quote.valid_until && (
+                      <div className="text-xs text-muted-foreground">
+                        Valid until {new Date(quote.valid_until).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Quotes;

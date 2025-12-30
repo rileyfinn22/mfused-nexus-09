@@ -36,6 +36,9 @@ import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import Customers from "./pages/Customers";
 import CustomerDetail from "./pages/CustomerDetail";
+import Quotes from "./pages/Quotes";
+import QuoteDetail from "./pages/QuoteDetail";
+import CreateQuote from "./pages/CreateQuote";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -80,6 +83,10 @@ const App = () => (
           <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
           <Route path="/customers" element={<DashboardLayout><Customers /></DashboardLayout>} />
           <Route path="/customers/:customerId" element={<DashboardLayout><CustomerDetail /></DashboardLayout>} />
+          <Route path="/quotes" element={<DashboardLayout><Quotes /></DashboardLayout>} />
+          <Route path="/quotes/create" element={<DashboardLayout><CreateQuote /></DashboardLayout>} />
+          <Route path="/quotes/edit/:quoteId" element={<DashboardLayout><CreateQuote /></DashboardLayout>} />
+          <Route path="/quotes/:quoteId" element={<DashboardLayout><QuoteDetail /></DashboardLayout>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

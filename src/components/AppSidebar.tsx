@@ -12,7 +12,8 @@ import {
   Settings,
   BarChart3,
   Users,
-  ChevronRight
+  ChevronRight,
+  Calculator
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -36,6 +37,7 @@ const customerNavigationItems = [
   { title: "Orders", url: "/orders", icon: ClipboardList },
   { title: "Production", url: "/production", icon: Factory },
   { title: "Invoices", url: "/invoices", icon: FileText },
+  { title: "Quotes", url: "/quotes", icon: Calculator },
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Pull & Ship", url: "/pull-ship", icon: Truck },
   { title: "My POs", url: "/my-pos", icon: FolderOpen },
@@ -46,6 +48,7 @@ const vibeAdminNavigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "All Orders", url: "/orders", icon: ClipboardList },
   { title: "Production", url: "/production", icon: Factory },
+  { title: "Quotes", url: "/quotes", icon: Calculator },
   { title: "Create Pull & Ship", url: "/pull-ship", icon: Truck },
   { title: "Pull & Ship Orders", url: "/pull-ship-orders", icon: FileText },
   { title: "Vendors", url: "/vendors", icon: Building2 },
