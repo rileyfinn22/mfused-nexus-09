@@ -38,8 +38,6 @@ import {
   Phone,
   Mail,
   Calendar,
-  ChevronDown,
-  ChevronRight,
   Truck,
   Clock,
   PlayCircle
@@ -47,10 +45,13 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { generateQuotePDF } from "@/lib/quoteUtils";
 import { SendToVendorDialog } from "@/components/SendToVendorDialog";
 
@@ -531,131 +532,113 @@ const QuoteDetail = () => {
             <CardHeader>
               <CardTitle className="text-base">Quote Items</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {items.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
                   No items added to this quote yet
                 </p>
               ) : (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-12 gap-4 text-sm font-medium text-muted-foreground border-b pb-2">
-                    <div className="col-span-4">Item</div>
-                    <div className="col-span-2">Description</div>
-                    <div className="col-span-2 text-right">Qty</div>
-                    <div className="col-span-2 text-right">Unit Price</div>
-                    <div className="col-span-2 text-right">Total</div>
-                  </div>
-                  {items.map((item) => {
-                    const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
-                    const formatQty = (qty: number) => qty.toLocaleString();
-                    
-                    return (
-                      <Collapsible key={item.id} defaultOpen={hasPriceBreaks}>
-                        <div className="grid grid-cols-12 gap-4 text-sm items-center">
-                          <div className={hasPriceBreaks ? "col-span-10" : "col-span-4"}>
-                            <div className="flex items-center gap-2">
-                              {hasPriceBreaks && (
-                                <CollapsibleTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                    <ChevronDown className="h-4 w-4 transition-transform data-[state=closed]:rotate-[-90deg]" />
-                                  </Button>
-                                </CollapsibleTrigger>
-                              )}
+                <div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="w-[280px]">Product</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right w-[100px]">Qty</TableHead>
+                        <TableHead className="text-right w-[120px]">Unit Price</TableHead>
+                        <TableHead className="text-right w-[120px]">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {items.map((item) => {
+                        const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
+                        
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell>
                               <div>
                                 <p className="font-medium">{item.name}</p>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 mt-0.5">
                                   <span className="text-muted-foreground font-mono text-xs">{item.sku}</span>
                                   {item.state && (
-                                    <span className="text-xs text-muted-foreground">({item.state})</span>
-                                  )}
-                                  {hasPriceBreaks && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {item.price_breaks.length} tier{item.price_breaks.length !== 1 ? 's' : ''}
+                                    <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                      {item.state}
                                     </Badge>
                                   )}
                                 </div>
                               </div>
-                            </div>
-                          </div>
-                          {hasPriceBreaks ? (
-                            <div className="col-span-2">
-                              {item.description && (
-                                <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
-                              )}
-                            </div>
-                          ) : (
-                            <>
-                              <div className="col-span-2">
-                                {item.description && (
-                                  <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
-                                )}
-                              </div>
-                              <div className="col-span-2 text-right">{item.quantity.toLocaleString()}</div>
-                              <div className="col-span-2 text-right">{formatCurrency(item.unit_price)}</div>
-                              <div className="col-span-2 text-right font-medium">{formatCurrency(item.total)}</div>
-                            </>
-                          )}
-                        </div>
-                        
-                        {hasPriceBreaks && (
-                          <CollapsibleContent>
-                            <div className="ml-8 mt-2 mb-3 p-3 bg-muted/50 rounded-md">
-                              <div className="grid grid-cols-3 gap-4 text-xs font-medium text-muted-foreground border-b pb-2 mb-2">
-                                <div>Quantity</div>
-                                <div className="text-right">Unit Price</div>
-                                <div className="text-right">Total</div>
-                              </div>
-                              <div className="space-y-1">
-                                {item.price_breaks.map((pb, idx) => (
-                                  <div 
-                                    key={idx} 
-                                    className={cn(
-                                      "grid grid-cols-3 gap-4 text-sm px-2 py-1.5 rounded",
-                                      item.selected_tier === idx && "bg-primary/10 text-primary font-medium"
-                                    )}
-                                  >
-                                    <span>{formatQty(pb.qty)} units</span>
-                                    <span className="text-right">{formatCurrency(pb.unit_price)}</span>
-                                    <span className="text-right font-medium">{formatCurrency(pb.qty * pb.unit_price)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </CollapsibleContent>
-                        )}
-                      </Collapsible>
-                    );
-                  })}
+                            </TableCell>
+                            <TableCell>
+                              <p className="text-sm text-muted-foreground line-clamp-2">
+                                {item.description || '-'}
+                              </p>
+                            </TableCell>
+                            {hasPriceBreaks ? (
+                              <>
+                                <TableCell colSpan={3} className="p-0">
+                                  <Select defaultValue={item.selected_tier?.toString() ?? "0"}>
+                                    <SelectTrigger className="border-0 bg-transparent h-auto py-3 px-4 justify-end gap-3 font-medium">
+                                      <SelectValue placeholder="Select tier" />
+                                    </SelectTrigger>
+                                    <SelectContent align="end" className="w-[320px]">
+                                      {item.price_breaks.map((pb, idx) => (
+                                        <SelectItem key={idx} value={idx.toString()} className="py-2">
+                                          <div className="flex items-center justify-between w-full gap-4">
+                                            <span className="font-medium">{pb.qty.toLocaleString()} units</span>
+                                            <span className="text-muted-foreground">{formatCurrency(pb.unit_price)}/ea</span>
+                                            <span className="font-semibold">{formatCurrency(pb.qty * pb.unit_price)}</span>
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                              </>
+                            ) : (
+                              <>
+                                <TableCell className="text-right">{item.quantity.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(item.unit_price)}</TableCell>
+                                <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
+                              </>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                  
+                  {/* Totals Section */}
                   {!hasAnyPriceBreaks && (
-                    <>
-                      <Separator />
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Subtotal</span>
-                          <span>{formatCurrency(quote.subtotal)}</span>
-                        </div>
-                        {quote.shipping_cost > 0 && (
+                    <div className="border-t p-4">
+                      <div className="flex justify-end">
+                        <div className="w-[280px] space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Shipping</span>
-                            <span>{formatCurrency(quote.shipping_cost)}</span>
+                            <span className="text-muted-foreground">Subtotal</span>
+                            <span>{formatCurrency(quote.subtotal)}</span>
                           </div>
-                        )}
-                        {quote.tax > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Tax</span>
-                            <span>{formatCurrency(quote.tax)}</span>
+                          {quote.shipping_cost > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Shipping</span>
+                              <span>{formatCurrency(quote.shipping_cost)}</span>
+                            </div>
+                          )}
+                          {quote.tax > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Tax</span>
+                              <span>{formatCurrency(quote.tax)}</span>
+                            </div>
+                          )}
+                          <Separator />
+                          <div className="flex justify-between font-semibold text-lg">
+                            <span>Total</span>
+                            <span>{formatCurrency(quote.total)}</span>
                           </div>
-                        )}
-                        <Separator />
-                        <div className="flex justify-between font-semibold text-lg">
-                          <span>Total</span>
-                          <span>{formatCurrency(quote.total)}</span>
                         </div>
                       </div>
-                    </>
+                    </div>
                   )}
                   {hasAnyPriceBreaks && (
-                    <div className="text-sm text-muted-foreground italic mt-4 text-center">
+                    <div className="text-sm text-muted-foreground italic p-4 text-center border-t">
                       * Pricing shown per tier. Final total depends on quantity selected.
                     </div>
                   )}
