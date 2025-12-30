@@ -1001,19 +1001,36 @@ const CreateQuote = () => {
                             {item.isExpanded && (
                               <TableRow className="bg-muted/30 hover:bg-muted/30">
                                 <TableCell colSpan={6} className="p-4">
-                                  <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                      <h4 className="text-sm font-medium">Price Breaks</h4>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => addPriceBreak(index)}
-                                      >
-                                        <Plus className="h-3 w-3 mr-1" />
-                                        Add Tier
-                                      </Button>
-                                    </div>
+                                  <div className="space-y-4">
+                                    {/* Description editing for vibe admins */}
+                                    {isVibeAdmin && (
+                                      <div className="space-y-2">
+                                        <Label className="text-sm font-medium">Item Description</Label>
+                                        <Textarea
+                                          placeholder="Add description for this item..."
+                                          value={item.description || ''}
+                                          onChange={(e) => {
+                                            const newItems = [...items];
+                                            newItems[index].description = e.target.value;
+                                            setItems(newItems);
+                                          }}
+                                          className="min-h-[60px]"
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-medium">Price Breaks</h4>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => addPriceBreak(index)}
+                                        >
+                                          <Plus className="h-3 w-3 mr-1" />
+                                          Add Tier
+                                        </Button>
+                                      </div>
                                     
                                     {item.price_breaks.length === 0 ? (
                                       <p className="text-sm text-muted-foreground">
@@ -1089,6 +1106,7 @@ const CreateQuote = () => {
                                         </p>
                                       </div>
                                     )}
+                                    </div>
                                   </div>
                                 </TableCell>
                               </TableRow>

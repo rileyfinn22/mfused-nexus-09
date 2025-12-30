@@ -540,7 +540,7 @@ const QuoteDetail = () => {
                 <div className="space-y-4">
                   <div className="grid grid-cols-12 gap-4 text-sm font-medium text-muted-foreground border-b pb-2">
                     <div className="col-span-4">Item</div>
-                    <div className="col-span-2">State</div>
+                    <div className="col-span-2">Description</div>
                     <div className="col-span-2 text-right">Qty</div>
                     <div className="col-span-2 text-right">Unit Price</div>
                     <div className="col-span-2 text-right">Total</div>
@@ -565,6 +565,9 @@ const QuoteDetail = () => {
                                 <p className="font-medium">{item.name}</p>
                                 <div className="flex items-center gap-2">
                                   <span className="text-muted-foreground font-mono text-xs">{item.sku}</span>
+                                  {item.state && (
+                                    <span className="text-xs text-muted-foreground">({item.state})</span>
+                                  )}
                                   {hasPriceBreaks && (
                                     <Badge variant="secondary" className="text-xs">
                                       {item.price_breaks.length} tier{item.price_breaks.length !== 1 ? 's' : ''}
@@ -576,15 +579,15 @@ const QuoteDetail = () => {
                           </div>
                           {hasPriceBreaks ? (
                             <div className="col-span-2">
-                              {item.state && (
-                                <Badge variant="outline">{item.state}</Badge>
+                              {item.description && (
+                                <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
                               )}
                             </div>
                           ) : (
                             <>
                               <div className="col-span-2">
-                                {item.state && (
-                                  <Badge variant="outline">{item.state}</Badge>
+                                {item.description && (
+                                  <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
                                 )}
                               </div>
                               <div className="col-span-2 text-right">{item.quantity.toLocaleString()}</div>
