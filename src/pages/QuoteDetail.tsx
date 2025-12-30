@@ -399,7 +399,7 @@ const QuoteDetail = () => {
               onClick={() => navigate(`/quotes/respond/${quote.id}`)}
             >
               <FileText className="h-4 w-4 mr-2" />
-              Respond with Quote
+              Create Quote for Customer
             </Button>
           )}
           {canSend && (
@@ -712,15 +712,36 @@ const QuoteDetail = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Original Request (if this is a response quote - vibe admin only) */}
+          {isVibeAdmin && quote.parent_quote_id && (
+            <Card className="border-warning/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-warning" />
+                  Original Customer Request
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => navigate(`/quotes/${quote.parent_quote_id}`)}
+                >
+                  View Original Request
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Response Quote (if this is a request with a response) */}
           {/* For customers: only show if response is sent/approved/rejected */}
           {/* For admins: always show if exists */}
-          {responseQuote && (isVibeAdmin || ['sent', 'approved', 'rejected'].includes(responseQuote.status)) && (
+          {responseQuote && (isVibeAdmin || ["sent", "approved", "rejected"].includes(responseQuote.status)) && (
             <Card className="border-primary/50">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <FileText className="h-4 w-4 text-primary" />
-                  {isVibeAdmin ? "Response Quote" : "Official Quote"}
+                  {isVibeAdmin ? "Your Quote Response" : "Official Quote"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -743,7 +764,7 @@ const QuoteDetail = () => {
                   className="w-full mt-2"
                   onClick={() => navigate(`/quotes/${responseQuote.id}`)}
                 >
-                  View {isVibeAdmin ? "Response Quote" : "Official Quote"}
+                  View {isVibeAdmin ? "Quote Response" : "Official Quote"}
                 </Button>
               </CardContent>
             </Card>
