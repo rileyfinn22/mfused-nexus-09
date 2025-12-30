@@ -106,15 +106,13 @@ const Quotes = () => {
       // Customers should only see:
       // - Their own requests (pending_review, where parent_quote_id is null)
       // - Official responses sent to them (sent, approved, rejected - where parent_quote_id is NOT null)
-      // - Their own drafts
+      // - Their own drafts (parent_quote_id is null)
+      // Hide: vibe admin's internal work quotes (in_progress, vendor_pending, vendor_received with parent_quote_id)
       let filteredData = data || [];
       if (!isVibeAdmin) {
         filteredData = filteredData.filter(quote => {
-          // Hide vendor-related internal statuses from customers
-          // Show "in_progress", "vendor_pending", "vendor_received" as "In Review" 
-          // but don't filter them out entirely - they're still the customer's quote
-          const hiddenStatuses = ['draft'];
-          if (hiddenStatuses.includes(quote.status)) {
+          // Hide internal vibe workflow quotes (response quotes that aren't sent yet)
+          if (quote.parent_quote_id && !['sent', 'approved', 'rejected'].includes(quote.status)) {
             return false;
           }
           return true;
