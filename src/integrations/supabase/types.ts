@@ -1647,6 +1647,10 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      validate_company_invitation: {
+        Args: { invitation_token_param: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "customer" | "vibe_admin" | "vendor" | "company"
