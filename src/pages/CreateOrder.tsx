@@ -823,9 +823,9 @@ const CreateOrder = () => {
           .limit(1)
           .single();
         
-        // Parse the max order number and increment, or start at 10700
-        const maxOrderNum = maxOrderData ? parseInt(maxOrderData.order_number, 10) : 10699;
-        const orderNum = (isNaN(maxOrderNum) ? 10699 : maxOrderNum) + 1;
+        // Parse the max order number and increment, or start at 11000
+        const maxOrderNum = maxOrderData ? parseInt(maxOrderData.order_number, 10) : 10999;
+        const orderNum = (isNaN(maxOrderNum) ? 10999 : Math.max(maxOrderNum, 10999)) + 1;
         orderNumber = String(orderNum);
 
         const { data: newOrder, error: orderError } = await supabase

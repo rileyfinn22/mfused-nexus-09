@@ -458,11 +458,8 @@ const PullShipOrderDetail = () => {
         let blanketInvoice = existingInvoices?.find(inv => inv.invoice_type === 'full' && inv.shipment_number === 1);
         
         if (!blanketInvoice) {
-          // Create the main blanket invoice first - get next sequence number
-          const { count: invoiceCount } = await supabase
-            .from('invoices')
-            .select('*', { count: 'exact', head: true });
-          const blanketInvoiceNumber = generateInvoiceNumber((invoiceCount || 0) + 1);
+          // Create the main blanket invoice first using parent order number
+          const blanketInvoiceNumber = generateInvoiceNumber(parentOrder.order_number, 1);
           const blanketTotal = parentOrder.total || 0;
           
           const { data: newBlanketInvoice, error: blanketError } = await supabase
@@ -502,11 +499,8 @@ const PullShipOrderDetail = () => {
           ? Math.max(...childInvoices.map(inv => inv.shipment_number)) + 1 
           : 2;
 
-        // Get next sequential invoice number
-        const { count: invoiceCount } = await supabase
-          .from('invoices')
-          .select('*', { count: 'exact', head: true });
-        const invoiceNumber = generateInvoiceNumber((invoiceCount || 0) + 1);
+        // Generate invoice number based on parent order number and shipment number
+        const invoiceNumber = generateInvoiceNumber(parentOrder.order_number, nextShipmentNumber);
 
         // Calculate percentage of order
         const pullShipTotal = editedOrder.total || 0;

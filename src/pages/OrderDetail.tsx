@@ -435,11 +435,8 @@ const OrderDetail = () => {
         .maybeSingle();
 
       if (!existingInvoice) {
-        // Create invoice with status "Final Review" - get next sequence number
-        const { count: invoiceCount } = await supabase
-          .from('invoices')
-          .select('*', { count: 'exact', head: true });
-        const invoiceNumber = generateInvoiceNumber((invoiceCount || 0) + 1);
+        // Create invoice with status "Final Review" using order number
+        const invoiceNumber = generateInvoiceNumber(order.order_number, 1);
         const { error: invoiceError } = await supabase
           .from('invoices')
           .insert({
