@@ -5,53 +5,128 @@ import {
   TrendingDown,
   Package,
   FileText,
-  Clock
+  DollarSign,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+
+interface LowStockItem {
+  sku: string;
+  state: string;
+  available: number;
+  redline: number;
+  status: 'critical' | 'warning';
+}
+
+interface RecentOrder {
+  id: string;
+  order_number: string;
+  status: string;
+  customer_name: string;
+}
 
 const Dashboard = () => {
-  const stats = [
-    { 
-      title: "Low Stock Items", 
-      value: "18", 
-      change: "Critical attention needed", 
-      trend: "down",
-      icon: AlertTriangle,
-      iconColor: "text-danger"
-    },
-    { 
-      title: "Open Orders", 
-      value: "34", 
-      change: "+5 from yesterday", 
-      trend: "up",
-      icon: Package,
-      iconColor: "text-primary"
-    },
-    { 
-      title: "Inventory Value", 
-      value: "$847,290", 
-      change: "+$23,450 this month", 
-      trend: "up",
-      icon: TrendingUp,
-      iconColor: "text-success"
-    },
-  ];
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [lowStockCount, setLowStockCount] = useState(0);
+  const [openOrdersCount, setOpenOrdersCount] = useState(0);
+  const [inventoryValue, setInventoryValue] = useState(0);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
 
-  const recentOrders = [
-    { id: "ORD-001", sku: "VAPE-CART-001", status: "In Production", statusColor: "text-primary" },
-    { id: "ORD-002", sku: "EDIBLE-PKG-005", status: "QC Review", statusColor: "text-warning" },
-    { id: "ORD-003", sku: "FLOWER-JAR-003", status: "Ready to Ship", statusColor: "text-success" },
-    { id: "ORD-004", sku: "CONCENTRATE-TIN", status: "In Production", statusColor: "text-primary" },
-    { id: "ORD-005", sku: "PRE-ROLL-TUBE", status: "Order Placed", statusColor: "text-muted-foreground" },
-  ];
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
-  const lowStockItems = [
-    { sku: "VAPE-CART-001", state: "WA", available: 12, redline: 50, status: "critical" },
-    { sku: "EDIBLE-PKG-005", state: "CA", available: 25, redline: 100, status: "warning" },
-    { sku: "FLOWER-JAR-003", state: "NY", available: 8, redline: 25, status: "critical" },
-    { sku: "CONCENTRATE-TIN", state: "AZ", available: 35, redline: 75, status: "warning" },
-    { sku: "PRE-ROLL-TUBE", state: "MD", available: 15, redline: 50, status: "warning" },
-  ];
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch low stock items (where available < redline)
+      const { data: inventoryData } = await supabase
+        .from('inventory')
+        .select('sku, state, available, redline')
+        .lt('available', supabase.rpc ? 100000 : 100000); // Get all, filter client-side
+
+      const lowStock = (inventoryData || [])
+        .filter(item => item.available < item.redline)
+        .map(item => ({
+          sku: item.sku,
+          state: item.state,
+          available: item.available,
+          redline: item.redline,
+          status: (item.available < item.redline * 0.25 ? 'critical' : 'warning') as 'critical' | 'warning'
+        }))
+        .slice(0, 5);
+
+      setLowStockItems(lowStock);
+      setLowStockCount((inventoryData || []).filter(item => item.available < item.redline).length);
+
+      // Fetch open orders count
+      const { count: ordersCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['pending', 'in_production', 'approved'])
+        .is('deleted_at', null);
+
+      setOpenOrdersCount(ordersCount || 0);
+
+      // Calculate inventory value
+      const { data: inventoryValueData } = await supabase
+        .from('inventory')
+        .select('available, product_id');
+
+      const { data: productsData } = await supabase
+        .from('products')
+        .select('id, cost');
+
+      const productCostMap = new Map((productsData || []).map(p => [p.id, p.cost || 0]));
+      const totalValue = (inventoryValueData || []).reduce((sum, item) => {
+        const cost = productCostMap.get(item.product_id) || 0;
+        return sum + (item.available * cost);
+      }, 0);
+
+      setInventoryValue(totalValue);
+
+      // Fetch recent orders
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('id, order_number, status, customer_name')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      setRecentOrders((ordersData || []).map(order => ({
+        id: order.id,
+        order_number: order.order_number,
+        status: order.status,
+        customer_name: order.customer_name
+      })));
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'in_production': return 'text-primary';
+      case 'approved': return 'text-success';
+      case 'pending': return 'text-warning';
+      case 'shipped': return 'text-success';
+      case 'draft': return 'text-muted-foreground';
+      default: return 'text-muted-foreground';
+    }
+  };
+
+  const formatStatus = (status: string) => {
+    return status.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
 
   const getStockBadgeClass = (status: string) => {
     switch (status) {
@@ -60,6 +135,50 @@ const Dashboard = () => {
       default: return 'status-success';
     }
   };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const stats = [
+    { 
+      title: "Low Stock Items", 
+      value: lowStockCount.toString(), 
+      description: lowStockCount > 0 ? "Items below redline" : "All items stocked", 
+      trend: lowStockCount > 0 ? "down" : "up",
+      icon: AlertTriangle,
+      iconColor: lowStockCount > 0 ? "text-danger" : "text-success"
+    },
+    { 
+      title: "Open Orders", 
+      value: openOrdersCount.toString(), 
+      description: "Pending & in production", 
+      trend: "up",
+      icon: Package,
+      iconColor: "text-primary"
+    },
+    { 
+      title: "Inventory Value", 
+      value: formatCurrency(inventoryValue), 
+      description: "Total at cost", 
+      trend: "up",
+      icon: DollarSign,
+      iconColor: "text-success"
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -85,7 +204,7 @@ const Dashboard = () => {
                       <TrendingDown className="h-3 w-3 text-danger" />
                     )}
                     <span className={stat.trend === 'up' ? 'text-success' : 'text-danger'}>
-                      {stat.change}
+                      {stat.description}
                     </span>
                   </div>
                 </div>
@@ -109,17 +228,27 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="divide-y divide-border">
-            {recentOrders.map((order) => (
-              <div key={order.id} className="p-4 flex items-center justify-between hover:bg-accent/30 transition-colors">
-                <div className="flex items-center gap-4">
-                  <span className="font-mono text-sm font-medium">{order.id}</span>
-                  <span className="text-sm text-muted-foreground">{order.sku}</span>
-                </div>
-                <span className={cn("text-sm font-medium", order.statusColor)}>
-                  {order.status}
-                </span>
+            {recentOrders.length === 0 ? (
+              <div className="p-4 text-center text-muted-foreground">
+                No orders yet
               </div>
-            ))}
+            ) : (
+              recentOrders.map((order) => (
+                <div 
+                  key={order.id} 
+                  className="p-4 flex items-center justify-between hover:bg-accent/30 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/orders/${order.id}`)}
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="font-mono text-sm font-medium">{order.order_number}</span>
+                    <span className="text-sm text-muted-foreground">{order.customer_name}</span>
+                  </div>
+                  <span className={cn("text-sm font-medium", getStatusColor(order.status))}>
+                    {formatStatus(order.status)}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </Card>
 
@@ -132,26 +261,36 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="divide-y divide-border">
-            {lowStockItems.map((item) => (
-              <div key={`${item.sku}-${item.state}`} className="p-4 flex items-center justify-between hover:bg-accent/30 transition-colors">
-                <div className="flex items-center gap-4">
-                  <span className="font-mono text-sm font-medium">{item.sku}</span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{item.state}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <span className="text-sm font-semibold">{item.available}</span>
-                    <span className="text-muted-foreground text-sm"> / {item.redline}</span>
-                  </div>
-                  <span className={cn(
-                    "text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border",
-                    getStockBadgeClass(item.status)
-                  )}>
-                    {item.status}
-                  </span>
-                </div>
+            {lowStockItems.length === 0 ? (
+              <div className="p-4 text-center text-muted-foreground">
+                All inventory levels are healthy
               </div>
-            ))}
+            ) : (
+              lowStockItems.map((item) => (
+                <div 
+                  key={`${item.sku}-${item.state}`} 
+                  className="p-4 flex items-center justify-between hover:bg-accent/30 transition-colors cursor-pointer"
+                  onClick={() => navigate('/inventory')}
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="font-mono text-sm font-medium">{item.sku}</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{item.state}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <span className="text-sm font-semibold">{item.available}</span>
+                      <span className="text-muted-foreground text-sm"> / {item.redline}</span>
+                    </div>
+                    <span className={cn(
+                      "text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border",
+                      getStockBadgeClass(item.status)
+                    )}>
+                      {item.status}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </Card>
       </div>
