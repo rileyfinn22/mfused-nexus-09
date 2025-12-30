@@ -174,6 +174,7 @@ const OrderDetail = () => {
       .from('invoices')
       .select('*')
       .eq('order_id', orderId)
+      .is('deleted_at', null)
       .order('shipment_number');
     
     if (data) {
