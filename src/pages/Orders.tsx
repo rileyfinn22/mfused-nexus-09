@@ -354,7 +354,8 @@ const Orders = () => {
               <div className="bg-table-header border-b border-table-border">
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
-                  {isVibeAdmin && <div className="col-span-2">Company</div>}
+                  <div className="col-span-1">Date</div>
+                  {isVibeAdmin && <div className="col-span-1">Company</div>}
                   <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
                   <div className="col-span-1">State</div>
                   <div className="col-span-1">Total</div>
@@ -381,19 +382,8 @@ const Orders = () => {
                           {orderTypeInfo.label}
                         </Badge>
                       </div>
-                      <div className="col-span-2">
-                        <Input
-                          type="text"
-                          value={order.description || ''}
-                          onChange={(e) => {
-                            setOrders(prev => prev.map(o => 
-                              o.id === order.id ? { ...o, description: e.target.value } : o
-                            ));
-                          }}
-                          onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
-                          placeholder="Add description..."
-                          className="h-8 text-xs"
-                        />
+                      <div className="col-span-1 text-sm text-muted-foreground">
+                        {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
                       </div>
                       {isVibeAdmin && (
                         <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
@@ -463,7 +453,7 @@ const Orders = () => {
               <div className="bg-table-header border-b border-table-border">
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
-                  <div className="col-span-2">Description</div>
+                  <div className="col-span-1">Date</div>
                   {isVibeAdmin && <div className="col-span-1">Company</div>}
                   <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
                   <div className="col-span-1">State</div>
@@ -500,19 +490,8 @@ const Orders = () => {
                         {orderTypeInfo.label}
                       </Badge>
                     </div>
-                    <div className="col-span-2">
-                      <Input
-                        type="text"
-                        value={order.description || ''}
-                        onChange={(e) => {
-                          setOrders(prev => prev.map(o => 
-                            o.id === order.id ? { ...o, description: e.target.value } : o
-                          ));
-                        }}
-                        onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
-                        placeholder="Add description..."
-                        className="h-8 text-xs"
-                      />
+                    <div className="col-span-1 text-sm text-muted-foreground">
+                      {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
                     </div>
                     {isVibeAdmin && (
                       <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
@@ -603,7 +582,7 @@ const Orders = () => {
             <div className="bg-table-header border-b border-table-border">
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-2">Order # / Type</div>
-                <div className="col-span-2">Description</div>
+                <div className="col-span-1">Date</div>
                 {isVibeAdmin && <div className="col-span-1">Company</div>}
                 <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
                 <div className="col-span-1">State</div>
@@ -643,19 +622,8 @@ const Orders = () => {
                         {orderTypeInfo.label}
                       </Badge>
                     </div>
-                    <div className="col-span-2">
-                      <Input
-                        type="text"
-                        value={order.description || ''}
-                        onChange={(e) => {
-                          setOrders(prev => prev.map(o => 
-                            o.id === order.id ? { ...o, description: e.target.value } : o
-                          ));
-                        }}
-                        onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
-                        placeholder="Add description..."
-                        className="h-8 text-xs"
-                      />
+                    <div className="col-span-1 text-sm text-muted-foreground">
+                      {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
                     </div>
                     {isVibeAdmin && (
                       <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
