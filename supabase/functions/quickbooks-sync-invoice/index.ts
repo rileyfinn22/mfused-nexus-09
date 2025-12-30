@@ -383,6 +383,141 @@ serve(async (req) => {
       }
     }
 
+    // Helper function to find or create a QuickBooks Item for a product
+    async function findOrCreateQBItem(itemName: string, itemDescription: string, unitPrice: number): Promise<string> {
+      // Sanitize item name for QuickBooks (max 100 chars, no special chars that cause issues)
+      const sanitizedName = itemName.substring(0, 100).replace(/[:"]/g, '');
+      
+      console.log(`Finding/creating QB item: ${sanitizedName}`);
+      
+      // Search for existing item by name
+      const searchResponse = await fetch(
+        `${qbApiUrl}/query?query=SELECT * FROM Item WHERE Name='${sanitizedName.replace(/'/g, "\\'")}' MAXRESULTS 1&minorversion=65`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+      const searchData = await searchResponse.json();
+      
+      if (searchData.QueryResponse?.Item?.length > 0) {
+        const existingItem = searchData.QueryResponse.Item[0];
+        console.log(`Found existing QB item: ${existingItem.Id} - ${existingItem.Name}`);
+        return existingItem.Id;
+      }
+      
+      // Item not found, create it as NonInventory (Product/Service that's sold)
+      console.log(`Creating new QB item: ${sanitizedName}`);
+      
+      // Get the default income account (Sales of Product Income) and COGS account
+      // First, try to find a suitable income account
+      const accountSearchResponse = await fetch(
+        `${qbApiUrl}/query?query=SELECT * FROM Account WHERE AccountType='Income' MAXRESULTS 10&minorversion=65`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+      const accountData = await accountSearchResponse.json();
+      const incomeAccounts = accountData.QueryResponse?.Account || [];
+      
+      // Prefer "Sales of Product Income" or similar, fallback to first income account
+      let incomeAccountId = '1';
+      const productIncomeAccount = incomeAccounts.find((a: any) => 
+        a.Name?.toLowerCase().includes('product') || 
+        a.Name?.toLowerCase().includes('sales') ||
+        a.AccountSubType === 'SalesOfProductIncome'
+      );
+      if (productIncomeAccount) {
+        incomeAccountId = productIncomeAccount.Id;
+      } else if (incomeAccounts.length > 0) {
+        incomeAccountId = incomeAccounts[0].Id;
+      }
+      
+      // Find COGS account for expense
+      const cogsSearchResponse = await fetch(
+        `${qbApiUrl}/query?query=SELECT * FROM Account WHERE AccountType='Cost of Goods Sold' MAXRESULTS 5&minorversion=65`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+      const cogsData = await cogsSearchResponse.json();
+      const cogsAccounts = cogsData.QueryResponse?.Account || [];
+      
+      let expenseAccountId = incomeAccountId; // Fallback to income account if no COGS found
+      if (cogsAccounts.length > 0) {
+        expenseAccountId = cogsAccounts[0].Id;
+      }
+      
+      console.log(`Using Income Account: ${incomeAccountId}, COGS Account: ${expenseAccountId}`);
+      
+      const itemPayload = {
+        Name: sanitizedName,
+        Description: itemDescription || sanitizedName,
+        Type: 'NonInventory', // NonInventory items can be sold and tracked without inventory management
+        IncomeAccountRef: {
+          value: incomeAccountId,
+        },
+        ExpenseAccountRef: {
+          value: expenseAccountId,
+        },
+        UnitPrice: unitPrice || 0,
+      };
+      
+      const createResponse = await fetch(`${qbApiUrl}/item?minorversion=65`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(itemPayload),
+      });
+      
+      const createData = await createResponse.json();
+      
+      if (!createResponse.ok) {
+        // If duplicate, try to find it again
+        if (createData.Fault?.Error?.[0]?.Message?.includes('Duplicate')) {
+          console.log('Duplicate item detected, searching again...');
+          const retrySearch = await fetch(
+            `${qbApiUrl}/query?query=SELECT * FROM Item WHERE Name LIKE '%${sanitizedName.replace(/'/g, "\\'")}%' MAXRESULTS 10&minorversion=65`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json',
+              },
+            }
+          );
+          const retryData = await retrySearch.json();
+          const items = retryData.QueryResponse?.Item || [];
+          const match = items.find((i: any) => i.Name?.toLowerCase() === sanitizedName.toLowerCase());
+          if (match) {
+            console.log(`Found item on retry: ${match.Id}`);
+            return match.Id;
+          }
+          // Use first match if exact match not found
+          if (items.length > 0) {
+            console.log(`Using first match: ${items[0].Id}`);
+            return items[0].Id;
+          }
+        }
+        console.error('Failed to create QB item:', createData);
+        // Fallback to default item ID
+        return '1';
+      }
+      
+      console.log(`Created new QB item: ${createData.Item.Id}`);
+      return createData.Item.Id;
+    }
+
     // Build invoice line items - always use full prices
     let lineItems = [];
     let calculatedSubtotal = 0;
@@ -390,28 +525,32 @@ serve(async (req) => {
     if (allocations && allocations.length > 0) {
       // Use inventory allocations for line items
       console.log('Using inventory allocations for line items');
-      lineItems = allocations.map((alloc: any) => {
+      for (const alloc of allocations) {
         const item = alloc.order_items;
         const qty = alloc.quantity_allocated;
         const unitPrice = item.unit_price;
         const fullAmount = qty * unitPrice;
-        calculatedSubtotal += fullAmount; // Add full amount
+        calculatedSubtotal += fullAmount;
         
-        console.log(`Item: ${item.name}, Allocated Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}`);
+        // Find or create the QB item using the product name
+        const qbItemId = await findOrCreateQBItem(item.name, item.description || item.name, unitPrice);
         
-        return {
+        console.log(`Item: ${item.name}, Allocated Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, QB Item ID: ${qbItemId}`);
+        
+        lineItems.push({
           DetailType: 'SalesItemLineDetail',
           Amount: fullAmount,
           SalesItemLineDetail: {
             ItemRef: {
-              value: '1', // Default item ID
+              value: qbItemId,
+              name: item.name,
             },
             Qty: qty,
-            UnitPrice: unitPrice, // Full price
+            UnitPrice: unitPrice,
           },
           Description: item.description || item.name,
-        };
-      });
+        });
+      }
     } else {
       // Fallback: Use order items with shipped_quantity or all items
       console.log('No allocations found, using order items with shipped_quantity');
@@ -419,52 +558,59 @@ serve(async (req) => {
         ?.filter((item: any) => item.shipped_quantity > 0) || [];
       
       if (shippedItems.length > 0) {
-        lineItems = shippedItems.map((item: any) => {
+        for (const item of shippedItems) {
           const qty = item.shipped_quantity;
           const unitPrice = item.unit_price;
           const fullAmount = qty * unitPrice;
           calculatedSubtotal += fullAmount;
           
-          console.log(`Item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}`);
+          const qbItemId = await findOrCreateQBItem(item.name, item.description || item.name, unitPrice);
           
-          return {
+          console.log(`Item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, QB Item ID: ${qbItemId}`);
+          
+          lineItems.push({
             DetailType: 'SalesItemLineDetail',
             Amount: fullAmount,
             SalesItemLineDetail: {
               ItemRef: {
-                value: '1',
+                value: qbItemId,
+                name: item.name,
               },
               Qty: qty,
               UnitPrice: unitPrice,
             },
             Description: item.description || item.name,
-          };
-        });
+          });
+        }
       } else {
         // Second fallback: Use all order items for deposit/pre-shipment billing
         console.log('No shipped items, using all order items');
         
-        lineItems = invoice.orders?.order_items?.map((item: any) => {
+        const orderItems = invoice.orders?.order_items || [];
+        for (const item of orderItems) {
           const qty = item.quantity;
           const unitPrice = item.unit_price;
           const fullAmount = qty * unitPrice;
           calculatedSubtotal += fullAmount;
           
-          console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}`);
+          const qbItemId = await findOrCreateQBItem(item.name, item.description || item.name, unitPrice);
           
-          return {
+          console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, QB Item ID: ${qbItemId}`);
+          
+          lineItems.push({
             DetailType: 'SalesItemLineDetail',
             Amount: fullAmount,
             SalesItemLineDetail: {
               ItemRef: {
-                value: '1',
+                value: qbItemId,
+                name: item.name,
               },
               Qty: qty,
               UnitPrice: unitPrice,
             },
             Description: item.description || item.name,
-          };
-        }) || [];
+          });
+        }
       }
     }
 
@@ -472,12 +618,19 @@ serve(async (req) => {
     if (invoice.shipping_cost > 0) {
       const shippingAmount = Number(invoice.shipping_cost);
       calculatedSubtotal += shippingAmount;
+      
+      // Find or create a Shipping item
+      const shippingItemId = await findOrCreateQBItem('Shipping', 'Shipping and handling charges', shippingAmount);
+      
       lineItems.push({
         DetailType: 'SalesItemLineDetail',
         Amount: shippingAmount,
         Description: 'Shipping',
         SalesItemLineDetail: {
-          ItemRef: { value: '1' }, // Default shipping item
+          ItemRef: { 
+            value: shippingItemId,
+            name: 'Shipping',
+          },
         },
       });
     }
@@ -503,12 +656,18 @@ serve(async (req) => {
         ? `Balance Due on Delivery (${unbilledPercentage}% of order)`
         : `Credit Applied (Deposit/Previous Payments)`;
       
+      // Find or create an adjustment item
+      const adjustmentItemId = await findOrCreateQBItem('Invoice Adjustment', 'Balance adjustments and credits', 0);
+      
       lineItems.push({
         DetailType: 'SalesItemLineDetail',
         Amount: unbilledAmount,
         Description: creditDescription,
         SalesItemLineDetail: {
-          ItemRef: { value: '1' },
+          ItemRef: { 
+            value: adjustmentItemId,
+            name: 'Invoice Adjustment',
+          },
         },
       });
       
@@ -530,12 +689,18 @@ serve(async (req) => {
       const depositCreditAmount = -(calculatedTotal - dbTotal);
       console.log(`Adding deposit credit line: $${Math.abs(depositCreditAmount).toFixed(2)}`);
       
+      // Find or create a deposit credit item
+      const depositCreditItemId = await findOrCreateQBItem('Deposit Credit Applied', 'Credit for deposits previously applied', 0);
+      
       lineItems.push({
         DetailType: 'SalesItemLineDetail',
         Amount: depositCreditAmount,
         Description: 'Less: Deposit Credit Applied',
         SalesItemLineDetail: {
-          ItemRef: { value: '1' },
+          ItemRef: { 
+            value: depositCreditItemId,
+            name: 'Deposit Credit Applied',
+          },
         },
       });
       
