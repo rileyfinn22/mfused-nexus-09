@@ -742,11 +742,11 @@ const CreateQuote = () => {
         </Button>
         <div>
           <h1 className="page-title">
-            {isEditing ? "Edit Quote" : (isResponding ? "Respond to Quote Request" : (isVibeAdmin ? "Create Quote" : "Request Quote"))}
+            {isEditing ? "Edit Quote" : (isResponding ? "Create Quote for Customer" : (isVibeAdmin ? "Create Quote" : "Request Quote"))}
           </h1>
           <p className="page-subtitle">
             {isResponding 
-              ? `Creating response quote for ${parentQuote?.quote_number || 'request'}`
+              ? `Creating official quote in response to ${parentQuote?.quote_number || "customer request"}`
               : (isVibeAdmin 
                 ? "Create a pricing quote for a customer" 
                 : "Submit a quote request for pricing")}
@@ -935,12 +935,15 @@ const CreateQuote = () => {
                                   </Button>
                                   <div>
                                     <p className="font-medium">{item.name}</p>
+                                    {item.description && (
+                                      <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
+                                    )}
                                     <div className="flex items-center gap-2">
                                       {item.state && <span className="text-xs text-muted-foreground">{item.state}</span>}
                                       {item.isCustom && <span className="text-xs text-primary">(Custom)</span>}
                                       {item.price_breaks.length > 0 && (
                                         <span className="text-xs text-primary">
-                                          {item.price_breaks.length} price tier{item.price_breaks.length !== 1 ? 's' : ''}
+                                          {item.price_breaks.length} price tier{item.price_breaks.length !== 1 ? "s" : ""}
                                         </span>
                                       )}
                                     </div>
