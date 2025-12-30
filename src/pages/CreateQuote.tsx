@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -15,12 +17,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft,
   Plus,
   Trash2,
   Loader2,
   Upload,
-  X
+  X,
+  Search,
+  Minus
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -34,6 +46,7 @@ interface QuoteItem {
   quantity: number;
   unit_price: number;
   total: number;
+  isCustom?: boolean; // Flag for custom items not from products table
 }
 
 interface Product {
@@ -41,7 +54,7 @@ interface Product {
   name: string;
   item_id: string | null;
   price: number | null;
-  states?: { state: string }[];
+  company_id: string;
 }
 
 interface Company {
@@ -85,6 +98,22 @@ const CreateQuote = () => {
   const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
   const [existingFilename, setExistingFilename] = useState<string | null>(null);
 
+  // Add items dialog state
+  const [showAddItemsDialog, setShowAddItemsDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [tempSelectedProducts, setTempSelectedProducts] = useState<string[]>([]);
+  
+  // Custom item dialog state
+  const [showCustomItemDialog, setShowCustomItemDialog] = useState(false);
+  const [customItem, setCustomItem] = useState({
+    sku: "",
+    name: "",
+    description: "",
+    state: "",
+    quantity: 1,
+    unit_price: 0
+  });
+
   useEffect(() => {
     initializeForm();
   }, [quoteId, parentQuoteId]);
@@ -94,6 +123,13 @@ const CreateQuote = () => {
       loadCompanyInfo(companyId);
     }
   }, [companyId, isVibeAdmin]);
+
+  // Re-fetch products when company changes
+  useEffect(() => {
+    if (companyId) {
+      fetchProducts(companyId);
+    }
+  }, [companyId]);
 
   const initializeForm = async () => {
     setLoading(true);
@@ -119,16 +155,9 @@ const CreateQuote = () => {
         setCompanies(companiesData || []);
       } else if (roleData?.company_id) {
         setCompanyId(roleData.company_id);
-        // Load customer company info for non-admin users
         await loadCompanyInfo(roleData.company_id);
+        await fetchProducts(roleData.company_id);
       }
-
-      // Fetch products
-      const { data: productsData } = await supabase
-        .from('products')
-        .select('id, name, item_id, price')
-        .order('name');
-      setProducts(productsData || []);
 
       if (isEditing) {
         await fetchQuote();
@@ -144,6 +173,15 @@ const CreateQuote = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchProducts = async (companyIdToFetch: string) => {
+    const { data: productsData } = await supabase
+      .from('products')
+      .select('id, name, item_id, price, company_id')
+      .eq('company_id', companyIdToFetch)
+      .order('name');
+    setProducts(productsData || []);
   };
 
   const loadParentQuote = async () => {
@@ -166,7 +204,6 @@ const CreateQuote = () => {
     setShippingState(quote.shipping_state || "");
     setShippingZip(quote.shipping_zip || "");
     setDescription(quote.description || "");
-    // Keep request notes visible but as internal reference
     setInternalNotes(`Original Request Notes:\n${quote.request_notes || 'None'}`);
     setTerms(quote.terms || "Net 30");
 
@@ -184,14 +221,16 @@ const CreateQuote = () => {
         description: item.description || "",
         state: item.state || "",
         quantity: item.quantity,
-        unit_price: 0, // Reset price for admin to fill in
+        unit_price: 0,
         total: 0
       })));
     }
+
+    // Fetch products for this company
+    await fetchProducts(quote.company_id);
   };
 
   const loadCompanyInfo = async (companyIdToLoad: string) => {
-    // Get company details
     const { data: companyData } = await supabase
       .from('companies')
       .select('*')
@@ -202,7 +241,6 @@ const CreateQuote = () => {
 
     const companyName = companyData.name;
 
-    // Try to get saved addresses first
     const { data: addressesData } = await supabase
       .from('customer_addresses')
       .select('*')
@@ -224,7 +262,6 @@ const CreateQuote = () => {
         setShippingZip(defaultShipping.zip);
       }
     } else {
-      // Fall back to company address info
       setCustomerName(companyName);
       setCustomerEmail(companyData.email || "");
       setCustomerPhone(companyData.phone || "");
@@ -279,49 +316,27 @@ const CreateQuote = () => {
       unit_price: item.unit_price,
       total: item.total
     })) || []);
-  };
 
-  const addItem = () => {
-    setItems([...items, {
-      sku: "",
-      name: "",
-      description: "",
-      state: "",
-      quantity: 1,
-      unit_price: 0,
-      total: 0
-    }]);
+    // Fetch products for this company
+    await fetchProducts(quote.company_id);
   };
 
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const updateItem = (index: number, field: keyof QuoteItem, value: any) => {
+  const updateItemQuantity = (index: number, change: number) => {
     const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    
-    if (field === 'quantity' || field === 'unit_price') {
-      newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
-    }
-    
+    newItems[index].quantity = Math.max(1, newItems[index].quantity + change);
+    newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
     setItems(newItems);
   };
 
-  const selectProduct = (index: number, productId: string) => {
-    const product = products.find(p => p.id === productId);
-    if (product) {
-      const newItems = [...items];
-      newItems[index] = {
-        ...newItems[index],
-        product_id: product.id,
-        sku: product.item_id || "",
-        name: product.name,
-        unit_price: product.price || 0,
-        total: (newItems[index].quantity || 1) * (product.price || 0)
-      };
-      setItems(newItems);
-    }
+  const updateItemPrice = (index: number, price: number) => {
+    const newItems = [...items];
+    newItems[index].unit_price = price;
+    newItems[index].total = newItems[index].quantity * price;
+    setItems(newItems);
   };
 
   const calculateSubtotal = () => {
@@ -359,6 +374,65 @@ const CreateQuote = () => {
       .getPublicUrl(filePath);
 
     return { url: publicUrl, filename: uploadedFile.name };
+  };
+
+  // Filter products for the add items dialog
+  const filteredProducts = products.filter(p => {
+    // Exclude already added products
+    const alreadyAdded = items.find(item => item.product_id === p.id);
+    if (alreadyAdded) return false;
+    
+    if (!searchQuery) return true;
+    
+    const search = searchQuery.toLowerCase();
+    return (
+      p.name.toLowerCase().includes(search) ||
+      p.item_id?.toLowerCase().includes(search)
+    );
+  });
+
+  const toggleProductSelection = (productId: string) => {
+    setTempSelectedProducts(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  const handleAddSelectedItems = () => {
+    const newItems: QuoteItem[] = tempSelectedProducts.map(productId => {
+      const product = products.find(p => p.id === productId);
+      return {
+        product_id: productId,
+        sku: product?.item_id || "",
+        name: product?.name || "",
+        description: "",
+        state: "",
+        quantity: 1,
+        unit_price: product?.price || 0,
+        total: product?.price || 0
+      };
+    });
+    setItems([...items, ...newItems]);
+    setTempSelectedProducts([]);
+    setSearchQuery("");
+    setShowAddItemsDialog(false);
+  };
+
+  const handleAddCustomItem = () => {
+    const newItem: QuoteItem = {
+      sku: customItem.sku,
+      name: customItem.name,
+      description: customItem.description,
+      state: customItem.state,
+      quantity: customItem.quantity,
+      unit_price: customItem.unit_price,
+      total: customItem.quantity * customItem.unit_price,
+      isCustom: true
+    };
+    setItems([...items, newItem]);
+    setCustomItem({ sku: "", name: "", description: "", state: "", quantity: 1, unit_price: 0 });
+    setShowCustomItemDialog(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -427,7 +501,6 @@ const CreateQuote = () => {
 
         if (error) throw error;
 
-        // Delete existing items and re-insert
         await supabase
           .from('quote_items')
           .delete()
@@ -452,7 +525,6 @@ const CreateQuote = () => {
         savedQuoteId = newQuote.id;
       }
 
-      // Insert items
       if (items.length > 0) {
         const itemsToInsert = items.map(item => ({
           quote_id: savedQuoteId,
@@ -570,7 +642,7 @@ const CreateQuote = () => {
                     <Input
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Enter customer name"
+                      placeholder="Customer name"
                       required
                     />
                   </div>
@@ -588,7 +660,7 @@ const CreateQuote = () => {
                     <Input
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
-                      placeholder="(555) 123-4567"
+                      placeholder="(555) 555-5555"
                     />
                   </div>
                 </div>
@@ -603,7 +675,7 @@ const CreateQuote = () => {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2 sm:col-span-2">
-                    <Label>Ship To Name</Label>
+                    <Label>Name</Label>
                     <Input
                       value={shippingName}
                       onChange={(e) => setShippingName(e.target.value)}
@@ -611,7 +683,7 @@ const CreateQuote = () => {
                     />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <Label>Street Address</Label>
+                    <Label>Street</Label>
                     <Input
                       value={shippingStreet}
                       onChange={(e) => setShippingStreet(e.target.value)}
@@ -623,7 +695,7 @@ const CreateQuote = () => {
                     <Input
                       value={shippingCity}
                       onChange={(e) => setShippingCity(e.target.value)}
-                      placeholder="City"
+                      placeholder="Los Angeles"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -633,6 +705,7 @@ const CreateQuote = () => {
                         value={shippingState}
                         onChange={(e) => setShippingState(e.target.value)}
                         placeholder="CA"
+                        maxLength={2}
                       />
                     </div>
                     <div className="space-y-2">
@@ -648,128 +721,343 @@ const CreateQuote = () => {
               </CardContent>
             </Card>
 
-            {/* Line Items */}
+            {/* Items Section - Order Style */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <CardTitle className="text-base">Quote Items</CardTitle>
-                <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
-                </Button>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent>
                 {items.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">
-                    No items added yet. Click "Add Item" to add products to this quote.
+                    No items added yet. Click "Add Items" to add products to this quote.
                   </p>
                 ) : (
-                  <>
-                    {items.map((item, index) => (
-                      <div key={index} className="p-4 border rounded-lg space-y-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="space-y-2 sm:col-span-2">
-                              <Label>Product</Label>
-                              <Select 
-                                value={item.product_id || ""} 
-                                onValueChange={(value) => selectProduct(index, value)}
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="w-12"></TableHead>
+                          <TableHead>SKU</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-center w-32">Qty</TableHead>
+                          <TableHead className="text-right">Unit Price</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-destructive"
+                                onClick={() => removeItem(index)}
                               >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select or enter manually" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {products.map((product) => (
-                                    <SelectItem key={product.id} value={product.id}>
-                                      {product.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>SKU</Label>
-                              <Input
-                                value={item.sku}
-                                onChange={(e) => updateItem(index, 'sku', e.target.value)}
-                                placeholder="SKU"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>State</Label>
-                              <Input
-                                value={item.state}
-                                onChange={(e) => updateItem(index, 'state', e.target.value)}
-                                placeholder="CA, WA, etc."
-                              />
-                            </div>
-                            <div className="space-y-2 sm:col-span-2">
-                              <Label>Name</Label>
-                              <Input
-                                value={item.name}
-                                onChange={(e) => updateItem(index, 'name', e.target.value)}
-                                placeholder="Product name"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Quantity</Label>
-                              <Input
-                                type="number"
-                                min="1"
-                                value={item.quantity}
-                                onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Unit Price</Label>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{item.sku || '-'}</TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{item.name}</p>
+                                {item.state && <span className="text-xs text-muted-foreground">{item.state}</span>}
+                                {item.isCustom && <span className="text-xs text-primary ml-2">(Custom)</span>}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => updateItemQuantity(index, -1)}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const newItems = [...items];
+                                    newItems[index].quantity = parseInt(e.target.value) || 1;
+                                    newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
+                                    setItems(newItems);
+                                  }}
+                                  className="h-7 w-14 text-center"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => updateItemQuantity(index, 1)}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
                               <Input
                                 type="number"
                                 min="0"
                                 step="0.01"
                                 value={item.unit_price}
-                                onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                onChange={(e) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                className="h-8 w-24 text-right ml-auto"
                               />
-                            </div>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeItem(index)}
-                          >
-                            <Trash2 className="h-4 w-4 text-danger" />
-                          </Button>
-                        </div>
-                        <div className="flex justify-end">
-                          <span className="text-sm font-medium">
-                            Line Total: {formatCurrency(item.total)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                    <Separator />
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Subtotal</span>
-                        <span className="font-medium">{formatCurrency(calculateSubtotal())}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Shipping</span>
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(item.total)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {/* Add Items Buttons */}
+                <div className="flex gap-2 mt-4">
+                  <Dialog open={showAddItemsDialog} onOpenChange={setShowAddItemsDialog}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        type="button"
+                        disabled={!companyId}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        {!companyId ? "Select a company first" : "Add Products"}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+                      <DialogHeader>
+                        <DialogTitle>Add Products to Quote</DialogTitle>
+                        <DialogDescription>
+                          Search and select products to add to your quote
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={shippingCost}
-                          onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
-                          className="w-32 text-right"
+                          placeholder="Search by name or SKU..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-10"
                         />
                       </div>
-                      <Separator />
-                      <div className="flex justify-between text-lg font-semibold">
-                        <span>Total</span>
-                        <span>{formatCurrency(calculateTotal())}</span>
+
+                      <div className="flex-1 overflow-y-auto border rounded-md">
+                        <Table>
+                          <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                              <TableHead className="w-12">
+                                <Checkbox
+                                  checked={tempSelectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setTempSelectedProducts(filteredProducts.map(p => p.id));
+                                    } else {
+                                      setTempSelectedProducts([]);
+                                    }
+                                  }}
+                                />
+                              </TableHead>
+                              <TableHead>SKU</TableHead>
+                              <TableHead>Product</TableHead>
+                              <TableHead className="text-right">Price</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredProducts.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                                  {!companyId
+                                    ? "Please select a company first to see available products" 
+                                    : searchQuery 
+                                      ? "No products found matching your search" 
+                                      : "No products available for this company"}
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              filteredProducts.map((product) => (
+                                <TableRow 
+                                  key={product.id}
+                                  className="cursor-pointer hover:bg-muted/50"
+                                  onClick={() => toggleProductSelection(product.id)}
+                                >
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={tempSelectedProducts.includes(product.id)}
+                                      onCheckedChange={() => toggleProductSelection(product.id)}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs">{product.item_id || '-'}</TableCell>
+                                  <TableCell className="font-medium">{product.name}</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(product.price || 0)}</TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
                       </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t">
+                        <p className="text-sm text-muted-foreground">
+                          {tempSelectedProducts.length} item{tempSelectedProducts.length !== 1 ? 's' : ''} selected
+                        </p>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => {
+                              setShowAddItemsDialog(false);
+                              setTempSelectedProducts([]);
+                              setSearchQuery("");
+                            }}
+                            type="button"
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            onClick={handleAddSelectedItems}
+                            disabled={tempSelectedProducts.length === 0}
+                            type="button"
+                          >
+                            Add {tempSelectedProducts.length} Item{tempSelectedProducts.length !== 1 ? 's' : ''}
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Add Custom Item */}
+                  <Dialog open={showCustomItemDialog} onOpenChange={setShowCustomItemDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" type="button">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Custom Item
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add Custom Item</DialogTitle>
+                        <DialogDescription>
+                          Add a custom item that won't be saved to the product catalog
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>SKU</Label>
+                            <Input
+                              value={customItem.sku}
+                              onChange={(e) => setCustomItem({ ...customItem, sku: e.target.value })}
+                              placeholder="CUSTOM-001"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>State</Label>
+                            <Input
+                              value={customItem.state}
+                              onChange={(e) => setCustomItem({ ...customItem, state: e.target.value })}
+                              placeholder="CA, WA, etc."
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Name *</Label>
+                          <Input
+                            value={customItem.name}
+                            onChange={(e) => setCustomItem({ ...customItem, name: e.target.value })}
+                            placeholder="Product name"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Description</Label>
+                          <Textarea
+                            value={customItem.description}
+                            onChange={(e) => setCustomItem({ ...customItem, description: e.target.value })}
+                            placeholder="Product description"
+                            rows={2}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Quantity</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={customItem.quantity}
+                              onChange={(e) => setCustomItem({ ...customItem, quantity: parseInt(e.target.value) || 1 })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Unit Price</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={customItem.unit_price}
+                              onChange={(e) => setCustomItem({ ...customItem, unit_price: parseFloat(e.target.value) || 0 })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-4">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            setShowCustomItemDialog(false);
+                            setCustomItem({ sku: "", name: "", description: "", state: "", quantity: 1, unit_price: 0 });
+                          }}
+                          type="button"
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={handleAddCustomItem}
+                          disabled={!customItem.name}
+                          type="button"
+                        >
+                          Add Item
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                {/* Totals */}
+                {items.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <Separator />
+                    <div className="flex justify-between pt-2">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="font-medium">{formatCurrency(calculateSubtotal())}</span>
                     </div>
-                  </>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Shipping</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={shippingCost}
+                        onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
+                        className="w-32 text-right"
+                      />
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between text-lg font-semibold">
+                      <span>Total</span>
+                      <span>{formatCurrency(calculateTotal())}</span>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -850,71 +1138,79 @@ const CreateQuote = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Payment Terms</Label>
+                  <Label>Terms</Label>
                   <Select value={terms} onValueChange={setTerms}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Net 15">Net 15</SelectItem>
                       <SelectItem value="Net 30">Net 30</SelectItem>
-                      <SelectItem value="Net 45">Net 45</SelectItem>
-                      <SelectItem value="Net 60">Net 60</SelectItem>
+                      <SelectItem value="Net 15">Net 15</SelectItem>
                       <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
+                      <SelectItem value="Net 60">Net 60</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Valid Until</Label>
-                  <Input
-                    type="date"
-                    value={validUntil}
-                    onChange={(e) => setValidUntil(e.target.value)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Notes */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Notes</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Quote description..."
-                    rows={3}
-                  />
-                </div>
                 {isVibeAdmin && (
                   <div className="space-y-2">
-                    <Label>Internal Notes</Label>
-                    <Textarea
-                      value={internalNotes}
-                      onChange={(e) => setInternalNotes(e.target.value)}
-                      placeholder="Notes for internal use only..."
-                      rows={3}
+                    <Label>Valid Until</Label>
+                    <Input
+                      type="date"
+                      value={validUntil}
+                      onChange={(e) => setValidUntil(e.target.value)}
                     />
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Actions */}
+            {/* Internal Notes (Vibe Admin only) */}
+            {isVibeAdmin && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Internal Notes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    value={internalNotes}
+                    onChange={(e) => setInternalNotes(e.target.value)}
+                    placeholder="Internal notes (not visible to customer)"
+                    rows={4}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Description */}
             <Card>
-              <CardContent className="pt-6">
-                <Button type="submit" className="w-full" disabled={saving}>
-                  {saving ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : null}
-                  {isEditing ? "Update Quote" : (isVibeAdmin ? "Create Quote" : "Submit Request")}
-                </Button>
+              <CardHeader>
+                <CardTitle className="text-base">Description</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Quote description or notes"
+                  rows={3}
+                />
               </CardContent>
             </Card>
+
+            {/* Submit Button */}
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                isEditing ? "Update Quote" : (isVibeAdmin ? "Create Quote" : "Submit Quote Request")
+              )}
+            </Button>
           </div>
         </div>
       </form>
