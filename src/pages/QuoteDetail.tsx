@@ -309,15 +309,16 @@ const QuoteDetail = () => {
   const isResponseQuote = !!quote.parent_quote_id; // Response quote created by vibe admin
   
   const canEdit = isVibeAdmin 
-    ? (isResponseQuote && (quote.status === 'draft')) // Vibe admin can only edit their response drafts
+    ? (isResponseQuote && (quote.status === 'draft' || quote.status === 'vendor_pending' || quote.status === 'vendor_received')) // Vibe admin can edit their response drafts or while working with vendors
     : (isCustomerRequest && quote.status === 'pending_review'); // Customers can only edit pending requests
   
-  const canSend = isVibeAdmin && quote.status === 'draft' && items.length > 0 && isResponseQuote;
+  const canSend = isVibeAdmin && (quote.status === 'draft' || quote.status === 'vendor_received') && items.length > 0 && isResponseQuote;
   const canApprove = !isVibeAdmin && quote.status === 'sent';
   const canReject = !isVibeAdmin && quote.status === 'sent';
-  const canRespond = isVibeAdmin && isCustomerRequest && (quote.status === 'pending_review' || quote.status === 'vendor_received') && !responseQuote;
-  const canSendToVendor = isVibeAdmin && isCustomerRequest && (quote.status === 'pending_review') && !quote.vendor_id;
-  const canMarkVendorReceived = isVibeAdmin && quote.status === 'vendor_pending';
+  const canRespond = isVibeAdmin && isCustomerRequest && quote.status === 'pending_review' && !responseQuote;
+  // Send to Vendor is now on the RESPONSE quote (vibe admin's quote for customer), not the original request
+  const canSendToVendor = isVibeAdmin && isResponseQuote && (quote.status === 'draft') && !quote.vendor_id;
+  const canMarkVendorReceived = isVibeAdmin && isResponseQuote && quote.status === 'vendor_pending';
 
   const handleDownloadPDF = () => {
     generateQuotePDF(quote, items);
