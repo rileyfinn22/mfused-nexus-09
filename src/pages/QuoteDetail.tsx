@@ -73,7 +73,16 @@ interface Quote {
   sent_at: string | null;
   approved_at: string | null;
   created_at: string;
+  parent_quote_id: string | null;
   company?: { name: string };
+}
+
+interface ResponseQuote {
+  id: string;
+  quote_number: string;
+  status: string;
+  total: number;
+  created_at: string;
 }
 
 const QuoteDetail = () => {
@@ -86,6 +95,7 @@ const QuoteDetail = () => {
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [responseQuote, setResponseQuote] = useState<ResponseQuote | null>(null);
 
   useEffect(() => {
     checkRole();
@@ -123,6 +133,17 @@ const QuoteDetail = () => {
 
       if (itemsError) throw itemsError;
       setItems(itemsData || []);
+
+      // Check if there's a response quote linked to this request
+      const { data: responseData } = await supabase
+        .from('quotes')
+        .select('id, quote_number, status, total, created_at')
+        .eq('parent_quote_id', quoteId)
+        .single();
+
+      if (responseData) {
+        setResponseQuote(responseData);
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -241,6 +262,7 @@ const QuoteDetail = () => {
   const canSend = isVibeAdmin && quote.status === 'draft' && items.length > 0;
   const canApprove = !isVibeAdmin && quote.status === 'sent';
   const canReject = !isVibeAdmin && quote.status === 'sent';
+  const canRespond = isVibeAdmin && quote.status === 'pending_review' && !responseQuote;
 
   return (
     <div className="space-y-6">
@@ -268,6 +290,14 @@ const QuoteDetail = () => {
             <Button variant="outline" onClick={() => navigate(`/quotes/edit/${quote.id}`)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
+            </Button>
+          )}
+          {canRespond && (
+            <Button 
+              onClick={() => navigate(`/quotes/respond/${quote.id}`)}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Respond with Quote
             </Button>
           )}
           {canSend && (
@@ -473,6 +503,41 @@ const QuoteDetail = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Response Quote (if this is a request with a response) */}
+          {responseQuote && (
+            <Card className="border-primary/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  Response Quote
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Quote Number</span>
+                  <span className="font-medium">{responseQuote.quote_number}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Status</span>
+                  <Badge className={getStatusColor(responseQuote.status)}>
+                    {formatStatus(responseQuote.status)}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total</span>
+                  <span className="font-semibold">{formatCurrency(responseQuote.total)}</span>
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full mt-2"
+                  onClick={() => navigate(`/quotes/${responseQuote.id}`)}
+                >
+                  View Response Quote
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Quote Summary */}
           <Card>
             <CardHeader>
