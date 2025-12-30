@@ -935,8 +935,10 @@ const CreateQuote = () => {
                                   </Button>
                                   <div>
                                     <p className="font-medium">{item.name}</p>
-                                    {item.description && (
+                                    {item.description ? (
                                       <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
+                                    ) : (
+                                      <p className="text-xs text-muted-foreground/60 italic">Click to add description</p>
                                     )}
                                     <div className="flex items-center gap-2">
                                       {item.state && <span className="text-xs text-muted-foreground">{item.state}</span>}
@@ -1002,22 +1004,20 @@ const CreateQuote = () => {
                               <TableRow className="bg-muted/30 hover:bg-muted/30">
                                 <TableCell colSpan={6} className="p-4">
                                   <div className="space-y-4">
-                                    {/* Description editing for vibe admins */}
-                                    {isVibeAdmin && (
-                                      <div className="space-y-2">
-                                        <Label className="text-sm font-medium">Item Description</Label>
-                                        <Textarea
-                                          placeholder="Add description for this item..."
-                                          value={item.description || ''}
-                                          onChange={(e) => {
-                                            const newItems = [...items];
-                                            newItems[index].description = e.target.value;
-                                            setItems(newItems);
-                                          }}
-                                          className="min-h-[60px]"
-                                        />
-                                      </div>
-                                    )}
+                                    {/* Description editing - available to all users */}
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-medium">Item Description</Label>
+                                      <Textarea
+                                        placeholder="Add description for this item..."
+                                        value={item.description || ''}
+                                        onChange={(e) => {
+                                          const newItems = [...items];
+                                          newItems[index].description = e.target.value;
+                                          setItems(newItems);
+                                        }}
+                                        className="min-h-[60px]"
+                                      />
+                                    </div>
                                     <div className="space-y-3">
                                       <div className="flex items-center justify-between">
                                         <h4 className="text-sm font-medium">Price Breaks</h4>
