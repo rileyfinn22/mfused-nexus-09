@@ -120,6 +120,7 @@ const QuoteDetail = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showVendorDialog, setShowVendorDialog] = useState(false);
+  const [responseQuote, setResponseQuote] = useState<{ id: string; quote_number: string; status: string } | null>(null);
 
   useEffect(() => {
     checkRole();
@@ -161,6 +162,19 @@ const QuoteDetail = () => {
         price_breaks: Array.isArray(item.price_breaks) ? (item.price_breaks as unknown as PriceBreak[]) : [],
         selected_tier: item.selected_tier ?? null
       })));
+
+      // Check if there's a response quote linked to this request (for vibe admins)
+      if (quoteData.status === 'pending_review' && !quoteData.parent_quote_id) {
+        const { data: responseData } = await supabase
+          .from('quotes')
+          .select('id, quote_number, status')
+          .eq('parent_quote_id', quoteId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        setResponseQuote(responseData);
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -339,22 +353,29 @@ const QuoteDetail = () => {
     );
   }
 
-  // Vibe admin can edit any quote that's not already sent/approved/rejected
+  // Vibe admin can edit internal quotes (in_progress, vendor_pending, vendor_received, draft)
+  // but NOT the original customer request (pending_review) - they should "Create Response" instead
   // Customer can only edit their own pending_review quotes
   const canEdit = isVibeAdmin 
-    ? !['sent', 'approved', 'rejected'].includes(quote.status)
+    ? !['sent', 'approved', 'rejected', 'pending_review'].includes(quote.status)
     : (quote.status === 'pending_review');
   
-  // Vibe admin can send quote to customer when it has items and is ready
-  const canSend = isVibeAdmin && ['pending_review', 'in_progress', 'vendor_received'].includes(quote.status) && items.length > 0;
+  // Vibe admin can create a response to a customer's request (pending_review with no parent and no existing response)
+  const canCreateResponse = isVibeAdmin && quote.status === 'pending_review' && !quote.parent_quote_id && !responseQuote;
+  
+  // Show link to existing response quote
+  const hasExistingResponse = isVibeAdmin && responseQuote;
+  
+  // Vibe admin can send quote to customer when it has items and is ready (only for response quotes, not original requests)
+  const canSend = isVibeAdmin && ['in_progress', 'vendor_received'].includes(quote.status) && items.length > 0 && quote.parent_quote_id;
   const canApprove = !isVibeAdmin && quote.status === 'sent';
   const canReject = !isVibeAdmin && quote.status === 'sent';
   
-  // Send to Vendor available when vibe admin is working on the quote
-  const canSendToVendor = isVibeAdmin && ['pending_review', 'in_progress'].includes(quote.status) && !quote.vendor_id;
+  // Send to Vendor available when vibe admin is working on their response quote
+  const canSendToVendor = isVibeAdmin && ['in_progress'].includes(quote.status) && !quote.vendor_id && quote.parent_quote_id;
   
-  // Status dropdown available for vibe admins on quotes they're working on
-  const showStatusDropdown = isVibeAdmin && !['sent', 'approved', 'rejected'].includes(quote.status);
+  // Status dropdown available for vibe admins on quotes they're working on (response quotes only)
+  const showStatusDropdown = isVibeAdmin && !['sent', 'approved', 'rejected', 'pending_review'].includes(quote.status);
   
   // Delete available for customers (draft, pending_review, sent, rejected) and vibe admins (any non-approved status)
   const canDelete = isVibeAdmin 
@@ -387,10 +408,26 @@ const QuoteDetail = () => {
               {!isVibeAdmin && quote.status === 'pending_review' && (
                 <Badge variant="outline" className="text-xs">Quote Request</Badge>
               )}
+              {/* Show response indicator for vibe admins */}
+              {isVibeAdmin && quote.parent_quote_id && (
+                <Badge variant="secondary" className="text-xs">Response Quote</Badge>
+              )}
             </div>
             <p className="page-subtitle">
               Created {new Date(quote.created_at).toLocaleDateString()}
               {quote.valid_until && ` • Valid until ${new Date(quote.valid_until).toLocaleDateString()}`}
+              {isVibeAdmin && quote.parent_quote_id && (
+                <Button 
+                  variant="link" 
+                  className="h-auto p-0 ml-2 text-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/quotes/${quote.parent_quote_id}`);
+                  }}
+                >
+                  ← View Original Request
+                </Button>
+              )}
             </p>
           </div>
         </div>
@@ -414,10 +451,22 @@ const QuoteDetail = () => {
             </Select>
           )}
           
+          {hasExistingResponse && responseQuote && (
+            <Button onClick={() => navigate(`/quotes/${responseQuote.id}`)}>
+              <FileText className="h-4 w-4 mr-2" />
+              View Response ({responseQuote.quote_number})
+            </Button>
+          )}
+          {canCreateResponse && (
+            <Button onClick={() => navigate(`/quotes/respond/${quote.id}`)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Create Response
+            </Button>
+          )}
           {canEdit && (
             <Button variant="outline" onClick={() => navigate(`/quotes/edit/${quote.id}`)}>
               <Edit className="h-4 w-4 mr-2" />
-              Edit
+              Edit Quote
             </Button>
           )}
           {canSend && (
