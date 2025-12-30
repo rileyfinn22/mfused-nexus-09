@@ -1293,9 +1293,11 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          price_breaks: Json | null
           product_id: string | null
           quantity: number
           quote_id: string
+          selected_tier: number | null
           sku: string
           state: string | null
           total: number
@@ -1306,9 +1308,11 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          price_breaks?: Json | null
           product_id?: string | null
           quantity?: number
           quote_id: string
+          selected_tier?: number | null
           sku: string
           state?: string | null
           total?: number
@@ -1319,9 +1323,11 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          price_breaks?: Json | null
           product_id?: string | null
           quantity?: number
           quote_id?: string
+          selected_tier?: number | null
           sku?: string
           state?: string | null
           total?: number
