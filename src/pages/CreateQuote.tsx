@@ -87,6 +87,12 @@ const CreateQuote = () => {
     initializeForm();
   }, [quoteId]);
 
+  useEffect(() => {
+    if (companyId && isVibeAdmin && !isEditing) {
+      loadCompanyInfo(companyId);
+    }
+  }, [companyId, isVibeAdmin]);
+
   const initializeForm = async () => {
     setLoading(true);
     try {
@@ -111,6 +117,8 @@ const CreateQuote = () => {
         setCompanies(companiesData || []);
       } else if (roleData?.company_id) {
         setCompanyId(roleData.company_id);
+        // Load customer company info for non-admin users
+        await loadCompanyInfo(roleData.company_id);
       }
 
       // Fetch products
@@ -131,6 +139,52 @@ const CreateQuote = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCompanyInfo = async (companyIdToLoad: string) => {
+    // Get company details
+    const { data: companyData } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', companyIdToLoad)
+      .single();
+
+    if (!companyData) return;
+
+    const companyName = companyData.name;
+
+    // Try to get saved addresses first
+    const { data: addressesData } = await supabase
+      .from('customer_addresses')
+      .select('*')
+      .eq('company_id', companyIdToLoad)
+      .order('is_default', { ascending: false });
+
+    if (addressesData && addressesData.length > 0) {
+      const defaultShipping = addressesData.find(a => a.address_type === 'shipping' && a.is_default) || 
+                              addressesData.find(a => a.address_type === 'shipping');
+      
+      if (defaultShipping) {
+        setCustomerName(companyName);
+        setCustomerEmail(defaultShipping.customer_email || companyData.email || "");
+        setCustomerPhone(defaultShipping.customer_phone || companyData.phone || "");
+        setShippingName(defaultShipping.name);
+        setShippingStreet(defaultShipping.street);
+        setShippingCity(defaultShipping.city);
+        setShippingState(defaultShipping.state);
+        setShippingZip(defaultShipping.zip);
+      }
+    } else {
+      // Fall back to company address info
+      setCustomerName(companyName);
+      setCustomerEmail(companyData.email || "");
+      setCustomerPhone(companyData.phone || "");
+      setShippingName(companyName);
+      setShippingStreet(companyData.shipping_street || "");
+      setShippingCity(companyData.shipping_city || "");
+      setShippingState(companyData.shipping_state || "");
+      setShippingZip(companyData.shipping_zip || "");
     }
   };
 
