@@ -354,14 +354,14 @@ const Invoices = () => {
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
-            <div className="col-span-2">Description</div>
+            <div className="col-span-1">Date</div>
             <div className="col-span-2">Company</div>
             <div className="col-span-1">Shipment</div>
             <div className="col-span-1">Type</div>
             <div className="col-span-1">Amount</div>
             <div className="col-span-1">PO Number</div>
             <div className="col-span-1">Status</div>
-            <div className="col-span-1">Actions</div>
+            <div className="col-span-2">Actions</div>
           </div>
         </div>
 
@@ -451,19 +451,8 @@ const Invoices = () => {
                       </div>
                     )}
                   </div>
-                  <div className="col-span-2">
-                    <Input
-                      type="text"
-                      value={invoice.description || ''}
-                      onChange={(e) => {
-                        setInvoices(prev => prev.map(inv => 
-                          inv.id === invoice.id ? { ...inv, description: e.target.value } : inv
-                        ));
-                      }}
-                      onBlur={(e) => handleDescriptionChange(invoice.id, e.target.value)}
-                      placeholder="Add description..."
-                      className="h-8 text-xs"
-                    />
+                  <div className="col-span-1 text-sm text-muted-foreground">
+                    {invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString() : '-'}
                   </div>
                   <div className="col-span-2">
                     <div className="font-medium text-sm">{invoice.companies?.name || 'N/A'}</div>
@@ -491,7 +480,7 @@ const Invoices = () => {
                       <span className={getStatusColor(displayStatus)}>{displayStatus}</span>
                     </div>
                   </div>
-                  <div className="col-span-1 flex gap-1">
+                  <div className="col-span-2 flex gap-1">
                     <Button 
                       variant="ghost" 
                       size="sm" 
