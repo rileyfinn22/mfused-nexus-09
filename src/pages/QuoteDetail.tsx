@@ -351,10 +351,10 @@ const QuoteDetail = () => {
   // Status dropdown available for vibe admins on quotes they're working on
   const showStatusDropdown = isVibeAdmin && !['sent', 'approved', 'rejected'].includes(quote.status);
   
-  // Delete available for customers (pending_review only) and vibe admins (any non-final status)
+  // Delete available for customers (draft, pending_review, sent, rejected) and vibe admins (any non-approved status)
   const canDelete = isVibeAdmin 
     ? !['approved'].includes(quote.status) // Vibe can delete anything except approved
-    : (quote.status === 'pending_review'); // Customer can only delete their pending requests
+    : ['draft', 'pending_review', 'sent', 'rejected'].includes(quote.status); // Customer can delete their drafts, requests, and received/rejected quotes
 
   const handleDownloadPDF = () => {
     generateQuotePDF(quote, items);
