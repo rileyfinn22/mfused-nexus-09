@@ -30,10 +30,23 @@ import {
   MapPin,
   Phone,
   Mail,
-  Calendar
+  Calendar,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+
+interface PriceBreak {
+  min_qty: number;
+  max_qty: number | null;
+  unit_price: number;
+}
 
 interface QuoteItem {
   id: string;
@@ -44,6 +57,8 @@ interface QuoteItem {
   quantity: number;
   unit_price: number;
   total: number;
+  price_breaks: PriceBreak[];
+  selected_tier: number | null;
 }
 
 interface Quote {
@@ -132,7 +147,11 @@ const QuoteDetail = () => {
         .order('created_at');
 
       if (itemsError) throw itemsError;
-      setItems(itemsData || []);
+      setItems((itemsData || []).map(item => ({
+        ...item,
+        price_breaks: Array.isArray(item.price_breaks) ? (item.price_breaks as unknown as PriceBreak[]) : [],
+        selected_tier: item.selected_tier ?? null
+      })));
 
       // Check if there's a response quote linked to this request
       const { data: responseData } = await supabase
@@ -420,22 +439,79 @@ const QuoteDetail = () => {
                     <div className="col-span-2 text-right">Unit Price</div>
                     <div className="col-span-2 text-right">Total</div>
                   </div>
-                  {items.map((item) => (
-                    <div key={item.id} className="grid grid-cols-12 gap-4 text-sm">
-                      <div className="col-span-4">
-                        <p className="font-medium">{item.name}</p>
-                        <p className="text-muted-foreground font-mono text-xs">{item.sku}</p>
-                      </div>
-                      <div className="col-span-2">
-                        {item.state && (
-                          <Badge variant="outline">{item.state}</Badge>
+                  {items.map((item) => {
+                    const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
+                    const formatPriceBreakRange = (pb: PriceBreak) => {
+                      if (pb.max_qty === null) return `${pb.min_qty}+`;
+                      return `${pb.min_qty}-${pb.max_qty}`;
+                    };
+                    
+                    return (
+                      <Collapsible key={item.id}>
+                        <div className="grid grid-cols-12 gap-4 text-sm items-center">
+                          <div className="col-span-4">
+                            <div className="flex items-center gap-2">
+                              {hasPriceBreaks && (
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                    <ChevronRight className="h-4 w-4 transition-transform data-[state=open]:rotate-90" />
+                                  </Button>
+                                </CollapsibleTrigger>
+                              )}
+                              <div>
+                                <p className="font-medium">{item.name}</p>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground font-mono text-xs">{item.sku}</span>
+                                  {hasPriceBreaks && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {item.price_breaks.length} tier{item.price_breaks.length !== 1 ? 's' : ''}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-span-2">
+                            {item.state && (
+                              <Badge variant="outline">{item.state}</Badge>
+                            )}
+                          </div>
+                          <div className="col-span-2 text-right">{item.quantity}</div>
+                          <div className="col-span-2 text-right">
+                            {formatCurrency(item.unit_price)}
+                            {item.selected_tier !== null && hasPriceBreaks && (
+                              <div className="text-xs text-muted-foreground">
+                                (Tier {item.selected_tier + 1})
+                              </div>
+                            )}
+                          </div>
+                          <div className="col-span-2 text-right font-medium">{formatCurrency(item.total)}</div>
+                        </div>
+                        
+                        {hasPriceBreaks && (
+                          <CollapsibleContent>
+                            <div className="ml-8 mt-2 mb-3 p-3 bg-muted/50 rounded-md">
+                              <p className="text-xs font-medium text-muted-foreground mb-2">Price Tiers</p>
+                              <div className="space-y-1">
+                                {item.price_breaks.map((pb, idx) => (
+                                  <div 
+                                    key={idx} 
+                                    className={cn(
+                                      "flex justify-between text-sm px-2 py-1 rounded",
+                                      item.selected_tier === idx && "bg-primary/10 text-primary font-medium"
+                                    )}
+                                  >
+                                    <span>Qty {formatPriceBreakRange(pb)}</span>
+                                    <span>{formatCurrency(pb.unit_price)} / unit</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </CollapsibleContent>
                         )}
-                      </div>
-                      <div className="col-span-2 text-right">{item.quantity}</div>
-                      <div className="col-span-2 text-right">{formatCurrency(item.unit_price)}</div>
-                      <div className="col-span-2 text-right font-medium">{formatCurrency(item.total)}</div>
-                    </div>
-                  ))}
+                      </Collapsible>
+                    );
+                  })}
                   <Separator />
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">

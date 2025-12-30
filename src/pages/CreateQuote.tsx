@@ -25,6 +25,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   ArrowLeft,
   Plus,
   Trash2,
@@ -32,9 +37,17 @@ import {
   Upload,
   X,
   Search,
-  Minus
+  Minus,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+interface PriceBreak {
+  min_qty: number;
+  max_qty: number | null;
+  unit_price: number;
+}
 
 interface QuoteItem {
   id?: string;
@@ -46,7 +59,10 @@ interface QuoteItem {
   quantity: number;
   unit_price: number;
   total: number;
-  isCustom?: boolean; // Flag for custom items not from products table
+  isCustom?: boolean;
+  price_breaks: PriceBreak[];
+  selected_tier: number | null;
+  isExpanded?: boolean;
 }
 
 interface Product {
@@ -222,7 +238,10 @@ const CreateQuote = () => {
         state: item.state || "",
         quantity: item.quantity,
         unit_price: 0,
-        total: 0
+        total: 0,
+        price_breaks: [],
+        selected_tier: null,
+        isExpanded: false
       })));
     }
 
@@ -314,7 +333,10 @@ const CreateQuote = () => {
       state: item.state || "",
       quantity: item.quantity,
       unit_price: item.unit_price,
-      total: item.total
+      total: item.total,
+      price_breaks: Array.isArray(item.price_breaks) ? (item.price_breaks as unknown as PriceBreak[]) : [],
+      selected_tier: item.selected_tier,
+      isExpanded: false
     })) || []);
 
     // Fetch products for this company
@@ -410,7 +432,10 @@ const CreateQuote = () => {
         state: "",
         quantity: 1,
         unit_price: product?.price || 0,
-        total: product?.price || 0
+        total: product?.price || 0,
+        price_breaks: [],
+        selected_tier: null,
+        isExpanded: false
       };
     });
     setItems([...items, ...newItems]);
@@ -428,11 +453,66 @@ const CreateQuote = () => {
       quantity: customItem.quantity,
       unit_price: customItem.unit_price,
       total: customItem.quantity * customItem.unit_price,
-      isCustom: true
+      isCustom: true,
+      price_breaks: [],
+      selected_tier: null,
+      isExpanded: false
     };
     setItems([...items, newItem]);
     setCustomItem({ sku: "", name: "", description: "", state: "", quantity: 1, unit_price: 0 });
     setShowCustomItemDialog(false);
+  };
+
+  const toggleItemExpanded = (index: number) => {
+    const newItems = [...items];
+    newItems[index].isExpanded = !newItems[index].isExpanded;
+    setItems(newItems);
+  };
+
+  const addPriceBreak = (index: number) => {
+    const newItems = [...items];
+    const lastBreak = newItems[index].price_breaks[newItems[index].price_breaks.length - 1];
+    const newMinQty = lastBreak ? (lastBreak.max_qty || lastBreak.min_qty) + 1 : 1;
+    
+    newItems[index].price_breaks.push({
+      min_qty: newMinQty,
+      max_qty: null,
+      unit_price: newItems[index].unit_price
+    });
+    newItems[index].isExpanded = true;
+    setItems(newItems);
+  };
+
+  const updatePriceBreak = (itemIndex: number, breakIndex: number, field: keyof PriceBreak, value: number | null) => {
+    const newItems = [...items];
+    newItems[itemIndex].price_breaks[breakIndex] = {
+      ...newItems[itemIndex].price_breaks[breakIndex],
+      [field]: value
+    };
+    setItems(newItems);
+  };
+
+  const removePriceBreak = (itemIndex: number, breakIndex: number) => {
+    const newItems = [...items];
+    newItems[itemIndex].price_breaks.splice(breakIndex, 1);
+    setItems(newItems);
+  };
+
+  const selectPriceTier = (itemIndex: number, tierIndex: number) => {
+    const newItems = [...items];
+    const tier = newItems[itemIndex].price_breaks[tierIndex];
+    newItems[itemIndex].selected_tier = tierIndex;
+    newItems[itemIndex].unit_price = tier.unit_price;
+    newItems[itemIndex].quantity = tier.min_qty;
+    newItems[itemIndex].total = tier.min_qty * tier.unit_price;
+    setItems(newItems);
+  };
+
+  const formatPriceBreakRange = (priceBreak: PriceBreak) => {
+    if (priceBreak.max_qty === null) {
+      return `${priceBreak.min_qty}+`;
+    }
+    return `${priceBreak.min_qty}-${priceBreak.max_qty}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -535,7 +615,9 @@ const CreateQuote = () => {
           state: item.state || null,
           quantity: item.quantity,
           unit_price: item.unit_price,
-          total: item.total
+          total: item.total,
+          price_breaks: item.price_breaks.length > 0 ? JSON.parse(JSON.stringify(item.price_breaks)) : null,
+          selected_tier: item.selected_tier
         }));
 
         const { error: itemsError } = await supabase
@@ -746,74 +828,202 @@ const CreateQuote = () => {
                       </TableHeader>
                       <TableBody>
                         {items.map((item, index) => (
-                          <TableRow key={index}>
-                            <TableCell>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 text-destructive"
-                                onClick={() => removeItem(index)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">{item.sku || '-'}</TableCell>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">{item.name}</p>
-                                {item.state && <span className="text-xs text-muted-foreground">{item.state}</span>}
-                                {item.isCustom && <span className="text-xs text-primary ml-2">(Custom)</span>}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center justify-center gap-1">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => updateItemQuantity(index, -1)}
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
+                          <Collapsible key={index} open={item.isExpanded} onOpenChange={() => toggleItemExpanded(index)}>
+                            <TableRow className={item.isExpanded ? "border-b-0" : ""}>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-destructive"
+                                    onClick={() => removeItem(index)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">{item.sku || '-'}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <CollapsibleTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-6 w-6 p-0"
+                                      type="button"
+                                    >
+                                      {item.isExpanded ? (
+                                        <ChevronDown className="h-4 w-4" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </CollapsibleTrigger>
+                                  <div>
+                                    <p className="font-medium">{item.name}</p>
+                                    <div className="flex items-center gap-2">
+                                      {item.state && <span className="text-xs text-muted-foreground">{item.state}</span>}
+                                      {item.isCustom && <span className="text-xs text-primary">(Custom)</span>}
+                                      {item.price_breaks.length > 0 && (
+                                        <span className="text-xs text-primary">
+                                          {item.price_breaks.length} price tier{item.price_breaks.length !== 1 ? 's' : ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 w-7 p-0"
+                                    onClick={() => updateItemQuantity(index, -1)}
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) => {
+                                      const newItems = [...items];
+                                      newItems[index].quantity = parseInt(e.target.value) || 1;
+                                      newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
+                                      setItems(newItems);
+                                    }}
+                                    className="h-7 w-14 text-center"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 w-7 p-0"
+                                    onClick={() => updateItemQuantity(index, 1)}
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
                                 <Input
                                   type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => {
-                                    const newItems = [...items];
-                                    newItems[index].quantity = parseInt(e.target.value) || 1;
-                                    newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
-                                    setItems(newItems);
-                                  }}
-                                  className="h-7 w-14 text-center"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.unit_price}
+                                  onChange={(e) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                  className="h-8 w-24 text-right ml-auto"
                                 />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => updateItemQuantity(index, 1)}
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={item.unit_price}
-                                onChange={(e) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                className="h-8 w-24 text-right ml-auto"
-                              />
-                            </TableCell>
-                            <TableCell className="text-right font-medium">
-                              {formatCurrency(item.total)}
-                            </TableCell>
-                          </TableRow>
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {formatCurrency(item.total)}
+                              </TableCell>
+                            </TableRow>
+                            <CollapsibleContent asChild>
+                              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                                <TableCell colSpan={6} className="p-4">
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="text-sm font-medium">Price Breaks</h4>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => addPriceBreak(index)}
+                                      >
+                                        <Plus className="h-3 w-3 mr-1" />
+                                        Add Tier
+                                      </Button>
+                                    </div>
+                                    
+                                    {item.price_breaks.length === 0 ? (
+                                      <p className="text-sm text-muted-foreground">
+                                        No price tiers defined. Add tiers to offer volume-based pricing.
+                                      </p>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        {item.price_breaks.map((priceBreak, breakIndex) => (
+                                          <div 
+                                            key={breakIndex} 
+                                            className={`flex items-center gap-3 p-2 rounded-md border ${
+                                              item.selected_tier === breakIndex 
+                                                ? 'border-primary bg-primary/5' 
+                                                : 'border-border'
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-2 flex-1">
+                                              <Label className="text-xs w-10">From</Label>
+                                              <Input
+                                                type="number"
+                                                min="1"
+                                                value={priceBreak.min_qty}
+                                                onChange={(e) => updatePriceBreak(index, breakIndex, 'min_qty', parseInt(e.target.value) || 1)}
+                                                className="h-8 w-20"
+                                              />
+                                              <Label className="text-xs w-6">To</Label>
+                                              <Input
+                                                type="number"
+                                                min={priceBreak.min_qty}
+                                                value={priceBreak.max_qty || ''}
+                                                onChange={(e) => updatePriceBreak(index, breakIndex, 'max_qty', e.target.value ? parseInt(e.target.value) : null)}
+                                                placeholder="∞"
+                                                className="h-8 w-20"
+                                              />
+                                              <Label className="text-xs w-10">Price</Label>
+                                              <div className="relative">
+                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                                <Input
+                                                  type="number"
+                                                  min="0"
+                                                  step="0.01"
+                                                  value={priceBreak.unit_price}
+                                                  onChange={(e) => updatePriceBreak(index, breakIndex, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                  className="h-8 w-24 pl-5"
+                                                />
+                                              </div>
+                                            </div>
+                                            <Button
+                                              type="button"
+                                              variant={item.selected_tier === breakIndex ? "default" : "outline"}
+                                              size="sm"
+                                              onClick={() => selectPriceTier(index, breakIndex)}
+                                            >
+                                              {item.selected_tier === breakIndex ? "Selected" : "Select"}
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-8 w-8 p-0 text-destructive"
+                                              onClick={() => removePriceBreak(index, breakIndex)}
+                                            >
+                                              <X className="h-4 w-4" />
+                                            </Button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    
+                                    {item.price_breaks.length > 0 && (
+                                      <div className="pt-2 border-t text-sm">
+                                        <p className="text-muted-foreground">
+                                          Summary: {item.price_breaks.map((pb, i) => (
+                                            <span key={i} className={item.selected_tier === i ? 'text-primary font-medium' : ''}>
+                                              {formatPriceBreakRange(pb)}: {formatCurrency(pb.unit_price)}
+                                              {i < item.price_breaks.length - 1 ? ' | ' : ''}
+                                            </span>
+                                          ))}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            </CollapsibleContent>
+                          </Collapsible>
                         ))}
                       </TableBody>
                     </Table>
