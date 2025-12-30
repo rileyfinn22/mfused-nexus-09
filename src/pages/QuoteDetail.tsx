@@ -659,6 +659,18 @@ const QuoteDetail = () => {
             </CardContent>
           </Card>
 
+          {/* Description - show in main content area */}
+          {quote.description && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Description</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap">{quote.description}</p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Request Notes */}
           {quote.request_notes && (
             <Card>
@@ -836,17 +848,6 @@ const QuoteDetail = () => {
             </Card>
           )}
 
-          {/* Description */}
-          {quote.description && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm whitespace-pre-wrap">{quote.description}</p>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
 
