@@ -1357,6 +1357,7 @@ export type Database = {
           description: string | null
           id: string
           internal_notes: string | null
+          parent_quote_id: string | null
           quote_number: string
           request_notes: string | null
           requested_by: string | null
@@ -1389,6 +1390,7 @@ export type Database = {
           description?: string | null
           id?: string
           internal_notes?: string | null
+          parent_quote_id?: string | null
           quote_number: string
           request_notes?: string | null
           requested_by?: string | null
@@ -1421,6 +1423,7 @@ export type Database = {
           description?: string | null
           id?: string
           internal_notes?: string | null
+          parent_quote_id?: string | null
           quote_number?: string
           request_notes?: string | null
           requested_by?: string | null
@@ -1447,6 +1450,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_parent_quote_id_fkey"
+            columns: ["parent_quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
             referencedColumns: ["id"]
           },
         ]

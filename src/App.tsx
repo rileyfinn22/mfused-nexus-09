@@ -86,6 +86,7 @@ const App = () => (
           <Route path="/quotes" element={<DashboardLayout><Quotes /></DashboardLayout>} />
           <Route path="/quotes/create" element={<DashboardLayout><CreateQuote /></DashboardLayout>} />
           <Route path="/quotes/edit/:quoteId" element={<DashboardLayout><CreateQuote /></DashboardLayout>} />
+          <Route path="/quotes/respond/:parentQuoteId" element={<DashboardLayout><CreateQuote /></DashboardLayout>} />
           <Route path="/quotes/:quoteId" element={<DashboardLayout><QuoteDetail /></DashboardLayout>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

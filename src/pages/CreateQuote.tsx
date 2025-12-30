@@ -50,10 +50,11 @@ interface Company {
 }
 
 const CreateQuote = () => {
-  const { quoteId } = useParams();
+  const { quoteId, parentQuoteId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const isEditing = !!quoteId;
+  const isResponding = !!parentQuoteId;
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -61,6 +62,7 @@ const CreateQuote = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
+  const [parentQuote, setParentQuote] = useState<any>(null);
 
   // Form state
   const [companyId, setCompanyId] = useState("");
@@ -85,10 +87,10 @@ const CreateQuote = () => {
 
   useEffect(() => {
     initializeForm();
-  }, [quoteId]);
+  }, [quoteId, parentQuoteId]);
 
   useEffect(() => {
-    if (companyId && isVibeAdmin && !isEditing) {
+    if (companyId && isVibeAdmin && !isEditing && !isResponding) {
       loadCompanyInfo(companyId);
     }
   }, [companyId, isVibeAdmin]);
@@ -130,6 +132,8 @@ const CreateQuote = () => {
 
       if (isEditing) {
         await fetchQuote();
+      } else if (isResponding) {
+        await loadParentQuote();
       }
     } catch (error: any) {
       toast({
@@ -139,6 +143,50 @@ const CreateQuote = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadParentQuote = async () => {
+    const { data: quote, error } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('id', parentQuoteId)
+      .single();
+
+    if (error) throw error;
+
+    setParentQuote(quote);
+    setCompanyId(quote.company_id);
+    setCustomerName(quote.customer_name);
+    setCustomerEmail(quote.customer_email || "");
+    setCustomerPhone(quote.customer_phone || "");
+    setShippingName(quote.shipping_name || "");
+    setShippingStreet(quote.shipping_street || "");
+    setShippingCity(quote.shipping_city || "");
+    setShippingState(quote.shipping_state || "");
+    setShippingZip(quote.shipping_zip || "");
+    setDescription(quote.description || "");
+    // Keep request notes visible but as internal reference
+    setInternalNotes(`Original Request Notes:\n${quote.request_notes || 'None'}`);
+    setTerms(quote.terms || "Net 30");
+
+    // Load items from parent quote if they exist
+    const { data: itemsData } = await supabase
+      .from('quote_items')
+      .select('*')
+      .eq('quote_id', parentQuoteId);
+
+    if (itemsData && itemsData.length > 0) {
+      setItems(itemsData.map(item => ({
+        product_id: item.product_id || undefined,
+        sku: item.sku,
+        name: item.name,
+        description: item.description || "",
+        state: item.state || "",
+        quantity: item.quantity,
+        unit_price: 0, // Reset price for admin to fill in
+        total: 0
+      })));
     }
   };
 
@@ -390,6 +438,9 @@ const CreateQuote = () => {
         if (!isVibeAdmin) {
           quoteData.requested_by = user?.id;
         }
+        if (isResponding && parentQuoteId) {
+          quoteData.parent_quote_id = parentQuoteId;
+        }
 
         const { data: newQuote, error } = await supabase
           .from('quotes')
@@ -463,12 +514,14 @@ const CreateQuote = () => {
         </Button>
         <div>
           <h1 className="page-title">
-            {isEditing ? "Edit Quote" : (isVibeAdmin ? "Create Quote" : "Request Quote")}
+            {isEditing ? "Edit Quote" : (isResponding ? "Respond to Quote Request" : (isVibeAdmin ? "Create Quote" : "Request Quote"))}
           </h1>
           <p className="page-subtitle">
-            {isVibeAdmin 
-              ? "Create a pricing quote for a customer" 
-              : "Submit a quote request for pricing"}
+            {isResponding 
+              ? `Creating response quote for ${parentQuote?.quote_number || 'request'}`
+              : (isVibeAdmin 
+                ? "Create a pricing quote for a customer" 
+                : "Submit a quote request for pricing")}
           </p>
         </div>
       </div>
@@ -484,7 +537,7 @@ const CreateQuote = () => {
                   <CardTitle className="text-base">Company</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Select value={companyId} onValueChange={setCompanyId}>
+                  <Select value={companyId} onValueChange={setCompanyId} disabled={isResponding}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a company" />
                     </SelectTrigger>
@@ -496,6 +549,11 @@ const CreateQuote = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  {isResponding && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Company is set from the original quote request
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             )}
