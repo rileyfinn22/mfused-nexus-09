@@ -624,17 +624,53 @@ serve(async (req) => {
         }),
       });
     } else {
-      // Create new invoice
-      console.log('Creating new QuickBooks invoice');
-      qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=65`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(invoicePayload),
-      });
+      // First check if an invoice with this DocNumber already exists in QuickBooks
+      const docNumber = invoice.invoice_number.substring(0, 21);
+      console.log('Checking if invoice exists with DocNumber:', docNumber);
+      
+      const queryResponse = await fetch(
+        `${qbApiUrl}/query?query=${encodeURIComponent(`SELECT * FROM Invoice WHERE DocNumber = '${docNumber}'`)}&minorversion=65`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+      
+      const queryData = await queryResponse.json();
+      const existingInvoice = queryData?.QueryResponse?.Invoice?.[0];
+      
+      if (existingInvoice) {
+        // Invoice already exists - update it instead of creating
+        console.log('Found existing QuickBooks invoice with ID:', existingInvoice.Id, 'SyncToken:', existingInvoice.SyncToken);
+        
+        qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=65`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...invoicePayload,
+            Id: existingInvoice.Id,
+            SyncToken: existingInvoice.SyncToken,
+          }),
+        });
+      } else {
+        // Create new invoice
+        console.log('Creating new QuickBooks invoice');
+        qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=65`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(invoicePayload),
+        });
+      }
     }
 
     const qbData = await qbResponse.json();
