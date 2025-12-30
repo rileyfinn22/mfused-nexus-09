@@ -390,9 +390,13 @@ serve(async (req) => {
       
       console.log(`Finding/creating QB item: ${sanitizedName}`);
       
+      // Properly encode the name for URL query - escape single quotes and URL encode the whole query
+      const escapedName = sanitizedName.replace(/'/g, "\\'");
+      const queryString = `SELECT * FROM Item WHERE Name='${escapedName}' MAXRESULTS 1`;
+      
       // Search for existing item by name
       const searchResponse = await fetch(
-        `${qbApiUrl}/query?query=SELECT * FROM Item WHERE Name='${sanitizedName.replace(/'/g, "\\'")}' MAXRESULTS 1&minorversion=65`,
+        `${qbApiUrl}/query?query=${encodeURIComponent(queryString)}&minorversion=65`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -414,7 +418,7 @@ serve(async (req) => {
       // Get the default income account (Sales of Product Income) and COGS account
       // First, try to find a suitable income account
       const accountSearchResponse = await fetch(
-        `${qbApiUrl}/query?query=SELECT * FROM Account WHERE AccountType='Income' MAXRESULTS 10&minorversion=65`,
+        `${qbApiUrl}/query?query=${encodeURIComponent("SELECT * FROM Account WHERE AccountType='Income' MAXRESULTS 10")}&minorversion=65`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -440,7 +444,7 @@ serve(async (req) => {
       
       // Find COGS account for expense
       const cogsSearchResponse = await fetch(
-        `${qbApiUrl}/query?query=SELECT * FROM Account WHERE AccountType='Cost of Goods Sold' MAXRESULTS 5&minorversion=65`,
+        `${qbApiUrl}/query?query=${encodeURIComponent("SELECT * FROM Account WHERE AccountType='Cost of Goods Sold' MAXRESULTS 5")}&minorversion=65`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -484,11 +488,23 @@ serve(async (req) => {
       const createData = await createResponse.json();
       
       if (!createResponse.ok) {
-        // If duplicate, try to find it again
+        // If duplicate, extract ID from error or search again
         if (createData.Fault?.Error?.[0]?.Message?.includes('Duplicate')) {
-          console.log('Duplicate item detected, searching again...');
+          const errorDetail = createData.Fault?.Error?.[0]?.Detail || '';
+          console.log('Duplicate item detected. Error detail:', errorDetail);
+          
+          // Try to extract ID from error message like "The name supplied already exists. : Id=1507"
+          const idMatch = errorDetail.match(/Id=(\d+)/);
+          if (idMatch) {
+            console.log(`Extracted existing item ID from error: ${idMatch[1]}`);
+            return idMatch[1];
+          }
+          
+          // Fallback: search again with LIKE and URL encoding
+          console.log('Searching again with LIKE query...');
+          const likeQuery = `SELECT * FROM Item WHERE Name LIKE '%${escapedName}%' MAXRESULTS 20`;
           const retrySearch = await fetch(
-            `${qbApiUrl}/query?query=SELECT * FROM Item WHERE Name LIKE '%${sanitizedName.replace(/'/g, "\\'")}%' MAXRESULTS 10&minorversion=65`,
+            `${qbApiUrl}/query?query=${encodeURIComponent(likeQuery)}&minorversion=65`,
             {
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -498,19 +514,44 @@ serve(async (req) => {
           );
           const retryData = await retrySearch.json();
           const items = retryData.QueryResponse?.Item || [];
-          const match = items.find((i: any) => i.Name?.toLowerCase() === sanitizedName.toLowerCase());
-          if (match) {
-            console.log(`Found item on retry: ${match.Id}`);
-            return match.Id;
+          console.log(`LIKE search returned ${items.length} items`);
+          
+          // Try exact case-insensitive match first
+          const exactMatch = items.find((i: any) => i.Name?.toLowerCase() === sanitizedName.toLowerCase());
+          if (exactMatch) {
+            console.log(`Found exact match on retry: ${exactMatch.Id} - ${exactMatch.Name}`);
+            return exactMatch.Id;
           }
+          
           // Use first match if exact match not found
           if (items.length > 0) {
-            console.log(`Using first match: ${items[0].Id}`);
+            console.log(`Using first LIKE match: ${items[0].Id} - ${items[0].Name}`);
             return items[0].Id;
+          }
+          
+          // Last resort: broad search
+          console.log('Trying broad item search...');
+          const broadQuery = `SELECT * FROM Item MAXRESULTS 500`;
+          const broadSearch = await fetch(
+            `${qbApiUrl}/query?query=${encodeURIComponent(broadQuery)}&minorversion=65`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json',
+              },
+            }
+          );
+          const broadData = await broadSearch.json();
+          const allItems = broadData.QueryResponse?.Item || [];
+          const broadMatch = allItems.find((i: any) => i.Name?.toLowerCase() === sanitizedName.toLowerCase());
+          if (broadMatch) {
+            console.log(`Found item in broad search: ${broadMatch.Id} - ${broadMatch.Name}`);
+            return broadMatch.Id;
           }
         }
         console.error('Failed to create QB item:', createData);
-        // Fallback to default item ID
+        // Fallback to default item ID - but log this as an error
+        console.error(`CRITICAL: Could not find or create item "${sanitizedName}", falling back to item ID 1`);
         return '1';
       }
       
