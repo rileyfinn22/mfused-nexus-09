@@ -22,6 +22,7 @@ import {
 interface VibeAdmin {
   id: string;
   user_id: string;
+  email: string;
 }
 
 export function VibeAdminManagement() {
@@ -57,21 +58,13 @@ export function VibeAdminManagement() {
 
       setVibePkgCompanyId(vibePkg.id);
 
-      // Get all vibe_admin users
-      const { data: roles, error } = await supabase
-        .from("user_roles")
-        .select("id, user_id")
-        .eq("role", "vibe_admin")
-        .eq("company_id", vibePkg.id);
+      // Get all vibe_admin users with emails using the database function
+      const { data: adminsData, error } = await supabase
+        .rpc("get_vibe_admins");
 
       if (error) throw error;
 
-      const adminsData: VibeAdmin[] = (roles || []).map((role) => ({
-        id: role.id,
-        user_id: role.user_id,
-      }));
-
-      setAdmins(adminsData);
+      setAdmins(adminsData || []);
     } catch (error: any) {
       toast({
         title: "Error loading admins",
@@ -237,7 +230,7 @@ export function VibeAdminManagement() {
                 >
                   <div className="flex items-center gap-3">
                     <Badge variant="secondary">vibe_admin</Badge>
-                    <span className="text-sm font-mono">{admin.user_id.slice(0, 8)}...</span>
+                    <span className="text-sm">{admin.email}</span>
                   </div>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

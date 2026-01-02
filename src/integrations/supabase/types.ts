@@ -1846,6 +1846,14 @@ export type Database = {
         Returns: string
       }
       get_user_company: { Args: { _user_id: string }; Returns: string }
+      get_vibe_admins: {
+        Args: never
+        Returns: {
+          email: string
+          id: string
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
