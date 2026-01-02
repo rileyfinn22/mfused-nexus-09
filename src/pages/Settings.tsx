@@ -7,10 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, Bell, Users, Save, Link2 } from "lucide-react";
+import { Building2, Bell, Users, Save, Link2, Shield } from "lucide-react";
 import { QuickBooksConnect } from "@/components/QuickBooksConnect";
+import { VibeAdminManagement } from "@/components/VibeAdminManagement";
 
 export default function Settings() {
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -34,7 +36,24 @@ export default function Settings() {
   useEffect(() => {
     loadSettings();
     handleOAuthCallback();
+    checkVibeAdmin();
   }, []);
+
+  const checkVibeAdmin = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase.rpc("has_role", {
+        _user_id: user.id,
+        _role: "vibe_admin",
+      });
+
+      setIsVibeAdmin(!!data);
+    } catch (error) {
+      console.error("Error checking vibe admin status:", error);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -206,6 +225,12 @@ export default function Settings() {
             <Users className="h-4 w-4" />
             Team
           </TabsTrigger>
+          {isVibeAdmin && (
+            <TabsTrigger value="vibe-admin" className="gap-2">
+              <Shield className="h-4 w-4" />
+              Vibe Admin
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="company" className="space-y-4">
@@ -356,6 +381,12 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isVibeAdmin && (
+          <TabsContent value="vibe-admin" className="space-y-4">
+            <VibeAdminManagement />
+          </TabsContent>
+        )}
       </Tabs>
 
       <div className="flex justify-end">
