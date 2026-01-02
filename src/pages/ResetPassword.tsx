@@ -25,20 +25,41 @@ export default function ResetPassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if we have a valid recovery session
+    // Listen for auth state changes - the recovery link will trigger PASSWORD_RECOVERY event
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || (session && event === "SIGNED_IN")) {
+        setValidSession(true);
+      }
+    });
+
+    // Also check if we already have a session (in case event already fired)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setValidSession(true);
-      } else {
-        toast({
-          title: "Invalid reset link",
-          description: "Please request a new password reset",
-          variant: "destructive",
-        });
-        navigate("/forgot-password");
       }
     });
-  }, [navigate, toast]);
+
+    // Give a few seconds for the auth event to process before redirecting
+    const timeout = setTimeout(() => {
+      if (!validSession) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session) {
+            toast({
+              title: "Invalid reset link",
+              description: "Please request a new password reset",
+              variant: "destructive",
+            });
+            navigate("/forgot-password");
+          }
+        });
+      }
+    }, 3000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
+  }, [navigate, toast, validSession]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
