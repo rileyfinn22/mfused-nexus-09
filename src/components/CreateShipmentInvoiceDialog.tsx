@@ -453,6 +453,42 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
               });
           }
         }
+        
+        // Check if overs were shipped and update blanket invoice total if needed
+        // Recalculate blanket total based on total shipped value across all items
+        const { data: updatedOrderItems } = await supabase
+          .from('order_items')
+          .select('*')
+          .eq('order_id', order.id);
+        
+        if (updatedOrderItems) {
+          // Calculate total shipped value
+          const totalShippedValue = updatedOrderItems.reduce((sum: number, item: any) => {
+            // Use the higher of: original order qty or shipped qty
+            const billedQty = Math.max(item.quantity, item.shipped_quantity || 0);
+            return sum + (billedQty * item.unit_price);
+          }, 0);
+          
+          const currentBlanketTotal = Number(blanketInvoice.total);
+          
+          // If total shipped value exceeds blanket total, update the blanket
+          if (totalShippedValue > currentBlanketTotal) {
+            console.log(`Updating blanket invoice total from ${currentBlanketTotal} to ${totalShippedValue} due to overs`);
+            
+            await supabase
+              .from('invoices')
+              .update({
+                subtotal: totalShippedValue,
+                total: totalShippedValue
+              })
+              .eq('id', blanketInvoice.id);
+            
+            toast({
+              title: "Blanket Invoice Updated",
+              description: `Updated blanket total to reflect shipped overs`,
+            });
+          }
+        }
       }
 
       toast({
