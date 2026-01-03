@@ -15,6 +15,7 @@ interface ProductionOrder {
   order_date: string;
   company_id: string;
   po_number: string | null;
+  description: string | null;
   shipping_state: string;
   total: number;
   companies: {
@@ -99,6 +100,7 @@ export default function Production() {
               order_date,
               company_id,
               po_number,
+              description,
               shipping_state,
               total,
               companies (
@@ -125,6 +127,7 @@ export default function Production() {
             order_date,
             company_id,
             po_number,
+            description,
             shipping_state,
             total,
             companies (
@@ -237,8 +240,7 @@ export default function Production() {
             <div className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider`}>
               <div className="col-span-2 text-left">Order #</div>
               {isVibeAdmin && <div className="col-span-2 text-left">Company</div>}
-              <div className="col-span-2 text-left">Customer</div>
-              <div className="col-span-1 text-left">PO #</div>
+              <div className="col-span-3 text-left">Description</div>
               <div className="col-span-1 text-left">State</div>
               <div className="col-span-1 text-left">Total</div>
               <div className="col-span-2 text-left">Progress</div>
@@ -266,8 +268,9 @@ export default function Production() {
                   {isVibeAdmin && (
                     <div className="col-span-2 text-left text-sm font-medium truncate">{order.companies?.name || '-'}</div>
                   )}
-                  <div className="col-span-2 text-left text-sm truncate">{order.customer_name}</div>
-                  <div className="col-span-1 text-left text-sm truncate">{order.po_number || '-'}</div>
+                  <div className="col-span-3 text-left text-sm text-muted-foreground truncate" title={order.description || ''}>
+                    {order.description || '-'}
+                  </div>
                   <div className="col-span-1 text-left">
                     <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                   </div>

@@ -356,11 +356,11 @@ const Orders = () => {
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
                   {isVibeAdmin && <div className="col-span-1">Company</div>}
-                  <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
+                  <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Description</div>
                   <div className="col-span-1">State</div>
                   <div className="col-span-1">Total</div>
-                  <div className="col-span-2">Status</div>
-                  <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>Due Date</div>
+                  <div className="col-span-1">Status</div>
+                  <div className="col-span-1">Due Date</div>
                   <div className="col-span-2">Actions</div>
                 </div>
               </div>
@@ -388,15 +388,23 @@ const Orders = () => {
                       {isVibeAdmin && (
                         <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
                       )}
-                      <div className={isVibeAdmin ? "col-span-1 text-sm" : "col-span-2 text-sm"}>{order.po_number || '-'}</div>
+                      <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>
+                        <Input
+                          className="h-7 text-xs"
+                          placeholder="Add description..."
+                          defaultValue={order.description || ''}
+                          onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
                       <div className="col-span-1">
                         <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                       </div>
                       <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
-                      <div className="col-span-2 text-sm capitalize text-muted-foreground">
+                      <div className="col-span-1 text-sm capitalize text-muted-foreground">
                         Draft
                       </div>
-                      <div className={isVibeAdmin ? "col-span-1 text-sm text-muted-foreground" : "col-span-2 text-sm text-muted-foreground"}>
+                      <div className="col-span-1 text-sm text-muted-foreground">
                         {dueDate}
                       </div>
                       <div className="col-span-2 flex gap-1">
@@ -455,11 +463,10 @@ const Orders = () => {
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
                   {isVibeAdmin && <div className="col-span-1">Company</div>}
-                  <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
+                  <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Description</div>
                   <div className="col-span-1">State</div>
                   <div className="col-span-1">Total</div>
-                  <div className="col-span-1">Status</div>
-                  <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>Checklist</div>
+                  <div className="col-span-1">Checklist</div>
                   <div className="col-span-1">Due Date</div>
                   <div className="col-span-2">Actions</div>
                 </div>
@@ -496,39 +503,41 @@ const Orders = () => {
                     {isVibeAdmin && (
                       <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
                     )}
-                    <div className={isVibeAdmin ? "col-span-1 text-sm" : "col-span-2 text-sm"}>{order.po_number || '-'}</div>
+                    <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>
+                      <Input
+                        className="h-7 text-xs"
+                        placeholder="Add description..."
+                        defaultValue={order.description || ''}
+                        onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
                     <div className="col-span-1">
                       <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                     </div>
                     <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
-                    <div className="col-span-1 text-sm capitalize text-blue-500">
-                      {order.status.replace('_', ' ')}
-                    </div>
-                    <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>
-                      <div className="flex gap-2 items-center">
-                        <div className="flex items-center gap-1" title="Art Approved">
+                    <div className="col-span-1">
+                      <div className="flex gap-1 items-center">
+                        <div className="flex items-center" title="Art Approved">
                           {order.artApproved ? (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <CheckCircle className="h-3.5 w-3.5 text-green-600" />
                           ) : (
-                            <Circle className="h-4 w-4 text-muted-foreground" />
+                            <Circle className="h-3.5 w-3.5 text-muted-foreground" />
                           )}
-                          <span className="text-xs text-muted-foreground">Art</span>
                         </div>
-                        <div className="flex items-center gap-1" title="Order Finalized">
+                        <div className="flex items-center" title="Order Finalized">
                           {order.order_finalized ? (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <CheckCircle className="h-3.5 w-3.5 text-green-600" />
                           ) : (
-                            <Circle className="h-4 w-4 text-muted-foreground" />
+                            <Circle className="h-3.5 w-3.5 text-muted-foreground" />
                           )}
-                          <span className="text-xs text-muted-foreground">Order</span>
                         </div>
-                        <div className="flex items-center gap-1" title="Vibe Processed">
+                        <div className="flex items-center" title="Vibe Processed">
                           {order.vibe_processed ? (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <CheckCircle className="h-3.5 w-3.5 text-green-600" />
                           ) : (
-                            <Circle className="h-4 w-4 text-muted-foreground" />
+                            <Circle className="h-3.5 w-3.5 text-muted-foreground" />
                           )}
-                          <span className="text-xs text-muted-foreground">Vibe</span>
                         </div>
                       </div>
                     </div>
@@ -584,10 +593,9 @@ const Orders = () => {
                 <div className="col-span-2">Order # / Type</div>
                 <div className="col-span-1">Date</div>
                 {isVibeAdmin && <div className="col-span-1">Company</div>}
-                <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>PO #</div>
+                <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Description</div>
                 <div className="col-span-1">State</div>
                 <div className="col-span-1">Total</div>
-                <div className={isVibeAdmin ? "col-span-1" : "col-span-2"}>Status</div>
                 <div className="col-span-2">Progress</div>
                 <div className="col-span-2">Actions</div>
               </div>
@@ -628,18 +636,23 @@ const Orders = () => {
                     {isVibeAdmin && (
                       <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
                     )}
-                    <div className={isVibeAdmin ? "col-span-1 text-sm" : "col-span-2 text-sm"}>{order.po_number || '-'}</div>
+                    <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>
+                      <Input
+                        className="h-7 text-xs"
+                        placeholder="Add description..."
+                        defaultValue={order.description || ''}
+                        onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
                     <div className="col-span-1">
                       <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                     </div>
                     <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
-                    <div className={`col-span-2 text-sm capitalize ${getStatusColor(order.status)}`}>
-                      {order.status.replace('_', ' ')}
-                    </div>
                     <div className="col-span-2 space-y-1">
                       <div className="flex justify-between text-xs">
-                        <span>{progress}%</span>
-                        <span className="text-muted-foreground">Due: {dueDate}</span>
+                        <span className={`capitalize ${getStatusColor(order.status)}`}>{order.status.replace('_', ' ')}</span>
+                        <span className="text-muted-foreground">{progress}%</span>
                       </div>
                       <Progress value={progress} className="h-1" />
                     </div>

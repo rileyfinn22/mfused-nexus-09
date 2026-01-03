@@ -65,7 +65,7 @@ const Invoices = () => {
       .from('invoices')
       .select(`
         *,
-        orders(order_number, customer_name, po_number),
+        orders(order_number, customer_name, po_number, description),
         companies(name)
       `)
       .is('deleted_at', null) // Only show non-deleted invoices
@@ -355,7 +355,7 @@ const Invoices = () => {
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Date</div>
-            <div className="col-span-2">Company</div>
+            <div className="col-span-2">Company / Description</div>
             <div className="col-span-1">Shipment</div>
             <div className="col-span-1">Type</div>
             <div className="col-span-1">Amount</div>
@@ -456,7 +456,11 @@ const Invoices = () => {
                   </div>
                   <div className="col-span-2">
                     <div className="font-medium text-sm">{invoice.companies?.name || 'N/A'}</div>
-                    {invoice.orders?.customer_name && (
+                    {invoice.orders?.description ? (
+                      <div className="text-xs text-muted-foreground truncate" title={invoice.orders.description}>
+                        {invoice.orders.description}
+                      </div>
+                    ) : invoice.orders?.customer_name && (
                       <div className="text-xs text-muted-foreground">
                         {invoice.orders.customer_name}
                       </div>
