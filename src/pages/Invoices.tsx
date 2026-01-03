@@ -213,11 +213,23 @@ const Invoices = () => {
     return items;
   });
 
-  // Calculate OPEN amount - sum of all invoices with status = 'open'
+  // Calculate OPEN amount - total of blanket orders minus all payments (including child invoices)
   const openAmount = filteredInvoices
-    .filter(inv => inv.status === 'open')
+    .filter(inv => {
+      const isBlanket = inv.invoice_type === 'full' || !inv.invoice_type;
+      const isNotPaid = inv.status !== 'paid';
+      return isBlanket && isNotPaid;
+    })
     .reduce((sum, invoice) => {
-      const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
+      // Get all child invoices for this parent
+      const childInvoices = invoices.filter(inv => inv.parent_invoice_id === invoice.id);
+      // Sum payments on parent and all children
+      const parentPaid = Number(invoice.total_paid) || 0;
+      const childrenPaid = childInvoices.reduce((childSum, child) => 
+        childSum + (Number(child.total_paid) || 0), 0);
+      const totalPaid = parentPaid + childrenPaid;
+      // Calculate remaining: parent total minus all payments
+      const remaining = Number(invoice.total) - totalPaid;
       return sum + remaining;
     }, 0);
 
