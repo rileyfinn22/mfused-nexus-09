@@ -73,8 +73,9 @@ const handler = async (req: Request): Promise<Response> => {
         })
       : "Upon Receipt";
 
-    // Build the email HTML
-    const portalUrl = "https://app.vibepkg.com";
+    // Build the email HTML - link directly to the invoice
+    const portalUrl = "https://vibepkgportal.com";
+    const invoiceUrl = `${portalUrl}/invoices/${invoiceId}`;
     const emailHtml = `
       <!DOCTYPE html>
       <html>
@@ -158,7 +159,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                       <tr>
                         <td align="center" style="padding: 16px 0;">
-                          <a href="${portalUrl}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);">
+                          <a href="${invoiceUrl}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);">
                             View in VibePKG Portal
                           </a>
                         </td>
