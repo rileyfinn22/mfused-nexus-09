@@ -945,7 +945,7 @@ const OrderDetail = () => {
                         <TableBody>
                           {order.order_items?.map((item: any) => {
                             const shipped = item.shipped_quantity || 0;
-                            const itemProgress = (shipped / item.quantity) * 100;
+                            const itemProgress = Math.min((shipped / item.quantity) * 100, 100);
                             
                             return (
                               <TableRow key={item.id}>
