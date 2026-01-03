@@ -213,25 +213,19 @@ const Invoices = () => {
     return items;
   });
 
-  // Calculate open amount - total of all blanket (full) invoices minus all payments (including child invoices)
+  // Calculate OPEN amount - sum of all invoices with status = 'open'
   const openAmount = filteredInvoices
-    .filter(inv => {
-      // Only count blanket/full invoices that are not fully paid
-      const isBlanket = inv.invoice_type === 'full' || !inv.invoice_type;
-      // Include open, partial, final_review, and any non-paid status
-      const isNotPaid = inv.status !== 'paid';
-      return isBlanket && isNotPaid;
-    })
+    .filter(inv => inv.status === 'open')
     .reduce((sum, invoice) => {
-      // Get all child invoices for this parent
-      const childInvoices = invoices.filter(inv => inv.parent_invoice_id === invoice.id);
-      // Sum payments on parent and all children
-      const parentPaid = Number(invoice.total_paid) || 0;
-      const childrenPaid = childInvoices.reduce((childSum, child) => 
-        childSum + (Number(child.total_paid) || 0), 0);
-      const totalPaid = parentPaid + childrenPaid;
-      // Calculate remaining amount: parent total minus all payments
-      const remaining = Number(invoice.total) - totalPaid;
+      const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
+      return sum + remaining;
+    }, 0);
+
+  // Calculate BILLED amount - sum of all invoices with status = 'billed' (synced to QB, pending due date)
+  const billedAmount = filteredInvoices
+    .filter(inv => inv.status === 'billed')
+    .reduce((sum, invoice) => {
+      const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
       return sum + remaining;
     }, 0);
 
@@ -239,7 +233,6 @@ const Invoices = () => {
   const dueAmount = filteredInvoices
     .filter(inv => inv.status === 'due')
     .reduce((sum, invoice) => {
-      // Calculate remaining amount: total minus what's been paid on this invoice
       const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
       return sum + remaining;
     }, 0);
@@ -265,13 +258,17 @@ const Invoices = () => {
       </div>
 
       {/* Summary Row */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-3 gap-6">
         <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Invoices</p>
-          <p className="text-2xl font-semibold mt-1 text-primary">{formatCurrency(openAmount)}</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Orders Total</p>
+          <p className="text-2xl font-semibold mt-1 text-yellow-600 dark:text-yellow-400">{formatCurrency(openAmount)}</p>
         </div>
         <div className="bg-table-row border border-table-border rounded p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">DUE Amount</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Billed Pending Due</p>
+          <p className="text-2xl font-semibold mt-1 text-blue-600 dark:text-blue-400">{formatCurrency(billedAmount)}</p>
+        </div>
+        <div className="bg-table-row border border-table-border rounded p-4">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Due Amount</p>
           <p className="text-2xl font-semibold mt-1 text-red-600 dark:text-red-400">{formatCurrency(dueAmount)}</p>
         </div>
       </div>
