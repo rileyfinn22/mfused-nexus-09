@@ -354,7 +354,7 @@ const Invoices = () => {
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
-            <div className="col-span-1">Date</div>
+            <div className="col-span-1">Due Date</div>
             <div className="col-span-2">Company / Description</div>
             <div className="col-span-1">Shipment</div>
             <div className="col-span-1">Type</div>
@@ -452,7 +452,7 @@ const Invoices = () => {
                     )}
                   </div>
                   <div className="col-span-1 text-sm text-muted-foreground">
-                    {invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString() : '-'}
+                    {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
                   </div>
                   <div className="col-span-2">
                     <div className="font-medium text-sm">{invoice.companies?.name || 'N/A'}</div>

@@ -771,47 +771,46 @@ const InvoiceDetail = () => {
                   </SelectContent>
                 </Select>
                 <div className="mt-4">
-                  <p className="text-sm text-muted-foreground">Invoice Date</p>
-                  <p className="font-medium">{new Date(invoice.invoice_date).toLocaleDateString()}</p>
+                  <p className="text-sm text-muted-foreground">Due Date</p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className={cn(
+                          "h-auto p-0 font-medium hover:bg-transparent",
+                          !invoice.due_date && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {invoice.due_date ? format(new Date(invoice.due_date), "MMM d, yyyy") : "Set Due Date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="single"
+                        selected={invoice.due_date ? new Date(invoice.due_date) : undefined}
+                        onSelect={async (date) => {
+                          const { error } = await supabase
+                            .from('invoices')
+                            .update({ due_date: date ? date.toISOString() : null })
+                            .eq('id', invoice.id);
+                          
+                          if (error) {
+                            toast({ title: "Error", description: "Failed to update due date", variant: "destructive" });
+                          } else {
+                            setInvoice({ ...invoice, due_date: date ? date.toISOString() : null });
+                            toast({ title: "Due date updated" });
+                          }
+                        }}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Created: {new Date(invoice.invoice_date).toLocaleDateString()}
+                  </p>
                 </div>
-                {<div className="mt-2">
-                    <p className="text-sm text-muted-foreground">Due Date</p>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className={cn(
-                            "h-auto p-0 font-medium hover:bg-transparent",
-                            !invoice.due_date && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {invoice.due_date ? format(new Date(invoice.due_date), "MMM d, yyyy") : "Set Due Date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="end">
-                        <Calendar
-                          mode="single"
-                          selected={invoice.due_date ? new Date(invoice.due_date) : undefined}
-                          onSelect={async (date) => {
-                            const { error } = await supabase
-                              .from('invoices')
-                              .update({ due_date: date ? date.toISOString() : null })
-                              .eq('id', invoice.id);
-                            
-                            if (error) {
-                              toast({ title: "Error", description: "Failed to update due date", variant: "destructive" });
-                            } else {
-                              setInvoice({ ...invoice, due_date: date ? date.toISOString() : null });
-                              toast({ title: "Due date updated" });
-                            }
-                          }}
-                          initialFocus
-                          className={cn("p-3 pointer-events-auto")}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>}
               </div>
             </div>
           </div>
