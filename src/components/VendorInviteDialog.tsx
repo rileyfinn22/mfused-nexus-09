@@ -56,7 +56,8 @@ export default function VendorInviteDialog({
 
       if (error) throw error;
 
-      const link = `${window.location.origin}/vendor-signup?token=${data.invitation_token}`;
+      const portalUrl = "https://vibepkgportal.com";
+      const link = `${portalUrl}/vendor-signup?token=${data.invitation_token}`;
       setInvitationLink(link);
 
       toast({
