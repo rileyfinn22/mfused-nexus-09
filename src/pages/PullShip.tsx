@@ -301,10 +301,17 @@ const PullShip = () => {
     doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 50);
     doc.text(`Due Date: ${new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}`, 20, 60);
     
-    // Bill To
-    doc.text("Bill To:", 20, 80);
+    // Ship To
+    doc.text("Ship To:", 20, 80);
     doc.text(orderData.shippingAddress, 20, 90);
     doc.text(`${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZip}`, 20, 100);
+    
+    // Bill To (if different from Ship To)
+    if (orderData.billingAddress) {
+      doc.text("Bill To:", 110, 80);
+      doc.text(orderData.billingAddress, 110, 90);
+      doc.text(`${orderData.billingCity || ''}, ${orderData.billingState || ''} ${orderData.billingZip || ''}`, 110, 100);
+    }
     
     // Items table with pricing
     const tableData = items.map(item => [

@@ -128,10 +128,19 @@ const PullShipOrderDetail = () => {
     doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 50);
     doc.text(`PO #: ${order.po_number || 'N/A'}`, 20, 60);
     
-    doc.text("Bill To:", 20, 80);
-    doc.text(order.customer_name, 20, 90);
+    // Ship To
+    doc.text("Ship To:", 20, 80);
+    doc.text(order.shipping_name || order.customer_name, 20, 90);
     doc.text(`${order.shipping_street}`, 20, 100);
     doc.text(`${order.shipping_city}, ${order.shipping_state} ${order.shipping_zip}`, 20, 110);
+    
+    // Bill To (if different from Ship To)
+    if (order.billing_name) {
+      doc.text("Bill To:", 110, 80);
+      doc.text(order.billing_name, 110, 90);
+      doc.text(`${order.billing_street || ''}`, 110, 100);
+      doc.text(`${order.billing_city || ''}, ${order.billing_state || ''} ${order.billing_zip || ''}`, 110, 110);
+    }
     
     const tableData = order.order_items.map((item: any) => [
       item.item_id || "N/A",

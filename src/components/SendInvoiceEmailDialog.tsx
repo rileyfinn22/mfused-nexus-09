@@ -118,15 +118,27 @@ export function SendInvoiceEmailDialog({
       doc.text(`Due: ${new Date(invoice.due_date).toLocaleDateString()}`, 150, 49);
     }
     
-    // Customer info
+    // Ship To info
     doc.setFontSize(11);
     doc.setTextColor(17, 24, 39);
-    doc.text("Bill To:", 20, 55);
+    doc.text("Ship To:", 20, 55);
     doc.setFontSize(10);
     doc.setTextColor(55, 65, 81);
     doc.text(order?.shipping_name || "Customer", 20, 62);
     doc.text(order?.shipping_street || "", 20, 69);
     doc.text(`${order?.shipping_city || ""}, ${order?.shipping_state || ""} ${order?.shipping_zip || ""}`, 20, 76);
+    
+    // Bill To info (if different from Ship To)
+    if (order?.billing_name) {
+      doc.setFontSize(11);
+      doc.setTextColor(17, 24, 39);
+      doc.text("Bill To:", 110, 55);
+      doc.setFontSize(10);
+      doc.setTextColor(55, 65, 81);
+      doc.text(order?.billing_name || "", 110, 62);
+      doc.text(order?.billing_street || "", 110, 69);
+      doc.text(`${order?.billing_city || ""}, ${order?.billing_state || ""} ${order?.billing_zip || ""}`, 110, 76);
+    }
     
     // Items table
     const tableData = items.map((item) => [
