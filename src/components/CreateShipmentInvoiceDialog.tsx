@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, AlertTriangle, Info, Package } from "lucide-react";
+import { Loader2, AlertTriangle, Info, Package, Upload, FileSpreadsheet, CheckCircle2, XCircle } from "lucide-react";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 import { generateInvoiceNumber, generatePartialInvoiceNumber } from "@/lib/invoiceUtils";
 
@@ -29,6 +29,20 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
   const [invoiceMode, setInvoiceMode] = useState<'deposit' | 'shipment'>(initialMode);
   const [depositPercentage, setDepositPercentage] = useState("30");
   const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
+  
+  // Packing list upload states
+  const [parsingPackingList, setParsingPackingList] = useState(false);
+  const [packingListResult, setPackingListResult] = useState<{
+    matched_items: Array<{
+      order_item_id: string;
+      shipped_quantity: number;
+      packing_list_name: string;
+      match_confidence: 'high' | 'medium' | 'low';
+    }>;
+    unmatched_items: Array<{ name: string; quantity: number }>;
+    parsing_notes: string;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open && order) {
@@ -36,8 +50,93 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       fetchExistingInvoices();
       fetchAvailableInventory();
       initializeQuantities();
+      setPackingListResult(null); // Reset packing list result when dialog opens
     }
   }, [open, order, initialMode]);
+
+  const handlePackingListUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset file input so the same file can be uploaded again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    // Validate file type
+    const validTypes = ['.csv', '.txt', '.xlsx', '.xls'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    if (!validTypes.some(t => fileExtension.includes(t.replace('.', '')))) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload a CSV, TXT, or Excel file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setParsingPackingList(true);
+    setPackingListResult(null);
+
+    try {
+      // Read file content
+      const fileContent = await file.text();
+      
+      // Call the edge function to parse the packing list
+      const { data, error } = await supabase.functions.invoke('parse-packing-list', {
+        body: {
+          fileContent,
+          fileName: file.name,
+          orderItems: order.order_items
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setPackingListResult(data);
+
+      // Apply matched quantities
+      if (data.matched_items && data.matched_items.length > 0) {
+        const newQuantities: {[itemId: string]: number} = {};
+        
+        // Start with zeros
+        order.order_items?.forEach((item: any) => {
+          newQuantities[item.id] = 0;
+        });
+        
+        // Apply matched quantities
+        data.matched_items.forEach((match: any) => {
+          newQuantities[match.order_item_id] = match.shipped_quantity;
+        });
+        
+        setShipmentQuantities(newQuantities);
+
+        toast({
+          title: "Packing List Parsed",
+          description: `Matched ${data.matched_items.length} items. ${data.unmatched_items?.length || 0} items could not be matched.`,
+        });
+      } else {
+        toast({
+          title: "No Matches Found",
+          description: "Could not match any items from the packing list. Please check the file format.",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      console.error('Error parsing packing list:', error);
+      toast({
+        title: "Error Parsing Packing List",
+        description: error.message || "Failed to parse the packing list",
+        variant: "destructive"
+      });
+    } finally {
+      setParsingPackingList(false);
+    }
+  };
 
   const fetchExistingInvoices = async () => {
     const { data } = await supabase
@@ -509,6 +608,88 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                   </div>
                 </div>
               )}
+
+              {/* Packing List Upload Section */}
+              <div className="bg-secondary/30 p-4 rounded-lg border border-border/50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-4 w-4 text-primary" />
+                    <Label className="text-sm font-medium">Upload Packing List</Label>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={parsingPackingList}
+                  >
+                    {parsingPackingList ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Parsing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload File
+                      </>
+                    )}
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv,.txt,.xlsx,.xls"
+                    onChange={handlePackingListUpload}
+                    className="hidden"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Upload a packing list (CSV, TXT, or Excel) to auto-fill shipped quantities based on product name matching.
+                </p>
+                
+                {/* Packing List Results */}
+                {packingListResult && (
+                  <div className="mt-3 space-y-2">
+                    {packingListResult.matched_items.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {packingListResult.matched_items.map((match, idx) => {
+                          const orderItem = order.order_items?.find((item: any) => item.id === match.order_item_id);
+                          return (
+                            <Badge 
+                              key={idx} 
+                              variant={match.match_confidence === 'high' ? 'default' : 'secondary'}
+                              className="text-xs flex items-center gap-1"
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              {orderItem?.name || 'Unknown'}: {match.shipped_quantity}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
+                    {packingListResult.unmatched_items.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs text-destructive mb-1">Unmatched items from packing list:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {packingListResult.unmatched_items.map((item, idx) => (
+                            <Badge key={idx} variant="outline" className="text-xs flex items-center gap-1 border-destructive/50 text-destructive">
+                              <XCircle className="h-3 w-3" />
+                              {item.name}: {item.quantity}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {packingListResult.parsing_notes && (
+                      <p className="text-xs text-muted-foreground italic mt-2">
+                        {packingListResult.parsing_notes}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div>
                 <Label className="text-base">Items to Ship</Label>

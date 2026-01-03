@@ -1,0 +1,194 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    console.log("Parsing packing list...");
+    const { fileContent, orderItems, fileName } = await req.json();
+    console.log(`Processing file: ${fileName}, order has ${orderItems?.length || 0} items`);
+    
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY is not configured");
+      throw new Error("LOVABLE_API_KEY is not configured");
+    }
+    
+    if (!fileContent) {
+      console.error("No file content provided");
+      throw new Error("No file content provided");
+    }
+
+    if (!orderItems || orderItems.length === 0) {
+      console.error("No order items provided");
+      throw new Error("No order items provided");
+    }
+
+    // Format order items for the AI to match against
+    const orderItemsList = orderItems.map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      sku: item.sku,
+      ordered_quantity: item.quantity,
+      already_shipped: item.shipped_quantity || 0
+    }));
+
+    const systemPrompt = `You are a packing list parser. Your job is to extract shipped quantities from a packing list document and match them to order items.
+
+The packing list may be in various formats (CSV, tab-separated, or plain text). It contains products that were shipped with their quantities.
+
+You have the following order items to match against:
+${JSON.stringify(orderItemsList, null, 2)}
+
+Match the products in the packing list to the order items by:
+1. PRODUCT NAME - Look for similar/matching product names (primary matching method)
+2. SKU - Look for matching SKU codes if names don't match
+3. Description similarity - Match based on similar descriptions
+
+For each match, return the order item ID and the shipped quantity from the packing list.
+
+Important:
+- Focus on PRODUCT NAME matching first, then SKU
+- Be flexible with naming variations (e.g., "Widget 1000mg" matches "1000mg Widget")
+- Ignore case differences
+- Extract numeric quantities from the shipped/qty columns
+- If a product in the packing list doesn't match any order item, include it in unmatched_items
+- If the shipped quantity would exceed what's remaining to ship, still include it (the user can adjust)`;
+
+    const userPrompt = `Parse this packing list and match products to order items. Return the shipped quantities for each matched item.
+
+Packing List Content:
+${fileContent}`;
+
+    console.log("Calling AI Gateway...");
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "parse_packing_list",
+              description: "Parse packing list and match to order items with shipped quantities",
+              parameters: {
+                type: "object",
+                properties: {
+                  matched_items: {
+                    type: "array",
+                    description: "Items that were matched between packing list and order",
+                    items: {
+                      type: "object",
+                      properties: {
+                        order_item_id: { 
+                          type: "string",
+                          description: "The ID of the matching order item"
+                        },
+                        shipped_quantity: { 
+                          type: "number",
+                          description: "The quantity shipped according to the packing list"
+                        },
+                        packing_list_name: {
+                          type: "string",
+                          description: "The product name as it appears in the packing list"
+                        },
+                        match_confidence: {
+                          type: "string",
+                          enum: ["high", "medium", "low"],
+                          description: "Confidence level of the match"
+                        }
+                      },
+                      required: ["order_item_id", "shipped_quantity", "packing_list_name", "match_confidence"]
+                    }
+                  },
+                  unmatched_items: {
+                    type: "array",
+                    description: "Items in packing list that couldn't be matched to any order item",
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        quantity: { type: "number" }
+                      },
+                      required: ["name", "quantity"]
+                    }
+                  },
+                  parsing_notes: {
+                    type: "string",
+                    description: "Any notes about the parsing process or issues encountered"
+                  }
+                },
+                required: ["matched_items", "unmatched_items", "parsing_notes"]
+              }
+            }
+          }
+        ],
+        tool_choice: { type: "function", function: { name: "parse_packing_list" } }
+      }),
+    });
+
+    console.log(`AI Gateway response status: ${response.status}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`AI Gateway error response: ${errorText}`);
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`AI Gateway error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("AI Gateway response received");
+    
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    
+    if (!toolCall) {
+      console.error("No tool call in AI response:", JSON.stringify(data));
+      throw new Error("No tool call in response");
+    }
+
+    const result = JSON.parse(toolCall.function.arguments);
+    console.log(`Successfully matched ${result.matched_items?.length || 0} items, ${result.unmatched_items?.length || 0} unmatched`);
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Error parsing packing list:", error);
+    return new Response(
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : "Failed to parse packing list",
+        matched_items: [],
+        unmatched_items: [],
+        parsing_notes: "Failed to parse packing list"
+      }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
