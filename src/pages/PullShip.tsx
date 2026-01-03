@@ -311,7 +311,7 @@ const PullShip = () => {
       item.itemId || "N/A",
       item.sku, 
       item.quantity.toString(), 
-      `$${(item.unitPrice || 1).toFixed(2)}`, 
+      `$${(item.unitPrice || 1).toFixed(3)}`, 
       `$${(item.quantity * (item.unitPrice || 1)).toFixed(2)}`
     ]);
     

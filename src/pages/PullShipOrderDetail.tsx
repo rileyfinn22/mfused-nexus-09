@@ -138,7 +138,7 @@ const PullShipOrderDetail = () => {
       item.sku,
       item.name,
       item.quantity.toString(),
-      `$${item.unit_price?.toFixed(2)}`,
+      `$${item.unit_price?.toFixed(3)}`,
       `$${item.total?.toFixed(2)}`
     ]);
     
@@ -1235,7 +1235,7 @@ const PullShipOrderDetail = () => {
                             className="h-8 w-24"
                           />
                         ) : (
-                          `$${item.unit_price?.toFixed(2)}`
+                          `$${item.unit_price?.toFixed(3)}`
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium">

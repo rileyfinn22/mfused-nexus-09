@@ -1541,7 +1541,7 @@ const CreateOrder = () => {
                           <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
-                          <TableCell className="text-right">${Number(item.unit_price).toFixed(2)}</TableCell>
+                          <TableCell className="text-right">${Number(item.unit_price).toFixed(3)}</TableCell>
                           <TableCell className="text-right font-medium">${Number(item.total).toFixed(2)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
