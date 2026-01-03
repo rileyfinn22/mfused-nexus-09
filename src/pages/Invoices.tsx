@@ -354,11 +354,11 @@ const Invoices = () => {
           onClick={() => {
             const partialInvoices = invoices.filter(inv => inv.invoice_type === 'partial');
             if (partialInvoices.length === 0) {
-              toast({ title: "No Partial Invoices", description: "No partial invoices found" });
+              toast({ title: "No Shipped Invoices", description: "No shipped invoices found" });
             }
           }}
         >
-          <Badge className="bg-blue-500 text-white mr-2">Partial</Badge>
+          <Badge className="bg-blue-500 text-white mr-2">Shipped</Badge>
           {invoices.filter(inv => inv.invoice_type === 'partial').length}
         </Button>
       </div>
@@ -488,7 +488,7 @@ const Invoices = () => {
                   </div>
                   <div className="col-span-1">
                     <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>
-                      {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
+                      {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
                     </Badge>
                   </div>
                   <div className="col-span-1 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
