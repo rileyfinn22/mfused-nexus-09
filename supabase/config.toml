@@ -32,3 +32,15 @@ verify_jwt = true
 
 [functions.quickbooks-refresh-tokens]
 verify_jwt = false
+
+[functions.quickbooks-delete-invoice]
+verify_jwt = true
+
+[functions.parse-product-csv]
+verify_jwt = true
+
+[functions.upload-inventory]
+verify_jwt = true
+
+[functions.send-invoice-email]
+verify_jwt = true
