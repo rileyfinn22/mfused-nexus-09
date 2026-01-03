@@ -914,14 +914,14 @@ serve(async (req) => {
     console.log('QuickBooks Invoice ID:', qbInvoiceId);
     console.log('QuickBooks Realm ID:', qbRealmId);
     
-    // QuickBooks customer-facing payment link
-    // We need to "send" the invoice to generate the shareable link
+    // QuickBooks payment link - DO NOT auto-send invoice via email
+    // Just enable online payments and retrieve the invoice link if available
     let qbPaymentLink = null;
     
     try {
-      console.log('Generating shareable payment link by sending invoice...');
+      console.log('Enabling online payments on invoice (not sending email)...');
       
-      // First, ensure online payment is enabled on the invoice
+      // Ensure online payment is enabled on the invoice
       const updatePayload = {
         Id: qbInvoiceId,
         SyncToken: qbData.Invoice.SyncToken,
@@ -942,66 +942,26 @@ serve(async (req) => {
       });
       
       if (updateResponse.ok) {
+        const updatedInvoice = await updateResponse.json();
         console.log('Online payment enabled on invoice');
-      }
-      
-      // Now send the invoice to generate the shareable link
-      // QuickBooks generates a unique link when you send an invoice
-      const customerEmail = invoice.orders?.customer_email || 'noemail@placeholder.com';
-      
-      const sendResponse = await fetch(
-        `${qbApiUrl}/invoice/${qbInvoiceId}/send?sendTo=${encodeURIComponent(customerEmail)}`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/octet-stream',
-          },
-        }
-      );
-      
-      if (sendResponse.ok) {
-        console.log('Invoice send triggered successfully');
         
-        // Wait for QuickBooks to generate the link
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Check if there's an invoice link available
+        qbPaymentLink = updatedInvoice.Invoice?.InvoiceLink || null;
         
-        // Query the invoice again to get the generated link
-        const queryResponse = await fetch(
-          `${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json',
-            },
-          }
-        );
-        
-        if (queryResponse.ok) {
-          const invoiceData = await queryResponse.json();
-          console.log('Invoice data after send:', JSON.stringify(invoiceData.Invoice, null, 2));
-          
-          // The InvoiceLink field should now contain the shareable link
-          qbPaymentLink = invoiceData.Invoice?.InvoiceLink || null;
-          
-          if (qbPaymentLink) {
-            console.log('Payment link generated:', qbPaymentLink);
-          } else {
-            console.log('No payment link in response, invoice may need to be emailed to customer');
-            // Provide a note instead of a broken link
-            qbPaymentLink = 'Email';
-          }
+        if (qbPaymentLink) {
+          console.log('Payment link available:', qbPaymentLink);
+        } else {
+          // Invoice was created but no auto-generated link - user can send manually from QuickBooks
+          console.log('Invoice created in QuickBooks. No auto-send - send manually from QB when ready.');
+          qbPaymentLink = 'Manual';
         }
       } else {
-        const sendError = await sendResponse.json();
-        console.error('Error sending invoice:', sendError);
-        qbPaymentLink = 'Email';
+        console.log('Could not enable online payments, but invoice was created');
+        qbPaymentLink = 'Manual';
       }
     } catch (linkError) {
-      console.error('Error generating payment link:', linkError);
-      qbPaymentLink = 'Email';
+      console.error('Error configuring payment options:', linkError);
+      qbPaymentLink = 'Manual';
     }
     
     console.log('QuickBooks invoice ID:', qbInvoiceId);

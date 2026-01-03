@@ -73,6 +73,7 @@ export type Database = {
       companies: {
         Row: {
           billing_city: string | null
+          billing_email: string | null
           billing_state: string | null
           billing_street: string | null
           billing_zip: string | null
@@ -92,6 +93,7 @@ export type Database = {
         }
         Insert: {
           billing_city?: string | null
+          billing_email?: string | null
           billing_state?: string | null
           billing_street?: string | null
           billing_zip?: string | null
@@ -111,6 +113,7 @@ export type Database = {
         }
         Update: {
           billing_city?: string | null
+          billing_email?: string | null
           billing_state?: string | null
           billing_street?: string | null
           billing_zip?: string | null
