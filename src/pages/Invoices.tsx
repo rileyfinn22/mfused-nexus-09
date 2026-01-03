@@ -325,11 +325,11 @@ const Invoices = () => {
           onClick={() => {
             const fullInvoices = invoices.filter(inv => !inv.invoice_type || inv.invoice_type === 'full');
             if (fullInvoices.length === 0) {
-              toast({ title: "No Full Invoices", description: "No full invoices found" });
+              toast({ title: "No Blanket Invoices", description: "No blanket invoices found" });
             }
           }}
         >
-          <Badge className="bg-purple-500 text-white mr-2">Full</Badge>
+          <Badge className="bg-purple-500 text-white mr-2">Blanket</Badge>
           {invoices.filter(inv => !inv.invoice_type || inv.invoice_type === 'full').length}
         </Button>
         <Button
@@ -469,7 +469,7 @@ const Invoices = () => {
                   </div>
                   <div className="col-span-1">
                     <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>
-                      {(invoice.invoice_type || 'full').charAt(0).toUpperCase() + (invoice.invoice_type || 'full').slice(1)}
+                      {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
                     </Badge>
                   </div>
                   <div className="col-span-1 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
