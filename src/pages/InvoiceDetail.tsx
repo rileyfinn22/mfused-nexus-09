@@ -1149,16 +1149,23 @@ const InvoiceDetail = () => {
               </p>
             </div>
             
-            {/* For Blanket Invoices - Show three totals */}
+            {/* For Blanket Invoices - Show four totals including original order total */}
             {invoice.invoice_type === 'full' && invoice.shipment_number === 1 ? (
               <div className="text-right space-y-2">
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Original Order Total</p>
+                    <p className="text-lg font-semibold text-muted-foreground">
+                      {formatCurrency(order?.order_items?.reduce((sum: number, item: any) => 
+                        sum + (item.quantity * item.unit_price), 0) || 0)}
+                    </p>
+                  </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Blanket Invoice Total</p>
                     <p className="text-lg font-semibold">{formatCurrency(Number(invoice.total || 0))}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Total Shipped Invoice Total</p>
+                    <p className="text-xs text-muted-foreground">Total Shipped Invoiced</p>
                     <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
                       {formatCurrency(relatedInvoices
                         .filter(inv => inv.shipment_number > 1)
@@ -1167,7 +1174,7 @@ const InvoiceDetail = () => {
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Total Paid Total</p>
+                    <p className="text-xs text-muted-foreground">Total Paid</p>
                     <p className="text-lg font-semibold text-green-600 dark:text-green-400">
                       {formatCurrency(payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0))}
                     </p>
