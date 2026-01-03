@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   Search, 
   Download, 
@@ -17,12 +19,14 @@ import {
   Link2,
   ChevronDown,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  CalendarIcon
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { exportToCSV } from "@/lib/exportUtils";
+import { format } from "date-fns";
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -155,6 +159,28 @@ const Invoices = () => {
 
     if (error) {
       console.error("Error updating invoice description:", error);
+    }
+  };
+
+  const handleDueDateChange = async (invoiceId: string, date: Date | undefined) => {
+    const { error } = await supabase
+      .from("invoices")
+      .update({ due_date: date ? date.toISOString() : null })
+      .eq("id", invoiceId);
+
+    if (error) {
+      console.error("Error updating invoice due date:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update due date",
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Success",
+        description: "Due date updated"
+      });
+      fetchInvoices();
     }
   };
 
@@ -352,16 +378,17 @@ const Invoices = () => {
       <div className="border border-table-border rounded">
         {/* Table Header */}
         <div className="bg-table-header border-b border-table-border">
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="grid grid-cols-14 gap-3 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Date</div>
+            <div className="col-span-1">Due Date</div>
             <div className="col-span-2">Company / Description</div>
             <div className="col-span-1">Shipment</div>
             <div className="col-span-1">Type</div>
             <div className="col-span-1">Amount</div>
             <div className="col-span-1">PO Number</div>
             <div className="col-span-1">Status</div>
-            <div className="col-span-2">Actions</div>
+            <div className="col-span-3">Actions</div>
           </div>
         </div>
 
@@ -387,7 +414,7 @@ const Invoices = () => {
               return (
                 <div 
                   key={invoice.id} 
-                  className={`grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors ${
+                  className={`grid grid-cols-14 gap-3 px-4 py-3 hover:bg-table-row-hover transition-colors ${
                     isChild ? 'bg-muted/30 border-l-4 border-l-blue-500/50' : ''
                   } ${isParent ? 'border-b-2 border-b-blue-500/20' : ''}`}
                 >
@@ -454,6 +481,51 @@ const Invoices = () => {
                   <div className="col-span-1 text-sm text-muted-foreground">
                     {invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString() : '-'}
                   </div>
+                  <div className="col-span-1">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`h-auto py-1 px-2 text-xs justify-start font-normal ${
+                            daysUntilDue !== null && daysUntilDue < 0 
+                              ? 'text-red-600 dark:text-red-400' 
+                              : daysUntilDue !== null && daysUntilDue <= 7 
+                                ? 'text-yellow-600 dark:text-yellow-400'
+                                : 'text-muted-foreground'
+                          }`}
+                        >
+                          <CalendarIcon className="h-3 w-3 mr-1" />
+                          {invoice.due_date 
+                            ? format(new Date(invoice.due_date), 'MM/dd/yy')
+                            : 'Set date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={invoice.due_date ? new Date(invoice.due_date) : undefined}
+                          onSelect={(date) => handleDueDateChange(invoice.id, date)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {daysUntilDue !== null && (
+                      <div className={`text-[10px] ${
+                        daysUntilDue < 0 
+                          ? 'text-red-600 dark:text-red-400' 
+                          : daysUntilDue <= 7 
+                            ? 'text-yellow-600 dark:text-yellow-400'
+                            : 'text-muted-foreground'
+                      }`}>
+                        {daysUntilDue < 0 
+                          ? `${Math.abs(daysUntilDue)}d overdue` 
+                          : daysUntilDue === 0 
+                            ? 'Due today'
+                            : `${daysUntilDue}d left`}
+                      </div>
+                    )}
+                  </div>
                   <div className="col-span-2">
                     <div className="font-medium text-sm">{invoice.companies?.name || 'N/A'}</div>
                     {invoice.orders?.description ? (
@@ -484,7 +556,7 @@ const Invoices = () => {
                       <span className={getStatusColor(displayStatus)}>{displayStatus}</span>
                     </div>
                   </div>
-                  <div className="col-span-2 flex gap-1">
+                  <div className="col-span-3 flex gap-1">
                     <Button 
                       variant="ghost" 
                       size="sm" 
