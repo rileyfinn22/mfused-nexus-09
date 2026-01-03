@@ -201,9 +201,10 @@ const handler = async (req: Request): Promise<Response> => {
       </html>
     `;
 
-    // Send the email
+    // Send the email - use verified domain for sending
     const emailResponse = await resend.emails.send({
-      from: `${senderName} <${senderEmail}>`,
+      from: `VibePKG <invoices@vibepkgportal.com>`,
+      replyTo: senderEmail,
       to: recipientEmails,
       subject: `Invoice ${invoiceNumber} from VibePKG - ${formattedAmount} Due ${formattedDueDate}`,
       html: emailHtml,
