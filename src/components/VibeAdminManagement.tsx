@@ -132,7 +132,8 @@ export function VibeAdminManagement() {
 
       if (error) throw error;
 
-      const inviteLink = `${window.location.origin}/accept-invite?token=${token}`;
+      const portalUrl = "https://vibepkgportal.com";
+      const inviteLink = `${portalUrl}/accept-invite?token=${token}`;
       
       // Copy to clipboard
       await navigator.clipboard.writeText(inviteLink);
@@ -297,7 +298,8 @@ function PendingInvitations({ companyId }: { companyId: string | null }) {
   };
 
   const copyInviteLink = async (token: string) => {
-    const link = `${window.location.origin}/accept-invite?token=${token}`;
+    const portalUrl = "https://vibepkgportal.com";
+    const link = `${portalUrl}/accept-invite?token=${token}`;
     await navigator.clipboard.writeText(link);
     toast({
       title: "Link copied",

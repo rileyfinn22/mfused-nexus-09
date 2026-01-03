@@ -102,8 +102,9 @@ export function InviteCompanyUserDialog({
 
       if (error) throw error;
 
-      // Generate invite link
-      const link = `${window.location.origin}/accept-invite?token=${invitation.invitation_token}`;
+      // Generate invite link using production domain
+      const portalUrl = "https://vibepkgportal.com";
+      const link = `${portalUrl}/accept-invite?token=${invitation.invitation_token}`;
       setInviteLink(link);
 
       toast({
