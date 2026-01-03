@@ -38,6 +38,7 @@ interface Product {
   description: string | null;
   state: string;
   cost: number | null;
+  price: number | null;
   image_url: string | null;
   item_id?: string | null;
   sku?: string;
@@ -145,6 +146,7 @@ const Products = () => {
             description: product.description,
             state: product.state,
             cost: product.cost,
+            price: product.price,
             image_url: product.image_url,
             item_id: product.item_id,
             sku: inventoryData?.sku,
@@ -394,7 +396,7 @@ const Products = () => {
             <div className="col-span-1">Preview</div>
             <div className="col-span-4">Name</div>
             <div className="col-span-2">State</div>
-            <div className="col-span-1">Cost</div>
+            <div className="col-span-1">{isVibeAdmin ? 'Cost' : 'Price'}</div>
             {!isEditMode && <div className="col-span-1">Actions</div>}
           </div>
         </div>
@@ -465,7 +467,9 @@ const Products = () => {
                       <Badge variant="outline" className="text-xs">{product.state}</Badge>
                     </div>
                     <div className="col-span-1 text-sm font-medium">
-                      {product.cost ? `$${product.cost.toFixed(3)}` : '—'}
+                      {isVibeAdmin 
+                        ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
+                        : (product.price ? `$${product.price.toFixed(3)}` : '—')}
                     </div>
                     {!isEditMode && (
                       <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
