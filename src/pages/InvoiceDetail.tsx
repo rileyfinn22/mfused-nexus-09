@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -19,6 +19,7 @@ import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
 import { SyncToQuickBooksDialog } from "@/components/SyncToQuickBooksDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
 import { InvoiceAuditLog } from "@/components/InvoiceAuditLog";
+import { SendInvoiceEmailDialog } from "@/components/SendInvoiceEmailDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
@@ -49,6 +50,9 @@ const InvoiceDetail = () => {
   const [refreshingLink, setRefreshingLink] = useState(false);
   const [syncingPayment, setSyncingPayment] = useState<string | null>(null);
   const [showPaymentPortal, setShowPaymentPortal] = useState(false);
+  const [showSendEmailDialog, setShowSendEmailDialog] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
+  const [currentUserName, setCurrentUserName] = useState<string>("");
   const {
     syncInvoice,
     checkConnection
@@ -70,6 +74,11 @@ const InvoiceDetail = () => {
         data
       } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
       setIsVibeAdmin(data?.role === 'vibe_admin');
+      setCurrentUserEmail(user.email || "");
+      // Extract name from email or use full email
+      const emailName = user.email?.split("@")[0] || "";
+      const formattedName = emailName.charAt(0).toUpperCase() + emailName.slice(1);
+      setCurrentUserName(formattedName);
     }
   };
   const fetchInvoiceDetails = async () => {
@@ -660,6 +669,12 @@ const InvoiceDetail = () => {
                   Close Invoice
                 </Button>}
             </>}
+          {isVibeAdmin && (
+            <Button variant="outline" onClick={() => setShowSendEmailDialog(true)}>
+              <Mail className="h-4 w-4 mr-2" />
+              Send to Customer
+            </Button>
+          )}
           <Button onClick={() => {}}>
             <Download className="h-4 w-4 mr-2" />
             Download PDF
@@ -1459,6 +1474,17 @@ const InvoiceDetail = () => {
 
       {/* Create Deposit Invoice Dialog */}
       <CreateShipmentInvoiceDialog open={showDepositDialog} onOpenChange={setShowDepositDialog} order={order} onSuccess={fetchInvoiceDetails} initialMode="deposit" />
+
+      {/* Send Invoice Email Dialog */}
+      <SendInvoiceEmailDialog 
+        open={showSendEmailDialog} 
+        onOpenChange={setShowSendEmailDialog} 
+        invoice={invoice} 
+        order={order} 
+        items={editedItems}
+        senderName={currentUserName}
+        senderEmail={currentUserEmail}
+      />
     </div>;
 };
 export default InvoiceDetail;
