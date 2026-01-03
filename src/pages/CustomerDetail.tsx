@@ -94,6 +94,26 @@ const CustomerDetail = () => {
   });
   const [productFormErrors, setProductFormErrors] = useState<Record<string, string>>({});
   const [productSearchQuery, setProductSearchQuery] = useState("");
+  
+  // Address management state
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [showAddAddressDialog, setShowAddAddressDialog] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<any>(null);
+  const [savingAddress, setSavingAddress] = useState(false);
+  const [deletingAddressId, setDeletingAddressId] = useState<string | null>(null);
+  const [addressFormData, setAddressFormData] = useState({
+    name: "",
+    address_type: "shipping",
+    street: "",
+    city: "",
+    state: "",
+    zip: "",
+    customer_name: "",
+    customer_email: "",
+    customer_phone: "",
+    is_default: false,
+  });
+  
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -115,8 +135,130 @@ const CustomerDetail = () => {
       fetchCustomerDetails();
       fetchProducts();
       fetchCustomerProducts();
+      fetchSavedAddresses();
     }
   }, [customerId]);
+
+  const fetchSavedAddresses = async () => {
+    const { data, error } = await supabase
+      .from('customer_addresses')
+      .select('*')
+      .eq('company_id', customerId)
+      .order('is_default', { ascending: false });
+
+    if (!error && data) {
+      setSavedAddresses(data);
+    }
+  };
+
+  const handleSaveAddress = async () => {
+    if (!addressFormData.name.trim() || !addressFormData.street.trim()) {
+      toast({
+        title: "Error",
+        description: "Name and street are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingAddress(true);
+    try {
+      const addressData = {
+        company_id: customerId,
+        name: addressFormData.name,
+        address_type: addressFormData.address_type,
+        street: addressFormData.street,
+        city: addressFormData.city,
+        state: addressFormData.state,
+        zip: addressFormData.zip,
+        customer_name: addressFormData.customer_name || formData.name,
+        customer_email: addressFormData.customer_email || null,
+        customer_phone: addressFormData.customer_phone || null,
+        is_default: addressFormData.is_default,
+      };
+
+      if (editingAddress) {
+        const { error } = await supabase
+          .from('customer_addresses')
+          .update(addressData)
+          .eq('id', editingAddress.id);
+        if (error) throw error;
+        toast({ title: "Address updated" });
+      } else {
+        const { error } = await supabase
+          .from('customer_addresses')
+          .insert(addressData);
+        if (error) throw error;
+        toast({ title: "Address saved" });
+      }
+
+      setShowAddAddressDialog(false);
+      setEditingAddress(null);
+      resetAddressForm();
+      fetchSavedAddresses();
+    } catch (error: any) {
+      toast({
+        title: "Error saving address",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  const handleEditAddress = (address: any) => {
+    setEditingAddress(address);
+    setAddressFormData({
+      name: address.name || "",
+      address_type: address.address_type || "shipping",
+      street: address.street || "",
+      city: address.city || "",
+      state: address.state || "",
+      zip: address.zip || "",
+      customer_name: address.customer_name || "",
+      customer_email: address.customer_email || "",
+      customer_phone: address.customer_phone || "",
+      is_default: address.is_default || false,
+    });
+    setShowAddAddressDialog(true);
+  };
+
+  const handleDeleteAddress = async (addressId: string) => {
+    setDeletingAddressId(addressId);
+    try {
+      const { error } = await supabase
+        .from('customer_addresses')
+        .delete()
+        .eq('id', addressId);
+      if (error) throw error;
+      toast({ title: "Address deleted" });
+      fetchSavedAddresses();
+    } catch (error: any) {
+      toast({
+        title: "Error deleting address",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingAddressId(null);
+    }
+  };
+
+  const resetAddressForm = () => {
+    setAddressFormData({
+      name: "",
+      address_type: "shipping",
+      street: "",
+      city: "",
+      state: "",
+      zip: "",
+      customer_name: "",
+      customer_email: "",
+      customer_phone: "",
+      is_default: false,
+    });
+  };
 
   const fetchCustomerDetails = async () => {
     setLoading(true);
@@ -806,6 +948,10 @@ const CustomerDetail = () => {
             <Building2 className="h-4 w-4 mr-2" />
             Information
           </TabsTrigger>
+          <TabsTrigger value="addresses">
+            <MapPin className="h-4 w-4 mr-2" />
+            Addresses ({savedAddresses.length})
+          </TabsTrigger>
           <TabsTrigger value="products">
             <Package className="h-4 w-4 mr-2" />
             Products ({customerProducts.length})
@@ -959,6 +1105,83 @@ const CustomerDetail = () => {
                 placeholder="Additional notes about this customer..."
                 rows={4}
               />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Addresses Tab */}
+        <TabsContent value="addresses" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Saved Addresses</CardTitle>
+                  <CardDescription>Manage shipping and billing addresses for this company</CardDescription>
+                </div>
+                <Button onClick={() => {
+                  resetAddressForm();
+                  setEditingAddress(null);
+                  setAddressFormData(prev => ({ ...prev, customer_name: formData.name }));
+                  setShowAddAddressDialog(true);
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Address
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {savedAddresses.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <MapPin className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                  <p>No saved addresses yet</p>
+                  <p className="text-sm">Add addresses to quickly load them when creating orders</p>
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {savedAddresses.map((address) => (
+                    <div key={address.id} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium">{address.name}</h4>
+                          <Badge variant="outline" className="text-xs">
+                            {address.address_type}
+                          </Badge>
+                          {address.is_default && (
+                            <Badge variant="secondary" className="text-xs">Default</Badge>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 w-7 p-0"
+                            onClick={() => handleEditAddress(address)}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteAddress(address.id)}
+                            disabled={deletingAddressId === address.id}
+                          >
+                            {deletingAddressId === address.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        <p>{address.street}</p>
+                        <p>{address.city}, {address.state} {address.zip}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1751,6 +1974,146 @@ const CustomerDetail = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add/Edit Address Dialog */}
+      <Dialog open={showAddAddressDialog} onOpenChange={(open) => {
+        setShowAddAddressDialog(open);
+        if (!open) {
+          setEditingAddress(null);
+          resetAddressForm();
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingAddress ? 'Edit Address' : 'Add New Address'}</DialogTitle>
+            <DialogDescription>
+              {editingAddress ? 'Update the address details' : 'Add a new shipping or billing address'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Label htmlFor="addr_name">Address Name *</Label>
+                <Input
+                  id="addr_name"
+                  value={addressFormData.name}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, name: e.target.value })}
+                  placeholder="e.g., Headquarters, Warehouse"
+                />
+              </div>
+              <div>
+                <Label htmlFor="addr_type">Type</Label>
+                <Select 
+                  value={addressFormData.address_type} 
+                  onValueChange={(value) => setAddressFormData({ ...addressFormData, address_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="shipping">Shipping</SelectItem>
+                    <SelectItem value="billing">Billing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Checkbox
+                  id="addr_default"
+                  checked={addressFormData.is_default}
+                  onCheckedChange={(checked) => setAddressFormData({ ...addressFormData, is_default: checked as boolean })}
+                />
+                <Label htmlFor="addr_default" className="cursor-pointer">Set as default</Label>
+              </div>
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="addr_street">Street Address *</Label>
+                <Input
+                  id="addr_street"
+                  value={addressFormData.street}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, street: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label htmlFor="addr_city">City</Label>
+                  <Input
+                    id="addr_city"
+                    value={addressFormData.city}
+                    onChange={(e) => setAddressFormData({ ...addressFormData, city: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="addr_state">State</Label>
+                  <Input
+                    id="addr_state"
+                    value={addressFormData.state}
+                    onChange={(e) => setAddressFormData({ ...addressFormData, state: e.target.value.toUpperCase() })}
+                    maxLength={2}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="addr_zip">ZIP</Label>
+                  <Input
+                    id="addr_zip"
+                    value={addressFormData.zip}
+                    onChange={(e) => setAddressFormData({ ...addressFormData, zip: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Contact for this address (optional)</p>
+              <div>
+                <Label htmlFor="addr_contact_name">Contact Name</Label>
+                <Input
+                  id="addr_contact_name"
+                  value={addressFormData.customer_name}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, customer_name: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="addr_contact_email">Email</Label>
+                  <Input
+                    id="addr_contact_email"
+                    type="email"
+                    value={addressFormData.customer_email}
+                    onChange={(e) => setAddressFormData({ ...addressFormData, customer_email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="addr_contact_phone">Phone</Label>
+                  <Input
+                    id="addr_contact_phone"
+                    value={addressFormData.customer_phone}
+                    onChange={(e) => setAddressFormData({ ...addressFormData, customer_phone: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => {
+                setShowAddAddressDialog(false);
+                setEditingAddress(null);
+                resetAddressForm();
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveAddress} disabled={savingAddress}>
+                {savingAddress ? "Saving..." : (editingAddress ? "Update Address" : "Save Address")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

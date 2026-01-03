@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -77,6 +78,11 @@ const CreateOrder = () => {
   const [sameAsBilling, setSameAsBilling] = useState(true);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [showAddressDialog, setShowAddressDialog] = useState(false);
+  const [addressLoadType, setAddressLoadType] = useState<'shipping' | 'billing'>('shipping');
+  const [showSaveAddressDialog, setShowSaveAddressDialog] = useState(false);
+  const [saveAddressType, setSaveAddressType] = useState<'shipping' | 'billing'>('shipping');
+  const [saveAddressName, setSaveAddressName] = useState('');
+  const [savingAddress, setSavingAddress] = useState(false);
   const [editingQuantityId, setEditingQuantityId] = useState<string | null>(null);
   const [tempQuantity, setTempQuantity] = useState<string>("");
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
@@ -536,19 +542,131 @@ const CreateOrder = () => {
     }
   };
 
-  const loadAddress = (address: SavedAddress) => {
-    setFormData({
-      ...formData,
-      customerName: address.customer_name,
-      customerEmail: address.customer_email || "",
-      customerPhone: address.customer_phone || "",
-      shippingName: address.name,
-      shippingStreet: address.street,
-      shippingCity: address.city,
-      shippingState: address.state,
-      shippingZip: address.zip,
-    });
+  const loadAddress = (address: SavedAddress, type: 'shipping' | 'billing') => {
+    if (type === 'shipping') {
+      setFormData({
+        ...formData,
+        shippingName: address.name,
+        shippingStreet: address.street,
+        shippingCity: address.city,
+        shippingState: address.state,
+        shippingZip: address.zip,
+      });
+    } else {
+      setFormData({
+        ...formData,
+        billingName: address.name,
+        billingStreet: address.street,
+        billingCity: address.city,
+        billingState: address.state,
+        billingZip: address.zip,
+      });
+      setSameAsBilling(false);
+    }
     setShowAddressDialog(false);
+  };
+
+  const handleSaveAddress = async () => {
+    const companyId = isVibeAdmin ? selectedCompanyId : await getUserCompanyId();
+    if (!companyId) {
+      toast({
+        title: "Error",
+        description: "Please select a company first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!saveAddressName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a name for this address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingAddress(true);
+    try {
+      const addressData = saveAddressType === 'shipping' 
+        ? {
+            company_id: companyId,
+            customer_name: formData.customerName,
+            customer_email: formData.customerEmail || null,
+            customer_phone: formData.customerPhone || null,
+            address_type: 'shipping',
+            name: saveAddressName,
+            street: formData.shippingStreet,
+            city: formData.shippingCity,
+            state: formData.shippingState,
+            zip: formData.shippingZip,
+          }
+        : {
+            company_id: companyId,
+            customer_name: formData.customerName,
+            customer_email: formData.customerEmail || null,
+            customer_phone: formData.customerPhone || null,
+            address_type: 'billing',
+            name: saveAddressName,
+            street: formData.billingStreet,
+            city: formData.billingCity,
+            state: formData.billingState,
+            zip: formData.billingZip,
+          };
+
+      const { error } = await supabase
+        .from('customer_addresses')
+        .insert(addressData);
+
+      if (error) throw error;
+
+      toast({
+        title: "Address saved",
+        description: `${saveAddressName} has been saved for future use`,
+      });
+
+      setShowSaveAddressDialog(false);
+      setSaveAddressName('');
+      
+      // Refresh addresses
+      if (isVibeAdmin && selectedCompanyId) {
+        loadCompanyAddresses();
+      } else {
+        fetchSavedAddresses();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error saving address",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  const getUserCompanyId = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    
+    const { data: userRole } = await supabase
+      .from('user_roles')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .single();
+    
+    return userRole?.company_id || null;
+  };
+
+  const openSaveAddressDialog = (type: 'shipping' | 'billing') => {
+    setSaveAddressType(type);
+    setSaveAddressName(type === 'shipping' ? formData.shippingName : formData.billingName);
+    setShowSaveAddressDialog(true);
+  };
+
+  const openLoadAddressDialog = (type: 'shipping' | 'billing') => {
+    setAddressLoadType(type);
+    setShowAddressDialog(true);
   };
 
   const handleProductToggle = (productId: string) => {
@@ -1092,37 +1210,7 @@ const CreateOrder = () => {
         {/* Customer & Address Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-muted/30 backdrop-blur rounded-lg p-6 border border-table-border">
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase text-muted-foreground">Customer</h3>
-              <Dialog open={showAddressDialog} onOpenChange={setShowAddressDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs">
-                    Load Saved
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Saved Addresses</DialogTitle>
-                    <DialogDescription>Select an address to load</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {savedAddresses.map((address) => (
-                      <div
-                        key={address.id}
-                        className="p-3 border rounded hover:bg-muted cursor-pointer"
-                        onClick={() => loadAddress(address)}
-                      >
-                        <p className="font-medium">{address.customer_name}</p>
-                        <p className="text-sm text-muted-foreground">{address.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {address.street}, {address.city}, {address.state} {address.zip}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
+            <h3 className="text-xs font-semibold uppercase text-muted-foreground">Customer</h3>
             <div className="space-y-3">
               <div className="space-y-1">
                 <Label htmlFor="customerName" className="text-xs">Customer Name *</Label>
@@ -1170,7 +1258,29 @@ const CreateOrder = () => {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-xs font-semibold uppercase text-muted-foreground">Ship To</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase text-muted-foreground">Ship To</h3>
+              <div className="flex gap-1">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 text-xs"
+                  onClick={() => openLoadAddressDialog('shipping')}
+                >
+                  Load
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 text-xs"
+                  onClick={() => openSaveAddressDialog('shipping')}
+                  disabled={!formData.shippingStreet}
+                >
+                  <Save className="h-3 w-3 mr-1" />
+                  Save
+                </Button>
+              </div>
+            </div>
             <div className="space-y-3">
               <div className="space-y-1">
                 <Label htmlFor="shippingName" className="text-xs">Name *</Label>
@@ -1229,7 +1339,31 @@ const CreateOrder = () => {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-xs font-semibold uppercase text-muted-foreground">Bill To</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase text-muted-foreground">Bill To</h3>
+              {!sameAsBilling && (
+                <div className="flex gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-xs"
+                    onClick={() => openLoadAddressDialog('billing')}
+                  >
+                    Load
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-xs"
+                    onClick={() => openSaveAddressDialog('billing')}
+                    disabled={!formData.billingStreet}
+                  >
+                    <Save className="h-3 w-3 mr-1" />
+                    Save
+                  </Button>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-2 mb-3">
               <Checkbox
                 id="sameAsBilling"
@@ -1292,6 +1426,84 @@ const CreateOrder = () => {
             )}
           </div>
         </div>
+
+        {/* Load Address Dialog */}
+        <Dialog open={showAddressDialog} onOpenChange={setShowAddressDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Load {addressLoadType === 'shipping' ? 'Shipping' : 'Billing'} Address</DialogTitle>
+              <DialogDescription>Select an address to load into the {addressLoadType} fields</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {savedAddresses.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No saved addresses found</p>
+              ) : (
+                savedAddresses.map((address) => (
+                  <div
+                    key={address.id}
+                    className="p-3 border rounded hover:bg-muted cursor-pointer"
+                    onClick={() => loadAddress(address, addressLoadType)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium">{address.name}</p>
+                      <Badge variant="outline" className="text-xs">
+                        {address.address_type}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {address.street}, {address.city}, {address.state} {address.zip}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Save Address Dialog */}
+        <Dialog open={showSaveAddressDialog} onOpenChange={setShowSaveAddressDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Save {saveAddressType === 'shipping' ? 'Shipping' : 'Billing'} Address</DialogTitle>
+              <DialogDescription>Save this address for future orders</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="addressName">Address Name *</Label>
+                <Input
+                  id="addressName"
+                  value={saveAddressName}
+                  onChange={(e) => setSaveAddressName(e.target.value)}
+                  placeholder="e.g., Headquarters, Warehouse, Distribution Center"
+                />
+              </div>
+              <div className="bg-muted/50 p-3 rounded-lg text-sm">
+                <p className="font-medium mb-1">Address Preview:</p>
+                {saveAddressType === 'shipping' ? (
+                  <>
+                    <p>{formData.shippingName}</p>
+                    <p>{formData.shippingStreet}</p>
+                    <p>{formData.shippingCity}, {formData.shippingState} {formData.shippingZip}</p>
+                  </>
+                ) : (
+                  <>
+                    <p>{formData.billingName}</p>
+                    <p>{formData.billingStreet}</p>
+                    <p>{formData.billingCity}, {formData.billingState} {formData.billingZip}</p>
+                  </>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowSaveAddressDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveAddress} disabled={savingAddress || !saveAddressName.trim()}>
+                  {savingAddress ? "Saving..." : "Save Address"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Unmatched PO Items Section */}
         {unmatchedPoItems.length > 0 && (
