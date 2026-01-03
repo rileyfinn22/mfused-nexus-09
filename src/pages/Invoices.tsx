@@ -372,9 +372,8 @@ const Invoices = () => {
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Due Date</div>
             <div className="col-span-2">Company / Description</div>
-            <div className="col-span-1">Shipment</div>
             <div className="col-span-1">Type</div>
-            <div className="col-span-1">Amount</div>
+            <div className="col-span-2">Amount</div>
             <div className="col-span-1">PO Number</div>
             <div className="col-span-1">Status</div>
             <div className="col-span-2">Actions</div>
@@ -483,16 +482,11 @@ const Invoices = () => {
                     )}
                   </div>
                   <div className="col-span-1">
-                    <Badge variant="secondary" className="text-xs">
-                      #{invoice.shipment_number || 1}
-                    </Badge>
-                  </div>
-                  <div className="col-span-1">
                     <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>
                       {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
                     </Badge>
                   </div>
-                  <div className="col-span-1 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
+                  <div className="col-span-2 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
                   <div className="col-span-1 text-sm">{invoice.orders?.po_number || 'N/A'}</div>
                   <div className="col-span-1 text-sm font-medium">
                     <div className="flex items-center gap-1">
