@@ -90,6 +90,7 @@ const Invoices = () => {
   const getStatusColor = (status: string) => {
     if (status === 'PAID') return 'text-green-600 dark:text-green-400';
     if (status === 'DUE') return 'text-red-600 dark:text-red-400';
+    if (status === 'BILLED') return 'text-blue-600 dark:text-blue-400';
     if (status === 'OPEN') return 'text-yellow-600 dark:text-yellow-400';
     return 'text-muted-foreground';
   };
@@ -98,12 +99,14 @@ const Invoices = () => {
     const status = getStatusDisplay(invoice);
     if (status === 'PAID') return CheckCircle;
     if (status === 'DUE') return AlertTriangle;
+    if (status === 'BILLED') return FileText;
     return Clock;
   };
 
   const getStatusDisplay = (invoice: any) => {
     if (invoice.status === 'paid') return 'PAID';
     if (invoice.status === 'due') return 'DUE';
+    if (invoice.status === 'billed') return 'BILLED';
     return 'OPEN';
   };
 
@@ -178,6 +181,8 @@ const Invoices = () => {
       matchesStatus = invoice.status === 'paid';
     } else if (statusFilter === "due") {
       matchesStatus = invoice.status === 'due';
+    } else if (statusFilter === "billed") {
+      matchesStatus = invoice.status === 'billed';
     } else if (statusFilter === "open") {
       matchesStatus = invoice.status === 'open';
     }
@@ -302,6 +307,7 @@ const Invoices = () => {
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="open">Open</SelectItem>
+            <SelectItem value="billed">Billed</SelectItem>
             <SelectItem value="due">Due</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
           </SelectContent>
