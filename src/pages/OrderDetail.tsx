@@ -926,7 +926,7 @@ const OrderDetail = () => {
               {(() => {
                 const totalOrdered = order.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
                 const totalShipped = order.order_items?.reduce((sum: number, item: any) => sum + (item.shipped_quantity || 0), 0) || 0;
-                const fulfillmentProgress = totalOrdered > 0 ? (totalShipped / totalOrdered) * 100 : 0;
+                const fulfillmentProgress = totalOrdered > 0 ? Math.min((totalShipped / totalOrdered) * 100, 100) : 0;
                 
                 return (
                   <>

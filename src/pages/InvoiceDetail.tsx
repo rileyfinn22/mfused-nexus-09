@@ -591,7 +591,7 @@ const InvoiceDetail = () => {
     if (!order?.order_items) return 0;
     const totalOrdered = order.order_items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
     const totalShipped = order.order_items.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0), 0);
-    return totalOrdered > 0 ? totalShipped / totalOrdered * 100 : 0;
+    return totalOrdered > 0 ? Math.min((totalShipped / totalOrdered) * 100, 100) : 0;
   };
   const shippedPercentage = calculateShippedPercentage();
   const totalVendorCost = vendorPOs.reduce((sum, po) => sum + Number(po.total), 0);
@@ -695,7 +695,7 @@ const InvoiceDetail = () => {
                     {(() => {
                   const totalShipped = order?.order_items?.reduce((sum: number, item: any) => sum + (item.shipped_quantity || 0), 0) || 0;
                   const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
-                  const shippedPercentage = totalOrdered > 0 ? totalShipped / totalOrdered * 100 : 0;
+                  const shippedPercentage = totalOrdered > 0 ? Math.min((totalShipped / totalOrdered) * 100, 100) : 0;
                   if (shippedPercentage === 0) {
                     return <span className="text-sm font-medium text-orange-600">
                             Not Shipped Yet
