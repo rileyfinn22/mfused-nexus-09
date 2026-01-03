@@ -161,6 +161,7 @@ const Invoices = () => {
     }
   };
 
+  // Using centralized formatCurrency from @/lib/utils
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',

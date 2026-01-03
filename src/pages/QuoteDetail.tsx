@@ -333,6 +333,17 @@ const QuoteDetail = () => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
+  const formatUnitPrice = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3,
     }).format(value);
   };
 
@@ -638,7 +649,7 @@ const QuoteDetail = () => {
                                         <SelectItem key={idx} value={idx.toString()} className="py-2">
                                           <div className="flex items-center justify-between w-full gap-4">
                                             <span className="font-medium">{pb.qty.toLocaleString()} units</span>
-                                            <span className="text-muted-foreground">{formatCurrency(pb.unit_price)}/ea</span>
+                                            <span className="text-muted-foreground">{formatUnitPrice(pb.unit_price)}/ea</span>
                                             <span className="font-semibold">{formatCurrency(pb.qty * pb.unit_price)}</span>
                                           </div>
                                         </SelectItem>
@@ -650,7 +661,7 @@ const QuoteDetail = () => {
                             ) : (
                               <>
                                 <TableCell className="text-right">{item.quantity.toLocaleString()}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(item.unit_price)}</TableCell>
+                                <TableCell className="text-right">{formatUnitPrice(item.unit_price)}</TableCell>
                                 <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
                               </>
                             )}

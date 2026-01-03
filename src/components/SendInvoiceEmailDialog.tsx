@@ -44,6 +44,15 @@ export function SendInvoiceEmailDialog({
     }).format(amount);
   };
 
+  const formatUnitPrice = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3,
+    }).format(amount);
+  };
+
   const addEmail = () => {
     const email = currentEmail.trim().toLowerCase();
     if (!email) return;
@@ -124,7 +133,7 @@ export function SendInvoiceEmailDialog({
       item.sku,
       item.name,
       item.quantity || item.shipped_quantity || 0,
-      formatCurrency(item.unit_price || 0),
+      formatUnitPrice(item.unit_price || 0),
       formatCurrency((item.quantity || item.shipped_quantity || 0) * (item.unit_price || 0)),
     ]);
     

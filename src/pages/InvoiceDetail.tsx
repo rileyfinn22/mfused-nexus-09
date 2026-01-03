@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
@@ -451,14 +451,7 @@ const InvoiceDetail = () => {
       setSyncingToQB(false);
     }
   };
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount);
-  };
+  // formatCurrency and formatUnitPrice are now imported from @/lib/utils
   const handleCopyPaymentLink = async () => {
     if (invoice?.quickbooks_payment_link) {
       try {
@@ -1060,7 +1053,7 @@ const InvoiceDetail = () => {
                         {isEditMode ? <Input type="number" min="0" value={shippedQty} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" /> : shippedQty}
                       </TableCell>
                       <TableCell className="text-right">
-                        {isEditMode ? <Input type="number" step="0.01" min="0" value={item.unit_price} onChange={e => handlePriceChange(item.id, parseFloat(e.target.value) || 0)} className="w-28 text-right" /> : formatCurrency(Number(item.unit_price))}
+                        {isEditMode ? <Input type="number" step="0.001" min="0" value={item.unit_price} onChange={e => handlePriceChange(item.id, parseFloat(e.target.value) || 0)} className="w-28 text-right" /> : formatUnitPrice(Number(item.unit_price))}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
                         {formatCurrency(shippedQty * Number(item.unit_price))}

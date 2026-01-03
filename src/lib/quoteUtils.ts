@@ -119,7 +119,7 @@ export function generateQuotePDF(quote: Quote, items: QuoteItem[]): void {
       item.price_breaks.forEach((pb) => {
         tableBody.push([
           `  Tier: ${pb.qty.toLocaleString()} units`,
-          formatCurrency(pb.unit_price),
+          formatUnitPrice(pb.unit_price),
           pb.qty.toLocaleString(),
           formatCurrency(pb.qty * pb.unit_price)
         ]);
@@ -128,7 +128,7 @@ export function generateQuotePDF(quote: Quote, items: QuoteItem[]): void {
       // Regular item without tiers
       tableBody.push([
         `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}`,
-        formatCurrency(item.unit_price),
+        formatUnitPrice(item.unit_price),
         item.quantity.toString(),
         formatCurrency(item.total)
       ]);
@@ -213,5 +213,16 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatUnitPrice(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
   }).format(value);
 }
