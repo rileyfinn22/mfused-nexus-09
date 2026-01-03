@@ -356,8 +356,7 @@ const Orders = () => {
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
                   {isVibeAdmin && <div className="col-span-1">Company</div>}
-                  <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Description</div>
-                  <div className="col-span-1">State</div>
+                  <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>Description</div>
                   <div className="col-span-1">Total</div>
                   <div className="col-span-1">Status</div>
                   <div className="col-span-1">Due Date</div>
@@ -388,7 +387,7 @@ const Orders = () => {
                       {isVibeAdmin && (
                         <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
                       )}
-                      <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>
+                      <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>
                         <Input
                           className="h-7 text-xs"
                           placeholder="Add description..."
@@ -396,9 +395,6 @@ const Orders = () => {
                           onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                         />
-                      </div>
-                      <div className="col-span-1">
-                        <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                       </div>
                       <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
                       <div className="col-span-1 text-sm capitalize text-muted-foreground">
@@ -463,8 +459,7 @@ const Orders = () => {
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
                   {isVibeAdmin && <div className="col-span-1">Company</div>}
-                  <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Description</div>
-                  <div className="col-span-1">State</div>
+                  <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>Description</div>
                   <div className="col-span-1">Total</div>
                   <div className="col-span-1">Checklist</div>
                   <div className="col-span-1">Due Date</div>
@@ -503,7 +498,7 @@ const Orders = () => {
                     {isVibeAdmin && (
                       <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
                     )}
-                    <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>
+                    <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>
                       <Input
                         className="h-7 text-xs"
                         placeholder="Add description..."
@@ -511,9 +506,6 @@ const Orders = () => {
                         onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                       />
-                    </div>
-                    <div className="col-span-1">
-                      <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                     </div>
                     <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
                     <div className="col-span-1">
@@ -593,8 +585,7 @@ const Orders = () => {
                 <div className="col-span-2">Order # / Type</div>
                 <div className="col-span-1">Date</div>
                 {isVibeAdmin && <div className="col-span-1">Company</div>}
-                <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Description</div>
-                <div className="col-span-1">State</div>
+                <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>Description</div>
                 <div className="col-span-1">Total</div>
                 <div className="col-span-2">Progress</div>
                 <div className="col-span-2">Actions</div>
@@ -636,7 +627,7 @@ const Orders = () => {
                     {isVibeAdmin && (
                       <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
                     )}
-                    <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>
+                    <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>
                       <Input
                         className="h-7 text-xs"
                         placeholder="Add description..."
@@ -644,9 +635,6 @@ const Orders = () => {
                         onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                       />
-                    </div>
-                    <div className="col-span-1">
-                      <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
                     </div>
                     <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
                     <div className="col-span-2 space-y-1">
