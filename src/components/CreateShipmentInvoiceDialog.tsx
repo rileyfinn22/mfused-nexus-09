@@ -592,16 +592,16 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
                     <Package className="h-4 w-4" />
-                    <p className="font-medium text-sm">Previous Shipments ({existingInvoices.length})</p>
+                    <p className="font-medium text-sm">Existing Invoices ({existingInvoices.length})</p>
                   </div>
                   <div className="space-y-1">
                     {existingInvoices.map(inv => (
                       <div key={inv.id} className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">
-                          Shipment {inv.shipment_number}: {inv.invoice_number}
+                          {inv.invoice_type === 'full' ? 'Blanket' : `Shipment ${inv.shipment_number}`}: {inv.invoice_number}
                         </span>
                         <Badge variant="outline" className="text-xs">
-                          {inv.invoice_type}
+                          {inv.invoice_type === 'full' ? 'blanket' : inv.invoice_type}
                         </Badge>
                       </div>
                     ))}
