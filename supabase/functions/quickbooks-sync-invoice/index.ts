@@ -970,7 +970,7 @@ serve(async (req) => {
     console.log('AllowOnlinePayment:', qbData.Invoice?.AllowOnlinePayment);
     console.log('AllowOnlineCreditCardPayment:', qbData.Invoice?.AllowOnlineCreditCardPayment);
     
-    // Update invoice with QuickBooks info
+    // Update invoice with QuickBooks info and set status to 'billed'
     const { error: updateError } = await supabase
       .from('invoices')
       .update({
@@ -978,7 +978,8 @@ serve(async (req) => {
         quickbooks_synced_at: new Date().toISOString(),
         quickbooks_sync_status: 'synced',
         quickbooks_payment_link: qbPaymentLink,
-        billed_percentage: billingPercentage
+        billed_percentage: billingPercentage,
+        status: 'billed'
       })
       .eq('id', invoiceId);
 
