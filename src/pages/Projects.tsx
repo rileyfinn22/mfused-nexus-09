@@ -162,11 +162,13 @@ const Projects = () => {
       if (data?.success) {
         const { synced } = data;
         const parts = [];
-        if (synced.invoices) parts.push(`${synced.invoices} invoices`);
-        if (synced.bills) parts.push(`${synced.bills} bills`);
-        if (synced.payments) parts.push(`${synced.payments} payments`);
+        if (synced.companies) parts.push(`${synced.companies} companies`);
+        if (synced.projects) parts.push(`${synced.projects} projects`);
         if (synced.estimates) parts.push(`${synced.estimates} estimates`);
-        if (synced.purchaseOrders) parts.push(`${synced.purchaseOrders} purchase orders`);
+        if (synced.invoices) parts.push(`${synced.invoices} invoices`);
+        if (synced.payments) parts.push(`${synced.payments} payments`);
+        if (synced.purchaseOrders) parts.push(`${synced.purchaseOrders} POs`);
+        if (synced.bills) parts.push(`${synced.bills} bills`);
         
         toast({
           title: "Sync Complete",
