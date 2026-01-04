@@ -149,77 +149,31 @@ serve(async (req) => {
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
 
-    // ========== STEP 1: Pull ALL customers (including sub-customers = projects) ==========
-    console.log('Fetching all customers from QuickBooks...');
-    const customersData = await qbQuery(qbApiUrl, accessToken, 'SELECT * FROM Customer MAXRESULTS 1000');
+    // Request body is optional (manual button vs scheduled job)
+    const body = await req.json().catch(() => ({} as any));
+    const mode = (body?.mode as string | undefined) ?? 'projects_only';
+
+    // ========== STEP 1: Pull customers and derive projects (sub-customers) ==========
+    console.log('Fetching customers from QuickBooks...');
+    const customersData = await qbQuery(
+      qbApiUrl,
+      accessToken,
+      'SELECT Id, DisplayName, FullyQualifiedName, ParentRef, ShipAddr, BillAddr, PrimaryEmailAddr, PrimaryPhone FROM Customer MAXRESULTS 1000'
+    );
     const qbCustomers = customersData.QueryResponse?.Customer || [];
     console.log(`Found ${qbCustomers.length} customers in QBO`);
 
-    // Separate parent customers from sub-customers (projects)
-    const parentCustomers = qbCustomers.filter((c: any) => !c.ParentRef);
-    const subCustomers = qbCustomers.filter((c: any) => c.ParentRef); // These are "Projects" in QBO
+    // Sub-customers (ParentRef) are treated as projects
+    const subCustomers = qbCustomers.filter((c: any) => c.ParentRef);
+    console.log(`Sub-customers (Projects): ${subCustomers.length}`);
 
-    console.log(`Parent customers: ${parentCustomers.length}, Sub-customers (Projects): ${subCustomers.length}`);
-
-    // Build lookup maps
+    // Build lookup map
     const customerById = new Map<string, any>();
-    for (const c of qbCustomers) {
-      customerById.set(c.Id, c);
-    }
+    for (const c of qbCustomers) customerById.set(c.Id, c);
 
-    // ========== STEP 2: Ensure all parent customers exist as Companies ==========
-    const { data: existingCompanies } = await supabase
-      .from('companies')
-      .select('id, name, quickbooks_id');
-
-    const companyByQBId = new Map<string, string>();
-    const companyByName = new Map<string, string>();
-    for (const c of existingCompanies || []) {
-      if (c.quickbooks_id) companyByQBId.set(c.quickbooks_id, c.id);
-      companyByName.set(c.name.toLowerCase().trim(), c.id);
-    }
-
-    let createdCompanies = 0;
-    for (const parent of parentCustomers) {
-      if (companyByQBId.has(parent.Id)) continue;
-
-      // Check by name as fallback
-      const nameKey = (parent.DisplayName || parent.CompanyName || '').toLowerCase().trim();
-      if (companyByName.has(nameKey)) {
-        // Link existing company to QB
-        const existingId = companyByName.get(nameKey)!;
-        await supabase.from('companies').update({ quickbooks_id: parent.Id }).eq('id', existingId);
-        companyByQBId.set(parent.Id, existingId);
-        continue;
-      }
-
-      // Create new company
-      const { data: newCompany, error } = await supabase
-        .from('companies')
-        .insert({
-          name: parent.DisplayName || parent.CompanyName || `QB Customer ${parent.Id}`,
-          quickbooks_id: parent.Id,
-          email: parent.PrimaryEmailAddr?.Address,
-          phone: parent.PrimaryPhone?.FreeFormNumber,
-          billing_street: parent.BillAddr?.Line1,
-          billing_city: parent.BillAddr?.City,
-          billing_state: parent.BillAddr?.CountrySubDivisionCode,
-          billing_zip: parent.BillAddr?.PostalCode,
-          shipping_street: parent.ShipAddr?.Line1,
-          shipping_city: parent.ShipAddr?.City,
-          shipping_state: parent.ShipAddr?.CountrySubDivisionCode,
-          shipping_zip: parent.ShipAddr?.PostalCode,
-        })
-        .select()
-        .single();
-
-      if (!error && newCompany) {
-        companyByQBId.set(parent.Id, newCompany.id);
-        companyByName.set((newCompany.name || '').toLowerCase().trim(), newCompany.id);
-        createdCompanies++;
-        console.log(`Created company: ${newCompany.name}`);
-      }
-    }
+    // NOTE: We intentionally do NOT sync all customers into the Companies table here.
+    // Doing so can be extremely slow and can cause function timeouts.
+    const createdCompanies = 0;
 
     // ========== STEP 3: Create Orders for each sub-customer (Project) ==========
     const { data: existingOrders } = await supabase
@@ -250,28 +204,25 @@ serve(async (req) => {
     for (const project of subCustomers) {
       if (orderByQBProjectId.has(project.Id)) continue;
 
-      // Find parent company
       const parentQBId = project.ParentRef?.value;
-      let companyId = parentQBId ? companyByQBId.get(parentQBId) : null;
-
-      // If parent not found, use VibePKG as fallback
-      if (!companyId) {
-        companyId = vibePkgCompanyId;
-      }
+      const parent = parentQBId ? customerById.get(parentQBId) : null;
+      const parentName = parent?.DisplayName || parent?.CompanyName || project.ParentRef?.name;
+      const projectName = project.DisplayName || project.FullyQualifiedName || 'QB Project';
+      const displayCustomerName = parentName ? `${parentName} — ${projectName}` : projectName;
 
       const orderNumber = `ORD-${String(orderCounter++).padStart(5, '0')}`;
 
       const { data: newOrder, error } = await supabase
         .from('orders')
         .insert({
-          company_id: companyId,
+          company_id: vibePkgCompanyId,
           order_number: orderNumber,
-          customer_name: project.DisplayName || project.FullyQualifiedName || 'QB Project',
+          customer_name: displayCustomerName,
           qb_project_id: project.Id,
           status: 'pending',
           order_type: 'standard',
           order_date: new Date().toISOString().split('T')[0],
-          shipping_name: project.DisplayName || 'TBD',
+          shipping_name: parentName || projectName || 'TBD',
           shipping_street: project.ShipAddr?.Line1 || 'TBD',
           shipping_city: project.ShipAddr?.City || 'TBD',
           shipping_state: project.ShipAddr?.CountrySubDivisionCode || 'CA',
@@ -279,7 +230,7 @@ serve(async (req) => {
           subtotal: 0,
           tax: 0,
           total: 0,
-          description: `Imported from QuickBooks: ${project.FullyQualifiedName || project.DisplayName}`,
+          description: `Imported from QuickBooks project: ${project.FullyQualifiedName || projectName}`,
         })
         .select()
         .single();
@@ -287,8 +238,27 @@ serve(async (req) => {
       if (!error && newOrder) {
         orderByQBProjectId.set(project.Id, newOrder.id);
         createdProjects++;
-        console.log(`Created project/order: ${orderNumber} for ${project.DisplayName}`);
+        console.log(`Created project/order: ${orderNumber} for ${projectName}`);
       }
+    }
+
+    if (mode === 'projects_only') {
+      console.log(`Projects-only sync complete: ${createdProjects} projects`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          synced: {
+            companies: 0,
+            projects: createdProjects,
+            estimates: 0,
+            invoices: 0,
+            payments: 0,
+            purchaseOrders: 0,
+            bills: 0,
+          },
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // ========== STEP 4: Pull Estimates ==========
@@ -308,18 +278,16 @@ serve(async (req) => {
       const quoteNumber = `QBO-${est.DocNumber || est.Id}`;
       if (quoteByNumber.has(quoteNumber)) continue;
 
-      // Find company by customer
       const custId = est.CustomerRef?.value;
       const cust = custId ? customerById.get(custId) : null;
-      const parentId = cust?.ParentRef?.value || custId;
-      const companyId = parentId ? companyByQBId.get(parentId) : vibePkgCompanyId;
+      const parentName = cust?.ParentRef?.name;
 
       const { data: newQuote, error } = await supabase
         .from('quotes')
         .insert({
-          company_id: companyId || vibePkgCompanyId,
+          company_id: vibePkgCompanyId,
           quote_number: quoteNumber,
-          customer_name: est.CustomerRef?.name || 'Unknown',
+          customer_name: parentName || est.CustomerRef?.name || 'Unknown',
           description: est.CustomerMemo?.value || `QB Estimate #${est.DocNumber || est.Id}`,
           status: est.TxnStatus === 'Accepted' ? 'accepted' : 
                   est.TxnStatus === 'Closed' ? 'accepted' : 
@@ -385,12 +353,24 @@ serve(async (req) => {
       if (!orderId) continue; // No matching project/order
 
       // Get company from order
-      const { data: order } = await supabase.from('orders').select('company_id').eq('id', orderId).single();
+      // (All imported QB data is stored under the VibePKG tenant company)
 
       const { error } = await supabase.from('invoices').insert({
-        company_id: order?.company_id || vibePkgCompanyId,
+        company_id: vibePkgCompanyId,
         order_id: orderId,
         invoice_number: inv.DocNumber || `QB-${inv.Id}`,
+        invoice_date: inv.TxnDate,
+        due_date: inv.DueDate,
+        subtotal: inv.TotalAmt,
+        tax: 0,
+        total: inv.TotalAmt,
+        total_paid: inv.TotalAmt - (inv.Balance || 0),
+        status: inv.Balance === 0 ? 'paid' : inv.Balance < inv.TotalAmt ? 'partial' : 'open',
+        quickbooks_id: inv.Id,
+        quickbooks_sync_status: 'synced',
+        quickbooks_synced_at: new Date().toISOString(),
+      });
+
         invoice_date: inv.TxnDate,
         due_date: inv.DueDate,
         subtotal: inv.TotalAmt,
