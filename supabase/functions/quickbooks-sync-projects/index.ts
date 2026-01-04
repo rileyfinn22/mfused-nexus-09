@@ -157,6 +157,27 @@ serve(async (req) => {
 
     console.log(`Found ${linkedCompanies?.length || 0} companies linked to QuickBooks`);
 
+    // Prefetch vendors + existing Vendor POs to avoid per-record DB lookups (keeps sync fast)
+    const { data: vendors } = await supabase
+      .from('vendors')
+      .select('id, name, company_id');
+
+    const vendorByName = new Map<string, { id: string; company_id: string }>();
+    for (const v of vendors || []) {
+      const key = (v.name || '').trim().toLowerCase();
+      if (key) vendorByName.set(key, { id: v.id, company_id: v.company_id });
+    }
+
+    const { data: existingVendorPOs } = await supabase
+      .from('vendor_pos')
+      .select('id, quickbooks_id')
+      .not('quickbooks_id', 'is', null);
+
+    const vendorPOByQBId = new Map<string, string>();
+    for (const po of existingVendorPOs || []) {
+      if (po.quickbooks_id) vendorPOByQBId.set(po.quickbooks_id, po.id);
+    }
+
     let syncedInvoices = 0;
     let syncedBills = 0;
     let syncedPayments = 0;
@@ -457,21 +478,10 @@ serve(async (req) => {
         const qbPOs = poData.QueryResponse?.PurchaseOrder || [];
         console.log(`Found ${qbPOs.length} purchase orders in QBO`);
 
-        // Get all vendors to match by name
-        const { data: vendors } = await supabase
-          .from('vendors')
-          .select('id, name, company_id');
-
         for (const qbPO of qbPOs) {
-          // Check if vendor PO already exists with this QB ID
-          const { data: existingPO } = await supabase
-            .from('vendor_pos')
-            .select('id')
-            .eq('quickbooks_id', qbPO.Id)
-            .single();
-
-          if (existingPO) {
-            // Update sync status
+          // Fast path: update existing PO without extra DB read
+          const existingId = vendorPOByQBId.get(qbPO.Id);
+          if (existingId) {
             await supabase
               .from('vendor_pos')
               .update({
@@ -480,61 +490,63 @@ serve(async (req) => {
                 total: qbPO.TotalAmt,
                 status: qbPO.POStatus === 'Closed' ? 'completed' : 'pending',
               })
-              .eq('id', existingPO.id);
+              .eq('id', existingId);
             syncedPurchaseOrders++;
-          } else {
-            // Try to find a matching vendor
-            const vendorName = qbPO.VendorRef?.name;
-            const matchedVendor = vendors?.find(v => 
-              v.name.toLowerCase() === vendorName?.toLowerCase()
-            );
+            continue;
+          }
 
-            if (matchedVendor) {
-              // Create new vendor PO from QB PurchaseOrder
-              const poNumber = `QBO-PO-${qbPO.DocNumber || qbPO.Id}`;
-              
-              const { data: newPO, error: poError } = await supabase
-                .from('vendor_pos')
+          // Only try to create when we can map the vendor
+          const vendorNameKey = (qbPO.VendorRef?.name || '').trim().toLowerCase();
+          const matchedVendor = vendorNameKey ? vendorByName.get(vendorNameKey) : undefined;
+
+          if (!matchedVendor) {
+            console.log(`No matching vendor found for QBO PO vendor: ${qbPO.VendorRef?.name}`);
+            continue;
+          }
+
+          // Create new vendor PO from QB PurchaseOrder
+          const poNumber = `QBO-PO-${qbPO.DocNumber || qbPO.Id}`;
+
+          const { data: newPO, error: poError } = await supabase
+            .from('vendor_pos')
+            .insert({
+              company_id: matchedVendor.company_id,
+              vendor_id: matchedVendor.id,
+              po_number: poNumber,
+              po_type: 'expense',
+              status: qbPO.POStatus === 'Closed' ? 'completed' : 'pending',
+              order_date: qbPO.TxnDate,
+              expected_delivery_date: qbPO.DueDate || qbPO.ShipDate,
+              total: qbPO.TotalAmt || 0,
+              description: qbPO.Memo || `QB PO #${qbPO.DocNumber || qbPO.Id}`,
+              quickbooks_id: qbPO.Id,
+              quickbooks_sync_status: 'synced',
+              quickbooks_synced_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (!poError && newPO) {
+            vendorPOByQBId.set(qbPO.Id, newPO.id);
+
+            // Create PO items from lines
+            const lineItems = qbPO.Line?.filter((l: any) => l.DetailType === 'ItemBasedExpenseLineDetail') || [];
+            for (const line of lineItems) {
+              await supabase
+                .from('vendor_po_items')
                 .insert({
-                  company_id: matchedVendor.company_id,
-                  vendor_id: matchedVendor.id,
-                  po_number: poNumber,
-                  po_type: 'expense',
-                  status: qbPO.POStatus === 'Closed' ? 'completed' : 'pending',
-                  order_date: qbPO.TxnDate,
-                  expected_delivery_date: qbPO.DueDate || qbPO.ShipDate,
-                  total: qbPO.TotalAmt || 0,
-                  description: qbPO.Memo || `QB PO #${qbPO.DocNumber || qbPO.Id}`,
-                  quickbooks_id: qbPO.Id,
-                  quickbooks_sync_status: 'synced',
-                  quickbooks_synced_at: new Date().toISOString(),
-                })
-                .select()
-                .single();
-
-              if (!poError && newPO) {
-                // Create PO items from lines
-                const lineItems = qbPO.Line?.filter((l: any) => l.DetailType === 'ItemBasedExpenseLineDetail') || [];
-                for (const line of lineItems) {
-                  await supabase
-                    .from('vendor_po_items')
-                    .insert({
-                      vendor_po_id: newPO.id,
-                      name: line.ItemBasedExpenseLineDetail?.ItemRef?.name || line.Description || 'Item',
-                      sku: line.ItemBasedExpenseLineDetail?.ItemRef?.name || 'QB-ITEM',
-                      description: line.Description,
-                      quantity: line.ItemBasedExpenseLineDetail?.Qty || 1,
-                      unit_cost: line.ItemBasedExpenseLineDetail?.UnitPrice || line.Amount || 0,
-                      total: line.Amount || 0,
-                      shipped_quantity: 0,
-                    });
-                }
-                syncedPurchaseOrders++;
-                console.log(`Created vendor PO ${poNumber} from QBO purchase order`);
-              }
-            } else {
-              console.log(`No matching vendor found for QBO PO vendor: ${vendorName}`);
+                  vendor_po_id: newPO.id,
+                  name: line.ItemBasedExpenseLineDetail?.ItemRef?.name || line.Description || 'Item',
+                  sku: line.ItemBasedExpenseLineDetail?.ItemRef?.name || 'QB-ITEM',
+                  description: line.Description,
+                  quantity: line.ItemBasedExpenseLineDetail?.Qty || 1,
+                  unit_cost: line.ItemBasedExpenseLineDetail?.UnitPrice || line.Amount || 0,
+                  total: line.Amount || 0,
+                  shipped_quantity: 0,
+                });
             }
+            syncedPurchaseOrders++;
+            console.log(`Created vendor PO ${poNumber} from QBO purchase order`);
           }
         }
       }
@@ -564,25 +576,18 @@ serve(async (req) => {
         console.log(`Found ${qbBills.length} bills in QBO`);
 
         for (const qbBill of qbBills) {
-          // Check if vendor PO already exists with this QB ID
-          const { data: existingPO } = await supabase
-            .from('vendor_pos')
-            .select('id')
-            .eq('quickbooks_id', qbBill.Id)
-            .single();
+          const existingId = vendorPOByQBId.get(qbBill.Id);
+          if (!existingId) continue;
 
-          if (existingPO) {
-            // Update sync status
-            await supabase
-              .from('vendor_pos')
-              .update({
-                quickbooks_sync_status: 'synced',
-                quickbooks_synced_at: new Date().toISOString(),
-                total: qbBill.TotalAmt,
-              })
-              .eq('id', existingPO.id);
-            syncedBills++;
-          }
+          await supabase
+            .from('vendor_pos')
+            .update({
+              quickbooks_sync_status: 'synced',
+              quickbooks_synced_at: new Date().toISOString(),
+              total: qbBill.TotalAmt,
+            })
+            .eq('id', existingId);
+          syncedBills++;
         }
       }
     } catch (billsError: any) {
