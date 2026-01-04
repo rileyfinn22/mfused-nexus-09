@@ -161,9 +161,18 @@ const Projects = () => {
 
       if (data?.success) {
         const { synced } = data;
+        const parts = [];
+        if (synced.invoices) parts.push(`${synced.invoices} invoices`);
+        if (synced.bills) parts.push(`${synced.bills} bills`);
+        if (synced.payments) parts.push(`${synced.payments} payments`);
+        if (synced.estimates) parts.push(`${synced.estimates} estimates`);
+        if (synced.purchaseOrders) parts.push(`${synced.purchaseOrders} purchase orders`);
+        
         toast({
           title: "Sync Complete",
-          description: `Synced ${synced.invoices} invoices, ${synced.bills} bills, ${synced.payments} payments from QuickBooks`,
+          description: parts.length > 0 
+            ? `Synced ${parts.join(', ')} from QuickBooks` 
+            : "No new data to sync from QuickBooks",
         });
       } else if (data?.error) {
         toast({
