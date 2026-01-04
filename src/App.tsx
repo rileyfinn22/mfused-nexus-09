@@ -34,14 +34,12 @@ import ResetPassword from "./pages/ResetPassword";
 import AcceptInvite from "./pages/AcceptInvite";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
-import JobCostingReport from "./pages/JobCostingReport";
+
 import Customers from "./pages/Customers";
 import CustomerDetail from "./pages/CustomerDetail";
 import Quotes from "./pages/Quotes";
 import QuoteDetail from "./pages/QuoteDetail";
 import CreateQuote from "./pages/CreateQuote";
-import Projects from "./pages/Projects";
-import ProjectDetail from "./pages/ProjectDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -84,7 +82,7 @@ const App = () => (
           <Route path="/production/:orderId" element={<DashboardLayout><ProductionDetail /></DashboardLayout>} />
           <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
           <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
-          <Route path="/reports/job-costing" element={<DashboardLayout><JobCostingReport /></DashboardLayout>} />
+          
           <Route path="/customers" element={<DashboardLayout><Customers /></DashboardLayout>} />
           <Route path="/customers/:customerId" element={<DashboardLayout><CustomerDetail /></DashboardLayout>} />
           <Route path="/quotes" element={<DashboardLayout><Quotes /></DashboardLayout>} />
@@ -92,8 +90,6 @@ const App = () => (
           <Route path="/quotes/edit/:quoteId" element={<DashboardLayout><CreateQuote /></DashboardLayout>} />
           <Route path="/quotes/respond/:parentQuoteId" element={<DashboardLayout><CreateQuote /></DashboardLayout>} />
           <Route path="/quotes/:quoteId" element={<DashboardLayout><QuoteDetail /></DashboardLayout>} />
-          <Route path="/projects" element={<DashboardLayout><Projects /></DashboardLayout>} />
-          <Route path="/projects/:projectId" element={<DashboardLayout><ProjectDetail /></DashboardLayout>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
