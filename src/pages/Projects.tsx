@@ -198,11 +198,38 @@ const Projects = () => {
     }
   };
 
+  // Derive status based on financial data if order status is just 'pending'
+  const deriveProjectStatus = (project: ProjectSummary): string => {
+    const rawStatus = project.status?.toLowerCase() || '';
+    
+    // If status is already meaningful, normalize it
+    if (rawStatus === 'completed' || rawStatus === 'complete' || rawStatus === 'closed') {
+      return 'completed';
+    }
+    if (rawStatus === 'cancelled' || rawStatus === 'canceled') {
+      return 'cancelled';
+    }
+    if (rawStatus === 'in_progress' || rawStatus === 'in progress' || rawStatus === 'in production') {
+      return 'in_progress';
+    }
+    
+    // For 'pending' or unknown statuses, derive from financial data
+    if (project.total_invoiced > 0 && project.total_paid >= project.total_invoiced) {
+      return 'completed'; // Fully paid = completed
+    }
+    if (project.total_invoiced > 0 || project.po_count > 0) {
+      return 'in_progress'; // Has invoices or POs = in progress
+    }
+    
+    return 'pending';
+  };
+
   const filteredProjects = projects.filter((project) => {
     const matchesSearch =
       project.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       project.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || project.status === statusFilter;
+    const derivedStatus = deriveProjectStatus(project);
+    const matchesStatus = statusFilter === "all" || derivedStatus === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -360,6 +387,7 @@ const Projects = () => {
                   const margin = project.total_invoiced > 0 
                     ? (project.profit / project.total_invoiced) * 100 
                     : 0;
+                  const derivedStatus = deriveProjectStatus(project);
                   return (
                     <TableRow
                       key={project.id}
@@ -374,8 +402,8 @@ const Projects = () => {
                       </TableCell>
                       <TableCell>{project.customer_name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getStatusColor(project.status)}>
-                          {project.status.replace("_", " ")}
+                        <Badge variant="outline" className={getStatusColor(derivedStatus)}>
+                          {derivedStatus.replace("_", " ")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">{project.invoice_count}</TableCell>
