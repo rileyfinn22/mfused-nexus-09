@@ -151,14 +151,14 @@ serve(async (req) => {
 
     // Request body is optional (manual button vs scheduled job)
     const body = await req.json().catch(() => ({} as any));
-    const mode = (body?.mode as string | undefined) ?? 'projects_only';
+    const mode = (body?.mode as string | undefined) ?? 'full';
 
     // ========== STEP 1: Pull customers and derive projects (sub-customers) ==========
     console.log('Fetching customers from QuickBooks...');
     const customersData = await qbQuery(
       qbApiUrl,
       accessToken,
-      'SELECT Id, DisplayName, FullyQualifiedName, ParentRef, ShipAddr, BillAddr, PrimaryEmailAddr, PrimaryPhone FROM Customer MAXRESULTS 1000'
+      'SELECT Id, DisplayName, FullyQualifiedName, ParentRef FROM Customer MAXRESULTS 1000'
     );
     const qbCustomers = customersData.QueryResponse?.Customer || [];
     console.log(`Found ${qbCustomers.length} customers in QBO`);
@@ -210,6 +210,8 @@ serve(async (req) => {
       const projectName = project.DisplayName || project.FullyQualifiedName || 'QB Project';
       const displayCustomerName = parentName ? `${parentName} — ${projectName}` : projectName;
 
+      const addr = project.BillAddr || parent?.BillAddr;
+
       const orderNumber = `ORD-${String(orderCounter++).padStart(5, '0')}`;
 
       const { data: newOrder, error } = await supabase
@@ -223,10 +225,10 @@ serve(async (req) => {
           order_type: 'standard',
           order_date: new Date().toISOString().split('T')[0],
           shipping_name: parentName || projectName || 'TBD',
-          shipping_street: project.ShipAddr?.Line1 || 'TBD',
-          shipping_city: project.ShipAddr?.City || 'TBD',
-          shipping_state: project.ShipAddr?.CountrySubDivisionCode || 'CA',
-          shipping_zip: project.ShipAddr?.PostalCode || '00000',
+          shipping_street: addr?.Line1 || 'TBD',
+          shipping_city: addr?.City || 'TBD',
+          shipping_state: addr?.CountrySubDivisionCode || 'CA',
+          shipping_zip: addr?.PostalCode || '00000',
           subtotal: 0,
           tax: 0,
           total: 0,
@@ -261,315 +263,338 @@ serve(async (req) => {
       );
     }
 
-    // ========== STEP 4: Pull Estimates ==========
-    console.log('Fetching estimates from QuickBooks...');
-    const estimatesData = await qbQuery(qbApiUrl, accessToken, 'SELECT * FROM Estimate MAXRESULTS 500');
-    const qbEstimates = estimatesData.QueryResponse?.Estimate || [];
-    console.log(`Found ${qbEstimates.length} estimates in QBO`);
+    // For full imports we run the heavy steps (estimates/invoices/payments/POs/bills) in the background
+    // so the UI + cron don't time out.
+    const runFullSyncInBackground = async () => {
+      try {
+        // ========== STEP 4: Pull Estimates ==========
+        console.log('Fetching estimates from QuickBooks...');
+        const estimatesData = await qbQuery(qbApiUrl, accessToken, 'SELECT * FROM Estimate MAXRESULTS 500');
+        const qbEstimates = estimatesData.QueryResponse?.Estimate || [];
+        console.log(`Found ${qbEstimates.length} estimates in QBO`);
 
-    const { data: existingQuotes } = await supabase.from('quotes').select('id, quote_number');
-    const quoteByNumber = new Map<string, string>();
-    for (const q of existingQuotes || []) {
-      quoteByNumber.set(q.quote_number, q.id);
-    }
-
-    let syncedEstimates = 0;
-    for (const est of qbEstimates) {
-      const quoteNumber = `QBO-${est.DocNumber || est.Id}`;
-      if (quoteByNumber.has(quoteNumber)) continue;
-
-      const custId = est.CustomerRef?.value;
-      const cust = custId ? customerById.get(custId) : null;
-      const parentName = cust?.ParentRef?.name;
-
-      const { data: newQuote, error } = await supabase
-        .from('quotes')
-        .insert({
-          company_id: vibePkgCompanyId,
-          quote_number: quoteNumber,
-          customer_name: parentName || est.CustomerRef?.name || 'Unknown',
-          description: est.CustomerMemo?.value || `QB Estimate #${est.DocNumber || est.Id}`,
-          status: est.TxnStatus === 'Accepted' ? 'accepted' : 
-                  est.TxnStatus === 'Closed' ? 'accepted' : 
-                  est.TxnStatus === 'Rejected' ? 'rejected' : 'sent',
-          subtotal: est.TotalAmt || 0,
-          shipping_cost: 0,
-          tax: 0,
-          total: est.TotalAmt || 0,
-          valid_until: est.ExpirationDate,
-        })
-        .select()
-        .single();
-
-      if (!error && newQuote) {
-        // Create quote items
-        const lines = est.Line?.filter((l: any) => l.DetailType === 'SalesItemLineDetail') || [];
-        for (const line of lines) {
-          await supabase.from('quote_items').insert({
-            quote_id: newQuote.id,
-            name: line.SalesItemLineDetail?.ItemRef?.name || line.Description || 'Item',
-            sku: line.SalesItemLineDetail?.ItemRef?.name || 'QB-ITEM',
-            description: line.Description,
-            quantity: line.SalesItemLineDetail?.Qty || 1,
-            unit_price: line.SalesItemLineDetail?.UnitPrice || 0,
-            total: line.Amount || 0,
-          });
+        const { data: existingQuotes } = await supabase.from('quotes').select('id, quote_number');
+        const quoteByNumber = new Map<string, string>();
+        for (const q of existingQuotes || []) {
+          quoteByNumber.set(q.quote_number, q.id);
         }
-        syncedEstimates++;
-      }
-    }
 
-    // ========== STEP 5: Pull Invoices ==========
-    console.log('Fetching invoices from QuickBooks...');
-    const invoicesData = await qbQuery(qbApiUrl, accessToken, 'SELECT * FROM Invoice MAXRESULTS 500');
-    const qbInvoices = invoicesData.QueryResponse?.Invoice || [];
-    console.log(`Found ${qbInvoices.length} invoices in QBO`);
+        let syncedEstimates = 0;
+        for (const est of qbEstimates) {
+          const quoteNumber = `QBO-${est.DocNumber || est.Id}`;
+          if (quoteByNumber.has(quoteNumber)) continue;
 
-    const { data: existingInvoices } = await supabase.from('invoices').select('id, quickbooks_id');
-    const invoiceByQBId = new Map<string, string>();
-    for (const inv of existingInvoices || []) {
-      if (inv.quickbooks_id) invoiceByQBId.set(inv.quickbooks_id, inv.id);
-    }
+          const custId = est.CustomerRef?.value;
+          const cust = custId ? customerById.get(custId) : null;
+          const parentName = cust?.ParentRef?.name;
 
-    let syncedInvoices = 0;
-    for (const inv of qbInvoices) {
-      if (invoiceByQBId.has(inv.Id)) {
-        // Update existing
-        await supabase.from('invoices').update({
-          total: inv.TotalAmt,
-          total_paid: inv.TotalAmt - (inv.Balance || 0),
-          status: inv.Balance === 0 ? 'paid' : inv.Balance < inv.TotalAmt ? 'partial' : 'open',
-          quickbooks_sync_status: 'synced',
-          quickbooks_synced_at: new Date().toISOString(),
-        }).eq('quickbooks_id', inv.Id);
-        syncedInvoices++;
-        continue;
-      }
+          const { data: newQuote, error } = await supabase
+            .from('quotes')
+            .insert({
+              company_id: vibePkgCompanyId,
+              quote_number: quoteNumber,
+              customer_name: parentName || est.CustomerRef?.name || 'Unknown',
+              description: est.CustomerMemo?.value || `QB Estimate #${est.DocNumber || est.Id}`,
+              status: est.TxnStatus === 'Accepted' ? 'accepted' :
+                      est.TxnStatus === 'Closed' ? 'accepted' :
+                      est.TxnStatus === 'Rejected' ? 'rejected' : 'sent',
+              subtotal: est.TotalAmt || 0,
+              shipping_cost: 0,
+              tax: 0,
+              total: est.TotalAmt || 0,
+              valid_until: est.ExpirationDate,
+            })
+            .select()
+            .single();
 
-      // Find order by project (customer could be a sub-customer)
-      const custId = inv.CustomerRef?.value;
-      const orderId = custId ? orderByQBProjectId.get(custId) : null;
+          if (!error && newQuote) {
+            // Create quote items
+            const lines = est.Line?.filter((l: any) => l.DetailType === 'SalesItemLineDetail') || [];
+            for (const line of lines) {
+              await supabase.from('quote_items').insert({
+                quote_id: newQuote.id,
+                name: line.SalesItemLineDetail?.ItemRef?.name || line.Description || 'Item',
+                sku: line.SalesItemLineDetail?.ItemRef?.name || 'QB-ITEM',
+                description: line.Description,
+                quantity: line.SalesItemLineDetail?.Qty || 1,
+                unit_price: line.SalesItemLineDetail?.UnitPrice || 0,
+                total: line.Amount || 0,
+              });
+            }
+            syncedEstimates++;
+          }
+        }
 
-      if (!orderId) continue; // No matching project/order
+        // ========== STEP 5: Pull Invoices ==========
+        console.log('Fetching invoices from QuickBooks...');
+        const invoicesData = await qbQuery(qbApiUrl, accessToken, 'SELECT * FROM Invoice MAXRESULTS 500');
+        const qbInvoices = invoicesData.QueryResponse?.Invoice || [];
+        console.log(`Found ${qbInvoices.length} invoices in QBO`);
 
-      // Get company from order
-      // (All imported QB data is stored under the VibePKG tenant company)
+        const { data: existingInvoices } = await supabase.from('invoices').select('id, quickbooks_id');
+        const invoiceByQBId = new Map<string, string>();
+        for (const inv of existingInvoices || []) {
+          if (inv.quickbooks_id) invoiceByQBId.set(inv.quickbooks_id, inv.id);
+        }
 
-      const { error } = await supabase.from('invoices').insert({
-        company_id: vibePkgCompanyId,
-        order_id: orderId,
-        invoice_number: inv.DocNumber || `QB-${inv.Id}`,
-        invoice_date: inv.TxnDate,
-        due_date: inv.DueDate,
-        subtotal: inv.TotalAmt,
-        tax: 0,
-        total: inv.TotalAmt,
-        total_paid: inv.TotalAmt - (inv.Balance || 0),
-        status: inv.Balance === 0 ? 'paid' : inv.Balance < inv.TotalAmt ? 'partial' : 'open',
-        quickbooks_id: inv.Id,
-        quickbooks_sync_status: 'synced',
-        quickbooks_synced_at: new Date().toISOString(),
-      });
+        let syncedInvoices = 0;
+        for (const inv of qbInvoices) {
+          if (invoiceByQBId.has(inv.Id)) {
+            // Update existing
+            await supabase
+              .from('invoices')
+              .update({
+                total: inv.TotalAmt,
+                total_paid: inv.TotalAmt - (inv.Balance || 0),
+                status:
+                  inv.Balance === 0
+                    ? 'paid'
+                    : inv.Balance < inv.TotalAmt
+                      ? 'partial'
+                      : 'open',
+                quickbooks_sync_status: 'synced',
+                quickbooks_synced_at: new Date().toISOString(),
+              })
+              .eq('quickbooks_id', inv.Id);
+            syncedInvoices++;
+            continue;
+          }
 
-        invoice_date: inv.TxnDate,
-        due_date: inv.DueDate,
-        subtotal: inv.TotalAmt,
-        tax: 0,
-        total: inv.TotalAmt,
-        total_paid: inv.TotalAmt - (inv.Balance || 0),
-        status: inv.Balance === 0 ? 'paid' : inv.Balance < inv.TotalAmt ? 'partial' : 'open',
-        quickbooks_id: inv.Id,
-        quickbooks_sync_status: 'synced',
-        quickbooks_synced_at: new Date().toISOString(),
-      });
+          // Find order by project (customer could be a sub-customer)
+          const custId = inv.CustomerRef?.value;
+          const orderId = custId ? orderByQBProjectId.get(custId) : null;
 
-      if (!error) {
-        invoiceByQBId.set(inv.Id, 'new');
-        syncedInvoices++;
-      }
-    }
+          if (!orderId) continue; // No matching project/order
 
-    // ========== STEP 6: Pull Payments ==========
-    console.log('Fetching payments from QuickBooks...');
-    const paymentsData = await qbQuery(qbApiUrl, accessToken, 'SELECT * FROM Payment MAXRESULTS 500');
-    const qbPayments = paymentsData.QueryResponse?.Payment || [];
-    console.log(`Found ${qbPayments.length} payments in QBO`);
-
-    const { data: existingPayments } = await supabase.from('payments').select('id, quickbooks_id');
-    const paymentByQBId = new Set<string>();
-    for (const p of existingPayments || []) {
-      if (p.quickbooks_id) paymentByQBId.add(p.quickbooks_id);
-    }
-
-    let syncedPayments = 0;
-    for (const pmt of qbPayments) {
-      if (paymentByQBId.has(pmt.Id)) continue;
-
-      // Find linked invoices
-      for (const line of pmt.Line || []) {
-        const linkedInv = line.LinkedTxn?.find((t: any) => t.TxnType === 'Invoice');
-        if (!linkedInv) continue;
-
-        const { data: invoice } = await supabase
-          .from('invoices')
-          .select('id, company_id')
-          .eq('quickbooks_id', linkedInv.TxnId)
-          .maybeSingle();
-
-        if (invoice) {
-          await supabase.from('payments').insert({
-            company_id: invoice.company_id,
-            invoice_id: invoice.id,
-            amount: line.Amount || pmt.TotalAmt,
-            payment_date: pmt.TxnDate,
-            payment_method: pmt.PaymentMethodRef?.name || 'Other',
-            reference_number: pmt.PaymentRefNum,
-            quickbooks_id: pmt.Id,
+          const { error } = await supabase.from('invoices').insert({
+            company_id: vibePkgCompanyId,
+            order_id: orderId,
+            invoice_number: inv.DocNumber || `QB-${inv.Id}`,
+            invoice_date: inv.TxnDate,
+            due_date: inv.DueDate,
+            subtotal: inv.TotalAmt,
+            tax: 0,
+            total: inv.TotalAmt,
+            total_paid: inv.TotalAmt - (inv.Balance || 0),
+            status:
+              inv.Balance === 0
+                ? 'paid'
+                : inv.Balance < inv.TotalAmt
+                  ? 'partial'
+                  : 'open',
+            quickbooks_id: inv.Id,
             quickbooks_sync_status: 'synced',
             quickbooks_synced_at: new Date().toISOString(),
           });
-          syncedPayments++;
-          paymentByQBId.add(pmt.Id);
-          break;
+
+          if (!error) {
+            invoiceByQBId.set(inv.Id, 'new');
+            syncedInvoices++;
+          }
         }
-      }
-    }
 
-    // ========== STEP 7: Pull Purchase Orders ==========
-    console.log('Fetching purchase orders from QuickBooks...');
-    const posData = await qbQuery(qbApiUrl, accessToken, 'SELECT * FROM PurchaseOrder MAXRESULTS 500');
-    const qbPOs = posData.QueryResponse?.PurchaseOrder || [];
-    console.log(`Found ${qbPOs.length} purchase orders in QBO`);
+        // ========== STEP 6: Pull Payments ==========
+        console.log('Fetching payments from QuickBooks...');
+        const paymentsData = await qbQuery(qbApiUrl, accessToken, 'SELECT * FROM Payment MAXRESULTS 500');
+        const qbPayments = paymentsData.QueryResponse?.Payment || [];
+        console.log(`Found ${qbPayments.length} payments in QBO`);
 
-    const { data: existingVendorPOs } = await supabase.from('vendor_pos').select('id, quickbooks_id');
-    const vendorPOByQBId = new Map<string, string>();
-    for (const vp of existingVendorPOs || []) {
-      if (vp.quickbooks_id) vendorPOByQBId.set(vp.quickbooks_id, vp.id);
-    }
+        const { data: existingPayments } = await supabase.from('payments').select('id, quickbooks_id');
+        const paymentByQBId = new Set<string>();
+        for (const p of existingPayments || []) {
+          if (p.quickbooks_id) paymentByQBId.add(p.quickbooks_id);
+        }
 
-    const { data: vendors } = await supabase.from('vendors').select('id, name, company_id');
-    const vendorByName = new Map<string, { id: string; company_id: string }>();
-    for (const v of vendors || []) {
-      vendorByName.set((v.name || '').toLowerCase().trim(), { id: v.id, company_id: v.company_id });
-    }
+        let syncedPayments = 0;
+        for (const pmt of qbPayments) {
+          if (paymentByQBId.has(pmt.Id)) continue;
 
-    let syncedPurchaseOrders = 0;
-    for (const po of qbPOs) {
-      if (vendorPOByQBId.has(po.Id)) {
-        await supabase.from('vendor_pos').update({
-          total: po.TotalAmt,
-          status: po.POStatus === 'Closed' ? 'completed' : 'pending',
-          quickbooks_sync_status: 'synced',
-          quickbooks_synced_at: new Date().toISOString(),
-        }).eq('quickbooks_id', po.Id);
-        syncedPurchaseOrders++;
-        continue;
-      }
+          // Find linked invoices
+          for (const line of pmt.Line || []) {
+            const linkedInv = line.LinkedTxn?.find((t: any) => t.TxnType === 'Invoice');
+            if (!linkedInv) continue;
 
-      const vendorName = (po.VendorRef?.name || '').toLowerCase().trim();
-      const vendor = vendorByName.get(vendorName);
-      if (!vendor) {
-        console.log(`No matching vendor for PO: ${po.VendorRef?.name}`);
-        continue;
-      }
+            const { data: invoice } = await supabase
+              .from('invoices')
+              .select('id, company_id')
+              .eq('quickbooks_id', linkedInv.TxnId)
+              .maybeSingle();
 
-      const poNumber = `QBO-PO-${po.DocNumber || po.Id}`;
-      const { data: newPO, error } = await supabase.from('vendor_pos').insert({
-        company_id: vendor.company_id,
-        vendor_id: vendor.id,
-        po_number: poNumber,
-        po_type: 'expense',
-        status: po.POStatus === 'Closed' ? 'completed' : 'pending',
-        order_date: po.TxnDate,
-        expected_delivery_date: po.DueDate || po.ShipDate,
-        total: po.TotalAmt || 0,
-        description: po.Memo || `QB PO #${po.DocNumber || po.Id}`,
-        quickbooks_id: po.Id,
-        quickbooks_sync_status: 'synced',
-        quickbooks_synced_at: new Date().toISOString(),
-      }).select().single();
+            if (invoice) {
+              await supabase.from('payments').insert({
+                company_id: invoice.company_id,
+                invoice_id: invoice.id,
+                amount: line.Amount || pmt.TotalAmt,
+                payment_date: pmt.TxnDate,
+                payment_method: pmt.PaymentMethodRef?.name || 'Other',
+                reference_number: pmt.PaymentRefNum,
+                quickbooks_id: pmt.Id,
+                quickbooks_sync_status: 'synced',
+                quickbooks_synced_at: new Date().toISOString(),
+              });
+              syncedPayments++;
+              paymentByQBId.add(pmt.Id);
+              break;
+            }
+          }
+        }
 
-      if (!error && newPO) {
-        const lines = po.Line?.filter((l: any) => l.DetailType === 'ItemBasedExpenseLineDetail') || [];
-        for (const line of lines) {
-          await supabase.from('vendor_po_items').insert({
-            vendor_po_id: newPO.id,
-            name: line.ItemBasedExpenseLineDetail?.ItemRef?.name || line.Description || 'Item',
-            sku: line.ItemBasedExpenseLineDetail?.ItemRef?.name || 'QB-ITEM',
-            description: line.Description,
-            quantity: line.ItemBasedExpenseLineDetail?.Qty || 1,
-            unit_cost: line.ItemBasedExpenseLineDetail?.UnitPrice || 0,
-            total: line.Amount || 0,
-            shipped_quantity: 0,
+        // ========== STEP 7: Pull Purchase Orders ==========
+        console.log('Fetching purchase orders from QuickBooks...');
+        const posData = await qbQuery(qbApiUrl, accessToken, 'SELECT * FROM PurchaseOrder MAXRESULTS 500');
+        const qbPOs = posData.QueryResponse?.PurchaseOrder || [];
+        console.log(`Found ${qbPOs.length} purchase orders in QBO`);
+
+        const { data: existingVendorPOs } = await supabase.from('vendor_pos').select('id, quickbooks_id');
+        const vendorPOByQBId = new Map<string, string>();
+        for (const vp of existingVendorPOs || []) {
+          if (vp.quickbooks_id) vendorPOByQBId.set(vp.quickbooks_id, vp.id);
+        }
+
+        const { data: vendors } = await supabase.from('vendors').select('id, name, company_id');
+        const vendorByName = new Map<string, { id: string; company_id: string }>();
+        for (const v of vendors || []) {
+          vendorByName.set((v.name || '').toLowerCase().trim(), { id: v.id, company_id: v.company_id });
+        }
+
+        let syncedPurchaseOrders = 0;
+        for (const po of qbPOs) {
+          if (vendorPOByQBId.has(po.Id)) {
+            await supabase
+              .from('vendor_pos')
+              .update({
+                total: po.TotalAmt,
+                status: po.POStatus === 'Closed' ? 'completed' : 'pending',
+                quickbooks_sync_status: 'synced',
+                quickbooks_synced_at: new Date().toISOString(),
+              })
+              .eq('quickbooks_id', po.Id);
+            syncedPurchaseOrders++;
+            continue;
+          }
+
+          const vendorName = (po.VendorRef?.name || '').toLowerCase().trim();
+          const vendor = vendorByName.get(vendorName);
+          if (!vendor) {
+            console.log(`No matching vendor for PO: ${po.VendorRef?.name}`);
+            continue;
+          }
+
+          const poNumber = `QBO-PO-${po.DocNumber || po.Id}`;
+          const { data: newPO, error } = await supabase
+            .from('vendor_pos')
+            .insert({
+              company_id: vendor.company_id,
+              vendor_id: vendor.id,
+              po_number: poNumber,
+              po_type: 'expense',
+              status: po.POStatus === 'Closed' ? 'completed' : 'pending',
+              order_date: po.TxnDate,
+              expected_delivery_date: po.DueDate || po.ShipDate,
+              total: po.TotalAmt || 0,
+              description: po.Memo || `QB PO #${po.DocNumber || po.Id}`,
+              quickbooks_id: po.Id,
+              quickbooks_sync_status: 'synced',
+              quickbooks_synced_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (!error && newPO) {
+            const lines = po.Line?.filter((l: any) => l.DetailType === 'ItemBasedExpenseLineDetail') || [];
+            for (const line of lines) {
+              await supabase.from('vendor_po_items').insert({
+                vendor_po_id: newPO.id,
+                name: line.ItemBasedExpenseLineDetail?.ItemRef?.name || line.Description || 'Item',
+                sku: line.ItemBasedExpenseLineDetail?.ItemRef?.name || 'QB-ITEM',
+                description: line.Description,
+                quantity: line.ItemBasedExpenseLineDetail?.Qty || 1,
+                unit_cost: line.ItemBasedExpenseLineDetail?.UnitPrice || 0,
+                total: line.Amount || 0,
+                shipped_quantity: 0,
+              });
+            }
+            vendorPOByQBId.set(po.Id, newPO.id);
+            syncedPurchaseOrders++;
+            console.log(`Created vendor PO: ${poNumber}`);
+          }
+        }
+
+        // ========== STEP 8: Pull Bills ==========
+        console.log('Fetching bills from QuickBooks...');
+        const billsData = await qbQuery(qbApiUrl, accessToken, 'SELECT * FROM Bill MAXRESULTS 500');
+        const qbBills = billsData.QueryResponse?.Bill || [];
+        console.log(`Found ${qbBills.length} bills in QBO`);
+
+        let syncedBills = 0;
+        for (const bill of qbBills) {
+          if (vendorPOByQBId.has(bill.Id)) {
+            await supabase
+              .from('vendor_pos')
+              .update({
+                total: bill.TotalAmt,
+                quickbooks_sync_status: 'synced',
+                quickbooks_synced_at: new Date().toISOString(),
+              })
+              .eq('quickbooks_id', bill.Id);
+            syncedBills++;
+            continue;
+          }
+
+          const vendorName = (bill.VendorRef?.name || '').toLowerCase().trim();
+          const vendor = vendorByName.get(vendorName);
+          if (!vendor) continue;
+
+          const poNumber = `QBO-BILL-${bill.DocNumber || bill.Id}`;
+          const { error } = await supabase.from('vendor_pos').insert({
+            company_id: vendor.company_id,
+            vendor_id: vendor.id,
+            po_number: poNumber,
+            po_type: 'expense',
+            status: 'completed',
+            order_date: bill.TxnDate,
+            total: bill.TotalAmt || 0,
+            description: bill.Memo || `QB Bill #${bill.DocNumber || bill.Id}`,
+            quickbooks_id: bill.Id,
+            quickbooks_sync_status: 'synced',
+            quickbooks_synced_at: new Date().toISOString(),
           });
+
+          if (!error) {
+            vendorPOByQBId.set(bill.Id, 'new');
+            syncedBills++;
+          }
         }
-        vendorPOByQBId.set(po.Id, newPO.id);
-        syncedPurchaseOrders++;
-        console.log(`Created vendor PO: ${poNumber}`);
+
+        // Update last sync timestamp
+        await supabase
+          .from('quickbooks_settings')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('company_id', vibePkgCompanyId);
+
+        console.log(
+          `Full sync complete: ${createdCompanies} companies, ${createdProjects} projects, ${syncedEstimates} estimates, ${syncedInvoices} invoices, ${syncedPayments} payments, ${syncedPurchaseOrders} POs, ${syncedBills} bills`
+        );
+      } catch (err) {
+        console.error('Full sync background task failed:', err);
       }
-    }
+    };
 
-    // ========== STEP 8: Pull Bills ==========
-    console.log('Fetching bills from QuickBooks...');
-    const billsData = await qbQuery(qbApiUrl, accessToken, 'SELECT * FROM Bill MAXRESULTS 500');
-    const qbBills = billsData.QueryResponse?.Bill || [];
-    console.log(`Found ${qbBills.length} bills in QBO`);
-
-    let syncedBills = 0;
-    for (const bill of qbBills) {
-      if (vendorPOByQBId.has(bill.Id)) {
-        await supabase.from('vendor_pos').update({
-          total: bill.TotalAmt,
-          quickbooks_sync_status: 'synced',
-          quickbooks_synced_at: new Date().toISOString(),
-        }).eq('quickbooks_id', bill.Id);
-        syncedBills++;
-        continue;
-      }
-
-      const vendorName = (bill.VendorRef?.name || '').toLowerCase().trim();
-      const vendor = vendorByName.get(vendorName);
-      if (!vendor) continue;
-
-      const poNumber = `QBO-BILL-${bill.DocNumber || bill.Id}`;
-      const { error } = await supabase.from('vendor_pos').insert({
-        company_id: vendor.company_id,
-        vendor_id: vendor.id,
-        po_number: poNumber,
-        po_type: 'expense',
-        status: 'completed',
-        order_date: bill.TxnDate,
-        total: bill.TotalAmt || 0,
-        description: bill.Memo || `QB Bill #${bill.DocNumber || bill.Id}`,
-        quickbooks_id: bill.Id,
-        quickbooks_sync_status: 'synced',
-        quickbooks_synced_at: new Date().toISOString(),
-      });
-
-      if (!error) {
-        vendorPOByQBId.set(bill.Id, 'new');
-        syncedBills++;
-      }
-    }
-
-    // Update last sync timestamp
-    await supabase.from('quickbooks_settings').update({
-      updated_at: new Date().toISOString(),
-    }).eq('company_id', vibePkgCompanyId);
-
-    console.log(`Sync complete: ${createdCompanies} companies, ${createdProjects} projects, ${syncedEstimates} estimates, ${syncedInvoices} invoices, ${syncedPayments} payments, ${syncedPurchaseOrders} POs, ${syncedBills} bills`);
+    // @ts-expect-error - EdgeRuntime exists in the edge environment
+    EdgeRuntime.waitUntil(runFullSyncInBackground());
 
     return new Response(
       JSON.stringify({
         success: true,
+        queued: true,
         synced: {
-          companies: createdCompanies,
+          companies: 0,
           projects: createdProjects,
-          estimates: syncedEstimates,
-          invoices: syncedInvoices,
-          payments: syncedPayments,
-          purchaseOrders: syncedPurchaseOrders,
-          bills: syncedBills,
+          estimates: 0,
+          invoices: 0,
+          payments: 0,
+          purchaseOrders: 0,
+          bills: 0,
         },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
