@@ -59,6 +59,7 @@ const vibeAdminNavigationItems = [
   { title: "Inventory", url: "/inventory", icon: Archive },
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "Job Costing", url: "/reports/job-costing", icon: BarChart3 },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
