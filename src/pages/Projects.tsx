@@ -149,15 +149,42 @@ const Projects = () => {
     setSyncing(true);
     toast({
       title: "Sync Started",
-      description: "Syncing projects from QuickBooks...",
+      description: "Pulling latest data from QuickBooks...",
     });
-    // This would trigger the QB sync - for now just refresh
-    await loadProjects();
-    setSyncing(false);
-    toast({
-      title: "Sync Complete",
-      description: "Projects have been refreshed",
-    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('quickbooks-sync-projects', {
+        body: {}
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        const { synced } = data;
+        toast({
+          title: "Sync Complete",
+          description: `Synced ${synced.invoices} invoices, ${synced.bills} bills, ${synced.payments} payments from QuickBooks`,
+        });
+      } else if (data?.error) {
+        toast({
+          title: "Sync Issue",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+
+      // Refresh the projects list
+      await loadProjects();
+    } catch (error: any) {
+      console.error("Error syncing from QuickBooks:", error);
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync from QuickBooks",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const filteredProjects = projects.filter((project) => {
