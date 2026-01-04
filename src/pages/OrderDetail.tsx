@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
-import { JobCostingSummary } from "@/components/JobCostingSummary";
+
 
 const STAGE_NAMES = [
   { value: 'production_proceeding_part_1', label: 'Production Proceeding (Part 1)', order: 1 },
@@ -1164,16 +1164,6 @@ const OrderDetail = () => {
               }}
             />
 
-            {/* Job Costing Summary - Vibe Admin Only */}
-            {isVibeAdmin && order && (
-              <div className="mt-8">
-                <JobCostingSummary 
-                  orderId={orderId!}
-                  orderTotal={order.total}
-                  companyId={order.company_id}
-                />
-              </div>
-            )}
 
             {/* Terms and Conditions */}
             <div className="mt-8 p-6 bg-muted/30 rounded-lg border border-table-border">
