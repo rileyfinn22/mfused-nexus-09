@@ -160,6 +160,8 @@ serve(async (req) => {
     let syncedInvoices = 0;
     let syncedBills = 0;
     let syncedPayments = 0;
+    let syncedEstimates = 0;
+    let syncedPurchaseOrders = 0;
     const syncErrors: string[] = [];
 
     // For each linked company, fetch their QBO invoices and payments
@@ -328,6 +330,219 @@ serve(async (req) => {
       }
     }
 
+    // Sync estimates from QBO for linked companies
+    for (const company of linkedCompanies || []) {
+      try {
+        console.log(`Syncing estimates for company: ${company.name} (QB ID: ${company.quickbooks_id})`);
+        
+        const estimatesQuery = `SELECT * FROM Estimate WHERE CustomerRef='${company.quickbooks_id}' MAXRESULTS 100`;
+        const estimatesResponse = await fetch(
+          `${qbApiUrl}/query?query=${encodeURIComponent(estimatesQuery)}&minorversion=65`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+            },
+          }
+        );
+
+        if (!estimatesResponse.ok) {
+          const errorData = await estimatesResponse.json();
+          console.error(`Error fetching estimates for ${company.name}:`, errorData);
+          syncErrors.push(`Failed to fetch estimates for ${company.name}`);
+          continue;
+        }
+
+        const estimatesData = await estimatesResponse.json();
+        const qbEstimates = estimatesData.QueryResponse?.Estimate || [];
+        console.log(`Found ${qbEstimates.length} estimates in QBO for ${company.name}`);
+
+        for (const qbEstimate of qbEstimates) {
+          // Check if order already exists with this estimate ID
+          const { data: existingOrder } = await supabase
+            .from('orders')
+            .select('id, qb_estimate_id')
+            .eq('qb_estimate_id', qbEstimate.Id)
+            .single();
+
+          if (existingOrder) {
+            // Update the order with latest estimate data
+            await supabase
+              .from('orders')
+              .update({
+                total: qbEstimate.TotalAmt,
+                subtotal: qbEstimate.TotalAmt,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existingOrder.id);
+            syncedEstimates++;
+          } else {
+            // Create a new quote from this estimate
+            const quoteNumber = `QBO-${qbEstimate.DocNumber || qbEstimate.Id}`;
+            
+            // Check if quote already exists
+            const { data: existingQuote } = await supabase
+              .from('quotes')
+              .select('id')
+              .eq('quote_number', quoteNumber)
+              .single();
+
+            if (!existingQuote) {
+              // Get VibePKG company ID for the quote
+              const { data: insertedQuote, error: quoteError } = await supabase
+                .from('quotes')
+                .insert({
+                  company_id: company.id,
+                  quote_number: quoteNumber,
+                  customer_name: company.name,
+                  description: qbEstimate.CustomerMemo?.value || `QB Estimate #${qbEstimate.DocNumber || qbEstimate.Id}`,
+                  status: qbEstimate.TxnStatus === 'Accepted' ? 'accepted' : 
+                          qbEstimate.TxnStatus === 'Closed' ? 'accepted' : 
+                          qbEstimate.TxnStatus === 'Rejected' ? 'rejected' : 'sent',
+                  subtotal: qbEstimate.TotalAmt || 0,
+                  shipping_cost: 0,
+                  tax: 0,
+                  total: qbEstimate.TotalAmt || 0,
+                  valid_until: qbEstimate.ExpirationDate,
+                  terms: qbEstimate.CustomerMemo?.value,
+                })
+                .select()
+                .single();
+
+              if (!quoteError && insertedQuote) {
+                // Create quote items from estimate lines
+                const lineItems = qbEstimate.Line?.filter((l: any) => l.DetailType === 'SalesItemLineDetail') || [];
+                for (const line of lineItems) {
+                  await supabase
+                    .from('quote_items')
+                    .insert({
+                      quote_id: insertedQuote.id,
+                      name: line.SalesItemLineDetail?.ItemRef?.name || line.Description || 'Item',
+                      sku: line.SalesItemLineDetail?.ItemRef?.name || 'QB-ITEM',
+                      description: line.Description,
+                      quantity: line.SalesItemLineDetail?.Qty || 1,
+                      unit_price: line.SalesItemLineDetail?.UnitPrice || line.Amount || 0,
+                      total: line.Amount || 0,
+                    });
+                }
+                syncedEstimates++;
+                console.log(`Created quote ${quoteNumber} from QBO estimate`);
+              }
+            }
+          }
+        }
+      } catch (estimateError: any) {
+        console.error(`Error syncing estimates for ${company.name}:`, estimateError);
+        syncErrors.push(`Error syncing estimates for ${company.name}: ${estimateError.message}`);
+      }
+    }
+
+    // Sync purchase orders from QBO
+    try {
+      console.log('Syncing purchase orders from QuickBooks...');
+      
+      const poQuery = `SELECT * FROM PurchaseOrder MAXRESULTS 200`;
+      const poResponse = await fetch(
+        `${qbApiUrl}/query?query=${encodeURIComponent(poQuery)}&minorversion=65`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+
+      if (poResponse.ok) {
+        const poData = await poResponse.json();
+        const qbPOs = poData.QueryResponse?.PurchaseOrder || [];
+        console.log(`Found ${qbPOs.length} purchase orders in QBO`);
+
+        // Get all vendors to match by name
+        const { data: vendors } = await supabase
+          .from('vendors')
+          .select('id, name, company_id');
+
+        for (const qbPO of qbPOs) {
+          // Check if vendor PO already exists with this QB ID
+          const { data: existingPO } = await supabase
+            .from('vendor_pos')
+            .select('id')
+            .eq('quickbooks_id', qbPO.Id)
+            .single();
+
+          if (existingPO) {
+            // Update sync status
+            await supabase
+              .from('vendor_pos')
+              .update({
+                quickbooks_sync_status: 'synced',
+                quickbooks_synced_at: new Date().toISOString(),
+                total: qbPO.TotalAmt,
+                status: qbPO.POStatus === 'Closed' ? 'completed' : 'pending',
+              })
+              .eq('id', existingPO.id);
+            syncedPurchaseOrders++;
+          } else {
+            // Try to find a matching vendor
+            const vendorName = qbPO.VendorRef?.name;
+            const matchedVendor = vendors?.find(v => 
+              v.name.toLowerCase() === vendorName?.toLowerCase()
+            );
+
+            if (matchedVendor) {
+              // Create new vendor PO from QB PurchaseOrder
+              const poNumber = `QBO-PO-${qbPO.DocNumber || qbPO.Id}`;
+              
+              const { data: newPO, error: poError } = await supabase
+                .from('vendor_pos')
+                .insert({
+                  company_id: matchedVendor.company_id,
+                  vendor_id: matchedVendor.id,
+                  po_number: poNumber,
+                  po_type: 'expense',
+                  status: qbPO.POStatus === 'Closed' ? 'completed' : 'pending',
+                  order_date: qbPO.TxnDate,
+                  expected_delivery_date: qbPO.DueDate || qbPO.ShipDate,
+                  total: qbPO.TotalAmt || 0,
+                  description: qbPO.Memo || `QB PO #${qbPO.DocNumber || qbPO.Id}`,
+                  quickbooks_id: qbPO.Id,
+                  quickbooks_sync_status: 'synced',
+                  quickbooks_synced_at: new Date().toISOString(),
+                })
+                .select()
+                .single();
+
+              if (!poError && newPO) {
+                // Create PO items from lines
+                const lineItems = qbPO.Line?.filter((l: any) => l.DetailType === 'ItemBasedExpenseLineDetail') || [];
+                for (const line of lineItems) {
+                  await supabase
+                    .from('vendor_po_items')
+                    .insert({
+                      vendor_po_id: newPO.id,
+                      name: line.ItemBasedExpenseLineDetail?.ItemRef?.name || line.Description || 'Item',
+                      sku: line.ItemBasedExpenseLineDetail?.ItemRef?.name || 'QB-ITEM',
+                      description: line.Description,
+                      quantity: line.ItemBasedExpenseLineDetail?.Qty || 1,
+                      unit_cost: line.ItemBasedExpenseLineDetail?.UnitPrice || line.Amount || 0,
+                      total: line.Amount || 0,
+                      shipped_quantity: 0,
+                    });
+                }
+                syncedPurchaseOrders++;
+                console.log(`Created vendor PO ${poNumber} from QBO purchase order`);
+              }
+            } else {
+              console.log(`No matching vendor found for QBO PO vendor: ${vendorName}`);
+            }
+          }
+        }
+      }
+    } catch (poError: any) {
+      console.error('Error syncing purchase orders:', poError);
+      syncErrors.push(`Error syncing purchase orders: ${poError.message}`);
+    }
+
     // Sync bills (vendor POs) from QBO
     try {
       console.log('Syncing bills from QuickBooks...');
@@ -368,8 +583,6 @@ serve(async (req) => {
               .eq('id', existingPO.id);
             syncedBills++;
           }
-          // Note: We don't create new vendor POs from QBO bills automatically
-          // as that requires manual mapping to orders and vendors
         }
       }
     } catch (billsError: any) {
@@ -385,7 +598,7 @@ serve(async (req) => {
       })
       .eq('company_id', vibeAdmin.company_id);
 
-    console.log(`Sync complete: ${syncedInvoices} invoices, ${syncedBills} bills, ${syncedPayments} payments`);
+    console.log(`Sync complete: ${syncedInvoices} invoices, ${syncedBills} bills, ${syncedPayments} payments, ${syncedEstimates} estimates, ${syncedPurchaseOrders} purchase orders`);
 
     return new Response(
       JSON.stringify({
@@ -394,6 +607,8 @@ serve(async (req) => {
           invoices: syncedInvoices,
           bills: syncedBills,
           payments: syncedPayments,
+          estimates: syncedEstimates,
+          purchaseOrders: syncedPurchaseOrders,
         },
         errors: syncErrors.length > 0 ? syncErrors : undefined,
         linkedCompanies: linkedCompanies?.length || 0,
@@ -404,13 +619,13 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error in quickbooks-sync-projects:', error);
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message,
-        synced: { invoices: 0, bills: 0, payments: 0 }
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: error.message,
+          synced: { invoices: 0, bills: 0, payments: 0, estimates: 0, purchaseOrders: 0 }
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
   }
 });
