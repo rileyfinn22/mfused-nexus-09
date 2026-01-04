@@ -452,6 +452,7 @@ export type Database = {
           notes: string | null
           order_id: string
           parent_invoice_id: string | null
+          qb_project_id: string | null
           quickbooks_id: string | null
           quickbooks_payment_link: string | null
           quickbooks_sync_status: string | null
@@ -480,6 +481,7 @@ export type Database = {
           notes?: string | null
           order_id: string
           parent_invoice_id?: string | null
+          qb_project_id?: string | null
           quickbooks_id?: string | null
           quickbooks_payment_link?: string | null
           quickbooks_sync_status?: string | null
@@ -508,6 +510,7 @@ export type Database = {
           notes?: string | null
           order_id?: string
           parent_invoice_id?: string | null
+          qb_project_id?: string | null
           quickbooks_id?: string | null
           quickbooks_payment_link?: string | null
           quickbooks_sync_status?: string | null
@@ -751,6 +754,8 @@ export type Database = {
           parent_order_id: string | null
           po_number: string | null
           po_pdf_path: string | null
+          qb_estimate_id: string | null
+          qb_project_id: string | null
           shipping_city: string
           shipping_cost: number | null
           shipping_name: string
@@ -798,6 +803,8 @@ export type Database = {
           parent_order_id?: string | null
           po_number?: string | null
           po_pdf_path?: string | null
+          qb_estimate_id?: string | null
+          qb_project_id?: string | null
           shipping_city: string
           shipping_cost?: number | null
           shipping_name: string
@@ -845,6 +852,8 @@ export type Database = {
           parent_order_id?: string | null
           po_number?: string | null
           po_pdf_path?: string | null
+          qb_estimate_id?: string | null
+          qb_project_id?: string | null
           shipping_city?: string
           shipping_cost?: number | null
           shipping_name?: string
@@ -1227,6 +1236,71 @@ export type Database = {
             columns: ["preferred_vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qb_import_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          data: Json | null
+          id: string
+          import_type: string
+          imported_at: string | null
+          notes: string | null
+          qb_customer_id: string | null
+          qb_customer_name: string | null
+          qb_project_id: string | null
+          qb_project_name: string
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          data?: Json | null
+          id?: string
+          import_type?: string
+          imported_at?: string | null
+          notes?: string | null
+          qb_customer_id?: string | null
+          qb_customer_name?: string | null
+          qb_project_id?: string | null
+          qb_project_name: string
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          data?: Json | null
+          id?: string
+          import_type?: string
+          imported_at?: string | null
+          notes?: string | null
+          qb_customer_id?: string | null
+          qb_customer_name?: string | null
+          qb_project_id?: string | null
+          qb_project_name?: string
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qb_import_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
