@@ -34,6 +34,7 @@ import ResetPassword from "./pages/ResetPassword";
 import AcceptInvite from "./pages/AcceptInvite";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
+import JobCostingReport from "./pages/JobCostingReport";
 import Customers from "./pages/Customers";
 import CustomerDetail from "./pages/CustomerDetail";
 import Quotes from "./pages/Quotes";
@@ -81,6 +82,7 @@ const App = () => (
           <Route path="/production/:orderId" element={<DashboardLayout><ProductionDetail /></DashboardLayout>} />
           <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
           <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
+          <Route path="/reports/job-costing" element={<DashboardLayout><JobCostingReport /></DashboardLayout>} />
           <Route path="/customers" element={<DashboardLayout><Customers /></DashboardLayout>} />
           <Route path="/customers/:customerId" element={<DashboardLayout><CustomerDetail /></DashboardLayout>} />
           <Route path="/quotes" element={<DashboardLayout><Quotes /></DashboardLayout>} />
