@@ -494,7 +494,9 @@ const InvoiceDetail = () => {
     yPos += 55;
     
     // ============ ITEMS TABLE ============
-    const tableData = editedItems.map((item: any) => [
+    // Use editedItems if available, otherwise fall back to order items
+    const itemsToDisplay = editedItems.length > 0 ? editedItems : (order?.order_items || []);
+    const tableData = itemsToDisplay.map((item: any) => [
       item.sku || '',
       item.name || '',
       (item.quantity || 0).toString(),
