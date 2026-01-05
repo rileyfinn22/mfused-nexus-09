@@ -298,10 +298,12 @@ const InvoiceDetail = () => {
     }
 
     // Fetch QuickBooks realm_id for opening invoices in QBO
+    // Get the realm_id from any connected QB account (there's typically one QB connection for the whole system)
     const { data: qbSettings } = await supabase
       .from('quickbooks_settings')
       .select('realm_id')
-      .eq('company_id', invoiceData.company_id)
+      .eq('is_connected', true)
+      .limit(1)
       .single();
     
     if (qbSettings?.realm_id) {
