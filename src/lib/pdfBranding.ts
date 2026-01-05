@@ -12,6 +12,33 @@ export const VIBE_COMPANY = {
   logoPath: '/images/vibe-logo.png'
 };
 
+// Pre-load logo and cache as base64
+let cachedLogoBase64: string | null = null;
+
+/**
+ * Preloads the logo and caches it for synchronous use
+ */
+export async function preloadLogo(): Promise<string | null> {
+  if (cachedLogoBase64) return cachedLogoBase64;
+  
+  try {
+    const response = await fetch(VIBE_COMPANY.logoPath);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        cachedLogoBase64 = reader.result as string;
+        resolve(cachedLogoBase64);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('Failed to preload logo:', error);
+    return null;
+  }
+}
+
 /**
  * Adds Vibe Packaging branding header to a PDF document
  * @param doc - jsPDF document instance
@@ -26,21 +53,25 @@ export async function addPdfBranding(
     titleAlign?: 'left' | 'center' | 'right';
   } = {}
 ): Promise<number> {
-  const { showAddress = true, documentTitle, titleAlign = 'center' } = options;
+  const { showAddress = true, documentTitle, titleAlign = 'left' } = options;
   const pageWidth = doc.internal.pageSize.getWidth();
   
   let yPos = 15;
   
   // Try to add logo
   try {
-    const logoImg = await loadImage(VIBE_COMPANY.logoPath);
-    // Logo dimensions - maintain aspect ratio
-    const logoWidth = 45;
-    const logoHeight = 30;
-    doc.addImage(logoImg, 'PNG', 14, yPos - 5, logoWidth, logoHeight);
+    const logoBase64 = await preloadLogo();
+    if (logoBase64) {
+      // Logo dimensions - maintain aspect ratio
+      const logoWidth = 45;
+      const logoHeight = 30;
+      doc.addImage(logoBase64, 'PNG', 14, yPos - 5, logoWidth, logoHeight);
+    } else {
+      throw new Error('Logo not loaded');
+    }
   } catch (error) {
     // Fallback to text if logo fails to load
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(76, 175, 80); // Green color
     doc.text('Vibe Packaging', 14, yPos + 10);
@@ -60,19 +91,19 @@ export async function addPdfBranding(
     );
   }
   
-  // Add document title if provided
+  // Add document title if provided - smaller and aligned
   if (documentTitle) {
     yPos += 25;
-    doc.setFontSize(20);
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(17, 24, 39);
     
-    let titleX = pageWidth / 2;
-    if (titleAlign === 'left') titleX = 14;
+    let titleX = 14;
+    if (titleAlign === 'center') titleX = pageWidth / 2;
     if (titleAlign === 'right') titleX = pageWidth - 14;
     
     doc.text(documentTitle, titleX, yPos, { align: titleAlign });
-    yPos += 10;
+    yPos += 8;
   } else {
     yPos += 30;
   }

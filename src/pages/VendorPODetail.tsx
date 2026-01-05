@@ -11,7 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { addPdfBrandingSync, addPdfFooter, VIBE_COMPANY } from "@/lib/pdfBranding";
+import { addPdfBranding, addPdfFooter, VIBE_COMPANY, preloadLogo } from "@/lib/pdfBranding";
 import { EmailPreviewDialog } from "@/components/EmailPreviewDialog";
 
 const VendorPODetail = () => {
@@ -179,38 +179,38 @@ const VendorPODetail = () => {
     }
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!po || !vendor) return;
 
     const doc = new jsPDF();
     
-    // Add branding header - smaller title, left aligned
-    const headerY = addPdfBrandingSync(doc, { documentTitle: 'Purchase Order', titleAlign: 'left' });
+    // Add branding header with logo - smaller title, left aligned
+    const headerY = await addPdfBranding(doc, { documentTitle: 'Purchase Order', titleAlign: 'left' });
     
-    // PO Info
+    // PO Info - removed status, added due date
     let yPos = headerY + 5;
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
     doc.text(`PO Number: ${po.po_number}`, 14, yPos);
     doc.text(`Order Date: ${new Date(po.order_date).toLocaleDateString()}`, 14, yPos + 7);
     doc.text(`Customer Order: ${po.orders?.order_number || 'N/A'}`, 14, yPos + 14);
-    doc.text(`Status: ${po.status.replace('_', ' ').toUpperCase()}`, 14, yPos + 21);
     
+    let lineOffset = 21;
     if (po.expected_delivery_date) {
-      doc.text(`Expected Delivery: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + 28);
-      yPos += 7;
+      doc.text(`Due Date: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + lineOffset);
+      lineOffset += 7;
     }
 
     // Vendor Info
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text("Vendor Information", 14, yPos + 38);
+    doc.text("Vendor Information", 14, yPos + lineOffset + 10);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(`${vendor.name}`, 14, yPos + 45);
-    if (vendor.contact_name) doc.text(`Contact: ${vendor.contact_name}`, 14, yPos + 51);
-    if (vendor.contact_email) doc.text(`Email: ${vendor.contact_email}`, 14, yPos + 57);
-    if (vendor.contact_phone) doc.text(`Phone: ${vendor.contact_phone}`, 14, yPos + 63);
+    doc.text(`${vendor.name}`, 14, yPos + lineOffset + 17);
+    if (vendor.contact_name) doc.text(`Contact: ${vendor.contact_name}`, 14, yPos + lineOffset + 23);
+    if (vendor.contact_email) doc.text(`Email: ${vendor.contact_email}`, 14, yPos + lineOffset + 29);
+    if (vendor.contact_phone) doc.text(`Phone: ${vendor.contact_phone}`, 14, yPos + lineOffset + 35);
 
     // Items table
     const tableData = poItems.map(item => [
@@ -223,7 +223,7 @@ const VendorPODetail = () => {
     ]);
 
     autoTable(doc, {
-      startY: yPos + 78,
+      startY: yPos + lineOffset + 50,
       head: [['SKU', 'Product', 'Description', 'Quantity', 'Unit Cost', 'Total']],
       body: tableData,
       theme: 'grid',
@@ -248,38 +248,38 @@ const VendorPODetail = () => {
     });
   };
 
-  const generatePdfBase64 = (): string => {
+  const generatePdfBase64 = async (): Promise<string> => {
     if (!po || !vendor) return '';
 
     const doc = new jsPDF();
     
-    // Add branding header - smaller title, left aligned
-    const headerY = addPdfBrandingSync(doc, { documentTitle: 'Purchase Order', titleAlign: 'left' });
+    // Add branding header with logo - smaller title, left aligned
+    const headerY = await addPdfBranding(doc, { documentTitle: 'Purchase Order', titleAlign: 'left' });
     
-    // PO Info
+    // PO Info - removed status, added due date
     let yPos = headerY + 5;
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
     doc.text(`PO Number: ${po.po_number}`, 14, yPos);
     doc.text(`Order Date: ${new Date(po.order_date).toLocaleDateString()}`, 14, yPos + 7);
     doc.text(`Customer Order: ${po.orders?.order_number || 'N/A'}`, 14, yPos + 14);
-    doc.text(`Status: ${po.status.replace('_', ' ').toUpperCase()}`, 14, yPos + 21);
     
+    let lineOffset = 21;
     if (po.expected_delivery_date) {
-      doc.text(`Expected Delivery: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + 28);
-      yPos += 7;
+      doc.text(`Due Date: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + lineOffset);
+      lineOffset += 7;
     }
 
     // Vendor Info
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text("Vendor Information", 14, yPos + 38);
+    doc.text("Vendor Information", 14, yPos + lineOffset + 10);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(`${vendor.name}`, 14, yPos + 45);
-    if (vendor.contact_name) doc.text(`Contact: ${vendor.contact_name}`, 14, yPos + 51);
-    if (vendor.contact_email) doc.text(`Email: ${vendor.contact_email}`, 14, yPos + 57);
-    if (vendor.contact_phone) doc.text(`Phone: ${vendor.contact_phone}`, 14, yPos + 63);
+    doc.text(`${vendor.name}`, 14, yPos + lineOffset + 17);
+    if (vendor.contact_name) doc.text(`Contact: ${vendor.contact_name}`, 14, yPos + lineOffset + 23);
+    if (vendor.contact_email) doc.text(`Email: ${vendor.contact_email}`, 14, yPos + lineOffset + 29);
+    if (vendor.contact_phone) doc.text(`Phone: ${vendor.contact_phone}`, 14, yPos + lineOffset + 35);
 
     // Items table
     const tableData = poItems.map(item => [
@@ -292,7 +292,7 @@ const VendorPODetail = () => {
     ]);
 
     autoTable(doc, {
-      startY: yPos + 78,
+      startY: yPos + lineOffset + 50,
       head: [['SKU', 'Product', 'Description', 'Quantity', 'Unit Cost', 'Total']],
       body: tableData,
       theme: 'grid',
@@ -314,7 +314,7 @@ const VendorPODetail = () => {
   const handleSendEmail = async (data: { to: string[]; subject: string; message: string }) => {
     setSendingEmail(true);
     try {
-      const pdfBase64 = generatePdfBase64();
+      const pdfBase64 = await generatePdfBase64();
       
       // Convert plain text message to HTML
       const htmlMessage = data.message
@@ -473,12 +473,14 @@ Thank you for your business.`;
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="submitted">Submitted</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="in_production">In Production</SelectItem>
-                      <SelectItem value="received">Received</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      {po.status === 'draft' ? (
+                        <>
+                          <SelectItem value="draft">Draft</SelectItem>
+                          <SelectItem value="submitted">Submitted</SelectItem>
+                        </>
+                      ) : (
+                        <SelectItem value="submitted">Submitted</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 ) : (
