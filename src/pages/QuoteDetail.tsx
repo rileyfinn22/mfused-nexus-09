@@ -469,6 +469,7 @@ const QuoteDetail = () => {
           total: quote.total,
           status: 'pending',
           order_type: 'standard',
+          quote_id: quote.id,
         })
         .select()
         .single();
@@ -541,6 +542,7 @@ const QuoteDetail = () => {
           total: quote.total,
           status: 'invoiced',
           order_type: 'standard',
+          quote_id: quote.id,
         })
         .select()
         .single();
@@ -578,6 +580,7 @@ const QuoteDetail = () => {
           total: quote.total,
           status: 'open',
           description: quote.description,
+          quote_id: quote.id,
         })
         .select()
         .single();
