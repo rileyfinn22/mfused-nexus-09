@@ -78,14 +78,8 @@ serve(async (req) => {
       throw new Error('Order not found');
     }
 
-    // Check if already has a QB project
-    if (order.qb_project_id) {
-      console.log('Order already has QB Project:', order.qb_project_id);
-      return new Response(
-        JSON.stringify({ success: true, qb_project_id: order.qb_project_id, message: 'Order already linked to QB Project' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const existingProjectId = order.qb_project_id as string | null;
+
 
     // Get VibePKG's company_id (the vibe_admin's company that manages QuickBooks)
     const { data: vibeAdmin, error: vibeAdminError } = await supabase
