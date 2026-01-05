@@ -1,16 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { X, Mail, Plus, Send, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { X, Mail, Plus, Send, Loader2, Eye, FileText, Paperclip } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
+import { addPdfBrandingSync, addPdfFooter, VIBE_COMPANY } from "@/lib/pdfBranding";
 
 interface SendInvoiceEmailDialogProps {
   open: boolean;
@@ -33,8 +36,10 @@ export function SendInvoiceEmailDialog({
 }: SendInvoiceEmailDialogProps) {
   const [emails, setEmails] = useState<string[]>([]);
   const [currentEmail, setCurrentEmail] = useState("");
-  const [customMessage, setCustomMessage] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [activeTab, setActiveTab] = useState("compose");
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -54,11 +59,35 @@ export function SendInvoiceEmailDialog({
     }).format(amount);
   };
 
+  // Reset state when dialog opens
+  useEffect(() => {
+    if (open && invoice) {
+      const defaultSubject = `Invoice ${invoice.invoice_number} from ${VIBE_COMPANY.name}`;
+      const defaultMessage = `Dear ${order?.shipping_name || order?.customer_name || 'Customer'},
+
+Please find attached invoice ${invoice.invoice_number} from ${VIBE_COMPANY.name}.
+
+Invoice Number: ${invoice.invoice_number}
+Invoice Date: ${new Date(invoice.invoice_date).toLocaleDateString()}
+Amount Due: ${formatCurrency(invoice.total || 0)}
+Due Date: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'Upon Receipt'}
+
+Please remit payment at your earliest convenience.
+
+Thank you for your business.`;
+
+      setSubject(defaultSubject);
+      setMessage(defaultMessage);
+      setEmails(order?.customer_email ? [order.customer_email] : []);
+      setCurrentEmail("");
+      setActiveTab("compose");
+    }
+  }, [open, invoice, order]);
+
   const addEmail = () => {
     const email = currentEmail.trim().toLowerCase();
     if (!email) return;
     
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       toast({
@@ -97,10 +126,8 @@ export function SendInvoiceEmailDialog({
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     
-    // Add branding header
     const headerY = addPdfBrandingSync(doc, { documentTitle: 'INVOICE' });
     
-    // Invoice details on the right
     doc.setFontSize(10);
     doc.setTextColor(55, 65, 81);
     doc.text(`Invoice #: ${invoice.invoice_number}`, pageWidth - 14, headerY - 15, { align: 'right' });
@@ -111,7 +138,6 @@ export function SendInvoiceEmailDialog({
     
     let yPos = headerY + 10;
     
-    // Ship To info
     doc.setFontSize(11);
     doc.setTextColor(17, 24, 39);
     doc.text("Ship To:", 14, yPos);
@@ -121,7 +147,6 @@ export function SendInvoiceEmailDialog({
     doc.text(order?.shipping_street || "", 14, yPos + 14);
     doc.text(`${order?.shipping_city || ""}, ${order?.shipping_state || ""} ${order?.shipping_zip || ""}`, 14, yPos + 21);
     
-    // Bill To info (if different from Ship To)
     if (order?.billing_name) {
       doc.setFontSize(11);
       doc.setTextColor(17, 24, 39);
@@ -133,7 +158,6 @@ export function SendInvoiceEmailDialog({
       doc.text(`${order?.billing_city || ""}, ${order?.billing_state || ""} ${order?.billing_zip || ""}`, 110, yPos + 21);
     }
     
-    // Items table
     const tableData = items.map((item) => [
       item.sku,
       item.name,
@@ -165,7 +189,6 @@ export function SendInvoiceEmailDialog({
       },
     });
     
-    // Totals
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     
     doc.setFontSize(10);
@@ -189,10 +212,8 @@ export function SendInvoiceEmailDialog({
     doc.text("Total Due:", 140, totalY);
     doc.text(formatCurrency(invoice.total || 0), 180, totalY, { align: "right" });
     
-    // Footer with branding
     addPdfFooter(doc);
     
-    // Convert to base64
     const pdfBase64 = doc.output("datauristring").split(",")[1];
     return pdfBase64;
   };
@@ -210,18 +231,34 @@ export function SendInvoiceEmailDialog({
     setSending(true);
     
     try {
-      // Generate PDF
       const pdfBase64 = await generatePdfBase64();
       
-      // Send via edge function
+      // Convert plain text message to HTML
+      const htmlMessage = message
+        .split('\n')
+        .map(line => line.trim() === '' ? '<br/>' : `<p style="margin: 8px 0;">${line}</p>`)
+        .join('');
+      
       const { data, error } = await supabase.functions.invoke("send-invoice-email", {
         body: {
           invoiceId: invoice.id,
           recipientEmails: emails,
           senderName,
           senderEmail,
-          customMessage: customMessage.trim() || undefined,
+          subject,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              ${htmlMessage}
+              <br/>
+              <p style="color: #666; margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee;">
+                ${VIBE_COMPANY.name}<br/>
+                ${VIBE_COMPANY.address.street}<br/>
+                ${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}
+              </p>
+            </div>
+          `,
           pdfBase64,
+          pdfFilename: `Invoice-${invoice.invoice_number}.pdf`,
           invoiceNumber: invoice.invoice_number,
           dueDate: invoice.due_date,
           totalAmount: invoice.total,
@@ -236,9 +273,8 @@ export function SendInvoiceEmailDialog({
         description: `Invoice ${invoice.invoice_number} has been emailed to ${emails.length} recipient${emails.length > 1 ? "s" : ""}`,
       });
       
-      // Reset and close
       setEmails([]);
-      setCustomMessage("");
+      setMessage("");
       onOpenChange(false);
     } catch (error: any) {
       console.error("Error sending invoice email:", error);
@@ -252,89 +288,176 @@ export function SendInvoiceEmailDialog({
     }
   };
 
+  // Convert message to HTML for preview
+  const messageToHtml = (text: string) => {
+    return text
+      .split('\n')
+      .map(line => line.trim() === '' ? '<br/>' : `<p style="margin: 8px 0;">${line}</p>`)
+      .join('');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5 text-primary" />
             Send Invoice via Email
           </DialogTitle>
           <DialogDescription>
-            Send invoice {invoice?.invoice_number} to your customer
+            Review and customize your email before sending invoice {invoice?.invoice_number}
           </DialogDescription>
         </DialogHeader>
-        
-        <div className="space-y-4 py-4">
-          {/* Invoice Summary */}
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Invoice:</span>
-              <span className="font-medium">{invoice?.invoice_number}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Amount Due:</span>
-              <span className="font-semibold text-primary">{formatCurrency(invoice?.total || 0)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Due Date:</span>
-              <span className="font-medium">
-                {invoice?.due_date ? new Date(invoice.due_date).toLocaleDateString() : "Upon Receipt"}
-              </span>
-            </div>
-          </div>
-          
-          {/* Email Recipients */}
-          <div className="space-y-2">
-            <Label>Send to</Label>
-            <div className="flex gap-2">
-              <Input
-                type="email"
-                placeholder="Enter email address"
-                value={currentEmail}
-                onChange={(e) => setCurrentEmail(e.target.value)}
-                onKeyDown={handleKeyDown}
-              />
-              <Button type="button" size="icon" variant="outline" onClick={addEmail}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            {emails.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-2">
-                {emails.map((email) => (
-                  <Badge key={email} variant="secondary" className="gap-1 pr-1">
-                    {email}
-                    <button
-                      type="button"
-                      onClick={() => removeEmail(email)}
-                      className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="compose" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Compose
+            </TabsTrigger>
+            <TabsTrigger value="preview" className="flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              Preview
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="compose" className="space-y-4 mt-4">
+            {/* Invoice Summary */}
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Invoice:</span>
+                <span className="font-medium">{invoice?.invoice_number}</span>
               </div>
-            )}
-          </div>
-          
-          {/* Custom Message */}
-          <div className="space-y-2">
-            <Label>Custom message (optional)</Label>
-            <Textarea
-              placeholder="Add a personal note to include in the email..."
-              value={customMessage}
-              onChange={(e) => setCustomMessage(e.target.value)}
-              rows={3}
-            />
-          </div>
-          
-          {/* Sender Info */}
-          <div className="bg-muted/30 rounded-lg p-3 text-sm">
-            <p className="text-muted-foreground">
-              This email will be sent from: <span className="font-medium text-foreground">{senderName} ({senderEmail})</span>
-            </p>
-          </div>
-        </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Amount Due:</span>
+                <span className="font-semibold text-primary">{formatCurrency(invoice?.total || 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Due Date:</span>
+                <span className="font-medium">
+                  {invoice?.due_date ? new Date(invoice.due_date).toLocaleDateString() : "Upon Receipt"}
+                </span>
+              </div>
+            </div>
+            
+            {/* Recipients */}
+            <div className="space-y-2">
+              <Label>To</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="Enter email address"
+                  value={currentEmail}
+                  onChange={(e) => setCurrentEmail(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                />
+                <Button type="button" size="icon" variant="outline" onClick={addEmail}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {emails.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {emails.map((email) => (
+                    <Badge key={email} variant="secondary" className="gap-1 pr-1">
+                      {email}
+                      <button
+                        type="button"
+                        onClick={() => removeEmail(email)}
+                        className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Subject */}
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Email subject"
+              />
+            </div>
+            
+            {/* Message */}
+            <div className="space-y-2">
+              <Label>Message</Label>
+              <Textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Your message..."
+                rows={8}
+                className="resize-none"
+              />
+            </div>
+            
+            {/* Attachment indicator */}
+            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+              <Paperclip className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
+              <Badge variant="outline" className="ml-auto">PDF</Badge>
+            </div>
+            
+            {/* Sender Info */}
+            <div className="bg-muted/30 rounded-lg p-3 text-sm">
+              <p className="text-muted-foreground">
+                This email will be sent from: <span className="font-medium text-foreground">{senderName} ({senderEmail})</span>
+              </p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="preview" className="mt-4">
+            <ScrollArea className="h-[400px] rounded-lg border bg-background">
+              <div className="p-6">
+                {/* Email Header Preview */}
+                <div className="space-y-3 pb-4 border-b">
+                  <div className="flex items-start gap-3">
+                    <span className="text-sm text-muted-foreground w-16">To:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {emails.length > 0 ? (
+                        emails.map((email) => (
+                          <span key={email} className="text-sm font-medium">{email}</span>
+                        ))
+                      ) : (
+                        <span className="text-sm text-muted-foreground italic">No recipients added</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-sm text-muted-foreground w-16">Subject:</span>
+                    <span className="text-sm font-medium">{subject || "(No subject)"}</span>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-sm text-muted-foreground w-16">Attach:</span>
+                    <div className="flex items-center gap-2">
+                      <Paperclip className="h-3 w-3" />
+                      <span className="text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Email Body Preview */}
+                <div className="pt-4">
+                  <div 
+                    className="prose prose-sm max-w-none dark:prose-invert"
+                    dangerouslySetInnerHTML={{ __html: messageToHtml(message) }}
+                  />
+                  <div className="mt-6 pt-4 border-t text-sm text-muted-foreground">
+                    <p>{VIBE_COMPANY.name}</p>
+                    <p>{VIBE_COMPANY.address.street}</p>
+                    <p>{VIBE_COMPANY.address.city}, {VIBE_COMPANY.address.state} {VIBE_COMPANY.address.zip}</p>
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
+
+        <Separator className="my-2" />
         
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>

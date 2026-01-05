@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Edit, Save, X, Plus, Send, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Edit, Save, X, Plus, Send } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addPdfBrandingSync, addPdfFooter, VIBE_COMPANY } from "@/lib/pdfBranding";
+import { EmailPreviewDialog } from "@/components/EmailPreviewDialog";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
@@ -28,6 +29,7 @@ const VendorPODetail = () => {
   const [editedPO, setEditedPO] = useState<any>({});
   const [isAdmin, setIsAdmin] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -309,37 +311,27 @@ const VendorPODetail = () => {
     return doc.output('datauristring').split(',')[1];
   };
 
-  const handleSendToVendor = async () => {
-    if (!vendor?.contact_email) {
-      toast({
-        title: "Cannot Send",
-        description: "Vendor does not have an email address configured",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const handleSendEmail = async (data: { to: string[]; subject: string; message: string }) => {
     setSendingEmail(true);
     try {
       const pdfBase64 = generatePdfBase64();
       
+      // Convert plain text message to HTML
+      const htmlMessage = data.message
+        .split('\n')
+        .map(line => line.trim() === '' ? '<br/>' : `<p style="margin: 8px 0;">${line}</p>`)
+        .join('');
+      
       const response = await supabase.functions.invoke('send-invoice-email', {
         body: {
-          to: vendor.contact_email,
-          subject: `Purchase Order ${po.po_number} from ${VIBE_COMPANY.name}`,
+          to: data.to[0], // Primary recipient
+          recipientEmails: data.to,
+          subject: data.subject,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2>Purchase Order ${po.po_number}</h2>
-              <p>Dear ${vendor.contact_name || vendor.name},</p>
-              <p>Please find attached the purchase order from ${VIBE_COMPANY.name}.</p>
-              <p><strong>PO Number:</strong> ${po.po_number}</p>
-              <p><strong>Order Date:</strong> ${new Date(po.order_date).toLocaleDateString()}</p>
-              <p><strong>Total Amount:</strong> $${poItems.reduce((sum, item) => sum + Number(item.total), 0).toFixed(2)}</p>
-              <p>Please confirm receipt of this order and provide an estimated delivery date.</p>
+              ${htmlMessage}
               <br/>
-              <p>Thank you for your business.</p>
-              <br/>
-              <p style="color: #666;">
+              <p style="color: #666; margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee;">
                 ${VIBE_COMPANY.name}<br/>
                 ${VIBE_COMPANY.address.street}<br/>
                 ${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}
@@ -361,9 +353,10 @@ const VendorPODetail = () => {
 
       toast({
         title: "PO Sent",
-        description: `Purchase order sent to ${vendor.contact_email}`
+        description: `Purchase order sent to ${data.to.join(', ')}`
       });
 
+      setShowEmailPreview(false);
       fetchPODetails();
     } catch (error: any) {
       console.error('Send error:', error);
@@ -375,6 +368,22 @@ const VendorPODetail = () => {
     } finally {
       setSendingEmail(false);
     }
+  };
+
+  const getDefaultEmailMessage = () => {
+    if (!po || !vendor) return '';
+    const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+    return `Dear ${vendor.contact_name || vendor.name},
+
+Please find attached the purchase order from ${VIBE_COMPANY.name}.
+
+PO Number: ${po.po_number}
+Order Date: ${new Date(po.order_date).toLocaleDateString()}
+Total Amount: $${totalAmount.toFixed(2)}
+
+Please confirm receipt of this order and provide an estimated delivery date.
+
+Thank you for your business.`;
   };
 
   if (loading) {
@@ -431,12 +440,8 @@ const VendorPODetail = () => {
             Download PDF
           </Button>
           {vendor?.contact_email && (
-            <Button onClick={handleSendToVendor} disabled={sendingEmail}>
-              {sendingEmail ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4 mr-2" />
-              )}
+            <Button onClick={() => setShowEmailPreview(true)}>
+              <Send className="h-4 w-4 mr-2" />
               Send to Vendor
             </Button>
           )}
@@ -709,6 +714,19 @@ const VendorPODetail = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Email Preview Dialog */}
+      <EmailPreviewDialog
+        open={showEmailPreview}
+        onOpenChange={setShowEmailPreview}
+        title="Send Purchase Order to Vendor"
+        defaultTo={vendor?.contact_email || ''}
+        defaultSubject={`Purchase Order ${po?.po_number} from ${VIBE_COMPANY.name}`}
+        defaultMessage={getDefaultEmailMessage()}
+        attachmentName={`PO-${po?.po_number}.pdf`}
+        onSend={handleSendEmail}
+        sending={sendingEmail}
+      />
     </div>
   );
 };
