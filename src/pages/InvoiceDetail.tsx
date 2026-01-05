@@ -1876,8 +1876,8 @@ const InvoiceDetail = () => {
           </CardContent>
         </Card>}
 
-      {/* Audit Log */}
-      {invoice && (
+      {/* Audit Log - Only visible to vibe_admin */}
+      {invoice && isVibeAdmin && (
         <Card className="shadow-lg">
           <CardContent className="p-8">
             <InvoiceAuditLog invoiceId={invoice.id} />
