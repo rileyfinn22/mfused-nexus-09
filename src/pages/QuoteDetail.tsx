@@ -388,8 +388,8 @@ const QuoteDetail = () => {
   // Send to Vendor available when vibe admin is working on their response quote
   const canSendToVendor = isVibeAdmin && ['in_progress'].includes(quote.status) && !quote.vendor_id && quote.parent_quote_id;
   
-  // Status dropdown available for vibe admins on quotes they're working on (response quotes only)
-  const showStatusDropdown = isVibeAdmin && !['sent', 'approved', 'rejected', 'pending_review'].includes(quote.status);
+  // Status dropdown available for vibe admins on quotes (not rejected or pending_review which is customer's original request)
+  const showStatusDropdown = isVibeAdmin && !['rejected', 'pending_review'].includes(quote.status);
   
   // Delete available for customers (draft, pending_review, sent, rejected) and vibe admins (any non-approved status)
   const canDelete = isVibeAdmin 
@@ -661,10 +661,12 @@ const QuoteDetail = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="pending_review">Pending Review</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="in_progress">Working on Quote</SelectItem>
                 <SelectItem value="vendor_pending">Sent to Vendor</SelectItem>
                 <SelectItem value="vendor_received">Vendor Response Received</SelectItem>
+                <SelectItem value="sent">Sent to Customer</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
               </SelectContent>
             </Select>
           )}
