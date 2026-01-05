@@ -669,11 +669,13 @@ const CreateOrder = () => {
     setShowAddressDialog(true);
   };
 
-  const handleProductToggle = (productId: string) => {
+  const handleRemoveItem = (productId: string) => {
+    setSelectedItems(prev => prev.filter(item => item.productId !== productId));
+  };
+
+  const handleAddItem = (productId: string) => {
     const exists = selectedItems.find(item => item.productId === productId);
-    if (exists) {
-      setSelectedItems(selectedItems.filter(item => item.productId !== productId));
-    } else {
+    if (!exists) {
       setSelectedItems([...selectedItems, { productId, quantity: 1 }]);
     }
   };
@@ -706,12 +708,16 @@ const CreateOrder = () => {
       // Add to products list
       setProducts([...products, newProduct]);
 
-      // Add to selected items with PO price
-      setSelectedItems([...selectedItems, {
-        productId: newProduct.id,
-        quantity: unmatchedItem.quantity,
-        unit_price: unmatchedItem.unit_price,
-      }]);
+      // Add to selected items with PO price (using callback to prevent race conditions)
+      setSelectedItems(prev => {
+        const exists = prev.find(item => item.productId === newProduct.id);
+        if (exists) return prev;
+        return [...prev, {
+          productId: newProduct.id,
+          quantity: unmatchedItem.quantity,
+          unit_price: unmatchedItem.unit_price,
+        }];
+      });
 
       // Remove from unmatched
       setUnmatchedPoItems(unmatchedPoItems.filter(item => item.id !== unmatchedItem.id));
@@ -733,12 +739,16 @@ const CreateOrder = () => {
   const handleMatchUnmatchedItem = (unmatchedItem: any, productId: string) => {
     if (!productId) return;
 
-    // Add to selected items with PO price
-    setSelectedItems([...selectedItems, {
-      productId: productId,
-      quantity: unmatchedItem.quantity,
-      unit_price: unmatchedItem.unit_price,
-    }]);
+    // Add to selected items with PO price (using callback to prevent race conditions)
+    setSelectedItems(prev => {
+      const exists = prev.find(item => item.productId === productId);
+      if (exists) return prev;
+      return [...prev, {
+        productId: productId,
+        quantity: unmatchedItem.quantity,
+        unit_price: unmatchedItem.unit_price,
+      }];
+    });
 
     // Remove from unmatched
     setUnmatchedPoItems(unmatchedPoItems.filter(item => item.id !== unmatchedItem.id));
@@ -790,11 +800,15 @@ const CreateOrder = () => {
   };
 
   const handleAddSelectedItems = () => {
-    const newItems = tempSelectedProducts.map(productId => ({
-      productId,
-      quantity: 1
-    }));
-    setSelectedItems([...selectedItems, ...newItems]);
+    // Filter out products that are already selected
+    const existingProductIds = new Set(selectedItems.map(item => item.productId));
+    const newItems = tempSelectedProducts
+      .filter(productId => !existingProductIds.has(productId))
+      .map(productId => ({
+        productId,
+        quantity: 1
+      }));
+    setSelectedItems(prev => [...prev, ...newItems]);
     setTempSelectedProducts([]);
     setSearchQuery("");
     setShowAddItemsDialog(false);
@@ -1649,7 +1663,7 @@ const CreateOrder = () => {
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 text-destructive"
-                          onClick={() => handleProductToggle(item.productId)}
+                          onClick={() => handleRemoveItem(item.productId)}
                         >
                           <X className="h-4 w-4" />
                         </Button>
