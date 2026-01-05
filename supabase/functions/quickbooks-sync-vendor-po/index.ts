@@ -235,6 +235,8 @@ serve(async (req) => {
     }
 
     // Build bill line items
+    // IMPORTANT: When we use sub-customers (Jobs) to represent “projects”, QuickBooks expects the Job
+    // to be set as CustomerRef on each expense line (ProjectRef will fail with ValidationFault 9341).
     const lineItems = vendorPo.vendor_po_items?.map((item: any) => ({
       DetailType: 'ItemBasedExpenseLineDetail',
       Amount: item.total,
@@ -244,6 +246,13 @@ serve(async (req) => {
         },
         Qty: item.quantity,
         UnitPrice: item.unit_cost,
+        ...(safeQbProjectId
+          ? {
+              CustomerRef: {
+                value: safeQbProjectId,
+              },
+            }
+          : {}),
       },
       Description: item.description || item.name,
     })) || [];
@@ -260,14 +269,9 @@ serve(async (req) => {
       PrivateNote: `Vendor PO: ${vendorPo.po_number}`,
     };
 
-    // Attach to QB Project if the linked order has one (for P&L tracking)
     if (safeQbProjectId) {
-      billPayload.ProjectRef = {
-        value: safeQbProjectId,
-      };
-      console.log('Attaching bill to QB Project:', safeQbProjectId);
+      console.log('Using sub-customer (Job) as bill line CustomerRef:', safeQbProjectId);
     }
-
 
     let qbResponse;
     if (vendorPo.quickbooks_id) {
