@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,8 +13,8 @@ serve(async (req) => {
 
   try {
     console.log("Parsing packing list...");
-    const { fileContent, orderItems, fileName } = await req.json();
-    console.log(`Processing file: ${fileName}, order has ${orderItems?.length || 0} items`);
+    const { fileContent, orderItems, fileName, isBase64 } = await req.json();
+    console.log(`Processing file: ${fileName}, order has ${orderItems?.length || 0} items, isBase64: ${isBase64}`);
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
@@ -30,6 +31,40 @@ serve(async (req) => {
     if (!orderItems || orderItems.length === 0) {
       console.error("No order items provided");
       throw new Error("No order items provided");
+    }
+
+    // Parse file content based on type
+    let parsedContent = "";
+    const fileNameLower = fileName.toLowerCase();
+    
+    if (fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls')) {
+      // Parse Excel file
+      console.log("Parsing Excel file...");
+      try {
+        // Decode base64 to binary
+        const binaryString = atob(fileContent);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        const workbook = XLSX.read(bytes, { type: 'array' });
+        console.log("Sheet names:", workbook.SheetNames);
+        
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convert to CSV for AI parsing
+        parsedContent = XLSX.utils.sheet_to_csv(worksheet);
+        console.log("Parsed Excel to CSV, preview:", parsedContent.substring(0, 500));
+      } catch (xlsxError) {
+        console.error("XLSX parsing error:", xlsxError);
+        throw new Error(`Failed to parse Excel file: ${xlsxError instanceof Error ? xlsxError.message : 'Unknown error'}. Please ensure the file is a valid Excel file.`);
+      }
+    } else {
+      // Text file (CSV/TXT) - use content directly
+      parsedContent = fileContent;
+      console.log("Using text content directly, preview:", parsedContent.substring(0, 500));
     }
 
     // Format order items for the AI to match against
@@ -66,7 +101,7 @@ Important:
     const userPrompt = `Parse this packing list and match products to order items. Return the shipped quantities for each matched item.
 
 Packing List Content:
-${fileContent}`;
+${parsedContent}`;
 
     console.log("Calling AI Gateway...");
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
