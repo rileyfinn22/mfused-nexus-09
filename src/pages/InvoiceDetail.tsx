@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check } from "lucide-react";
 import { format } from "date-fns";
 import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -54,6 +55,7 @@ const InvoiceDetail = () => {
   const [showSendEmailDialog, setShowSendEmailDialog] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
   const [currentUserName, setCurrentUserName] = useState<string>("");
+  const [qbRealmId, setQbRealmId] = useState<string | null>(null);
   const {
     syncInvoice,
     checkConnection
@@ -294,6 +296,18 @@ const InvoiceDetail = () => {
       console.log('Setting payments:', paymentsData);
       setPayments(paymentsData);
     }
+
+    // Fetch QuickBooks realm_id for opening invoices in QBO
+    const { data: qbSettings } = await supabase
+      .from('quickbooks_settings')
+      .select('realm_id')
+      .eq('company_id', invoiceData.company_id)
+      .single();
+    
+    if (qbSettings?.realm_id) {
+      setQbRealmId(qbSettings.realm_id);
+    }
+
     setLoading(false);
   };
   const handleDeleteInvoice = async () => {
@@ -1037,10 +1051,47 @@ const InvoiceDetail = () => {
                   <Button variant="outline" onClick={() => navigate(`/orders/${invoice.order_id}`)}>
                     View Order
                   </Button>
-                  <Button variant="outline" onClick={() => setShowSyncDialog(true)} disabled={syncingToQB}>
-                    <RefreshCw className={`h-4 w-4 mr-2 ${syncingToQB ? 'animate-spin' : ''}`} />
-                    {invoice.quickbooks_sync_status === 'synced' ? 'Re-Bill in QuickBooks' : 'Bill in QuickBooks'}
-                  </Button>
+                  {invoice.quickbooks_sync_status === 'synced' && invoice.quickbooks_id ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button className="bg-green-600 hover:bg-green-700 text-white">
+                          <Check className="h-4 w-4 mr-2" />
+                          Synced to QBO
+                          <ChevronDown className="h-4 w-4 ml-2" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (qbRealmId && invoice.quickbooks_id) {
+                              window.open(
+                                `https://app.qbo.intuit.com/app/invoice?txnId=${invoice.quickbooks_id}&companyId=${qbRealmId}`,
+                                '_blank'
+                              );
+                            } else {
+                              toast({
+                                title: "Unable to open",
+                                description: "QuickBooks connection info not available",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View in QuickBooks
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setShowSyncDialog(true)}>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Re-Bill in QuickBooks
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <Button variant="outline" onClick={() => setShowSyncDialog(true)} disabled={syncingToQB}>
+                      <RefreshCw className={`h-4 w-4 mr-2 ${syncingToQB ? 'animate-spin' : ''}`} />
+                      Bill in QuickBooks
+                    </Button>
+                  )}
                   {invoice.quickbooks_id && <Button variant="outline" onClick={handleRefreshPaymentLink} disabled={refreshingLink}>
                       <RefreshCw className={`h-4 w-4 mr-2 ${refreshingLink ? 'animate-spin' : ''}`} />
                       {refreshingLink ? 'Getting Link...' : 'Get Payment Link'}
