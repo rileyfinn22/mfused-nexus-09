@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Edit, Save, X, Plus } from "lucide-react";
+import { ArrowLeft, Download, Edit, Save, X, Plus, Send, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
+import { addPdfBrandingSync, addPdfFooter, VIBE_COMPANY } from "@/lib/pdfBranding";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
@@ -27,6 +27,7 @@ const VendorPODetail = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedPO, setEditedPO] = useState<any>({});
   const [isAdmin, setIsAdmin] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -245,6 +246,137 @@ const VendorPODetail = () => {
     });
   };
 
+  const generatePdfBase64 = (): string => {
+    if (!po || !vendor) return '';
+
+    const doc = new jsPDF();
+    
+    // Add branding header
+    const headerY = addPdfBrandingSync(doc, { documentTitle: 'VENDOR PURCHASE ORDER' });
+    
+    // PO Info
+    let yPos = headerY + 5;
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`PO Number: ${po.po_number}`, 14, yPos);
+    doc.text(`Order Date: ${new Date(po.order_date).toLocaleDateString()}`, 14, yPos + 7);
+    doc.text(`Customer Order: ${po.orders?.order_number || 'N/A'}`, 14, yPos + 14);
+    doc.text(`Status: ${po.status.replace('_', ' ').toUpperCase()}`, 14, yPos + 21);
+    
+    if (po.expected_delivery_date) {
+      doc.text(`Expected Delivery: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + 28);
+      yPos += 7;
+    }
+
+    // Vendor Info
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Vendor Information", 14, yPos + 38);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`${vendor.name}`, 14, yPos + 45);
+    if (vendor.contact_name) doc.text(`Contact: ${vendor.contact_name}`, 14, yPos + 51);
+    if (vendor.contact_email) doc.text(`Email: ${vendor.contact_email}`, 14, yPos + 57);
+    if (vendor.contact_phone) doc.text(`Phone: ${vendor.contact_phone}`, 14, yPos + 63);
+
+    // Items table
+    const tableData = poItems.map(item => [
+      item.sku,
+      item.name,
+      item.description || '',
+      item.quantity.toString(),
+      `$${Number(item.unit_cost).toFixed(3)}`,
+      `$${Number(item.total).toFixed(2)}`
+    ]);
+
+    autoTable(doc, {
+      startY: yPos + 78,
+      head: [['SKU', 'Product', 'Description', 'Quantity', 'Unit Cost', 'Total']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [66, 66, 66] },
+    });
+
+    // Total
+    const finalY = (doc as any).lastAutoTable.finalY || 125;
+    doc.setFontSize(14);
+    const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+    doc.text(`Total: $${totalAmount.toFixed(2)}`, 150, finalY + 15);
+
+    // Footer
+    addPdfFooter(doc);
+
+    return doc.output('datauristring').split(',')[1];
+  };
+
+  const handleSendToVendor = async () => {
+    if (!vendor?.contact_email) {
+      toast({
+        title: "Cannot Send",
+        description: "Vendor does not have an email address configured",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      const pdfBase64 = generatePdfBase64();
+      
+      const response = await supabase.functions.invoke('send-invoice-email', {
+        body: {
+          to: vendor.contact_email,
+          subject: `Purchase Order ${po.po_number} from ${VIBE_COMPANY.name}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2>Purchase Order ${po.po_number}</h2>
+              <p>Dear ${vendor.contact_name || vendor.name},</p>
+              <p>Please find attached the purchase order from ${VIBE_COMPANY.name}.</p>
+              <p><strong>PO Number:</strong> ${po.po_number}</p>
+              <p><strong>Order Date:</strong> ${new Date(po.order_date).toLocaleDateString()}</p>
+              <p><strong>Total Amount:</strong> $${poItems.reduce((sum, item) => sum + Number(item.total), 0).toFixed(2)}</p>
+              <p>Please confirm receipt of this order and provide an estimated delivery date.</p>
+              <br/>
+              <p>Thank you for your business.</p>
+              <br/>
+              <p style="color: #666;">
+                ${VIBE_COMPANY.name}<br/>
+                ${VIBE_COMPANY.address.street}<br/>
+                ${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}
+              </p>
+            </div>
+          `,
+          pdfBase64,
+          pdfFilename: `PO-${po.po_number}.pdf`
+        }
+      });
+
+      if (response.error) throw response.error;
+
+      // Update PO status to submitted
+      await supabase
+        .from('vendor_pos')
+        .update({ status: 'submitted' })
+        .eq('id', poId);
+
+      toast({
+        title: "PO Sent",
+        description: `Purchase order sent to ${vendor.contact_email}`
+      });
+
+      fetchPODetails();
+    } catch (error: any) {
+      console.error('Send error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send email",
+        variant: "destructive"
+      });
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto py-12 text-center">
@@ -294,10 +426,20 @@ const VendorPODetail = () => {
               )}
             </>
           )}
-          <Button onClick={handleDownloadPDF}>
+          <Button variant="outline" onClick={handleDownloadPDF}>
             <Download className="h-4 w-4 mr-2" />
             Download PDF
           </Button>
+          {vendor?.contact_email && (
+            <Button onClick={handleSendToVendor} disabled={sendingEmail}>
+              {sendingEmail ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Send to Vendor
+            </Button>
+          )}
         </div>
       </div>
 
