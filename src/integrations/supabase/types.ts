@@ -1858,6 +1858,18 @@ export type Database = {
       }
       vendors: {
         Row: {
+          address_city: string | null
+          address_country: string | null
+          address_state: string | null
+          address_street: string | null
+          address_zip: string | null
+          bank_account_name: string | null
+          bank_account_number: string | null
+          bank_country: string | null
+          bank_iban: string | null
+          bank_name: string | null
+          bank_routing_number: string | null
+          bank_swift_code: string | null
           category: string
           company_id: string
           contact_email: string | null
@@ -1873,6 +1885,18 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          address_city?: string | null
+          address_country?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_country?: string | null
+          bank_iban?: string | null
+          bank_name?: string | null
+          bank_routing_number?: string | null
+          bank_swift_code?: string | null
           category?: string
           company_id: string
           contact_email?: string | null
@@ -1888,6 +1912,18 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          address_city?: string | null
+          address_country?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_country?: string | null
+          bank_iban?: string | null
+          bank_name?: string | null
+          bank_routing_number?: string | null
+          bank_swift_code?: string | null
           category?: string
           company_id?: string
           contact_email?: string | null

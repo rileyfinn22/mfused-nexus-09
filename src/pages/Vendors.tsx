@@ -28,7 +28,21 @@ const Vendors = () => {
     contact_email: "",
     contact_phone: "",
     notes: "",
-    category: "production" as "production" | "fulfillment"
+    category: "production" as "production" | "fulfillment",
+    // Address fields
+    address_street: "",
+    address_city: "",
+    address_state: "",
+    address_zip: "",
+    address_country: "USA",
+    // Bank fields
+    bank_name: "",
+    bank_account_name: "",
+    bank_account_number: "",
+    bank_routing_number: "",
+    bank_swift_code: "",
+    bank_iban: "",
+    bank_country: ""
   });
 
   useEffect(() => {
@@ -127,7 +141,19 @@ const Vendors = () => {
       contact_email: vendor.contact_email || "",
       contact_phone: vendor.contact_phone || "",
       notes: vendor.notes || "",
-      category: vendor.category || "production"
+      category: vendor.category || "production",
+      address_street: vendor.address_street || "",
+      address_city: vendor.address_city || "",
+      address_state: vendor.address_state || "",
+      address_zip: vendor.address_zip || "",
+      address_country: vendor.address_country || "USA",
+      bank_name: vendor.bank_name || "",
+      bank_account_name: vendor.bank_account_name || "",
+      bank_account_number: vendor.bank_account_number || "",
+      bank_routing_number: vendor.bank_routing_number || "",
+      bank_swift_code: vendor.bank_swift_code || "",
+      bank_iban: vendor.bank_iban || "",
+      bank_country: vendor.bank_country || ""
     });
     setDialogOpen(true);
   };
@@ -146,7 +172,19 @@ const Vendors = () => {
       contact_email: "",
       contact_phone: "",
       notes: "",
-      category: "production"
+      category: "production",
+      address_street: "",
+      address_city: "",
+      address_state: "",
+      address_zip: "",
+      address_country: "USA",
+      bank_name: "",
+      bank_account_name: "",
+      bank_account_number: "",
+      bank_routing_number: "",
+      bank_swift_code: "",
+      bank_iban: "",
+      bank_country: ""
     });
   };
 
@@ -173,59 +211,203 @@ const Vendors = () => {
             <DialogHeader>
               <DialogTitle>{editingVendor ? 'Edit Vendor' : 'Add New Vendor'}</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Label>Vendor Name *</Label>
-                  <Input
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    placeholder="Vendor Name"
-                  />
+            <form onSubmit={handleSubmit} className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+              {/* Basic Info */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground border-b pb-2">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <Label>Vendor Name *</Label>
+                    <Input
+                      required
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      placeholder="Vendor Name"
+                    />
+                  </div>
+                  <div>
+                    <Label>Contact Name</Label>
+                    <Input
+                      value={formData.contact_name}
+                      onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                      placeholder="Contact Name"
+                    />
+                  </div>
+                  <div>
+                    <Label>Contact Email</Label>
+                    <Input
+                      type="email"
+                      value={formData.contact_email}
+                      onChange={(e) => setFormData({...formData, contact_email: e.target.value})}
+                      placeholder="email@example.com"
+                    />
+                  </div>
+                  <div>
+                    <Label>Contact Phone</Label>
+                    <Input
+                      value={formData.contact_phone}
+                      onChange={(e) => setFormData({...formData, contact_phone: e.target.value})}
+                      placeholder="Phone Number"
+                    />
+                  </div>
+                  <div>
+                    <Label>Category *</Label>
+                    <Select 
+                      value={formData.category} 
+                      onValueChange={(value: "production" | "fulfillment") => setFormData({...formData, category: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="production">Production</SelectItem>
+                        <SelectItem value="fulfillment">Fulfillment</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+              </div>
+
+              {/* Address Section */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground border-b pb-2">Address</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <Label>Country</Label>
+                    <Select 
+                      value={formData.address_country} 
+                      onValueChange={(value) => setFormData({...formData, address_country: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USA">United States</SelectItem>
+                        <SelectItem value="Canada">Canada</SelectItem>
+                        <SelectItem value="UK">United Kingdom</SelectItem>
+                        <SelectItem value="China">China</SelectItem>
+                        <SelectItem value="Mexico">Mexico</SelectItem>
+                        <SelectItem value="Germany">Germany</SelectItem>
+                        <SelectItem value="Japan">Japan</SelectItem>
+                        <SelectItem value="India">India</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Street Address</Label>
+                    <Input
+                      value={formData.address_street}
+                      onChange={(e) => setFormData({...formData, address_street: e.target.value})}
+                      placeholder="123 Main St"
+                    />
+                  </div>
+                  <div>
+                    <Label>City</Label>
+                    <Input
+                      value={formData.address_city}
+                      onChange={(e) => setFormData({...formData, address_city: e.target.value})}
+                      placeholder="City"
+                    />
+                  </div>
+                  <div>
+                    <Label>{formData.address_country === 'USA' ? 'State' : 'State/Province/Region'}</Label>
+                    <Input
+                      value={formData.address_state}
+                      onChange={(e) => setFormData({...formData, address_state: e.target.value})}
+                      placeholder={formData.address_country === 'USA' ? 'CA' : 'Province/Region'}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label>{formData.address_country === 'USA' ? 'ZIP Code' : 'Postal Code'}</Label>
+                    <Input
+                      value={formData.address_zip}
+                      onChange={(e) => setFormData({...formData, address_zip: e.target.value})}
+                      placeholder={formData.address_country === 'USA' ? '12345' : 'Postal Code'}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank Info Section */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground border-b pb-2">Bank Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Bank Country</Label>
+                    <Select 
+                      value={formData.bank_country} 
+                      onValueChange={(value) => setFormData({...formData, bank_country: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select bank country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USA">United States</SelectItem>
+                        <SelectItem value="International">International</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Bank Name</Label>
+                    <Input
+                      value={formData.bank_name}
+                      onChange={(e) => setFormData({...formData, bank_name: e.target.value})}
+                      placeholder="Bank of America"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Account Name</Label>
+                    <Input
+                      value={formData.bank_account_name}
+                      onChange={(e) => setFormData({...formData, bank_account_name: e.target.value})}
+                      placeholder="Account holder name"
+                    />
+                  </div>
+                  <div>
+                    <Label>Account Number</Label>
+                    <Input
+                      value={formData.bank_account_number}
+                      onChange={(e) => setFormData({...formData, bank_account_number: e.target.value})}
+                      placeholder="Account number"
+                    />
+                  </div>
+                  {formData.bank_country === 'USA' || !formData.bank_country ? (
+                    <div>
+                      <Label>Routing Number (ACH)</Label>
+                      <Input
+                        value={formData.bank_routing_number}
+                        onChange={(e) => setFormData({...formData, bank_routing_number: e.target.value})}
+                        placeholder="9-digit routing number"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <Label>SWIFT/BIC Code</Label>
+                        <Input
+                          value={formData.bank_swift_code}
+                          onChange={(e) => setFormData({...formData, bank_swift_code: e.target.value})}
+                          placeholder="SWIFT code"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label>IBAN</Label>
+                        <Input
+                          value={formData.bank_iban}
+                          onChange={(e) => setFormData({...formData, bank_iban: e.target.value})}
+                          placeholder="International Bank Account Number"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground border-b pb-2">Notes</h3>
                 <div>
-                  <Label>Contact Name</Label>
-                  <Input
-                    value={formData.contact_name}
-                    onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
-                    placeholder="Contact Name"
-                  />
-                </div>
-                <div>
-                  <Label>Contact Email</Label>
-                  <Input
-                    type="email"
-                    value={formData.contact_email}
-                    onChange={(e) => setFormData({...formData, contact_email: e.target.value})}
-                    placeholder="email@example.com"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Label>Contact Phone</Label>
-                  <Input
-                    value={formData.contact_phone}
-                    onChange={(e) => setFormData({...formData, contact_phone: e.target.value})}
-                    placeholder="Phone Number"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Label>Category *</Label>
-                  <Select 
-                    value={formData.category} 
-                    onValueChange={(value: "production" | "fulfillment") => setFormData({...formData, category: value})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="production">Production</SelectItem>
-                      <SelectItem value="fulfillment">Fulfillment</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-2">
-                  <Label>Notes</Label>
                   <Textarea
                     value={formData.notes}
                     onChange={(e) => setFormData({...formData, notes: e.target.value})}
@@ -234,7 +416,8 @@ const Vendors = () => {
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2">
+
+              <div className="flex justify-end gap-2 pt-4 border-t sticky bottom-0 bg-background">
                 <Button type="button" variant="outline" onClick={handleCloseDialog}>Cancel</Button>
                 <Button type="submit">{editingVendor ? 'Update' : 'Create'} Vendor</Button>
               </div>
