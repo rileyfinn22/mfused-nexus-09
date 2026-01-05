@@ -79,15 +79,31 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
     setPackingListResult(null);
 
     try {
-      // Read file content
-      const fileContent = await file.text();
+      // Read file content - handle binary files (Excel) differently
+      let fileContent: string;
+      const isExcel = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
+      
+      if (isExcel) {
+        // For Excel files, read as base64
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        fileContent = btoa(binary);
+      } else {
+        // For text files (CSV, TXT), read as text
+        fileContent = await file.text();
+      }
       
       // Call the edge function to parse the packing list
       const { data, error } = await supabase.functions.invoke('parse-packing-list', {
         body: {
           fileContent,
           fileName: file.name,
-          orderItems: order.order_items
+          orderItems: order.order_items,
+          isBase64: isExcel
         }
       });
 
@@ -171,7 +187,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
   const initializeQuantities = () => {
     const quantities: {[itemId: string]: number} = {};
     order.order_items?.forEach((item: any) => {
-      quantities[item.id] = item.quantity - (item.shipped_quantity || 0);
+      quantities[item.id] = 0; // Always start at 0, user must specify qty to ship
     });
     setShipmentQuantities(quantities);
   };
