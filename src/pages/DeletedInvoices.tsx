@@ -29,6 +29,7 @@ const DeletedInvoices = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [roleChecked, setRoleChecked] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,11 +41,11 @@ const DeletedInvoices = () => {
   }, []);
 
   useEffect(() => {
-    if (isVibeAdmin) {
+    if (roleChecked && isVibeAdmin) {
       fetchCompanies();
+      fetchDeletedInvoices();
     }
-    fetchDeletedInvoices();
-  }, [isVibeAdmin]);
+  }, [isVibeAdmin, roleChecked]);
 
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -52,7 +53,20 @@ const DeletedInvoices = () => {
       const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
       setIsVibeAdmin(data?.role === 'vibe_admin');
     }
+    setRoleChecked(true);
   };
+
+  // Redirect non-vibe_admin users
+  if (roleChecked && !isVibeAdmin) {
+    return (
+      <div className="max-w-7xl mx-auto py-12 text-center">
+        <p className="text-muted-foreground">You don't have permission to view this page.</p>
+        <Button variant="outline" className="mt-4" onClick={() => navigate('/invoices')}>
+          Back to Invoices
+        </Button>
+      </div>
+    );
+  }
 
   const fetchCompanies = async () => {
     const { data } = await supabase.from('companies').select('*').order('name');

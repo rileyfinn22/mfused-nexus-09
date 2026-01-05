@@ -259,10 +259,12 @@ const Invoices = () => {
           <p className="text-sm text-muted-foreground mt-1">Manage invoices, track payments, and monitor due dates</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => navigate('/invoices/deleted')}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            Deleted Archive
-          </Button>
+          {isVibeAdmin && (
+            <Button size="sm" variant="outline" onClick={() => navigate('/invoices/deleted')}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Deleted Archive
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={() => exportToCSV(filteredInvoices, 'invoices')}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
