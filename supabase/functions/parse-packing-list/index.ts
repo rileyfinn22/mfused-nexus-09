@@ -76,6 +76,8 @@ serve(async (req) => {
       already_shipped: item.shipped_quantity || 0
     }));
 
+    console.log("Order items for matching:", JSON.stringify(orderItemsList.map((i: any) => ({ id: i.id.substring(0,8), name: i.name, sku: i.sku })), null, 2));
+
     const systemPrompt = `You are a packing list parser. Your job is to extract shipped quantities from a packing list document and match them to order items.
 
 The packing list may be in various formats (CSV, tab-separated, or plain text). It contains products that were shipped with their quantities.
@@ -83,31 +85,38 @@ The packing list may be in various formats (CSV, tab-separated, or plain text). 
 You have the following order items to match against:
 ${JSON.stringify(orderItemsList, null, 2)}
 
-MATCHING RULES (in order of priority):
-1. **SKU MATCHING (HIGHEST PRIORITY)** - If the packing list contains SKU codes, match them EXACTLY to order item SKUs. This is the most reliable method.
-2. **PRODUCT NAME MATCHING** - Match product names, being flexible with:
-   - Word order variations (e.g., "Widget 1000mg" = "1000mg Widget")
-   - Case differences (ignore capitalization)
-   - Minor spelling variations
-   - Abbreviations and full forms
-   - Size/weight in different formats (e.g., "1000mg" = "1g" = "1 gram")
-3. **PARTIAL NAME MATCHING** - If exact match fails, match if key product identifiers appear in both
+MATCHING RULES - FOLLOW STRICTLY IN THIS ORDER:
+1. **SKU MATCHING (HIGHEST PRIORITY)** - If the packing list contains SKU codes (look for columns like "SKU", "Item Code", "Part #", "Product Code"), match them EXACTLY to order item SKUs first.
 
-CRITICAL INSTRUCTIONS:
-- Look for columns like "SKU", "Item #", "Part #", "Code" for SKU matching
-- Look for columns like "Qty", "Quantity", "Shipped", "Ship Qty", "Amount", "Count" for quantities
-- Extract numeric quantities - ignore units like "ea", "pcs", "units"
-- If a row has multiple quantity columns, prefer "Shipped" or "Ship Qty" over "Ordered"
-- Each packing list item should match AT MOST one order item
-- If you cannot confidently match an item, put it in unmatched_items
-- Return ALL matched items, even if quantity exceeds remaining to ship`;
+2. **PRODUCT NAME MATCHING** - When SKU is not available, match by product name:
+   - Compare the FULL product name from the packing list to EACH order item name
+   - Look for the MOST SIMILAR match, not just partial matches
+   - Be flexible with: word order, capitalization, abbreviations, size formats
+   - The product name in the packing list may appear in columns like "Product", "Description", "Item", "Name"
 
-    const userPrompt = `Parse this packing list and match products to order items. Return the shipped quantities for each matched item.
+3. **FUZZY MATCHING** - For products that don't match exactly:
+   - Look for key identifiers: product type, size, flavor, color, model number
+   - Match based on unique identifying words that appear in both names
+
+QUANTITY EXTRACTION:
+- Look for columns: "Qty", "Quantity", "Shipped", "Ship Qty", "Amount", "Count", "Units"
+- If multiple quantity columns exist, prefer "Shipped" or "Ship Qty" over "Ordered" or "Order Qty"
+- Extract only numeric values, ignore units like "ea", "pcs", "units"
+
+CRITICAL RULES:
+- Each order item ID should appear AT MOST ONCE in matched_items
+- Each packing list row should match AT MOST one order item
+- If unsure about a match, put the item in unmatched_items with its name and quantity
+- ALWAYS verify the match makes sense - don't match "Product A" to "Product B" just because they both have "Product"`;
+
+    const userPrompt = `Parse this packing list and match each product row to the correct order item. For each row in the packing list, find the BEST matching order item based on name similarity.
 
 Packing List Content:
-${parsedContent}`;
+${parsedContent}
 
-    console.log("Calling AI Gateway...");
+IMPORTANT: Return the order_item_id (the "id" field from the order items list) for each match, not the row number or any other identifier.`;
+
+    console.log("Calling AI Gateway with gemini-2.5-pro...");
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -115,7 +124,7 @@ ${parsedContent}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
