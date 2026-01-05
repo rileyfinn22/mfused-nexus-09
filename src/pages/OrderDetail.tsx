@@ -98,7 +98,7 @@ const OrderDetail = () => {
       .from('orders')
       .select('*, order_items(*)')
       .eq('id', orderId)
-      .order('created_at', { ascending: true, foreignTable: 'order_items' })
+      .order('line_number', { ascending: true, nullsFirst: false, foreignTable: 'order_items' })
       .single();
     if (!error && data) {
       setOrder(data);
