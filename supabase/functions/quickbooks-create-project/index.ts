@@ -192,13 +192,13 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Create sub-customer (Project) for this order
+    // Step 2: Create actual QBO Project (not a sub-customer)
     const projectName = `${order.order_number} - ${order.customer_name}`;
-    console.log('Creating project (sub-customer):', projectName);
+    console.log('Creating QBO Project:', projectName);
 
-    // Check if project already exists
+    // Check if project already exists for this customer
     const projectSearchResponse = await fetch(
-      `${qbApiUrl}/query?query=${encodeURIComponent(`SELECT * FROM Customer WHERE DisplayName='${projectName.replace(/'/g, "\\'")}' MAXRESULTS 1`)}&minorversion=65`,
+      `${qbApiUrl}/query?query=${encodeURIComponent(`SELECT * FROM Project WHERE ProjectName='${projectName.replace(/'/g, "\\'")}' MAXRESULTS 10`)}&minorversion=70`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -207,30 +207,31 @@ serve(async (req) => {
       }
     );
     const projectSearchData = await projectSearchResponse.json();
+    console.log('Project search result:', JSON.stringify(projectSearchData));
 
     let qbProjectId;
 
-    if (projectSearchData.QueryResponse?.Customer?.length > 0) {
-      qbProjectId = projectSearchData.QueryResponse.Customer[0].Id;
+    // Find existing project linked to this customer
+    const existingProject = projectSearchData.QueryResponse?.Project?.find(
+      (p: any) => p.CustomerRef?.value === parentCustomerId
+    );
+
+    if (existingProject) {
+      qbProjectId = existingProject.Id;
       console.log('Found existing project:', qbProjectId);
     } else {
-      // Create sub-customer (project)
+      // Create new QBO Project using the Projects API
       const projectPayload = {
-        DisplayName: projectName,
-        Job: true, // Mark as a job/project
-        ParentRef: {
+        ProjectName: projectName,
+        CustomerRef: {
           value: parentCustomerId,
         },
-        BillAddr: {
-          Line1: order.shipping_street || '',
-          City: order.shipping_city || '',
-          CountrySubDivisionCode: order.shipping_state || '',
-          PostalCode: order.shipping_zip || '',
-        },
-        Notes: `Order: ${order.order_number}\nDescription: ${order.description || ''}\nPO Number: ${order.po_number || ''}`,
+        Description: `Order: ${order.order_number}\nDescription: ${order.description || ''}\nPO Number: ${order.po_number || ''}`,
       };
 
-      const createProjectResponse = await fetch(`${qbApiUrl}/customer?minorversion=65`, {
+      console.log('Creating project with payload:', JSON.stringify(projectPayload));
+
+      const createProjectResponse = await fetch(`${qbApiUrl}/project?minorversion=70`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -243,11 +244,11 @@ serve(async (req) => {
       const newProject = await createProjectResponse.json();
 
       if (!createProjectResponse.ok) {
-        console.error('Failed to create project:', newProject);
+        console.error('Failed to create project:', JSON.stringify(newProject));
         throw new Error(newProject.Fault?.Error?.[0]?.Message || 'Failed to create project in QuickBooks');
       }
 
-      qbProjectId = newProject.Customer.Id;
+      qbProjectId = newProject.Project.Id;
       console.log('Created QB Project:', qbProjectId);
     }
 

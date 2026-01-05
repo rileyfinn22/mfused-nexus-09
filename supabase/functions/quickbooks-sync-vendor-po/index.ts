@@ -165,18 +165,21 @@ serve(async (req) => {
 
     async function isValidQbProjectRef(projectId: string): Promise<boolean> {
       try {
-        const resp = await fetch(`${qbApiUrl}/customer/${projectId}?minorversion=65`, {
+        // Check if this is an actual QBO Project (not a sub-customer)
+        const resp = await fetch(`${qbApiUrl}/project/${projectId}?minorversion=70`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json',
           },
         });
 
-        if (!resp.ok) return false;
+        if (!resp.ok) {
+          console.warn('Project not found or invalid:', projectId, resp.status);
+          return false;
+        }
 
         const data = await resp.json();
-        const customer = data?.Customer;
-        return !!customer && (customer.Job === true || !!customer.ParentRef);
+        return !!data?.Project;
       } catch (e) {
         console.warn('Failed to validate ProjectRef:', projectId, e);
         return false;
