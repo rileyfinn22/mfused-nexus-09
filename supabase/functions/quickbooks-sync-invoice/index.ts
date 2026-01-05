@@ -189,10 +189,11 @@ serve(async (req) => {
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
 
-    // Validate QB Project using Projects API
-    async function isValidQbProjectRef(projectId: string): Promise<boolean> {
+    // Validate QB "Project" reference as a Customer Job (sub-customer)
+    // (The /project API is not supported for some realms even if Projects UI is enabled.)
+    async function isValidQbProjectRef(jobCustomerId: string): Promise<boolean> {
       try {
-        const resp = await fetch(`${qbApiUrl}/project/${projectId}?minorversion=69`, {
+        const resp = await fetch(`${qbApiUrl}/customer/${jobCustomerId}?minorversion=65`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json',
@@ -200,14 +201,15 @@ serve(async (req) => {
         });
 
         if (!resp.ok) {
-          console.warn('Project not found or invalid:', projectId, resp.status);
+          console.warn('Job customer not found or invalid:', jobCustomerId, resp.status);
           return false;
         }
 
         const data = await resp.json();
-        return !!data?.Project;
+        const customer = data?.Customer;
+        return !!customer && (customer.Job === true || !!customer.ParentRef);
       } catch (e) {
-        console.warn('Failed to validate ProjectRef:', projectId, e);
+        console.warn('Failed to validate Job customer ref:', jobCustomerId, e);
         return false;
       }
     }
@@ -793,10 +795,13 @@ serve(async (req) => {
 
     console.log('QB Project ID for invoice:', qbProjectId);
 
-    // Create invoice payload using Projects API (QBO Plus/Advanced with Projects enabled)
+    // Create invoice payload.
+    // If an order has a Job (sub-customer) id in qb_project_id, we invoice against that Job so it shows up under Projects.
+    const invoiceCustomerRef = qbProjectId ? String(qbProjectId) : customerId;
+
     const invoicePayload: any = {
       CustomerRef: {
-        value: customerId,
+        value: invoiceCustomerRef,
       },
       Line: lineItems,
       TxnDate: invoice.invoice_date.split('T')[0],
@@ -824,12 +829,8 @@ serve(async (req) => {
       AllowOnlineACHPayment: true,
     };
 
-    // Attach to QB Project using ProjectRef (for P&L tracking via real Projects API)
     if (qbProjectId) {
-      invoicePayload.ProjectRef = {
-        value: String(qbProjectId),
-      };
-      console.log('Attaching invoice to QB Project:', qbProjectId);
+      console.log('Using Job customer for invoice (Projects UI):', qbProjectId);
     }
 
     // Note: We don't use the Deposit field for partial billing

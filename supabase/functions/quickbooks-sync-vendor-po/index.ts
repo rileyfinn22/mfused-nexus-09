@@ -163,10 +163,10 @@ serve(async (req) => {
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
 
-    // Validate QB Project using Projects API
-    async function isValidQbProjectRef(projectId: string): Promise<boolean> {
+    // Validate QB "Project" reference as a Customer Job (sub-customer)
+    async function isValidQbProjectRef(jobCustomerId: string): Promise<boolean> {
       try {
-        const resp = await fetch(`${qbApiUrl}/project/${projectId}?minorversion=69`, {
+        const resp = await fetch(`${qbApiUrl}/customer/${jobCustomerId}?minorversion=65`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json',
@@ -174,14 +174,15 @@ serve(async (req) => {
         });
 
         if (!resp.ok) {
-          console.warn('Project not found or invalid:', projectId, resp.status);
+          console.warn('Job customer not found or invalid:', jobCustomerId, resp.status);
           return false;
         }
 
         const data = await resp.json();
-        return !!data?.Project;
+        const customer = data?.Customer;
+        return !!customer && (customer.Job === true || !!customer.ParentRef);
       } catch (e) {
-        console.warn('Failed to validate ProjectRef:', projectId, e);
+        console.warn('Failed to validate Job customer ref:', jobCustomerId, e);
         return false;
       }
     }
@@ -243,6 +244,7 @@ serve(async (req) => {
         },
         Qty: item.quantity,
         UnitPrice: item.unit_cost,
+        ...(safeQbProjectId ? { CustomerRef: { value: safeQbProjectId } } : {}),
       },
       Description: item.description || item.name,
     })) || [];
@@ -259,12 +261,8 @@ serve(async (req) => {
       PrivateNote: `Vendor PO: ${vendorPo.po_number}`,
     };
 
-    // Attach to QB Project using ProjectRef (for P&L tracking)
     if (safeQbProjectId) {
-      billPayload.ProjectRef = {
-        value: safeQbProjectId,
-      };
-      console.log('Attaching bill to QB Project:', safeQbProjectId);
+      console.log('Tagging bill lines to Job customer (Projects UI):', safeQbProjectId);
     }
 
     let qbResponse;
