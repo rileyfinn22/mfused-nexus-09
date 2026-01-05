@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -906,6 +906,31 @@ const InvoiceDetail = () => {
     }
   };
 
+  const handleReopenInvoice = async () => {
+    if (!confirm('Reopen this invoice? This will set the status back to pending.')) {
+      return;
+    }
+    try {
+      const {
+        error
+      } = await supabase.from('invoices').update({
+        status: 'pending'
+      }).eq('id', invoiceId);
+      if (error) throw error;
+      toast({
+        title: "Invoice Reopened",
+        description: "Invoice has been reopened and set to pending"
+      });
+      fetchInvoiceDetails();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reopen invoice",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Calculate totals based on items actually on THIS invoice (from allocations)
   // For edit mode, recalculate. Otherwise use stored invoice.total
   const displayItems = editedItems;
@@ -984,6 +1009,10 @@ const InvoiceDetail = () => {
               {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleCloseInvoice} className="border-green-500 text-green-700 hover:bg-green-50">
                   <CheckCircle2 className="h-4 w-4 mr-2" />
                   Close Invoice
+                </Button>}
+              {invoice.status === 'closed' && <Button variant="outline" onClick={handleReopenInvoice} className="border-amber-500 text-amber-700 hover:bg-amber-50">
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reopen Invoice
                 </Button>}
             </>}
           {isVibeAdmin && (
