@@ -549,6 +549,14 @@ const InvoiceDetail = () => {
     const balance = (invoice.total || 0) - totalPaid;
     const hasPayments = totalPaid > 0;
     const totalsBoxHeight = hasPayments ? 55 : 35;
+
+    // Ensure we have space above the footer; if not, put totals/terms on a new page.
+    const footerLineY = pageHeight - 12;
+    const requiredSpace = totalsBoxHeight + (invoice.notes ? 85 : 55) + 20;
+    if (finalY + requiredSpace > footerLineY) {
+      doc.addPage();
+      finalY = 30;
+    }
     
     doc.roundedRect(totalsX, finalY - 5, totalsWidth, totalsBoxHeight, 2, 2, 'F');
     
@@ -631,8 +639,8 @@ const InvoiceDetail = () => {
     }
     
     // ============ FOOTER ============
-    // Check if content might overlap footer, adjust if needed
-    const footerStartY = pageHeight - 18;
+    // Place footer very low so it doesn't overlap totals
+    const footerStartY = pageHeight - 12;
     
     // Footer separator line
     doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
@@ -640,10 +648,10 @@ const InvoiceDetail = () => {
     doc.line(14, footerStartY, pageWidth - 14, footerStartY);
     
     // Company info footer
-    doc.setFontSize(7);
+    doc.setFontSize(6);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Vibe Packaging | 1415 S 700 W, Ste FLEXETC, Salt Lake City, UT 84104 | Thank you for your business!', pageWidth / 2, footerStartY + 7, { align: 'center' });
+    doc.text('Vibe Packaging | 1415 S 700 W, Ste FLEXETC, Salt Lake City, UT 84104 | Thank you for your business!', pageWidth / 2, footerStartY + 6, { align: 'center' });
     
     // Save
     doc.save(`invoice-${invoice.invoice_number}.pdf`);
