@@ -18,6 +18,7 @@ const EditProduct = () => {
   const [availableStock, setAvailableStock] = useState<number>(0);
   const [vendors, setVendors] = useState<any[]>([]);
   const [artworkFiles, setArtworkFiles] = useState<any[]>([]);
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   
   const [formData, setFormData] = useState({
@@ -34,12 +35,29 @@ const EditProduct = () => {
   });
 
   useEffect(() => {
+    checkRole();
+  }, []);
+
+  useEffect(() => {
     if (id) {
       fetchProduct();
       fetchInventory();
       fetchVendors();
     }
   }, [id]);
+
+  const checkRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: userRole } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    setIsVibeAdmin(userRole?.role === 'vibe_admin');
+  };
 
   useEffect(() => {
     // Auto-resize description textarea when content loads
@@ -304,22 +322,24 @@ const EditProduct = () => {
         <div className="space-y-4 bg-card p-6 rounded-lg border">
           <h2 className="text-lg font-semibold mb-4">Pricing</h2>
           
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="cost">Cost per Unit (Vendor Cost)</Label>
-              <Input
-                id="cost"
-                type="number"
-                step="0.001"
-                value={formData.cost}
-                onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                placeholder="0.000"
-              />
-              <p className="text-xs text-muted-foreground">What the vendor charges</p>
-            </div>
+          <div className={isVibeAdmin ? "grid grid-cols-2 gap-4" : ""}>
+            {isVibeAdmin && (
+              <div className="space-y-2">
+                <Label htmlFor="cost">Cost per Unit (Vendor Cost)</Label>
+                <Input
+                  id="cost"
+                  type="number"
+                  step="0.001"
+                  value={formData.cost}
+                  onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                  placeholder="0.000"
+                />
+                <p className="text-xs text-muted-foreground">What the vendor charges</p>
+              </div>
+            )}
 
             <div className="space-y-2">
-              <Label htmlFor="price">Price per Unit (Customer Price)</Label>
+              <Label htmlFor="price">Price per Unit</Label>
               <Input
                 id="price"
                 type="number"
@@ -328,7 +348,7 @@ const EditProduct = () => {
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 placeholder="0.000"
               />
-              <p className="text-xs text-muted-foreground">What you charge the customer</p>
+              {isVibeAdmin && <p className="text-xs text-muted-foreground">What you charge the customer</p>}
             </div>
           </div>
 
