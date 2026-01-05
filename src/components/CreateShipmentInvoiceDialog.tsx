@@ -757,7 +757,9 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {order.order_items?.map((item: any) => {
+                    {[...(order.order_items || [])].sort((a: any, b: any) => 
+                      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                    ).map((item: any) => {
                       const shipped = item.shipped_quantity || 0;
                       const remaining = item.quantity - shipped;
                       const availInv = availableInventory[item.sku]?.reduce((sum, inv) => sum + inv.available, 0) || 0;
