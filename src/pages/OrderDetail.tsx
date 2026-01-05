@@ -52,6 +52,7 @@ const OrderDetail = () => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [stageNotes, setStageNotes] = useState<{[key: string]: string}>({});
   const [stageImages, setStageImages] = useState<{[key: string]: File | null}>({});
+  const [stageFiles, setStageFiles] = useState<{[key: string]: File | null}>({});
   const [updatingStages, setUpdatingStages] = useState<{[key: string]: boolean}>({});
   const [invoices, setInvoices] = useState<any[]>([]);
   const [showShipmentDialog, setShowShipmentDialog] = useState(false);
@@ -273,6 +274,27 @@ const OrderDetail = () => {
         imageUrl = publicUrl;
       }
 
+      // Upload file (PDF/Excel) if provided - admin only
+      let fileUrl = null;
+      let uploadedFileName = null;
+      if (isVibeAdmin && stageFiles[stageId]) {
+        const file = stageFiles[stageId]!;
+        uploadedFileName = file.name;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${stageId}-${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('production-images')
+          .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('production-images')
+          .getPublicUrl(fileName);
+
+        fileUrl = publicUrl;
+      }
+
       // Update stage status
       const { error } = await supabase
         .from('production_stages')
@@ -293,6 +315,8 @@ const OrderDetail = () => {
         new_status: newStatus,
         note_text: stageNotes[stageId] || null,
         image_url: imageUrl,
+        file_url: fileUrl,
+        file_name: uploadedFileName,
       });
 
       if (updates.length > 0) {
@@ -303,9 +327,10 @@ const OrderDetail = () => {
         if (updateError) throw updateError;
       }
 
-      // Clear note and image for this stage
+      // Clear note, image and file for this stage
       setStageNotes(prev => ({ ...prev, [stageId]: "" }));
       setStageImages(prev => ({ ...prev, [stageId]: null }));
+      setStageFiles(prev => ({ ...prev, [stageId]: null }));
 
       toast({
         title: "Stage Updated",
@@ -1391,6 +1416,24 @@ const OrderDetail = () => {
                             )}
                           </div>
                           
+                          {isVibeAdmin && (
+                            <div>
+                              <Label htmlFor={`file-${stage.id}`} className="text-xs">Add Document (PDF/Excel - Optional)</Label>
+                              <Input
+                                id={`file-${stage.id}`}
+                                type="file"
+                                accept=".pdf,.xlsx,.xls,.csv"
+                                onChange={(e) => setStageFiles(prev => ({ ...prev, [stage.id]: e.target.files?.[0] || null }))}
+                                className="mt-1 text-xs"
+                              />
+                              {stageFiles[stage.id] && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Selected: {stageFiles[stage.id]!.name}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          
                           <Button
                             size="sm"
                             onClick={() => handleStageStatusChange(stage.id, stage.status)}
@@ -1437,6 +1480,21 @@ const OrderDetail = () => {
                                       <span className="text-white text-sm font-medium">Click to preview</span>
                                     </div>
                                   </div>
+                                )}
+                                {update.file_url && (
+                                  <a
+                                    href={update.file_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 mt-2 p-2 bg-background rounded border border-table-border hover:border-primary transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <FileText className="h-4 w-4 text-primary" />
+                                    <span className="text-xs text-primary hover:underline">
+                                      {update.file_name || 'Download Document'}
+                                    </span>
+                                    <Download className="h-3 w-3 text-muted-foreground ml-auto" />
+                                  </a>
                                 )}
                                 {update.previous_status && update.new_status && (
                                   <p className="text-muted-foreground">

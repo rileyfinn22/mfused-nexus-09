@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Upload, Plus, CheckCircle2, Circle, Clock } from "lucide-react";
+import { Loader2, ArrowLeft, Upload, Plus, CheckCircle2, Circle, Clock, FileText, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface Order {
@@ -40,6 +40,8 @@ interface StageUpdate {
   update_type: string;
   note_text: string | null;
   image_url: string | null;
+  file_url: string | null;
+  file_name: string | null;
   previous_status: string | null;
   new_status: string | null;
   created_at: string;
@@ -72,6 +74,7 @@ export default function ProductionDetail() {
   const [selectedStage, setSelectedStage] = useState<ProductionStage | null>(null);
   const [updateNote, setUpdateNote] = useState("");
   const [updateImage, setUpdateImage] = useState<File | null>(null);
+  const [updateFile, setUpdateFile] = useState<File | null>(null);
   const [newStatus, setNewStatus] = useState("");
   const [uploading, setUploading] = useState(false);
 
@@ -141,6 +144,8 @@ export default function ProductionDetail() {
             update_type,
             note_text,
             image_url,
+            file_url,
+            file_name,
             previous_status,
             new_status,
             created_at
@@ -243,6 +248,26 @@ export default function ProductionDetail() {
         imageUrl = publicUrl;
       }
 
+      // Upload file (PDF/Excel) if provided - admin only
+      let fileUrl = null;
+      let uploadedFileName = null;
+      if (isVibeAdmin && updateFile) {
+        uploadedFileName = updateFile.name;
+        const fileExt = updateFile.name.split('.').pop();
+        const fileName = `${selectedStage.id}-${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('production-images')
+          .upload(fileName, updateFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('production-images')
+          .getPublicUrl(fileName);
+
+        fileUrl = publicUrl;
+      }
+
       // Create updates
       const updates = [];
 
@@ -261,6 +286,16 @@ export default function ProductionDetail() {
           updated_by: user.id,
           update_type: 'image',
           image_url: imageUrl,
+        });
+      }
+
+      if (fileUrl && isVibeAdmin) {
+        updates.push({
+          stage_id: selectedStage.id,
+          updated_by: user.id,
+          update_type: 'file',
+          file_url: fileUrl,
+          file_name: uploadedFileName,
         });
       }
 
@@ -298,6 +333,7 @@ export default function ProductionDetail() {
       setUpdateDialogOpen(false);
       setUpdateNote("");
       setUpdateImage(null);
+      setUpdateFile(null);
       setNewStatus("");
       setSelectedStage(null);
       await fetchOrderAndStages();
@@ -453,6 +489,16 @@ export default function ProductionDetail() {
                                 />
                               </div>
                             )}
+                            {isVibeAdmin && (
+                              <div>
+                                <Label>Upload Document (PDF/Excel)</Label>
+                                <Input
+                                  type="file"
+                                  accept=".pdf,.xlsx,.xls,.csv"
+                                  onChange={(e) => setUpdateFile(e.target.files?.[0] || null)}
+                                />
+                              </div>
+                            )}
                             <Button onClick={handleUpdateStage} disabled={uploading} className="w-full">
                               {uploading ? (
                                 <>
@@ -493,6 +539,20 @@ export default function ProductionDetail() {
                               alt="Stage update"
                               className="rounded-lg max-h-48 object-cover"
                             />
+                          )}
+                          {update.file_url && (
+                            <a
+                              href={update.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg border hover:border-primary transition-colors"
+                            >
+                              <FileText className="h-4 w-4 text-primary" />
+                              <span className="text-sm text-primary hover:underline">
+                                {update.file_name || 'Download Document'}
+                              </span>
+                              <Download className="h-3 w-3 text-muted-foreground ml-auto" />
+                            </a>
                           )}
                           {update.previous_status && update.new_status && (
                             <p className="text-sm text-muted-foreground">
