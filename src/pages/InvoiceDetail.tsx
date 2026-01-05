@@ -387,97 +387,259 @@ const InvoiceDetail = () => {
     if (!invoice || !order) return;
     
     const doc = new jsPDF();
-    
-    // Add branding header
-    const headerY = await addPdfBranding(doc, { documentTitle: 'INVOICE' });
-    
-    let yPos = headerY + 5;
-    
-    // Invoice details
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Invoice #: ${invoice.invoice_number}`, 14, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Date: ${format(new Date(invoice.invoice_date), 'MMM d, yyyy')}`, 14, yPos + 5);
-    if (invoice.due_date) {
-      doc.text(`Due Date: ${format(new Date(invoice.due_date), 'MMM d, yyyy')}`, 14, yPos + 10);
-    }
-    doc.text(`Order #: ${order.order_number}`, 14, yPos + 15);
-    if (order.po_number) {
-      doc.text(`PO #: ${order.po_number}`, 14, yPos + 20);
-    }
-    
-    // Customer/Ship To info on the right
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    
+    // Colors
+    const primaryGreen = [76, 175, 80];
+    const darkGray = [51, 51, 51];
+    const mediumGray = [102, 102, 102];
+    const lightGray = [245, 245, 245];
+    
+    // ============ HEADER SECTION ============
+    // Green header bar
+    doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+    doc.rect(0, 0, pageWidth, 35, 'F');
+    
+    // Logo on left side of header
+    try {
+      const logoResponse = await fetch('/images/vibe-logo.png');
+      const logoBlob = await logoResponse.blob();
+      const logoBase64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(logoBlob);
+      });
+      doc.addImage(logoBase64, 'PNG', 14, 5, 45, 25);
+    } catch (error) {
+      // Fallback text logo
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text('Vibe Packaging', 14, 22);
+    }
+    
+    // INVOICE title on right side of header
+    doc.setFontSize(28);
     doc.setFont('helvetica', 'bold');
-    doc.text('Bill To:', pageWidth - 80, yPos);
+    doc.setTextColor(255, 255, 255);
+    doc.text('INVOICE', pageWidth - 14, 23, { align: 'right' });
+    
+    let yPos = 50;
+    
+    // ============ INVOICE INFO & BILL TO SECTION ============
+    // Left side - Invoice details in a styled box
+    doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+    doc.roundedRect(14, yPos - 5, 85, 45, 2, 2, 'F');
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+    doc.text('INVOICE DETAILS', 18, yPos + 2);
+    
+    doc.setFontSize(9);
+    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice #:', 18, yPos + 12);
     doc.setFont('helvetica', 'normal');
-    doc.text((invoice.companies as any)?.name || order.customer_name, pageWidth - 80, yPos + 5);
-    doc.text(order.billing_street || order.shipping_street, pageWidth - 80, yPos + 10);
-    doc.text(`${order.billing_city || order.shipping_city}, ${order.billing_state || order.shipping_state} ${order.billing_zip || order.shipping_zip}`, pageWidth - 80, yPos + 15);
+    doc.text(invoice.invoice_number, 50, yPos + 12);
     
-    yPos += 35;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Date:', 18, yPos + 20);
+    doc.setFont('helvetica', 'normal');
+    doc.text(format(new Date(invoice.invoice_date), 'MMM d, yyyy'), 50, yPos + 20);
     
-    // Items table
+    if (invoice.due_date) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('Due Date:', 18, yPos + 28);
+      doc.setFont('helvetica', 'normal');
+      doc.text(format(new Date(invoice.due_date), 'MMM d, yyyy'), 50, yPos + 28);
+    }
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Order #:', 18, yPos + 36);
+    doc.setFont('helvetica', 'normal');
+    doc.text(order.order_number, 50, yPos + 36);
+    
+    // Right side - Bill To
+    doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+    doc.roundedRect(105, yPos - 5, 90, 45, 2, 2, 'F');
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+    doc.text('BILL TO', 109, yPos + 2);
+    
+    doc.setFontSize(9);
+    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.text((invoice.companies as any)?.name || order.customer_name, 109, yPos + 12);
+    doc.setFont('helvetica', 'normal');
+    
+    const billStreet = order.billing_street || order.shipping_street || '';
+    const billCity = order.billing_city || order.shipping_city || '';
+    const billState = order.billing_state || order.shipping_state || '';
+    const billZip = order.billing_zip || order.shipping_zip || '';
+    
+    if (billStreet) doc.text(billStreet, 109, yPos + 20);
+    if (billCity) doc.text(`${billCity}, ${billState} ${billZip}`, 109, yPos + 28);
+    if (order.po_number) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('PO #: ', 109, yPos + 36);
+      doc.setFont('helvetica', 'normal');
+      doc.text(order.po_number, 122, yPos + 36);
+    }
+    
+    yPos += 55;
+    
+    // ============ ITEMS TABLE ============
     const tableData = editedItems.map((item: any) => [
       item.sku || '',
       item.name || '',
-      item.quantity?.toString() || '0',
+      (item.quantity || 0).toString(),
       formatUnitPrice(item.unit_price || 0),
       formatCurrency((item.quantity || 0) * (item.unit_price || 0))
     ]);
     
     autoTable(doc, {
       startY: yPos,
-      head: [['SKU', 'Description', 'Qty', 'Unit Price', 'Total']],
+      head: [['SKU', 'Description', 'Qty', 'Unit Price', 'Amount']],
       body: tableData,
-      theme: 'striped',
-      headStyles: { fillColor: [76, 175, 80], textColor: 255 },
-      columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 70 },
-        2: { cellWidth: 20, halign: 'right' },
-        3: { cellWidth: 25, halign: 'right' },
-        4: { cellWidth: 30, halign: 'right' }
+      theme: 'plain',
+      headStyles: { 
+        fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]], 
+        textColor: 255,
+        fontStyle: 'bold',
+        fontSize: 9,
+        cellPadding: 4
       },
-      margin: { left: 14, right: 14 }
+      bodyStyles: {
+        fontSize: 9,
+        cellPadding: 4,
+        textColor: [darkGray[0], darkGray[1], darkGray[2]]
+      },
+      alternateRowStyles: {
+        fillColor: [250, 250, 250]
+      },
+      columnStyles: {
+        0: { cellWidth: 35 },
+        1: { cellWidth: 75 },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 30, halign: 'right' },
+        4: { cellWidth: 30, halign: 'right', fontStyle: 'bold' }
+      },
+      margin: { left: 14, right: 14 },
+      tableLineColor: [220, 220, 220],
+      tableLineWidth: 0.1
     });
     
     // Get final Y position after table
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    let finalY = (doc as any).lastAutoTable.finalY + 15;
     
-    // Totals
-    const totalsX = pageWidth - 60;
-    doc.setFontSize(10);
-    doc.text('Subtotal:', totalsX - 30, finalY);
-    doc.text(formatCurrency(invoice.subtotal || 0), totalsX + 15, finalY, { align: 'right' });
+    // ============ TOTALS SECTION ============
+    const totalsWidth = 80;
+    const totalsX = pageWidth - totalsWidth - 14;
     
-    if (invoice.shipping_cost && invoice.shipping_cost > 0) {
-      doc.text('Shipping:', totalsX - 30, finalY + 6);
-      doc.text(formatCurrency(invoice.shipping_cost), totalsX + 15, finalY + 6, { align: 'right' });
-    }
+    // Totals box
+    doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
     
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total:', totalsX - 30, finalY + 14);
-    doc.text(formatCurrency(invoice.total || 0), totalsX + 15, finalY + 14, { align: 'right' });
-    
-    // Payment status
     const totalPaid = invoice.total_paid || 0;
     const balance = (invoice.total || 0) - totalPaid;
-    if (totalPaid > 0) {
-      doc.setFont('helvetica', 'normal');
-      doc.text('Paid:', totalsX - 30, finalY + 22);
-      doc.text(formatCurrency(totalPaid), totalsX + 15, finalY + 22, { align: 'right' });
-      
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(balance > 0 ? 220 : 76, balance > 0 ? 53 : 175, balance > 0 ? 69 : 80);
-      doc.text('Balance Due:', totalsX - 30, finalY + 30);
-      doc.text(formatCurrency(balance), totalsX + 15, finalY + 30, { align: 'right' });
-      doc.setTextColor(0, 0, 0);
+    const hasPayments = totalPaid > 0;
+    const totalsBoxHeight = hasPayments ? 55 : 35;
+    
+    doc.roundedRect(totalsX, finalY - 5, totalsWidth, totalsBoxHeight, 2, 2, 'F');
+    
+    doc.setFontSize(9);
+    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+    
+    // Subtotal
+    doc.setFont('helvetica', 'normal');
+    doc.text('Subtotal:', totalsX + 5, finalY + 5);
+    doc.text(formatCurrency(invoice.subtotal || 0), totalsX + totalsWidth - 5, finalY + 5, { align: 'right' });
+    
+    let totalsYOffset = 12;
+    
+    // Shipping
+    if (invoice.shipping_cost && invoice.shipping_cost > 0) {
+      doc.text('Shipping:', totalsX + 5, finalY + totalsYOffset + 5);
+      doc.text(formatCurrency(invoice.shipping_cost), totalsX + totalsWidth - 5, finalY + totalsYOffset + 5, { align: 'right' });
+      totalsYOffset += 8;
     }
     
-    // Footer
-    addPdfFooter(doc);
+    // Total line
+    doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+    doc.setLineWidth(0.5);
+    doc.line(totalsX + 5, finalY + totalsYOffset + 3, totalsX + totalsWidth - 5, finalY + totalsYOffset + 3);
+    
+    // Total
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+    doc.text('Total:', totalsX + 5, finalY + totalsYOffset + 12);
+    doc.text(formatCurrency(invoice.total || 0), totalsX + totalsWidth - 5, finalY + totalsYOffset + 12, { align: 'right' });
+    
+    // Payment info if applicable
+    if (hasPayments) {
+      totalsYOffset += 18;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text('Amount Paid:', totalsX + 5, finalY + totalsYOffset + 5);
+      doc.text(`-${formatCurrency(totalPaid)}`, totalsX + totalsWidth - 5, finalY + totalsYOffset + 5, { align: 'right' });
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      if (balance > 0) {
+        doc.setTextColor(220, 53, 69); // Red for balance due
+      } else {
+        doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]); // Green for paid
+      }
+      doc.text('Balance Due:', totalsX + 5, finalY + totalsYOffset + 15);
+      doc.text(formatCurrency(balance), totalsX + totalsWidth - 5, finalY + totalsYOffset + 15, { align: 'right' });
+    }
+    
+    // ============ TERMS & NOTES SECTION (Left side) ============
+    const termsY = finalY - 5;
+    const termsWidth = pageWidth - totalsWidth - 35;
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+    doc.text('PAYMENT TERMS', 14, termsY + 5);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+    doc.setFontSize(8);
+    const termsText = order.terms || 'Net 30 - Payment due within 30 days of invoice date.';
+    const splitTerms = doc.splitTextToSize(termsText, termsWidth);
+    doc.text(splitTerms, 14, termsY + 13);
+    
+    if (invoice.notes) {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.setFontSize(9);
+      doc.text('NOTES', 14, termsY + 28);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.setFontSize(8);
+      const splitNotes = doc.splitTextToSize(invoice.notes, termsWidth);
+      doc.text(splitNotes, 14, termsY + 36);
+    }
+    
+    // ============ FOOTER ============
+    // Footer separator line
+    doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+    doc.setLineWidth(1);
+    doc.line(14, pageHeight - 25, pageWidth - 14, pageHeight - 25);
+    
+    // Company info footer
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+    doc.text('Vibe Packaging | 1415 S 700 W, Ste FLEXETC, Salt Lake City, UT 84104', pageWidth / 2, pageHeight - 18, { align: 'center' });
+    doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
     
     // Save
     doc.save(`invoice-${invoice.invoice_number}.pdf`);
