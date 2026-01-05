@@ -192,13 +192,15 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Create actual QBO Project (not a sub-customer)
-    const projectName = `${order.order_number} - ${order.customer_name}`;
-    console.log('Creating QBO Project:', projectName);
+    // Step 2: Create sub-customer (Job) to represent this order
+    // Note: QBO Projects API is only available on Plus/Advanced with Projects enabled.
+    // Sub-customers work on all QBO tiers and serve the same purpose for tracking.
+    const subCustomerName = `${order.order_number} - ${order.customer_name}`;
+    console.log('Creating sub-customer for order:', subCustomerName);
 
-    // Check if project already exists for this customer
-    const projectSearchResponse = await fetch(
-      `${qbApiUrl}/query?query=${encodeURIComponent(`SELECT * FROM Project WHERE ProjectName='${projectName.replace(/'/g, "\\'")}' MAXRESULTS 10`)}&minorversion=70`,
+    // Check if sub-customer already exists
+    const subCustomerSearchResponse = await fetch(
+      `${qbApiUrl}/query?query=${encodeURIComponent(`SELECT * FROM Customer WHERE DisplayName='${subCustomerName.replace(/'/g, "\\'")}' MAXRESULTS 1`)}&minorversion=65`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -206,50 +208,81 @@ serve(async (req) => {
         },
       }
     );
-    const projectSearchData = await projectSearchResponse.json();
-    console.log('Project search result:', JSON.stringify(projectSearchData));
+    const subCustomerSearchData = await subCustomerSearchResponse.json();
 
     let qbProjectId;
 
-    // Find existing project linked to this customer
-    const existingProject = projectSearchData.QueryResponse?.Project?.find(
-      (p: any) => p.CustomerRef?.value === parentCustomerId
-    );
-
-    if (existingProject) {
-      qbProjectId = existingProject.Id;
-      console.log('Found existing project:', qbProjectId);
+    if (subCustomerSearchData.QueryResponse?.Customer?.length > 0) {
+      qbProjectId = subCustomerSearchData.QueryResponse.Customer[0].Id;
+      console.log('Found existing sub-customer:', qbProjectId);
     } else {
-      // Create new QBO Project using the Projects API
-      const projectPayload = {
-        ProjectName: projectName,
-        CustomerRef: {
+      // Create new sub-customer under the parent
+      const subCustomerPayload = {
+        DisplayName: subCustomerName,
+        CompanyName: (order.companies as any)?.name || order.customer_name,
+        Job: true,
+        ParentRef: {
           value: parentCustomerId,
         },
-        Description: `Order: ${order.order_number}\nDescription: ${order.description || ''}\nPO Number: ${order.po_number || ''}`,
+        Notes: `Order: ${order.order_number}\nDescription: ${order.description || ''}\nPO Number: ${order.po_number || ''}`,
+        BillAddr: {
+          Line1: order.billing_street || order.shipping_street || '',
+          City: order.billing_city || order.shipping_city || '',
+          CountrySubDivisionCode: order.billing_state || order.shipping_state || '',
+          PostalCode: order.billing_zip || order.shipping_zip || '',
+        },
+        ShipAddr: {
+          Line1: order.shipping_street || '',
+          City: order.shipping_city || '',
+          CountrySubDivisionCode: order.shipping_state || '',
+          PostalCode: order.shipping_zip || '',
+        },
       };
 
-      console.log('Creating project with payload:', JSON.stringify(projectPayload));
+      console.log('Creating sub-customer with payload:', JSON.stringify(subCustomerPayload));
 
-      const createProjectResponse = await fetch(`${qbApiUrl}/project?minorversion=70`, {
+      const createSubCustomerResponse = await fetch(`${qbApiUrl}/customer?minorversion=65`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(projectPayload),
+        body: JSON.stringify(subCustomerPayload),
       });
 
-      const newProject = await createProjectResponse.json();
+      const newSubCustomer = await createSubCustomerResponse.json();
 
-      if (!createProjectResponse.ok) {
-        console.error('Failed to create project:', JSON.stringify(newProject));
-        throw new Error(newProject.Fault?.Error?.[0]?.Message || 'Failed to create project in QuickBooks');
+      if (!createSubCustomerResponse.ok) {
+        console.error('Failed to create sub-customer:', JSON.stringify(newSubCustomer));
+        // Handle duplicate name
+        if (newSubCustomer.Fault?.Error?.[0]?.Message?.includes('Duplicate')) {
+          const retrySearch = await fetch(
+            `${qbApiUrl}/query?query=${encodeURIComponent(`SELECT * FROM Customer WHERE DisplayName LIKE '%${order.order_number}%' MAXRESULTS 10`)}&minorversion=65`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json',
+              },
+            }
+          );
+          const retryData = await retrySearch.json();
+          const match = retryData.QueryResponse?.Customer?.find(
+            (c: any) => c.DisplayName?.includes(order.order_number)
+          );
+          if (match) {
+            qbProjectId = match.Id;
+            console.log('Found duplicate sub-customer:', qbProjectId);
+          } else {
+            throw new Error(`Sub-customer for order ${order.order_number} exists but cannot be located`);
+          }
+        } else {
+          throw new Error(newSubCustomer.Fault?.Error?.[0]?.Message || 'Failed to create sub-customer in QuickBooks');
+        }
+      } else {
+        qbProjectId = newSubCustomer.Customer.Id;
+        console.log('Created sub-customer:', qbProjectId);
       }
-
-      qbProjectId = newProject.Project.Id;
-      console.log('Created QB Project:', qbProjectId);
     }
 
     // Step 3: Update order with QB Project ID
