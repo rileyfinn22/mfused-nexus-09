@@ -666,22 +666,58 @@ const InvoiceDetail = () => {
 
   const handleSaveQuantities = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // For blanket invoices, we need to create inventory allocations if quantities are being set
+      const isBlanketInvoice = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
+      
       // Update each order item
       for (const item of editedItems) {
-        const newTotal = Number(item.shipped_quantity) * Number(item.unit_price);
+        const newShippedQty = Number(item.shipped_quantity) || 0;
+        const newTotal = newShippedQty * Number(item.unit_price);
         const {
           error
         } = await supabase.from('order_items').update({
-          shipped_quantity: item.shipped_quantity,
+          shipped_quantity: newShippedQty,
           unit_price: item.unit_price,
           total: newTotal
         }).eq('id', item.id);
         if (error) throw error;
+        
+        // For blanket invoices being shipped directly, create/update inventory allocations
+        if (isBlanketInvoice && newShippedQty > 0) {
+          // Check if allocation already exists
+          const { data: existingAlloc } = await supabase
+            .from('inventory_allocations')
+            .select('id, quantity_allocated')
+            .eq('invoice_id', invoiceId)
+            .eq('order_item_id', item.id)
+            .single();
+          
+          if (existingAlloc) {
+            // Update existing allocation
+            await supabase
+              .from('inventory_allocations')
+              .update({ quantity_allocated: newShippedQty })
+              .eq('id', existingAlloc.id);
+          } else {
+            // Create new allocation
+            await supabase
+              .from('inventory_allocations')
+              .insert({
+                invoice_id: invoiceId,
+                order_item_id: item.id,
+                quantity_allocated: newShippedQty,
+                allocated_by: user?.id,
+                status: 'allocated'
+              });
+          }
+        }
       }
 
-      // Recalculate order totals
-      const newSubtotal = editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity) * Number(item.unit_price), 0);
-      const newTotal = newSubtotal + Number(invoice.tax);
+      // Recalculate order totals based on shipped quantities
+      const newSubtotal = editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
+      const newTotal = newSubtotal + Number(invoice.tax || 0);
 
       // Update order totals
       const {
@@ -934,7 +970,12 @@ const InvoiceDetail = () => {
   // Calculate totals based on items actually on THIS invoice (from allocations)
   // For edit mode, recalculate. Otherwise use stored invoice.total
   const displayItems = editedItems;
-  const displaySubtotal = isEditMode ? displayItems.reduce((sum: number, item: any) => sum + Number(item.quantity || item.shipped_quantity) * Number(item.unit_price), 0) : Number(invoice?.subtotal || 0);
+  const displaySubtotal = isEditMode 
+    ? displayItems.reduce((sum: number, item: any) => {
+        const qty = invoice?.invoice_type === 'full' ? Number(item.shipped_quantity || 0) : Number(item.quantity || 0);
+        return sum + qty * Number(item.unit_price);
+      }, 0) 
+    : Number(invoice?.subtotal || 0);
   const displayTotal = isEditMode ? displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0) : Number(invoice?.total || 0);
 
   // Calculate shipped percentage from actual quantities
@@ -978,7 +1019,16 @@ const InvoiceDetail = () => {
                     Save Changes
                   </Button>
                 </> : <>
-                  <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                  <Button variant="outline" onClick={() => {
+                // For blanket invoices, ensure we have the order items with shipped_quantity
+                if (invoice?.invoice_type === 'full' && order?.order_items) {
+                  setEditedItems(order.order_items.map((item: any) => ({
+                    ...item,
+                    shipped_quantity: item.shipped_quantity || 0
+                  })));
+                }
+                setIsEditMode(true);
+              }}>
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Items
                   </Button>
@@ -1434,13 +1484,18 @@ const InvoiceDetail = () => {
               </TableHeader>
               <TableBody>
                 {displayItems.map((item: any) => {
-                // For blanket (full) invoices, show the original order quantity and actual shipped quantity from DB
+                // For blanket (full) invoices, show the original order quantity and actual shipped quantity
                 // For partial invoices, show only the items in this shipment
                 const orderedQty = invoice?.invoice_type === 'partial' ? item.quantity || 0 : order?.order_items?.find((oi: any) => oi.sku === item.sku)?.quantity || item.quantity;
 
-                // For blanket invoices, get the real shipped_quantity from order_items
-                // For partial invoices, show the quantity in this shipment
-                const shippedQty = invoice?.invoice_type === 'partial' ? item.quantity || 0 : order?.order_items?.find((oi: any) => oi.sku === item.sku)?.shipped_quantity || 0;
+                // For blanket invoices in edit mode, use the editedItems value
+                // Otherwise get from order_items
+                const orderItem = order?.order_items?.find((oi: any) => oi.sku === item.sku);
+                const editedItem = editedItems.find((ei: any) => ei.id === item.id);
+                const shippedQty = isEditMode && editedItem 
+                  ? (editedItem.shipped_quantity || 0)
+                  : (invoice?.invoice_type === 'partial' ? item.quantity || 0 : orderItem?.shipped_quantity || 0);
+                
                 return <TableRow key={item.id}>
                       <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                       <TableCell className="font-medium">{item.name}</TableCell>
@@ -1453,7 +1508,7 @@ const InvoiceDetail = () => {
                             {orderedQty}
                           </TableCell>
                           <TableCell className="text-center">
-                            {isEditMode ? <Input type="number" min="0" value={shippedQty} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" /> : shippedQty}
+                            {isEditMode ? <Input type="number" min="0" max={orderedQty} value={shippedQty} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" /> : shippedQty}
                           </TableCell>
                         </>
                       ) : (
@@ -1465,7 +1520,7 @@ const InvoiceDetail = () => {
                         {isEditMode ? <Input type="number" step="0.001" min="0" value={item.unit_price} onChange={e => handlePriceChange(item.id, parseFloat(e.target.value) || 0)} className="w-28 text-right" /> : formatUnitPrice(Number(item.unit_price))}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {formatCurrency((invoice?.invoice_type === 'full' ? shippedQty : (item.quantity || 0)) * Number(item.unit_price))}
+                        {formatCurrency(shippedQty * Number(item.unit_price))}
                       </TableCell>
                     </TableRow>;
               })}
