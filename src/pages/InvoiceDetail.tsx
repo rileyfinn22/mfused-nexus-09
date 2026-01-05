@@ -1420,10 +1420,14 @@ const InvoiceDetail = () => {
                   <TableHead>SKU</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead className="text-center">Ordered</TableHead>
-                  <TableHead className="text-center">
-                    {invoice?.invoice_type === 'partial' ? 'In Shipment' : 'Shipped'}
-                  </TableHead>
+                  {invoice?.invoice_type === 'full' ? (
+                    <>
+                      <TableHead className="text-center">Ordered</TableHead>
+                      <TableHead className="text-center">Shipped</TableHead>
+                    </>
+                  ) : (
+                    <TableHead className="text-center">Quantity</TableHead>
+                  )}
                   <TableHead className="text-right">Unit Price</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
@@ -1443,17 +1447,25 @@ const InvoiceDetail = () => {
                       <TableCell className="text-sm text-muted-foreground">
                         {item.description || '-'}
                       </TableCell>
-                      <TableCell className="text-center">
-                        {orderedQty}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {isEditMode ? <Input type="number" min="0" value={shippedQty} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" /> : shippedQty}
-                      </TableCell>
+                      {invoice?.invoice_type === 'full' ? (
+                        <>
+                          <TableCell className="text-center">
+                            {orderedQty}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {isEditMode ? <Input type="number" min="0" value={shippedQty} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" /> : shippedQty}
+                          </TableCell>
+                        </>
+                      ) : (
+                        <TableCell className="text-center">
+                          {isEditMode ? <Input type="number" min="0" value={item.quantity || 0} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" /> : (item.quantity || 0)}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right">
                         {isEditMode ? <Input type="number" step="0.001" min="0" value={item.unit_price} onChange={e => handlePriceChange(item.id, parseFloat(e.target.value) || 0)} className="w-28 text-right" /> : formatUnitPrice(Number(item.unit_price))}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {formatCurrency(shippedQty * Number(item.unit_price))}
+                        {formatCurrency((invoice?.invoice_type === 'full' ? shippedQty : (item.quantity || 0)) * Number(item.unit_price))}
                       </TableCell>
                     </TableRow>;
               })}
