@@ -50,3 +50,6 @@ verify_jwt = true
 
 [functions.quickbooks-sync-projects]
 verify_jwt = false
+
+[functions.quickbooks-create-project]
+verify_jwt = true
