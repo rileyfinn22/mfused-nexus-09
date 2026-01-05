@@ -1194,7 +1194,11 @@ const OrderDetail = () => {
             <CreateShipmentInvoiceDialog
               open={showShipmentDialog}
               onOpenChange={setShowShipmentDialog}
-              order={order}
+              order={{
+                ...order,
+                // Keep the exact same item ordering the user sees on the Order page
+                order_items: displayItems,
+              }}
               onSuccess={() => {
                 fetchInvoices();
                 fetchOrder();
