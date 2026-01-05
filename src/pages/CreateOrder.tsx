@@ -719,8 +719,16 @@ const CreateOrder = () => {
         }];
       });
 
-      // Remove from unmatched
+      // Remove from unmatched state
       setUnmatchedPoItems(unmatchedPoItems.filter(item => item.id !== unmatchedItem.id));
+      
+      // Delete the unmatched item from database immediately
+      if (unmatchedItem.id) {
+        await supabase
+          .from('order_items')
+          .delete()
+          .eq('id', unmatchedItem.id);
+      }
 
       toast({
         title: "Product Added",
@@ -736,7 +744,7 @@ const CreateOrder = () => {
     }
   };
 
-  const handleMatchUnmatchedItem = (unmatchedItem: any, productId: string) => {
+  const handleMatchUnmatchedItem = async (unmatchedItem: any, productId: string) => {
     if (!productId) return;
 
     // Add to selected items with PO price (using callback to prevent race conditions)
@@ -750,8 +758,16 @@ const CreateOrder = () => {
       }];
     });
 
-    // Remove from unmatched
+    // Remove from unmatched state
     setUnmatchedPoItems(unmatchedPoItems.filter(item => item.id !== unmatchedItem.id));
+
+    // Delete the unmatched item from database immediately
+    if (unmatchedItem.id) {
+      await supabase
+        .from('order_items')
+        .delete()
+        .eq('id', unmatchedItem.id);
+    }
 
     // Clear selection and close popover
     setMatchingProductId({ ...matchingProductId, [unmatchedItem.id]: "" });
@@ -942,10 +958,25 @@ const CreateOrder = () => {
           .select('*')
           .eq('order_id', orderId);
 
-        // Track which existing items are still in the order
+        // Track which existing items (with product_id) are still in the order
         existingItemsMap = new Map(
-          (existingItems || []).map(item => [item.product_id, item])
+          (existingItems || [])
+            .filter(item => item.product_id !== null)
+            .map(item => [item.product_id, item])
         );
+        
+        // Also track unmatched items (null product_id) by their id for deletion
+        const unmatchedItemIds = (existingItems || [])
+          .filter(item => item.product_id === null)
+          .map(item => item.id);
+          
+        // Delete all unmatched items immediately
+        if (unmatchedItemIds.length > 0) {
+          await supabase
+            .from('order_items')
+            .delete()
+            .in('id', unmatchedItemIds);
+        }
       } else {
         // Create new order with sequential number - get max existing order number
         const { data: maxOrderData } = await supabase
@@ -1039,7 +1070,7 @@ const CreateOrder = () => {
           }
         }
         
-        // Delete items that are no longer in the order
+        // Delete items that are no longer in the order (matched items that were removed)
         const itemsToDelete = Array.from(existingItemsMap.values());
         if (itemsToDelete.length > 0) {
           await supabase
