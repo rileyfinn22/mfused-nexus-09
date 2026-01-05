@@ -93,6 +93,7 @@ const Customers = () => {
     const { data, error } = await supabase
       .from('companies')
       .select('*')
+      .neq('name', 'VibePKG')
       .order('name');
     
     if (error) {
