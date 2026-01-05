@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { exportToCSV } from "@/lib/exportUtils";
+import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -629,8 +630,34 @@ const Invoices = () => {
                       size="sm" 
                       className="h-6 w-6 p-0" 
                       title="Download Invoice"
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
+                        try {
+                          // Fetch order items for the PDF
+                          const { data: orderData } = await supabase
+                            .from('orders')
+                            .select(`
+                              *,
+                              order_items (*)
+                            `)
+                            .eq('id', invoice.order_id)
+                            .single();
+                          
+                          if (orderData) {
+                            await generateInvoicePDF(invoice, orderData);
+                            toast({
+                              title: "Success",
+                              description: "Invoice PDF downloaded"
+                            });
+                          }
+                        } catch (error) {
+                          console.error('Download error:', error);
+                          toast({
+                            title: "Error",
+                            description: "Failed to download invoice",
+                            variant: "destructive"
+                          });
+                        }
                       }}
                     >
                       <Download className="h-3 w-3" />
