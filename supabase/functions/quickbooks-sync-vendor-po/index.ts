@@ -84,13 +84,14 @@ serve(async (req) => {
 
     console.log('Syncing vendor PO:', vendorPoId);
 
-    // Get vendor PO with items
+    // Get vendor PO with items and linked order's QB project
     const { data: vendorPo, error: poError } = await supabase
       .from('vendor_pos')
       .select(`
         *,
         vendors(name, contact_email),
-        vendor_po_items(*)
+        vendor_po_items(*),
+        orders:order_id(qb_project_id)
       `)
       .eq('id', vendorPoId)
       .single();
@@ -98,6 +99,10 @@ serve(async (req) => {
     if (poError || !vendorPo) {
       throw new Error('Vendor PO not found');
     }
+
+    // Get the QB Project ID from the linked order (for P&L tracking)
+    const qbProjectId = (vendorPo.orders as any)?.qb_project_id;
+    console.log('QB Project ID for vendor PO:', qbProjectId);
 
     // Get QuickBooks settings and decrypt tokens
     const { data: qbSettings, error: qbError } = await supabase
@@ -210,7 +215,7 @@ serve(async (req) => {
     })) || [];
 
     // Create bill payload
-    const billPayload = {
+    const billPayload: any = {
       VendorRef: {
         value: qbVendorId,
       },
@@ -220,6 +225,14 @@ serve(async (req) => {
       DocNumber: vendorPo.po_number,
       PrivateNote: `Vendor PO: ${vendorPo.po_number}`,
     };
+
+    // Attach to QB Project if the linked order has one (for P&L tracking)
+    if (qbProjectId) {
+      billPayload.ProjectRef = {
+        value: qbProjectId,
+      };
+      console.log('Attaching bill to QB Project:', qbProjectId);
+    }
 
     let qbResponse;
     if (vendorPo.quickbooks_id) {

@@ -91,13 +91,12 @@ serve(async (req) => {
 
     console.log('Syncing invoice:', invoiceId, 'with billing percentage:', billingPercentage);
 
-    // Get invoice with items, allocations, and company info
-    // Get invoice with items and company info
+    // Get invoice with items, allocations, company info, and order's QB project
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .select(`
         *,
-        orders(*, order_items(*)),
+        orders(*, order_items(*), qb_project_id),
         companies:company_id(name, id)
       `)
       .eq('id', invoiceId)
@@ -756,6 +755,10 @@ serve(async (req) => {
     // This way customers see the full order value with deposit clearly shown
     console.log(`Billing ${billingPercentage}% now, ${100 - billingPercentage}% due later`);
 
+    // Get the QB Project ID from the order (if exists)
+    const qbProjectId = invoice.orders?.qb_project_id || invoice.qb_project_id;
+    console.log('QB Project ID for invoice:', qbProjectId);
+
     // Create invoice payload
     const invoicePayload: any = {
       CustomerRef: {
@@ -786,6 +789,14 @@ serve(async (req) => {
       AllowOnlineCreditCardPayment: true,
       AllowOnlineACHPayment: true,
     };
+
+    // Attach to QB Project if the order has one (for P&L tracking)
+    if (qbProjectId) {
+      invoicePayload.ProjectRef = {
+        value: qbProjectId,
+      };
+      console.log('Attaching invoice to QB Project:', qbProjectId);
+    }
 
     // Note: We don't use the Deposit field for partial billing
     // Instead, we adjust the line item amounts to reflect the billing percentage
