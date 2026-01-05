@@ -85,6 +85,21 @@ const InvoiceDetail = () => {
   const fetchInvoiceDetails = async () => {
     setLoading(true);
 
+    // First check if user is authenticated and has access
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      // Not logged in - redirect to login
+      navigate('/login');
+      return;
+    }
+
+    // Get user's company and role
+    const { data: userRole } = await supabase
+      .from('user_roles')
+      .select('company_id, role')
+      .eq('user_id', user.id)
+      .single();
+
     // Fetch invoice with order details and company info
     const {
       data: invoiceData,
@@ -113,6 +128,24 @@ const InvoiceDetail = () => {
       setLoading(false);
       return;
     }
+
+    // Check if user has access to this invoice
+    // vibe_admin can access all invoices, other users can only access their company's invoices
+    const isVibeAdminUser = userRole?.role === 'vibe_admin';
+    const userCompanyId = userRole?.company_id;
+    const invoiceCompanyId = invoiceData.company_id;
+
+    if (!isVibeAdminUser && userCompanyId !== invoiceCompanyId) {
+      // User doesn't have access to this invoice
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to view this invoice",
+        variant: "destructive"
+      });
+      navigate('/login');
+      return;
+    }
+
     console.log('Fetched invoice with company:', invoiceData);
     setInvoice(invoiceData);
     setOrder(invoiceData.orders);
