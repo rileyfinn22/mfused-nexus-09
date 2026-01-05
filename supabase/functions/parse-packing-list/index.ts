@@ -67,56 +67,72 @@ serve(async (req) => {
       console.log("Using text content directly, preview:", parsedContent.substring(0, 500));
     }
 
-    // Format order items for the AI to match against
+    // Format order items for deterministic matching
+    const normalizeSku = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const normalizeText = (s: string) =>
+      (s || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+
+    const tokenize = (s: string) => {
+      const t = normalizeText(s);
+      if (!t) return [] as string[];
+      return t.split(/\s+/).filter(Boolean);
+    };
+
+    const jaccard = (a: string[], b: string[]) => {
+      if (a.length === 0 || b.length === 0) return 0;
+      const A = new Set(a);
+      const B = new Set(b);
+      let inter = 0;
+      for (const x of A) if (B.has(x)) inter++;
+      const union = new Set([...A, ...B]).size;
+      return union === 0 ? 0 : inter / union;
+    };
+
     const orderItemsList = orderItems.map((item: any) => ({
       id: item.id,
       name: item.name,
       sku: item.sku,
       ordered_quantity: item.quantity,
-      already_shipped: item.shipped_quantity || 0
+      already_shipped: item.shipped_quantity || 0,
+      _sku_norm: normalizeSku(item.sku || ""),
+      _name_norm: normalizeText(item.name || ""),
+      _name_tokens: tokenize(item.name || ""),
     }));
 
-    console.log("Order items for matching:", JSON.stringify(orderItemsList.map((i: any) => ({ id: i.id.substring(0,8), name: i.name, sku: i.sku })), null, 2));
+    const orderBySku = new Map<string, any>();
+    for (const item of orderItemsList) {
+      if (item._sku_norm) orderBySku.set(item._sku_norm, item);
+    }
 
-    const systemPrompt = `You are a packing list parser. Your job is to extract shipped quantities from a packing list document and match them to order items.
+    console.log(
+      "Order items for matching:",
+      JSON.stringify(orderItemsList.map((i: any) => ({ id: i.id.substring(0, 8), name: i.name, sku: i.sku })), null, 2),
+    );
 
-The packing list may be in various formats (CSV, tab-separated, or plain text). It contains products that were shipped with their quantities.
+    // Step 1: Use AI ONLY to extract packing list line items (name/sku/qty) from the document.
+    // Step 2: Match extracted lines to order items deterministically (SKU first, then strict fuzzy name match).
 
-You have the following order items to match against:
-${JSON.stringify(orderItemsList, null, 2)}
+    const systemPrompt = `You extract shipped line items from a packing list.
 
-MATCHING RULES - FOLLOW STRICTLY IN THIS ORDER:
-1. **SKU MATCHING (HIGHEST PRIORITY)** - If the packing list contains SKU codes (look for columns like "SKU", "Item Code", "Part #", "Product Code"), match them EXACTLY to order item SKUs first.
+Return ONLY items that appear in the packing list content. Do NOT guess, do NOT invent items, and do NOT try to match against an order.
 
-2. **PRODUCT NAME MATCHING** - When SKU is not available, match by product name:
-   - Compare the FULL product name from the packing list to EACH order item name
-   - Look for the MOST SIMILAR match, not just partial matches
-   - Be flexible with: word order, capitalization, abbreviations, size formats
-   - The product name in the packing list may appear in columns like "Product", "Description", "Item", "Name"
+Rules:
+- Identify each shipped product row and extract:
+  - name (string)
+  - quantity (number)
+  - sku (string, optional) if present in the row (columns like SKU/Item Code/Part #)
+- If you can't find a quantity for a row, skip the row.
+- Ignore headers, totals, empty rows, and notes.
+- Quantity must be a number (e.g. 12, 1, 0.5).`;
 
-3. **FUZZY MATCHING** - For products that don't match exactly:
-   - Look for key identifiers: product type, size, flavor, color, model number
-   - Match based on unique identifying words that appear in both names
+    const userPrompt = `Extract the shipped line items from this packing list:
 
-QUANTITY EXTRACTION:
-- Look for columns: "Qty", "Quantity", "Shipped", "Ship Qty", "Amount", "Count", "Units"
-- If multiple quantity columns exist, prefer "Shipped" or "Ship Qty" over "Ordered" or "Order Qty"
-- Extract only numeric values, ignore units like "ea", "pcs", "units"
+${parsedContent}`;
 
-CRITICAL RULES:
-- Each order item ID should appear AT MOST ONCE in matched_items
-- Each packing list row should match AT MOST one order item
-- If unsure about a match, put the item in unmatched_items with its name and quantity
-- ALWAYS verify the match makes sense - don't match "Product A" to "Product B" just because they both have "Product"`;
-
-    const userPrompt = `Parse this packing list and match each product row to the correct order item. For each row in the packing list, find the BEST matching order item based on name similarity.
-
-Packing List Content:
-${parsedContent}
-
-IMPORTANT: Return the order_item_id (the "id" field from the order items list) for each match, not the row number or any other identifier.`;
-
-    console.log("Calling AI Gateway with gemini-2.5-pro...");
+    console.log("Calling AI Gateway (extract items)...");
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -127,85 +143,55 @@ IMPORTANT: Return the order_item_id (the "id" field from the order items list) f
         model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+          { role: "user", content: userPrompt },
         ],
         tools: [
           {
             type: "function",
             function: {
-              name: "parse_packing_list",
-              description: "Parse packing list and match to order items with shipped quantities",
+              name: "extract_packing_list_items",
+              description: "Extract shipped items (name/sku/quantity) from a packing list",
               parameters: {
                 type: "object",
                 properties: {
-                  matched_items: {
+                  packing_list_items: {
                     type: "array",
-                    description: "Items that were matched between packing list and order",
-                    items: {
-                      type: "object",
-                      properties: {
-                        order_item_id: { 
-                          type: "string",
-                          description: "The ID of the matching order item"
-                        },
-                        shipped_quantity: { 
-                          type: "number",
-                          description: "The quantity shipped according to the packing list"
-                        },
-                        packing_list_name: {
-                          type: "string",
-                          description: "The product name as it appears in the packing list"
-                        },
-                        match_confidence: {
-                          type: "string",
-                          enum: ["high", "medium", "low"],
-                          description: "Confidence level of the match"
-                        }
-                      },
-                      required: ["order_item_id", "shipped_quantity", "packing_list_name", "match_confidence"]
-                    }
-                  },
-                  unmatched_items: {
-                    type: "array",
-                    description: "Items in packing list that couldn't be matched to any order item",
                     items: {
                       type: "object",
                       properties: {
                         name: { type: "string" },
-                        quantity: { type: "number" }
+                        sku: { type: "string" },
+                        quantity: { type: "number" },
                       },
-                      required: ["name", "quantity"]
-                    }
+                      required: ["name", "quantity"],
+                    },
                   },
-                  parsing_notes: {
-                    type: "string",
-                    description: "Any notes about the parsing process or issues encountered"
-                  }
+                  parsing_notes: { type: "string" },
                 },
-                required: ["matched_items", "unmatched_items", "parsing_notes"]
-              }
-            }
-          }
+                required: ["packing_list_items", "parsing_notes"],
+              },
+            },
+          },
         ],
-        tool_choice: { type: "function", function: { name: "parse_packing_list" } }
+        tool_choice: { type: "function", function: { name: "extract_packing_list_items" } },
       }),
     });
 
     console.log(`AI Gateway response status: ${response.status}`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`AI Gateway error response: ${errorText}`);
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
       if (response.status === 402) {
         return new Response(
           JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
       throw new Error(`AI Gateway error: ${response.status}`);
@@ -213,16 +199,98 @@ IMPORTANT: Return the order_item_id (the "id" field from the order items list) f
 
     const data = await response.json();
     console.log("AI Gateway response received");
-    
+
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
+
     if (!toolCall) {
       console.error("No tool call in AI response:", JSON.stringify(data));
       throw new Error("No tool call in response");
     }
 
-    const result = JSON.parse(toolCall.function.arguments);
-    console.log(`Successfully matched ${result.matched_items?.length || 0} items, ${result.unmatched_items?.length || 0} unmatched`);
+    const extracted = JSON.parse(toolCall.function.arguments) as {
+      packing_list_items: Array<{ name: string; sku?: string; quantity: number }>;
+      parsing_notes: string;
+    };
+
+    const lines = (extracted.packing_list_items || [])
+      .map((x) => ({
+        name: (x.name || "").trim(),
+        sku: (x.sku || "").trim(),
+        quantity: Number(x.quantity),
+      }))
+      .filter((x) => x.name && Number.isFinite(x.quantity) && x.quantity > 0);
+
+    console.log(`Extracted ${lines.length} line items from packing list`);
+
+    // Deterministic matching (SKU first, then strict fuzzy name match)
+    const confidenceRankToStr = (r: number): "high" | "medium" | "low" => (r >= 3 ? "high" : r === 2 ? "medium" : "low");
+
+    const matchedAgg = new Map<
+      string,
+      { qty: number; names: Set<string>; confidenceRank: number }
+    >();
+
+    const unmatched: Array<{ name: string; quantity: number }> = [];
+
+    for (const line of lines) {
+      const skuNorm = normalizeSku(line.sku || "");
+      const nameNorm = normalizeText(line.name);
+
+      // 1) SKU exact match
+      if (skuNorm && orderBySku.has(skuNorm)) {
+        const orderItem = orderBySku.get(skuNorm);
+        const prev = matchedAgg.get(orderItem.id) || { qty: 0, names: new Set<string>(), confidenceRank: 3 };
+        prev.qty += line.quantity;
+        prev.names.add(line.name);
+        prev.confidenceRank = Math.min(prev.confidenceRank, 3);
+        matchedAgg.set(orderItem.id, prev);
+        continue;
+      }
+
+      // 2) Name fuzzy match with threshold
+      const lineTokens = tokenize(line.name);
+      if (!nameNorm || lineTokens.length === 0) {
+        unmatched.push({ name: line.name || "(unknown)", quantity: line.quantity });
+        continue;
+      }
+
+      let best: { item: any; score: number } | null = null;
+      for (const item of orderItemsList) {
+        const base = jaccard(lineTokens, item._name_tokens);
+        const substringBoost = item._name_norm && (item._name_norm.includes(nameNorm) || nameNorm.includes(item._name_norm)) ? 0.15 : 0;
+        const score = Math.min(1, base + substringBoost);
+        if (!best || score > best.score) best = { item, score };
+      }
+
+      const bestScore = best?.score ?? 0;
+      if (!best || bestScore < 0.55) {
+        // Below threshold = don't match
+        unmatched.push({ name: line.name, quantity: line.quantity });
+        continue;
+      }
+
+      const rank = bestScore >= 0.8 ? 3 : bestScore >= 0.7 ? 2 : 1;
+      const prev = matchedAgg.get(best.item.id) || { qty: 0, names: new Set<string>(), confidenceRank: rank };
+      prev.qty += line.quantity;
+      prev.names.add(line.name);
+      prev.confidenceRank = Math.min(prev.confidenceRank, rank);
+      matchedAgg.set(best.item.id, prev);
+    }
+
+    const matched_items = [...matchedAgg.entries()].map(([order_item_id, v]) => ({
+      order_item_id,
+      shipped_quantity: v.qty,
+      packing_list_name: [...v.names].join("; "),
+      match_confidence: confidenceRankToStr(v.confidenceRank),
+    }));
+
+    const result = {
+      matched_items,
+      unmatched_items: unmatched,
+      parsing_notes: `Extracted ${lines.length} packing list rows. Matched ${matched_items.length} order items (SKU-first + strict name matching). ${unmatched.length} rows unmatched. ${extracted.parsing_notes || ""}`.trim(),
+    };
+
+    console.log(`Matched ${matched_items.length} items, ${unmatched.length} unmatched`);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
