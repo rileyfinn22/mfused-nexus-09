@@ -157,6 +157,11 @@ const VendorPODetail = () => {
         .update({
           status: editedPO.status,
           expected_delivery_date: editedPO.expected_delivery_date,
+          ship_to_name: editedPO.ship_to_name,
+          ship_to_street: editedPO.ship_to_street,
+          ship_to_city: editedPO.ship_to_city,
+          ship_to_state: editedPO.ship_to_state,
+          ship_to_zip: editedPO.ship_to_zip,
           total: newTotal
         })
         .eq('id', poId);
@@ -183,11 +188,12 @@ const VendorPODetail = () => {
     if (!po || !vendor) return;
 
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
     
-    // Add branding header with logo - smaller title, left aligned
+    // Add branding header with logo on right, title on left
     const headerY = await addPdfBranding(doc, { documentTitle: 'Purchase Order', titleAlign: 'left' });
     
-    // PO Info - removed status, added due date
+    // PO Info
     let yPos = headerY + 5;
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
@@ -195,22 +201,35 @@ const VendorPODetail = () => {
     doc.text(`Order Date: ${new Date(po.order_date).toLocaleDateString()}`, 14, yPos + 7);
     doc.text(`Customer Order: ${po.orders?.order_number || 'N/A'}`, 14, yPos + 14);
     
-    let lineOffset = 21;
     if (po.expected_delivery_date) {
-      doc.text(`Due Date: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + lineOffset);
-      lineOffset += 7;
+      doc.text(`Requested Due Date: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + 21);
     }
 
-    // Vendor Info
-    doc.setFontSize(12);
+    // Two column layout: Vendor Info (left) | Ship To (right)
+    const colWidth = (pageWidth - 28) / 2;
+    const infoStartY = yPos + 35;
+    
+    // Vendor Info (left column)
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text("Vendor Information", 14, yPos + lineOffset + 10);
+    doc.text("Vendor", 14, infoStartY);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(`${vendor.name}`, 14, yPos + lineOffset + 17);
-    if (vendor.contact_name) doc.text(`Contact: ${vendor.contact_name}`, 14, yPos + lineOffset + 23);
-    if (vendor.contact_email) doc.text(`Email: ${vendor.contact_email}`, 14, yPos + lineOffset + 29);
-    if (vendor.contact_phone) doc.text(`Phone: ${vendor.contact_phone}`, 14, yPos + lineOffset + 35);
+    doc.text(`${vendor.name}`, 14, infoStartY + 7);
+    if (vendor.contact_name) doc.text(`${vendor.contact_name}`, 14, infoStartY + 13);
+    if (vendor.contact_email) doc.text(`${vendor.contact_email}`, 14, infoStartY + 19);
+    if (vendor.contact_phone) doc.text(`${vendor.contact_phone}`, 14, infoStartY + 25);
+
+    // Ship To (right column)
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Ship To", 14 + colWidth + 10, infoStartY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    if (po.ship_to_name) doc.text(po.ship_to_name, 14 + colWidth + 10, infoStartY + 7);
+    if (po.ship_to_street) doc.text(po.ship_to_street, 14 + colWidth + 10, infoStartY + 13);
+    const cityStateZip = [po.ship_to_city, po.ship_to_state, po.ship_to_zip].filter(Boolean).join(', ');
+    if (cityStateZip) doc.text(cityStateZip, 14 + colWidth + 10, infoStartY + 19);
 
     // Items table
     const tableData = poItems.map(item => [
@@ -223,7 +242,7 @@ const VendorPODetail = () => {
     ]);
 
     autoTable(doc, {
-      startY: yPos + lineOffset + 50,
+      startY: infoStartY + 40,
       head: [['SKU', 'Product', 'Description', 'Quantity', 'Unit Cost', 'Total']],
       body: tableData,
       theme: 'grid',
@@ -252,11 +271,12 @@ const VendorPODetail = () => {
     if (!po || !vendor) return '';
 
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
     
-    // Add branding header with logo - smaller title, left aligned
+    // Add branding header with logo on right, title on left
     const headerY = await addPdfBranding(doc, { documentTitle: 'Purchase Order', titleAlign: 'left' });
     
-    // PO Info - removed status, added due date
+    // PO Info
     let yPos = headerY + 5;
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
@@ -264,22 +284,35 @@ const VendorPODetail = () => {
     doc.text(`Order Date: ${new Date(po.order_date).toLocaleDateString()}`, 14, yPos + 7);
     doc.text(`Customer Order: ${po.orders?.order_number || 'N/A'}`, 14, yPos + 14);
     
-    let lineOffset = 21;
     if (po.expected_delivery_date) {
-      doc.text(`Due Date: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + lineOffset);
-      lineOffset += 7;
+      doc.text(`Requested Due Date: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + 21);
     }
 
-    // Vendor Info
-    doc.setFontSize(12);
+    // Two column layout: Vendor Info (left) | Ship To (right)
+    const colWidth = (pageWidth - 28) / 2;
+    const infoStartY = yPos + 35;
+    
+    // Vendor Info (left column)
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text("Vendor Information", 14, yPos + lineOffset + 10);
+    doc.text("Vendor", 14, infoStartY);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(`${vendor.name}`, 14, yPos + lineOffset + 17);
-    if (vendor.contact_name) doc.text(`Contact: ${vendor.contact_name}`, 14, yPos + lineOffset + 23);
-    if (vendor.contact_email) doc.text(`Email: ${vendor.contact_email}`, 14, yPos + lineOffset + 29);
-    if (vendor.contact_phone) doc.text(`Phone: ${vendor.contact_phone}`, 14, yPos + lineOffset + 35);
+    doc.text(`${vendor.name}`, 14, infoStartY + 7);
+    if (vendor.contact_name) doc.text(`${vendor.contact_name}`, 14, infoStartY + 13);
+    if (vendor.contact_email) doc.text(`${vendor.contact_email}`, 14, infoStartY + 19);
+    if (vendor.contact_phone) doc.text(`${vendor.contact_phone}`, 14, infoStartY + 25);
+
+    // Ship To (right column)
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Ship To", 14 + colWidth + 10, infoStartY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    if (po.ship_to_name) doc.text(po.ship_to_name, 14 + colWidth + 10, infoStartY + 7);
+    if (po.ship_to_street) doc.text(po.ship_to_street, 14 + colWidth + 10, infoStartY + 13);
+    const cityStateZip = [po.ship_to_city, po.ship_to_state, po.ship_to_zip].filter(Boolean).join(', ');
+    if (cityStateZip) doc.text(cityStateZip, 14 + colWidth + 10, infoStartY + 19);
 
     // Items table
     const tableData = poItems.map(item => [
@@ -292,7 +325,7 @@ const VendorPODetail = () => {
     ]);
 
     autoTable(doc, {
-      startY: yPos + lineOffset + 50,
+      startY: infoStartY + 40,
       head: [['SKU', 'Product', 'Description', 'Quantity', 'Unit Cost', 'Total']],
       body: tableData,
       theme: 'grid',
@@ -491,28 +524,78 @@ Thank you for your business.`;
               </div>
             </div>
 
-            {/* Dates */}
+            {/* Dates and Ship To */}
             <div className="grid grid-cols-2 gap-6 mt-6 bg-background/80 backdrop-blur rounded-lg p-6">
-              <div>
-                <Label className="text-xs text-muted-foreground">Order Date</Label>
-                <p className="font-medium">{new Date(po.order_date).toLocaleDateString()}</p>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Order Date</Label>
+                  <p className="font-medium">{new Date(po.order_date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Requested Due Date</Label>
+                  {isEditMode ? (
+                    <Input
+                      type="date"
+                      value={editedPO.expected_delivery_date || ''}
+                      onChange={(e) => setEditedPO({...editedPO, expected_delivery_date: e.target.value})}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {po.expected_delivery_date 
+                        ? new Date(po.expected_delivery_date).toLocaleDateString()
+                        : 'Not set'
+                      }
+                    </p>
+                  )}
+                </div>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Expected Delivery</Label>
+                <Label className="text-xs text-muted-foreground mb-2 block">Ship To Address</Label>
                 {isEditMode ? (
-                  <Input
-                    type="date"
-                    value={editedPO.expected_delivery_date || ''}
-                    onChange={(e) => setEditedPO({...editedPO, expected_delivery_date: e.target.value})}
-                    className="mt-1"
-                  />
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Name / Company"
+                      value={editedPO.ship_to_name || ''}
+                      onChange={(e) => setEditedPO({...editedPO, ship_to_name: e.target.value})}
+                    />
+                    <Input
+                      placeholder="Street Address"
+                      value={editedPO.ship_to_street || ''}
+                      onChange={(e) => setEditedPO({...editedPO, ship_to_street: e.target.value})}
+                    />
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input
+                        placeholder="City"
+                        value={editedPO.ship_to_city || ''}
+                        onChange={(e) => setEditedPO({...editedPO, ship_to_city: e.target.value})}
+                      />
+                      <Input
+                        placeholder="State"
+                        value={editedPO.ship_to_state || ''}
+                        onChange={(e) => setEditedPO({...editedPO, ship_to_state: e.target.value})}
+                      />
+                      <Input
+                        placeholder="ZIP"
+                        value={editedPO.ship_to_zip || ''}
+                        onChange={(e) => setEditedPO({...editedPO, ship_to_zip: e.target.value})}
+                      />
+                    </div>
+                  </div>
                 ) : (
-                  <p className="font-medium">
-                    {po.expected_delivery_date 
-                      ? new Date(po.expected_delivery_date).toLocaleDateString()
-                      : 'Not set'
-                    }
-                  </p>
+                  <div className="text-sm">
+                    {po.ship_to_name || po.ship_to_street ? (
+                      <>
+                        {po.ship_to_name && <p className="font-medium">{po.ship_to_name}</p>}
+                        {po.ship_to_street && <p>{po.ship_to_street}</p>}
+                        {(po.ship_to_city || po.ship_to_state || po.ship_to_zip) && (
+                          <p>{[po.ship_to_city, po.ship_to_state, po.ship_to_zip].filter(Boolean).join(', ')}</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground">Not set</p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

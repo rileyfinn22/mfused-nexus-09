@@ -1787,6 +1787,11 @@ export type Database = {
           quickbooks_id: string | null
           quickbooks_sync_status: string | null
           quickbooks_synced_at: string | null
+          ship_to_city: string | null
+          ship_to_name: string | null
+          ship_to_state: string | null
+          ship_to_street: string | null
+          ship_to_zip: string | null
           status: string
           total: number
           updated_at: string
@@ -1807,6 +1812,11 @@ export type Database = {
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
+          ship_to_city?: string | null
+          ship_to_name?: string | null
+          ship_to_state?: string | null
+          ship_to_street?: string | null
+          ship_to_zip?: string | null
           status?: string
           total?: number
           updated_at?: string
@@ -1827,6 +1837,11 @@ export type Database = {
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
+          ship_to_city?: string | null
+          ship_to_name?: string | null
+          ship_to_state?: string | null
+          ship_to_street?: string | null
+          ship_to_zip?: string | null
           status?: string
           total?: number
           updated_at?: string
