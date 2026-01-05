@@ -399,9 +399,9 @@ const InvoiceDetail = () => {
     // ============ HEADER SECTION ============
     // Green header bar
     doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.rect(0, 0, pageWidth, 32, 'F');
+    doc.rect(0, 0, pageWidth, 38, 'F');
     
-    // Logo on left side of header - proper aspect ratio
+    // Logo on left side of header - natural size, no stretching
     try {
       const logoResponse = await fetch('/images/vibe-logo.png');
       const logoBlob = await logoResponse.blob();
@@ -410,23 +410,23 @@ const InvoiceDetail = () => {
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(logoBlob);
       });
-      // Use proper aspect ratio for logo (wider, not as tall)
-      doc.addImage(logoBase64, 'PNG', 12, 4, 55, 24);
+      // Let the logo maintain its natural aspect ratio
+      doc.addImage(logoBase64, 'PNG', 14, 6, 0, 26);
     } catch (error) {
       // Fallback text logo
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(255, 255, 255);
-      doc.text('Vibe Packaging', 14, 20);
+      doc.text('Vibe Packaging', 14, 24);
     }
     
     // INVOICE title on right side of header
     doc.setFontSize(26);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255);
-    doc.text('INVOICE', pageWidth - 14, 20, { align: 'right' });
+    doc.text('INVOICE', pageWidth - 14, 24, { align: 'right' });
     
-    let yPos = 50;
+    let yPos = 52;
     
     // ============ INVOICE INFO & BILL TO SECTION ============
     // Left side - Invoice details in a styled box
@@ -631,17 +631,20 @@ const InvoiceDetail = () => {
     }
     
     // ============ FOOTER ============
+    // Check if content might overlap footer, adjust if needed
+    const footerStartY = pageHeight - 30;
+    
     // Footer separator line
     doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.setLineWidth(1);
-    doc.line(14, pageHeight - 25, pageWidth - 14, pageHeight - 25);
+    doc.setLineWidth(0.5);
+    doc.line(14, footerStartY, pageWidth - 14, footerStartY);
     
     // Company info footer
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Vibe Packaging | 1415 S 700 W, Ste FLEXETC, Salt Lake City, UT 84104', pageWidth / 2, pageHeight - 18, { align: 'center' });
-    doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+    doc.text('Vibe Packaging | 1415 S 700 W, Ste FLEXETC, Salt Lake City, UT 84104', pageWidth / 2, footerStartY + 8, { align: 'center' });
+    doc.text('Thank you for your business!', pageWidth / 2, footerStartY + 14, { align: 'center' });
     
     // Save
     doc.save(`invoice-${invoice.invoice_number}.pdf`);
