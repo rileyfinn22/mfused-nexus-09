@@ -376,12 +376,12 @@ Return ONLY valid JSON:
       .order('created_at', { ascending: false })
       .limit(100);
     
-    let orderNum = 10700; // Default starting number
+    let orderNum = 10703; // Starting number (after existing Mfused orders)
     if (maxOrderData && maxOrderData.length > 0) {
-      // Find the highest numeric order number (handles both "ORD-00001" and "10700" formats)
+      // Find the highest numeric order number
       for (const order of maxOrderData) {
         const orderNumStr = order.order_number;
-        // Try to extract number from formats like "ORD-00001" or plain "10700"
+        // Extract trailing digits from order number
         const match = orderNumStr.match(/(\d+)$/);
         if (match) {
           const num = parseInt(match[1], 10);
