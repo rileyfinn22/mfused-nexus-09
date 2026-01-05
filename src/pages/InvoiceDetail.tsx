@@ -24,7 +24,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
+import { addPdfBranding, addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
 const InvoiceDetail = () => {
   const {
     invoiceId
@@ -349,6 +349,112 @@ const InvoiceDetail = () => {
       });
     }
   };
+
+  const handleDownloadPDF = async () => {
+    if (!invoice || !order) return;
+    
+    const doc = new jsPDF();
+    
+    // Add branding header
+    const headerY = await addPdfBranding(doc, { documentTitle: 'INVOICE' });
+    
+    let yPos = headerY + 5;
+    
+    // Invoice details
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Invoice #: ${invoice.invoice_number}`, 14, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Date: ${format(new Date(invoice.invoice_date), 'MMM d, yyyy')}`, 14, yPos + 5);
+    if (invoice.due_date) {
+      doc.text(`Due Date: ${format(new Date(invoice.due_date), 'MMM d, yyyy')}`, 14, yPos + 10);
+    }
+    doc.text(`Order #: ${order.order_number}`, 14, yPos + 15);
+    if (order.po_number) {
+      doc.text(`PO #: ${order.po_number}`, 14, yPos + 20);
+    }
+    
+    // Customer/Ship To info on the right
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.setFont('helvetica', 'bold');
+    doc.text('Bill To:', pageWidth - 80, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text((invoice.companies as any)?.name || order.customer_name, pageWidth - 80, yPos + 5);
+    doc.text(order.billing_street || order.shipping_street, pageWidth - 80, yPos + 10);
+    doc.text(`${order.billing_city || order.shipping_city}, ${order.billing_state || order.shipping_state} ${order.billing_zip || order.shipping_zip}`, pageWidth - 80, yPos + 15);
+    
+    yPos += 35;
+    
+    // Items table
+    const tableData = editedItems.map((item: any) => [
+      item.sku || '',
+      item.name || '',
+      item.quantity?.toString() || '0',
+      formatUnitPrice(item.unit_price || 0),
+      formatCurrency((item.quantity || 0) * (item.unit_price || 0))
+    ]);
+    
+    autoTable(doc, {
+      startY: yPos,
+      head: [['SKU', 'Description', 'Qty', 'Unit Price', 'Total']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [76, 175, 80], textColor: 255 },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 70 },
+        2: { cellWidth: 20, halign: 'right' },
+        3: { cellWidth: 25, halign: 'right' },
+        4: { cellWidth: 30, halign: 'right' }
+      },
+      margin: { left: 14, right: 14 }
+    });
+    
+    // Get final Y position after table
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    
+    // Totals
+    const totalsX = pageWidth - 60;
+    doc.setFontSize(10);
+    doc.text('Subtotal:', totalsX - 30, finalY);
+    doc.text(formatCurrency(invoice.subtotal || 0), totalsX + 15, finalY, { align: 'right' });
+    
+    if (invoice.shipping_cost && invoice.shipping_cost > 0) {
+      doc.text('Shipping:', totalsX - 30, finalY + 6);
+      doc.text(formatCurrency(invoice.shipping_cost), totalsX + 15, finalY + 6, { align: 'right' });
+    }
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total:', totalsX - 30, finalY + 14);
+    doc.text(formatCurrency(invoice.total || 0), totalsX + 15, finalY + 14, { align: 'right' });
+    
+    // Payment status
+    const totalPaid = invoice.total_paid || 0;
+    const balance = (invoice.total || 0) - totalPaid;
+    if (totalPaid > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.text('Paid:', totalsX - 30, finalY + 22);
+      doc.text(formatCurrency(totalPaid), totalsX + 15, finalY + 22, { align: 'right' });
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(balance > 0 ? 220 : 76, balance > 0 ? 53 : 175, balance > 0 ? 69 : 80);
+      doc.text('Balance Due:', totalsX - 30, finalY + 30);
+      doc.text(formatCurrency(balance), totalsX + 15, finalY + 30, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+    }
+    
+    // Footer
+    addPdfFooter(doc);
+    
+    // Save
+    doc.save(`invoice-${invoice.invoice_number}.pdf`);
+    
+    toast({
+      title: "PDF Downloaded",
+      description: `Invoice ${invoice.invoice_number} has been downloaded`
+    });
+  };
+
   const handleSaveQuantities = async () => {
     try {
       // Update each order item
@@ -677,7 +783,7 @@ const InvoiceDetail = () => {
               Send to Customer
             </Button>
           )}
-          <Button onClick={() => {}}>
+          <Button onClick={handleDownloadPDF}>
             <Download className="h-4 w-4 mr-2" />
             Download PDF
           </Button>
