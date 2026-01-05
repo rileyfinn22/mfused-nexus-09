@@ -399,9 +399,9 @@ const InvoiceDetail = () => {
     // ============ HEADER SECTION ============
     // Green header bar
     doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.rect(0, 0, pageWidth, 35, 'F');
+    doc.rect(0, 0, pageWidth, 32, 'F');
     
-    // Logo on left side of header
+    // Logo on left side of header - proper aspect ratio
     try {
       const logoResponse = await fetch('/images/vibe-logo.png');
       const logoBlob = await logoResponse.blob();
@@ -410,20 +410,21 @@ const InvoiceDetail = () => {
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(logoBlob);
       });
-      doc.addImage(logoBase64, 'PNG', 14, 5, 45, 25);
+      // Use proper aspect ratio for logo (wider, not as tall)
+      doc.addImage(logoBase64, 'PNG', 12, 4, 55, 24);
     } catch (error) {
       // Fallback text logo
-      doc.setFontSize(20);
+      doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(255, 255, 255);
-      doc.text('Vibe Packaging', 14, 22);
+      doc.text('Vibe Packaging', 14, 20);
     }
     
     // INVOICE title on right side of header
-    doc.setFontSize(28);
+    doc.setFontSize(26);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255);
-    doc.text('INVOICE', pageWidth - 14, 23, { align: 'right' });
+    doc.text('INVOICE', pageWidth - 14, 20, { align: 'right' });
     
     let yPos = 50;
     
@@ -511,15 +512,16 @@ const InvoiceDetail = () => {
         textColor: 255,
         fontStyle: 'bold',
         fontSize: 9,
-        cellPadding: 4
+        cellPadding: 5
       },
       bodyStyles: {
         fontSize: 9,
-        cellPadding: 4,
-        textColor: [darkGray[0], darkGray[1], darkGray[2]]
+        cellPadding: 5,
+        textColor: [darkGray[0], darkGray[1], darkGray[2]],
+        lineWidth: 0
       },
       alternateRowStyles: {
-        fillColor: [250, 250, 250]
+        fillColor: [235, 235, 235]
       },
       columnStyles: {
         0: { cellWidth: 35 },
@@ -529,8 +531,8 @@ const InvoiceDetail = () => {
         4: { cellWidth: 30, halign: 'right', fontStyle: 'bold' }
       },
       margin: { left: 14, right: 14 },
-      tableLineColor: [220, 220, 220],
-      tableLineWidth: 0.1
+      showHead: 'firstPage',
+      tableLineWidth: 0
     });
     
     // Get final Y position after table
