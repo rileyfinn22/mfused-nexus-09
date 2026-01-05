@@ -53,47 +53,13 @@ export async function addPdfBranding(
     titleAlign?: 'left' | 'center' | 'right';
   } = {}
 ): Promise<number> {
-  const { showAddress = true, documentTitle, titleAlign = 'left' } = options;
+  const { documentTitle, titleAlign = 'left' } = options;
   const pageWidth = doc.internal.pageSize.getWidth();
   
   let yPos = 15;
   
-  // Try to add logo
-  try {
-    const logoBase64 = await preloadLogo();
-    if (logoBase64) {
-      // Logo dimensions - maintain aspect ratio
-      const logoWidth = 45;
-      const logoHeight = 30;
-      doc.addImage(logoBase64, 'PNG', 14, yPos - 5, logoWidth, logoHeight);
-    } else {
-      throw new Error('Logo not loaded');
-    }
-  } catch (error) {
-    // Fallback to text if logo fails to load
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(76, 175, 80); // Green color
-    doc.text('Vibe Packaging', 14, yPos + 10);
-  }
-  
-  // Add company address on the right side
-  if (showAddress) {
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 100, 100);
-    doc.text(VIBE_COMPANY.address.street, pageWidth - 14, yPos, { align: 'right' });
-    doc.text(
-      `${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}`,
-      pageWidth - 14,
-      yPos + 5,
-      { align: 'right' }
-    );
-  }
-  
-  // Add document title if provided - smaller and aligned
+  // Add document title on the left - smaller
   if (documentTitle) {
-    yPos += 25;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(17, 24, 39);
@@ -102,11 +68,29 @@ export async function addPdfBranding(
     if (titleAlign === 'center') titleX = pageWidth / 2;
     if (titleAlign === 'right') titleX = pageWidth - 14;
     
-    doc.text(documentTitle, titleX, yPos, { align: titleAlign });
-    yPos += 8;
-  } else {
-    yPos += 30;
+    doc.text(documentTitle, titleX, yPos + 5, { align: titleAlign });
   }
+  
+  // Try to add logo on the RIGHT side
+  try {
+    const logoBase64 = await preloadLogo();
+    if (logoBase64) {
+      // Logo dimensions - maintain aspect ratio, position on right
+      const logoWidth = 40;
+      const logoHeight = 25;
+      doc.addImage(logoBase64, 'PNG', pageWidth - logoWidth - 14, yPos - 5, logoWidth, logoHeight);
+    } else {
+      throw new Error('Logo not loaded');
+    }
+  } catch (error) {
+    // Fallback to text on right if logo fails to load
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(76, 175, 80); // Green color
+    doc.text('Vibe Packaging', pageWidth - 14, yPos + 10, { align: 'right' });
+  }
+  
+  yPos += 25;
   
   // Reset text color
   doc.setTextColor(0, 0, 0);
