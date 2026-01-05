@@ -1165,6 +1165,41 @@ const InvoiceDetail = () => {
                   </div>
                 </div>}
             </div>
+            
+            {/* Payment Terms - Editable by vibe_admin */}
+            {isVibeAdmin && (
+              <div className="mt-6 pt-4 border-t">
+                <h3 className="text-sm font-semibold mb-3">Payment Terms</h3>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={order?.terms || ''}
+                    placeholder="e.g., Net 30 - Payment due within 30 days"
+                    onChange={async (e) => {
+                      const newTerms = e.target.value;
+                      // Update local state immediately
+                      setOrder({ ...order, terms: newTerms });
+                    }}
+                    onBlur={async (e) => {
+                      const newTerms = e.target.value;
+                      const { error } = await supabase
+                        .from('orders')
+                        .update({ terms: newTerms })
+                        .eq('id', order?.id);
+                      
+                      if (error) {
+                        toast({ title: "Error", description: "Failed to update terms", variant: "destructive" });
+                      } else {
+                        toast({ title: "Payment terms updated" });
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  These terms will appear on the invoice PDF
+                </p>
+              </div>
+            )}
           </div>
 
           {/* QuickBooks Payment Link */}
