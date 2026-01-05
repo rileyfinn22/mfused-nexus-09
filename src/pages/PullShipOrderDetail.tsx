@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Download, Package, CheckCircle2, Circle, Truck, FileText, Send, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +31,7 @@ const PullShipOrderDetail = () => {
   const [editedOrder, setEditedOrder] = useState<any>(null);
   const [vendors, setVendors] = useState<any[]>([]);
   const [approving, setApproving] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -736,10 +738,6 @@ const PullShipOrderDetail = () => {
   };
 
   const handleDeleteOrder = async () => {
-    if (!confirm('Are you sure you want to delete this pull & ship order? This action cannot be undone.')) {
-      return;
-    }
-
     try {
       // If this was an approved order, restore inventory
       if (order.vibe_approved) {
@@ -851,6 +849,8 @@ const PullShipOrderDetail = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setShowDeleteDialog(false);
     }
   };
 
@@ -880,7 +880,7 @@ const PullShipOrderDetail = () => {
         </Button>
         <div className="flex gap-3">
           {isAdmin && (
-            <Button variant="destructive" size="sm" onClick={handleDeleteOrder}>
+            <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
               <Trash2 className="h-4 w-4 mr-2" />
               Delete Order
             </Button>
@@ -1319,6 +1319,23 @@ const PullShipOrderDetail = () => {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Pull & Ship Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete order {order?.order_number}? This action cannot be undone. Inventory will be restored and the parent order will be updated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

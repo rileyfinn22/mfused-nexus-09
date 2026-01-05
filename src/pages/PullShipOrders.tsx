@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { Search, Eye, CheckCircle, Clock, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -16,6 +17,7 @@ const PullShipOrders = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [deleteOrderData, setDeleteOrderData] = useState<{ id: string; orderNumber: string } | null>(null);
 
   useEffect(() => {
     checkRole();
@@ -286,12 +288,14 @@ const PullShipOrders = () => {
     }
   };
 
-  const handleDeleteOrder = async (orderId: string, orderNumber: string, e: React.MouseEvent) => {
+  const confirmDelete = (orderId: string, orderNumber: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    if (!confirm(`Delete order ${orderNumber}? This action cannot be undone.`)) {
-      return;
-    }
+    setDeleteOrderData({ id: orderId, orderNumber });
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!deleteOrderData) return;
+    const { id: orderId, orderNumber } = deleteOrderData;
 
     try {
       // Get the order details first
@@ -407,6 +411,8 @@ const PullShipOrders = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setDeleteOrderData(null);
     }
   };
 
@@ -512,7 +518,7 @@ const PullShipOrders = () => {
                   variant="ghost" 
                   size="sm" 
                   className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                  onClick={(e) => handleDeleteOrder(order.id, order.order_number, e)}
+                  onClick={(e) => confirmDelete(order.id, order.order_number, e)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -521,6 +527,23 @@ const PullShipOrders = () => {
           ))}
         </div>
       </div>
+
+      <AlertDialog open={deleteOrderData !== null} onOpenChange={(open) => !open && setDeleteOrderData(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Pull & Ship Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete order {deleteOrderData?.orderNumber}? This action cannot be undone. Inventory will be restored and the parent order will be updated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
