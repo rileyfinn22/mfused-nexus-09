@@ -40,7 +40,9 @@ import {
   Calendar,
   Truck,
   Clock,
-  PlayCircle
+  PlayCircle,
+  ShoppingCart,
+  Receipt
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -121,6 +123,7 @@ const QuoteDetail = () => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showVendorDialog, setShowVendorDialog] = useState(false);
   const [responseQuote, setResponseQuote] = useState<{ id: string; quote_number: string; status: string } | null>(null);
+  const [convertLoading, setConvertLoading] = useState<'order' | 'invoice' | null>(null);
 
   useEffect(() => {
     checkRole();
@@ -397,6 +400,207 @@ const QuoteDetail = () => {
     generateQuotePDF(quote, items);
   };
 
+  const generateOrderNumber = async () => {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('order_number')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    if (error) throw error;
+    
+    const lastNumber = data?.[0]?.order_number;
+    if (lastNumber) {
+      const match = lastNumber.match(/ORD-(\d+)/);
+      if (match) {
+        const nextNum = parseInt(match[1]) + 1;
+        return `ORD-${nextNum.toString().padStart(5, '0')}`;
+      }
+    }
+    return 'ORD-00001';
+  };
+
+  const generateInvoiceNumber = async () => {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('invoice_number')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    if (error) throw error;
+    
+    const lastNumber = data?.[0]?.invoice_number;
+    if (lastNumber) {
+      const match = lastNumber.match(/INV-(\d+)/);
+      if (match) {
+        const nextNum = parseInt(match[1]) + 1;
+        return `INV-${nextNum.toString().padStart(5, '0')}`;
+      }
+    }
+    return 'INV-00001';
+  };
+
+  const handleConvertToOrder = async () => {
+    if (!quote) return;
+    setConvertLoading('order');
+    
+    try {
+      const orderNumber = await generateOrderNumber();
+      
+      // Create the order
+      const { data: newOrder, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          order_number: orderNumber,
+          company_id: quote.company_id,
+          customer_name: quote.customer_name,
+          customer_email: quote.customer_email,
+          customer_phone: quote.customer_phone,
+          shipping_name: quote.shipping_name || quote.customer_name,
+          shipping_street: quote.shipping_street || '',
+          shipping_city: quote.shipping_city || '',
+          shipping_state: quote.shipping_state || '',
+          shipping_zip: quote.shipping_zip || '',
+          description: quote.description,
+          terms: quote.terms,
+          subtotal: quote.subtotal,
+          tax: quote.tax,
+          shipping_cost: quote.shipping_cost,
+          total: quote.total,
+          status: 'pending',
+          order_type: 'standard',
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Create order items from quote items
+      const orderItems = items.map(item => ({
+        order_id: newOrder.id,
+        sku: item.sku,
+        name: item.name,
+        description: item.description,
+        quantity: item.quantity,
+        shipped_quantity: 0,
+        unit_price: item.unit_price,
+        total: item.total,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      toast({
+        title: "Order Created",
+        description: `Order ${orderNumber} has been created from this quote`,
+      });
+
+      navigate(`/orders/${newOrder.id}`);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setConvertLoading(null);
+    }
+  };
+
+  const handleConvertToInvoice = async () => {
+    if (!quote) return;
+    setConvertLoading('invoice');
+    
+    try {
+      // First create an order (invoices need an order)
+      const orderNumber = await generateOrderNumber();
+      const invoiceNumber = await generateInvoiceNumber();
+      
+      // Create the order
+      const { data: newOrder, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          order_number: orderNumber,
+          company_id: quote.company_id,
+          customer_name: quote.customer_name,
+          customer_email: quote.customer_email,
+          customer_phone: quote.customer_phone,
+          shipping_name: quote.shipping_name || quote.customer_name,
+          shipping_street: quote.shipping_street || '',
+          shipping_city: quote.shipping_city || '',
+          shipping_state: quote.shipping_state || '',
+          shipping_zip: quote.shipping_zip || '',
+          description: quote.description,
+          terms: quote.terms,
+          subtotal: quote.subtotal,
+          tax: quote.tax,
+          shipping_cost: quote.shipping_cost,
+          total: quote.total,
+          status: 'invoiced',
+          order_type: 'standard',
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Create order items
+      const orderItems = items.map(item => ({
+        order_id: newOrder.id,
+        sku: item.sku,
+        name: item.name,
+        description: item.description,
+        quantity: item.quantity,
+        shipped_quantity: 0,
+        unit_price: item.unit_price,
+        total: item.total,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // Create the invoice
+      const { data: newInvoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          invoice_number: invoiceNumber,
+          company_id: quote.company_id,
+          order_id: newOrder.id,
+          subtotal: quote.subtotal,
+          tax: quote.tax,
+          shipping_cost: quote.shipping_cost,
+          total: quote.total,
+          status: 'open',
+          description: quote.description,
+        })
+        .select()
+        .single();
+
+      if (invoiceError) throw invoiceError;
+
+      toast({
+        title: "Invoice Created",
+        description: `Invoice ${invoiceNumber} has been created from this quote`,
+      });
+
+      navigate(`/invoices/${newInvoice.id}`);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setConvertLoading(null);
+    }
+  };
+
   // Check if any items have price breaks
   const hasAnyPriceBreaks = items.some(item => item.price_breaks && item.price_breaks.length > 0);
 
@@ -525,6 +729,33 @@ const QuoteDetail = () => {
             <Download className="h-4 w-4 mr-2" />
             PDF
           </Button>
+          {quote.status === 'approved' && isVibeAdmin && (
+            <>
+              <Button 
+                onClick={handleConvertToOrder}
+                disabled={convertLoading !== null}
+                variant="outline"
+              >
+                {convertLoading === 'order' ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                )}
+                Convert to Order
+              </Button>
+              <Button 
+                onClick={handleConvertToInvoice}
+                disabled={convertLoading !== null}
+              >
+                {convertLoading === 'invoice' ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Receipt className="h-4 w-4 mr-2" />
+                )}
+                Convert to Invoice
+              </Button>
+            </>
+          )}
           {canSendToVendor && (
             <Button variant="outline" onClick={() => setShowVendorDialog(true)}>
               <Truck className="h-4 w-4 mr-2" />
