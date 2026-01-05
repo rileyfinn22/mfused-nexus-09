@@ -798,9 +798,13 @@ serve(async (req) => {
     console.log('QB Project ID for invoice:', qbProjectId);
 
     // Create invoice payload
+    // IMPORTANT: When we use sub-customers (Jobs) to represent “projects”, QuickBooks expects the Job
+    // to be the CustomerRef. Sending ProjectRef with a Customer/Job Id causes ValidationFault 9341.
+    const invoiceCustomerRefValue = qbProjectId ? String(qbProjectId) : String(customerId);
+
     const invoicePayload: any = {
       CustomerRef: {
-        value: customerId,
+        value: invoiceCustomerRefValue,
       },
       Line: lineItems,
       TxnDate: invoice.invoice_date.split('T')[0],
@@ -828,12 +832,8 @@ serve(async (req) => {
       AllowOnlineACHPayment: true,
     };
 
-    // Attach to QB Project if the order has one (for P&L tracking)
     if (qbProjectId) {
-      invoicePayload.ProjectRef = {
-        value: qbProjectId,
-      };
-      console.log('Attaching invoice to QB Project:', qbProjectId);
+      console.log('Using sub-customer (Job) as invoice CustomerRef:', qbProjectId);
     }
 
     // Note: We don't use the Deposit field for partial billing
