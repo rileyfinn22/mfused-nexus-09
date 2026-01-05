@@ -204,7 +204,23 @@ const VendorPOs = () => {
                 </TableRow>
               ) : (
                 filteredPOs.map((po) => (
-                  <TableRow key={po.id}>
+                  <TableRow
+                    key={po.id}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      toast({ title: "Opening PO...", description: po.po_number });
+                      navigate(`/vendor-pos/${po.id}`);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toast({ title: "Opening PO...", description: po.po_number });
+                        navigate(`/vendor-pos/${po.id}`);
+                      }
+                    }}
+                  >
                     <TableCell className="font-medium">{po.po_number}</TableCell>
                     <TableCell>
                       <Badge variant={po.po_type === 'expense' ? 'secondary' : 'outline'}>
@@ -237,7 +253,10 @@ const VendorPOs = () => {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => navigate(`/vendor-pos/${po.id}`)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/vendor-pos/${po.id}`);
+                          }}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -245,7 +264,10 @@ const VendorPOs = () => {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => handleDeleteClick(po)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(po);
+                            }}
                             className="text-destructive hover:text-destructive"
                           >
                             <Trash2 className="h-4 w-4" />
