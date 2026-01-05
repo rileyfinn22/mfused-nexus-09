@@ -184,8 +184,8 @@ const VendorPODetail = () => {
 
     const doc = new jsPDF();
     
-    // Add branding header
-    const headerY = addPdfBrandingSync(doc, { documentTitle: 'VENDOR PURCHASE ORDER' });
+    // Add branding header - smaller title, left aligned
+    const headerY = addPdfBrandingSync(doc, { documentTitle: 'Purchase Order', titleAlign: 'left' });
     
     // PO Info
     let yPos = headerY + 5;
@@ -253,8 +253,8 @@ const VendorPODetail = () => {
 
     const doc = new jsPDF();
     
-    // Add branding header
-    const headerY = addPdfBrandingSync(doc, { documentTitle: 'VENDOR PURCHASE ORDER' });
+    // Add branding header - smaller title, left aligned
+    const headerY = addPdfBrandingSync(doc, { documentTitle: 'Purchase Order', titleAlign: 'left' });
     
     // PO Info
     let yPos = headerY + 5;
