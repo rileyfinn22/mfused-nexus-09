@@ -163,10 +163,10 @@ serve(async (req) => {
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
 
+    // Validate QB Project using Projects API
     async function isValidQbProjectRef(projectId: string): Promise<boolean> {
       try {
-        // Check if this is a valid sub-customer (Job) in QBO
-        const resp = await fetch(`${qbApiUrl}/customer/${projectId}?minorversion=65`, {
+        const resp = await fetch(`${qbApiUrl}/project/${projectId}?minorversion=69`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json',
@@ -174,12 +174,12 @@ serve(async (req) => {
         });
 
         if (!resp.ok) {
-          console.warn('Sub-customer not found or invalid:', projectId, resp.status);
+          console.warn('Project not found or invalid:', projectId, resp.status);
           return false;
         }
 
         const data = await resp.json();
-        return !!data?.Customer;
+        return !!data?.Project;
       } catch (e) {
         console.warn('Failed to validate ProjectRef:', projectId, e);
         return false;
@@ -197,7 +197,6 @@ serve(async (req) => {
     }
 
     // Find or create vendor in QuickBooks
-
     const vendorName = vendorPo.vendors?.name || 'Unknown Vendor';
     const vendorSearchResponse = await fetch(
       `${qbApiUrl}/query?query=SELECT * FROM Vendor WHERE DisplayName='${encodeURIComponent(vendorName)}' MAXRESULTS 1&minorversion=65`,
@@ -235,8 +234,6 @@ serve(async (req) => {
     }
 
     // Build bill line items
-    // IMPORTANT: When we use sub-customers (Jobs) to represent “projects”, QuickBooks expects the Job
-    // to be set as CustomerRef on each expense line (ProjectRef will fail with ValidationFault 9341).
     const lineItems = vendorPo.vendor_po_items?.map((item: any) => ({
       DetailType: 'ItemBasedExpenseLineDetail',
       Amount: item.total,
@@ -246,13 +243,6 @@ serve(async (req) => {
         },
         Qty: item.quantity,
         UnitPrice: item.unit_cost,
-        ...(safeQbProjectId
-          ? {
-              CustomerRef: {
-                value: safeQbProjectId,
-              },
-            }
-          : {}),
       },
       Description: item.description || item.name,
     })) || [];
@@ -269,8 +259,12 @@ serve(async (req) => {
       PrivateNote: `Vendor PO: ${vendorPo.po_number}`,
     };
 
+    // Attach to QB Project using ProjectRef (for P&L tracking)
     if (safeQbProjectId) {
-      console.log('Using sub-customer (Job) as bill line CustomerRef:', safeQbProjectId);
+      billPayload.ProjectRef = {
+        value: safeQbProjectId,
+      };
+      console.log('Attaching bill to QB Project:', safeQbProjectId);
     }
 
     let qbResponse;
