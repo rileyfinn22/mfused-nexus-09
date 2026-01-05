@@ -663,7 +663,6 @@ const QuoteDetail = () => {
               <SelectContent>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="in_progress">Working on Quote</SelectItem>
-                <SelectItem value="vendor_pending">Sent to Vendor</SelectItem>
                 <SelectItem value="vendor_received">Vendor Response Received</SelectItem>
                 <SelectItem value="sent">Sent to Customer</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
