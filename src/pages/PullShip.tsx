@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
 import { 
   Plus, 
   Package, 
@@ -247,19 +248,20 @@ const PullShip = () => {
   const generatePackingListPDF = (items: Array<{sku: string, itemId?: string, quantity: number}>, orderData: any, invoiceId: string) => {
     const doc = new jsPDF();
     
-    // Header
-    doc.setFontSize(20);
-    doc.text("PACKING LIST", 105, 20, { align: "center" });
+    // Add branding header
+    const headerY = addPdfBrandingSync(doc, { documentTitle: 'PACKING LIST' });
     
-    doc.setFontSize(12);
-    doc.text(`Packing List ID: ${invoiceId}-PACK`, 20, 40);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 50);
-    doc.text(`Destination: ${orderData.state}`, 20, 60);
+    let yPos = headerY + 5;
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Packing List ID: ${invoiceId}-PACK`, 14, yPos);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, yPos + 7);
+    doc.text(`Destination: ${orderData.state}`, 14, yPos + 14);
     
     // Shipping Address
-    doc.text("Ship To:", 20, 80);
-    doc.text(orderData.shippingAddress, 20, 90);
-    doc.text(`${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZip}`, 20, 100);
+    doc.text("Ship To:", 14, yPos + 28);
+    doc.text(orderData.shippingAddress, 14, yPos + 35);
+    doc.text(`${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZip}`, 14, yPos + 42);
     
     // Items table
     const tableData = items.map(item => [
@@ -272,19 +274,23 @@ const PullShip = () => {
     autoTable(doc, {
       head: [["Item ID", "SKU", "Quantity", "Unit"]],
       body: tableData,
-      startY: 120,
+      startY: yPos + 55,
       theme: "grid",
       headStyles: { fillColor: [66, 139, 202] },
     });
     
     // Summary
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-    doc.text(`Total Items: ${totalItems}`, 20, (doc as any).lastAutoTable.finalY + 20);
+    const tableEndY = (doc as any).lastAutoTable.finalY + 20;
+    doc.text(`Total Items: ${totalItems}`, 14, tableEndY);
     
     if (orderData.notes) {
-      doc.text("Notes:", 20, (doc as any).lastAutoTable.finalY + 35);
-      doc.text(orderData.notes, 20, (doc as any).lastAutoTable.finalY + 45);
+      doc.text("Notes:", 14, tableEndY + 15);
+      doc.text(orderData.notes, 14, tableEndY + 22);
     }
+    
+    // Footer
+    addPdfFooter(doc);
     
     return doc;
   };
@@ -292,25 +298,26 @@ const PullShip = () => {
   const generateInvoicePDF = (items: Array<{sku: string, itemId?: string, quantity: number, unitPrice?: number}>, orderData: any, invoiceId: string, invoiceAmount: string) => {
     const doc = new jsPDF();
     
-    // Header
-    doc.setFontSize(20);
-    doc.text("INVOICE", 105, 20, { align: "center" });
+    // Add branding header
+    const headerY = addPdfBrandingSync(doc, { documentTitle: 'INVOICE' });
     
-    doc.setFontSize(12);
-    doc.text(`Invoice #: ${invoiceId}`, 20, 40);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 50);
-    doc.text(`Due Date: ${new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}`, 20, 60);
+    let yPos = headerY + 5;
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Invoice #: ${invoiceId}`, 14, yPos);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, yPos + 7);
+    doc.text(`Due Date: ${new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}`, 14, yPos + 14);
     
     // Ship To
-    doc.text("Ship To:", 20, 80);
-    doc.text(orderData.shippingAddress, 20, 90);
-    doc.text(`${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZip}`, 20, 100);
+    doc.text("Ship To:", 14, yPos + 28);
+    doc.text(orderData.shippingAddress, 14, yPos + 35);
+    doc.text(`${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZip}`, 14, yPos + 42);
     
     // Bill To (if different from Ship To)
     if (orderData.billingAddress) {
-      doc.text("Bill To:", 110, 80);
-      doc.text(orderData.billingAddress, 110, 90);
-      doc.text(`${orderData.billingCity || ''}, ${orderData.billingState || ''} ${orderData.billingZip || ''}`, 110, 100);
+      doc.text("Bill To:", 110, yPos + 28);
+      doc.text(orderData.billingAddress, 110, yPos + 35);
+      doc.text(`${orderData.billingCity || ''}, ${orderData.billingState || ''} ${orderData.billingZip || ''}`, 110, yPos + 42);
     }
     
     // Items table with pricing
@@ -325,7 +332,7 @@ const PullShip = () => {
     autoTable(doc, {
       head: [["Item ID", "SKU", "Quantity", "Unit Price", "Total"]],
       body: tableData,
-      startY: 120,
+      startY: yPos + 55,
       theme: "grid",
       headStyles: { fillColor: [66, 139, 202] },
     });
@@ -337,6 +344,9 @@ const PullShip = () => {
     const finalY = (doc as any).lastAutoTable.finalY + 20;
     doc.text(`Subtotal: $${subtotal.toFixed(2)}`, 130, finalY);
     doc.text(`Total: $${total.toFixed(2)}`, 130, finalY + 10);
+    
+    // Footer
+    addPdfFooter(doc);
     
     return doc;
   };

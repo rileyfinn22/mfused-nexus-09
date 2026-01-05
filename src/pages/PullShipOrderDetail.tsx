@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
 const PullShipOrderDetail = () => {
@@ -89,15 +90,17 @@ const PullShipOrderDetail = () => {
   const generatePackingListPDF = () => {
     const doc = new jsPDF();
     
-    doc.setFontSize(20);
-    doc.text("PACKING LIST", 105, 20, { align: "center" });
+    // Add branding header
+    const headerY = addPdfBrandingSync(doc, { documentTitle: 'PACKING LIST' });
     
-    doc.setFontSize(12);
-    doc.text(`Order: ${order.order_number}`, 20, 40);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 50);
-    doc.text(`Ship To: ${order.shipping_name}`, 20, 60);
-    doc.text(`${order.shipping_street}`, 20, 70);
-    doc.text(`${order.shipping_city}, ${order.shipping_state} ${order.shipping_zip}`, 20, 80);
+    let yPos = headerY + 5;
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Order: ${order.order_number}`, 14, yPos);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, yPos + 7);
+    doc.text(`Ship To: ${order.shipping_name}`, 14, yPos + 14);
+    doc.text(`${order.shipping_street}`, 14, yPos + 21);
+    doc.text(`${order.shipping_city}, ${order.shipping_state} ${order.shipping_zip}`, 14, yPos + 28);
     
     const tableData = order.order_items.map((item: any) => [
       item.item_id || "N/A",
@@ -109,10 +112,13 @@ const PullShipOrderDetail = () => {
     autoTable(doc, {
       head: [["Item ID", "SKU", "Description", "Quantity"]],
       body: tableData,
-      startY: 100,
+      startY: yPos + 40,
       theme: "grid",
       headStyles: { fillColor: [66, 139, 202] },
     });
+    
+    // Footer
+    addPdfFooter(doc);
     
     return doc;
   };
@@ -120,26 +126,28 @@ const PullShipOrderDetail = () => {
   const generateInvoicePDF = () => {
     const doc = new jsPDF();
     
-    doc.setFontSize(20);
-    doc.text("INVOICE", 105, 20, { align: "center" });
+    // Add branding header
+    const headerY = addPdfBrandingSync(doc, { documentTitle: 'INVOICE' });
     
-    doc.setFontSize(12);
-    doc.text(`Invoice #: ${order.order_number}`, 20, 40);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 50);
-    doc.text(`PO #: ${order.po_number || 'N/A'}`, 20, 60);
+    let yPos = headerY + 5;
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Invoice #: ${order.order_number}`, 14, yPos);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, yPos + 7);
+    doc.text(`PO #: ${order.po_number || 'N/A'}`, 14, yPos + 14);
     
     // Ship To
-    doc.text("Ship To:", 20, 80);
-    doc.text(order.shipping_name || order.customer_name, 20, 90);
-    doc.text(`${order.shipping_street}`, 20, 100);
-    doc.text(`${order.shipping_city}, ${order.shipping_state} ${order.shipping_zip}`, 20, 110);
+    doc.text("Ship To:", 14, yPos + 28);
+    doc.text(order.shipping_name || order.customer_name, 14, yPos + 35);
+    doc.text(`${order.shipping_street}`, 14, yPos + 42);
+    doc.text(`${order.shipping_city}, ${order.shipping_state} ${order.shipping_zip}`, 14, yPos + 49);
     
     // Bill To (if different from Ship To)
     if (order.billing_name) {
-      doc.text("Bill To:", 110, 80);
-      doc.text(order.billing_name, 110, 90);
-      doc.text(`${order.billing_street || ''}`, 110, 100);
-      doc.text(`${order.billing_city || ''}, ${order.billing_state || ''} ${order.billing_zip || ''}`, 110, 110);
+      doc.text("Bill To:", 110, yPos + 28);
+      doc.text(order.billing_name, 110, yPos + 35);
+      doc.text(`${order.billing_street || ''}`, 110, yPos + 42);
+      doc.text(`${order.billing_city || ''}, ${order.billing_state || ''} ${order.billing_zip || ''}`, 110, yPos + 49);
     }
     
     const tableData = order.order_items.map((item: any) => [
@@ -154,7 +162,7 @@ const PullShipOrderDetail = () => {
     autoTable(doc, {
       head: [["Item ID", "SKU", "Description", "Qty", "Unit Price", "Total"]],
       body: tableData,
-      startY: 130,
+      startY: yPos + 60,
       theme: "grid",
       headStyles: { fillColor: [66, 139, 202] },
     });
@@ -163,6 +171,9 @@ const PullShipOrderDetail = () => {
     doc.text(`Subtotal: $${order.subtotal.toFixed(2)}`, 130, finalY);
     doc.text(`Tax: $${order.tax.toFixed(2)}`, 130, finalY + 10);
     doc.text(`Total: $${order.total.toFixed(2)}`, 130, finalY + 20);
+    
+    // Footer
+    addPdfFooter(doc);
     
     return doc;
   };

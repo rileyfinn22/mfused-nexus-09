@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { addPdfBrandingSync, addPdfFooter } from './pdfBranding';
 
 interface PriceBreak {
   qty: number;
@@ -42,17 +43,16 @@ export function generateQuotePDF(quote: Quote, items: QuoteItem[]): void {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   
-  // Header
-  doc.setFontSize(24);
-  doc.setFont('helvetica', 'bold');
-  doc.text('QUOTE', pageWidth / 2, 25, { align: 'center' });
+  // Add branding header
+  let yPos = addPdfBrandingSync(doc, { documentTitle: 'QUOTE' });
   
+  // Quote number
   doc.setFontSize(12);
   doc.setFont('helvetica', 'normal');
-  doc.text(quote.quote_number, pageWidth / 2, 33, { align: 'center' });
+  doc.text(quote.quote_number, pageWidth / 2, yPos, { align: 'center' });
   
   // Quote Info
-  let yPos = 50;
+  yPos += 15;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.text('Quote Details', 14, yPos);
@@ -68,40 +68,40 @@ export function generateQuotePDF(quote: Quote, items: QuoteItem[]): void {
   doc.text(`Terms: ${quote.terms || 'Net 30'}`, 14, yPos);
   
   // Customer Info
-  yPos = 50;
+  let customerY = yPos - 12;
   doc.setFont('helvetica', 'bold');
-  doc.text('Customer', pageWidth / 2, yPos);
+  doc.text('Customer', pageWidth / 2, customerY);
   
   doc.setFont('helvetica', 'normal');
-  yPos += 7;
-  doc.text(quote.customer_name, pageWidth / 2, yPos);
+  customerY += 7;
+  doc.text(quote.customer_name, pageWidth / 2, customerY);
   if (quote.customer_email) {
-    yPos += 5;
-    doc.text(quote.customer_email, pageWidth / 2, yPos);
+    customerY += 5;
+    doc.text(quote.customer_email, pageWidth / 2, customerY);
   }
   if (quote.customer_phone) {
-    yPos += 5;
-    doc.text(quote.customer_phone, pageWidth / 2, yPos);
+    customerY += 5;
+    doc.text(quote.customer_phone, pageWidth / 2, customerY);
   }
   
   // Shipping Address
   if (quote.shipping_street) {
-    yPos += 10;
+    customerY += 10;
     doc.setFont('helvetica', 'bold');
-    doc.text('Ship To', pageWidth / 2, yPos);
+    doc.text('Ship To', pageWidth / 2, customerY);
     doc.setFont('helvetica', 'normal');
-    yPos += 7;
+    customerY += 7;
     if (quote.shipping_name) {
-      doc.text(quote.shipping_name, pageWidth / 2, yPos);
-      yPos += 5;
+      doc.text(quote.shipping_name, pageWidth / 2, customerY);
+      customerY += 5;
     }
-    doc.text(quote.shipping_street, pageWidth / 2, yPos);
-    yPos += 5;
-    doc.text(`${quote.shipping_city}, ${quote.shipping_state} ${quote.shipping_zip}`, pageWidth / 2, yPos);
+    doc.text(quote.shipping_street, pageWidth / 2, customerY);
+    customerY += 5;
+    doc.text(`${quote.shipping_city}, ${quote.shipping_state} ${quote.shipping_zip}`, pageWidth / 2, customerY);
   }
   
   // Items Table
-  const tableStartY = Math.max(yPos + 15, 100);
+  const tableStartY = Math.max(customerY + 15, yPos + 15, 100);
   
   // Prepare table data - handle price tiers
   const tableBody: (string | { content: string; colSpan?: number; styles?: any })[][] = [];
@@ -198,12 +198,8 @@ export function generateQuotePDF(quote: Quote, items: QuoteItem[]): void {
     doc.text(quote.description, 14, notesY + 6, { maxWidth: pageWidth - 28 });
   }
   
-  // Footer
-  const footerY = doc.internal.pageSize.getHeight() - 15;
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(128);
-  doc.text('Thank you for your business!', pageWidth / 2, footerY, { align: 'center' });
+  // Footer with branding
+  addPdfFooter(doc);
   
   // Download
   doc.save(`${quote.quote_number}.pdf`);

@@ -10,6 +10,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
 
 interface SendInvoiceEmailDialogProps {
   open: boolean;
@@ -94,50 +95,42 @@ export function SendInvoiceEmailDialog({
 
   const generatePdfBase64 = async (): Promise<string> => {
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
     
-    // Header
-    doc.setFontSize(24);
-    doc.setTextColor(37, 99, 235);
-    doc.text("VibePKG", 20, 25);
+    // Add branding header
+    const headerY = addPdfBrandingSync(doc, { documentTitle: 'INVOICE' });
     
-    doc.setFontSize(10);
-    doc.setTextColor(107, 114, 128);
-    doc.text("Premium Packaging Solutions", 20, 32);
-    
-    // Invoice title
-    doc.setFontSize(20);
-    doc.setTextColor(17, 24, 39);
-    doc.text("INVOICE", 150, 25);
-    
-    // Invoice details
+    // Invoice details on the right
     doc.setFontSize(10);
     doc.setTextColor(55, 65, 81);
-    doc.text(`Invoice #: ${invoice.invoice_number}`, 150, 35);
-    doc.text(`Date: ${new Date(invoice.invoice_date).toLocaleDateString()}`, 150, 42);
+    doc.text(`Invoice #: ${invoice.invoice_number}`, pageWidth - 14, headerY - 15, { align: 'right' });
+    doc.text(`Date: ${new Date(invoice.invoice_date).toLocaleDateString()}`, pageWidth - 14, headerY - 8, { align: 'right' });
     if (invoice.due_date) {
-      doc.text(`Due: ${new Date(invoice.due_date).toLocaleDateString()}`, 150, 49);
+      doc.text(`Due: ${new Date(invoice.due_date).toLocaleDateString()}`, pageWidth - 14, headerY - 1, { align: 'right' });
     }
+    
+    let yPos = headerY + 10;
     
     // Ship To info
     doc.setFontSize(11);
     doc.setTextColor(17, 24, 39);
-    doc.text("Ship To:", 20, 55);
+    doc.text("Ship To:", 14, yPos);
     doc.setFontSize(10);
     doc.setTextColor(55, 65, 81);
-    doc.text(order?.shipping_name || "Customer", 20, 62);
-    doc.text(order?.shipping_street || "", 20, 69);
-    doc.text(`${order?.shipping_city || ""}, ${order?.shipping_state || ""} ${order?.shipping_zip || ""}`, 20, 76);
+    doc.text(order?.shipping_name || "Customer", 14, yPos + 7);
+    doc.text(order?.shipping_street || "", 14, yPos + 14);
+    doc.text(`${order?.shipping_city || ""}, ${order?.shipping_state || ""} ${order?.shipping_zip || ""}`, 14, yPos + 21);
     
     // Bill To info (if different from Ship To)
     if (order?.billing_name) {
       doc.setFontSize(11);
       doc.setTextColor(17, 24, 39);
-      doc.text("Bill To:", 110, 55);
+      doc.text("Bill To:", 110, yPos);
       doc.setFontSize(10);
       doc.setTextColor(55, 65, 81);
-      doc.text(order?.billing_name || "", 110, 62);
-      doc.text(order?.billing_street || "", 110, 69);
-      doc.text(`${order?.billing_city || ""}, ${order?.billing_state || ""} ${order?.billing_zip || ""}`, 110, 76);
+      doc.text(order?.billing_name || "", 110, yPos + 7);
+      doc.text(order?.billing_street || "", 110, yPos + 14);
+      doc.text(`${order?.billing_city || ""}, ${order?.billing_state || ""} ${order?.billing_zip || ""}`, 110, yPos + 21);
     }
     
     // Items table
@@ -150,7 +143,7 @@ export function SendInvoiceEmailDialog({
     ]);
     
     autoTable(doc, {
-      startY: 90,
+      startY: yPos + 35,
       head: [["SKU", "Description", "Qty", "Unit Price", "Total"]],
       body: tableData,
       theme: "striped",
@@ -196,12 +189,8 @@ export function SendInvoiceEmailDialog({
     doc.text("Total Due:", 140, totalY);
     doc.text(formatCurrency(invoice.total || 0), 180, totalY, { align: "right" });
     
-    // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(156, 163, 175);
-    doc.setFont(undefined, "normal");
-    doc.text("Thank you for your business!", 105, 280, { align: "center" });
-    doc.text("VibePKG - app.vibepkg.com", 105, 286, { align: "center" });
+    // Footer with branding
+    addPdfFooter(doc);
     
     // Convert to base64
     const pdfBase64 = doc.output("datauristring").split(",")[1];
