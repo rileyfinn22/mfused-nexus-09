@@ -189,10 +189,10 @@ serve(async (req) => {
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
 
+    // Validate QB Project using Projects API
     async function isValidQbProjectRef(projectId: string): Promise<boolean> {
       try {
-        // Check if this is a valid sub-customer (Job) in QBO
-        const resp = await fetch(`${qbApiUrl}/customer/${projectId}?minorversion=65`, {
+        const resp = await fetch(`${qbApiUrl}/project/${projectId}?minorversion=69`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json',
@@ -200,12 +200,12 @@ serve(async (req) => {
         });
 
         if (!resp.ok) {
-          console.warn('Sub-customer not found or invalid:', projectId, resp.status);
+          console.warn('Project not found or invalid:', projectId, resp.status);
           return false;
         }
 
         const data = await resp.json();
-        return !!data?.Customer;
+        return !!data?.Project;
       } catch (e) {
         console.warn('Failed to validate ProjectRef:', projectId, e);
         return false;
@@ -216,7 +216,6 @@ serve(async (req) => {
     const customerName = (invoice.companies as any)?.name || 'Unknown Customer';
     const customerEmail = companyEmail || '';
 
-    
     console.log('Looking for customer (company):', customerName, 'Email:', customerEmail);
     console.log('Order customer_name (ship-to):', invoice.orders?.customer_name);
     
@@ -439,7 +438,6 @@ serve(async (req) => {
       console.log(`Creating new QB item: ${sanitizedName}`);
       
       // Get the default income account (Sales of Product Income) and COGS account
-      // First, try to find a suitable income account
       const accountSearchResponse = await fetch(
         `${qbApiUrl}/query?query=${encodeURIComponent("SELECT * FROM Account WHERE AccountType='Income' MAXRESULTS 10")}&minorversion=65`,
         {
@@ -488,7 +486,7 @@ serve(async (req) => {
       const itemPayload = {
         Name: sanitizedName,
         Description: itemDescription || sanitizedName,
-        Type: 'NonInventory', // NonInventory items can be sold and tracked without inventory management
+        Type: 'NonInventory',
         IncomeAccountRef: {
           value: incomeAccountId,
         },
@@ -573,7 +571,6 @@ serve(async (req) => {
           }
         }
         console.error('Failed to create QB item:', createData);
-        // Fallback to default item ID - but log this as an error
         console.error(`CRITICAL: Could not find or create item "${sanitizedName}", falling back to item ID 1`);
         return '1';
       }
@@ -776,7 +773,6 @@ serve(async (req) => {
     }
 
     // For partial billing, we'll show full invoice then subtract the unbilled portion
-    // This way customers see the full order value with deposit clearly shown
     console.log(`Billing ${billingPercentage}% now, ${100 - billingPercentage}% due later`);
 
     // Get the QB Project ID from the order (if exists)
@@ -797,14 +793,10 @@ serve(async (req) => {
 
     console.log('QB Project ID for invoice:', qbProjectId);
 
-    // Create invoice payload
-    // IMPORTANT: When we use sub-customers (Jobs) to represent “projects”, QuickBooks expects the Job
-    // to be the CustomerRef. Sending ProjectRef with a Customer/Job Id causes ValidationFault 9341.
-    const invoiceCustomerRefValue = qbProjectId ? String(qbProjectId) : String(customerId);
-
+    // Create invoice payload using Projects API (QBO Plus/Advanced with Projects enabled)
     const invoicePayload: any = {
       CustomerRef: {
-        value: invoiceCustomerRefValue,
+        value: customerId,
       },
       Line: lineItems,
       TxnDate: invoice.invoice_date.split('T')[0],
@@ -832,8 +824,12 @@ serve(async (req) => {
       AllowOnlineACHPayment: true,
     };
 
+    // Attach to QB Project using ProjectRef (for P&L tracking via real Projects API)
     if (qbProjectId) {
-      console.log('Using sub-customer (Job) as invoice CustomerRef:', qbProjectId);
+      invoicePayload.ProjectRef = {
+        value: String(qbProjectId),
+      };
+      console.log('Attaching invoice to QB Project:', qbProjectId);
     }
 
     // Note: We don't use the Deposit field for partial billing
@@ -1038,7 +1034,6 @@ serve(async (req) => {
     }
 
     console.log('Invoice synced successfully');
-
 
     return new Response(
       JSON.stringify({ 
