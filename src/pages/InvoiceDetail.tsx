@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check } from "lucide-react";
 import { format } from "date-fns";
 import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
@@ -1056,14 +1056,19 @@ const InvoiceDetail = () => {
                   {invoice.quickbooks_sync_status === 'synced' && invoice.quickbooks_id ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button className="bg-green-600 hover:bg-green-700 text-white">
-                          <Check className="h-4 w-4 mr-2" />
+                        <Button className="bg-green-600 hover:bg-green-700 text-white gap-2">
+                          <Check className="h-4 w-4" />
                           Synced to QBO
-                          <ChevronDown className="h-4 w-4 ml-2" />
+                          <ChevronDown className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                          QuickBooks Actions
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
+                          className="cursor-pointer"
                           onClick={() => {
                             if (qbRealmId && invoice.quickbooks_id) {
                               window.open(
@@ -1079,12 +1084,16 @@ const InvoiceDetail = () => {
                             }
                           }}
                         >
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          View in QuickBooks
+                          <ExternalLink className="h-4 w-4 mr-2 text-blue-500" />
+                          <span>View in QuickBooks</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setShowSyncDialog(true)}>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Re-Bill in QuickBooks
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className="cursor-pointer"
+                          onClick={() => setShowSyncDialog(true)}
+                        >
+                          <RefreshCw className="h-4 w-4 mr-2 text-amber-500" />
+                          <span>Re-Sync to QuickBooks</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
