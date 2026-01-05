@@ -600,6 +600,7 @@ export type Database = {
           description: string | null
           id: string
           item_id: string | null
+          line_number: number | null
           name: string
           order_id: string
           product_id: string | null
@@ -617,6 +618,7 @@ export type Database = {
           description?: string | null
           id?: string
           item_id?: string | null
+          line_number?: number | null
           name: string
           order_id: string
           product_id?: string | null
@@ -634,6 +636,7 @@ export type Database = {
           description?: string | null
           id?: string
           item_id?: string | null
+          line_number?: number | null
           name?: string
           order_id?: string
           product_id?: string | null
