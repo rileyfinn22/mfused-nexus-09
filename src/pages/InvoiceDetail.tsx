@@ -101,7 +101,7 @@ const InvoiceDetail = () => {
         companies!company_id(name)
       `)
       .eq('id', invoiceId)
-      .order('created_at', { ascending: true, foreignTable: 'orders.order_items' })
+      .order('line_number', { ascending: true, nullsFirst: false, foreignTable: 'orders.order_items' })
       .single();
     if (invoiceError || !invoiceData) {
       console.error('Invoice fetch error:', invoiceError);
@@ -124,12 +124,20 @@ const InvoiceDetail = () => {
       .from('inventory_allocations')
       .select(`
         *,
-        order_items(id, name, sku, unit_price, quantity, shipped_quantity, item_id, description),
+        order_items(id, name, sku, unit_price, quantity, shipped_quantity, item_id, description, line_number),
         inventory(state, available)
       `)
       .eq('invoice_id', invoiceId)
-      .order('created_at', { ascending: true })
-      .order('created_at', { ascending: true, foreignTable: 'order_items' });
+      .order('created_at', { ascending: true });
+    
+    // Sort by order_items.line_number after fetch
+    if (allocationsData) {
+      allocationsData.sort((a, b) => {
+        const lineA = a.order_items?.line_number ?? 999;
+        const lineB = b.order_items?.line_number ?? 999;
+        return lineA - lineB;
+      });
+    }
     if (allocationsData) {
       setInventoryAllocations(allocationsData);
 
