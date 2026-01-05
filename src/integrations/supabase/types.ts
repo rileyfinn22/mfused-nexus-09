@@ -457,6 +457,7 @@ export type Database = {
           quickbooks_payment_link: string | null
           quickbooks_sync_status: string | null
           quickbooks_synced_at: string | null
+          quote_id: string | null
           shipment_number: number | null
           shipping_cost: number | null
           status: string
@@ -486,6 +487,7 @@ export type Database = {
           quickbooks_payment_link?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
+          quote_id?: string | null
           shipment_number?: number | null
           shipping_cost?: number | null
           status?: string
@@ -515,6 +517,7 @@ export type Database = {
           quickbooks_payment_link?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
+          quote_id?: string | null
           shipment_number?: number | null
           shipping_cost?: number | null
           status?: string
@@ -544,6 +547,13 @@ export type Database = {
             columns: ["parent_invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
             referencedColumns: ["id"]
           },
         ]
@@ -756,6 +766,7 @@ export type Database = {
           po_pdf_path: string | null
           qb_estimate_id: string | null
           qb_project_id: string | null
+          quote_id: string | null
           shipping_city: string
           shipping_cost: number | null
           shipping_name: string
@@ -805,6 +816,7 @@ export type Database = {
           po_pdf_path?: string | null
           qb_estimate_id?: string | null
           qb_project_id?: string | null
+          quote_id?: string | null
           shipping_city: string
           shipping_cost?: number | null
           shipping_name: string
@@ -854,6 +866,7 @@ export type Database = {
           po_pdf_path?: string | null
           qb_estimate_id?: string | null
           qb_project_id?: string | null
+          quote_id?: string | null
           shipping_city?: string
           shipping_cost?: number | null
           shipping_name?: string
@@ -895,6 +908,13 @@ export type Database = {
             columns: ["parent_order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
             referencedColumns: ["id"]
           },
         ]

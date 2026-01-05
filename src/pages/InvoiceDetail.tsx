@@ -725,6 +725,15 @@ const InvoiceDetail = () => {
                 <p className="text-sm text-muted-foreground">
                   Customer: {(invoice?.companies as any)?.name || 'N/A'}
                 </p>
+                {invoice?.quote_id && (
+                  <Button 
+                    variant="link" 
+                    className="h-auto p-0 text-sm text-primary"
+                    onClick={() => navigate(`/quotes/${invoice.quote_id}`)}
+                  >
+                    View Source Quote
+                  </Button>
+                )}
                 {order?.po_number && <p className="text-sm text-muted-foreground">
                     Customer PO: {order.po_number}
                   </p>}

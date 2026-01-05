@@ -778,6 +778,18 @@ const OrderDetail = () => {
                   <span>Order Date: {new Date(order.order_date || order.created_at).toLocaleDateString()}</span>
                   <span>•</span>
                   <span>Due Date: {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set'}</span>
+                  {order.quote_id && (
+                    <>
+                      <span>•</span>
+                      <Button 
+                        variant="link" 
+                        className="h-auto p-0 text-sm text-primary"
+                        onClick={() => navigate(`/quotes/${order.quote_id}`)}
+                      >
+                        View Source Quote
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="text-right">
