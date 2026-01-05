@@ -24,6 +24,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
 const InvoiceDetail = () => {
   const {
     invoiceId
@@ -1308,25 +1309,29 @@ const InvoiceDetail = () => {
                           // Generate and download PDF for this PO
                           const doc = new jsPDF();
                           
-                          // Header
-                          doc.setFontSize(20);
-                          doc.text("VENDOR PURCHASE ORDER", 105, 20, { align: "center" });
+                          // Add branding header
+                          const headerY = addPdfBrandingSync(doc, { documentTitle: 'VENDOR PURCHASE ORDER' });
                           
                           // PO Info
-                          doc.setFontSize(12);
-                          doc.text(`PO Number: ${po.po_number}`, 20, 40);
-                          doc.text(`Order Date: ${new Date(po.order_date).toLocaleDateString()}`, 20, 48);
-                          doc.text(`Status: ${po.status.replace('_', ' ').toUpperCase()}`, 20, 56);
+                          let yPos = headerY + 5;
+                          doc.setFontSize(11);
+                          doc.setTextColor(0, 0, 0);
+                          doc.text(`PO Number: ${po.po_number}`, 14, yPos);
+                          doc.text(`Order Date: ${new Date(po.order_date).toLocaleDateString()}`, 14, yPos + 7);
+                          doc.text(`Status: ${po.status.replace('_', ' ').toUpperCase()}`, 14, yPos + 14);
                           
                           if (po.expected_delivery_date) {
-                            doc.text(`Expected Delivery: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 20, 64);
+                            doc.text(`Expected Delivery: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + 21);
+                            yPos += 7;
                           }
 
                           // Vendor Info
-                          doc.setFontSize(14);
-                          doc.text("Vendor Information", 20, 80);
-                          doc.setFontSize(11);
-                          doc.text(`${po.vendors?.name || 'Unknown'}`, 20, 88);
+                          doc.setFontSize(12);
+                          doc.setFont('helvetica', 'bold');
+                          doc.text("Vendor Information", 14, yPos + 28);
+                          doc.setFont('helvetica', 'normal');
+                          doc.setFontSize(10);
+                          doc.text(`${po.vendors?.name || 'Unknown'}`, 14, yPos + 35);
 
                           // Items table
                           const tableData = (po.vendor_po_items || []).map((item: any) => [
@@ -1339,7 +1344,7 @@ const InvoiceDetail = () => {
                           ]);
 
                           autoTable(doc, {
-                            startY: 100,
+                            startY: yPos + 45,
                             head: [['SKU', 'Product', 'Description', 'Quantity', 'Unit Cost', 'Total']],
                             body: tableData,
                             theme: 'grid',
@@ -1350,6 +1355,9 @@ const InvoiceDetail = () => {
                           const finalY = (doc as any).lastAutoTable.finalY || 100;
                           doc.setFontSize(14);
                           doc.text(`Total: ${formatCurrency(Number(po.total))}`, 150, finalY + 15);
+
+                          // Footer
+                          addPdfFooter(doc);
 
                           // Save
                           doc.save(`vendor-po-${po.po_number}.pdf`);

@@ -11,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
@@ -180,29 +181,33 @@ const VendorPODetail = () => {
 
     const doc = new jsPDF();
     
-    // Header
-    doc.setFontSize(20);
-    doc.text("VENDOR PURCHASE ORDER", 105, 20, { align: "center" });
+    // Add branding header
+    const headerY = addPdfBrandingSync(doc, { documentTitle: 'VENDOR PURCHASE ORDER' });
     
     // PO Info
-    doc.setFontSize(12);
-    doc.text(`PO Number: ${po.po_number}`, 20, 40);
-    doc.text(`Order Date: ${new Date(po.order_date).toLocaleDateString()}`, 20, 48);
-    doc.text(`Customer Order: ${po.orders?.order_number || 'N/A'}`, 20, 56);
-    doc.text(`Status: ${po.status.replace('_', ' ').toUpperCase()}`, 20, 64);
+    let yPos = headerY + 5;
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`PO Number: ${po.po_number}`, 14, yPos);
+    doc.text(`Order Date: ${new Date(po.order_date).toLocaleDateString()}`, 14, yPos + 7);
+    doc.text(`Customer Order: ${po.orders?.order_number || 'N/A'}`, 14, yPos + 14);
+    doc.text(`Status: ${po.status.replace('_', ' ').toUpperCase()}`, 14, yPos + 21);
     
     if (po.expected_delivery_date) {
-      doc.text(`Expected Delivery: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 20, 72);
+      doc.text(`Expected Delivery: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + 28);
+      yPos += 7;
     }
 
     // Vendor Info
-    doc.setFontSize(14);
-    doc.text("Vendor Information", 20, 88);
-    doc.setFontSize(11);
-    doc.text(`${vendor.name}`, 20, 96);
-    if (vendor.contact_name) doc.text(`Contact: ${vendor.contact_name}`, 20, 102);
-    if (vendor.contact_email) doc.text(`Email: ${vendor.contact_email}`, 20, 108);
-    if (vendor.contact_phone) doc.text(`Phone: ${vendor.contact_phone}`, 20, 114);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Vendor Information", 14, yPos + 38);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`${vendor.name}`, 14, yPos + 45);
+    if (vendor.contact_name) doc.text(`Contact: ${vendor.contact_name}`, 14, yPos + 51);
+    if (vendor.contact_email) doc.text(`Email: ${vendor.contact_email}`, 14, yPos + 57);
+    if (vendor.contact_phone) doc.text(`Phone: ${vendor.contact_phone}`, 14, yPos + 63);
 
     // Items table
     const tableData = poItems.map(item => [
@@ -215,7 +220,7 @@ const VendorPODetail = () => {
     ]);
 
     autoTable(doc, {
-      startY: 125,
+      startY: yPos + 78,
       head: [['SKU', 'Product', 'Description', 'Quantity', 'Unit Cost', 'Total']],
       body: tableData,
       theme: 'grid',
@@ -227,6 +232,9 @@ const VendorPODetail = () => {
     doc.setFontSize(14);
     const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
     doc.text(`Total: $${totalAmount.toFixed(2)}`, 150, finalY + 15);
+
+    // Footer
+    addPdfFooter(doc);
 
     // Save
     doc.save(`vendor-po-${po.po_number}.pdf`);
