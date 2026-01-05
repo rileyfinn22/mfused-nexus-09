@@ -558,46 +558,48 @@ const InvoiceDetail = () => {
       finalY = 30;
     }
     
-    doc.roundedRect(totalsX, finalY - 5, totalsWidth, totalsBoxHeight, 2, 2, 'F');
-    
+    // Simple totals section - no box, just clean text aligned right
     doc.setFontSize(9);
     doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
     
     // Subtotal
     doc.setFont('helvetica', 'normal');
-    doc.text('Subtotal:', totalsX + 5, finalY + 5);
-    doc.text(formatCurrency(invoice.subtotal || 0), totalsX + totalsWidth - 5, finalY + 5, { align: 'right' });
+    doc.text('Subtotal:', totalsX, finalY);
+    doc.text(formatCurrency(invoice.subtotal || 0), pageWidth - 14, finalY, { align: 'right' });
     
-    let totalsYOffset = 12;
+    let totalsYOffset = 7;
     
     // Shipping
     if (invoice.shipping_cost && invoice.shipping_cost > 0) {
-      doc.text('Shipping:', totalsX + 5, finalY + totalsYOffset + 5);
-      doc.text(formatCurrency(invoice.shipping_cost), totalsX + totalsWidth - 5, finalY + totalsYOffset + 5, { align: 'right' });
-      totalsYOffset += 8;
+      doc.text('Shipping:', totalsX, finalY + totalsYOffset);
+      doc.text(formatCurrency(invoice.shipping_cost), pageWidth - 14, finalY + totalsYOffset, { align: 'right' });
+      totalsYOffset += 7;
     }
     
-    // Total line
-    doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.setLineWidth(0.5);
-    doc.line(totalsX + 5, finalY + totalsYOffset + 3, totalsX + totalsWidth - 5, finalY + totalsYOffset + 3);
+    // Separator line before total
+    totalsYOffset += 3;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(totalsX, finalY + totalsYOffset, pageWidth - 14, finalY + totalsYOffset);
+    totalsYOffset += 6;
     
     // Total
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text('Total:', totalsX + 5, finalY + totalsYOffset + 12);
-    doc.text(formatCurrency(invoice.total || 0), totalsX + totalsWidth - 5, finalY + totalsYOffset + 12, { align: 'right' });
+    doc.text('Total:', totalsX, finalY + totalsYOffset);
+    doc.text(formatCurrency(invoice.total || 0), pageWidth - 14, finalY + totalsYOffset, { align: 'right' });
     
     // Payment info if applicable
     if (hasPayments) {
-      totalsYOffset += 18;
+      totalsYOffset += 10;
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Amount Paid:', totalsX + 5, finalY + totalsYOffset + 5);
-      doc.text(`-${formatCurrency(totalPaid)}`, totalsX + totalsWidth - 5, finalY + totalsYOffset + 5, { align: 'right' });
+      doc.text('Amount Paid:', totalsX, finalY + totalsYOffset);
+      doc.text(`-${formatCurrency(totalPaid)}`, pageWidth - 14, finalY + totalsYOffset, { align: 'right' });
       
+      totalsYOffset += 8;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       if (balance > 0) {
@@ -605,8 +607,8 @@ const InvoiceDetail = () => {
       } else {
         doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]); // Green for paid
       }
-      doc.text('Balance Due:', totalsX + 5, finalY + totalsYOffset + 15);
-      doc.text(formatCurrency(balance), totalsX + totalsWidth - 5, finalY + totalsYOffset + 15, { align: 'right' });
+      doc.text('Balance Due:', totalsX, finalY + totalsYOffset);
+      doc.text(formatCurrency(balance), pageWidth - 14, finalY + totalsYOffset, { align: 'right' });
     }
     
     // ============ TERMS & NOTES SECTION (Left side) ============
