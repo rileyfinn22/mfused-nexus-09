@@ -1640,6 +1640,41 @@ export type Database = {
         }
         Relationships: []
       }
+      sent_email_history: {
+        Row: {
+          company_id: string
+          created_at: string
+          email: string
+          id: string
+          last_used_at: string
+          use_count: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email: string
+          id?: string
+          last_used_at?: string
+          use_count?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          last_used_at?: string
+          use_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sent_email_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           company_id: string

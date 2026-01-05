@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addPdfBrandingSync, addPdfFooter, VIBE_COMPANY } from "@/lib/pdfBranding";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface SendInvoiceEmailDialogProps {
   open: boolean;
@@ -40,6 +42,10 @@ export function SendInvoiceEmailDialog({
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [activeTab, setActiveTab] = useState("compose");
+  const [emailHistory, setEmailHistory] = useState<string[]>([]);
+  const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -58,6 +64,41 @@ export function SendInvoiceEmailDialog({
       maximumFractionDigits: 3,
     }).format(amount);
   };
+
+  // Fetch email history on mount
+  useEffect(() => {
+    const fetchEmailHistory = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get user's company
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (roleData?.company_id) {
+        setCompanyId(roleData.company_id);
+        
+        // Fetch email history
+        const { data: historyData } = await supabase
+          .from('sent_email_history')
+          .select('email')
+          .eq('company_id', roleData.company_id)
+          .order('last_used_at', { ascending: false })
+          .limit(50);
+
+        if (historyData) {
+          setEmailHistory(historyData.map(h => h.email));
+        }
+      }
+    };
+
+    if (open) {
+      fetchEmailHistory();
+    }
+  }, [open]);
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -81,11 +122,45 @@ Thank you for your business.`;
       setEmails(order?.customer_email ? [order.customer_email] : []);
       setCurrentEmail("");
       setActiveTab("compose");
+      setShowEmailSuggestions(false);
     }
   }, [open, invoice, order]);
 
-  const addEmail = () => {
-    const email = currentEmail.trim().toLowerCase();
+  // Save emails to history
+  const saveEmailsToHistory = async (emailsToSave: string[]) => {
+    if (!companyId) return;
+
+    for (const email of emailsToSave) {
+      // Upsert: insert or update use_count and last_used_at
+      const { error } = await supabase
+        .from('sent_email_history')
+        .upsert(
+          {
+            company_id: companyId,
+            email: email.toLowerCase(),
+            last_used_at: new Date().toISOString(),
+            use_count: 1,
+          },
+          {
+            onConflict: 'company_id,email',
+            ignoreDuplicates: false,
+          }
+        );
+
+      if (error) {
+        console.error('Error saving email history:', error);
+      }
+    }
+
+    // Update local state
+    setEmailHistory(prev => {
+      const newEmails = emailsToSave.filter(e => !prev.includes(e.toLowerCase()));
+      return [...newEmails.map(e => e.toLowerCase()), ...prev];
+    });
+  };
+
+  const addEmail = (emailToAdd?: string) => {
+    const email = (emailToAdd || currentEmail).trim().toLowerCase();
     if (!email) return;
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -109,7 +184,19 @@ Thank you for your business.`;
     
     setEmails([...emails, email]);
     setCurrentEmail("");
+    setShowEmailSuggestions(false);
   };
+
+  const selectEmailFromHistory = (email: string) => {
+    addEmail(email);
+  };
+
+  // Filter suggestions based on current input
+  const filteredSuggestions = emailHistory.filter(
+    email => 
+      !emails.includes(email) && 
+      (currentEmail.length === 0 || email.toLowerCase().includes(currentEmail.toLowerCase()))
+  ).slice(0, 10);
 
   const removeEmail = (emailToRemove: string) => {
     setEmails(emails.filter((e) => e !== emailToRemove));
@@ -268,6 +355,9 @@ Thank you for your business.`;
       
       if (error) throw error;
       
+      // Save emails to history after successful send
+      await saveEmailsToHistory(emails);
+      
       toast({
         title: "Invoice sent!",
         description: `Invoice ${invoice.invoice_number} has been emailed to ${emails.length} recipient${emails.length > 1 ? "s" : ""}`,
@@ -343,15 +433,41 @@ Thank you for your business.`;
             {/* Recipients */}
             <div className="space-y-2">
               <Label>To</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="email"
-                  placeholder="Enter email address"
-                  value={currentEmail}
-                  onChange={(e) => setCurrentEmail(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                />
-                <Button type="button" size="icon" variant="outline" onClick={addEmail}>
+              <div className="flex gap-2 relative">
+                <div className="flex-1 relative">
+                  <Input
+                    ref={inputRef}
+                    type="email"
+                    placeholder="Enter email address"
+                    value={currentEmail}
+                    onChange={(e) => {
+                      setCurrentEmail(e.target.value);
+                      setShowEmailSuggestions(e.target.value.length > 0);
+                    }}
+                    onFocus={() => setShowEmailSuggestions(currentEmail.length > 0 || emailHistory.length > 0)}
+                    onBlur={() => setTimeout(() => setShowEmailSuggestions(false), 200)}
+                    onKeyDown={handleKeyDown}
+                  />
+                  {showEmailSuggestions && filteredSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-auto">
+                      {filteredSuggestions.map((email) => (
+                        <button
+                          key={email}
+                          type="button"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            selectEmailFromHistory(email);
+                          }}
+                        >
+                          <Mail className="h-3 w-3 text-muted-foreground" />
+                          {email}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Button type="button" size="icon" variant="outline" onClick={() => addEmail()}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
