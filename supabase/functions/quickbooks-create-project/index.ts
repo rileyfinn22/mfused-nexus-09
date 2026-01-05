@@ -189,13 +189,15 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Create a QBO Project using the Projects API
-    const projectName = `${order.order_number} - ${order.customer_name}`;
-    console.log('Creating QBO Project:', projectName);
+    // Step 2: Create a Job (sub-customer) under the parent customer.
+    // In QuickBooks Online, the "Projects" UI is backed by Customers with Job=true.
+    const projectName = `${order.order_number} - ${order.customer_name}`.substring(0, 100);
+    console.log('Creating Job (Project) under customer:', parentCustomerId, 'Name:', projectName);
 
-    // Check if a project with this name already exists
-    const projectSearchResponse = await fetch(
-      `${qbApiUrl}/query?query=${encodeURIComponent(`SELECT * FROM Project WHERE ProjectName='${projectName.replace(/'/g, "\\'")}' MAXRESULTS 1`)}&minorversion=69`,
+    // Check if the job already exists under this parent
+    const jobSearchQuery = `SELECT * FROM Customer WHERE DisplayName='${projectName.replace(/'/g, "\\'")}' AND ParentRef='${parentCustomerId}' MAXRESULTS 1`;
+    const jobSearchResponse = await fetch(
+      `${qbApiUrl}/query?query=${encodeURIComponent(jobSearchQuery)}&minorversion=65`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -203,78 +205,48 @@ serve(async (req) => {
         },
       }
     );
-    const projectSearchData = await projectSearchResponse.json();
-    console.log('Project search response:', JSON.stringify(projectSearchData));
+    const jobSearchData = await jobSearchResponse.json();
+    console.log('Job search response:', JSON.stringify(jobSearchData));
 
     let qbProjectId;
 
-    if (projectSearchData.QueryResponse?.Project?.length > 0) {
-      qbProjectId = projectSearchData.QueryResponse.Project[0].Id;
-      console.log('Found existing project:', qbProjectId);
+    if (jobSearchData.QueryResponse?.Customer?.length > 0) {
+      qbProjectId = jobSearchData.QueryResponse.Customer[0].Id;
+      console.log('Found existing Job (Project):', qbProjectId);
     } else {
-      // Create new project using Projects API
-      const projectPayload = {
-        ProjectName: projectName,
-        CustomerRef: {
-          value: parentCustomerId,
-        },
-        Description: `Order: ${order.order_number}\nPO: ${order.po_number || 'N/A'}\n${order.description || ''}`.substring(0, 1000),
-        ProjectStatus: "IN_PROGRESS",
+      const jobPayload: any = {
+        DisplayName: projectName,
+        ParentRef: { value: parentCustomerId },
+        Job: true,
+        // Keep billing behavior simple/compatible; the important part is Job + ParentRef.
+        BillWithParent: true,
+        Notes: `Order: ${order.order_number}\nPO: ${order.po_number || 'N/A'}`.substring(0, 4000),
       };
 
-      console.log('Creating project with payload:', JSON.stringify(projectPayload));
+      console.log('Creating Job payload:', JSON.stringify(jobPayload));
 
-      const createProjectResponse = await fetch(`${qbApiUrl}/project?minorversion=69`, {
+      const createJobResponse = await fetch(`${qbApiUrl}/customer?minorversion=65`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(projectPayload),
+        body: JSON.stringify(jobPayload),
       });
 
-      const newProject = await createProjectResponse.json();
-      console.log('Create project response:', JSON.stringify(newProject));
+      const newJob = await createJobResponse.json();
+      console.log('Create job response:', JSON.stringify(newJob));
 
-      if (!createProjectResponse.ok) {
-        console.error('Failed to create project:', JSON.stringify(newProject));
-        
-        // Handle duplicate name
-        if (newProject.Fault?.Error?.[0]?.Message?.includes('Duplicate') || 
-            newProject.Fault?.Error?.[0]?.code === '6240') {
-          // Try to find the existing project
-          const retrySearch = await fetch(
-            `${qbApiUrl}/query?query=${encodeURIComponent(`SELECT * FROM Project WHERE ProjectName LIKE '%${order.order_number}%' MAXRESULTS 10`)}&minorversion=69`,
-            {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Accept': 'application/json',
-              },
-            }
-          );
-          const retryData = await retrySearch.json();
-          const match = retryData.QueryResponse?.Project?.find(
-            (p: any) => p.ProjectName?.includes(order.order_number)
-          );
-          if (match) {
-            qbProjectId = match.Id;
-            console.log('Found duplicate project:', qbProjectId);
-          } else {
-            throw new Error(`Project for order ${order.order_number} exists but cannot be located`);
-          }
-        } else {
-          const errorMsg = newProject.Fault?.Error?.[0]?.Message || 
-                          newProject.Fault?.Error?.[0]?.Detail ||
-                          'Failed to create project in QuickBooks';
-          throw new Error(errorMsg);
-        }
-      } else {
-        qbProjectId = newProject.Project.Id;
-        console.log('Created project:', qbProjectId);
+      if (!createJobResponse.ok) {
+        console.error('Failed to create Job (Project):', JSON.stringify(newJob));
+        const errorMsg = newJob.Fault?.Error?.[0]?.Message || newJob.Fault?.Error?.[0]?.Detail || 'Failed to create Job (Project) in QuickBooks';
+        throw new Error(errorMsg);
       }
-    }
 
+      qbProjectId = newJob.Customer.Id;
+      console.log('Created Job (Project):', qbProjectId);
+    }
     // Step 3: Update order with QB Project ID
     await supabase
       .from('orders')
@@ -287,7 +259,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         qb_project_id: qbProjectId,
-        message: 'QuickBooks Project created successfully'
+        message: 'QuickBooks Job (Project) created successfully'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
