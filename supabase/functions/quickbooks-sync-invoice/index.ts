@@ -189,9 +189,32 @@ serve(async (req) => {
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
 
+    async function isValidQbProjectRef(projectId: string): Promise<boolean> {
+      try {
+        const resp = await fetch(`${qbApiUrl}/customer/${projectId}?minorversion=65`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!resp.ok) return false;
+
+        const data = await resp.json();
+        const customer = data?.Customer;
+
+        // QuickBooks "Projects" are represented as sub-customers (jobs)
+        return !!customer && (customer.Job === true || !!customer.ParentRef);
+      } catch (e) {
+        console.warn('Failed to validate ProjectRef:', projectId, e);
+        return false;
+      }
+    }
+
     // Find or create customer in QuickBooks using company name and email
     const customerName = (invoice.companies as any)?.name || 'Unknown Customer';
     const customerEmail = companyEmail || '';
+
     
     console.log('Looking for customer (company):', customerName, 'Email:', customerEmail);
     console.log('Order customer_name (ship-to):', invoice.orders?.customer_name);
@@ -756,7 +779,21 @@ serve(async (req) => {
     console.log(`Billing ${billingPercentage}% now, ${100 - billingPercentage}% due later`);
 
     // Get the QB Project ID from the order (if exists)
-    const qbProjectId = invoice.orders?.qb_project_id || invoice.qb_project_id;
+    let qbProjectId: string | null = (invoice.orders?.qb_project_id || invoice.qb_project_id || null) as any;
+
+    if (qbProjectId) {
+      const valid = await isValidQbProjectRef(String(qbProjectId));
+      if (!valid) {
+        console.warn(
+          `Invalid QB ProjectRef "${qbProjectId}" for order ${invoice.order_id}. Clearing and syncing without project.`
+        );
+
+        await supabase.from('orders').update({ qb_project_id: null }).eq('id', invoice.order_id);
+        await supabase.from('invoices').update({ qb_project_id: null }).eq('id', invoiceId);
+        qbProjectId = null;
+      }
+    }
+
     console.log('QB Project ID for invoice:', qbProjectId);
 
     // Create invoice payload

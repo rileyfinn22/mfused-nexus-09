@@ -163,7 +163,38 @@ serve(async (req) => {
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
 
+    async function isValidQbProjectRef(projectId: string): Promise<boolean> {
+      try {
+        const resp = await fetch(`${qbApiUrl}/customer/${projectId}?minorversion=65`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!resp.ok) return false;
+
+        const data = await resp.json();
+        const customer = data?.Customer;
+        return !!customer && (customer.Job === true || !!customer.ParentRef);
+      } catch (e) {
+        console.warn('Failed to validate ProjectRef:', projectId, e);
+        return false;
+      }
+    }
+
+    let safeQbProjectId: string | null = qbProjectId ? String(qbProjectId) : null;
+    if (safeQbProjectId) {
+      const valid = await isValidQbProjectRef(safeQbProjectId);
+      if (!valid) {
+        console.warn('Invalid QB ProjectRef for vendor PO, clearing order link:', safeQbProjectId);
+        await supabase.from('orders').update({ qb_project_id: null }).eq('id', vendorPo.order_id);
+        safeQbProjectId = null;
+      }
+    }
+
     // Find or create vendor in QuickBooks
+
     const vendorName = vendorPo.vendors?.name || 'Unknown Vendor';
     const vendorSearchResponse = await fetch(
       `${qbApiUrl}/query?query=SELECT * FROM Vendor WHERE DisplayName='${encodeURIComponent(vendorName)}' MAXRESULTS 1&minorversion=65`,
@@ -227,12 +258,13 @@ serve(async (req) => {
     };
 
     // Attach to QB Project if the linked order has one (for P&L tracking)
-    if (qbProjectId) {
+    if (safeQbProjectId) {
       billPayload.ProjectRef = {
-        value: qbProjectId,
+        value: safeQbProjectId,
       };
-      console.log('Attaching bill to QB Project:', qbProjectId);
+      console.log('Attaching bill to QB Project:', safeQbProjectId);
     }
+
 
     let qbResponse;
     if (vendorPo.quickbooks_id) {
