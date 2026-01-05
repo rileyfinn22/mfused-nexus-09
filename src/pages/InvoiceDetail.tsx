@@ -632,7 +632,7 @@ const InvoiceDetail = () => {
     
     // ============ FOOTER ============
     // Check if content might overlap footer, adjust if needed
-    const footerStartY = pageHeight - 30;
+    const footerStartY = pageHeight - 18;
     
     // Footer separator line
     doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
@@ -640,11 +640,10 @@ const InvoiceDetail = () => {
     doc.line(14, footerStartY, pageWidth - 14, footerStartY);
     
     // Company info footer
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Vibe Packaging | 1415 S 700 W, Ste FLEXETC, Salt Lake City, UT 84104', pageWidth / 2, footerStartY + 8, { align: 'center' });
-    doc.text('Thank you for your business!', pageWidth / 2, footerStartY + 14, { align: 'center' });
+    doc.text('Vibe Packaging | 1415 S 700 W, Ste FLEXETC, Salt Lake City, UT 84104 | Thank you for your business!', pageWidth / 2, footerStartY + 7, { align: 'center' });
     
     // Save
     doc.save(`invoice-${invoice.invoice_number}.pdf`);
