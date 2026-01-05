@@ -83,20 +83,24 @@ The packing list may be in various formats (CSV, tab-separated, or plain text). 
 You have the following order items to match against:
 ${JSON.stringify(orderItemsList, null, 2)}
 
-Match the products in the packing list to the order items by:
-1. PRODUCT NAME - Look for similar/matching product names (primary matching method)
-2. SKU - Look for matching SKU codes if names don't match
-3. Description similarity - Match based on similar descriptions
+MATCHING RULES (in order of priority):
+1. **SKU MATCHING (HIGHEST PRIORITY)** - If the packing list contains SKU codes, match them EXACTLY to order item SKUs. This is the most reliable method.
+2. **PRODUCT NAME MATCHING** - Match product names, being flexible with:
+   - Word order variations (e.g., "Widget 1000mg" = "1000mg Widget")
+   - Case differences (ignore capitalization)
+   - Minor spelling variations
+   - Abbreviations and full forms
+   - Size/weight in different formats (e.g., "1000mg" = "1g" = "1 gram")
+3. **PARTIAL NAME MATCHING** - If exact match fails, match if key product identifiers appear in both
 
-For each match, return the order item ID and the shipped quantity from the packing list.
-
-Important:
-- Focus on PRODUCT NAME matching first, then SKU
-- Be flexible with naming variations (e.g., "Widget 1000mg" matches "1000mg Widget")
-- Ignore case differences
-- Extract numeric quantities from the shipped/qty columns
-- If a product in the packing list doesn't match any order item, include it in unmatched_items
-- If the shipped quantity would exceed what's remaining to ship, still include it (the user can adjust)`;
+CRITICAL INSTRUCTIONS:
+- Look for columns like "SKU", "Item #", "Part #", "Code" for SKU matching
+- Look for columns like "Qty", "Quantity", "Shipped", "Ship Qty", "Amount", "Count" for quantities
+- Extract numeric quantities - ignore units like "ea", "pcs", "units"
+- If a row has multiple quantity columns, prefer "Shipped" or "Ship Qty" over "Ordered"
+- Each packing list item should match AT MOST one order item
+- If you cannot confidently match an item, put it in unmatched_items
+- Return ALL matched items, even if quantity exceeds remaining to ship`;
 
     const userPrompt = `Parse this packing list and match products to order items. Return the shipped quantities for each matched item.
 
