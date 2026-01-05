@@ -373,14 +373,22 @@ Return ONLY valid JSON:
     const { data: maxOrderData } = await supabase
       .from('orders')
       .select('order_number')
-      .order('order_number', { ascending: false })
-      .limit(1);
+      .order('created_at', { ascending: false })
+      .limit(100);
     
     let orderNum = 10700; // Default starting number
     if (maxOrderData && maxOrderData.length > 0) {
-      const maxNum = parseInt(maxOrderData[0].order_number, 10);
-      if (!isNaN(maxNum)) {
-        orderNum = maxNum + 1;
+      // Find the highest numeric order number (handles both "ORD-00001" and "10700" formats)
+      for (const order of maxOrderData) {
+        const orderNumStr = order.order_number;
+        // Try to extract number from formats like "ORD-00001" or plain "10700"
+        const match = orderNumStr.match(/(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num >= orderNum) {
+            orderNum = num + 1;
+          }
+        }
       }
     }
     const orderNumber = String(orderNum);
