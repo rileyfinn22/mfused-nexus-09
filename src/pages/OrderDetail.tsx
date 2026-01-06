@@ -643,6 +643,16 @@ const OrderDetail = () => {
       });
 
       if (error) throw error;
+
+      // Graceful no-op when Projects API access isn't available
+      if (data?.skipped) {
+        toast({
+          title: "Projects not available",
+          description: data.message || "This QuickBooks connection can't create Projects. Invoices will still sync normally.",
+        });
+        return;
+      }
+
       if (data?.error) throw new Error(data.error);
 
       toast({

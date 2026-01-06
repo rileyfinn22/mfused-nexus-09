@@ -254,18 +254,38 @@ serve(async (req) => {
 
     if (createProjectResponse.ok) {
       const responseData = JSON.parse(projectResponseText);
-      
+
       if (responseData.data?.projectManagementCreateProject?.project?.id) {
         qbProjectId = responseData.data.projectManagementCreateProject.project.id;
         console.log("Created Project via GraphQL:", qbProjectId);
       } else if (responseData.errors) {
-        const errorMessage = responseData.errors[0]?.message || 'Unknown GraphQL error';
+        const errorMessage = responseData.errors[0]?.message || "Unknown GraphQL error";
         console.warn("GraphQL returned errors:", errorMessage);
-        
+
+        // If Projects API isn't available for this connection/app, gracefully no-op.
+        const lower = errorMessage.toLowerCase();
+        if (
+          lower.includes("forbidden") ||
+          lower.includes("not authorized") ||
+          lower.includes("permission") ||
+          lower.includes("scope")
+        ) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              skipped: true,
+              reason: "projects_api_forbidden",
+              message:
+                "QuickBooks Projects API access is not available for this connection. Continuing without creating a Project.",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+
         // Check for duplicate - query existing projects
-        if (errorMessage.toLowerCase().includes('duplicate') || errorMessage.toLowerCase().includes('already exists')) {
+        if (lower.includes("duplicate") || lower.includes("already exists")) {
           console.log("Project may already exist, querying...");
-          
+
           const queryProjects = {
             query: `
               query ListProjects($customerId: ID!) {
@@ -280,28 +300,28 @@ serve(async (req) => {
                 }
               }
             `,
-            variables: { customerId: parentCustomerId }
+            variables: { customerId: parentCustomerId },
           };
-          
+
           const listResponse = await fetch(graphqlUrl, {
-            method: 'POST',
+            method: "POST",
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+              Accept: "application/json",
+              "Content-Type": "application/json",
             },
             body: JSON.stringify(queryProjects),
           });
-          
+
           if (listResponse.ok) {
             const listData = await listResponse.json();
             const projects = listData.data?.projectManagementProjects?.edges || [];
             console.log("Found", projects.length, "existing projects for customer");
-            
-            const existingProject = projects.find((p: any) => 
-              p.node?.name?.toLowerCase().trim() === projectName.toLowerCase().trim()
+
+            const existingProject = projects.find(
+              (p: any) => p.node?.name?.toLowerCase().trim() === projectName.toLowerCase().trim(),
             );
-            
+
             if (existingProject?.node?.id) {
               qbProjectId = existingProject.node.id;
               console.log("Found existing project:", qbProjectId);
@@ -320,9 +340,15 @@ serve(async (req) => {
     } else {
       const status = createProjectResponse.status;
       if (status === 403) {
-        throw new Error(
-          'GraphQL request forbidden (403). The QuickBooks connection likely lacks the "project-management.project" scope. ' +
-            'Disconnect and reconnect QuickBooks to grant Projects access.'
+        return new Response(
+          JSON.stringify({
+            success: false,
+            skipped: true,
+            reason: "projects_api_forbidden",
+            message:
+              "QuickBooks Projects API access is forbidden for this connection/app. Continuing without creating a Project.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
       throw new Error(`GraphQL request failed with status: ${status}`);
@@ -344,7 +370,22 @@ serve(async (req) => {
   } catch (error: any) {
     console.error("Create project error:", error);
 
-    return new Response(JSON.stringify({ error: error.message }), {
+    const msg = String(error?.message || "Unknown error");
+    // Never return a 500 for Projects-scope issues (the UI should not hard-fail).
+    if (msg.includes("project-management.project") || msg.toLowerCase().includes("graphql request forbidden")) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          skipped: true,
+          reason: "projects_api_forbidden",
+          message:
+            "QuickBooks Projects API access is not available for this connection/app. Continuing without creating a Project.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    return new Response(JSON.stringify({ error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
