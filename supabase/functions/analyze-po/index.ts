@@ -37,9 +37,9 @@ serve(async (req) => {
     // Create service client for operations that need elevated privileges
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { pdfPath, companyId, filename, orderType = 'pull_ship' } = await req.json();
+    const { pdfPath, companyId, filename, orderType = 'pull_ship', returnProductsOnly = false } = await req.json();
     
-    console.log(`Processing PO for company_id: ${companyId}`);
+    console.log(`Processing PO for company_id: ${companyId}, returnProductsOnly: ${returnProductsOnly}`);
     
     // Validate user has access to this company
     const { data: userRole, error: roleError } = await supabase
@@ -368,6 +368,46 @@ Return ONLY valid JSON:
       });
       return null;
     };
+
+    // If returnProductsOnly is true, just return the extracted items with product matching
+    // This is used when combining multiple POs into a single order
+    if (returnProductsOnly) {
+      console.log('returnProductsOnly mode - returning extracted items without creating order');
+      
+      const matchedItems = (extractedData.items || []).map((item: any) => {
+        const matchedProduct = findMatchingProduct(item);
+        return {
+          product_id: matchedProduct?.id || null,
+          sku: item.sku || 'UNKNOWN',
+          name: item.name || item.description || 'Unknown Item',
+          description: matchedProduct?.description || item.description || null,
+          quantity: item.quantity || 1,
+          unit_price: item.unit_price || 0,
+          item_id: matchedProduct?.item_id || item.sku || null,
+          vendor_id: matchedProduct?.preferred_vendor_id || null,
+          vendor_cost: matchedProduct?.cost || null,
+        };
+      });
+      
+      console.log(`Returning ${matchedItems.length} items, ${matchedItems.filter((i: any) => i.product_id).length} matched`);
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          items: matchedItems,
+          poNumber: extractedData.po_number || null,
+          customerName: extractedData.customer_name || null,
+          shippingAddress: {
+            name: extractedData.shipping_name,
+            street: extractedData.shipping_street,
+            city: extractedData.shipping_city,
+            state: extractedData.shipping_state,
+            zip: extractedData.shipping_zip,
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Generate sequential order number by finding the max existing order number
     const { data: maxOrderData } = await supabase

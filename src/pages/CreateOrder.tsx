@@ -98,7 +98,8 @@ const CreateOrder = () => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadedPOs, setUploadedPOs] = useState<{ filename: string; poNumber?: string }[]>([]);
   const [matchingProductId, setMatchingProductId] = useState<Record<string, string>>({});
   const [openCombobox, setOpenCombobox] = useState<Record<string, boolean>>({});
 
@@ -312,22 +313,34 @@ const CreateOrder = () => {
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== 'application/pdf') {
-        toast({
-          title: "Invalid file type",
-          description: "Please upload a PDF file",
-          variant: "destructive",
-        });
-        return;
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const validFiles: File[] = [];
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].type !== 'application/pdf') {
+          toast({
+            title: "Invalid file type",
+            description: `${files[i].name} is not a PDF file`,
+            variant: "destructive",
+          });
+        } else {
+          validFiles.push(files[i]);
+        }
       }
-      setSelectedFile(file);
+      if (validFiles.length > 0) {
+        setSelectedFiles(prev => [...prev, ...validFiles]);
+      }
     }
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  };
+
+  const removeSelectedFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handlePOUpload = async () => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
 
     setUploading(true);
 
@@ -370,59 +383,133 @@ const CreateOrder = () => {
         companyId = userRole.company_id;
       }
 
-      // Upload to storage
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('po-documents')
-        .upload(fileName, selectedFile);
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw uploadError;
-      }
-
       toast({
-        title: "Upload successful",
-        description: "Your PO is being analyzed...",
+        title: "Processing POs",
+        description: `Analyzing ${selectedFiles.length} purchase order(s)...`,
       });
 
       setUploading(false);
       setAnalyzing(true);
 
-      // Trigger AI analysis - but specify this is for standard orders
-      const { data: functionData, error: functionError } = await supabase.functions.invoke('analyze-po', {
-        body: { 
-          pdfPath: fileName,
-          companyId: companyId,
-          filename: selectedFile.name,
-          orderType: 'standard' // Explicitly set order type for Create Order page
-        }
-      });
-
-      if (functionError) {
-        console.error('Analysis error:', functionError);
-        toast({
-          title: "Analysis failed",
-          description: "Continue with manual entry below",
-          variant: "destructive",
-        });
-      } else if (functionData?.orderId) {
-        toast({
-          title: "PO analyzed successfully",
-          description: "Order details loaded below - review and edit before saving",
-        });
+      // Process each file and accumulate products
+      for (const file of selectedFiles) {
+        // Upload to storage
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         
-        // Navigate to the created draft order so URL reflects which order is being edited
-        navigate(`/orders/edit/${functionData.orderId}`);
+        const { error: uploadError } = await supabase.storage
+          .from('po-documents')
+          .upload(fileName, file);
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast({
+            title: "Upload failed",
+            description: `Failed to upload ${file.name}`,
+            variant: "destructive",
+          });
+          continue;
+        }
+
+        // Trigger AI analysis
+        const { data: functionData, error: functionError } = await supabase.functions.invoke('analyze-po', {
+          body: { 
+            pdfPath: fileName,
+            companyId: companyId,
+            filename: file.name,
+            orderType: 'standard',
+            returnProductsOnly: true // New flag to just return extracted data without creating order
+          }
+        });
+
+        if (functionError) {
+          console.error('Analysis error:', functionError);
+          toast({
+            title: "Analysis failed",
+            description: `Could not analyze ${file.name}`,
+            variant: "destructive",
+          });
+          continue;
+        }
+
+        // Add extracted products to order
+        if (functionData?.items && Array.isArray(functionData.items)) {
+          const newItems: OrderItem[] = [];
+          const newUnmatched: any[] = [];
+          
+          for (const item of functionData.items) {
+            if (item.product_id) {
+              // Check if already in selected items
+              const existingIdx = selectedItems.findIndex(si => si.productId === item.product_id);
+              if (existingIdx >= 0) {
+                // Add quantity to existing
+                setSelectedItems(prev => prev.map((si, idx) => 
+                  idx === existingIdx 
+                    ? { ...si, quantity: si.quantity + (item.quantity || 1) }
+                    : si
+                ));
+              } else {
+                newItems.push({
+                  productId: item.product_id,
+                  quantity: item.quantity || 1,
+                  unit_price: item.unit_price,
+                });
+              }
+            } else {
+              // Unmatched item
+              newUnmatched.push(item);
+            }
+          }
+          
+          if (newItems.length > 0) {
+            setSelectedItems(prev => [...prev, ...newItems]);
+          }
+          if (newUnmatched.length > 0) {
+            setUnmatchedPoItems(prev => [...prev, ...newUnmatched]);
+          }
+        }
+
+        // Extract PO number from data or filename
+        const poNum = functionData?.poNumber || file.name.replace('.pdf', '');
+        setUploadedPOs(prev => [...prev, { filename: file.name, poNumber: poNum }]);
+        
+        // Update form PO number field (combine multiple)
+        setFormData(prev => ({
+          ...prev,
+          poNumber: prev.poNumber 
+            ? `${prev.poNumber}, ${poNum}` 
+            : poNum
+        }));
+
+        // Fill in customer/shipping if available and not already filled
+        if (functionData?.customerName && !formData.customerName) {
+          setFormData(prev => ({ ...prev, customerName: functionData.customerName }));
+        }
+        if (functionData?.shippingAddress) {
+          const addr = functionData.shippingAddress;
+          if (!formData.shippingStreet && addr.street) {
+            setFormData(prev => ({
+              ...prev,
+              shippingName: addr.name || prev.shippingName,
+              shippingStreet: addr.street || prev.shippingStreet,
+              shippingCity: addr.city || prev.shippingCity,
+              shippingState: addr.state || prev.shippingState,
+              shippingZip: addr.zip || prev.shippingZip,
+            }));
+          }
+        }
       }
 
+      toast({
+        title: "POs analyzed",
+        description: `${selectedFiles.length} PO(s) processed. Review items below.`,
+      });
+
       setAnalyzing(false);
-      setSelectedFile(null);
+      setSelectedFiles([]);
 
     } catch (error: any) {
-      console.error('Error uploading PO:', error);
+      console.error('Error uploading POs:', error);
       toast({
         title: "Upload failed",
         description: error.message || "Please try again",
@@ -1203,7 +1290,7 @@ const CreateOrder = () => {
               <div>
                 <h3 className="text-sm font-medium">Order Entry</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Upload a PO to auto-fill or enter manually
+                  Upload one or more POs to combine into a single order
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1213,25 +1300,19 @@ const CreateOrder = () => {
                   onChange={handleFileSelect}
                   className="hidden"
                   id="po-upload"
+                  multiple
                   disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
                 />
-                {selectedFile && !uploading && !analyzing && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <FileText className="h-3 w-3" />
-                    {selectedFile.name.substring(0, 20)}...
-                  </span>
-                )}
-                {!selectedFile ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => document.getElementById('po-upload')?.click()}
-                    disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload PO
-                  </Button>
-                ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById('po-upload')?.click()}
+                  disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {selectedFiles.length > 0 ? 'Add More POs' : 'Upload POs'}
+                </Button>
+                {selectedFiles.length > 0 && (
                   <Button
                     onClick={handlePOUpload}
                     disabled={uploading || analyzing}
@@ -1243,12 +1324,43 @@ const CreateOrder = () => {
                         {uploading ? 'Uploading...' : 'Analyzing...'}
                       </>
                     ) : (
-                      'Analyze'
+                      `Analyze ${selectedFiles.length} PO${selectedFiles.length > 1 ? 's' : ''}`
                     )}
                   </Button>
                 )}
               </div>
             </div>
+            {/* Show selected files */}
+            {selectedFiles.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {selectedFiles.map((file, idx) => (
+                  <Badge key={idx} variant="secondary" className="flex items-center gap-1">
+                    <FileText className="h-3 w-3" />
+                    {file.name.length > 25 ? `${file.name.substring(0, 22)}...` : file.name}
+                    <button
+                      onClick={() => removeSelectedFile(idx)}
+                      className="ml-1 hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {/* Show already processed POs */}
+            {uploadedPOs.length > 0 && (
+              <div className="mt-3 border-t pt-3">
+                <p className="text-xs text-muted-foreground mb-2">Processed POs:</p>
+                <div className="flex flex-wrap gap-2">
+                  {uploadedPOs.map((po, idx) => (
+                    <Badge key={idx} variant="outline" className="flex items-center gap-1">
+                      <Check className="h-3 w-3 text-green-500" />
+                      {po.poNumber || po.filename}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
