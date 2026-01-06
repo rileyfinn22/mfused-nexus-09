@@ -66,6 +66,7 @@ interface ProductTemplate {
   price: number | null;
   cost: number | null;
   company_id: string | null;
+  thumbnail_url: string | null;
   product_count?: number;
 }
 
