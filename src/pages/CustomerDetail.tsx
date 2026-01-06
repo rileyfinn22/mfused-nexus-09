@@ -96,6 +96,7 @@ const CustomerDetail = () => {
   const [productFormErrors, setProductFormErrors] = useState<Record<string, string>>({});
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const [productViewMode, setProductViewMode] = useState<"templates" | "list">("templates");
+  const [isInsideTemplateView, setIsInsideTemplateView] = useState(false);
   
   // Address management state
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
@@ -1212,20 +1213,22 @@ const CustomerDetail = () => {
                 All Products
               </Button>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowAddProductDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Link Existing
-              </Button>
-              <Button variant="outline" onClick={() => setShowBulkUploadDialog(true)}>
-                <Upload className="h-4 w-4 mr-2" />
-                Bulk Upload
-              </Button>
-              <Button onClick={() => setShowCreateProductDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create New
-              </Button>
-            </div>
+            {!(productViewMode === "templates" && isInsideTemplateView) && (
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowAddProductDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Link Existing
+                </Button>
+                <Button variant="outline" onClick={() => setShowBulkUploadDialog(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Bulk Upload
+                </Button>
+                <Button onClick={() => setShowCreateProductDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Templates Grid View */}
@@ -1234,6 +1237,7 @@ const CustomerDetail = () => {
               companyId={customerId!}
               companyName={customer.name}
               onProductsChange={fetchCustomerProducts}
+              onTemplateViewChange={setIsInsideTemplateView}
             />
           )}
 
