@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy, Trash2 } from "lucide-react";
+import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy, Trash2, LayoutGrid, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -64,6 +64,7 @@ export function ProductTemplateGrid({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTemplate, setDeletingTemplate] = useState<ProductTemplate | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   useEffect(() => {
     fetchTemplates();
@@ -274,6 +275,29 @@ export function ProductTemplateGrid({
 
   return (
     <>
+      {/* View Toggle */}
+      <div className="flex justify-end mb-4">
+        <div className="flex items-center border rounded-lg p-1 bg-muted/30">
+          <Button
+            variant={viewMode === "grid" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-8"
+            onClick={() => setViewMode("grid")}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-8"
+            onClick={() => setViewMode("list")}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {viewMode === "grid" ? (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {templates.map((template) => (
           <Card
@@ -361,7 +385,72 @@ export function ProductTemplateGrid({
           </Card>
         )}
       </div>
-
+      ) : (
+        /* List View */
+        <Card className="overflow-hidden">
+          <div className="bg-muted/50 border-b border-border px-4 py-3">
+            <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="col-span-1"></div>
+              <div className="col-span-4">Template Name</div>
+              <div className="col-span-4">Description</div>
+              <div className="col-span-2">Products</div>
+              <div className="col-span-1">Actions</div>
+            </div>
+          </div>
+          <div className="divide-y divide-border">
+            {templates.map((template) => (
+              <div
+                key={template.id}
+                className={cn(
+                  "grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/30 transition-colors cursor-pointer items-center",
+                  selectedTemplate?.id === template.id && "bg-primary/5"
+                )}
+                onClick={() => onSelectTemplate(template)}
+              >
+                <div className="col-span-1">
+                  {template.thumbnail_url ? (
+                    <img src={template.thumbnail_url} alt={template.name} className="w-10 h-10 rounded object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                      <Package className="h-5 w-5 text-muted-foreground/50" />
+                    </div>
+                  )}
+                </div>
+                <div className="col-span-4 font-medium text-sm">{template.name}</div>
+                <div className="col-span-4 text-sm text-muted-foreground truncate">
+                  {template.description?.split('\n')[0] || '-'}
+                </div>
+                <div className="col-span-2">
+                  <Badge variant="secondary">{template.product_count} SKUs</Badge>
+                </div>
+                <div className="col-span-1 flex gap-1" onClick={(e) => e.stopPropagation()}>
+                  {isVibeAdmin && (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={(e) => openEditDialog(template, e)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={(e) => handleDuplicateTemplate(template, e)}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => openDeleteDialog(template, e)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+            {isVibeAdmin && (
+              <div className="px-4 py-3 text-center">
+                <Button variant="outline" size="sm">
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add Template
+                </Button>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
       {/* Edit Template Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="sm:max-w-md">
