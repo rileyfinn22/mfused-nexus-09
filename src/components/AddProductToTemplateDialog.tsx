@@ -99,11 +99,13 @@ export function AddProductToTemplateDialog({
 
       for (const name of names) {
         const tempSKU = generateTempSKU();
+        // Prepend template name to product name
+        const fullProductName = `${template.name} - ${name}`;
 
         const { data: product, error: productError } = await supabase
           .from('products')
           .insert({
-            name: name,
+            name: fullProductName,
             description: template.description,
             cost: template.cost,
             price: template.price,
