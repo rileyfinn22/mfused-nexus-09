@@ -793,57 +793,138 @@ serve(async (req) => {
       }
     }
 
-    console.log('QB Project ID for invoice:', qbProjectId);
-
-    // Ensure the Job is flagged as a Project in QBO so it appears under Projects.
-    if (qbProjectId) {
+    // If no project exists, create one using the QuickBooks GraphQL Projects API
+    if (!qbProjectId && invoice.orders) {
+      console.log('No QB Project ID found - creating real Project via GraphQL API...');
+      
       try {
-        const getResp = await fetch(`${qbApiUrl}/customer/${qbProjectId}?minorversion=65`, {
+        const order = invoice.orders as any;
+        const projectName = `${order.order_number} - ${order.customer_name}`.substring(0, 100);
+        
+        // Use GraphQL endpoint to create project
+        const graphqlUrl = 'https://qb.api.intuit.com/graphql';
+        
+        console.log('Creating Project via GraphQL:', projectName, 'for customer:', customerId);
+        
+        // GraphQL mutation to create a project
+        const graphqlMutation = {
+          query: `
+            mutation CreateProject($input: ProjectManagementCreateProjectInput!) {
+              projectManagementCreateProject(input: $input) {
+                project {
+                  id
+                  name
+                  status
+                }
+              }
+            }
+          `,
+          variables: {
+            input: {
+              name: projectName,
+              customerId: customerId,
+              description: `Order: ${order.order_number}\nPO: ${order.po_number || 'N/A'}`.substring(0, 1000),
+            }
+          }
+        };
+        
+        console.log('GraphQL mutation:', JSON.stringify(graphqlMutation));
+        
+        const createProjectResponse = await fetch(graphqlUrl, {
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json',
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify(graphqlMutation),
         });
-
-        if (getResp.ok) {
-          const getData = await getResp.json();
-          const cust = getData?.Customer;
-
-          if (cust?.Id && cust?.SyncToken != null && (cust.Job !== true || cust.IsProject !== true)) {
-            const updatePayload: any = {
-              sparse: true,
-              Id: cust.Id,
-              SyncToken: cust.SyncToken,
-              Job: true,
-              IsProject: true,
-            };
-
-            if (cust.ParentRef?.value) {
-              updatePayload.ParentRef = { value: cust.ParentRef.value };
-            }
-
-            const updResp = await fetch(`${qbApiUrl}/customer?minorversion=65`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(updatePayload),
-            });
-
-            const updData = await updResp.json();
-            if (!updResp.ok) {
-              console.warn('Failed to mark Job as Project:', qbProjectId, JSON.stringify(updData));
-            } else {
-              console.log('Marked Job as Project in QBO (invoice sync):', qbProjectId);
+        
+        const projectResponseText = await createProjectResponse.text();
+        console.log('Create project response status:', createProjectResponse.status);
+        console.log('Create project response:', projectResponseText.substring(0, 1000));
+        
+        if (createProjectResponse.ok) {
+          const responseData = JSON.parse(projectResponseText);
+          
+          if (responseData.data?.projectManagementCreateProject?.project?.id) {
+            qbProjectId = responseData.data.projectManagementCreateProject.project.id;
+            console.log('Created Project via GraphQL API:', qbProjectId);
+            
+            // Save to order and invoice
+            await supabase.from('orders').update({ qb_project_id: qbProjectId }).eq('id', invoice.order_id);
+            await supabase.from('invoices').update({ qb_project_id: qbProjectId }).eq('id', invoiceId);
+          } else if (responseData.errors) {
+            const errorMessage = responseData.errors[0]?.message || 'Unknown GraphQL error';
+            console.warn('GraphQL project creation returned errors:', errorMessage);
+            
+            // Check if it's a duplicate error - query existing projects
+            if (errorMessage.toLowerCase().includes('duplicate') || errorMessage.toLowerCase().includes('already exists')) {
+              console.log('Project may already exist, querying...');
+              
+              const queryProjects = {
+                query: `
+                  query ListProjects($customerId: ID!) {
+                    projectManagementProjects(filter: { customerId: { eq: $customerId } }) {
+                      edges {
+                        node {
+                          id
+                          name
+                          status
+                        }
+                      }
+                    }
+                  }
+                `,
+                variables: { customerId: customerId }
+              };
+              
+              const listResponse = await fetch(graphqlUrl, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(queryProjects),
+              });
+              
+              if (listResponse.ok) {
+                const listData = await listResponse.json();
+                const projects = listData.data?.projectManagementProjects?.edges || [];
+                console.log('Found', projects.length, 'existing projects for customer');
+                
+                const existingProject = projects.find((p: any) => 
+                  p.node?.name?.toLowerCase().trim() === projectName.toLowerCase().trim()
+                );
+                
+                if (existingProject?.node?.id) {
+                  qbProjectId = existingProject.node.id;
+                  console.log('Found existing project:', qbProjectId);
+                  
+                  await supabase.from('orders').update({ qb_project_id: qbProjectId }).eq('id', invoice.order_id);
+                  await supabase.from('invoices').update({ qb_project_id: qbProjectId }).eq('id', invoiceId);
+                }
+              }
             }
           }
+        } else {
+          console.warn('GraphQL request failed with status:', createProjectResponse.status);
         }
-      } catch (e) {
-        console.warn('Failed to verify/mark Job as Project:', qbProjectId, e);
+        
+        // If we still don't have a project, continue without one
+        if (!qbProjectId) {
+          console.warn('Could not create/find project via GraphQL, continuing with parent customer only');
+        }
+      } catch (projError: any) {
+        console.error('Error creating project:', projError.message);
+        // Continue without project - invoice will sync to parent customer
       }
     }
+
+    console.log('QB Project ID for invoice:', qbProjectId);
+
+    // Note: We're now using real GraphQL Projects, so no need to mark Jobs as Projects via Customer API
 
     // Persist the currently-linked Job/Project id on the invoice row as well (helps UI/debugging).
     await supabase
@@ -852,12 +933,10 @@ serve(async (req) => {
       .eq('id', invoiceId);
 
     // Create invoice payload.
-    // If an order has a Job (sub-customer) id in qb_project_id, we invoice against that Job so it shows up under Projects.
-    const invoiceCustomerRef = qbProjectId ? String(qbProjectId) : customerId;
-
+    // Use the parent customer for CustomerRef, and add ProjectRef if we have a project
     const invoicePayload: any = {
       CustomerRef: {
-        value: invoiceCustomerRef,
+        value: customerId, // Always use parent customer
       },
       Line: lineItems,
       TxnDate: invoice.invoice_date.split('T')[0],
@@ -885,35 +964,12 @@ serve(async (req) => {
       AllowOnlineACHPayment: true,
     };
 
+    // Add ProjectRef if we have a project ID (links invoice to project in QBO)
     if (qbProjectId) {
-      console.log('Using Job customer for invoice (Projects UI):', qbProjectId);
-
-      // Debug: confirm what QBO is actually returning for this Job/Project.
-      // Some realms ignore IsProject updates via the Customer endpoint, which would explain why it never appears in Projects.
-      try {
-        const dbgResp = await fetch(`${qbApiUrl}/customer/${qbProjectId}?minorversion=65`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json',
-          },
-        });
-
-        const dbgData = await dbgResp.json();
-        const c = dbgData?.Customer;
-        console.log('Job customer debug (id/display/job/isProject/active/parent/fullyQualified):', JSON.stringify({
-          ok: dbgResp.ok,
-          status: dbgResp.status,
-          Id: c?.Id,
-          DisplayName: c?.DisplayName,
-          FullyQualifiedName: c?.FullyQualifiedName,
-          Job: c?.Job,
-          IsProject: c?.IsProject,
-          Active: c?.Active,
-          ParentRef: c?.ParentRef?.value,
-        }));
-      } catch (e) {
-        console.warn('Job customer debug fetch failed:', qbProjectId, e);
-      }
+      invoicePayload.ProjectRef = {
+        value: qbProjectId,
+      };
+      console.log('Adding ProjectRef to invoice:', qbProjectId);
     }
 
     // Note: We don't use the Deposit field for partial billing
@@ -975,7 +1031,7 @@ serve(async (req) => {
 
             shouldCreateNew = true;
           } else {
-            qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=65`, {
+            qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=70`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -1015,7 +1071,7 @@ serve(async (req) => {
         // Invoice already exists - update it instead of creating
         console.log('Found existing QuickBooks invoice with ID:', existingInvoice.Id, 'SyncToken:', existingInvoice.SyncToken);
         
-        qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=65`, {
+        qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=70`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -1031,7 +1087,7 @@ serve(async (req) => {
       } else {
         // Create new invoice
         console.log('Creating new QuickBooks invoice');
-        qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=65`, {
+        qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=70`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,

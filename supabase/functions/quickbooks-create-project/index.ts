@@ -137,7 +137,7 @@ serve(async (req) => {
     const customerSearchResponse = await fetch(
       `${qbApiUrl}/query?query=${encodeURIComponent(
         `SELECT * FROM Customer WHERE DisplayName='${companyName.replace(/'/g, "\\'")}' MAXRESULTS 1`,
-      )}&minorversion=65`,
+      )}&minorversion=70`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -163,7 +163,7 @@ serve(async (req) => {
         },
       };
 
-      const createCustomerResponse = await fetch(`${qbApiUrl}/customer?minorversion=65`, {
+      const createCustomerResponse = await fetch(`${qbApiUrl}/customer?minorversion=70`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -181,7 +181,7 @@ serve(async (req) => {
           const retrySearch = await fetch(
             `${qbApiUrl}/query?query=${encodeURIComponent(
               `SELECT * FROM Customer WHERE DisplayName LIKE '%${companyName.replace(/'/g, "\\'")}%' MAXRESULTS 10`,
-            )}&minorversion=65`,
+            )}&minorversion=70`,
             {
               headers: {
                 Authorization: `Bearer ${accessToken}`,
@@ -207,89 +207,118 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Create a Project using the QuickBooks Projects API
-    // The Projects API uses a different endpoint than the standard v3 API
+    // Step 2: Create a Project using the QuickBooks GraphQL API
     const projectName = `${order.order_number} - ${order.customer_name}`.substring(0, 100);
-    console.log("Creating Project via Projects API. Customer:", parentCustomerId, "Name:", projectName);
+    console.log("Creating Project via GraphQL API. Customer:", parentCustomerId, "Name:", projectName);
 
-    // QuickBooks Projects API endpoint
-    const projectsApiUrl = `https://quickbooks.api.intuit.com/quickbooks/v4/customers/${parentCustomerId}/projects`;
+    const graphqlUrl = 'https://qb.api.intuit.com/graphql';
 
-    const projectPayload = {
-      name: projectName,
-      description: `Order: ${order.order_number}\nPO: ${order.po_number || "N/A"}`.substring(0, 1000),
+    const graphqlMutation = {
+      query: `
+        mutation CreateProject($input: ProjectManagementCreateProjectInput!) {
+          projectManagementCreateProject(input: $input) {
+            project {
+              id
+              name
+              status
+            }
+          }
+        }
+      `,
+      variables: {
+        input: {
+          name: projectName,
+          customerId: parentCustomerId,
+          description: `Order: ${order.order_number}\nPO: ${order.po_number || 'N/A'}`.substring(0, 1000),
+        }
+      }
     };
 
-    console.log("Projects API URL:", projectsApiUrl);
-    console.log("Project payload:", JSON.stringify(projectPayload));
+    console.log("GraphQL mutation:", JSON.stringify(graphqlMutation));
 
-    const createProjectResponse = await fetch(projectsApiUrl, {
-      method: "POST",
+    const createProjectResponse = await fetch(graphqlUrl, {
+      method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(projectPayload),
+      body: JSON.stringify(graphqlMutation),
     });
 
     const projectResponseText = await createProjectResponse.text();
     console.log("Create project response status:", createProjectResponse.status);
-    console.log("Create project response:", projectResponseText);
+    console.log("Create project response:", projectResponseText.substring(0, 1000));
 
     let qbProjectId: string;
 
-    if (!createProjectResponse.ok) {
-      // Try to parse error
-      let errorData: any;
-      try {
-        errorData = JSON.parse(projectResponseText);
-      } catch {
-        errorData = { message: projectResponseText };
-      }
-
-      console.error("Failed to create project:", JSON.stringify(errorData));
-
-      // Check if it's a duplicate name error - try to find existing project
-      const errorMessage = errorData?.errors?.[0]?.message || errorData?.message || "";
-      if (errorMessage.toLowerCase().includes("duplicate") || errorMessage.toLowerCase().includes("already exists")) {
-        console.log("Project may already exist, searching...");
+    if (createProjectResponse.ok) {
+      const responseData = JSON.parse(projectResponseText);
+      
+      if (responseData.data?.projectManagementCreateProject?.project?.id) {
+        qbProjectId = responseData.data.projectManagementCreateProject.project.id;
+        console.log("Created Project via GraphQL:", qbProjectId);
+      } else if (responseData.errors) {
+        const errorMessage = responseData.errors[0]?.message || 'Unknown GraphQL error';
+        console.warn("GraphQL returned errors:", errorMessage);
         
-        // List projects for this customer to find existing one
-        const listProjectsResponse = await fetch(
-          `https://quickbooks.api.intuit.com/quickbooks/v4/customers/${parentCustomerId}/projects`,
-          {
+        // Check for duplicate - query existing projects
+        if (errorMessage.toLowerCase().includes('duplicate') || errorMessage.toLowerCase().includes('already exists')) {
+          console.log("Project may already exist, querying...");
+          
+          const queryProjects = {
+            query: `
+              query ListProjects($customerId: ID!) {
+                projectManagementProjects(filter: { customerId: { eq: $customerId } }) {
+                  edges {
+                    node {
+                      id
+                      name
+                      status
+                    }
+                  }
+                }
+              }
+            `,
+            variables: { customerId: parentCustomerId }
+          };
+          
+          const listResponse = await fetch(graphqlUrl, {
+            method: 'POST',
             headers: {
-              Authorization: `Bearer ${accessToken}`,
-              Accept: "application/json",
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
             },
-          },
-        );
-
-        if (listProjectsResponse.ok) {
-          const projectsList = await listProjectsResponse.json();
-          console.log("Existing projects:", JSON.stringify(projectsList));
+            body: JSON.stringify(queryProjects),
+          });
           
-          const existingProject = projectsList?.find?.((p: any) => 
-            p.name?.toLowerCase().trim() === projectName.toLowerCase().trim()
-          );
-          
-          if (existingProject?.id) {
-            qbProjectId = existingProject.id;
-            console.log("Found existing project:", qbProjectId);
+          if (listResponse.ok) {
+            const listData = await listResponse.json();
+            const projects = listData.data?.projectManagementProjects?.edges || [];
+            console.log("Found", projects.length, "existing projects for customer");
+            
+            const existingProject = projects.find((p: any) => 
+              p.node?.name?.toLowerCase().trim() === projectName.toLowerCase().trim()
+            );
+            
+            if (existingProject?.node?.id) {
+              qbProjectId = existingProject.node.id;
+              console.log("Found existing project:", qbProjectId);
+            } else {
+              throw new Error(errorMessage);
+            }
           } else {
-            throw new Error(errorMessage || "Failed to create project and could not find existing one");
+            throw new Error(errorMessage);
           }
         } else {
-          throw new Error(errorMessage || "Failed to create project");
+          throw new Error(errorMessage);
         }
       } else {
-        throw new Error(errorMessage || `Failed to create project: ${createProjectResponse.status}`);
+        throw new Error("Unexpected GraphQL response format");
       }
     } else {
-      const newProject = JSON.parse(projectResponseText);
-      qbProjectId = newProject.id;
-      console.log("Created Project:", qbProjectId);
+      throw new Error(`GraphQL request failed with status: ${createProjectResponse.status}`);
     }
 
     // Step 3: Update order with QB Project ID
