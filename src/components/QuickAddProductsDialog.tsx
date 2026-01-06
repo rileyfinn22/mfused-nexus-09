@@ -21,6 +21,7 @@ interface ProductTemplate {
   price: number | null;
   cost: number | null;
   company_id: string | null;
+  state: string | null;
 }
 
 export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: QuickAddProductsDialogProps) {
@@ -84,7 +85,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
     try {
       const { data, error } = await supabase
         .from('product_templates')
-        .select('id, name, description, price, cost, company_id')
+        .select('id, name, description, price, cost, company_id, state')
         .order('name');
 
       if (error) throw error;
@@ -147,6 +148,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
             description: selectedTemplate.description,
             cost: selectedTemplate.cost,
             price: selectedTemplate.price,
+            state: selectedTemplate.state,
             item_id: tempSKU,
             company_id: finalCompanyId
           })
@@ -247,16 +249,17 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
             <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-sm">
               <p className="font-medium">{selectedTemplate.name}</p>
               <p className="text-muted-foreground whitespace-pre-line text-xs">{selectedTemplate.description || 'No description'}</p>
-              {(selectedTemplate.price || selectedTemplate.cost) && (
-                <div className="flex gap-4 pt-2 border-t border-border mt-2">
-                  {selectedTemplate.price && (
-                    <p><span className="text-muted-foreground">Price:</span> ${Number(selectedTemplate.price).toFixed(3)}</p>
-                  )}
-                  {isVibeAdmin && selectedTemplate.cost && (
-                    <p><span className="text-muted-foreground">Cost:</span> ${Number(selectedTemplate.cost).toFixed(3)}</p>
-                  )}
-                </div>
-              )}
+              <div className="flex gap-4 pt-2 border-t border-border mt-2 flex-wrap">
+                {selectedTemplate.price && (
+                  <p><span className="text-muted-foreground">Price:</span> ${Number(selectedTemplate.price).toFixed(3)}</p>
+                )}
+                {isVibeAdmin && selectedTemplate.cost && (
+                  <p><span className="text-muted-foreground">Cost:</span> ${Number(selectedTemplate.cost).toFixed(3)}</p>
+                )}
+                {selectedTemplate.state && (
+                  <p><span className="text-muted-foreground">State:</span> {selectedTemplate.state}</p>
+                )}
+              </div>
             </div>
           )}
 

@@ -209,6 +209,7 @@ export function TemplateProductsView({
           description: product.description,
           price: product.price,
           cost: product.cost,
+          state: product.state,
           item_id: tempSKU,
           template_id: template.id,
           company_id: companyFilter !== 'all' ? companyFilter : null
@@ -255,6 +256,7 @@ export function TemplateProductsView({
           description: template.description,
           price: template.price,
           cost: template.cost,
+          state: template.state,
           item_id: tempSKU,
           template_id: template.id,
           company_id: companyFilter
@@ -491,6 +493,10 @@ export function TemplateProductsView({
               <div className="p-3 space-y-1">
                 <h3 className="font-medium text-sm leading-snug">{getDisplayName(product)}</h3>
                 <p className="text-xs text-muted-foreground font-mono">{product.item_id}</p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {product.price && <span>${Number(product.price).toFixed(2)}</span>}
+                  {product.state && <Badge variant="outline" className="text-[10px] py-0">{product.state}</Badge>}
+                </div>
               </div>
 
               {/* Action Buttons */}
