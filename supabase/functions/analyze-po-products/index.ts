@@ -110,7 +110,7 @@ serve(async (req) => {
 3. state: The US state code if mentioned (e.g., "WA", "CA", "OR", "MO", "AZ") - often embedded in SKU or product name
 4. cost: The unit price/rate as a decimal number
 5. product_type: Infer from context (e.g., "packaging", "label", "bag", "box", "jar", "sleeve", etc.)
-6. suggested_template: Try to match to one of the existing templates below based on product name similarity
+6. suggested_template: Match to one of the existing templates below
 
 EXISTING TEMPLATES IN SYSTEM:
 ${templateNames}
@@ -120,6 +120,14 @@ ${analysisHint}
 
 Use this hint to better match products to templates. The user knows their products best.
 ` : ''}
+TEMPLATE MATCHING RULES (CRITICAL - FOLLOW STRICTLY):
+1. ALWAYS prefer STATE-SPECIFIC templates over generic ones
+2. If a product has a state (e.g., "MO", "AZ", "NY"), MUST match to template with that state prefix
+3. Example: "MO Fatty 2pk" should match "MO 2pk Fatty Bags", NOT generic "2pk Merch Packs"
+4. Look for state codes in the product SKU, name, or description
+5. Match by product TYPE + STATE first (e.g., "fatty" + "MO" = "MO Fatty Bags")
+6. Only fall back to generic templates if no state-specific match exists
+
 IMPORTANT:
 - Extract ALL line items from the PO
 - DO NOT include SKUs or item IDs - we will generate our own
