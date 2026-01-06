@@ -292,7 +292,7 @@ export function TemplateProductsView({
           </div>
         </Card>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredProducts.map((product) => (
             <Card
               key={product.id}
@@ -342,9 +342,13 @@ export function TemplateProductsView({
                 )}
               </div>
 
-              {/* Product Info */}
+              {/* Product Info - Show only product-specific name (strip template prefix) */}
               <div className="p-3 space-y-1">
-                <h3 className="font-medium text-sm truncate">{product.name}</h3>
+                <h3 className="font-medium text-sm leading-snug">
+                  {product.name.startsWith(template.name + ' - ') 
+                    ? product.name.slice(template.name.length + 3) 
+                    : product.name}
+                </h3>
                 <p className="text-xs text-muted-foreground font-mono">{product.item_id}</p>
               </div>
 
