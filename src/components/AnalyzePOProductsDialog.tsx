@@ -57,6 +57,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [companyId, setCompanyId] = useState<string>("");
   const [step, setStep] = useState<"upload" | "review">("upload");
+  const [analysisHint, setAnalysisHint] = useState<string>("");
 
   useEffect(() => {
     checkVibeAdmin();
@@ -144,6 +145,9 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
       const formData = new FormData();
       formData.append('file', file);
       formData.append('company_id', companyId);
+      if (analysisHint.trim()) {
+        formData.append('analysis_hint', analysisHint.trim());
+      }
 
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -297,6 +301,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     setTemplates([]);
     setCustomerName(null);
     setStep("upload");
+    setAnalysisHint("");
     if (!selectedCompanyId && isVibeAdmin) {
       setCompanyId("");
     }
@@ -346,7 +351,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
 
             <div className="space-y-2">
               <Label>Purchase Order PDF</Label>
-              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
+              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
                 <input
                   type="file"
                   accept=".pdf"
@@ -355,7 +360,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                   id="po-file-upload"
                 />
                 <label htmlFor="po-file-upload" className="cursor-pointer">
-                  <FileUp className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                  <FileUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                   {file ? (
                     <p className="text-sm font-medium">{file.name}</p>
                   ) : (
@@ -366,6 +371,19 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                   )}
                 </label>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Template Matching Hint <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <textarea
+                value={analysisHint}
+                onChange={(e) => setAnalysisHint(e.target.value)}
+                placeholder="e.g., These are all AZ state products for 2pk Fatty Bags..."
+                className="w-full h-20 px-3 py-2 text-sm border rounded-md resize-none bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <p className="text-xs text-muted-foreground">
+                Help the AI match products to the right templates
+              </p>
             </div>
 
             <Button 
