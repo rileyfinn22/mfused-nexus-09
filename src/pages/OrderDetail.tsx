@@ -57,6 +57,11 @@ const OrderDetail = () => {
   const [updatingStages, setUpdatingStages] = useState<{[key: string]: boolean}>({});
   const [invoices, setInvoices] = useState<any[]>([]);
   const [showShipmentDialog, setShowShipmentDialog] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [showAddItemDialog, setShowAddItemDialog] = useState(false);
+  const [newItemProductId, setNewItemProductId] = useState<string>('');
+  const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
+  const [newItemPrice, setNewItemPrice] = useState<number>(0);
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -64,8 +69,17 @@ const OrderDetail = () => {
       fetchProductionStages();
       fetchVendors();
       fetchInvoices();
+      fetchProducts();
     }
   }, [orderId]);
+
+  const fetchProducts = async () => {
+    const { data } = await supabase
+      .from('products')
+      .select('*')
+      .order('name');
+    if (data) setProducts(data);
+  };
   const checkAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
@@ -530,11 +544,47 @@ const OrderDetail = () => {
   };
 
   const handleSaveOrder = async () => {
-    if (!isAdmin) return;
+    if (!isAdmin && !isVibeAdmin) return;
 
     try {
-      // Update each order item with new unit prices and quantities
-      for (const item of editedItems) {
+      // Find items to delete (in original but not in edited)
+      const originalItemIds = (order.order_items || []).map((item: any) => item.id);
+      const editedItemIds = editedItems.filter(item => !item.isNew).map(item => item.id);
+      const itemsToDelete = originalItemIds.filter((id: string) => !editedItemIds.includes(id));
+
+      // Delete removed items
+      if (itemsToDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('order_items')
+          .delete()
+          .in('id', itemsToDelete);
+        if (deleteError) throw deleteError;
+      }
+
+      // Insert new items
+      const newItems = editedItems.filter(item => item.isNew);
+      if (newItems.length > 0) {
+        const itemsToInsert = newItems.map(item => ({
+          order_id: orderId,
+          product_id: item.product_id,
+          sku: item.sku,
+          item_id: item.item_id,
+          name: item.name,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total: Number(item.quantity) * Number(item.unit_price),
+          shipped_quantity: 0
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('order_items')
+          .insert(itemsToInsert);
+        if (insertError) throw insertError;
+      }
+
+      // Update existing items
+      for (const item of editedItems.filter(item => !item.isNew)) {
         const newTotal = Number(item.quantity) * Number(item.unit_price);
         
         const { error } = await supabase
@@ -619,6 +669,36 @@ const OrderDetail = () => {
           : item
       )
     );
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    setEditedItems(items => items.filter(item => item.id !== itemId));
+  };
+
+  const handleAddItem = () => {
+    const product = products.find(p => p.id === newItemProductId);
+    if (!product) return;
+
+    const newItem = {
+      id: `new-${Date.now()}`,
+      order_id: orderId,
+      product_id: product.id,
+      sku: product.item_id || product.id.slice(0, 8),
+      item_id: product.item_id || null,
+      name: product.name,
+      description: product.description || '',
+      quantity: newItemQuantity,
+      unit_price: newItemPrice || product.price || 0,
+      total: newItemQuantity * (newItemPrice || product.price || 0),
+      shipped_quantity: 0,
+      isNew: true
+    };
+
+    setEditedItems(items => [...items, newItem]);
+    setShowAddItemDialog(false);
+    setNewItemProductId('');
+    setNewItemQuantity(1);
+    setNewItemPrice(0);
   };
   const handleDownloadPackingList = () => {
     toast({
@@ -1030,17 +1110,18 @@ const OrderDetail = () => {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-table-header">
-                    <TableHead className="w-16">Image</TableHead>
+             <TableHead className="w-16">Image</TableHead>
                     <TableHead>Item ID</TableHead>
                     <TableHead>Product/Service</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead className="text-right">Rate</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
+                    {isEditMode && isVibeAdmin && <TableHead className="w-12"></TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayItems.map((item: any, index: number) => <TableRow key={index}>
+                  {displayItems.map((item: any, index: number) => <TableRow key={item.id || index}>
                       <TableCell>
                         <div className="w-12 h-12 bg-muted rounded border border-table-border flex items-center justify-center">
                           <Package className="h-6 w-6 text-muted-foreground" />
@@ -1077,10 +1158,32 @@ const OrderDetail = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium">${item.total?.toFixed(3)}</TableCell>
+                      {isEditMode && isVibeAdmin && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteItem(item.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>)}
                 </TableBody>
               </Table>
             </div>
+
+            {/* Add Item Button */}
+            {isEditMode && isVibeAdmin && (
+              <div className="mt-4">
+                <Button variant="outline" onClick={() => setShowAddItemDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Line Item
+                </Button>
+              </div>
+            )}
 
             {/* Totals Section - Right Aligned */}
             <div className="flex justify-end mt-6">
@@ -1547,6 +1650,67 @@ const OrderDetail = () => {
                 className="w-full h-auto rounded"
               />
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Item Dialog */}
+      <Dialog open={showAddItemDialog} onOpenChange={setShowAddItemDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Line Item</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Product</Label>
+              <Select value={newItemProductId} onValueChange={(value) => {
+                setNewItemProductId(value);
+                const product = products.find(p => p.id === value);
+                if (product) {
+                  setNewItemPrice(product.price || 0);
+                }
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a product" />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((product) => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {product.name} {product.item_id ? `(${product.item_id})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Quantity</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={newItemQuantity}
+                  onChange={(e) => setNewItemQuantity(parseInt(e.target.value) || 1)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Unit Price</Label>
+                <Input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={newItemPrice}
+                  onChange={(e) => setNewItemPrice(parseFloat(e.target.value) || 0)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setShowAddItemDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddItem} disabled={!newItemProductId}>
+                Add Item
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
