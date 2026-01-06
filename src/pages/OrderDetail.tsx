@@ -62,6 +62,7 @@ const OrderDetail = () => {
   const [newItemProductId, setNewItemProductId] = useState<string>('');
   const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
   const [newItemPrice, setNewItemPrice] = useState<number>(0);
+  const [productSearch, setProductSearch] = useState<string>('');
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -69,14 +70,21 @@ const OrderDetail = () => {
       fetchProductionStages();
       fetchVendors();
       fetchInvoices();
-      fetchProducts();
     }
   }, [orderId]);
 
-  const fetchProducts = async () => {
+  useEffect(() => {
+    if (order?.company_id) {
+      fetchProducts(order.company_id);
+    }
+  }, [order?.company_id]);
+
+  const fetchProducts = async (companyId?: string) => {
+    if (!companyId) return;
     const { data } = await supabase
       .from('products')
       .select('*')
+      .eq('company_id', companyId)
       .order('name');
     if (data) setProducts(data);
   };
@@ -1655,7 +1663,13 @@ const OrderDetail = () => {
       </Dialog>
 
       {/* Add Item Dialog */}
-      <Dialog open={showAddItemDialog} onOpenChange={setShowAddItemDialog}>
+      <Dialog open={showAddItemDialog} onOpenChange={(open) => {
+        setShowAddItemDialog(open);
+        if (!open) {
+          setProductSearch('');
+          setNewItemProductId('');
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add Line Item</DialogTitle>
@@ -1663,24 +1677,45 @@ const OrderDetail = () => {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Product</Label>
-              <Select value={newItemProductId} onValueChange={(value) => {
-                setNewItemProductId(value);
-                const product = products.find(p => p.id === value);
-                if (product) {
-                  setNewItemPrice(product.price || 0);
-                }
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.name} {product.item_id ? `(${product.item_id})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Input
+                  placeholder="Search products..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="mb-2"
+                />
+                <div className="border rounded-md max-h-48 overflow-y-auto">
+                  {products
+                    .filter(p => 
+                      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+                      (p.item_id && p.item_id.toLowerCase().includes(productSearch.toLowerCase()))
+                    )
+                    .map((product) => (
+                      <div
+                        key={product.id}
+                        className={`px-3 py-2 cursor-pointer hover:bg-accent ${
+                          newItemProductId === product.id ? 'bg-accent' : ''
+                        }`}
+                        onClick={() => {
+                          setNewItemProductId(product.id);
+                          setNewItemPrice(product.price || 0);
+                          setProductSearch(product.name + (product.item_id ? ` (${product.item_id})` : ''));
+                        }}
+                      >
+                        <div className="text-sm font-medium">{product.name}</div>
+                        {product.item_id && (
+                          <div className="text-xs text-muted-foreground">{product.item_id}</div>
+                        )}
+                      </div>
+                    ))}
+                  {products.filter(p => 
+                    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+                    (p.item_id && p.item_id.toLowerCase().includes(productSearch.toLowerCase()))
+                  ).length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">No products found</div>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
