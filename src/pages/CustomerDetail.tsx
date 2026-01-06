@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List } from "lucide-react";
+import { CompanyProductTemplates } from "@/components/CompanyProductTemplates";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -94,6 +95,7 @@ const CustomerDetail = () => {
   });
   const [productFormErrors, setProductFormErrors] = useState<Record<string, string>>({});
   const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [productViewMode, setProductViewMode] = useState<"templates" | "list">("templates");
   
   // Address management state
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
@@ -1188,118 +1190,152 @@ const CustomerDetail = () => {
 
         {/* Products Tab */}
         <TabsContent value="products" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
+          {/* View Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center border rounded-lg p-1 bg-muted/30">
+              <Button
+                variant={productViewMode === "templates" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8"
+                onClick={() => setProductViewMode("templates")}
+              >
+                <LayoutGrid className="h-4 w-4 mr-1.5" />
+                Templates
+              </Button>
+              <Button
+                variant={productViewMode === "list" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8"
+                onClick={() => setProductViewMode("list")}
+              >
+                <List className="h-4 w-4 mr-1.5" />
+                All Products
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowAddProductDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Link Existing
+              </Button>
+              <Button variant="outline" onClick={() => setShowBulkUploadDialog(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Upload
+              </Button>
+              <Button onClick={() => setShowCreateProductDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create New
+              </Button>
+            </div>
+          </div>
+
+          {/* Templates Grid View */}
+          {productViewMode === "templates" && (
+            <CompanyProductTemplates
+              companyId={customerId!}
+              companyName={customer.name}
+              onProductsChange={fetchCustomerProducts}
+            />
+          )}
+
+          {/* List View */}
+          {productViewMode === "list" && (
+            <Card>
+              <CardHeader>
                 <div>
-                  <CardTitle>Linked Products</CardTitle>
-                  <CardDescription>Products associated with {customer.name}</CardDescription>
+                  <CardTitle>All Products</CardTitle>
+                  <CardDescription>All products associated with {customer.name}</CardDescription>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setShowAddProductDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Link Existing
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowBulkUploadDialog(true)}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Bulk Upload
-                  </Button>
-                  <Button onClick={() => setShowCreateProductDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create New
-                  </Button>
+                <div className="relative mt-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search products by name or item ID..."
+                    value={productSearchQuery}
+                    onChange={(e) => setProductSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
-              </div>
-              <div className="relative mt-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products by name or item ID..."
-                  value={productSearchQuery}
-                  onChange={(e) => setProductSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </CardHeader>
-            <CardContent>
-              {customerProducts.filter(product => {
-                const query = productSearchQuery.toLowerCase();
-                return product.name.toLowerCase().includes(query) ||
-                       product.item_id?.toLowerCase().includes(query) ||
-                       product.description?.toLowerCase().includes(query);
-              }).length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>{productSearchQuery ? 'No products match your search' : 'No products linked yet'}</p>
-                  <p className="text-sm mt-2">{productSearchQuery ? 'Try a different search term' : 'Click "Add Products" to get started'}</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {customerProducts.filter(product => {
-                    const query = productSearchQuery.toLowerCase();
-                    return product.name.toLowerCase().includes(query) ||
-                           product.item_id?.toLowerCase().includes(query) ||
-                           product.description?.toLowerCase().includes(query);
-                  }).map((product) => (
-                    <div
-                      key={product.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        {product.image_url ? (
-                          <img
-                            src={product.image_url}
-                            alt={product.name}
-                            className="w-12 h-12 object-cover rounded"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
-                            <Package className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium">{product.name}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            {product.item_id && (
-                              <span className="text-xs text-muted-foreground font-mono">
-                                {product.item_id}
-                              </span>
-                            )}
-                            {product.state && (
-                              <Badge variant="outline" className="text-xs">
-                                {product.state === 'general' ? 'General' : product.state}
-                              </Badge>
-                            )}
-                            {product.price && (
-                              <span className="text-xs text-muted-foreground">
-                                ${parseFloat(product.price).toFixed(2)}
-                              </span>
-                            )}
+              </CardHeader>
+              <CardContent>
+                {customerProducts.filter(product => {
+                  const query = productSearchQuery.toLowerCase();
+                  return product.name.toLowerCase().includes(query) ||
+                         product.item_id?.toLowerCase().includes(query) ||
+                         product.description?.toLowerCase().includes(query);
+                }).length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>{productSearchQuery ? 'No products match your search' : 'No products linked yet'}</p>
+                    <p className="text-sm mt-2">{productSearchQuery ? 'Try a different search term' : 'Click "Add Products" to get started'}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {customerProducts.filter(product => {
+                      const query = productSearchQuery.toLowerCase();
+                      return product.name.toLowerCase().includes(query) ||
+                             product.item_id?.toLowerCase().includes(query) ||
+                             product.description?.toLowerCase().includes(query);
+                    }).map((product) => (
+                      <div
+                        key={product.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          {product.image_url ? (
+                            <img
+                              src={product.image_url}
+                              alt={product.name}
+                              className="w-12 h-12 object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
+                              <Package className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {product.item_id && (
+                                <span className="text-xs text-muted-foreground font-mono">
+                                  {product.item_id}
+                                </span>
+                              )}
+                              {product.state && (
+                                <Badge variant="outline" className="text-xs">
+                                  {product.state === 'general' ? 'General' : product.state}
+                                </Badge>
+                              )}
+                              {product.price && (
+                                <span className="text-xs text-muted-foreground">
+                                  ${parseFloat(product.price).toFixed(2)}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditProduct(product)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteProductClick(product)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditProduct(product)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteProductClick(product)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
 
