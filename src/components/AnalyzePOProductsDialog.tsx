@@ -15,7 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { FileUp, Loader2, Sparkles, Package, Check, FolderTree } from "lucide-react";
+import { FileUp, Loader2, Sparkles, Package, Check, FolderTree, FileText } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ExtractedProduct {
@@ -57,6 +59,8 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
   const [companyId, setCompanyId] = useState<string>("");
   const [step, setStep] = useState<"upload" | "review">("upload");
   const [analysisHint, setAnalysisHint] = useState<string>("");
+  const [inputMode, setInputMode] = useState<"pdf" | "text">("pdf");
+  const [textInput, setTextInput] = useState<string>("");
 
   useEffect(() => {
     checkVibeAdmin();
@@ -120,10 +124,19 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
   };
 
   const handleAnalyze = async () => {
-    if (!file) {
+    if (inputMode === "pdf" && !file) {
       toast({
         title: "No file selected",
         description: "Please select a PDF file to analyze.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (inputMode === "text" && !textInput.trim()) {
+      toast({
+        title: "No text provided",
+        description: "Please paste some text to analyze.",
         variant: "destructive",
       });
       return;
@@ -141,30 +154,51 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     setAnalyzing(true);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('company_id', companyId);
-      if (analysisHint.trim()) {
-        formData.append('analysis_hint', analysisHint.trim());
-      }
-
       const { data: { session } } = await supabase.auth.getSession();
       
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-po-products`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`,
-          },
-          body: formData,
+      let response;
+      
+      if (inputMode === "pdf") {
+        const formData = new FormData();
+        formData.append('file', file!);
+        formData.append('company_id', companyId);
+        if (analysisHint.trim()) {
+          formData.append('analysis_hint', analysisHint.trim());
         }
-      );
+
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-po-products`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session?.access_token}`,
+            },
+            body: formData,
+          }
+        );
+      } else {
+        // Text mode - send JSON
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-po-products`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session?.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text_content: textInput.trim(),
+              company_id: companyId,
+              analysis_hint: analysisHint.trim() || undefined,
+            }),
+          }
+        );
+      }
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to analyze PO');
+        throw new Error(result.error || 'Failed to analyze');
       }
 
       if (result.products && result.products.length > 0) {
@@ -204,15 +238,15 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
       } else {
         toast({
           title: "No products found",
-          description: "The AI couldn't extract any products from this PO.",
+          description: "The AI couldn't extract any products from the input.",
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error('Error analyzing PO:', error);
+      console.error('Error analyzing:', error);
       toast({
         title: "Analysis failed",
-        description: error instanceof Error ? error.message : "Failed to analyze PO",
+        description: error instanceof Error ? error.message : "Failed to analyze",
         variant: "destructive",
       });
     } finally {
@@ -299,6 +333,8 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     setCustomerName(null);
     setStep("upload");
     setAnalysisHint("");
+    setInputMode("pdf");
+    setTextInput("");
     if (!selectedCompanyId && isVibeAdmin) {
       setCompanyId("");
     }
@@ -322,7 +358,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
             AI Product Import
           </DialogTitle>
           <DialogDescription>
-            Upload a PO (PDF) to extract products and assign them to templates.
+            Upload a PDF or paste text to extract products and assign them to templates.
           </DialogDescription>
         </DialogHeader>
 
@@ -346,37 +382,67 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label>Purchase Order PDF</Label>
-              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="po-file-upload"
-                />
-                <label htmlFor="po-file-upload" className="cursor-pointer">
-                  <FileUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  {file ? (
-                    <p className="text-sm font-medium">{file.name}</p>
-                  ) : (
-                    <>
-                      <p className="text-sm font-medium">Click to upload PDF</p>
-                      <p className="text-xs text-muted-foreground mt-1">or drag and drop</p>
-                    </>
-                  )}
-                </label>
-              </div>
-            </div>
+            <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as "pdf" | "text")}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="pdf" className="flex items-center gap-1.5">
+                  <FileUp className="h-4 w-4" />
+                  PDF Upload
+                </TabsTrigger>
+                <TabsTrigger value="text" className="flex items-center gap-1.5">
+                  <FileText className="h-4 w-4" />
+                  Paste Text
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="pdf" className="mt-4">
+                <div className="space-y-2">
+                  <Label>Purchase Order PDF</Label>
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="po-file-upload"
+                    />
+                    <label htmlFor="po-file-upload" className="cursor-pointer">
+                      <FileUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      {file ? (
+                        <p className="text-sm font-medium">{file.name}</p>
+                      ) : (
+                        <>
+                          <p className="text-sm font-medium">Click to upload PDF</p>
+                          <p className="text-xs text-muted-foreground mt-1">or drag and drop</p>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="text" className="mt-4">
+                <div className="space-y-2">
+                  <Label>Paste Product List</Label>
+                  <Textarea
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    placeholder="Paste product names from email, order, or any text...&#10;&#10;Example:&#10;SKU-001 Blueberry Kush 1g Bag&#10;SKU-002 OG Cookie 2.5g Bag&#10;..."
+                    className="min-h-[150px] resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Paste from emails, spreadsheets, or any text containing product names
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
 
             <div className="space-y-2">
               <Label>Template Matching Hint <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              <textarea
+              <Textarea
                 value={analysisHint}
                 onChange={(e) => setAnalysisHint(e.target.value)}
                 placeholder="e.g., These are all AZ state products for 2pk Fatty Bags..."
-                className="w-full h-20 px-3 py-2 text-sm border rounded-md resize-none bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-20 resize-none"
               />
               <p className="text-xs text-muted-foreground">
                 Help the AI match products to the right templates
@@ -385,7 +451,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
 
             <Button 
               onClick={handleAnalyze} 
-              disabled={!file || analyzing || (isVibeAdmin && !companyId)}
+              disabled={(inputMode === "pdf" ? !file : !textInput.trim()) || analyzing || (isVibeAdmin && !companyId)}
               className="w-full"
             >
               {analyzing ? (
@@ -396,7 +462,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Analyze PO
+                  Analyze {inputMode === "pdf" ? "PO" : "Text"}
                 </>
               )}
             </Button>

@@ -33,17 +33,56 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const companyId = formData.get('company_id') as string;
-    const analysisHint = formData.get('analysis_hint') as string | null;
+    // Check content type to determine input mode
+    const contentType = req.headers.get('content-type') || '';
+    let companyId: string;
+    let analysisHint: string | null = null;
+    let extractedText: string;
+    let inputSource: string;
 
-    if (!file) {
-      throw new Error('No file provided');
+    if (contentType.includes('application/json')) {
+      // Text mode - parse JSON body
+      const jsonBody = await req.json();
+      companyId = jsonBody.company_id;
+      analysisHint = jsonBody.analysis_hint || null;
+      extractedText = jsonBody.text_content || '';
+      inputSource = 'text input';
+      
+      if (!extractedText.trim()) {
+        throw new Error('No text content provided');
+      }
+      
+      console.log(`Analyzing text input for products, company_id: ${companyId}, text length: ${extractedText.length}, hint: ${analysisHint || 'none'}`);
+    } else {
+      // PDF mode - parse form data
+      const formData = await req.formData();
+      const file = formData.get('file') as File;
+      companyId = formData.get('company_id') as string;
+      analysisHint = formData.get('analysis_hint') as string | null;
+
+      if (!file) {
+        throw new Error('No file provided');
+      }
+
+      console.log(`Analyzing PO for products, company_id: ${companyId}, file: ${file.name}, hint: ${analysisHint || 'none'}`);
+      inputSource = file.name;
+
+      // Read file content
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Use pdf-parse library to extract text
+      console.log('Extracting text from PDF...');
+      const pdfParse = (await import('npm:pdf-parse@1.1.1')).default;
+      
+      try {
+        const pdfData = await pdfParse(new Uint8Array(arrayBuffer));
+        extractedText = pdfData.text;
+        console.log('Successfully extracted text, length:', extractedText.length);
+      } catch (parseError) {
+        console.error('PDF parse error:', parseError);
+        throw new Error('Failed to parse PDF. Please ensure it is a valid PDF file.');
+      }
     }
-
-    console.log(`Analyzing PO for products, company_id: ${companyId}, file: ${file.name}, hint: ${analysisHint || 'none'}`);
-
 
     // Validate user has access to this company
     const { data: userRole, error: roleError } = await supabase
@@ -69,23 +108,6 @@ serve(async (req) => {
 
     const templateNames = templates?.map(t => `- "${t.name}" (${t.state || 'no state'})`).join('\n') || 'No templates found';
 
-    // Read file content
-    const arrayBuffer = await file.arrayBuffer();
-    
-    // Use pdf-parse library to extract text
-    console.log('Extracting text from PDF...');
-    const pdfParse = (await import('npm:pdf-parse@1.1.1')).default;
-    
-    let extractedText = '';
-    try {
-      const pdfData = await pdfParse(new Uint8Array(arrayBuffer));
-      extractedText = pdfData.text;
-      console.log('Successfully extracted text, length:', extractedText.length);
-    } catch (parseError) {
-      console.error('PDF parse error:', parseError);
-      throw new Error('Failed to parse PDF. Please ensure it is a valid PDF file.');
-    }
-
     // Analyze with Lovable AI to extract products
     console.log('Sending to AI for product extraction...');
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -103,12 +125,12 @@ serve(async (req) => {
           },
           {
             role: 'user',
-            content: `Analyze this purchase order and extract ALL product/item information. For each product found, extract:
+            content: `Analyze this content and extract ALL product/item information. For each product found, extract:
 
 1. name: The product name/description
 2. description: Additional description if available
 3. state: The US state code if mentioned (e.g., "WA", "CA", "OR", "MO", "AZ") - often embedded in SKU or product name
-4. cost: The unit price/rate as a decimal number
+4. cost: The unit price/rate as a decimal number (if available)
 5. product_type: Infer from context (e.g., "packaging", "label", "bag", "box", "jar", "sleeve", etc.)
 6. suggested_template: Match to one of the existing templates below
 
@@ -137,15 +159,16 @@ TEMPLATE MATCHING RULES (CRITICAL - FOLLOW STRICTLY):
 6. The state code is almost always at the VERY END after the last dash (e.g., "... - Sat - MD" means state is MD)
 
 IMPORTANT:
-- Extract ALL line items from the PO
+- Extract ALL line items/products from the text
+- Even simple text lists of product names should be parsed (one per line, comma-separated, etc.)
 - DO NOT include SKUs or item IDs - we will generate our own
-- cost should be a number (e.g., 0.218), not a formatted string
+- cost should be a number (e.g., 0.218) or null if not found
 - Be thorough - don't miss any products
 - For suggested_template, return the EXACT template name if you find a good match, or null if no match
 - Pay attention to any user hints provided above for template matching
-- For customer_name, extract ONLY the main company/brand name (e.g., "Mfused" not "Mfused - Arizona")
+- For customer_name, extract ONLY the main company/brand name if visible, or null
 
-PURCHASE ORDER TEXT:
+CONTENT TO ANALYZE:
 ${extractedText}
 
 Return ONLY valid JSON in this format:
@@ -160,7 +183,7 @@ Return ONLY valid JSON in this format:
       "suggested_template": "Exact Template Name or null"
     }
   ],
-  "customer_name": "Main Company Name Only"
+  "customer_name": "Main Company Name Only or null"
 }`
           }
         ],
@@ -200,7 +223,7 @@ Return ONLY valid JSON in this format:
       success: true,
       products: extractedData.products || [],
       customer_name: extractedData.customer_name || null,
-      filename: file.name,
+      source: inputSource,
       templates: templates || []
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
