@@ -4,7 +4,15 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +32,10 @@ import {
   Copy, 
   Package,
   Search,
-  AlertTriangle 
+  AlertTriangle,
+  LayoutGrid,
+  List,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -76,6 +87,21 @@ export function TemplateProductsView({
   const [isEditMode, setIsEditMode] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  
+  // Quick add state
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddName, setQuickAddName] = useState("");
+  const [quickAddLoading, setQuickAddLoading] = useState(false);
+  
+  // Inline edit state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editCost, setEditCost] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -205,9 +231,101 @@ export function TemplateProductsView({
     }
   };
 
+  const handleQuickAdd = async () => {
+    if (!quickAddName.trim()) {
+      toast({ title: "Error", description: "Please enter a product name.", variant: "destructive" });
+      return;
+    }
+
+    if (!companyFilter || companyFilter === 'all') {
+      toast({ title: "Error", description: "Please select a company first.", variant: "destructive" });
+      return;
+    }
+
+    setQuickAddLoading(true);
+    try {
+      const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
+      const fullProductName = `${template.name} - ${quickAddName.trim()}`;
+
+      const { error } = await supabase
+        .from('products')
+        .insert({
+          name: fullProductName,
+          description: template.description,
+          price: template.price,
+          cost: template.cost,
+          item_id: tempSKU,
+          template_id: template.id,
+          company_id: companyFilter
+        });
+
+      if (error) throw error;
+
+      toast({ title: "Product added", description: `"${quickAddName.trim()}" has been added.` });
+      setQuickAddName("");
+      setQuickAddOpen(false);
+      fetchProducts();
+    } catch (error) {
+      console.error('Error adding product:', error);
+      toast({ title: "Error", description: "Failed to add product.", variant: "destructive" });
+    } finally {
+      setQuickAddLoading(false);
+    }
+  };
+
+  const openEditDialog = (product: Product) => {
+    setEditingProduct(product);
+    // Strip template prefix for editing
+    const displayName = product.name.startsWith(template.name + ' - ') 
+      ? product.name.slice(template.name.length + 3) 
+      : product.name;
+    setEditName(displayName);
+    setEditDescription(product.description || "");
+    setEditPrice(product.price?.toString() || "");
+    setEditCost(product.cost?.toString() || "");
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveProduct = async () => {
+    if (!editingProduct) return;
+    setSaving(true);
+
+    try {
+      // Reconstruct full name with template prefix
+      const fullName = `${template.name} - ${editName.trim()}`;
+
+      const { error } = await supabase
+        .from('products')
+        .update({
+          name: fullName,
+          description: editDescription.trim() || null,
+          price: editPrice ? parseFloat(editPrice) : null,
+          cost: editCost ? parseFloat(editCost) : null
+        })
+        .eq('id', editingProduct.id);
+
+      if (error) throw error;
+
+      toast({ title: "Product updated", description: "Changes saved successfully." });
+      setEditDialogOpen(false);
+      fetchProducts();
+    } catch (error) {
+      console.error('Error updating product:', error);
+      toast({ title: "Error", description: "Failed to update product.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const hasApprovedArtwork = (itemId?: string | null) => {
     if (!itemId) return false;
     return artworkStatus[itemId] === true;
+  };
+
+  const getDisplayName = (product: Product) => {
+    return product.name.startsWith(template.name + ' - ') 
+      ? product.name.slice(template.name.length + 3) 
+      : product.name;
   };
 
   if (loading) {
@@ -249,7 +367,12 @@ export function TemplateProductsView({
             }}
           >
             <Edit className="h-4 w-4 mr-1.5" />
-            {isEditMode ? "Done" : "Edit"}
+            {isEditMode ? "Done" : "Select"}
+          </Button>
+          {/* Quick Add Button */}
+          <Button size="sm" variant="outline" onClick={() => setQuickAddOpen(true)}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            Quick Add
           </Button>
           <AddProductToTemplateDialog 
             template={template}
@@ -266,18 +389,39 @@ export function TemplateProductsView({
         </Card>
       )}
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search products..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
+      {/* Search and View Toggle */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search products..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {/* View Toggle */}
+        <div className="flex items-center border rounded-lg p-1 bg-muted/30">
+          <Button
+            variant={viewMode === "grid" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-8"
+            onClick={() => setViewMode("grid")}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-8"
+            onClick={() => setViewMode("list")}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Products Grid */}
+      {/* Products Grid/List */}
       {filteredProducts.length === 0 ? (
         <Card className="p-16">
           <div className="text-center">
@@ -291,12 +435,12 @@ export function TemplateProductsView({
             />
           </div>
         </Card>
-      ) : (
+      ) : viewMode === "grid" ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredProducts.map((product) => (
             <Card
               key={product.id}
-              className="group overflow-hidden transition-all hover:shadow-lg"
+              className="group overflow-hidden transition-all hover:shadow-lg relative"
             >
               {/* Edit mode checkbox */}
               {isEditMode && (
@@ -312,7 +456,7 @@ export function TemplateProductsView({
               {/* Product Image */}
               <div 
                 className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative cursor-pointer"
-                onClick={() => navigate(`/products/edit/${product.id}`)}
+                onClick={() => openEditDialog(product)}
               >
                 {product.item_id && artworkThumbnails[product.item_id] ? (
                   <img 
@@ -342,13 +486,9 @@ export function TemplateProductsView({
                 )}
               </div>
 
-              {/* Product Info - Show only product-specific name (strip template prefix) */}
+              {/* Product Info */}
               <div className="p-3 space-y-1">
-                <h3 className="font-medium text-sm leading-snug">
-                  {product.name.startsWith(template.name + ' - ') 
-                    ? product.name.slice(template.name.length + 3) 
-                    : product.name}
-                </h3>
+                <h3 className="font-medium text-sm leading-snug">{getDisplayName(product)}</h3>
                 <p className="text-xs text-muted-foreground font-mono">{product.item_id}</p>
               </div>
 
@@ -358,7 +498,7 @@ export function TemplateProductsView({
                   variant="ghost"
                   size="sm"
                   className="flex-1 rounded-none h-9 text-xs"
-                  onClick={() => navigate(`/products/edit/${product.id}`)}
+                  onClick={() => openEditDialog(product)}
                 >
                   <Edit className="h-3.5 w-3.5 mr-1" />
                   Edit
@@ -385,7 +525,153 @@ export function TemplateProductsView({
             </Card>
           ))}
         </div>
+      ) : (
+        /* List View */
+        <Card className="overflow-hidden">
+          <div className="bg-muted/50 border-b border-border px-4 py-3">
+            <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {isEditMode && <div className="col-span-1"><Checkbox checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0} onCheckedChange={handleSelectAll} /></div>}
+              <div className={cn(isEditMode ? "col-span-2" : "col-span-2")}>SKU</div>
+              <div className="col-span-5">Product Name</div>
+              <div className="col-span-2">Price</div>
+              <div className={cn(isEditMode ? "col-span-2" : "col-span-3")}>Actions</div>
+            </div>
+          </div>
+          <div className="divide-y divide-border">
+            {filteredProducts.map((product) => (
+              <div key={product.id} className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/30 items-center">
+                {isEditMode && (
+                  <div className="col-span-1">
+                    <Checkbox
+                      checked={selectedProducts.has(product.id)}
+                      onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
+                    />
+                  </div>
+                )}
+                <div className={cn("font-mono text-sm", isEditMode ? "col-span-2" : "col-span-2")}>{product.item_id}</div>
+                <div className="col-span-5">
+                  <p className="font-medium text-sm">{getDisplayName(product)}</p>
+                  {product.description && <p className="text-xs text-muted-foreground truncate">{product.description}</p>}
+                </div>
+                <div className="col-span-2 text-sm">${product.price?.toFixed(2) || '0.00'}</div>
+                <div className={cn("flex gap-1", isEditMode ? "col-span-2" : "col-span-3")}>
+                  <Button variant="ghost" size="sm" onClick={() => openEditDialog(product)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleDuplicate(product)}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(product.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
+
+      {/* Quick Add Dialog */}
+      <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Quick Add Product</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              Adding to: <span className="font-medium text-foreground">{template.name}</span>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quick-add-name">Product Name</Label>
+              <Input
+                id="quick-add-name"
+                value={quickAddName}
+                onChange={(e) => setQuickAddName(e.target.value)}
+                placeholder="Enter product name (e.g., Blue Dream)"
+                onKeyDown={(e) => e.key === 'Enter' && handleQuickAdd()}
+              />
+              <p className="text-xs text-muted-foreground">
+                Full name will be: {template.name} - {quickAddName || '...'}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setQuickAddOpen(false)}>Cancel</Button>
+              <Button onClick={handleQuickAdd} disabled={quickAddLoading || !quickAddName.trim()}>
+                {quickAddLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Plus className="h-4 w-4 mr-1.5" />}
+                Add Product
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Product Name</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Product name"
+              />
+              <p className="text-xs text-muted-foreground">
+                Full name: {template.name} - {editName || '...'}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Product description"
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-price">Price ($)</Label>
+                <Input
+                  id="edit-price"
+                  type="number"
+                  step="0.01"
+                  value={editPrice}
+                  onChange={(e) => setEditPrice(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-cost">Cost ($)</Label>
+                <Input
+                  id="edit-cost"
+                  type="number"
+                  step="0.01"
+                  value={editCost}
+                  onChange={(e) => setEditCost(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+            <div className="flex justify-between pt-2">
+              <Button variant="outline" size="sm" onClick={() => navigate(`/products/edit/${editingProduct?.id}`)}>
+                Full Edit Page
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleSaveProduct} disabled={saving || !editName.trim()}>
+                  {saving ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
