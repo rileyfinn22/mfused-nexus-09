@@ -144,6 +144,24 @@ const Invoices = () => {
     });
   };
 
+  // Get the highest priority status from child invoices
+  // Priority: due > billed > open
+  const getChildrenPriorityStatus = (parentId: string): 'due' | 'billed' | 'open' | null => {
+    const children = invoices.filter(inv => inv.parent_invoice_id === parentId);
+    if (children.length === 0) return null;
+    
+    const hasDue = children.some(child => child.status === 'due');
+    if (hasDue) return 'due';
+    
+    const hasBilled = children.some(child => child.status === 'billed');
+    if (hasBilled) return 'billed';
+    
+    const hasOpen = children.some(child => child.status === 'open');
+    if (hasOpen) return 'open';
+    
+    return null;
+  };
+
   const hasDueChildren = (parentId: string) => {
     const children = invoices.filter(inv => inv.parent_invoice_id === parentId);
     return children.some(child => 
@@ -400,8 +418,23 @@ const Invoices = () => {
               const daysUntilDue = invoice.due_date ? getDaysUntilDue(invoice.due_date) : null;
               const isExpanded = expandedInvoices.has(invoice.id);
               const showOverdueAlert = isParent && hasChildren && hasOverdueChildren(invoice.id);
-              const showDueStatus = isParent && hasChildren && hasDueChildren(invoice.id);
-              const displayStatus = showDueStatus ? 'DUE' : getStatusDisplay(invoice);
+              
+              // Get priority status from children for parent display
+              const childrenPriorityStatus = isParent && hasChildren ? getChildrenPriorityStatus(invoice.id) : null;
+              const displayStatus = childrenPriorityStatus 
+                ? childrenPriorityStatus.toUpperCase() 
+                : getStatusDisplay(invoice);
+              
+              // Determine dropdown button color based on children priority status
+              const getDropdownButtonColors = () => {
+                if (childrenPriorityStatus === 'due') {
+                  return 'border-red-500 bg-red-500/10 hover:bg-red-500/20 text-red-600';
+                }
+                if (childrenPriorityStatus === 'billed') {
+                  return 'border-blue-500 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600';
+                }
+                return `border-primary/30 ${isExpanded ? 'bg-primary/10 border-primary' : 'hover:bg-primary/5'}`;
+              };
               
               return (
                 <div 
@@ -416,18 +449,18 @@ const Invoices = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          className={`h-7 px-2 gap-1 border-primary/30 ${isExpanded ? 'bg-primary/10 border-primary' : 'hover:bg-primary/5'}`}
+                          className={`h-7 px-2 gap-1 ${getDropdownButtonColors()}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleExpanded(invoice.id);
                           }}
                         >
                           {isExpanded ? (
-                            <ChevronDown className="h-4 w-4 text-primary" />
+                            <ChevronDown className={`h-4 w-4 ${childrenPriorityStatus === 'due' ? 'text-red-600' : childrenPriorityStatus === 'billed' ? 'text-blue-600' : 'text-primary'}`} />
                           ) : (
-                            <ChevronRight className="h-4 w-4 text-primary" />
+                            <ChevronRight className={`h-4 w-4 ${childrenPriorityStatus === 'due' ? 'text-red-600' : childrenPriorityStatus === 'billed' ? 'text-blue-600' : 'text-primary'}`} />
                           )}
-                          <span className="text-xs font-medium text-primary">
+                          <span className={`text-xs font-medium ${childrenPriorityStatus === 'due' ? 'text-red-600' : childrenPriorityStatus === 'billed' ? 'text-blue-600' : 'text-primary'}`}>
                             {invoices.filter(inv => inv.parent_invoice_id === invoice.id).length}
                           </span>
                         </Button>
