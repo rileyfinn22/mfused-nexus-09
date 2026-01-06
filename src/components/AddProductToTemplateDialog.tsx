@@ -6,7 +6,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Sparkles, Loader2 } from "lucide-react";
-import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 
 interface ProductTemplate {
   id: string;
@@ -31,7 +30,6 @@ export function AddProductToTemplateDialog({
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [skuNames, setSkuNames] = useState("");
-  const { syncProduct, checkConnection } = useQuickBooksAutoSync();
 
   const generateTempSKU = () => {
     const randomDigits = Math.floor(10000 + Math.random() * 90000);
@@ -124,13 +122,7 @@ export function AddProductToTemplateDialog({
         createdProducts.push(product.id);
       }
 
-      // Auto-sync to QuickBooks if connected
-      const isConnected = await checkConnection();
-      if (isConnected && createdProducts.length > 0) {
-        for (const productId of createdProducts) {
-          await syncProduct(productId);
-        }
-      }
+      // Note: QuickBooks sync removed - products should be synced manually or via the company's own QB connection
 
       toast.success(`Successfully added ${createdProducts.length} products`);
       
