@@ -331,20 +331,34 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="cost">Cost (Vendor Cost)</Label>
-              <Input
-                id="cost"
-                type="number"
-                step="0.001"
-                value={formData.cost}
-                onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                placeholder="0.000"
-              />
+          {isVibeAdmin ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cost">Cost (Vendor Cost)</Label>
+                <Input
+                  id="cost"
+                  type="number"
+                  step="0.001"
+                  value={formData.cost}
+                  onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                  placeholder="0.000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="price">Price (Customer Price)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.001"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  placeholder="0.000"
+                />
+              </div>
             </div>
+          ) : (
             <div className="space-y-2">
-              <Label htmlFor="price">Price (Customer Price)</Label>
+              <Label htmlFor="price">Price</Label>
               <Input
                 id="price"
                 type="number"
@@ -354,25 +368,27 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
                 placeholder="0.000"
               />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="preferred_vendor">Preferred Vendor (Optional)</Label>
-            <Select
-              value={formData.preferred_vendor_id || undefined}
-              onValueChange={(value) => setFormData({ ...formData, preferred_vendor_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="No preferred vendor" />
-              </SelectTrigger>
-              <SelectContent>
-                {vendors.map((vendor) => (
-                  <SelectItem key={vendor.id} value={vendor.id}>
-                    {vendor.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          )}
+          {isVibeAdmin && (
+            <div className="space-y-2">
+              <Label htmlFor="preferred_vendor">Preferred Vendor (Optional)</Label>
+              <Select
+                value={formData.preferred_vendor_id || undefined}
+                onValueChange={(value) => setFormData({ ...formData, preferred_vendor_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="No preferred vendor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendors.map((vendor) => (
+                    <SelectItem key={vendor.id} value={vendor.id}>
+                      {vendor.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="specs">Specifications (Optional)</Label>
             <Input
