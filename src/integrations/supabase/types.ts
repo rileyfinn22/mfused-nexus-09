@@ -1087,6 +1087,47 @@ export type Database = {
           },
         ]
       }
+      product_templates: {
+        Row: {
+          company_id: string | null
+          cost: number | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          price: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_stage_updates: {
         Row: {
           created_at: string
