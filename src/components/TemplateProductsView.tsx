@@ -202,6 +202,9 @@ export function TemplateProductsView({
     try {
       const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
       
+      // Use companyFilter if set, otherwise use template's company_id
+      const targetCompanyId = companyFilter !== 'all' ? companyFilter : template.company_id;
+      
       const { error } = await supabase
         .from('products')
         .insert({
@@ -212,7 +215,7 @@ export function TemplateProductsView({
           state: product.state,
           item_id: tempSKU,
           template_id: template.id,
-          company_id: companyFilter !== 'all' ? companyFilter : null
+          company_id: targetCompanyId
         });
 
       if (error) throw error;
@@ -239,7 +242,10 @@ export function TemplateProductsView({
       return;
     }
 
-    if (!companyFilter || companyFilter === 'all') {
+    // Use companyFilter if set, otherwise use template's company_id
+    const targetCompanyId = companyFilter !== 'all' ? companyFilter : template.company_id;
+    
+    if (!targetCompanyId) {
       toast({ title: "Error", description: "Please select a company first.", variant: "destructive" });
       return;
     }
@@ -259,7 +265,7 @@ export function TemplateProductsView({
           state: template.state,
           item_id: tempSKU,
           template_id: template.id,
-          company_id: companyFilter
+          company_id: targetCompanyId
         });
 
       if (error) throw error;
@@ -379,7 +385,7 @@ export function TemplateProductsView({
           </Button>
           <AddProductToTemplateDialog 
             template={template}
-            companyId={companyFilter !== 'all' ? companyFilter : undefined}
+            companyId={companyFilter !== 'all' ? companyFilter : (template.company_id || undefined)}
             onProductsAdded={fetchProducts}
           />
         </div>
@@ -433,7 +439,7 @@ export function TemplateProductsView({
             <p className="text-sm text-muted-foreground mb-4">Add products to get started.</p>
             <AddProductToTemplateDialog 
               template={template}
-              companyId={companyFilter !== 'all' ? companyFilter : undefined}
+              companyId={companyFilter !== 'all' ? companyFilter : (template.company_id || undefined)}
               onProductsAdded={fetchProducts}
             />
           </div>
