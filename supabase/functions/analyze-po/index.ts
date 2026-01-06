@@ -37,9 +37,9 @@ serve(async (req) => {
     // Create service client for operations that need elevated privileges
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { pdfPath, companyId, filename, orderType = 'pull_ship', returnProductsOnly = false } = await req.json();
+    const { pdfPath, companyId, filename, orderType = 'pull_ship', returnProductsOnly = false, textContent } = await req.json();
     
-    console.log(`Processing PO for company_id: ${companyId}, returnProductsOnly: ${returnProductsOnly}`);
+    console.log(`Processing PO for company_id: ${companyId}, returnProductsOnly: ${returnProductsOnly}, hasTextContent: ${!!textContent}`);
     
     // Validate user has access to this company
     const { data: userRole, error: roleError } = await supabase
@@ -58,44 +58,53 @@ serve(async (req) => {
     if (userRole.role !== 'vibe_admin' && userRole.company_id !== companyId) {
       throw new Error('Unauthorized: User does not have access to this company');
     }
-    console.log('Analyzing PO from path:', pdfPath, 'for order type:', orderType);
+    console.log('Analyzing PO from path:', pdfPath || 'N/A (text input)', 'for order type:', orderType);
 
-    // Download PDF from storage
-    console.log('Downloading PDF from storage...');
-    const { data: pdfBlob, error: downloadError } = await supabase
-      .storage
-      .from('po-documents')
-      .download(pdfPath);
-
-    if (downloadError) {
-      console.error('Download error:', JSON.stringify(downloadError, null, 2));
-      throw new Error(`Failed to download PDF: ${downloadError.message || 'Unknown error'}`);
-    }
-    
-    if (!pdfBlob) {
-      throw new Error('No PDF data received');
-    }
-    
-    console.log('PDF downloaded, size:', pdfBlob.size);
-    
-    // Convert to array buffer for PDF parsing
-    const pdfArrayBuffer = await pdfBlob.arrayBuffer();
-    
-    // Use pdf-parse library to extract text
-    console.log('Extracting text from PDF with pdf-parse...');
-    
-    // Import pdf-parse for Deno
-    const pdfParse = (await import('npm:pdf-parse@1.1.1')).default;
-    
     let extractedText = '';
-    try {
-      const pdfData = await pdfParse(new Uint8Array(pdfArrayBuffer));
-      extractedText = pdfData.text;
-      console.log('Successfully extracted text, length:', extractedText.length);
-      console.log('First 500 chars:', extractedText.substring(0, 500));
-    } catch (parseError) {
-      console.error('PDF parse error:', parseError);
-      extractedText = `Failed to parse PDF: ${filename}. Please enter data manually.`;
+    
+    // If textContent is provided, use it directly instead of parsing PDF
+    if (textContent) {
+      console.log('Using provided text content, length:', textContent.length);
+      extractedText = textContent;
+    } else if (pdfPath) {
+      // Download PDF from storage
+      console.log('Downloading PDF from storage...');
+      const { data: pdfBlob, error: downloadError } = await supabase
+        .storage
+        .from('po-documents')
+        .download(pdfPath);
+
+      if (downloadError) {
+        console.error('Download error:', JSON.stringify(downloadError, null, 2));
+        throw new Error(`Failed to download PDF: ${downloadError.message || 'Unknown error'}`);
+      }
+      
+      if (!pdfBlob) {
+        throw new Error('No PDF data received');
+      }
+      
+      console.log('PDF downloaded, size:', pdfBlob.size);
+      
+      // Convert to array buffer for PDF parsing
+      const pdfArrayBuffer = await pdfBlob.arrayBuffer();
+      
+      // Use pdf-parse library to extract text
+      console.log('Extracting text from PDF with pdf-parse...');
+      
+      // Import pdf-parse for Deno
+      const pdfParse = (await import('npm:pdf-parse@1.1.1')).default;
+      
+      try {
+        const pdfData = await pdfParse(new Uint8Array(pdfArrayBuffer));
+        extractedText = pdfData.text;
+        console.log('Successfully extracted text, length:', extractedText.length);
+        console.log('First 500 chars:', extractedText.substring(0, 500));
+      } catch (parseError) {
+        console.error('PDF parse error:', parseError);
+        extractedText = `Failed to parse PDF: ${filename}. Please enter data manually.`;
+      }
+    } else {
+      throw new Error('Either pdfPath or textContent must be provided');
     }
 
     // Analyze with Lovable AI
