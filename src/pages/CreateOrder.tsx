@@ -42,6 +42,7 @@ interface Product {
   description: string | null;
   image_url: string | null;
   company_id: string;
+  state: string | null;
 }
 
 interface Company {
@@ -694,7 +695,7 @@ const CreateOrder = () => {
   const fetchProducts = async () => {
     const { data, error } = await supabase
       .from('products')
-      .select('id, name, item_id, cost, description, image_url, company_id')
+      .select('id, name, item_id, cost, description, image_url, company_id, state')
       .order('name');
     
     if (!error && data) {
@@ -2095,7 +2096,9 @@ const CreateOrder = () => {
                         </Button>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{product.item_id || '-'}</TableCell>
-                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {product.state ? `${product.state} - ${product.name}` : product.name}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
                         {product.description}
                       </TableCell>
@@ -2254,7 +2257,9 @@ const CreateOrder = () => {
                                 />
                               </TableCell>
                               <TableCell className="font-mono text-xs">{product.item_id || '-'}</TableCell>
-                              <TableCell className="font-medium">{product.name}</TableCell>
+                              <TableCell className="font-medium">
+                                {product.state ? `${product.state} - ${product.name}` : product.name}
+                              </TableCell>
                               <TableCell className="text-right">${product.cost?.toFixed(3) || '0.000'}</TableCell>
                             </TableRow>
                           ))
