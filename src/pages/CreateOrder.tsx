@@ -1599,18 +1599,49 @@ const CreateOrder = () => {
               </TabsContent>
             </Tabs>
             
-            {/* Show already processed POs */}
-            {uploadedPOs.length > 0 && (
+            {/* Show already processed POs with clear option */}
+            {(uploadedPOs.length > 0 || selectedItems.length > 0 || unmatchedPoItems.length > 0) && (
               <div className="mt-3 border-t pt-3">
-                <p className="text-xs text-muted-foreground mb-2">Processed POs:</p>
-                <div className="flex flex-wrap gap-2">
-                  {uploadedPOs.map((po, idx) => (
-                    <Badge key={idx} variant="outline" className="flex items-center gap-1">
-                      <Check className="h-3 w-3 text-green-500" />
-                      {po.poNumber || po.filename}
-                    </Badge>
-                  ))}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-muted-foreground">
+                    {uploadedPOs.length > 0 ? 'Processed POs:' : 'Analysis Results:'}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                    onClick={() => {
+                      setSelectedItems([]);
+                      setUnmatchedPoItems([]);
+                      setUploadedPOs([]);
+                      setTextInput("");
+                      setFormData(prev => ({ ...prev, poNumber: "" }));
+                      toast({
+                        title: "Analysis cleared",
+                        description: "You can now re-analyze with different input or hints",
+                      });
+                    }}
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear & Retry
+                  </Button>
                 </div>
+                {uploadedPOs.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {uploadedPOs.map((po, idx) => (
+                      <Badge key={idx} variant="outline" className="flex items-center gap-1">
+                        <Check className="h-3 w-3 text-green-500" />
+                        {po.poNumber || po.filename}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {selectedItems.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {selectedItems.length} item(s) matched
+                    {unmatchedPoItems.length > 0 && `, ${unmatchedPoItems.length} unmatched`}
+                  </p>
+                )}
               </div>
             )}
           </div>
