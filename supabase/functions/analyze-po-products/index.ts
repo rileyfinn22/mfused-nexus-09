@@ -60,11 +60,11 @@ serve(async (req) => {
       throw new Error('Unauthorized: User does not have access to this company');
     }
 
-    // Fetch existing templates for this company to help with matching
+    // Fetch existing templates for this company (plus global templates) to help with matching
     const { data: templates } = await supabase
       .from('product_templates')
-      .select('id, name, description, state, price, cost')
-      .eq('company_id', companyId)
+      .select('id, name, description, state, price, cost, company_id')
+      .or(`company_id.eq.${companyId},company_id.is.null`)
       .order('name');
 
     const templateNames = templates?.map(t => `- "${t.name}" (${t.state || 'no state'})`).join('\n') || 'No templates found';
