@@ -795,6 +795,12 @@ serve(async (req) => {
 
     console.log('QB Project ID for invoice:', qbProjectId);
 
+    // Persist the currently-linked Job/Project id on the invoice row as well (helps UI/debugging).
+    await supabase
+      .from('invoices')
+      .update({ qb_project_id: qbProjectId })
+      .eq('id', invoiceId);
+
     // Create invoice payload.
     // If an order has a Job (sub-customer) id in qb_project_id, we invoice against that Job so it shows up under Projects.
     const invoiceCustomerRef = qbProjectId ? String(qbProjectId) : customerId;
