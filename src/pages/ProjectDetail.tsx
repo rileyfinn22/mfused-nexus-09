@@ -326,6 +326,7 @@ const ProjectDetail = () => {
                       <TableRow 
                         key={`${item.type}-${item.id}`}
                         className={`cursor-pointer hover:bg-muted/50 ${
+                          item.isOrder ? 'bg-gray-500/5' :
                           item.type === 'invoice' ? 'bg-blue-500/5' : 
                           item.type === 'payment' ? 'bg-green-500/5' : 
                           'bg-orange-500/5'
@@ -336,12 +337,13 @@ const ProjectDetail = () => {
                           <Badge 
                             variant="outline" 
                             className={`
-                              ${item.type === 'invoice' ? 'border-blue-500/50 text-blue-600 bg-blue-500/10' : ''}
+                              ${item.isOrder ? 'border-gray-400/50 text-gray-500 bg-gray-500/10' : ''}
+                              ${!item.isOrder && item.type === 'invoice' ? 'border-blue-500/50 text-blue-600 bg-blue-500/10' : ''}
                               ${item.type === 'payment' ? 'border-green-500/50 text-green-600 bg-green-500/10' : ''}
                               ${item.type === 'vendor_po' ? 'border-orange-500/50 text-orange-600 bg-orange-500/10' : ''}
                             `}
                           >
-                            {item.type === 'invoice' ? 'Invoice' : item.type === 'payment' ? 'Payment' : 'Vendor PO'}
+                            {item.isOrder ? 'Order' : item.type === 'invoice' ? 'Invoice' : item.type === 'payment' ? 'Payment' : 'Vendor PO'}
                           </Badge>
                         </TableCell>
                         <TableCell className="font-medium">{item.reference}</TableCell>
