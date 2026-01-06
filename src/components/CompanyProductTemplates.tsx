@@ -110,6 +110,13 @@ export function CompanyProductTemplates({
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddName, setQuickAddName] = useState("");
   const [quickAddSaving, setQuickAddSaving] = useState(false);
+  const [createTemplateOpen, setCreateTemplateOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [newTemplateDescription, setNewTemplateDescription] = useState("");
+  const [newTemplatePrice, setNewTemplatePrice] = useState("");
+  const [newTemplateCost, setNewTemplateCost] = useState("");
+  const [newTemplateState, setNewTemplateState] = useState("");
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
 
   useEffect(() => {
     fetchTemplates();
@@ -476,6 +483,57 @@ export function CompanyProductTemplates({
     } finally {
       setSavingTemplate(false);
     }
+  };
+
+  const handleCreateTemplate = async () => {
+    if (!newTemplateName.trim()) return;
+    setCreatingTemplate(true);
+
+    try {
+      const { error } = await supabase
+        .from('product_templates')
+        .insert({
+          name: newTemplateName.trim(),
+          description: newTemplateDescription.trim() || null,
+          price: newTemplatePrice ? parseFloat(newTemplatePrice) : null,
+          cost: newTemplateCost ? parseFloat(newTemplateCost) : null,
+          state: newTemplateState.trim() || null,
+          company_id: companyId // Company-specific template
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Template created",
+        description: "New template has been created successfully.",
+      });
+
+      setCreateTemplateOpen(false);
+      setNewTemplateName("");
+      setNewTemplateDescription("");
+      setNewTemplatePrice("");
+      setNewTemplateCost("");
+      setNewTemplateState("");
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error creating template:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create template.",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingTemplate(false);
+    }
+  };
+
+  const openCreateTemplateDialog = () => {
+    setNewTemplateName("");
+    setNewTemplateDescription("");
+    setNewTemplatePrice("");
+    setNewTemplateCost("");
+    setNewTemplateState("");
+    setCreateTemplateOpen(true);
   };
 
   if (loading) {
@@ -883,7 +941,11 @@ export function CompanyProductTemplates({
   // Template grid view
   return (
     <div className="space-y-4">
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-between items-center mb-4">
+        <Button variant="outline" size="sm" onClick={openCreateTemplateDialog}>
+          <Plus className="h-4 w-4 mr-1.5" />
+          Add Template
+        </Button>
         <div className="flex items-center border rounded-md">
           <Button
             variant={templateViewMode === "grid" ? "secondary" : "ghost"}
@@ -908,7 +970,7 @@ export function CompanyProductTemplates({
         <div className="text-center py-8 text-muted-foreground">
           <LayoutGrid className="h-10 w-10 mx-auto mb-3 opacity-30" />
           <p className="font-medium">No product templates</p>
-          <p className="text-sm">Products added from templates will appear here</p>
+          <p className="text-sm">Click "Add Template" to create your first template</p>
         </div>
       ) : templateViewMode === "grid" ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -1054,6 +1116,83 @@ export function CompanyProductTemplates({
               </Button>
               <Button onClick={handleSaveTemplate} disabled={savingTemplate || !editTemplateName.trim()}>
                 {savingTemplate ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Template Dialog */}
+      <Dialog open={createTemplateOpen} onOpenChange={setCreateTemplateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="newTemplateName">Template Name</Label>
+              <Input
+                id="newTemplateName"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder="Enter template name"
+              />
+            </div>
+            
+            {/* Price & Cost */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="newTemplatePrice">Default Price ($)</Label>
+                <Input
+                  id="newTemplatePrice"
+                  type="number"
+                  step="0.01"
+                  value={newTemplatePrice}
+                  onChange={(e) => setNewTemplatePrice(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newTemplateCost">Default Cost ($)</Label>
+                <Input
+                  id="newTemplateCost"
+                  type="number"
+                  step="0.01"
+                  value={newTemplateCost}
+                  onChange={(e) => setNewTemplateCost(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            {/* State */}
+            <div className="space-y-2">
+              <Label htmlFor="newTemplateState">State</Label>
+              <Input
+                id="newTemplateState"
+                value={newTemplateState}
+                onChange={(e) => setNewTemplateState(e.target.value)}
+                placeholder="e.g., WA, CA, general"
+              />
+              <p className="text-xs text-muted-foreground">Link this template to a specific state/region</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="newTemplateDescription">Description / Specs</Label>
+              <Textarea
+                id="newTemplateDescription"
+                value={newTemplateDescription}
+                onChange={(e) => setNewTemplateDescription(e.target.value)}
+                placeholder="Enter template description, specifications, dimensions, etc."
+                rows={3}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setCreateTemplateOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateTemplate} disabled={creatingTemplate || !newTemplateName.trim()}>
+                {creatingTemplate ? "Creating..." : "Create Template"}
               </Button>
             </div>
           </div>

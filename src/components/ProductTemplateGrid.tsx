@@ -68,6 +68,13 @@ export function ProductTemplateGrid({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTemplate, setDeletingTemplate] = useState<ProductTemplate | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [newTemplateDescription, setNewTemplateDescription] = useState("");
+  const [newTemplatePrice, setNewTemplatePrice] = useState("");
+  const [newTemplateCost, setNewTemplateCost] = useState("");
+  const [newTemplateState, setNewTemplateState] = useState("");
+  const [creating, setCreating] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   useEffect(() => {
@@ -273,6 +280,49 @@ export function ProductTemplateGrid({
     }
   };
 
+  const handleCreateTemplate = async () => {
+    if (!newTemplateName.trim()) return;
+    setCreating(true);
+
+    try {
+      const { error } = await supabase
+        .from('product_templates')
+        .insert({
+          name: newTemplateName.trim(),
+          description: newTemplateDescription.trim() || null,
+          price: newTemplatePrice ? parseFloat(newTemplatePrice) : null,
+          cost: newTemplateCost ? parseFloat(newTemplateCost) : null,
+          state: newTemplateState.trim() || null,
+          company_id: null // Global template
+        });
+
+      if (error) throw error;
+
+      toast({ title: "Template created", description: "New template has been created successfully." });
+      setCreateDialogOpen(false);
+      setNewTemplateName("");
+      setNewTemplateDescription("");
+      setNewTemplatePrice("");
+      setNewTemplateCost("");
+      setNewTemplateState("");
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error creating template:', error);
+      toast({ title: "Error", description: "Failed to create template.", variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const openCreateDialog = () => {
+    setNewTemplateName("");
+    setNewTemplateDescription("");
+    setNewTemplatePrice("");
+    setNewTemplateCost("");
+    setNewTemplateState("");
+    setCreateDialogOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -387,7 +437,10 @@ export function ProductTemplateGrid({
 
         {/* Add Template Card - Only for vibe_admin */}
         {isVibeAdmin && (
-          <Card className="aspect-square border-dashed border-2 flex items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all">
+          <Card 
+            className="aspect-square border-dashed border-2 flex items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all"
+            onClick={openCreateDialog}
+          >
             <div className="text-center text-muted-foreground">
               <Plus className="h-8 w-8 mx-auto mb-2" />
               <p className="text-sm font-medium">Add Template</p>
@@ -452,7 +505,7 @@ export function ProductTemplateGrid({
             ))}
             {isVibeAdmin && (
               <div className="px-4 py-3 text-center">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={openCreateDialog}>
                   <Plus className="h-4 w-4 mr-1.5" />
                   Add Template
                 </Button>
@@ -605,6 +658,87 @@ export function ProductTemplateGrid({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Template Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Name */}
+            <div className="space-y-2">
+              <Label htmlFor="new-template-name">Name</Label>
+              <Input
+                id="new-template-name"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder="Template name"
+              />
+            </div>
+
+            {/* Price & Cost */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-template-price">Default Price ($)</Label>
+                <Input
+                  id="new-template-price"
+                  type="number"
+                  step="0.01"
+                  value={newTemplatePrice}
+                  onChange={(e) => setNewTemplatePrice(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-template-cost">Default Cost ($)</Label>
+                <Input
+                  id="new-template-cost"
+                  type="number"
+                  step="0.01"
+                  value={newTemplateCost}
+                  onChange={(e) => setNewTemplateCost(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            {/* State */}
+            <div className="space-y-2">
+              <Label htmlFor="new-template-state">State</Label>
+              <Input
+                id="new-template-state"
+                value={newTemplateState}
+                onChange={(e) => setNewTemplateState(e.target.value)}
+                placeholder="e.g., WA, CA, general"
+              />
+              <p className="text-xs text-muted-foreground">Link this template to a specific state/region</p>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="new-template-description">Description / Specs</Label>
+              <Textarea
+                id="new-template-description"
+                value={newTemplateDescription}
+                onChange={(e) => setNewTemplateDescription(e.target.value)}
+                placeholder="Template description, specifications, etc."
+                rows={3}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateTemplate} disabled={creating || !newTemplateName.trim()}>
+                {creating ? "Creating..." : "Create Template"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
