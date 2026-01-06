@@ -1244,6 +1244,7 @@ export type Database = {
           quickbooks_sync_status: string | null
           quickbooks_synced_at: string | null
           state: string | null
+          template_id: string | null
           units_per_case: number | null
           updated_at: string
           volume_per_case: number | null
@@ -1266,6 +1267,7 @@ export type Database = {
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
           state?: string | null
+          template_id?: string | null
           units_per_case?: number | null
           updated_at?: string
           volume_per_case?: number | null
@@ -1288,6 +1290,7 @@ export type Database = {
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
           state?: string | null
+          template_id?: string | null
           units_per_case?: number | null
           updated_at?: string
           volume_per_case?: number | null
@@ -1306,6 +1309,13 @@ export type Database = {
             columns: ["preferred_vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "product_templates"
             referencedColumns: ["id"]
           },
         ]

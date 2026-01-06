@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
@@ -24,12 +25,16 @@ import {
   AlertTriangle,
   Edit,
   Trash2,
-  Package
+  Package,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AddProductDialog } from "@/components/AddProductDialog";
 import { AnalyzePOProductsDialog } from "@/components/AnalyzePOProductsDialog";
 import { QuickAddProductsDialog } from "@/components/QuickAddProductsDialog";
+import { ProductTemplateGrid } from "@/components/ProductTemplateGrid";
+import { TemplateProductsView } from "@/components/TemplateProductsView";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +59,16 @@ interface ProductState {
   status: string;
 }
 
+interface ProductTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number | null;
+  cost: number | null;
+  company_id: string | null;
+  product_count?: number;
+}
+
 const Products = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -70,6 +85,8 @@ const Products = () => {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [companies, setCompanies] = useState<any[]>([]);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [viewMode, setViewMode] = useState<"templates" | "list">("templates");
+  const [selectedTemplate, setSelectedTemplate] = useState<ProductTemplate | null>(null);
 
   useEffect(() => {
     checkRole();
@@ -314,6 +331,22 @@ const Products = () => {
     );
   }
 
+  // If a template is selected, show the template products view
+  if (selectedTemplate) {
+    return (
+      <div className="space-y-6">
+        <TemplateProductsView
+          template={selectedTemplate}
+          companyFilter={companyFilter}
+          isVibeAdmin={isVibeAdmin}
+          onBack={() => setSelectedTemplate(null)}
+          artworkThumbnails={artworkThumbnails}
+          artworkStatus={artworkStatus}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -323,23 +356,25 @@ const Products = () => {
           <p className="page-subtitle">Manage SKUs and state-specific packaging requirements</p>
         </div>
         <div className="flex gap-2">
-          {selectedProducts.size > 0 && (
+          {viewMode === "list" && selectedProducts.size > 0 && (
             <Button variant="destructive" size="sm" onClick={handleDeleteSelected}>
               <Trash2 className="h-4 w-4 mr-1.5" />
               Delete ({selectedProducts.size})
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setIsEditMode(!isEditMode);
-              if (isEditMode) setSelectedProducts(new Set());
-            }}
-          >
-            <Edit className="h-4 w-4 mr-1.5" />
-            {isEditMode ? "Done" : "Edit"}
-          </Button>
+          {viewMode === "list" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsEditMode(!isEditMode);
+                if (isEditMode) setSelectedProducts(new Set());
+              }}
+            >
+              <Edit className="h-4 w-4 mr-1.5" />
+              {isEditMode ? "Done" : "Edit"}
+            </Button>
+          )}
           <AnalyzePOProductsDialog 
             onProductsAdded={fetchProducts}
             selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
@@ -355,170 +390,208 @@ const Products = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search products..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+      {/* Filters and View Toggle */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {viewMode === "list" && (
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          )}
+          {isVibeAdmin && (
+            <Select value={companyFilter} onValueChange={setCompanyFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Company" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Companies</SelectItem>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
-        {isVibeAdmin && (
-          <Select value={companyFilter} onValueChange={setCompanyFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Company" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Companies</SelectItem>
-              {companies.map((company) => (
-                <SelectItem key={company.id} value={company.id}>
-                  {company.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+
+        {/* View Toggle */}
+        <div className="flex items-center border rounded-lg p-1 bg-muted/30">
+          <Button
+            variant={viewMode === "templates" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-8"
+            onClick={() => setViewMode("templates")}
+          >
+            <LayoutGrid className="h-4 w-4 mr-1.5" />
+            Templates
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-8"
+            onClick={() => setViewMode("list")}
+          >
+            <List className="h-4 w-4 mr-1.5" />
+            All Products
+          </Button>
+        </div>
       </div>
 
-      {/* Products Table */}
-      <Card className="overflow-hidden">
-        {/* Table Header */}
-        <div className="bg-muted/50 border-b border-border px-4 py-3">
-          <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {isEditMode && (
-              <div className="col-span-1 flex items-center">
-                <Checkbox
-                  checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
-                  onCheckedChange={handleSelectAll}
-                />
-              </div>
-            )}
-            <div className={cn("flex items-center", isEditMode ? "col-span-1" : "col-span-1")}></div>
-            <div className={cn(isEditMode ? "col-span-2" : "col-span-2")}>Product ID</div>
-            <div className="col-span-1">Preview</div>
-            <div className="col-span-4">Name</div>
-            <div className="col-span-2">State</div>
-            <div className="col-span-1">{isVibeAdmin ? 'Cost' : 'Price'}</div>
-            {!isEditMode && <div className="col-span-1">Actions</div>}
-          </div>
-        </div>
+      {/* Template Grid View */}
+      {viewMode === "templates" && (
+        <ProductTemplateGrid
+          companyFilter={companyFilter}
+          isVibeAdmin={isVibeAdmin}
+          onSelectTemplate={setSelectedTemplate}
+          selectedTemplate={selectedTemplate}
+        />
+      )}
 
-        {/* Table Body */}
-        <div className="divide-y divide-border">
-          {filteredProducts.length === 0 ? (
-            <div className="empty-state py-16">
-              <Package className="h-12 w-12 mb-4 text-muted-foreground/50" />
-              <p className="font-medium">No products found</p>
-              <p className="text-sm">Add your first product to get started.</p>
+      {/* Products Table/List View */}
+      {viewMode === "list" && (
+        <Card className="overflow-hidden">
+          {/* Table Header */}
+          <div className="bg-muted/50 border-b border-border px-4 py-3">
+            <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {isEditMode && (
+                <div className="col-span-1 flex items-center">
+                  <Checkbox
+                    checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
+                    onCheckedChange={handleSelectAll}
+                  />
+                </div>
+              )}
+              <div className={cn("flex items-center", isEditMode ? "col-span-1" : "col-span-1")}></div>
+              <div className={cn(isEditMode ? "col-span-2" : "col-span-2")}>Product ID</div>
+              <div className="col-span-1">Preview</div>
+              <div className="col-span-4">Name</div>
+              <div className="col-span-2">State</div>
+              <div className="col-span-1">{isVibeAdmin ? 'Cost' : 'Price'}</div>
+              {!isEditMode && <div className="col-span-1">Actions</div>}
             </div>
-          ) : (
-            filteredProducts.map((product) => {
-              const isExpanded = expandedProducts.includes(product.id);
-              
-              return (
-                <div key={product.id}>
-                  <div 
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/30 transition-colors cursor-pointer items-center"
-                    onClick={() => toggleExpanded(product.id)}
-                  >
-                    {isEditMode && (
-                      <div className="col-span-1 flex items-center" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedProducts.has(product.id)}
-                          onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
-                        />
+          </div>
+
+          {/* Table Body */}
+          <div className="divide-y divide-border">
+            {filteredProducts.length === 0 ? (
+              <div className="empty-state py-16">
+                <Package className="h-12 w-12 mb-4 text-muted-foreground/50" />
+                <p className="font-medium">No products found</p>
+                <p className="text-sm">Add your first product to get started.</p>
+              </div>
+            ) : (
+              filteredProducts.map((product) => {
+                const isExpanded = expandedProducts.includes(product.id);
+                
+                return (
+                  <div key={product.id}>
+                    <div 
+                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/30 transition-colors cursor-pointer items-center"
+                      onClick={() => toggleExpanded(product.id)}
+                    >
+                      {isEditMode && (
+                        <div className="col-span-1 flex items-center" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedProducts.has(product.id)}
+                            onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
+                          />
+                        </div>
+                      )}
+                      <div className={cn("flex items-center", isEditMode ? "col-span-1" : "col-span-1")}>
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </div>
-                    )}
-                    <div className={cn("flex items-center", isEditMode ? "col-span-1" : "col-span-1")}>
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className={cn("font-mono text-xs flex items-center gap-2", isEditMode ? "col-span-2" : "col-span-2")}>
-                      <span className="truncate">{product.item_id || `${product.id.slice(0, 8)}...`}</span>
-                      {product.sku && !hasApprovedArtwork(product.sku) && (
-                        <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />
-                      )}
-                    </div>
-                    <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
-                      {product.sku && (artworkThumbnails[product.sku] || product.image_url) ? (
-                        <img 
-                          src={artworkThumbnails[product.sku] || product.image_url} 
-                          alt={product.name}
-                          className="w-10 h-10 object-cover rounded-md border border-border cursor-pointer hover:opacity-80 transition-opacity"
-                          onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.sku)}`)}
-                        />
-                      ) : product.image_url ? (
-                        <img 
-                          src={product.image_url} 
-                          alt={product.name}
-                          className="w-10 h-10 object-cover rounded-md border border-border"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 bg-muted rounded-md border border-border flex items-center justify-center">
-                          <Package className="h-4 w-4 text-muted-foreground" />
+                      <div className={cn("font-mono text-xs flex items-center gap-2", isEditMode ? "col-span-2" : "col-span-2")}>
+                        <span className="truncate">{product.item_id || `${product.id.slice(0, 8)}...`}</span>
+                        {product.sku && !hasApprovedArtwork(product.sku) && (
+                          <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />
+                        )}
+                      </div>
+                      <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
+                        {product.sku && (artworkThumbnails[product.sku] || product.image_url) ? (
+                          <img 
+                            src={artworkThumbnails[product.sku] || product.image_url} 
+                            alt={product.name}
+                            className="w-10 h-10 object-cover rounded-md border border-border cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.sku)}`)}
+                          />
+                        ) : product.image_url ? (
+                          <img 
+                            src={product.image_url} 
+                            alt={product.name}
+                            className="w-10 h-10 object-cover rounded-md border border-border"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-muted rounded-md border border-border flex items-center justify-center">
+                            <Package className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="col-span-4">
+                        <span className="text-sm font-medium truncate block">{product.name}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <Badge variant="outline" className="text-xs">{product.state}</Badge>
+                      </div>
+                      <div className="col-span-1 text-sm font-medium">
+                        {isVibeAdmin 
+                          ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
+                          : (product.price ? `$${product.price.toFixed(3)}` : '—')}
+                      </div>
+                      {!isEditMode && (
+                        <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => navigate(`/products/edit/${product.id}`)}
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-danger"
+                            onClick={() => handleDeleteClick(product.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       )}
                     </div>
-                    <div className="col-span-4">
-                      <span className="text-sm font-medium truncate block">{product.name}</span>
-                    </div>
-                    <div className="col-span-2">
-                      <Badge variant="outline" className="text-xs">{product.state}</Badge>
-                    </div>
-                    <div className="col-span-1 text-sm font-medium">
-                      {isVibeAdmin 
-                        ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
-                        : (product.price ? `$${product.price.toFixed(3)}` : '—')}
-                    </div>
-                    {!isEditMode && (
-                      <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={() => navigate(`/products/edit/${product.id}`)}
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-danger"
-                          onClick={() => handleDeleteClick(product.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+
+                    {/* Expanded State Details */}
+                    {isExpanded && product.states.length > 0 && (
+                      <div className="bg-muted/30 border-t border-border">
+                        <div className="px-8 py-3 space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">State Variants</p>
+                          {product.states.map((state) => (
+                            <div key={state.id} className="flex items-center gap-4 text-sm py-1.5">
+                              <Badge variant="outline" className="text-xs min-w-[40px] justify-center">{state.state}</Badge>
+                              <span className={cn("text-xs font-medium", getStatusColor(state.status))}>{state.status}</span>
+                              {state.specs && <span className="text-xs text-muted-foreground">{state.specs}</span>}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  {/* Expanded State Details */}
-                  {isExpanded && product.states.length > 0 && (
-                    <div className="bg-muted/30 border-t border-border">
-                      <div className="px-8 py-3 space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">State Variants</p>
-                        {product.states.map((state) => (
-                          <div key={state.id} className="flex items-center gap-4 text-sm py-1.5">
-                            <Badge variant="outline" className="text-xs min-w-[40px] justify-center">{state.state}</Badge>
-                            <span className={cn("text-xs font-medium", getStatusColor(state.status))}>{state.status}</span>
-                            {state.specs && <span className="text-xs text-muted-foreground">{state.specs}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-      </Card>
+                );
+              })
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
