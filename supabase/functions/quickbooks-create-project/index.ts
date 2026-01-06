@@ -194,24 +194,37 @@ serve(async (req) => {
     const projectName = `${order.order_number} - ${order.customer_name}`.substring(0, 100);
     console.log('Creating Job (Project) under customer:', parentCustomerId, 'Name:', projectName);
 
-    // Check if the job already exists under this parent
-    const jobSearchQuery = `SELECT * FROM Customer WHERE DisplayName='${projectName.replace(/'/g, "\\'")}' AND ParentRef='${parentCustomerId}' MAXRESULTS 1`;
-    const jobSearchResponse = await fetch(
-      `${qbApiUrl}/query?query=${encodeURIComponent(jobSearchQuery)}&minorversion=65`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-        },
-      }
-    );
-    const jobSearchData = await jobSearchResponse.json();
-    console.log('Job search response:', JSON.stringify(jobSearchData));
 
-    let qbProjectId;
+    // Check if the job already exists.
+    // Note: Some QBO realms do NOT allow querying ParentRef, so we query by DisplayName then filter in code.
+    const findExistingJob = async () => {
+      const exactQuery = `SELECT * FROM Customer WHERE DisplayName='${projectName.replace(/'/g, "\\'")}' MAXRESULTS 10`;
+      const resp = await fetch(
+        `${qbApiUrl}/query?query=${encodeURIComponent(exactQuery)}&minorversion=65`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
 
-    if (jobSearchData.QueryResponse?.Customer?.length > 0) {
-      qbProjectId = jobSearchData.QueryResponse.Customer[0].Id;
+      const data = await resp.json();
+      console.log('Job lookup response:', JSON.stringify(data));
+
+      const customers: any[] = data?.QueryResponse?.Customer || [];
+      const match = customers.find((c: any) => {
+        const parentVal = c?.ParentRef?.value;
+        const isJob = c?.Job === true;
+        return isJob && String(parentVal || '') === String(parentCustomerId);
+      });
+
+      return match?.Id as string | undefined;
+    };
+
+    let qbProjectId = await findExistingJob();
+
+    if (qbProjectId) {
       console.log('Found existing Job (Project):', qbProjectId);
     } else {
       const jobPayload: any = {
@@ -239,13 +252,25 @@ serve(async (req) => {
       console.log('Create job response:', JSON.stringify(newJob));
 
       if (!createJobResponse.ok) {
-        console.error('Failed to create Job (Project):', JSON.stringify(newJob));
-        const errorMsg = newJob.Fault?.Error?.[0]?.Message || newJob.Fault?.Error?.[0]?.Detail || 'Failed to create Job (Project) in QuickBooks';
-        throw new Error(errorMsg);
-      }
+        const qbErr = newJob?.Fault?.Error?.[0];
+        const isDuplicate = qbErr?.code === '6240' || String(qbErr?.Message || '').toLowerCase().includes('duplicate');
 
-      qbProjectId = newJob.Customer.Id;
-      console.log('Created Job (Project):', qbProjectId);
+        if (isDuplicate) {
+          console.warn('Duplicate job name reported by QBO; searching to locate existing job...');
+          qbProjectId = await findExistingJob();
+        }
+
+        if (!qbProjectId) {
+          console.error('Failed to create Job (Project):', JSON.stringify(newJob));
+          const errorMsg = qbErr?.Message || qbErr?.Detail || 'Failed to create Job (Project) in QuickBooks';
+          throw new Error(errorMsg);
+        }
+
+        console.log('Recovered existing Job (Project) after duplicate:', qbProjectId);
+      } else {
+        qbProjectId = newJob.Customer.Id;
+        console.log('Created Job (Project):', qbProjectId);
+      }
     }
     // Step 3: Update order with QB Project ID
     await supabase
