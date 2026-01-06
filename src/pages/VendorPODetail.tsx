@@ -370,41 +370,46 @@ const VendorPODetail = () => {
         fillColor: [lightGray[0], lightGray[1], lightGray[2]]
       },
       columnStyles: {
-        0: { cellWidth: 35 },
-        1: { cellWidth: 80 },
-        2: { cellWidth: 25, halign: 'center' },
-        3: { cellWidth: 30, halign: 'right' },
-        4: { cellWidth: 32, halign: 'right', fontStyle: 'bold' }
+        0: { cellWidth: 30 },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 28, halign: 'right' },
+        4: { cellWidth: 28, halign: 'right', fontStyle: 'bold' }
       },
       margin: { left: 14, right: 14 },
       showHead: 'firstPage',
-      tableLineWidth: 0
+      tableLineWidth: 0,
+      tableWidth: 'auto'
     });
 
     // ============ TOTALS SECTION ============
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
     
-    const totalsWidth = 85;
+    const totalsWidth = 80;
     const totalsX = pageWidth - totalsWidth - 14;
     
     // Divider line before total
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.3);
-    doc.line(totalsX, finalY, totalsX + totalsWidth, finalY);
+    doc.line(totalsX, finalY, pageWidth - 14, finalY);
     
     // Total - emphasized
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
     doc.text('TOTAL', totalsX, finalY + 8);
-    doc.text(`$${totalAmount.toFixed(2)}`, totalsX + totalsWidth, finalY + 8, { align: 'right' });
+    doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - 14, finalY + 8, { align: 'right' });
 
     // ============ FOOTER ============
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+    // Only add footer if there's enough space, otherwise it will overlap with table
+    const footerY = Math.max(finalY + 30, pageHeight - 20);
+    if (footerY < pageHeight - 10) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+    }
 
     doc.save(`vendor-po-${po.po_number}.pdf`);
     
@@ -599,41 +604,45 @@ const VendorPODetail = () => {
         fillColor: [lightGray[0], lightGray[1], lightGray[2]]
       },
       columnStyles: {
-        0: { cellWidth: 35 },
-        1: { cellWidth: 80 },
-        2: { cellWidth: 25, halign: 'center' },
-        3: { cellWidth: 30, halign: 'right' },
-        4: { cellWidth: 32, halign: 'right', fontStyle: 'bold' }
+        0: { cellWidth: 30 },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 28, halign: 'right' },
+        4: { cellWidth: 28, halign: 'right', fontStyle: 'bold' }
       },
       margin: { left: 14, right: 14 },
       showHead: 'firstPage',
-      tableLineWidth: 0
+      tableLineWidth: 0,
+      tableWidth: 'auto'
     });
 
     // ============ TOTALS SECTION ============
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
     
-    const totalsWidth = 85;
+    const totalsWidth = 80;
     const totalsX = pageWidth - totalsWidth - 14;
     
     // Divider line before total
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.3);
-    doc.line(totalsX, finalY, totalsX + totalsWidth, finalY);
+    doc.line(totalsX, finalY, pageWidth - 14, finalY);
     
     // Total - emphasized
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
     doc.text('TOTAL', totalsX, finalY + 8);
-    doc.text(`$${totalAmount.toFixed(2)}`, totalsX + totalsWidth, finalY + 8, { align: 'right' });
+    doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - 14, finalY + 8, { align: 'right' });
 
     // ============ FOOTER ============
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+    const footerY = Math.max(finalY + 30, pageHeight - 20);
+    if (footerY < pageHeight - 10) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+    }
 
     return doc.output('datauristring').split(',')[1];
   };
