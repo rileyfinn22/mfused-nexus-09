@@ -264,7 +264,7 @@ export function ProductTemplateGrid({
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {[...Array(8)].map((_, i) => (
           <Card key={i} className="aspect-square animate-pulse bg-muted" />
         ))}
@@ -274,7 +274,7 @@ export function ProductTemplateGrid({
 
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {templates.map((template) => (
           <Card
             key={template.id}
@@ -341,7 +341,7 @@ export function ProductTemplateGrid({
 
             {/* Template Info */}
             <div className="p-3 space-y-1">
-              <h3 className="font-medium text-sm truncate">{template.name}</h3>
+              <h3 className="font-medium text-sm leading-snug">{template.name}</h3>
               {template.description && (
                 <p className="text-xs text-muted-foreground line-clamp-2">
                   {template.description.split('\n')[0]}
