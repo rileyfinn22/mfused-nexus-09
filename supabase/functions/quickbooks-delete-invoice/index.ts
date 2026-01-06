@@ -152,6 +152,26 @@ serve(async (req) => {
     if (!getResponse.ok) {
       const errorData = await getResponse.json();
       console.error('Failed to fetch invoice for deletion:', errorData);
+      
+      // If invoice not found in QB (error 610), just clear local sync status
+      const errorCode = errorData.Fault?.Error?.[0]?.code;
+      if (errorCode === '610') {
+        console.log('Invoice not found in QuickBooks - clearing local sync status');
+        await supabase
+          .from('invoices')
+          .update({
+            quickbooks_id: null,
+            quickbooks_sync_status: null,
+            quickbooks_synced_at: null,
+          })
+          .eq('id', invoiceId);
+        
+        return new Response(
+          JSON.stringify({ success: true, message: 'Invoice was already removed from QuickBooks - local sync status cleared' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       throw new Error('Failed to fetch invoice from QuickBooks');
     }
 
