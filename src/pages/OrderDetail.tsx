@@ -616,15 +616,20 @@ const OrderDetail = () => {
         if (error) throw error;
 
         // Update linked vendor_po_items with new quantity and details
-        const { data: vendorPoItems } = await supabase
+        const { data: vendorPoItems, error: fetchPoItemsError } = await supabase
           .from('vendor_po_items')
           .select('id, vendor_po_id, unit_cost')
           .eq('order_item_id', item.id);
 
+        if (fetchPoItemsError) {
+          console.error('Error fetching vendor PO items for order_item_id:', item.id, fetchPoItemsError);
+        }
+
         if (vendorPoItems && vendorPoItems.length > 0) {
+          console.log('Updating vendor PO items for order item:', item.id, 'Found:', vendorPoItems.length);
           for (const poItem of vendorPoItems) {
             const poItemTotal = Number(item.quantity) * Number(poItem.unit_cost);
-            await supabase
+            const { error: updatePoItemError } = await supabase
               .from('vendor_po_items')
               .update({
                 quantity: item.quantity,
@@ -633,7 +638,15 @@ const OrderDetail = () => {
                 total: poItemTotal
               })
               .eq('id', poItem.id);
+            
+            if (updatePoItemError) {
+              console.error('Error updating vendor PO item:', poItem.id, updatePoItemError);
+            } else {
+              console.log('Updated vendor PO item:', poItem.id, 'with quantity:', item.quantity, 'total:', poItemTotal);
+            }
           }
+        } else {
+          console.log('No vendor PO items found for order_item_id:', item.id);
         }
       }
 
