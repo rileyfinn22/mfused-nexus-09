@@ -560,8 +560,14 @@ const OrderDetail = () => {
       const editedItemIds = editedItems.filter(item => !item.isNew).map(item => item.id);
       const itemsToDelete = originalItemIds.filter((id: string) => !editedItemIds.includes(id));
 
-      // Delete removed items
+      // Delete removed items - also need to handle related vendor_po_items
       if (itemsToDelete.length > 0) {
+        // First, nullify order_item_id in vendor_po_items for deleted items
+        await supabase
+          .from('vendor_po_items')
+          .update({ order_item_id: null })
+          .in('order_item_id', itemsToDelete);
+
         const { error: deleteError } = await supabase
           .from('order_items')
           .delete()
@@ -591,7 +597,7 @@ const OrderDetail = () => {
         if (insertError) throw insertError;
       }
 
-      // Update existing items
+      // Update existing items and sync vendor PO items
       for (const item of editedItems.filter(item => !item.isNew)) {
         const newTotal = Number(item.quantity) * Number(item.unit_price);
         
@@ -608,6 +614,27 @@ const OrderDetail = () => {
           .eq('id', item.id);
 
         if (error) throw error;
+
+        // Update linked vendor_po_items with new quantity and details
+        const { data: vendorPoItems } = await supabase
+          .from('vendor_po_items')
+          .select('id, vendor_po_id, unit_cost')
+          .eq('order_item_id', item.id);
+
+        if (vendorPoItems && vendorPoItems.length > 0) {
+          for (const poItem of vendorPoItems) {
+            const poItemTotal = Number(item.quantity) * Number(poItem.unit_cost);
+            await supabase
+              .from('vendor_po_items')
+              .update({
+                quantity: item.quantity,
+                name: item.name,
+                sku: item.sku || item.item_id,
+                total: poItemTotal
+              })
+              .eq('id', poItem.id);
+          }
+        }
       }
 
       // Recalculate order totals
@@ -642,12 +669,55 @@ const OrderDetail = () => {
 
       if (orderError) throw orderError;
 
+      // Recalculate vendor PO totals
+      const { data: affectedPOs } = await supabase
+        .from('vendor_pos')
+        .select('id')
+        .eq('order_id', orderId);
+
+      if (affectedPOs && affectedPOs.length > 0) {
+        for (const po of affectedPOs) {
+          const { data: poItems } = await supabase
+            .from('vendor_po_items')
+            .select('total')
+            .eq('vendor_po_id', po.id);
+
+          if (poItems) {
+            const poTotal = poItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
+            await supabase
+              .from('vendor_pos')
+              .update({ total: poTotal })
+              .eq('id', po.id);
+          }
+        }
+      }
+
+      // Update blanket invoice if exists (type = 'blanket')
+      const { data: blanketInvoice } = await supabase
+        .from('invoices')
+        .select('id, invoice_type')
+        .eq('order_id', orderId)
+        .eq('invoice_type', 'blanket')
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      if (blanketInvoice) {
+        await supabase
+          .from('invoices')
+          .update({
+            subtotal: newSubtotal,
+            total: newTotal + Number(editedOrder.shipping_cost || 0)
+          })
+          .eq('id', blanketInvoice.id);
+      }
+
       toast({
         title: "Order Updated",
-        description: "Order details saved successfully"
+        description: "Order, vendor POs, and invoices synced successfully"
       });
       setIsEditMode(false);
       fetchOrder();
+      fetchInvoices();
     } catch (error: any) {
       toast({
         title: "Error",
