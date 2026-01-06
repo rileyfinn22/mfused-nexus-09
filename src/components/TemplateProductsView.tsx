@@ -48,6 +48,7 @@ interface ProductTemplate {
   price: number | null;
   cost: number | null;
   company_id: string | null;
+  state: string | null;
 }
 
 interface Product {

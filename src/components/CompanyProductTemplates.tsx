@@ -50,6 +50,7 @@ interface ProductTemplate {
   price: number | null;
   cost: number | null;
   company_id: string | null;
+  state: string | null;
   product_count?: number;
 }
 
@@ -94,6 +95,9 @@ export function CompanyProductTemplates({
   const [editingTemplate, setEditingTemplate] = useState<ProductTemplate | null>(null);
   const [editTemplateName, setEditTemplateName] = useState("");
   const [editTemplateDescription, setEditTemplateDescription] = useState("");
+  const [editTemplatePrice, setEditTemplatePrice] = useState("");
+  const [editTemplateCost, setEditTemplateCost] = useState("");
+  const [editTemplateState, setEditTemplateState] = useState("");
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [templateViewMode, setTemplateViewMode] = useState<"grid" | "list">("grid");
@@ -420,6 +424,9 @@ export function CompanyProductTemplates({
     setEditingTemplate(template);
     setEditTemplateName(template.name);
     setEditTemplateDescription(template.description || "");
+    setEditTemplatePrice(template.price?.toString() || "");
+    setEditTemplateCost(template.cost?.toString() || "");
+    setEditTemplateState(template.state || "");
   };
 
   const handleSaveTemplate = async () => {
@@ -431,7 +438,10 @@ export function CompanyProductTemplates({
         .from('product_templates')
         .update({
           name: editTemplateName.trim(),
-          description: editTemplateDescription.trim() || null
+          description: editTemplateDescription.trim() || null,
+          price: editTemplatePrice ? parseFloat(editTemplatePrice) : null,
+          cost: editTemplateCost ? parseFloat(editTemplateCost) : null,
+          state: editTemplateState.trim() || null
         })
         .eq('id', editingTemplate.id);
 
@@ -447,7 +457,10 @@ export function CompanyProductTemplates({
         setSelectedTemplate({
           ...selectedTemplate,
           name: editTemplateName.trim(),
-          description: editTemplateDescription.trim() || null
+          description: editTemplateDescription.trim() || null,
+          price: editTemplatePrice ? parseFloat(editTemplatePrice) : null,
+          cost: editTemplateCost ? parseFloat(editTemplateCost) : null,
+          state: editTemplateState.trim() || null
         });
       }
 
@@ -986,6 +999,45 @@ export function CompanyProductTemplates({
                 placeholder="Enter template name"
               />
             </div>
+            
+            {/* Price & Cost */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="templatePrice">Default Price ($)</Label>
+                <Input
+                  id="templatePrice"
+                  type="number"
+                  step="0.01"
+                  value={editTemplatePrice}
+                  onChange={(e) => setEditTemplatePrice(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="templateCost">Default Cost ($)</Label>
+                <Input
+                  id="templateCost"
+                  type="number"
+                  step="0.01"
+                  value={editTemplateCost}
+                  onChange={(e) => setEditTemplateCost(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            {/* State */}
+            <div className="space-y-2">
+              <Label htmlFor="templateState">State</Label>
+              <Input
+                id="templateState"
+                value={editTemplateState}
+                onChange={(e) => setEditTemplateState(e.target.value)}
+                placeholder="e.g., WA, CA, general"
+              />
+              <p className="text-xs text-muted-foreground">Link this template to a specific state/region</p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="templateDescription">Description / Specs</Label>
               <Textarea
@@ -993,7 +1045,7 @@ export function CompanyProductTemplates({
                 value={editTemplateDescription}
                 onChange={(e) => setEditTemplateDescription(e.target.value)}
                 placeholder="Enter template description, specifications, dimensions, etc."
-                rows={6}
+                rows={4}
               />
             </div>
             <div className="flex justify-end gap-2">

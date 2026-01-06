@@ -1096,6 +1096,7 @@ export type Database = {
           id: string
           name: string
           price: number | null
+          state: string | null
           thumbnail_url: string | null
           updated_at: string
         }
@@ -1107,6 +1108,7 @@ export type Database = {
           id?: string
           name: string
           price?: number | null
+          state?: string | null
           thumbnail_url?: string | null
           updated_at?: string
         }
@@ -1118,6 +1120,7 @@ export type Database = {
           id?: string
           name?: string
           price?: number | null
+          state?: string | null
           thumbnail_url?: string | null
           updated_at?: string
         }
