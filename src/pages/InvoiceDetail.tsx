@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink } from "lucide-react";
 import { format } from "date-fns";
 import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -56,6 +56,8 @@ const InvoiceDetail = () => {
   const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
   const [currentUserName, setCurrentUserName] = useState<string>("");
   const [qbRealmId, setQbRealmId] = useState<string | null>(null);
+  const [unsyncingFromQB, setUnsyncingFromQB] = useState(false);
+  const [showUnsyncDialog, setShowUnsyncDialog] = useState(false);
   const {
     syncInvoice,
     checkConnection
@@ -985,7 +987,35 @@ const InvoiceDetail = () => {
     }
   };
 
-  // Calculate totals based on items actually on THIS invoice (from allocations)
+  const handleUnsyncFromQB = async () => {
+    setUnsyncingFromQB(true);
+    try {
+      const { error, data } = await supabase.functions.invoke('quickbooks-delete-invoice', {
+        body: { invoiceId }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: "Invoice Unsynced",
+        description: "Invoice has been removed from QuickBooks and unlinked locally."
+      });
+
+      setShowUnsyncDialog(false);
+      fetchInvoiceDetails();
+    } catch (error: any) {
+      console.error('Error unsyncing from QB:', error);
+      toast({
+        title: "Unsync Failed",
+        description: error.message || "Failed to unsync invoice from QuickBooks",
+        variant: "destructive"
+      });
+    } finally {
+      setUnsyncingFromQB(false);
+    }
+  };
+
   // For edit mode, recalculate. Otherwise use stored invoice.total
   const displayItems = editedItems;
   const displaySubtotal = isEditMode 
@@ -1094,6 +1124,14 @@ const InvoiceDetail = () => {
                         >
                           <RefreshCw className="h-4 w-4 mr-2 text-amber-500" />
                           <span>Re-Sync to QuickBooks</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className="cursor-pointer text-destructive focus:text-destructive"
+                          onClick={() => setShowUnsyncDialog(true)}
+                        >
+                          <Unlink className="h-4 w-4 mr-2" />
+                          <span>Unsync from QuickBooks</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -2041,6 +2079,35 @@ const InvoiceDetail = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteInvoice} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unsync from QuickBooks Confirmation Dialog */}
+      <AlertDialog open={showUnsyncDialog} onOpenChange={setShowUnsyncDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsync from QuickBooks?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete the invoice from QuickBooks and remove the sync link. The invoice will remain in your portal but will no longer be connected to QuickBooks. You can re-sync it later if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={unsyncingFromQB}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleUnsyncFromQB} 
+              disabled={unsyncingFromQB}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {unsyncingFromQB ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Unsyncing...
+                </>
+              ) : (
+                'Unsync from QB'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
