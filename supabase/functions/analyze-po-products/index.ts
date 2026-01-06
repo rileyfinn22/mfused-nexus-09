@@ -36,12 +36,14 @@ serve(async (req) => {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     const companyId = formData.get('company_id') as string;
+    const analysisHint = formData.get('analysis_hint') as string | null;
 
     if (!file) {
       throw new Error('No file provided');
     }
 
-    console.log(`Analyzing PO for products, company_id: ${companyId}, file: ${file.name}`);
+    console.log(`Analyzing PO for products, company_id: ${companyId}, file: ${file.name}, hint: ${analysisHint || 'none'}`);
+
 
     // Validate user has access to this company
     const { data: userRole, error: roleError } = await supabase
@@ -114,12 +116,18 @@ serve(async (req) => {
 EXISTING TEMPLATES IN SYSTEM:
 ${templateNames}
 
+${analysisHint ? `USER HINT FOR TEMPLATE MATCHING:
+${analysisHint}
+
+Use this hint to better match products to templates. The user knows their products best.
+` : ''}
 IMPORTANT:
 - Extract ALL line items from the PO
 - If state is embedded in SKU (like PCK-00430-WA), extract it as "WA"
 - cost should be a number (e.g., 0.218), not a formatted string
 - Be thorough - don't miss any products
 - For suggested_template, return the EXACT template name if you find a good match, or null if no match
+- Pay attention to any user hints provided above for template matching
 
 PURCHASE ORDER TEXT:
 ${extractedText}
