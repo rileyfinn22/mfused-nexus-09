@@ -1066,17 +1066,27 @@ const CreateOrder = () => {
         }
       } else {
         // Create new order with sequential number - get max existing order number
-        const { data: maxOrderData } = await supabase
+        // Fetch recent orders and find the highest numeric order number
+        const { data: recentOrders } = await supabase
           .from('orders')
           .select('order_number')
-          .order('order_number', { ascending: false })
-          .limit(1)
-          .single();
+          .order('created_at', { ascending: false })
+          .limit(100);
         
-        // Parse the max order number and increment, or start at 11000
-        const maxOrderNum = maxOrderData ? parseInt(maxOrderData.order_number, 10) : 10999;
-        const orderNum = (isNaN(maxOrderNum) ? 10999 : Math.max(maxOrderNum, 10999)) + 1;
-        orderNumber = String(orderNum);
+        // Find the highest numeric order number from recent orders
+        let maxOrderNum = 10699; // Starting point (will increment to 10700)
+        if (recentOrders && recentOrders.length > 0) {
+          for (const order of recentOrders) {
+            const match = order.order_number.match(/(\d+)$/);
+            if (match) {
+              const num = parseInt(match[1], 10);
+              if (!isNaN(num) && num > maxOrderNum) {
+                maxOrderNum = num;
+              }
+            }
+          }
+        }
+        orderNumber = String(maxOrderNum + 1);
 
         const { data: newOrder, error: orderError } = await supabase
           .from('orders')
