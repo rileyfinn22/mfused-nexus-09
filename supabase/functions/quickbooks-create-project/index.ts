@@ -78,14 +78,16 @@ serve(async (req) => {
       throw new Error("Order not found");
     }
 
-    // If we've already linked a Job/Project for this order, don't call QuickBooks again.
-    // We still continue so we can ensure the existing Job is flagged as a "Project" in QBO.
-    const existingQbProjectId: string | null = order.qb_project_id ? String(order.qb_project_id) : null;
-    if (existingQbProjectId) {
-      console.log(
-        "Order already has QB Project/Job ID:",
-        existingQbProjectId,
-        "- will verify it is marked as a Project.",
+    // If order already has a project, return it
+    if (order.qb_project_id) {
+      console.log("Order already has QB Project ID:", order.qb_project_id);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          qb_project_id: order.qb_project_id,
+          message: "QuickBooks Project already exists",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -122,13 +124,14 @@ serve(async (req) => {
       accessToken = await refreshAccessToken(supabase, vibeAdmin.company_id, refreshToken);
     }
 
-    const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
+    const realmId = qbSettings.realm_id;
+    const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${realmId}`;
 
     // Step 1: Find or create the parent customer (company)
     const companyName = (order.companies as any)?.name || order.customer_name;
     console.log("Looking for parent customer:", companyName);
 
-    let parentCustomerId;
+    let parentCustomerId: string;
 
     // Search for existing customer
     const customerSearchResponse = await fetch(
@@ -204,152 +207,90 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Create a Job (sub-customer) under the parent customer.
-    // In QuickBooks Online, the "Projects" UI is backed by Customers with Job=true AND IsProject=true.
+    // Step 2: Create a Project using the QuickBooks Projects API
+    // The Projects API uses a different endpoint than the standard v3 API
     const projectName = `${order.order_number} - ${order.customer_name}`.substring(0, 100);
-    console.log("Creating Job (Project) under customer:", parentCustomerId, "Name:", projectName);
+    console.log("Creating Project via Projects API. Customer:", parentCustomerId, "Name:", projectName);
 
-    async function ensureJobMarkedAsProject(jobCustomerId: string) {
-      try {
-        const getResp = await fetch(`${qbApiUrl}/customer/${jobCustomerId}?minorversion=65`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            Accept: "application/json",
-          },
-        });
+    // QuickBooks Projects API endpoint
+    const projectsApiUrl = `https://quickbooks.api.intuit.com/quickbooks/v4/customers/${parentCustomerId}/projects`;
 
-        if (!getResp.ok) {
-          console.warn("Could not fetch Job to verify IsProject flag:", jobCustomerId, getResp.status);
-          return;
-        }
-
-        const getData = await getResp.json();
-        const cust = getData?.Customer;
-
-        if (!cust?.Id || cust?.SyncToken == null) {
-          console.warn("Unexpected customer payload when verifying Job/Project:", JSON.stringify(getData));
-          return;
-        }
-
-        const needsUpdate = cust.Job !== true || cust.IsProject !== true;
-        if (!needsUpdate) {
-          console.log("Job already marked as Project:", jobCustomerId);
-          return;
-        }
-
-        const updatePayload: any = {
-          sparse: true,
-          Id: cust.Id,
-          SyncToken: cust.SyncToken,
-          Job: true,
-          IsProject: true,
-          ParentRef: cust.ParentRef?.value ? { value: cust.ParentRef.value } : { value: parentCustomerId },
-          BillWithParent: typeof cust.BillWithParent === "boolean" ? cust.BillWithParent : true,
-        };
-
-        const updResp = await fetch(`${qbApiUrl}/customer?minorversion=65`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updatePayload),
-        });
-
-        const updData = await updResp.json();
-        if (!updResp.ok) {
-          console.warn("Failed to mark Job as Project:", jobCustomerId, JSON.stringify(updData));
-          return;
-        }
-
-        console.log("Marked Job as Project in QBO:", jobCustomerId);
-      } catch (e) {
-        console.warn("ensureJobMarkedAsProject failed:", jobCustomerId, e);
-      }
-    }
-
-    // Check if the job already exists.
-    // Note: Some QBO realms do NOT allow querying ParentRef, so we query by DisplayName then filter in code.
-    const findExistingJob = async () => {
-      const exactQuery = `SELECT * FROM Customer WHERE DisplayName='${projectName.replace(/'/g, "\\'")}' MAXRESULTS 10`;
-      const resp = await fetch(
-        `${qbApiUrl}/query?query=${encodeURIComponent(exactQuery)}&minorversion=65`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            Accept: "application/json",
-          },
-        },
-      );
-
-      const data = await resp.json();
-      console.log("Job lookup response:", JSON.stringify(data));
-
-      const customers: any[] = data?.QueryResponse?.Customer || [];
-      const match = customers.find((c: any) => {
-        const parentVal = c?.ParentRef?.value;
-        const isJob = c?.Job === true;
-        return isJob && String(parentVal || "") === String(parentCustomerId);
-      });
-
-      return match?.Id as string | undefined;
+    const projectPayload = {
+      name: projectName,
+      description: `Order: ${order.order_number}\nPO: ${order.po_number || "N/A"}`.substring(0, 1000),
     };
 
-    let qbProjectId = existingQbProjectId || (await findExistingJob());
+    console.log("Projects API URL:", projectsApiUrl);
+    console.log("Project payload:", JSON.stringify(projectPayload));
 
-    if (qbProjectId) {
-      console.log("Using existing Job (Project):", qbProjectId);
-    } else {
-      const jobPayload: any = {
-        DisplayName: projectName,
-        ParentRef: { value: parentCustomerId },
-        Job: true,
-        IsProject: true,
-        // Keep billing behavior simple/compatible; the important part is Job + IsProject + ParentRef.
-        BillWithParent: true,
-        Notes: `Order: ${order.order_number}\nPO: ${order.po_number || "N/A"}`.substring(0, 4000),
-      };
+    const createProjectResponse = await fetch(projectsApiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(projectPayload),
+    });
 
-      console.log("Creating Job payload:", JSON.stringify(jobPayload));
+    const projectResponseText = await createProjectResponse.text();
+    console.log("Create project response status:", createProjectResponse.status);
+    console.log("Create project response:", projectResponseText);
 
-      const createJobResponse = await fetch(`${qbApiUrl}/customer?minorversion=65`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(jobPayload),
-      });
+    let qbProjectId: string;
 
-      const newJob = await createJobResponse.json();
-      console.log("Create job response:", JSON.stringify(newJob));
-
-      if (!createJobResponse.ok) {
-        const qbErr = newJob?.Fault?.Error?.[0];
-        const isDuplicate = qbErr?.code === "6240" || String(qbErr?.Message || "").toLowerCase().includes("duplicate");
-
-        if (isDuplicate) {
-          console.warn("Duplicate job name reported by QBO; searching to locate existing job...");
-          qbProjectId = await findExistingJob();
-        }
-
-        if (!qbProjectId) {
-          console.error("Failed to create Job (Project):", JSON.stringify(newJob));
-          const errorMsg = qbErr?.Message || qbErr?.Detail || "Failed to create Job (Project) in QuickBooks";
-          throw new Error(errorMsg);
-        }
-
-        console.log("Recovered existing Job (Project) after duplicate:", qbProjectId);
-      } else {
-        qbProjectId = newJob.Customer.Id;
-        console.log("Created Job (Project):", qbProjectId);
+    if (!createProjectResponse.ok) {
+      // Try to parse error
+      let errorData: any;
+      try {
+        errorData = JSON.parse(projectResponseText);
+      } catch {
+        errorData = { message: projectResponseText };
       }
-    }
 
-    // Ensure the Job is flagged as a Project in QBO so it appears under Projects.
-    await ensureJobMarkedAsProject(String(qbProjectId));
+      console.error("Failed to create project:", JSON.stringify(errorData));
+
+      // Check if it's a duplicate name error - try to find existing project
+      const errorMessage = errorData?.errors?.[0]?.message || errorData?.message || "";
+      if (errorMessage.toLowerCase().includes("duplicate") || errorMessage.toLowerCase().includes("already exists")) {
+        console.log("Project may already exist, searching...");
+        
+        // List projects for this customer to find existing one
+        const listProjectsResponse = await fetch(
+          `https://quickbooks.api.intuit.com/quickbooks/v4/customers/${parentCustomerId}/projects`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              Accept: "application/json",
+            },
+          },
+        );
+
+        if (listProjectsResponse.ok) {
+          const projectsList = await listProjectsResponse.json();
+          console.log("Existing projects:", JSON.stringify(projectsList));
+          
+          const existingProject = projectsList?.find?.((p: any) => 
+            p.name?.toLowerCase().trim() === projectName.toLowerCase().trim()
+          );
+          
+          if (existingProject?.id) {
+            qbProjectId = existingProject.id;
+            console.log("Found existing project:", qbProjectId);
+          } else {
+            throw new Error(errorMessage || "Failed to create project and could not find existing one");
+          }
+        } else {
+          throw new Error(errorMessage || "Failed to create project");
+        }
+      } else {
+        throw new Error(errorMessage || `Failed to create project: ${createProjectResponse.status}`);
+      }
+    } else {
+      const newProject = JSON.parse(projectResponseText);
+      qbProjectId = newProject.id;
+      console.log("Created Project:", qbProjectId);
+    }
 
     // Step 3: Update order with QB Project ID
     await supabase.from("orders").update({ qb_project_id: qbProjectId }).eq("id", orderId);
@@ -360,7 +301,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         qb_project_id: qbProjectId,
-        message: "QuickBooks Job (Project) created successfully",
+        message: "QuickBooks Project created successfully",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
