@@ -78,6 +78,20 @@ serve(async (req) => {
       throw new Error('Order not found');
     }
 
+    // If we've already linked a Job/Project for this order, don't call QuickBooks again.
+    // (Prevents duplicate-name loops and saves credits.)
+    if (order.qb_project_id) {
+      console.log('Order already has QB Project/Job ID, returning without creating:', order.qb_project_id);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          qb_project_id: order.qb_project_id,
+          message: 'QuickBooks Job (Project) already linked'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Get VibePKG's company_id (the vibe_admin's company that manages QuickBooks)
     const { data: vibeAdmin, error: vibeAdminError } = await supabase
       .from('user_roles')
