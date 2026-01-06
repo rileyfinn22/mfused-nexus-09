@@ -865,8 +865,9 @@ serve(async (req) => {
       } else {
         const currentInvoice = await getResponse.json();
         console.log('Current invoice response:', JSON.stringify(currentInvoice).substring(0, 200));
-        
-        if (!currentInvoice?.Invoice?.SyncToken) {
+
+        const currentSyncToken = currentInvoice?.Invoice?.SyncToken;
+        if (!currentSyncToken) {
           console.warn('Invalid invoice response, will create new:', currentInvoice);
           await supabase
             .from('invoices')
@@ -874,19 +875,37 @@ serve(async (req) => {
             .eq('id', invoiceId);
           shouldCreateNew = true;
         } else {
-          qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=65`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              ...invoicePayload,
-              Id: invoice.quickbooks_id,
-              SyncToken: currentInvoice.Invoice.SyncToken,
-            }),
-          });
+          const currentCustomerRef = String(currentInvoice?.Invoice?.CustomerRef?.value || '');
+          const desiredCustomerRef = String(invoicePayload?.CustomerRef?.value || '');
+
+          // If we are trying to move an existing invoice onto a Job (Projects UI), prefer recreating if QBO blocks the update.
+          if (desiredCustomerRef && currentCustomerRef && desiredCustomerRef !== currentCustomerRef) {
+            console.warn(
+              `Invoice CustomerRef mismatch (current=${currentCustomerRef}, desired=${desiredCustomerRef}). ` +
+              'Will recreate invoice to ensure it lands under the Project/Job.'
+            );
+
+            await supabase
+              .from('invoices')
+              .update({ quickbooks_id: null, quickbooks_sync_status: 'pending' })
+              .eq('id', invoiceId);
+
+            shouldCreateNew = true;
+          } else {
+            qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=65`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                ...invoicePayload,
+                Id: invoice.quickbooks_id,
+                SyncToken: currentSyncToken,
+              }),
+            });
+          }
         }
       }
     }
