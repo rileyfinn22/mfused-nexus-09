@@ -124,53 +124,55 @@ serve(async (req) => {
           },
           {
             role: 'user',
-            content: `You are an expert at analyzing purchase orders. Extract data carefully from the table structure.
+            content: `You are an expert at analyzing purchase orders and product lists. Extract data carefully.
 
 ANALYSIS INSTRUCTIONS:
 
-1. IDENTIFY THE TABLE STRUCTURE:
-Look at the column headers in the purchase order table. Common headers include:
-- Item/Item #/SKU/Product Code: Contains the SKU NUMBER (alphanumeric code)
-- Description/Product Name/Item Name: Contains the PRODUCT NAME (text description)
+1. IDENTIFY THE STRUCTURE:
+The input may be a formal PO table OR a simple text list of products. Adapt accordingly.
+
+For formal POs with tables, look for columns like:
+- Item/SKU/Product Code: Contains the SKU NUMBER
+- Description/Product Name: Contains the PRODUCT NAME
 - Qty/Quantity: Numeric quantities
-- Rate/Unit Price/Price: The price per unit (THIS IS CRITICAL - extract as a decimal number)
-- Amount/Total: Total for that line
+- Rate/Unit Price: Price per unit (extract as decimal number)
+
+For simple text lists, each line typically contains:
+- Product identifier/name
+- Quantity (often at end after a dash or colon)
 
 2. FOR EACH LINE ITEM, EXTRACT:
-- sku: The SKU NUMBER from the Item/SKU/Product Code column (e.g., "PCK-00430-WA" or "12345")
+- sku: The SKU code if present
 - item_id: Same as sku
-- name: The PRODUCT NAME from the Description/Product Name column (e.g., "BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb")
+- name: The PRODUCT NAME/DESCRIPTION - INCLUDE STATE PREFIX if specified (e.g., "AZ", "WA", "NY", "MD")
 - quantity: The numeric quantity
-- unit_price: The rate/price per unit - MUST be a decimal number (e.g., 0.218, not "$0.218")
+- unit_price: The rate/price per unit - MUST be a decimal number
 
-IMPORTANT MATCHING RULES:
-- sku/item_id = The SKU CODE/NUMBER (will match to product's item_id in database)
-- name = The PRODUCT NAME/DESCRIPTION (will match to product's name in database)
-- These are often in SEPARATE columns in the PO table
-
-EXAMPLE:
-If you see a table row like:
-SKU: PCK-00430-WA
-Description: BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb
-Qty: 3000
-Rate: $0.218
+CRITICAL FOR STATE-BASED PRODUCTS:
+If the input groups products by state (like "AZ", "WA", "NY", "MD"), you MUST include the state in the name.
+For example, if you see:
+AZ
+Red Card - Vape 2g - Sleeve - 8000
 
 Extract as:
 {
-  "item_id": "PCK-00430-WA",
-  "sku": "PCK-00430-WA",
-  "name": "BAG - E2.5 - 1g - Super Fog - Twisted - Apple Ambush - Hyb",
-  "quantity": 3000,
-  "unit_price": 0.218
+  "name": "Red Card - Vape 2g - Sleeve - AZ",  // Include state!
+  "quantity": 8000
 }
 
-3. FOR ORDER INFO:
-- po_number: Look for "PO #", "Order #"
-- due_date: Look for "Due Date", "Expected Date" - format as YYYY-MM-DD
-- customer_name: Vendor name
-- shipping address: Ship To section
+3. PRODUCT TYPE KEYWORDS TO PRESERVE:
+- "Sleeve" or "Sleeves" = sleeve/cartridge packaging
+- "Ion" = Ion vape products
+- "Fatty" or "Fattys" = Fatty pre-roll products
+- "Bag" = bag packaging
+Keep these in the name for matching.
 
-${analysisHint ? `4. ADDITIONAL CONTEXT FROM USER:\n${analysisHint}\n\nUse this hint to help with product matching and data extraction.\n` : ''}
+4. FOR ORDER INFO:
+- po_number: Look for "PO #", "Order #"
+- due_date: Format as YYYY-MM-DD if found
+- customer_name: Customer/Vendor name
+
+${analysisHint ? `5. ADDITIONAL CONTEXT FROM USER:\n${analysisHint}\n\nThis context is CRITICAL - follow it exactly for product naming and matching.\n` : ''}
 PURCHASE ORDER TEXT:
 ${extractedText}
 
@@ -422,9 +424,79 @@ Return ONLY valid JSON:
         console.log(`✗ No partial name match found for: "${poName}"`);
       }
 
-      // STEP 5: FALLBACK - Try exact match on item_id (case insensitive)
+      // STEP 5: SMART SHORTHAND MATCHING
+      // Handles formats like "Red Card - Vape 2g - Sleeve" or "Golden Glove - Ion 1g - Bag"
+      // Maps to products like "AZ Sleeves - Red Card" or "WA Ion Bags - Golden Glove"
+      if (poName && extractedState) {
+        console.log(`\n[STEP 5] Trying SMART SHORTHAND match for: "${poName}" with state "${extractedState}"`);
+        
+        // Extract strain name and product type from shorthand format
+        // Common patterns: "Strain - Vape Xg - Sleeve", "Strain - Ion Xg - Bag", "Strain - Fatty Xg - Bag"
+        const strainPatterns = [
+          /^(.+?)\s*[-–—]\s*(?:Vape|Cart|Cartridge)\s*\d+g?\s*[-–—]\s*Sleeve/i,  // Sleeve products
+          /^(.+?)\s*[-–—]\s*(?:Ion)\s*\d+g?\s*[-–—]\s*Bag/i,                       // Ion Bag products  
+          /^(.+?)\s*[-–—]\s*(?:Fatty|Fattys?)\s*\d+g?\s*[-–—]\s*Bag/i,            // Fatty Bag products
+        ];
+        
+        let strainName: string | null = null;
+        let productTypeKey: string | null = null;
+        
+        for (const pattern of strainPatterns) {
+          const match = poName.match(pattern);
+          if (match) {
+            strainName = match[1].trim();
+            if (/Sleeve/i.test(poName)) productTypeKey = 'sleeve';
+            else if (/Ion/i.test(poName)) productTypeKey = 'ion';
+            else if (/Fatty|Fattys/i.test(poName)) productTypeKey = 'fatty';
+            break;
+          }
+        }
+        
+        if (strainName && productTypeKey) {
+          console.log(`  Detected strain: "${strainName}", type: "${productTypeKey}", state: "${extractedState}"`);
+          
+          // Map product type to expected name patterns in database
+          const typePatterns: Record<string, string[]> = {
+            'sleeve': ['Sleeves', 'Sleeve'],
+            'ion': ['Ion Bags', 'Ion'],
+            'fatty': ['2pk Fatty Bags', 'Fatty Bags', '5pk Fatty Bags', 'Fatty'],
+          };
+          
+          const patterns = typePatterns[productTypeKey] || [];
+          const normalizedStrain = strainName.toLowerCase().trim();
+          
+          // Look for products matching: [STATE] [TYPE] - [STRAIN]
+          const match = products.find(p => {
+            if (!p.name) return false;
+            const productNameLower = p.name.toLowerCase();
+            
+            // Check if product name starts with state
+            if (!productNameLower.startsWith(extractedState!.toLowerCase())) return false;
+            
+            // Check if product name contains one of the type patterns
+            const hasType = patterns.some(typePattern => 
+              productNameLower.includes(typePattern.toLowerCase())
+            );
+            if (!hasType) return false;
+            
+            // Check if product name contains the strain
+            if (!productNameLower.includes(normalizedStrain)) return false;
+            
+            console.log(`  Candidate match: "${p.name}"`);
+            return true;
+          });
+          
+          if (match) {
+            console.log(`✓ SMART SHORTHAND MATCH FOUND: "${poName}" -> "${match.name}" (ID: ${match.id})`);
+            return match;
+          }
+        }
+        console.log(`✗ No smart shorthand match found for: "${poName}"`);
+      }
+
+      // STEP 6: FALLBACK - Try exact match on item_id (case insensitive)
       if (poItemId) {
-        console.log(`\n[STEP 5] Trying exact item_id match for: "${poItemId}"`);
+        console.log(`\n[STEP 6] Trying exact item_id match for: "${poItemId}"`);
         const match = products.find(p => {
           return p.item_id && p.item_id.toLowerCase().trim() === poItemId.toLowerCase().trim();
         });
@@ -435,9 +507,9 @@ Return ONLY valid JSON:
         console.log(`✗ No exact item_id match found for: "${poItemId}"`);
       }
 
-      // STEP 6: Try exact match on SKU (case insensitive)
+      // STEP 7: Try exact match on SKU (case insensitive)
       if (poSku && poSku !== poItemId) {
-        console.log(`\n[STEP 6] Trying exact SKU match for: "${poSku}"`);
+        console.log(`\n[STEP 7] Trying exact SKU match for: "${poSku}"`);
         const match = products.find(p => 
           p.item_id && p.item_id.toLowerCase().trim() === poSku.toLowerCase().trim()
         );
