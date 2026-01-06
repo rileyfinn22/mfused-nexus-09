@@ -14,21 +14,19 @@ interface QuickAddProductsDialogProps {
   selectedCompanyId?: string;
 }
 
-interface TemplateProduct {
+interface ProductTemplate {
   id: string;
   name: string;
   description: string | null;
-  state: string | null;
-  cost: number | null;
   price: number | null;
-  preferred_vendor_id: string | null;
-  company_id: string;
+  cost: number | null;
+  company_id: string | null;
 }
 
 export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: QuickAddProductsDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState<TemplateProduct[]>([]);
+  const [templates, setTemplates] = useState<ProductTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [skuNames, setSkuNames] = useState("");
   const [companies, setCompanies] = useState<any[]>([]);
@@ -36,11 +34,12 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
   const [companyId, setCompanyId] = useState<string>(selectedCompanyId || "");
   const { syncProduct, checkConnection } = useQuickBooksAutoSync();
 
-  const selectedTemplate = products.find(p => p.id === selectedTemplateId);
+  const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
   useEffect(() => {
     if (open) {
       checkRole();
+      fetchTemplates();
     }
   }, [open]);
 
@@ -49,12 +48,6 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
       setCompanyId(selectedCompanyId);
     }
   }, [selectedCompanyId]);
-
-  useEffect(() => {
-    if (open && (companyId || !isVibeAdmin)) {
-      fetchProducts();
-    }
-  }, [open, companyId, isVibeAdmin]);
 
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -87,23 +80,17 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
     }
   };
 
-  const fetchProducts = async () => {
+  const fetchTemplates = async () => {
     try {
-      let query = supabase
-        .from('products')
-        .select('id, name, description, state, cost, price, preferred_vendor_id, company_id')
+      const { data, error } = await supabase
+        .from('product_templates')
+        .select('id, name, description, price, cost, company_id')
         .order('name');
 
-      if (companyId) {
-        query = query.eq('company_id', companyId);
-      }
-
-      const { data, error } = await query;
-
       if (error) throw error;
-      setProducts(data || []);
+      setTemplates(data || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error fetching templates:', error);
     }
   };
 
@@ -116,7 +103,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
     e.preventDefault();
     
     if (!selectedTemplate) {
-      toast.error("Please select a template product");
+      toast.error("Please select a template");
       return;
     }
 
@@ -135,19 +122,18 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
       return;
     }
 
+    const finalCompanyId = isVibeAdmin ? companyId : companyId;
+    
+    if (!finalCompanyId) {
+      toast.error("Please select a company");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
-
-      const finalCompanyId = isVibeAdmin ? companyId : selectedTemplate.company_id;
-      
-      if (!finalCompanyId) {
-        toast.error("Please select a company");
-        setLoading(false);
-        return;
-      }
 
       const createdProducts: string[] = [];
 
@@ -159,10 +145,8 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
           .insert({
             name: name,
             description: selectedTemplate.description,
-            state: selectedTemplate.state,
             cost: selectedTemplate.cost,
             price: selectedTemplate.price,
-            preferred_vendor_id: selectedTemplate.preferred_vendor_id,
             item_id: tempSKU,
             company_id: finalCompanyId
           })
@@ -212,7 +196,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
         <DialogHeader>
           <DialogTitle>Quick Add Products</DialogTitle>
           <DialogDescription>
-            Select a template product, then enter multiple product names (one per line) to bulk create products with the same description and price.
+            Select a product template, then enter multiple product names (one per line) to bulk create products with the template's description and price.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -222,10 +206,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
               <Label htmlFor="company">Company <span className="text-destructive">*</span></Label>
               <Select
                 value={companyId}
-                onValueChange={(value) => {
-                  setCompanyId(value);
-                  setSelectedTemplateId("");
-                }}
+                onValueChange={setCompanyId}
                 required
               >
                 <SelectTrigger>
@@ -243,36 +224,38 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="template">Template Product <span className="text-destructive">*</span></Label>
+            <Label htmlFor="template">Product Template <span className="text-destructive">*</span></Label>
             <Select
               value={selectedTemplateId}
               onValueChange={setSelectedTemplateId}
               required
-              disabled={isVibeAdmin && !companyId}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a product as template" />
+                <SelectValue placeholder="Select a product template" />
               </SelectTrigger>
               <SelectContent>
-                {products.map((product) => (
-                  <SelectItem key={product.id} value={product.id}>
-                    {product.name}
+                {templates.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {isVibeAdmin && !companyId && (
-              <p className="text-xs text-muted-foreground">Select a company first</p>
-            )}
           </div>
 
           {selectedTemplate && (
             <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-sm">
-              <p><span className="text-muted-foreground">Description:</span> {selectedTemplate.description || 'None'}</p>
-              <p><span className="text-muted-foreground">State:</span> {selectedTemplate.state || 'None'}</p>
-              <p><span className="text-muted-foreground">Price:</span> {selectedTemplate.price ? `$${selectedTemplate.price.toFixed(3)}` : 'None'}</p>
-              {isVibeAdmin && (
-                <p><span className="text-muted-foreground">Cost:</span> {selectedTemplate.cost ? `$${selectedTemplate.cost.toFixed(3)}` : 'None'}</p>
+              <p className="font-medium">{selectedTemplate.name}</p>
+              <p className="text-muted-foreground whitespace-pre-line text-xs">{selectedTemplate.description || 'No description'}</p>
+              {(selectedTemplate.price || selectedTemplate.cost) && (
+                <div className="flex gap-4 pt-2 border-t border-border mt-2">
+                  {selectedTemplate.price && (
+                    <p><span className="text-muted-foreground">Price:</span> ${Number(selectedTemplate.price).toFixed(3)}</p>
+                  )}
+                  {isVibeAdmin && selectedTemplate.cost && (
+                    <p><span className="text-muted-foreground">Cost:</span> ${Number(selectedTemplate.cost).toFixed(3)}</p>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -292,7 +275,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
             </p>
           </div>
 
-          <Button type="submit" disabled={loading || !selectedTemplateId} className="w-full">
+          <Button type="submit" disabled={loading || !selectedTemplateId || (isVibeAdmin && !companyId)} className="w-full">
             {loading ? "Adding..." : "Add Products"}
           </Button>
         </form>
