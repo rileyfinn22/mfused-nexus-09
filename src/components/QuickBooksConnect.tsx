@@ -75,7 +75,8 @@ export const QuickBooksConnect = () => {
       if (!userRole) throw new Error("No company found");
       
       const clientId = initData.clientId;
-      const scope = 'com.intuit.quickbooks.accounting';
+      // Required to create/list Projects via GraphQL and link transactions via REST
+      const scope = 'com.intuit.quickbooks.accounting project-management.project';
       const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quickbooks-oauth`;
       
       // Generate secure state parameter with company_id and random nonce
@@ -90,7 +91,7 @@ export const QuickBooksConnect = () => {
       // Build OAuth URL
       const authUrl = `https://appcenter.intuit.com/connect/oauth2?` +
         `client_id=${clientId}&` +
-        `scope=${scope}&` +
+        `scope=${encodeURIComponent(scope)}&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `response_type=code&` +
         `state=${encodeURIComponent(state)}`;

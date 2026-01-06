@@ -318,7 +318,14 @@ serve(async (req) => {
         throw new Error("Unexpected GraphQL response format");
       }
     } else {
-      throw new Error(`GraphQL request failed with status: ${createProjectResponse.status}`);
+      const status = createProjectResponse.status;
+      if (status === 403) {
+        throw new Error(
+          'GraphQL request forbidden (403). The QuickBooks connection likely lacks the "project-management.project" scope. ' +
+            'Disconnect and reconnect QuickBooks to grant Projects access.'
+        );
+      }
+      throw new Error(`GraphQL request failed with status: ${status}`);
     }
 
     // Step 3: Update order with QB Project ID

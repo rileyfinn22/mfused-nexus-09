@@ -910,6 +910,12 @@ serve(async (req) => {
           }
         } else {
           console.warn('GraphQL request failed with status:', createProjectResponse.status);
+          if (createProjectResponse.status === 403) {
+            console.warn(
+              'GraphQL 403 usually means the QuickBooks connection is missing the "project-management.project" scope. ' +
+                'Disconnect and reconnect QuickBooks to grant Projects access.'
+            );
+          }
         }
         
         // If we still don't have a project, continue without one
