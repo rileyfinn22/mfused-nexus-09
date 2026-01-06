@@ -428,12 +428,12 @@ const Invoices = () => {
               // Determine dropdown button color based on children priority status
               const getDropdownButtonColors = () => {
                 if (childrenPriorityStatus === 'due') {
-                  return 'border-red-500 bg-red-500/10 hover:bg-red-500/20 text-red-600';
+                  return 'border-red-400/40 bg-red-500/5 hover:bg-red-500/10 text-red-500/80';
                 }
                 if (childrenPriorityStatus === 'billed') {
-                  return 'border-blue-500 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600';
+                  return 'border-blue-400/40 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500/80';
                 }
-                return `border-primary/30 ${isExpanded ? 'bg-primary/10 border-primary' : 'hover:bg-primary/5'}`;
+                return `border-muted-foreground/20 ${isExpanded ? 'bg-muted/50 border-muted-foreground/30' : 'hover:bg-muted/30'}`;
               };
               
               return (
