@@ -34,6 +34,7 @@ interface ProductTemplate {
   cost: number | null;
   company_id: string | null;
   thumbnail_url: string | null;
+  state: string | null;
   product_count?: number;
 }
 
@@ -57,6 +58,9 @@ export function ProductTemplateGrid({
   const [editingTemplate, setEditingTemplate] = useState<ProductTemplate | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editCost, setEditCost] = useState("");
+  const [editState, setEditState] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -114,11 +118,14 @@ export function ProductTemplateGrid({
     }
   };
 
-  const openEditDialog = (template: ProductTemplate, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openEditDialog = (template: ProductTemplate, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setEditingTemplate(template);
     setEditName(template.name);
     setEditDescription(template.description || "");
+    setEditPrice(template.price?.toString() || "");
+    setEditCost(template.cost?.toString() || "");
+    setEditState(template.state || "");
     setImagePreview(template.thumbnail_url);
     setImageFile(null);
     setEditDialogOpen(true);
@@ -168,6 +175,9 @@ export function ProductTemplateGrid({
         .update({
           name: editName.trim(),
           description: editDescription.trim() || null,
+          price: editPrice ? parseFloat(editPrice) : null,
+          cost: editCost ? parseFloat(editCost) : null,
+          state: editState.trim() || null,
           thumbnail_url: thumbnailUrl
         })
         .eq('id', editingTemplate.id);
@@ -508,6 +518,44 @@ export function ProductTemplateGrid({
                 onChange={(e) => setEditName(e.target.value)}
                 placeholder="Template name"
               />
+            </div>
+
+            {/* Price & Cost */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="template-price">Default Price ($)</Label>
+                <Input
+                  id="template-price"
+                  type="number"
+                  step="0.01"
+                  value={editPrice}
+                  onChange={(e) => setEditPrice(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="template-cost">Default Cost ($)</Label>
+                <Input
+                  id="template-cost"
+                  type="number"
+                  step="0.01"
+                  value={editCost}
+                  onChange={(e) => setEditCost(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            {/* State */}
+            <div className="space-y-2">
+              <Label htmlFor="template-state">State</Label>
+              <Input
+                id="template-state"
+                value={editState}
+                onChange={(e) => setEditState(e.target.value)}
+                placeholder="e.g., WA, CA, general"
+              />
+              <p className="text-xs text-muted-foreground">Link this template to a specific state/region</p>
             </div>
 
             {/* Description */}
