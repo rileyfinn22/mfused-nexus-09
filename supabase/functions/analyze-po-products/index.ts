@@ -121,12 +121,20 @@ ${analysisHint}
 Use this hint to better match products to templates. The user knows their products best.
 ` : ''}
 TEMPLATE MATCHING RULES (CRITICAL - FOLLOW STRICTLY):
-1. ALWAYS prefer STATE-SPECIFIC templates over generic ones
-2. If a product has a state (e.g., "MO", "AZ", "NY"), MUST match to template with that state prefix
-3. Example: "MO Fatty 2pk" should match "MO 2pk Fatty Bags", NOT generic "2pk Merch Packs"
-4. Look for state codes in the product SKU, name, or description
-5. Match by product TYPE + STATE first (e.g., "fatty" + "MO" = "MO Fatty Bags")
-6. Only fall back to generic templates if no state-specific match exists
+1. STATE CODE: Look for 2-letter state code at the END of product names (e.g., "- MD", "- MO", "- AZ")
+2. PRODUCT TYPE PATTERNS:
+   - "BAG - Fatty - 2.5g (5 x 0.5g)" = 5pk Fatty Bags
+   - "BAG - Fatty - 1g (2 x 0.5g)" = 2pk Fatty Bags  
+   - "SLEEVE - E2.5 - 1g (1 x 1g)" = Sleeves 1G
+   - "SLEEVE - E3.0" patterns = Sleeves (check gram size)
+   - "BAG" with quantities = Bags
+3. COMBINE STATE + TYPE: If product ends with "- MD" and is "BAG - Fatty - 2.5g (5 x 0.5g)", match to "MD 5pk Fatty Bags"
+4. MATCHING PRIORITY:
+   a. Extract state code from end of product name
+   b. Identify product type from pattern (Fatty 5pk, Fatty 2pk, Sleeve 1G, etc.)
+   c. Find template with format "[STATE] [TYPE]" (e.g., "MD 5pk Fatty Bags")
+5. NEVER match to generic templates if state-specific template exists
+6. The state code is almost always at the VERY END after the last dash (e.g., "... - Sat - MD" means state is MD)
 
 IMPORTANT:
 - Extract ALL line items from the PO
