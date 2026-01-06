@@ -68,12 +68,14 @@ interface CompanyProductTemplatesProps {
   companyId: string;
   companyName: string;
   onProductsChange: () => void;
+  onTemplateViewChange?: (isInsideTemplate: boolean) => void;
 }
 
 export function CompanyProductTemplates({ 
   companyId, 
   companyName,
-  onProductsChange 
+  onProductsChange,
+  onTemplateViewChange
 }: CompanyProductTemplatesProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -114,6 +116,8 @@ export function CompanyProductTemplates({
     if (selectedTemplate) {
       fetchProducts();
     }
+    // Notify parent about template view state
+    onTemplateViewChange?.(!!selectedTemplate);
   }, [selectedTemplate]);
 
   const fetchTemplates = async () => {
