@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Plus, Pencil, Upload, X, ImageIcon } from "lucide-react";
+import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -50,6 +50,7 @@ export function ProductTemplateGrid({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
 
   useEffect(() => {
     fetchTemplates();
@@ -175,6 +176,34 @@ export function ProductTemplateGrid({
     setImagePreview(null);
   };
 
+  const handleDuplicateTemplate = async (template: ProductTemplate, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDuplicating(true);
+
+    try {
+      const { error } = await supabase
+        .from('product_templates')
+        .insert({
+          name: `${template.name} (Copy)`,
+          description: template.description,
+          price: template.price,
+          cost: template.cost,
+          company_id: template.company_id,
+          thumbnail_url: template.thumbnail_url
+        });
+
+      if (error) throw error;
+
+      toast({ title: "Template duplicated", description: "A copy of the template has been created." });
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error duplicating template:', error);
+      toast({ title: "Error", description: "Failed to duplicate template.", variant: "destructive" });
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -197,16 +226,29 @@ export function ProductTemplateGrid({
             )}
             onClick={() => onSelectTemplate(template)}
           >
-            {/* Edit button for admins */}
+            {/* Admin action buttons */}
             {isVibeAdmin && (
-              <Button
-                variant="secondary"
-                size="icon"
-                className="absolute top-2 left-2 z-10 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity bg-background/90 backdrop-blur-sm"
-                onClick={(e) => openEditDialog(template, e)}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
+              <div className="absolute top-2 left-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-7 w-7 bg-background/90 backdrop-blur-sm"
+                  onClick={(e) => openEditDialog(template, e)}
+                  title="Edit template"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-7 w-7 bg-background/90 backdrop-blur-sm"
+                  onClick={(e) => handleDuplicateTemplate(template, e)}
+                  disabled={duplicating}
+                  title="Duplicate template"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             )}
 
             {/* Template Image/Icon Area */}
