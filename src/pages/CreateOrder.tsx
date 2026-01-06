@@ -56,6 +56,24 @@ interface OrderItem {
   unit_price?: number; // Preserve PO prices
 }
 
+const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[] => {
+  const merged = new Map<string, OrderItem>();
+
+  for (const item of [...base, ...additions]) {
+    const priceKey = item.unit_price ?? "";
+    const key = `${item.productId}::${priceKey}`;
+
+    const existing = merged.get(key);
+    if (existing) {
+      existing.quantity += item.quantity;
+    } else {
+      merged.set(key, { ...item });
+    }
+  }
+
+  return Array.from(merged.values());
+};
+
 interface SavedAddress {
   id: string;
   customer_name: string;
@@ -440,38 +458,26 @@ const CreateOrder = () => {
 
         // Add extracted products to order
         if (functionData?.items && Array.isArray(functionData.items)) {
-          const newItems: OrderItem[] = [];
+          const additions: OrderItem[] = [];
           const newUnmatched: any[] = [];
-          
+
           for (const item of functionData.items) {
             if (item.product_id) {
-              // Check if already in selected items
-              const existingIdx = selectedItems.findIndex(si => si.productId === item.product_id);
-              if (existingIdx >= 0) {
-                // Add quantity to existing
-                setSelectedItems(prev => prev.map((si, idx) => 
-                  idx === existingIdx 
-                    ? { ...si, quantity: si.quantity + (item.quantity || 1) }
-                    : si
-                ));
-              } else {
-                newItems.push({
-                  productId: item.product_id,
-                  quantity: item.quantity || 1,
-                  unit_price: item.unit_price,
-                });
-              }
+              additions.push({
+                productId: item.product_id,
+                quantity: item.quantity || 1,
+                unit_price: item.unit_price,
+              });
             } else {
-              // Unmatched item
               newUnmatched.push(item);
             }
           }
-          
-          if (newItems.length > 0) {
-            setSelectedItems(prev => [...prev, ...newItems]);
+
+          if (additions.length > 0) {
+            setSelectedItems((prev) => mergeOrderItems(prev, additions));
           }
           if (newUnmatched.length > 0) {
-            setUnmatchedPoItems(prev => [...prev, ...newUnmatched]);
+            setUnmatchedPoItems((prev) => [...prev, ...newUnmatched]);
           }
         }
 
@@ -786,7 +792,7 @@ const CreateOrder = () => {
           quantity: item.quantity,
           unit_price: item.unit_price, // Preserve PO prices
         }));
-      setSelectedItems(items);
+      setSelectedItems(mergeOrderItems([], items));
       
       // Store unmatched items from PO for display
       const unmatchedItems = order.order_items.filter((item: any) => item.product_id === null);
@@ -2020,7 +2026,7 @@ const CreateOrder = () => {
                                         {companyFilteredProducts.map((product) => (
                                           <CommandItem
                                             key={product.id}
-                                            value={`${product.item_id || ''} ${product.name}`}
+                                            value={`${product.item_id || ''} ${product.state ? product.state + ' ' : ''}${product.name}`}
                                             onSelect={() => {
                                               setMatchingProductId({ ...matchingProductId, [item.id]: product.id });
                                               handleMatchUnmatchedItem(item, product.id);
@@ -2034,7 +2040,9 @@ const CreateOrder = () => {
                                               )}
                                             />
                                             <div className="flex flex-col">
-                                              <span className="font-medium">{product.name}</span>
+                                              <span className="font-medium">
+                                                {product.state ? `${product.state} - ${product.name}` : product.name}
+                                              </span>
                                               {product.item_id && (
                                                 <span className="text-xs text-muted-foreground font-mono">{product.item_id}</span>
                                               )}
