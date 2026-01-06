@@ -184,8 +184,20 @@ serve(async (req) => {
 
     console.log('Invoice deleted from QuickBooks successfully');
 
+    // Clear the quickbooks sync status from the local invoice
+    await supabase
+      .from('invoices')
+      .update({
+        quickbooks_id: null,
+        quickbooks_sync_status: null,
+        quickbooks_synced_at: null,
+      })
+      .eq('id', invoiceId);
+
+    console.log('Cleared QuickBooks sync status from local invoice');
+
     return new Response(
-      JSON.stringify({ success: true, message: 'Invoice deleted from QuickBooks' }),
+      JSON.stringify({ success: true, message: 'Invoice unsynced from QuickBooks' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
