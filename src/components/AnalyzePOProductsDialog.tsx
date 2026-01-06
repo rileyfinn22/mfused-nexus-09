@@ -19,7 +19,6 @@ import { FileUp, Loader2, Sparkles, Package, Check, FolderTree } from "lucide-re
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ExtractedProduct {
-  item_id: string;
   name: string;
   description?: string;
   state?: string;
@@ -252,37 +251,12 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     setImporting(true);
 
     try {
-      // Check for existing products with same item_id
-      const itemIds = selectedProducts.map(p => p.item_id).filter(Boolean);
-      const { data: existingProducts } = await supabase
-        .from('products')
-        .select('item_id')
-        .eq('company_id', companyId)
-        .in('item_id', itemIds);
-
-      const existingItemIds = new Set(existingProducts?.map(p => p.item_id) || []);
-      
-      // Filter out products that already exist
-      const newProducts = selectedProducts.filter(p => !p.item_id || !existingItemIds.has(p.item_id));
-      const skippedCount = selectedProducts.length - newProducts.length;
-
-      if (newProducts.length === 0) {
-        toast({
-          title: "No new products",
-          description: `All ${skippedCount} products already exist in the system.`,
-          variant: "destructive",
-        });
-        setImporting(false);
-        return;
-      }
-
       // Create products with template associations
-      const productsToInsert = newProducts.map(p => {
+      const productsToInsert = selectedProducts.map(p => {
         const selectedTemplate = p.template_id ? templates.find(t => t.id === p.template_id) : null;
         
         return {
           company_id: companyId,
-          item_id: p.item_id || null,
           name: p.name,
           description: p.description || selectedTemplate?.description || null,
           state: p.state || selectedTemplate?.state || null,
@@ -297,14 +271,10 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
 
       if (error) throw error;
 
-      const withTemplate = newProducts.filter(p => p.template_id).length;
-      const message = skippedCount > 0 
-        ? `Imported ${newProducts.length} products (${skippedCount} skipped as duplicates). ${withTemplate} added to templates.`
-        : `Imported ${newProducts.length} products. ${withTemplate} added to templates.`;
-      
+      const withTemplate = selectedProducts.filter(p => p.template_id).length;
       toast({
         title: "Products imported",
-        description: message,
+        description: `Imported ${selectedProducts.length} products. ${withTemplate} added to templates.`,
       });
 
       onProductsAdded();
@@ -474,9 +444,6 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                         </div>
                         
                         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                          {product.item_id && (
-                            <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{product.item_id}</span>
-                          )}
                           {product.state && (
                             <span className="bg-muted px-1.5 py-0.5 rounded">{product.state}</span>
                           )}

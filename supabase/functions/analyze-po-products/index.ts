@@ -105,13 +105,12 @@ serve(async (req) => {
             role: 'user',
             content: `Analyze this purchase order and extract ALL product/item information. For each product found, extract:
 
-1. item_id/sku: The SKU or product code (e.g., "PCK-00430-WA", "12345")
-2. name: The product name/description
-3. description: Additional description if available
-4. state: The US state code if mentioned (e.g., "WA", "CA", "OR") - often embedded in SKU or mentioned separately
-5. cost: The unit price/rate as a decimal number
-6. product_type: Infer from context (e.g., "packaging", "label", "bag", "box", "jar", etc.)
-7. suggested_template: Try to match to one of the existing templates below based on product name similarity
+1. name: The product name/description
+2. description: Additional description if available
+3. state: The US state code if mentioned (e.g., "WA", "CA", "OR", "MO", "AZ") - often embedded in SKU or product name
+4. cost: The unit price/rate as a decimal number
+5. product_type: Infer from context (e.g., "packaging", "label", "bag", "box", "jar", "sleeve", etc.)
+6. suggested_template: Try to match to one of the existing templates below based on product name similarity
 
 EXISTING TEMPLATES IN SYSTEM:
 ${templateNames}
@@ -123,11 +122,12 @@ Use this hint to better match products to templates. The user knows their produc
 ` : ''}
 IMPORTANT:
 - Extract ALL line items from the PO
-- If state is embedded in SKU (like PCK-00430-WA), extract it as "WA"
+- DO NOT include SKUs or item IDs - we will generate our own
 - cost should be a number (e.g., 0.218), not a formatted string
 - Be thorough - don't miss any products
 - For suggested_template, return the EXACT template name if you find a good match, or null if no match
 - Pay attention to any user hints provided above for template matching
+- For customer_name, extract ONLY the main company/brand name (e.g., "Mfused" not "Mfused - Arizona")
 
 PURCHASE ORDER TEXT:
 ${extractedText}
@@ -136,7 +136,6 @@ Return ONLY valid JSON in this format:
 {
   "products": [
     {
-      "item_id": "SKU-CODE",
       "name": "Product Name",
       "description": "Optional description",
       "state": "XX or null",
@@ -145,7 +144,7 @@ Return ONLY valid JSON in this format:
       "suggested_template": "Exact Template Name or null"
     }
   ],
-  "customer_name": "Customer/Vendor name from PO"
+  "customer_name": "Main Company Name Only"
 }`
           }
         ],
