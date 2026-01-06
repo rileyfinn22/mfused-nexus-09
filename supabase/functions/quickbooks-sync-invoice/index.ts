@@ -976,7 +976,61 @@ serve(async (req) => {
       }
     }
 
-    const qbData = await qbResponse.json();
+    let qbData = await qbResponse.json();
+
+    // Check for ProjectRef error - if so, remove it and retry
+    if (!qbResponse.ok && qbData?.Fault?.Error?.[0]?.code === '9341') {
+      console.warn('ProjectRef rejected by QuickBooks (requires premium tier). Retrying without project link...');
+      
+      // Remove ProjectRef and retry
+      delete invoicePayload.ProjectRef;
+      
+      // Clear the project ID from the order/invoice since it's not usable
+      await supabase.from('orders').update({ qb_project_id: null }).eq('id', invoice.order_id);
+      await supabase.from('invoices').update({ qb_project_id: null }).eq('id', invoiceId);
+      
+      // Retry the sync without ProjectRef
+      if (invoice.quickbooks_id && !shouldCreateNew) {
+        // Update existing
+        const currentInvoice = await fetch(
+          `${qbApiUrl}/invoice/${invoice.quickbooks_id}?minorversion=70`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+            },
+          }
+        );
+        const currentData = await currentInvoice.json();
+        
+        qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=70`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...invoicePayload,
+            Id: invoice.quickbooks_id,
+            SyncToken: currentData?.Invoice?.SyncToken || '0',
+          }),
+        });
+      } else {
+        // Create new
+        qbResponse = await fetch(`${qbApiUrl}/invoice?minorversion=70`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(invoicePayload),
+        });
+      }
+      
+      qbData = await qbResponse.json();
+    }
 
     if (!qbResponse.ok) {
       console.error('QuickBooks API error:', qbData);
