@@ -38,15 +38,20 @@ export function ProductTemplateGrid({
 
   const fetchTemplates = async () => {
     try {
-      // Fetch templates
-      const { data: templatesData, error: templatesError } = await supabase
+      // Fetch templates (when a company is selected, only show that company's templates + global)
+      let templatesQuery = supabase
         .from('product_templates')
-        .select('*')
-        .order('name');
+        .select('*');
+
+      if (companyFilter !== 'all') {
+        templatesQuery = templatesQuery.or(`company_id.eq.${companyFilter},company_id.is.null`);
+      }
+
+      const { data: templatesData, error: templatesError } = await templatesQuery.order('name');
 
       if (templatesError) throw templatesError;
 
-      // Fetch product counts for each template
+      // Fetch product counts for each template (scoped to selected company when filtered)
       const templatesWithCounts = await Promise.all(
         (templatesData || []).map(async (template) => {
           let query = supabase
