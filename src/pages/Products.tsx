@@ -29,6 +29,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { AddProductDialog } from "@/components/AddProductDialog";
 import { AnalyzePOProductsDialog } from "@/components/AnalyzePOProductsDialog";
+import { QuickAddProductsDialog } from "@/components/QuickAddProductsDialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -340,6 +341,10 @@ const Products = () => {
             {isEditMode ? "Done" : "Edit"}
           </Button>
           <AnalyzePOProductsDialog 
+            onProductsAdded={fetchProducts}
+            selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
+          />
+          <QuickAddProductsDialog 
             onProductsAdded={fetchProducts}
             selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
           />
