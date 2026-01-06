@@ -235,7 +235,7 @@ Return ONLY valid JSON:
     
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id, item_id, name, description, preferred_vendor_id, cost')
+      .select('id, item_id, name, description, preferred_vendor_id, cost, state')
       .eq('company_id', companyId);
 
     if (productsError) {
@@ -275,11 +275,82 @@ Return ONLY valid JSON:
           .trim();
       };
 
+      // Helper to extract state suffix from a string (e.g., "- NY", "- WA", "- AZ")
+      const extractStateFromString = (str: string): { state: string | null, nameWithoutState: string } => {
+        if (!str) return { state: null, nameWithoutState: str };
+        
+        // Common US state abbreviations
+        const stateAbbreviations = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 
+                                    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 
+                                    'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 
+                                    'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 
+                                    'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'];
+        
+        // Try to match " - XX" or "- XX" at the end where XX is a state
+        const stateMatch = str.match(/\s*[-–—]\s*([A-Z]{2})\s*$/i);
+        if (stateMatch) {
+          const potentialState = stateMatch[1].toUpperCase();
+          if (stateAbbreviations.includes(potentialState)) {
+            const nameWithoutState = str.replace(/\s*[-–—]\s*[A-Z]{2}\s*$/i, '').trim();
+            console.log(`  Extracted state "${potentialState}" from "${str}" -> name: "${nameWithoutState}"`);
+            return { state: potentialState, nameWithoutState };
+          }
+        }
+        
+        return { state: null, nameWithoutState: str };
+      };
+
       const poItemId = poItem.item_id || '';
       const poSku = poItem.sku || '';
       const poName = poItem.name || '';
 
-      // STEP 1: Try exact name match FIRST (highest priority)
+      // Extract state from the sku/item_id (often contains state suffix like "- NY")
+      const { state: stateFromSku } = extractStateFromString(poSku || poItemId);
+      // Also try to extract from name
+      const { state: stateFromName, nameWithoutState } = extractStateFromString(poName);
+      
+      // Use whichever state we found
+      const extractedState = stateFromSku || stateFromName;
+      
+      if (extractedState) {
+        console.log(`  Detected state: "${extractedState}" from PO item`);
+      }
+
+      // STEP 0: STATE-AWARE MATCHING (highest priority when state is detected)
+      if (extractedState && poName) {
+        console.log(`\n[STEP 0] Trying STATE-AWARE match for: "${poName}" with state "${extractedState}"`);
+        
+        // Try matching name (with or without state suffix) + product.state field
+        const match = products.find(p => {
+          if (!p.name || !p.state) return false;
+          
+          // Check if product state matches
+          if (p.state.toUpperCase() !== extractedState.toUpperCase()) return false;
+          
+          // Now match name (could be with or without state suffix)
+          const normalizedPoName = normalizeName(nameWithoutState || poName);
+          const normalizedProductName = normalizeName(p.name);
+          
+          // Try exact match
+          if (normalizedProductName === normalizedPoName) return true;
+          
+          // Try alphanumeric match
+          if (normalize(p.name) === normalize(nameWithoutState || poName)) return true;
+          
+          // Try partial match (PO name contains product name or vice versa)
+          if (normalizedProductName.includes(normalizedPoName) || normalizedPoName.includes(normalizedProductName)) return true;
+          
+          return false;
+        });
+        
+        if (match) {
+          console.log(`✓ STATE-AWARE MATCH FOUND: "${poName}" (state: ${extractedState}) -> product: ${match.name} (state: ${match.state}, ID: ${match.id})`);
+          return match;
+        }
+        console.log(`✗ No state-aware match found for: "${poName}" with state "${extractedState}"`);
+      }
+
+      // STEP 1: Try exact name match (including state in name if present)
       if (poName) {
         console.log(`\n[STEP 1] Trying exact name match for: "${poName}"`);
         const match = products.find(p => 
@@ -327,18 +398,25 @@ Return ONLY valid JSON:
       }
 
       // STEP 4: Try partial name match (PO name contains product name or vice versa)
+      // BUT only match products with the same state (or no state) when we have a detected state
       if (poName && poName.length > 10) {
         console.log(`\n[STEP 4] Trying partial name match for: "${poName}"`);
-        const normalizedPoName = normalizeName(poName);
+        const normalizedPoName = normalizeName(nameWithoutState || poName);
         const match = products.find(p => {
           if (!p.name || p.name.length < 10) return false;
+          
+          // If we detected a state from PO, only match products with same state or no state
+          if (extractedState && p.state && p.state.toUpperCase() !== extractedState.toUpperCase()) {
+            return false;
+          }
+          
           const normalizedProductName = normalizeName(p.name);
-          // Check if one contains the other (at least 80% overlap)
+          // Check if one contains the other
           return normalizedProductName.includes(normalizedPoName) || 
                  normalizedPoName.includes(normalizedProductName);
         });
         if (match) {
-          console.log(`✓ PARTIAL NAME MATCH FOUND: "${poName}" -> "${match.name}"`);
+          console.log(`✓ PARTIAL NAME MATCH FOUND: "${poName}" -> "${match.name}" (state: ${match.state || 'none'})`);
           return match;
         }
         console.log(`✗ No partial name match found for: "${poName}"`);
@@ -371,10 +449,10 @@ Return ONLY valid JSON:
       }
 
       console.log(`\n========== NO MATCH FOUND ==========`);
-      console.log(`✗ Failed to match: name="${poName}", item_id="${poItemId}", sku="${poSku}"`);
+      console.log(`✗ Failed to match: name="${poName}", item_id="${poItemId}", sku="${poSku}", detectedState="${extractedState || 'none'}"`);
       console.log(`Sample products in database:`);
       products.slice(0, 5).forEach(p => {
-        console.log(`  - ${p.name} (item_id: ${p.item_id})`);
+        console.log(`  - ${p.name} (item_id: ${p.item_id}, state: ${p.state || 'none'})`);
       });
       return null;
     };
