@@ -374,9 +374,10 @@ const Invoices = () => {
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Due Date</div>
-            <div className="col-span-2">Company / Description</div>
+            <div className="col-span-1">Company</div>
+            <div className="col-span-2">Description</div>
             <div className="col-span-1">Type</div>
-            <div className="col-span-2">Amount</div>
+            <div className="col-span-1">Amount</div>
             <div className="col-span-1">PO Number</div>
             <div className="col-span-1">Status</div>
             <div className="col-span-2">Actions</div>
@@ -475,24 +476,37 @@ const Invoices = () => {
                   <div className="col-span-1 text-sm text-muted-foreground">
                     {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
                   </div>
+                  <div className="col-span-1">
+                    <div className="font-medium text-sm truncate" title={invoice.companies?.name}>
+                      {invoice.companies?.name || 'N/A'}
+                    </div>
+                  </div>
                   <div className="col-span-2">
-                    <div className="font-medium text-sm">{invoice.companies?.name || 'N/A'}</div>
-                    {invoice.orders?.description ? (
-                      <div className="text-xs text-muted-foreground truncate" title={invoice.orders.description}>
-                        {invoice.orders.description}
-                      </div>
-                    ) : invoice.orders?.customer_name && (
-                      <div className="text-xs text-muted-foreground">
-                        {invoice.orders.customer_name}
-                      </div>
-                    )}
+                    <Input
+                      className="h-7 text-xs"
+                      placeholder="Add description..."
+                      defaultValue={invoice.orders?.description || ''}
+                      onBlur={(e) => {
+                        // Update the order's description
+                        if (invoice.order_id) {
+                          supabase
+                            .from("orders")
+                            .update({ description: e.target.value })
+                            .eq("id", invoice.order_id)
+                            .then(({ error }) => {
+                              if (error) console.error("Error updating description:", error);
+                            });
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
                   </div>
                   <div className="col-span-1">
                     <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>
                       {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
                     </Badge>
                   </div>
-                  <div className="col-span-2 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
+                  <div className="col-span-1 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
                   <div className="col-span-1 text-sm">{invoice.orders?.po_number || 'N/A'}</div>
                   <div className="col-span-1 text-sm font-medium">
                     <div className="flex items-center gap-1">
