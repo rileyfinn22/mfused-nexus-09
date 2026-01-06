@@ -13,6 +13,7 @@ interface ProductTemplate {
   description: string | null;
   price: number | null;
   cost: number | null;
+  state: string | null;
 }
 
 interface AddProductToTemplateDialogProps {
@@ -107,6 +108,7 @@ export function AddProductToTemplateDialog({
             description: template.description,
             cost: template.cost,
             price: template.price,
+            state: template.state,
             item_id: tempSKU,
             template_id: template.id,
             company_id: companyId
