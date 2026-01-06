@@ -185,16 +185,26 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
       const tax = subtotal * 0.06;
       const total = subtotal + tax;
 
-      // Generate order number - start from 11000, get max existing
-      const { data: maxOrderData } = await supabase
+      // Generate order number - find highest numeric order number from recent orders
+      const { data: recentOrders } = await supabase
         .from('orders')
         .select('order_number')
-        .order('order_number', { ascending: false })
-        .limit(1)
-        .single();
+        .order('created_at', { ascending: false })
+        .limit(100);
       
-      const maxOrderNum = maxOrderData ? parseInt(maxOrderData.order_number, 10) : 10999;
-      const orderNumber = String((isNaN(maxOrderNum) ? 10999 : Math.max(maxOrderNum, 10999)) + 1);
+      let maxOrderNum = 10699;
+      if (recentOrders && recentOrders.length > 0) {
+        for (const order of recentOrders) {
+          const match = order.order_number.match(/(\d+)$/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxOrderNum) {
+              maxOrderNum = num;
+            }
+          }
+        }
+      }
+      const orderNumber = String(maxOrderNum + 1);
 
       // Create order
       const { data: order, error: orderError } = await supabase
