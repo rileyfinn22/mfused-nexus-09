@@ -119,14 +119,21 @@ const ProjectDetail = () => {
     );
   }
 
-  // Calculate P&L
-  const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
-  const totalPaid = invoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
+  // Calculate P&L - only count billed invoices as revenue
+  // The blanket/parent invoice (no parent_invoice_id and not billed) doesn't count toward revenue
+  const billedInvoices = invoices.filter(inv => inv.status === 'billed' || inv.status === 'paid');
+  const totalRevenue = billedInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+  const totalPaid = billedInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
   const totalCosts = vendorPOs.reduce((sum, po) => sum + (po.total || 0), 0);
   const accrualProfit = totalRevenue - totalCosts;
   const cashProfit = totalPaid - totalCosts;
   const accrualMargin = totalRevenue > 0 ? (accrualProfit / totalRevenue) * 100 : 0;
   const cashMargin = totalPaid > 0 ? (cashProfit / totalPaid) * 100 : 0;
+  
+  // Helper to determine if invoice is the blanket/parent order
+  const isBlanketOrder = (invoice: any) => {
+    return !invoice.parent_invoice_id && invoice.status !== 'billed' && invoice.status !== 'paid';
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -271,29 +278,41 @@ const ProjectDetail = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoices.map((invoice) => (
-                    <TableRow 
-                      key={invoice.id} 
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/invoices/${invoice.id}`)}
-                    >
-                      <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                      <TableCell>{new Date(invoice.invoice_date).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{invoice.invoice_type || 'Standard'}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'}>
-                          {invoice.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{formatCurrency(invoice.total)}</TableCell>
-                      <TableCell className="text-right text-green-600">{formatCurrency(invoice.total_paid || 0)}</TableCell>
-                      <TableCell className="text-right text-orange-600">
-                        {formatCurrency((invoice.total || 0) - (invoice.total_paid || 0))}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {invoices.map((invoice) => {
+                    const isOrder = isBlanketOrder(invoice);
+                    const displayTotal = isOrder ? 0 : invoice.total;
+                    const displayPaid = isOrder ? 0 : (invoice.total_paid || 0);
+                    return (
+                      <TableRow 
+                        key={invoice.id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => navigate(`/invoices/${invoice.id}`)}
+                      >
+                        <TableCell className="font-medium">
+                          {invoice.invoice_number}
+                          {isOrder && <span className="ml-2 text-muted-foreground">(Order)</span>}
+                        </TableCell>
+                        <TableCell>{new Date(invoice.invoice_date).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{isOrder ? 'Blanket Order' : (invoice.invoice_type || 'Standard')}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={invoice.status === 'paid' ? 'default' : invoice.status === 'billed' ? 'default' : 'secondary'}>
+                            {invoice.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={`text-right ${isOrder ? 'text-muted-foreground' : ''}`}>
+                          {isOrder ? <span className="text-muted-foreground italic">$0.00</span> : formatCurrency(invoice.total)}
+                        </TableCell>
+                        <TableCell className={`text-right ${isOrder ? 'text-muted-foreground' : 'text-green-600'}`}>
+                          {isOrder ? <span className="italic">$0.00</span> : formatCurrency(invoice.total_paid || 0)}
+                        </TableCell>
+                        <TableCell className={`text-right ${isOrder ? 'text-muted-foreground' : 'text-orange-600'}`}>
+                          {isOrder ? <span className="italic">$0.00</span> : formatCurrency((invoice.total || 0) - (invoice.total_paid || 0))}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {invoices.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
