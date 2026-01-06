@@ -105,6 +105,7 @@ const CreateOrder = () => {
   const [openCombobox, setOpenCombobox] = useState<Record<string, boolean>>({});
   const [inputMode, setInputMode] = useState<"pdf" | "text">("pdf");
   const [textInput, setTextInput] = useState<string>("");
+  const [analysisHint, setAnalysisHint] = useState<string>("");
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -421,7 +422,8 @@ const CreateOrder = () => {
             companyId: companyId,
             filename: file.name,
             orderType: 'standard',
-            returnProductsOnly: true // New flag to just return extracted data without creating order
+            returnProductsOnly: true, // New flag to just return extracted data without creating order
+            analysisHint: analysisHint.trim() || undefined
           }
         });
 
@@ -585,7 +587,8 @@ const CreateOrder = () => {
           textContent: textInput.trim(),
           companyId: companyId,
           orderType: 'standard',
-          returnProductsOnly: true
+          returnProductsOnly: true,
+          analysisHint: analysisHint.trim() || undefined
         }
       });
 
@@ -1474,6 +1477,20 @@ const CreateOrder = () => {
                   Upload POs or paste text from email to automatically fill the order
                 </p>
               </div>
+            </div>
+            
+            {/* Analysis Hint */}
+            <div className="mb-3">
+              <Label className="text-xs text-muted-foreground mb-1 block">
+                AI Matching Hint (optional)
+              </Label>
+              <Input
+                value={analysisHint}
+                onChange={(e) => setAnalysisHint(e.target.value)}
+                placeholder="e.g., 'All items are for California warehouse' or 'SKUs start with ABC-'"
+                className="h-8 text-sm"
+                disabled={analyzing || (isVibeAdmin && !selectedCompanyId)}
+              />
             </div>
             
             <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as "pdf" | "text")} className="w-full">

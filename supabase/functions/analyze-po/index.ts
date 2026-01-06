@@ -37,9 +37,9 @@ serve(async (req) => {
     // Create service client for operations that need elevated privileges
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { pdfPath, companyId, filename, orderType = 'pull_ship', returnProductsOnly = false, textContent } = await req.json();
+    const { pdfPath, companyId, filename, orderType = 'pull_ship', returnProductsOnly = false, textContent, analysisHint } = await req.json();
     
-    console.log(`Processing PO for company_id: ${companyId}, returnProductsOnly: ${returnProductsOnly}, hasTextContent: ${!!textContent}`);
+    console.log(`Processing PO for company_id: ${companyId}, returnProductsOnly: ${returnProductsOnly}, hasTextContent: ${!!textContent}, hasHint: ${!!analysisHint}`);
     
     // Validate user has access to this company
     const { data: userRole, error: roleError } = await supabase
@@ -170,6 +170,7 @@ Extract as:
 - customer_name: Vendor name
 - shipping address: Ship To section
 
+${analysisHint ? `4. ADDITIONAL CONTEXT FROM USER:\n${analysisHint}\n\nUse this hint to help with product matching and data extraction.\n` : ''}
 PURCHASE ORDER TEXT:
 ${extractedText}
 
