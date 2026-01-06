@@ -11,8 +11,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy } from "lucide-react";
+import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -51,6 +61,9 @@ export function ProductTemplateGrid({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingTemplate, setDeletingTemplate] = useState<ProductTemplate | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchTemplates();
@@ -204,6 +217,51 @@ export function ProductTemplateGrid({
     }
   };
 
+  const openDeleteDialog = (template: ProductTemplate, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeletingTemplate(template);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteTemplate = async () => {
+    if (!deletingTemplate) return;
+    setDeleting(true);
+
+    try {
+      // First, unlink products from this template (set template_id to null)
+      const { error: unlinkError } = await supabase
+        .from('products')
+        .update({ template_id: null })
+        .eq('template_id', deletingTemplate.id);
+
+      if (unlinkError) throw unlinkError;
+
+      // Then delete the template
+      const { error } = await supabase
+        .from('product_templates')
+        .delete()
+        .eq('id', deletingTemplate.id);
+
+      if (error) throw error;
+
+      toast({ title: "Template deleted", description: "The template has been removed." });
+      setDeleteDialogOpen(false);
+      setDeletingTemplate(null);
+      
+      // Clear selection if deleted template was selected
+      if (selectedTemplate?.id === deletingTemplate.id) {
+        onSelectTemplate(null);
+      }
+      
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      toast({ title: "Error", description: "Failed to delete template.", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -247,6 +305,15 @@ export function ProductTemplateGrid({
                   title="Duplicate template"
                 >
                   <Copy className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-7 w-7 bg-background/90 backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={(e) => openDeleteDialog(template, e)}
+                  title="Delete template"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             )}
@@ -378,6 +445,29 @@ export function ProductTemplateGrid({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingTemplate?.name}"? 
+              Products linked to this template will be unlinked but not deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTemplate}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
