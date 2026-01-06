@@ -11,11 +11,12 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, ExternalLink } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, ExternalLink, FolderOpen } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
+import { QBProjectSelectorDialog } from "@/components/QBProjectSelectorDialog";
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
 
@@ -57,6 +58,7 @@ const OrderDetail = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [showShipmentDialog, setShowShipmentDialog] = useState(false);
   const [creatingQBProject, setCreatingQBProject] = useState(false);
+  const [showProjectSelector, setShowProjectSelector] = useState(false);
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -768,15 +770,10 @@ const OrderDetail = () => {
               ) : (
                 <Button 
                   variant="outline"
-                  onClick={handleCreateQBProject}
-                  disabled={creatingQBProject}
+                  onClick={() => setShowProjectSelector(true)}
                 >
-                  {creatingQBProject ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4 mr-2" />
-                  )}
-                  Create QB Project
+                  <FolderOpen className="h-4 w-4 mr-2" />
+                  Link QB Project
                 </Button>
               )}
             </>
@@ -800,6 +797,18 @@ const OrderDetail = () => {
           orderId={orderId || ''}
           orderItems={order.order_items.filter((item: any) => item.product_id !== null)}
           onSuccess={fetchOrder}
+        />
+      )}
+
+      {/* QB Project Selector Dialog */}
+      {isVibeAdmin && (
+        <QBProjectSelectorDialog
+          open={showProjectSelector}
+          onOpenChange={setShowProjectSelector}
+          orderId={orderId || ''}
+          orderNumber={order?.order_number || ''}
+          companyName={order?.customer_name || ''}
+          onProjectSelected={fetchOrder}
         />
       )}
 

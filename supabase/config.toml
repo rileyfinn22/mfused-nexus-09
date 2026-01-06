@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.quickbooks-create-project]
 verify_jwt = true
+
+[functions.quickbooks-query-projects]
+verify_jwt = true
