@@ -11,12 +11,12 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, ExternalLink, FolderOpen } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
-import { QBProjectSelectorDialog } from "@/components/QBProjectSelectorDialog";
+
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
 
@@ -57,8 +57,6 @@ const OrderDetail = () => {
   const [updatingStages, setUpdatingStages] = useState<{[key: string]: boolean}>({});
   const [invoices, setInvoices] = useState<any[]>([]);
   const [showShipmentDialog, setShowShipmentDialog] = useState(false);
-  const [creatingQBProject, setCreatingQBProject] = useState(false);
-  const [showProjectSelector, setShowProjectSelector] = useState(false);
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -635,46 +633,6 @@ const OrderDetail = () => {
     });
   };
 
-  const handleCreateQBProject = async () => {
-    if (!orderId) return;
-    
-    setCreatingQBProject(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('quickbooks-create-project', {
-        body: { orderId }
-      });
-
-      if (error) throw error;
-
-      // Graceful no-op when Projects API access isn't available
-      if (data?.skipped) {
-        toast({
-          title: "Projects not available",
-          description: data.message || "This QuickBooks connection can't create Projects. Invoices will still sync normally.",
-        });
-        return;
-      }
-
-      if (data?.error) throw new Error(data.error);
-
-      toast({
-        title: "QB Project Created",
-        description: data.message || "Order is now linked to a QuickBooks Project for P&L tracking."
-      });
-
-      // Refresh order to get the qb_project_id
-      fetchOrder();
-    } catch (error: any) {
-      console.error('Error creating QB project:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create QuickBooks project",
-        variant: "destructive"
-      });
-    } finally {
-      setCreatingQBProject(false);
-    }
-  };
   if (loading) {
     return <div className="max-w-7xl mx-auto py-12 text-center">
         <p className="text-muted-foreground">Loading order...</p>
@@ -753,29 +711,6 @@ const OrderDetail = () => {
                 <Package className="h-4 w-4 mr-2" />
                 Assign Vendors
               </Button>
-              {order.qb_project_id ? (
-                <Button 
-                  variant="outline" 
-                  className="text-green-600 border-green-600 hover:bg-green-50"
-                  onClick={() => {
-                    window.open(
-                      `https://app.qbo.intuit.com/app/customerdetail?nameId=${order.qb_project_id}`,
-                      '_blank'
-                    );
-                  }}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View QB Project
-                </Button>
-              ) : (
-                <Button 
-                  variant="outline"
-                  onClick={() => setShowProjectSelector(true)}
-                >
-                  <FolderOpen className="h-4 w-4 mr-2" />
-                  Link QB Project
-                </Button>
-              )}
             </>
           )}
           <Button variant="outline" onClick={handleDownloadPackingList}>
@@ -800,17 +735,6 @@ const OrderDetail = () => {
         />
       )}
 
-      {/* QB Project Selector Dialog */}
-      {isVibeAdmin && (
-        <QBProjectSelectorDialog
-          open={showProjectSelector}
-          onOpenChange={setShowProjectSelector}
-          orderId={orderId || ''}
-          orderNumber={order?.order_number || ''}
-          companyName={order?.customer_name || ''}
-          onProjectSelected={fetchOrder}
-        />
-      )}
 
       {/* Order Checklist */}
       <Card className="mb-6 shadow-md">

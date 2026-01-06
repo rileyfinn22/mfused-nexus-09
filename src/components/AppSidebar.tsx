@@ -46,21 +46,20 @@ const customerNavigationItems = [
 
 const vibeAdminNavigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  
+  { title: "Projects", url: "/projects", icon: FolderOpen },
   { title: "All Orders", url: "/orders", icon: ClipboardList },
   { title: "Production", url: "/production", icon: Factory },
   { title: "Quotes", url: "/quotes", icon: Calculator },
   { title: "Create Pull & Ship", url: "/pull-ship", icon: Truck },
   { title: "Pull & Ship Orders", url: "/pull-ship-orders", icon: FileText },
   { title: "Vendors", url: "/vendors", icon: Building2 },
-  { title: "Vendor POs", url: "/vendor-pos", icon: FolderOpen },
+  { title: "Vendor POs", url: "/vendor-pos", icon: Package },
   { title: "Invoices", url: "/invoices", icon: FileText },
   { title: "Companies", url: "/customers", icon: Building2 },
   { title: "Products", url: "/products", icon: Package },
   { title: "Inventory", url: "/inventory", icon: Archive },
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Reports", url: "/reports", icon: BarChart3 },
-  { title: "Job Costing", url: "/reports/job-costing", icon: BarChart3 },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
