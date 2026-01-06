@@ -106,12 +106,13 @@ const VendorPODetail = () => {
       // Update existing items with edited quantities
       for (const item of poItems) {
         if (!item.isNew) {
-          // Update existing items - use shipped_quantity for calculations
-          const newTotal = Number(item.shipped_quantity) * Number(item.unit_cost);
+          // Update existing items - use quantity for PO total calculations (not shipped_quantity)
+          const newTotal = Number(item.quantity) * Number(item.unit_cost);
           
           const { error: updateError } = await supabase
             .from('vendor_po_items')
             .update({
+              quantity: item.quantity,
               shipped_quantity: item.shipped_quantity,
               total: newTotal
             })
@@ -940,7 +941,7 @@ Thank you for your business.`;
                       sku: '',
                       name: '',
                       quantity: 1,
-                      shipped_quantity: 1,
+                      shipped_quantity: 0,
                       unit_cost: 0,
                       total: 0,
                       isNew: true
@@ -1032,7 +1033,8 @@ Thank you for your business.`;
                             if (updated[index].isNew) {
                               updated[index].quantity = newQuantity;
                             }
-                            updated[index].total = updated[index].shipped_quantity * Number(updated[index].unit_cost);
+                            // Calculate total based on ordered quantity, not shipped
+                            updated[index].total = updated[index].quantity * Number(updated[index].unit_cost);
                             setPOItems(updated);
                           }}
                           className="w-24 text-center"
