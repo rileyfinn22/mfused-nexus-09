@@ -252,9 +252,32 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     setImporting(true);
 
     try {
+      // Check for existing products with same item_id
+      const itemIds = selectedProducts.map(p => p.item_id).filter(Boolean);
+      const { data: existingProducts } = await supabase
+        .from('products')
+        .select('item_id')
+        .eq('company_id', companyId)
+        .in('item_id', itemIds);
+
+      const existingItemIds = new Set(existingProducts?.map(p => p.item_id) || []);
+      
+      // Filter out products that already exist
+      const newProducts = selectedProducts.filter(p => !p.item_id || !existingItemIds.has(p.item_id));
+      const skippedCount = selectedProducts.length - newProducts.length;
+
+      if (newProducts.length === 0) {
+        toast({
+          title: "No new products",
+          description: `All ${skippedCount} products already exist in the system.`,
+          variant: "destructive",
+        });
+        setImporting(false);
+        return;
+      }
+
       // Create products with template associations
-      const productsToInsert = selectedProducts.map(p => {
-        // If a template is selected, get the template's state
+      const productsToInsert = newProducts.map(p => {
         const selectedTemplate = p.template_id ? templates.find(t => t.id === p.template_id) : null;
         
         return {
@@ -274,10 +297,14 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
 
       if (error) throw error;
 
-      const withTemplate = selectedProducts.filter(p => p.template_id).length;
+      const withTemplate = newProducts.filter(p => p.template_id).length;
+      const message = skippedCount > 0 
+        ? `Imported ${newProducts.length} products (${skippedCount} skipped as duplicates). ${withTemplate} added to templates.`
+        : `Imported ${newProducts.length} products. ${withTemplate} added to templates.`;
+      
       toast({
         title: "Products imported",
-        description: `Imported ${selectedProducts.length} products. ${withTemplate} added to templates.`,
+        description: message,
       });
 
       onProductsAdded();
