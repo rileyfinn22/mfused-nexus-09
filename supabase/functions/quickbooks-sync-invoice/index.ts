@@ -795,6 +795,56 @@ serve(async (req) => {
 
     console.log('QB Project ID for invoice:', qbProjectId);
 
+    // Ensure the Job is flagged as a Project in QBO so it appears under Projects.
+    if (qbProjectId) {
+      try {
+        const getResp = await fetch(`${qbApiUrl}/customer/${qbProjectId}?minorversion=65`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (getResp.ok) {
+          const getData = await getResp.json();
+          const cust = getData?.Customer;
+
+          if (cust?.Id && cust?.SyncToken != null && (cust.Job !== true || cust.IsProject !== true)) {
+            const updatePayload: any = {
+              sparse: true,
+              Id: cust.Id,
+              SyncToken: cust.SyncToken,
+              Job: true,
+              IsProject: true,
+            };
+
+            if (cust.ParentRef?.value) {
+              updatePayload.ParentRef = { value: cust.ParentRef.value };
+            }
+
+            const updResp = await fetch(`${qbApiUrl}/customer?minorversion=65`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(updatePayload),
+            });
+
+            const updData = await updResp.json();
+            if (!updResp.ok) {
+              console.warn('Failed to mark Job as Project:', qbProjectId, JSON.stringify(updData));
+            } else {
+              console.log('Marked Job as Project in QBO (invoice sync):', qbProjectId);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to verify/mark Job as Project:', qbProjectId, e);
+      }
+    }
+
     // Persist the currently-linked Job/Project id on the invoice row as well (helps UI/debugging).
     await supabase
       .from('invoices')
