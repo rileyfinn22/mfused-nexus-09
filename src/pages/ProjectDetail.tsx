@@ -14,7 +14,8 @@ import {
   TrendingUp, 
   TrendingDown, 
   DollarSign,
-  ExternalLink
+  ExternalLink,
+  LayoutList
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -242,8 +243,12 @@ const ProjectDetail = () => {
       </div>
 
       {/* Details Sections */}
-      <Tabs defaultValue="invoices" className="space-y-4">
+      <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="overview" className="gap-2">
+            <LayoutList className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
           <TabsTrigger value="invoices" className="gap-2">
             <FileText className="h-4 w-4" />
             Invoices ({invoices.length})
@@ -257,6 +262,119 @@ const ProjectDetail = () => {
             Vendor POs ({vendorPOs.length})
           </TabsTrigger>
         </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">All Transactions</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {/* Combine all transactions and sort by date */}
+                  {[
+                    ...invoices.map(inv => ({
+                      type: 'invoice' as const,
+                      id: inv.id,
+                      reference: inv.invoice_number,
+                      date: new Date(inv.invoice_date),
+                      details: isBlanketOrder(inv) ? 'Blanket Order' : (inv.invoice_type || 'Standard'),
+                      status: inv.status,
+                      amount: isBlanketOrder(inv) ? 0 : (inv.total || 0),
+                      isOrder: isBlanketOrder(inv),
+                      onClick: () => navigate(`/invoices/${inv.id}`)
+                    })),
+                    ...payments.map(pay => {
+                      const invoice = invoices.find(inv => inv.id === pay.invoice_id);
+                      return {
+                        type: 'payment' as const,
+                        id: pay.id,
+                        reference: pay.reference_number || `Payment for ${invoice?.invoice_number || '-'}`,
+                        date: new Date(pay.payment_date),
+                        details: pay.payment_method,
+                        status: 'received',
+                        amount: pay.amount,
+                        isOrder: false,
+                        onClick: () => {}
+                      };
+                    }),
+                    ...vendorPOs.map(po => ({
+                      type: 'vendor_po' as const,
+                      id: po.id,
+                      reference: po.po_number,
+                      date: new Date(po.order_date),
+                      details: (po.vendors as any)?.name || 'Unknown Vendor',
+                      status: po.status,
+                      amount: po.total || 0,
+                      isOrder: false,
+                      onClick: () => navigate(`/vendor-pos/${po.id}`)
+                    }))
+                  ]
+                    .sort((a, b) => b.date.getTime() - a.date.getTime())
+                    .map((item, idx) => (
+                      <TableRow 
+                        key={`${item.type}-${item.id}`}
+                        className={`cursor-pointer hover:bg-muted/50 ${
+                          item.type === 'invoice' ? 'bg-blue-500/5' : 
+                          item.type === 'payment' ? 'bg-green-500/5' : 
+                          'bg-orange-500/5'
+                        }`}
+                        onClick={item.onClick}
+                      >
+                        <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={`
+                              ${item.type === 'invoice' ? 'border-blue-500/50 text-blue-600 bg-blue-500/10' : ''}
+                              ${item.type === 'payment' ? 'border-green-500/50 text-green-600 bg-green-500/10' : ''}
+                              ${item.type === 'vendor_po' ? 'border-orange-500/50 text-orange-600 bg-orange-500/10' : ''}
+                            `}
+                          >
+                            {item.type === 'invoice' ? 'Invoice' : item.type === 'payment' ? 'Payment' : 'Vendor PO'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{item.reference}</TableCell>
+                        <TableCell>{item.date.toLocaleDateString()}</TableCell>
+                        <TableCell className="text-muted-foreground">{item.details}</TableCell>
+                        <TableCell>
+                          <Badge variant={item.status === 'paid' || item.status === 'received' || item.status === 'completed' ? 'default' : 'secondary'}>
+                            {item.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={`text-right font-medium ${
+                          item.isOrder ? 'text-muted-foreground' :
+                          item.type === 'invoice' ? 'text-blue-600' : 
+                          item.type === 'payment' ? 'text-green-600' : 
+                          'text-orange-600'
+                        }`}>
+                          {item.type === 'vendor_po' ? '-' : ''}{formatCurrency(item.amount)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  }
+                  {invoices.length === 0 && payments.length === 0 && vendorPOs.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No transactions for this project
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Invoices Tab */}
         <TabsContent value="invoices">
