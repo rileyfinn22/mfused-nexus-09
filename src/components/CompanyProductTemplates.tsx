@@ -106,10 +106,12 @@ export function CompanyProductTemplates({
 
   const fetchTemplates = async () => {
     try {
-      // Fetch all templates
+      // Fetch templates that belong to this company OR are global (no company_id)
+      // This ensures company-specific templates are only visible to their owner
       const { data: templatesData, error: templatesError } = await supabase
         .from('product_templates')
         .select('*')
+        .or(`company_id.eq.${companyId},company_id.is.null`)
         .order('name');
 
       if (templatesError) throw templatesError;
@@ -130,9 +132,12 @@ export function CompanyProductTemplates({
         })
       );
 
-      // Only show templates that have products for this company
-      const templatesWithProducts = templatesWithCounts.filter(t => t.product_count > 0);
-      setTemplates(templatesWithProducts);
+      // Show all templates owned by this company (even with 0 products)
+      // For global templates (no company_id), only show if they have products
+      const visibleTemplates = templatesWithCounts.filter(t => 
+        t.company_id === companyId || t.product_count > 0
+      );
+      setTemplates(visibleTemplates);
     } catch (error) {
       console.error('Error fetching templates:', error);
     } finally {
