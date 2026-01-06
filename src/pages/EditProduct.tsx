@@ -352,25 +352,27 @@ const EditProduct = () => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="preferred_vendor">Preferred Vendor</Label>
-            <Select
-              value={formData.preferred_vendor_id || undefined}
-              onValueChange={(value) => setFormData({ ...formData, preferred_vendor_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="No preferred vendor" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover z-50">
-                {vendors.map((vendor) => (
-                  <SelectItem key={vendor.id} value={vendor.id}>
-                    {vendor.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">Auto-populates when creating orders (can be edited)</p>
-          </div>
+          {isVibeAdmin && (
+            <div className="space-y-2">
+              <Label htmlFor="preferred_vendor">Preferred Vendor</Label>
+              <Select
+                value={formData.preferred_vendor_id || undefined}
+                onValueChange={(value) => setFormData({ ...formData, preferred_vendor_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="No preferred vendor" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover z-50">
+                  {vendors.map((vendor) => (
+                    <SelectItem key={vendor.id} value={vendor.id}>
+                      {vendor.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Auto-populates when creating orders (can be edited)</p>
+            </div>
+          )}
         </div>
 
         {/* Artwork Files Section */}
