@@ -413,9 +413,9 @@ const Invoices = () => {
                     <div className="flex items-center gap-2">
                       {isParent && hasChildren && (
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="h-6 w-6 p-0"
+                          className={`h-7 px-2 gap-1 border-primary/30 ${isExpanded ? 'bg-primary/10 border-primary' : 'hover:bg-primary/5'}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleExpanded(invoice.id);
@@ -424,17 +424,20 @@ const Invoices = () => {
                           {isExpanded ? (
                             <ChevronDown className="h-4 w-4 text-primary" />
                           ) : (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            <ChevronRight className="h-4 w-4 text-primary" />
                           )}
+                          <span className="text-xs font-medium text-primary">
+                            {invoices.filter(inv => inv.parent_invoice_id === invoice.id).length}
+                          </span>
                         </Button>
                       )}
                       {isChild && (
-                        <div className="flex items-center text-muted-foreground mr-1">
-                          <div className="w-4 h-px bg-border mr-1"></div>
-                          <Package className="h-3 w-3" />
+                        <div className="flex items-center text-blue-500 mr-1">
+                          <div className="w-3 h-px bg-blue-400 mr-1"></div>
+                          <Package className="h-3.5 w-3.5" />
                         </div>
                       )}
-                      <div className={`font-medium font-mono text-base ${isChild ? 'ml-2' : ''} ${!isParent || !hasChildren ? 'ml-8' : ''}`}>{invoice.invoice_number}</div>
+                      <div className={`font-medium font-mono text-base ${isChild ? 'ml-1' : ''} ${!isParent || !hasChildren ? 'ml-10' : ''}`}>{invoice.invoice_number}</div>
                       {showOverdueAlert && (
                         <Badge 
                           variant="outline" 
