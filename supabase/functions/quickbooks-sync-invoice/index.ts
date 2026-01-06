@@ -887,6 +887,33 @@ serve(async (req) => {
 
     if (qbProjectId) {
       console.log('Using Job customer for invoice (Projects UI):', qbProjectId);
+
+      // Debug: confirm what QBO is actually returning for this Job/Project.
+      // Some realms ignore IsProject updates via the Customer endpoint, which would explain why it never appears in Projects.
+      try {
+        const dbgResp = await fetch(`${qbApiUrl}/customer/${qbProjectId}?minorversion=65`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        });
+
+        const dbgData = await dbgResp.json();
+        const c = dbgData?.Customer;
+        console.log('Job customer debug (id/display/job/isProject/active/parent/fullyQualified):', JSON.stringify({
+          ok: dbgResp.ok,
+          status: dbgResp.status,
+          Id: c?.Id,
+          DisplayName: c?.DisplayName,
+          FullyQualifiedName: c?.FullyQualifiedName,
+          Job: c?.Job,
+          IsProject: c?.IsProject,
+          Active: c?.Active,
+          ParentRef: c?.ParentRef?.value,
+        }));
+      } catch (e) {
+        console.warn('Job customer debug fetch failed:', qbProjectId, e);
+      }
     }
 
     // Note: We don't use the Deposit field for partial billing
