@@ -1859,61 +1859,193 @@ const InvoiceDetail = () => {
                         <p className="text-lg font-bold">{formatCurrency(Number(po.total))}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => {
-                          // Generate and download PDF for this PO
+                        <Button variant="outline" size="sm" onClick={async () => {
+                          // Generate and download PDF for this PO - matching VendorPODetail format
                           const doc = new jsPDF();
+                          const pageWidth = doc.internal.pageSize.getWidth();
+                          const pageHeight = doc.internal.pageSize.getHeight();
                           
-                          // Add branding header
-                          const headerY = addPdfBrandingSync(doc, { documentTitle: 'VENDOR PURCHASE ORDER' });
+                          // Colors
+                          const primaryGreen = [76, 175, 80];
+                          const darkGray = [51, 51, 51];
+                          const lightGray = [248, 248, 248];
+                          const mediumGray = [100, 100, 100];
                           
-                          // PO Info
-                          let yPos = headerY + 5;
+                          // ============ HEADER SECTION ============
+                          let yPos = 15;
+                          
+                          // Company name and address on left
+                          doc.setFontSize(16);
+                          doc.setFont('helvetica', 'bold');
+                          doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+                          doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
+                          
+                          doc.setFontSize(9);
+                          doc.setFont('helvetica', 'normal');
+                          doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+                          doc.text('1415 S 700 W', 14, yPos + 7);
+                          doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
+                          doc.text('www.vibepkg.com', 14, yPos + 17);
+                          
+                          // Logo on right
+                          try {
+                            const logoResponse = await fetch('/images/vibe-logo.png');
+                            const logoBlob = await logoResponse.blob();
+                            const logoBase64 = await new Promise<string>((resolve) => {
+                              const reader = new FileReader();
+                              reader.onloadend = () => resolve(reader.result as string);
+                              reader.readAsDataURL(logoBlob);
+                            });
+                            doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
+                          } catch (error) {
+                            doc.setFontSize(14);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+                            doc.text('VIBE', pageWidth - 14, yPos + 8, { align: 'right' });
+                          }
+                          
+                          yPos += 28;
+                          
+                          // Divider line
+                          doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+                          doc.setLineWidth(0.5);
+                          doc.line(14, yPos, pageWidth - 14, yPos);
+                          
+                          yPos += 12;
+                          
+                          // ============ PO TITLE ============
+                          doc.setFontSize(24);
+                          doc.setFont('helvetica', 'bold');
+                          doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+                          doc.text('Purchase Order', 14, yPos);
+                          
+                          yPos += 15;
+                          
+                          // ============ VENDOR & PO DETAILS SECTION ============
+                          const leftColX = 14;
+                          const rightColX = pageWidth / 2 + 10;
+                          
+                          // Vendor section (left)
+                          doc.setFontSize(10);
+                          doc.setFont('helvetica', 'bold');
+                          doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+                          doc.text('Vendor', leftColX, yPos);
+                          
                           doc.setFontSize(11);
-                          doc.setTextColor(0, 0, 0);
-                          doc.text(`PO Number: ${po.po_number}`, 14, yPos);
-                          doc.text(`Order Date: ${new Date(po.order_date).toLocaleDateString()}`, 14, yPos + 7);
-                          doc.text(`Status: ${po.status.replace('_', ' ').toUpperCase()}`, 14, yPos + 14);
+                          doc.setFont('helvetica', 'bold');
+                          doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+                          doc.text(po.vendors?.name || 'Unknown', leftColX, yPos + 8);
+                          
+                          doc.setFontSize(9);
+                          doc.setFont('helvetica', 'normal');
+                          doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+                          
+                          let vendorY = yPos + 14;
+                          if (po.vendors?.contact_name) {
+                            doc.text(po.vendors.contact_name, leftColX, vendorY);
+                            vendorY += 5;
+                          }
+                          if (po.vendors?.contact_email) {
+                            doc.text(po.vendors.contact_email, leftColX, vendorY);
+                          }
+                          
+                          // PO details on right
+                          const detailsStartY = yPos;
+                          doc.setFontSize(9);
+                          doc.setFont('helvetica', 'normal');
+                          doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+                          
+                          doc.text('PO #:', rightColX, detailsStartY);
+                          doc.setFont('helvetica', 'bold');
+                          doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+                          doc.text(po.po_number, rightColX + 45, detailsStartY);
+                          
+                          doc.setFont('helvetica', 'normal');
+                          doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+                          doc.text('Date:', rightColX, detailsStartY + 7);
+                          doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+                          doc.text(new Date(po.order_date).toLocaleDateString(), rightColX + 45, detailsStartY + 7);
                           
                           if (po.expected_delivery_date) {
-                            doc.text(`Expected Delivery: ${new Date(po.expected_delivery_date).toLocaleDateString()}`, 14, yPos + 21);
-                            yPos += 7;
+                            doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+                            doc.text('Due Date:', rightColX, detailsStartY + 14);
+                            doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+                            doc.text(new Date(po.expected_delivery_date).toLocaleDateString(), rightColX + 45, detailsStartY + 14);
                           }
-
-                          // Vendor Info
-                          doc.setFontSize(12);
-                          doc.setFont('helvetica', 'bold');
-                          doc.text("Vendor Information", 14, yPos + 28);
-                          doc.setFont('helvetica', 'normal');
-                          doc.setFontSize(10);
-                          doc.text(`${po.vendors?.name || 'Unknown'}`, 14, yPos + 35);
-
-                          // Items table
+                          
+                          yPos += 35;
+                          
+                          // ============ ITEMS TABLE ============
                           const tableData = (po.vendor_po_items || []).map((item: any) => [
                             item.sku,
                             item.name,
-                            item.description || '',
-                            item.quantity.toString(),
+                            item.quantity.toLocaleString(),
                             `$${Number(item.unit_cost).toFixed(3)}`,
                             `$${Number(item.total).toFixed(2)}`
                           ]);
 
                           autoTable(doc, {
-                            startY: yPos + 45,
-                            head: [['SKU', 'Product', 'Description', 'Quantity', 'Unit Cost', 'Total']],
+                            startY: yPos,
+                            head: [['SKU', 'DESCRIPTION', 'QTY', 'UNIT COST', 'AMOUNT']],
                             body: tableData,
-                            theme: 'grid',
-                            headStyles: { fillColor: [66, 66, 66] },
+                            theme: 'plain',
+                            headStyles: { 
+                              fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]], 
+                              textColor: 255,
+                              fontStyle: 'bold',
+                              fontSize: 9,
+                              cellPadding: 4
+                            },
+                            bodyStyles: {
+                              fontSize: 9,
+                              cellPadding: 4,
+                              textColor: [darkGray[0], darkGray[1], darkGray[2]],
+                              lineWidth: 0
+                            },
+                            alternateRowStyles: {
+                              fillColor: [lightGray[0], lightGray[1], lightGray[2]]
+                            },
+                            columnStyles: {
+                              0: { cellWidth: 30 },
+                              1: { cellWidth: 'auto' },
+                              2: { cellWidth: 20, halign: 'center' },
+                              3: { cellWidth: 28, halign: 'right' },
+                              4: { cellWidth: 28, halign: 'right', fontStyle: 'bold' }
+                            },
+                            margin: { left: 14, right: 14 },
+                            showHead: 'firstPage',
+                            tableLineWidth: 0,
+                            tableWidth: 'auto'
                           });
 
-                          // Total
-                          const finalY = (doc as any).lastAutoTable.finalY || 100;
-                          doc.setFontSize(14);
-                          doc.text(`Total: ${formatCurrency(Number(po.total))}`, 150, finalY + 15);
+                          // ============ TOTALS SECTION ============
+                          const finalY = (doc as any).lastAutoTable.finalY + 10;
+                          const totalAmount = (po.vendor_po_items || []).reduce((sum: number, item: any) => sum + Number(item.total), 0);
+                          
+                          const totalsWidth = 80;
+                          const totalsX = pageWidth - totalsWidth - 14;
+                          
+                          // Divider line before total
+                          doc.setDrawColor(200, 200, 200);
+                          doc.setLineWidth(0.3);
+                          doc.line(totalsX, finalY, pageWidth - 14, finalY);
+                          
+                          // Total - emphasized
+                          doc.setFontSize(11);
+                          doc.setFont('helvetica', 'bold');
+                          doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+                          doc.text('TOTAL', totalsX, finalY + 8);
+                          doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - 14, finalY + 8, { align: 'right' });
 
-                          // Footer
-                          addPdfFooter(doc);
+                          // ============ FOOTER ============
+                          const footerY = Math.max(finalY + 30, pageHeight - 20);
+                          if (footerY < pageHeight - 10) {
+                            doc.setFontSize(9);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+                            doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+                          }
 
-                          // Save
                           doc.save(`vendor-po-${po.po_number}.pdf`);
                           
                           toast({
