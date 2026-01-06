@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +17,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   ArrowLeft, 
@@ -26,7 +34,10 @@ import {
   Search,
   AlertTriangle,
   LayoutGrid,
-  List
+  List,
+  Pencil,
+  Save,
+  X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -78,7 +89,10 @@ export function CompanyProductTemplates({
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [artworkThumbnails, setArtworkThumbnails] = useState<Record<string, string>>({});
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
-
+  const [editingTemplate, setEditingTemplate] = useState<ProductTemplate | null>(null);
+  const [editTemplateName, setEditTemplateName] = useState("");
+  const [editTemplateDescription, setEditTemplateDescription] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
   useEffect(() => {
     fetchTemplates();
     fetchArtworkData();
@@ -280,6 +294,56 @@ export function CompanyProductTemplates({
     return artworkStatus[itemId] === true;
   };
 
+  const openEditTemplate = (template: ProductTemplate, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setEditingTemplate(template);
+    setEditTemplateName(template.name);
+    setEditTemplateDescription(template.description || "");
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!editingTemplate) return;
+    
+    setSavingTemplate(true);
+    try {
+      const { error } = await supabase
+        .from('product_templates')
+        .update({
+          name: editTemplateName.trim(),
+          description: editTemplateDescription.trim() || null
+        })
+        .eq('id', editingTemplate.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Template updated",
+        description: "Template details have been saved.",
+      });
+
+      // Update local state
+      if (selectedTemplate?.id === editingTemplate.id) {
+        setSelectedTemplate({
+          ...selectedTemplate,
+          name: editTemplateName.trim(),
+          description: editTemplateDescription.trim() || null
+        });
+      }
+
+      fetchTemplates();
+      setEditingTemplate(null);
+    } catch (error) {
+      console.error('Error updating template:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update template.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -300,11 +364,21 @@ export function CompanyProductTemplates({
             <Button variant="ghost" size="icon" onClick={() => setSelectedTemplate(null)}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div>
-              <h3 className="text-lg font-semibold">{selectedTemplate.name}</h3>
-              <p className="text-sm text-muted-foreground">
-                {products.length} product{products.length !== 1 ? 's' : ''}
-              </p>
+            <div className="flex items-center gap-2">
+              <div>
+                <h3 className="text-lg font-semibold">{selectedTemplate.name}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {products.length} product{products.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => openEditTemplate(selectedTemplate)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
             </div>
           </div>
           <div className="flex gap-2">
@@ -339,7 +413,7 @@ export function CompanyProductTemplates({
 
         {/* Template specs */}
         {selectedTemplate.description && (
-          <Card className="p-3 bg-muted/30">
+          <Card className="p-3 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => openEditTemplate(selectedTemplate)}>
             <p className="text-xs text-muted-foreground whitespace-pre-line">{selectedTemplate.description}</p>
           </Card>
         )}
@@ -495,9 +569,17 @@ export function CompanyProductTemplates({
           {templates.map((template) => (
             <Card
               key={template.id}
-              className="group cursor-pointer overflow-hidden transition-all hover:shadow-md hover:border-primary/50"
+              className="group cursor-pointer overflow-hidden transition-all hover:shadow-md hover:border-primary/50 relative"
               onClick={() => setSelectedTemplate(template)}
             >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 left-2 z-10 h-7 w-7 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => openEditTemplate(template, e)}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
               <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
                 <Package className="h-12 w-12 text-muted-foreground/30" />
                 <Badge 
@@ -519,6 +601,44 @@ export function CompanyProductTemplates({
           ))}
         </div>
       )}
+
+      {/* Edit Template Dialog */}
+      <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && setEditingTemplate(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="templateName">Template Name</Label>
+              <Input
+                id="templateName"
+                value={editTemplateName}
+                onChange={(e) => setEditTemplateName(e.target.value)}
+                placeholder="Enter template name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="templateDescription">Description / Specs</Label>
+              <Textarea
+                id="templateDescription"
+                value={editTemplateDescription}
+                onChange={(e) => setEditTemplateDescription(e.target.value)}
+                placeholder="Enter template description, specifications, dimensions, etc."
+                rows={6}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditingTemplate(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveTemplate} disabled={savingTemplate || !editTemplateName.trim()}>
+                {savingTemplate ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

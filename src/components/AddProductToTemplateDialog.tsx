@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles, Loader2 } from "lucide-react";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 
 interface ProductTemplate {
@@ -29,12 +29,41 @@ export function AddProductToTemplateDialog({
 }: AddProductToTemplateDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [parsing, setParsing] = useState(false);
   const [skuNames, setSkuNames] = useState("");
   const { syncProduct, checkConnection } = useQuickBooksAutoSync();
 
   const generateTempSKU = () => {
     const randomDigits = Math.floor(10000 + Math.random() * 90000);
     return `VB-${randomDigits}`;
+  };
+
+  const handleAIParse = async () => {
+    if (!skuNames.trim()) {
+      toast.error("Please enter some text to parse");
+      return;
+    }
+
+    setParsing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('parse-product-names', {
+        body: { text: skuNames }
+      });
+
+      if (error) throw error;
+
+      if (data.products && data.products.length > 0) {
+        setSkuNames(data.products.join('\n'));
+        toast.success(`Found ${data.products.length} product names`);
+      } else {
+        toast.info("No product names found in the text");
+      }
+    } catch (error) {
+      console.error('Error parsing product names:', error);
+      toast.error("Failed to parse product names");
+    } finally {
+      setParsing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -126,7 +155,7 @@ export function AddProductToTemplateDialog({
         <DialogHeader>
           <DialogTitle>Add Products to {template.name}</DialogTitle>
           <DialogDescription>
-            Enter product names (one per line) to create products using this template's specifications.
+            Paste product names, order text, or emails - AI will extract product names automatically.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -139,17 +168,33 @@ export function AddProductToTemplateDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="skuNames">Product Names <span className="text-destructive">*</span></Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="skuNames">Product Names <span className="text-destructive">*</span></Label>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                onClick={handleAIParse}
+                disabled={parsing || !skuNames.trim()}
+              >
+                {parsing ? (
+                  <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3 mr-1.5" />
+                )}
+                AI Parse
+              </Button>
+            </div>
             <Textarea
               id="skuNames"
               value={skuNames}
               onChange={(e) => setSkuNames(e.target.value)}
-              placeholder="Enter product names, one per line:&#10;Blue Dream&#10;OG Kush&#10;Gelato"
-              rows={8}
+              placeholder="Paste order text, emails, or product lists:&#10;&#10;Peach Halos - 1000&#10;Stars & Stripesicles - 1000&#10;Pink Burzt - 1000&#10;&#10;Or just enter product names separated by commas or new lines"
+              rows={10}
               required
             />
             <p className="text-xs text-muted-foreground">
-              {skuNames.split('\n').filter(n => n.trim()).length} product(s) will be created
+              {skuNames.split('\n').filter(n => n.trim()).length} line(s) • Click "AI Parse" to extract product names from pasted text
             </p>
           </div>
 
