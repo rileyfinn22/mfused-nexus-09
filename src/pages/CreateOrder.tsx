@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -102,6 +103,8 @@ const CreateOrder = () => {
   const [uploadedPOs, setUploadedPOs] = useState<{ filename: string; poNumber?: string }[]>([]);
   const [matchingProductId, setMatchingProductId] = useState<Record<string, string>>({});
   const [openCombobox, setOpenCombobox] = useState<Record<string, boolean>>({});
+  const [inputMode, setInputMode] = useState<"pdf" | "text">("pdf");
+  const [textInput, setTextInput] = useState<string>("");
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -516,6 +519,171 @@ const CreateOrder = () => {
         variant: "destructive",
       });
       setUploading(false);
+      setAnalyzing(false);
+    }
+  };
+
+  const handleTextAnalyze = async () => {
+    if (!textInput.trim()) {
+      toast({
+        title: "No text provided",
+        description: "Please paste some text to analyze",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAnalyzing(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Not authenticated",
+          description: "Please log in to analyze orders",
+          variant: "destructive",
+        });
+        navigate('/login');
+        return;
+      }
+
+      // For vibe_admin, require company selection
+      let companyId: string;
+      if (isVibeAdmin) {
+        if (!selectedCompanyId) {
+          toast({
+            title: "Company Required",
+            description: "Please select a company before analyzing text",
+            variant: "destructive",
+          });
+          setAnalyzing(false);
+          return;
+        }
+        companyId = selectedCompanyId;
+      } else {
+        // Get user's company
+        const { data: userRole } = await supabase
+          .from('user_roles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!userRole?.company_id) {
+          throw new Error('User not associated with a company');
+        }
+        companyId = userRole.company_id;
+      }
+
+      toast({
+        title: "Analyzing text",
+        description: "Processing your order data...",
+      });
+
+      // Trigger AI analysis with text content
+      const { data: functionData, error: functionError } = await supabase.functions.invoke('analyze-po', {
+        body: { 
+          textContent: textInput.trim(),
+          companyId: companyId,
+          orderType: 'standard',
+          returnProductsOnly: true
+        }
+      });
+
+      if (functionError) {
+        console.error('Analysis error:', functionError);
+        toast({
+          title: "Analysis failed",
+          description: "Could not analyze the text",
+          variant: "destructive",
+        });
+        setAnalyzing(false);
+        return;
+      }
+
+      // Add extracted products to order
+      if (functionData?.items && Array.isArray(functionData.items)) {
+        const newItems: OrderItem[] = [];
+        const newUnmatched: any[] = [];
+        
+        for (const item of functionData.items) {
+          if (item.product_id) {
+            // Check if already in selected items
+            const existingIdx = selectedItems.findIndex(si => si.productId === item.product_id);
+            if (existingIdx >= 0) {
+              // Add quantity to existing
+              setSelectedItems(prev => prev.map((si, idx) => 
+                idx === existingIdx 
+                  ? { ...si, quantity: si.quantity + (item.quantity || 1) }
+                  : si
+              ));
+            } else {
+              newItems.push({
+                productId: item.product_id,
+                quantity: item.quantity || 1,
+                unit_price: item.unit_price,
+              });
+            }
+          } else {
+            // Unmatched item
+            newUnmatched.push(item);
+          }
+        }
+        
+        if (newItems.length > 0) {
+          setSelectedItems(prev => [...prev, ...newItems]);
+        }
+        if (newUnmatched.length > 0) {
+          setUnmatchedPoItems(prev => [...prev, ...newUnmatched]);
+        }
+      }
+
+      // Extract PO number if available
+      if (functionData?.poNumber) {
+        setFormData(prev => ({
+          ...prev,
+          poNumber: prev.poNumber 
+            ? `${prev.poNumber}, ${functionData.poNumber}` 
+            : functionData.poNumber
+        }));
+      }
+
+      // Fill in customer/shipping if available and not already filled
+      if (functionData?.customerName && !formData.customerName) {
+        setFormData(prev => ({ ...prev, customerName: functionData.customerName }));
+      }
+      if (functionData?.shippingAddress) {
+        const addr = functionData.shippingAddress;
+        if (!formData.shippingName && addr.name) {
+          setFormData(prev => ({
+            ...prev,
+            shippingName: addr.name || prev.shippingName,
+            shippingStreet: addr.street || prev.shippingStreet,
+            shippingCity: addr.city || prev.shippingCity,
+            shippingState: addr.state || prev.shippingState,
+            shippingZip: addr.zip || prev.shippingZip,
+          }));
+        }
+      }
+
+      const matchedCount = functionData?.items?.filter((i: any) => i.product_id).length || 0;
+      const totalCount = functionData?.items?.length || 0;
+      
+      toast({
+        title: "Text analyzed",
+        description: `Found ${totalCount} items. ${matchedCount} matched to products.`,
+      });
+
+      setTextInput("");
+      setInputMode("pdf");
+      
+    } catch (error: any) {
+      console.error('Error analyzing text:', error);
+      toast({
+        title: "Analysis failed",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    } finally {
       setAnalyzing(false);
     }
   };
@@ -1293,70 +1461,127 @@ const CreateOrder = () => {
           </div>
         )}
 
-        {/* Upload PO Option */}
+        {/* Order Entry - Upload PO or Paste Text */}
         {!orderId && (
           <div className="bg-muted/30 backdrop-blur rounded-lg p-4 border border-table-border">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className="text-sm font-medium">Order Entry</h3>
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  AI Order Entry
+                </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Upload one or more POs to combine into a single order
+                  Upload POs or paste text from email to automatically fill the order
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="po-upload"
-                  multiple
-                  disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => document.getElementById('po-upload')?.click()}
-                  disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  {selectedFiles.length > 0 ? 'Add More POs' : 'Upload POs'}
-                </Button>
-                {selectedFiles.length > 0 && (
-                  <Button
-                    onClick={handlePOUpload}
-                    disabled={uploading || analyzing}
-                    size="sm"
-                  >
-                    {uploading || analyzing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {uploading ? 'Uploading...' : 'Analyzing...'}
-                      </>
-                    ) : (
-                      `Analyze ${selectedFiles.length} PO${selectedFiles.length > 1 ? 's' : ''}`
-                    )}
-                  </Button>
-                )}
-              </div>
             </div>
-            {/* Show selected files */}
-            {selectedFiles.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {selectedFiles.map((file, idx) => (
-                  <Badge key={idx} variant="secondary" className="flex items-center gap-1">
-                    <FileText className="h-3 w-3" />
-                    {file.name.length > 25 ? `${file.name.substring(0, 22)}...` : file.name}
-                    <button
-                      onClick={() => removeSelectedFile(idx)}
-                      className="ml-1 hover:text-destructive"
+            
+            <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as "pdf" | "text")} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-3">
+                <TabsTrigger value="pdf" className="flex items-center gap-1.5">
+                  <Upload className="h-4 w-4" />
+                  Upload PO
+                </TabsTrigger>
+                <TabsTrigger value="text" className="flex items-center gap-1.5">
+                  <FileText className="h-4 w-4" />
+                  Paste Text
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="pdf" className="mt-0">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="po-upload"
+                    multiple
+                    disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('po-upload')?.click()}
+                    disabled={uploading || analyzing || (isVibeAdmin && !selectedCompanyId)}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {selectedFiles.length > 0 ? 'Add More POs' : 'Select PDF Files'}
+                  </Button>
+                  {selectedFiles.length > 0 && (
+                    <Button
+                      onClick={handlePOUpload}
+                      disabled={uploading || analyzing}
+                      size="sm"
                     >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
+                      {uploading || analyzing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          {uploading ? 'Uploading...' : 'Analyzing...'}
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          {`Analyze ${selectedFiles.length} PO${selectedFiles.length > 1 ? 's' : ''}`}
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                {/* Show selected files */}
+                {selectedFiles.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedFiles.map((file, idx) => (
+                      <Badge key={idx} variant="secondary" className="flex items-center gap-1">
+                        <FileText className="h-3 w-3" />
+                        {file.name.length > 25 ? `${file.name.substring(0, 22)}...` : file.name}
+                        <button
+                          onClick={() => removeSelectedFile(idx)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="text" className="mt-0">
+                <div className="space-y-3">
+                  <Textarea
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    placeholder="Paste product names or order details from email...&#10;&#10;Example:&#10;SKU-001 Product Name x 100&#10;SKU-002 Another Product x 50&#10;..."
+                    className="min-h-[120px] resize-y"
+                    disabled={analyzing || (isVibeAdmin && !selectedCompanyId)}
+                  />
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Paste from emails, spreadsheets, or any text containing product info
+                    </p>
+                    <Button
+                      onClick={handleTextAnalyze}
+                      disabled={!textInput.trim() || analyzing || (isVibeAdmin && !selectedCompanyId)}
+                      size="sm"
+                    >
+                      {analyzing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Analyze Text
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+            
             {/* Show already processed POs */}
             {uploadedPOs.length > 0 && (
               <div className="mt-3 border-t pt-3">
