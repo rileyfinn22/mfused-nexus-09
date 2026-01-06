@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { FileUp, Loader2, Sparkles, Package, Check } from "lucide-react";
+import { FileUp, Loader2, Sparkles, Package, Check, FolderTree } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ExtractedProduct {
@@ -26,6 +26,17 @@ interface ExtractedProduct {
   cost?: number;
   product_type?: string;
   selected?: boolean;
+  suggested_template?: string | null;
+  template_id?: string | null;
+}
+
+interface Template {
+  id: string;
+  name: string;
+  description?: string;
+  state?: string | null;
+  price?: number | null;
+  cost?: number | null;
 }
 
 interface AnalyzePOProductsDialogProps {
@@ -40,6 +51,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
   const [analyzing, setAnalyzing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [extractedProducts, setExtractedProducts] = useState<ExtractedProduct[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
@@ -153,12 +165,38 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
       }
 
       if (result.products && result.products.length > 0) {
-        setExtractedProducts(result.products.map((p: ExtractedProduct) => ({ ...p, selected: true })));
+        // Store templates from the response
+        const returnedTemplates: Template[] = result.templates || [];
+        setTemplates(returnedTemplates);
+
+        // Match suggested templates to actual template IDs
+        const productsWithTemplates = result.products.map((p: ExtractedProduct) => {
+          let matchedTemplateId: string | null = null;
+          
+          if (p.suggested_template) {
+            const matchedTemplate = returnedTemplates.find(
+              t => t.name.toLowerCase() === p.suggested_template?.toLowerCase()
+            );
+            if (matchedTemplate) {
+              matchedTemplateId = matchedTemplate.id;
+            }
+          }
+          
+          return { 
+            ...p, 
+            selected: true,
+            template_id: matchedTemplateId
+          };
+        });
+
+        setExtractedProducts(productsWithTemplates);
         setCustomerName(result.customer_name);
         setStep("review");
+        
+        const matchedCount = productsWithTemplates.filter((p: ExtractedProduct) => p.template_id).length;
         toast({
           title: "Analysis complete",
-          description: `Found ${result.products.length} products in the PO.`,
+          description: `Found ${result.products.length} products. ${matchedCount} matched to templates.`,
         });
       } else {
         toast({
@@ -189,6 +227,12 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     setExtractedProducts(prev => prev.map(p => ({ ...p, selected: checked })));
   };
 
+  const updateProductTemplate = (index: number, templateId: string | null) => {
+    setExtractedProducts(prev =>
+      prev.map((p, i) => i === index ? { ...p, template_id: templateId } : p)
+    );
+  };
+
   const handleImport = async () => {
     const selectedProducts = extractedProducts.filter(p => p.selected);
     
@@ -204,24 +248,32 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     setImporting(true);
 
     try {
-      // Create products - no customer_id needed since products belong to companies now
-      const productsToInsert = selectedProducts.map(p => ({
-        company_id: companyId,
-        item_id: p.item_id || null,
-        name: p.name,
-        description: p.description || null,
-        state: p.state || null,
-        cost: p.cost || null,
-        product_type: p.product_type || null,
-      }));
+      // Create products with template associations
+      const productsToInsert = selectedProducts.map(p => {
+        // If a template is selected, get the template's state
+        const selectedTemplate = p.template_id ? templates.find(t => t.id === p.template_id) : null;
+        
+        return {
+          company_id: companyId,
+          item_id: p.item_id || null,
+          name: p.name,
+          description: p.description || selectedTemplate?.description || null,
+          state: p.state || selectedTemplate?.state || null,
+          cost: p.cost || selectedTemplate?.cost || null,
+          price: selectedTemplate?.price || null,
+          product_type: p.product_type || null,
+          template_id: p.template_id || null,
+        };
+      });
 
       const { error } = await supabase.from('products').insert(productsToInsert);
 
       if (error) throw error;
 
+      const withTemplate = selectedProducts.filter(p => p.template_id).length;
       toast({
         title: "Products imported",
-        description: `Successfully imported ${selectedProducts.length} products.`,
+        description: `Imported ${selectedProducts.length} products. ${withTemplate} added to templates.`,
       });
 
       onProductsAdded();
@@ -242,6 +294,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     setOpen(false);
     setFile(null);
     setExtractedProducts([]);
+    setTemplates([]);
     setCustomerName(null);
     setStep("upload");
     if (!selectedCompanyId && isVibeAdmin) {
@@ -250,6 +303,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
   };
 
   const selectedCount = extractedProducts.filter(p => p.selected).length;
+  const templatedCount = extractedProducts.filter(p => p.selected && p.template_id).length;
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => isOpen ? setOpen(true) : handleClose()}>
@@ -266,7 +320,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
             AI Product Import
           </DialogTitle>
           <DialogDescription>
-            Upload a PO (PDF) to automatically extract and import products.
+            Upload a PO (PDF) to extract products and assign them to templates.
           </DialogDescription>
         </DialogHeader>
 
@@ -348,33 +402,33 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                 />
                 <span className="text-sm">Select all</span>
               </div>
-              <span className="text-sm text-muted-foreground">
-                {selectedCount} of {extractedProducts.length} selected
-              </span>
+              <div className="text-sm text-muted-foreground">
+                {selectedCount} selected · {templatedCount} with templates
+              </div>
             </div>
 
-            <ScrollArea className="h-[300px] border rounded-lg">
+            <ScrollArea className="h-[350px] border rounded-lg">
               <div className="p-2 space-y-2">
                 {extractedProducts.map((product, index) => (
                   <Card 
                     key={index}
-                    className={`p-3 cursor-pointer transition-colors ${
-                      product.selected ? 'border-primary bg-primary/5' : 'opacity-60'
+                    className={`p-3 transition-colors ${
+                      product.selected ? 'border-primary/50 bg-primary/5' : 'opacity-60'
                     }`}
-                    onClick={() => toggleProductSelection(index)}
                   >
                     <div className="flex items-start gap-3">
                       <Checkbox
                         checked={product.selected}
                         onCheckedChange={() => toggleProductSelection(index)}
-                        onClick={(e) => e.stopPropagation()}
+                        className="mt-1"
                       />
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-center gap-2">
                           <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                           <span className="font-medium text-sm truncate">{product.name}</span>
                         </div>
-                        <div className="flex flex-wrap gap-2 mt-1 text-xs text-muted-foreground">
+                        
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                           {product.item_id && (
                             <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{product.item_id}</span>
                           )}
@@ -388,10 +442,33 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                             <span className="capitalize">{product.product_type}</span>
                           )}
                         </div>
+
+                        {/* Template dropdown */}
+                        <div className="flex items-center gap-2">
+                          <FolderTree className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <Select 
+                            value={product.template_id || "none"} 
+                            onValueChange={(val) => updateProductTemplate(index, val === "none" ? null : val)}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Assign to template" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">
+                                <span className="text-muted-foreground">No template</span>
+                              </SelectItem>
+                              {templates.map((template) => (
+                                <SelectItem key={template.id} value={template.id}>
+                                  {template.name} {template.state && `(${template.state})`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {product.template_id && (
+                            <Check className="h-4 w-4 text-success shrink-0" />
+                          )}
+                        </div>
                       </div>
-                      {product.selected && (
-                        <Check className="h-4 w-4 text-primary shrink-0" />
-                      )}
                     </div>
                   </Card>
                 ))}

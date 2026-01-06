@@ -58,6 +58,15 @@ serve(async (req) => {
       throw new Error('Unauthorized: User does not have access to this company');
     }
 
+    // Fetch existing templates for this company to help with matching
+    const { data: templates } = await supabase
+      .from('product_templates')
+      .select('id, name, description, state, price, cost')
+      .eq('company_id', companyId)
+      .order('name');
+
+    const templateNames = templates?.map(t => `- "${t.name}" (${t.state || 'no state'})`).join('\n') || 'No templates found';
+
     // Read file content
     const arrayBuffer = await file.arrayBuffer();
     
@@ -88,7 +97,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'You are an expert at analyzing purchase orders and extracting product information.'
+            content: 'You are an expert at analyzing purchase orders and extracting product information. You also match products to existing templates when possible.'
           },
           {
             role: 'user',
@@ -100,12 +109,17 @@ serve(async (req) => {
 4. state: The US state code if mentioned (e.g., "WA", "CA", "OR") - often embedded in SKU or mentioned separately
 5. cost: The unit price/rate as a decimal number
 6. product_type: Infer from context (e.g., "packaging", "label", "bag", "box", "jar", etc.)
+7. suggested_template: Try to match to one of the existing templates below based on product name similarity
+
+EXISTING TEMPLATES IN SYSTEM:
+${templateNames}
 
 IMPORTANT:
 - Extract ALL line items from the PO
 - If state is embedded in SKU (like PCK-00430-WA), extract it as "WA"
 - cost should be a number (e.g., 0.218), not a formatted string
 - Be thorough - don't miss any products
+- For suggested_template, return the EXACT template name if you find a good match, or null if no match
 
 PURCHASE ORDER TEXT:
 ${extractedText}
@@ -119,7 +133,8 @@ Return ONLY valid JSON in this format:
       "description": "Optional description",
       "state": "XX or null",
       "cost": 0.00,
-      "product_type": "packaging"
+      "product_type": "packaging",
+      "suggested_template": "Exact Template Name or null"
     }
   ],
   "customer_name": "Customer/Vendor name from PO"
@@ -162,7 +177,8 @@ Return ONLY valid JSON in this format:
       success: true,
       products: extractedData.products || [],
       customer_name: extractedData.customer_name || null,
-      filename: file.name
+      filename: file.name,
+      templates: templates || []
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
