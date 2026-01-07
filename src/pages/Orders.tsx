@@ -351,8 +351,8 @@ const Orders = () => {
           <div className="space-y-3">
             <h2 className="text-lg font-medium">Draft Orders - Incomplete</h2>
             <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-              <div className="bg-muted/30 border-b border-border">
-                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="bg-muted border-b-2 border-border">
+                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
                   {isVibeAdmin && <div className="col-span-1">Company</div>}
@@ -363,7 +363,7 @@ const Orders = () => {
                   <div className="col-span-2">Actions</div>
                 </div>
               </div>
-              <div className="divide-y divide-border/50">
+              <div className="divide-y divide-border">
                 {draftOrders.map((order) => {
                   const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
                   const orderTypeInfo = getOrderTypeDisplay(order.order_type);
@@ -372,7 +372,7 @@ const Orders = () => {
                   return (
                     <div 
                       key={order.id} 
-                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/30 transition-colors even:bg-muted/10"
+                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors even:bg-muted/40"
                     >
                       <div className="col-span-2 space-y-1">
                         <div className="font-medium font-mono text-sm">{order.order_number}</div>
@@ -454,8 +454,8 @@ const Orders = () => {
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Pending Orders - Awaiting Production</h2>
           <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-              <div className="bg-muted/30 border-b border-border">
-                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="bg-muted border-b-2 border-border">
+                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
                   {isVibeAdmin && <div className="col-span-1">Company</div>}
@@ -466,7 +466,7 @@ const Orders = () => {
                   <div className="col-span-2">Actions</div>
                 </div>
               </div>
-            <div className="divide-y divide-border/50">
+            <div className="divide-y divide-border">
               {loading ? (
                 <div className="text-center py-12 text-muted-foreground">
                   Loading orders...
@@ -483,7 +483,7 @@ const Orders = () => {
                 return (
                   <div 
                     key={order.id} 
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/30 transition-colors even:bg-muted/10"
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors even:bg-muted/40"
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-base">{order.order_number}</div>
@@ -582,8 +582,8 @@ const Orders = () => {
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Orders in Production</h2>
           <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-            <div className="bg-muted/30 border-b border-border">
-              <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="bg-muted border-b-2 border-border">
+              <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-2">Order # / Type</div>
                 <div className="col-span-1">Date</div>
                 {isVibeAdmin && <div className="col-span-1">Company</div>}
@@ -593,7 +593,7 @@ const Orders = () => {
                 <div className="col-span-2">Actions</div>
               </div>
             </div>
-            <div className="divide-y divide-border/50">
+            <div className="divide-y divide-border">
               {loading ? (
                 <div className="text-center py-12 text-muted-foreground">
                   Loading orders...
@@ -614,7 +614,7 @@ const Orders = () => {
                 return (
                   <div 
                     key={order.id} 
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/30 transition-colors even:bg-muted/10"
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors even:bg-muted/40"
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-base">{order.order_number}</div>

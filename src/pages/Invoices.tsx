@@ -388,8 +388,8 @@ const Invoices = () => {
       {/* Invoices Table */}
       <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
         {/* Table Header */}
-        <div className="bg-muted/30 border-b border-border">
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <div className="bg-muted border-b-2 border-border">
+          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Due Date</div>
             <div className="col-span-1">Company</div>
@@ -403,7 +403,7 @@ const Invoices = () => {
         </div>
 
         {/* Table Body */}
-        <div className="divide-y divide-border/50">
+        <div className="divide-y divide-border">
           {loading ? (
             <div className="text-center py-12 text-muted-foreground">
               Loading invoices...
@@ -440,8 +440,8 @@ const Invoices = () => {
                 <div 
                   key={invoice.id} 
                   className={`grid grid-cols-12 gap-4 px-4 py-3 transition-colors ${
-                    isChild ? 'bg-muted/20 border-l-4 border-l-primary/50' : 'hover:bg-muted/30'
-                  } ${isChild ? '' : 'even:bg-muted/10'}`}
+                    isChild ? 'bg-muted/60 border-l-4 border-l-primary/50' : 'hover:bg-muted/50'
+                  } ${isChild ? '' : 'even:bg-muted/40'}`}
                 >
                   <div className="col-span-2">
                     <div className="flex items-center gap-2">
