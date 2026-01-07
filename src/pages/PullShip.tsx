@@ -62,6 +62,7 @@ const PullShip = () => {
   const [blanketOrders, setBlanketOrders] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [invoiceItemPrices, setInvoiceItemPrices] = useState<Record<string, number>>({});
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
 
   useEffect(() => {
     fetchPullShipOrders();
@@ -97,28 +98,50 @@ const PullShip = () => {
     }
 
     try {
-      // Only fetch orders that have a full invoice (not partial)
+      // Fetch orders with their items to filter by selected products later
       const { data, error } = await supabase
         .from('orders')
         .select(`
           id, 
           order_number, 
           customer_name, 
-          total, 
+          description,
           created_at,
           invoices!inner(invoice_type),
-          companies!company_id(name)
+          companies!company_id(name),
+          order_items(sku, product_id, products(item_id))
         `)
         .eq('company_id', companyId)
         .eq('order_type', 'standard')
         .eq('invoices.invoice_type', 'full')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(50);
 
       if (error) throw error;
       setBlanketOrders(data || []);
     } catch (error) {
       console.error('Error fetching blanket orders:', error);
+    }
+  };
+
+  const fetchSavedAddresses = async (companyId: string) => {
+    if (!companyId) {
+      setSavedAddresses([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('customer_addresses')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('is_default', { ascending: false })
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setSavedAddresses(data || []);
+    } catch (error) {
+      console.error('Error fetching saved addresses:', error);
     }
   };
 
@@ -413,7 +436,32 @@ const PullShip = () => {
     setBlanketOrders([]);
     setInvoiceItemPrices({});
     fetchBlanketOrders(companyId);
+    fetchSavedAddresses(companyId);
   };
+
+  const handleLoadSavedAddress = (addressId: string) => {
+    const address = savedAddresses.find(a => a.id === addressId);
+    if (address) {
+      setOrderData(prev => ({
+        ...prev,
+        shippingAddress: address.street,
+        shippingCity: address.city,
+        shippingState: address.state,
+        shippingZip: address.zip
+      }));
+    }
+  };
+
+  // Filter blanket orders based on selected products
+  const filteredBlanketOrders = blanketOrders.filter(order => {
+    if (selectedSkus.size === 0) return true; // Show all if no products selected yet
+    
+    // Get all item_ids from the order's order_items
+    const orderItemIds = order.order_items?.map((item: any) => item.products?.item_id).filter(Boolean) || [];
+    
+    // Check if any selected SKU matches an order item
+    return Array.from(selectedSkus).some(sku => orderItemIds.includes(sku));
+  });
 
   const fetchInvoiceItemPrices = async (parentOrderId: string) => {
     if (!parentOrderId) {
@@ -860,15 +908,17 @@ const PullShip = () => {
                           </SelectTrigger>
                           <SelectContent className="bg-background border border-border shadow-lg z-50">
                             <SelectItem value="none">None (standalone order)</SelectItem>
-                            {blanketOrders.map(order => (
+                            {filteredBlanketOrders.map(order => (
                               <SelectItem key={order.id} value={order.id}>
-                                {order.order_number} - {order.companies?.name || order.customer_name} (${order.total?.toFixed(2)})
+                                #{order.order_number} - {order.description || order.customer_name || 'No description'}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">
-                          Select a blanket order to create invoice when approved
+                          {selectedSkus.size > 0 
+                            ? `Showing ${filteredBlanketOrders.length} orders containing selected products`
+                            : "Select products to filter matching blanket orders"}
                         </p>
                       </div>
                     </>
@@ -877,7 +927,23 @@ const PullShip = () => {
 
                 {orderData.state && (
                   <div className="space-y-4">
-                    <Label className="text-sm font-medium">Shipping Address</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Shipping Address</Label>
+                      {savedAddresses.length > 0 && (
+                        <Select onValueChange={handleLoadSavedAddress}>
+                          <SelectTrigger className="h-8 w-48 text-xs">
+                            <SelectValue placeholder="Load saved address..." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border border-border shadow-lg z-50">
+                            {savedAddresses.map(addr => (
+                              <SelectItem key={addr.id} value={addr.id}>
+                                {addr.name} {addr.is_default && '(Default)'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
                     <Input className="h-10" placeholder="Street Address" value={orderData.shippingAddress} onChange={(e) => handleInputChange('shippingAddress', e.target.value)} required />
                     <div className="grid grid-cols-2 gap-4">
                       <Input className="h-10" placeholder="City" value={orderData.shippingCity} onChange={(e) => handleInputChange('shippingCity', e.target.value)} required />
