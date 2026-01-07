@@ -535,6 +535,7 @@ const EditProduct = () => {
           onOpenChange={setAddArtworkOpen}
           onSuccess={() => fetchArtworkFiles(formData.item_id)}
           defaultSku={formData.item_id}
+          defaultProductId={id}
           restrictToCompany={productCompanyId || undefined}
         />
 

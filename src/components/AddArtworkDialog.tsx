@@ -19,6 +19,7 @@ interface AddArtworkDialogProps {
   // Pre-fill values
   defaultSku?: string;
   defaultCompanyId?: string;
+  defaultProductId?: string;
   // If provided, show only this company's products
   restrictToCompany?: string;
 }
@@ -41,6 +42,7 @@ const AddArtworkDialog = ({
   onSuccess,
   defaultSku = '',
   defaultCompanyId = '',
+  defaultProductId = '',
   restrictToCompany,
 }: AddArtworkDialogProps) => {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -54,7 +56,7 @@ const AddArtworkDialog = ({
   const [formData, setFormData] = useState({
     companyId: defaultCompanyId || restrictToCompany || '',
     sku: defaultSku,
-    productId: '',
+    productId: defaultProductId,
     file: null as File | null,
     previewFile: null as File | null,
     notes: '',
@@ -70,14 +72,14 @@ const AddArtworkDialog = ({
       setFormData({
         companyId: defaultCompanyId || restrictToCompany || '',
         sku: defaultSku,
-        productId: '',
+        productId: defaultProductId,
         file: null,
         previewFile: null,
         notes: '',
         artworkType: 'print_ready',
       });
     }
-  }, [open, defaultSku, defaultCompanyId, restrictToCompany]);
+  }, [open, defaultSku, defaultCompanyId, defaultProductId, restrictToCompany]);
 
   useEffect(() => {
     // Filter products based on selected company
