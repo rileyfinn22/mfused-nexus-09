@@ -1140,12 +1140,11 @@ serve(async (req) => {
       console.error('Error configuring payment options / retrieving InvoiceLink:', linkError);
     }
 
-    // If we still don't have a proper InvoiceLink, construct a direct invoice payment URL
-    // This format links directly to the specific invoice (not the customer portal with all invoices)
+    // NOTE: QuickBooks does not support single-invoice payment links.
+    // The InvoiceLink always shows all unpaid invoices for the customer.
+    // This is a QuickBooks limitation - there is no API to get a direct single-invoice payment URL.
     if (!qbPaymentLink) {
-      // Direct invoice payment link using the transaction ID (QBO invoice ID)
-      qbPaymentLink = `https://app.qbo.intuit.com/app/paynow?realmId=${qbRealmId}&txnId=${qbInvoiceId}&txnType=invoice`;
-      console.log('Generated direct invoice payment link:', qbPaymentLink);
+      console.log('No InvoiceLink available from QuickBooks. Customer will see all unpaid invoices when paying.');
     }
 
     console.log('QuickBooks invoice ID:', qbInvoiceId);
