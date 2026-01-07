@@ -1819,7 +1819,11 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          final_quantity: number | null
+          final_unit_cost: number | null
           id: string
+          is_adjustment: boolean | null
+          item_type: string | null
           name: string
           order_item_id: string | null
           quantity: number
@@ -1832,7 +1836,11 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          final_quantity?: number | null
+          final_unit_cost?: number | null
           id?: string
+          is_adjustment?: boolean | null
+          item_type?: string | null
           name: string
           order_item_id?: string | null
           quantity: number
@@ -1845,7 +1853,11 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          final_quantity?: number | null
+          final_unit_cost?: number | null
           id?: string
+          is_adjustment?: boolean | null
+          item_type?: string | null
           name?: string
           order_item_id?: string | null
           quantity?: number
@@ -1872,6 +1884,56 @@ export type Database = {
           },
         ]
       }
+      vendor_po_payments: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string
+          reference_number: string | null
+          updated_at: string
+          vendor_po_id: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string
+          reference_number?: string | null
+          updated_at?: string
+          vendor_po_id: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string
+          reference_number?: string | null
+          updated_at?: string
+          vendor_po_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_po_payments_vendor_po_id_fkey"
+            columns: ["vendor_po_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_pos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_pos: {
         Row: {
           company_id: string
@@ -1880,7 +1942,9 @@ export type Database = {
           description: string | null
           expected_delivery_date: string | null
           expense_category: string | null
+          final_total: number | null
           id: string
+          notes: string | null
           order_date: string
           order_id: string | null
           po_number: string
@@ -1895,6 +1959,7 @@ export type Database = {
           ship_to_zip: string | null
           status: string
           total: number
+          total_paid: number | null
           updated_at: string
           vendor_id: string
         }
@@ -1905,7 +1970,9 @@ export type Database = {
           description?: string | null
           expected_delivery_date?: string | null
           expense_category?: string | null
+          final_total?: number | null
           id?: string
+          notes?: string | null
           order_date?: string
           order_id?: string | null
           po_number: string
@@ -1920,6 +1987,7 @@ export type Database = {
           ship_to_zip?: string | null
           status?: string
           total?: number
+          total_paid?: number | null
           updated_at?: string
           vendor_id: string
         }
@@ -1930,7 +1998,9 @@ export type Database = {
           description?: string | null
           expected_delivery_date?: string | null
           expense_category?: string | null
+          final_total?: number | null
           id?: string
+          notes?: string | null
           order_date?: string
           order_id?: string | null
           po_number?: string
@@ -1945,6 +2015,7 @@ export type Database = {
           ship_to_zip?: string | null
           status?: string
           total?: number
+          total_paid?: number | null
           updated_at?: string
           vendor_id?: string
         }

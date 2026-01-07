@@ -126,8 +126,9 @@ const ProjectDetail = () => {
   const totalRevenue = billedInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
   const totalPaid = billedInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
   const totalCosts = vendorPOs.reduce((sum, po) => sum + (po.total || 0), 0);
+  const totalCostsPaid = vendorPOs.reduce((sum, po) => sum + (po.total_paid || 0), 0);
   const accrualProfit = totalRevenue - totalCosts;
-  const cashProfit = totalPaid - totalCosts;
+  const cashProfit = totalPaid - totalCostsPaid;
   const accrualMargin = totalRevenue > 0 ? (accrualProfit / totalRevenue) * 100 : 0;
   const cashMargin = totalPaid > 0 ? (cashProfit / totalPaid) * 100 : 0;
   
@@ -535,34 +536,51 @@ const ProjectDetail = () => {
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Owed</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {vendorPOs.map((po) => (
-                    <TableRow 
-                      key={po.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/vendor-pos/${po.id}`)}
-                    >
-                      <TableCell className="font-medium">{po.po_number}</TableCell>
-                      <TableCell>{new Date(po.order_date).toLocaleDateString()}</TableCell>
-                      <TableCell>{(po.vendors as any)?.name || '-'}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{po.po_type || 'Standard'}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={po.status === 'completed' ? 'default' : 'secondary'}>
-                          {po.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-red-600 font-medium">
-                        {formatCurrency(po.total)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {vendorPOs.map((po) => {
+                    const poOwed = (po.total || 0) - (po.total_paid || 0);
+                    return (
+                      <TableRow 
+                        key={po.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => navigate(`/vendor-pos/${po.id}`)}
+                      >
+                        <TableCell className="font-medium">{po.po_number}</TableCell>
+                        <TableCell>{new Date(po.order_date).toLocaleDateString()}</TableCell>
+                        <TableCell>{(po.vendors as any)?.name || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{po.po_type || 'Standard'}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            po.status === 'paid' ? 'default' : 
+                            po.status === 'partial' ? 'default' : 
+                            'destructive'
+                          }>
+                            {po.status === 'unpaid' ? 'Unpaid' : 
+                             po.status === 'partial' ? 'Partial Paid' : 
+                             po.status === 'paid' ? 'Paid' : po.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-red-600 font-medium">
+                          {formatCurrency(po.total)}
+                        </TableCell>
+                        <TableCell className="text-right text-green-600">
+                          {formatCurrency(po.total_paid || 0)}
+                        </TableCell>
+                        <TableCell className="text-right text-orange-600 font-medium">
+                          {formatCurrency(poOwed)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {vendorPOs.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No vendor POs for this project
                       </TableCell>
                     </TableRow>
@@ -571,10 +589,18 @@ const ProjectDetail = () => {
               </Table>
               {vendorPOs.length > 0 && (
                 <div className="border-t p-4 bg-muted/30">
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-8">
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Costs</p>
                       <p className="text-lg font-bold text-red-600">{formatCurrency(totalCosts)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Total Paid</p>
+                      <p className="text-lg font-bold text-green-600">{formatCurrency(totalCostsPaid)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Total Owed</p>
+                      <p className="text-lg font-bold text-orange-600">{formatCurrency(totalCosts - totalCostsPaid)}</p>
                     </div>
                   </div>
                 </div>
@@ -630,8 +656,8 @@ const ProjectDetail = () => {
                   <span>{formatCurrency(totalPaid)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Costs (Vendor POs)</span>
-                  <span className="text-red-600">-{formatCurrency(totalCosts)}</span>
+                  <span className="text-muted-foreground">Costs Paid (Vendor POs)</span>
+                  <span className="text-red-600">-{formatCurrency(totalCostsPaid)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold">

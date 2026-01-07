@@ -115,13 +115,25 @@ const VendorPOs = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'unpaid': return 'destructive';
+      case 'partial': return 'default';
+      case 'paid': return 'default';
       case 'draft': return 'secondary';
-      case 'submitted': return 'default';
-      case 'confirmed': return 'default';
-      case 'in_production': return 'default';
-      case 'received': return 'default';
+      case 'submitted': return 'secondary';
+      case 'confirmed': return 'secondary';
+      case 'in_production': return 'secondary';
+      case 'received': return 'secondary';
       case 'cancelled': return 'destructive';
       default: return 'secondary';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'unpaid': return 'Unpaid';
+      case 'partial': return 'Partial Paid';
+      case 'paid': return 'Paid';
+      default: return status.replace('_', ' ');
     }
   };
 
@@ -242,10 +254,19 @@ const VendorPOs = () => {
                     <TableCell>
                       {new Date(po.order_date).toLocaleDateString()}
                     </TableCell>
-                    <TableCell>${po.total?.toFixed(2) || '0.00'}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div>${po.total?.toFixed(2) || '0.00'}</div>
+                        {(po.total_paid || 0) > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            Paid: ${(po.total_paid || 0).toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={getStatusColor(po.status)}>
-                        {po.status.replace('_', ' ')}
+                        {getStatusLabel(po.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
