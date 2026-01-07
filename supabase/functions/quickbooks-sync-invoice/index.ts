@@ -837,9 +837,9 @@ serve(async (req) => {
         CountrySubDivisionCode: invoice.orders?.shipping_state || '',
         PostalCode: invoice.orders?.shipping_zip || '',
       },
-      // Enable online payment options to get payment link
+      // Enable ACH only (no credit card) for payment
       AllowOnlinePayment: true,
-      AllowOnlineCreditCardPayment: true,
+      AllowOnlineCreditCardPayment: false,
       AllowOnlineACHPayment: true,
     };
 
@@ -1064,7 +1064,7 @@ serve(async (req) => {
         SyncToken: qbData.Invoice.SyncToken,
         sparse: true,
         AllowOnlinePayment: true,
-        AllowOnlineCreditCardPayment: true,
+        AllowOnlineCreditCardPayment: false,  // ACH only
         AllowOnlineACHPayment: true,
         BillEmail: customerEmail ? { Address: customerEmail } : undefined,
       };
@@ -1138,6 +1138,14 @@ serve(async (req) => {
       }
     } catch (linkError) {
       console.error('Error configuring payment options / retrieving InvoiceLink:', linkError);
+    }
+
+    // If we still don't have a proper InvoiceLink, construct a direct invoice payment URL
+    // This format links directly to the specific invoice (not the customer portal with all invoices)
+    if (!qbPaymentLink) {
+      // Direct invoice payment link using the transaction ID (QBO invoice ID)
+      qbPaymentLink = `https://app.qbo.intuit.com/app/paynow?realmId=${qbRealmId}&txnId=${qbInvoiceId}&txnType=invoice`;
+      console.log('Generated direct invoice payment link:', qbPaymentLink);
     }
 
     console.log('QuickBooks invoice ID:', qbInvoiceId);
