@@ -515,16 +515,15 @@ const Invoices = () => {
                     </div>
                   </div>
                   <div className="col-span-2">
-                    <Input
-                      className="h-7 text-xs"
-                      placeholder="Add description..."
-                      defaultValue={invoice.orders?.description || ''}
+                    <div 
+                      className="text-sm text-muted-foreground whitespace-normal break-words cursor-text hover:bg-muted/50 rounded px-1 py-0.5 min-h-[28px]"
+                      contentEditable
+                      suppressContentEditableWarning
                       onBlur={(e) => {
-                        // Update the order's description
                         if (invoice.order_id) {
                           supabase
                             .from("orders")
-                            .update({ description: e.target.value })
+                            .update({ description: e.currentTarget.textContent || '' })
                             .eq("id", invoice.order_id)
                             .then(({ error }) => {
                               if (error) console.error("Error updating description:", error);
@@ -532,7 +531,9 @@ const Invoices = () => {
                         }
                       }}
                       onClick={(e) => e.stopPropagation()}
-                    />
+                    >
+                      {invoice.orders?.description || 'Add description...'}
+                    </div>
                   </div>
                   <div className="col-span-1">
                     <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>
