@@ -20,6 +20,8 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>(selectedCompanyId || "");
+  const [blanketOrders, setBlanketOrders] = useState<any[]>([]);
+  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
 
   useEffect(() => {
     checkVibeAdmin();
@@ -34,6 +36,15 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
   useEffect(() => {
     setSelectedCompany(selectedCompanyId || "");
   }, [selectedCompanyId]);
+
+  useEffect(() => {
+    if (selectedCompany) {
+      fetchBlanketOrders(selectedCompany);
+    } else {
+      setBlanketOrders([]);
+      setSelectedOrderId("");
+    }
+  }, [selectedCompany]);
 
   const checkVibeAdmin = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -60,6 +71,30 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
     }
   };
 
+  const fetchBlanketOrders = async (companyId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id, 
+          order_number, 
+          description,
+          customer_name,
+          invoices!inner(invoice_type)
+        `)
+        .eq('company_id', companyId)
+        .eq('order_type', 'standard')
+        .eq('invoices.invoice_type', 'full')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setBlanketOrders(data || []);
+    } catch (error) {
+      console.error('Error fetching blanket orders:', error);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -70,9 +105,14 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
     e.preventDefault();
     if (!file) return;
 
-    // Require company selection for vibe_admin
+    // Require company and blanket order selection for vibe_admin
     if (isVibeAdmin && !selectedCompany) {
       toast.error("Please select a company before uploading");
+      return;
+    }
+
+    if (isVibeAdmin && !selectedOrderId) {
+      toast.error("Please select a blanket order to link this inventory");
       return;
     }
 
@@ -82,9 +122,12 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
       const formData = new FormData();
       formData.append('file', file);
       
-      // Pass selected company ID (for vibe_admin)
+      // Pass selected company ID and order ID
       if (selectedCompany) {
         formData.append('company_id', selectedCompany);
+      }
+      if (selectedOrderId) {
+        formData.append('order_id', selectedOrderId);
       }
 
       const { data, error } = await supabase.functions.invoke('upload-inventory', {
@@ -93,9 +136,11 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
 
       if (error) throw error;
 
-      toast.success(`Successfully uploaded ${data.inserted} inventory items`);
+      const orderInfo = blanketOrders.find(o => o.id === selectedOrderId);
+      toast.success(`Successfully uploaded ${data.inserted} inventory items linked to order #${orderInfo?.order_number || 'N/A'}`);
       setOpen(false);
       setFile(null);
+      setSelectedOrderId("");
       onInventoryUploaded();
     } catch (error) {
       console.error('Error uploading inventory:', error);
@@ -122,21 +167,44 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           {isVibeAdmin && (
-            <div className="space-y-2">
-              <Label htmlFor="company">Company *</Label>
-              <Select value={selectedCompany} onValueChange={setSelectedCompany} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a company" />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="company">Company *</Label>
+                <Select value={selectedCompany} onValueChange={setSelectedCompany} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {selectedCompany && (
+                <div className="space-y-2">
+                  <Label htmlFor="order">Link to Blanket Order *</Label>
+                  <Select value={selectedOrderId} onValueChange={setSelectedOrderId} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select blanket order..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {blanketOrders.map((order) => (
+                        <SelectItem key={order.id} value={order.id}>
+                          #{order.order_number} - {order.description || order.customer_name || 'No description'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Inventory will be linked to this order for automatic invoicing when pulled
+                  </p>
+                </div>
+              )}
+            </>
           )}
           <div className="space-y-2">
             <Label htmlFor="file">Select File</Label>
@@ -150,7 +218,7 @@ export function UploadInventoryDialog({ onInventoryUploaded, selectedCompanyId }
           </div>
           <Button 
             type="submit" 
-            disabled={loading || !file || (isVibeAdmin && !selectedCompany)} 
+            disabled={loading || !file || (isVibeAdmin && (!selectedCompany || !selectedOrderId))} 
             className="w-full"
           >
             {loading ? "Uploading..." : "Upload Inventory"}

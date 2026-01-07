@@ -43,13 +43,16 @@ serve(async (req) => {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     const requestedCompanyId = formData.get('company_id') as string | null;
+    const requestedOrderId = formData.get('order_id') as string | null;
 
     // Determine which company to use
     let companyId = userRole.company_id;
+    let orderId = requestedOrderId || null;
+    
     if (requestedCompanyId && userRole.role === 'vibe_admin') {
       // Vibe admins can upload for any company
       companyId = requestedCompanyId;
-      console.log(`Vibe admin uploading for company: ${companyId}`);
+      console.log(`Vibe admin uploading for company: ${companyId}, linked to order: ${orderId}`);
     } else {
       console.log(`User uploading for their own company: ${companyId}`);
     }
@@ -239,6 +242,7 @@ serve(async (req) => {
         redline: redline,
         upload_batch_id: batchId,
         upload_timestamp: uploadTimestamp,
+        order_id: orderId, // Link to blanket order
       });
     }
 
