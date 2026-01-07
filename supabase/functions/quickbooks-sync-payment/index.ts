@@ -111,16 +111,32 @@ serve(async (req) => {
       );
     }
 
-    const companyId = payment.invoices.company_id;
+    // Get VibePKG's company_id (the vibe_admin's company that manages QuickBooks)
+    const { data: vibeAdmin, error: vibeAdminError } = await supabase
+      .from('user_roles')
+      .select('company_id')
+      .eq('role', 'vibe_admin')
+      .limit(1)
+      .single();
 
-    // Get QuickBooks settings
+    if (vibeAdminError || !vibeAdmin) {
+      console.error('VibePKG company not found:', vibeAdminError);
+      return new Response(
+        JSON.stringify({ error: 'VibePKG company not found' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const vibeCompanyId = vibeAdmin.company_id;
+
+    // Get QuickBooks settings from VibePKG (not the customer's company)
     const { data: qbSettings, error: qbError } = await supabase
       .from('quickbooks_settings')
       .select('*')
-      .eq('company_id', companyId)
+      .eq('company_id', vibeCompanyId)
       .single();
 
-    if (qbError || !qbSettings) {
+    if (qbError || !qbSettings || !qbSettings.is_connected) {
       console.error('QuickBooks settings not found:', qbError);
       return new Response(
         JSON.stringify({ error: 'QuickBooks not connected' }),
@@ -137,7 +153,7 @@ serve(async (req) => {
 
     if (tokenExpiresAt <= now) {
       console.log('Access token expired, refreshing...');
-      accessToken = await refreshAccessToken(supabase, companyId, qbSettings.refresh_token);
+      accessToken = await refreshAccessToken(supabase, vibeCompanyId, qbSettings.refresh_token);
     }
 
     // Create payment in QuickBooks
@@ -194,7 +210,7 @@ serve(async (req) => {
           last_error: errorText,
           last_error_at: new Date().toISOString(),
         })
-        .eq('company_id', companyId);
+        .eq('company_id', vibeCompanyId);
 
       return new Response(
         JSON.stringify({ error: 'Failed to create payment in QuickBooks', details: errorText }),
@@ -228,7 +244,7 @@ serve(async (req) => {
         last_error: null,
         last_error_at: null,
       })
-      .eq('company_id', companyId);
+      .eq('company_id', vibeCompanyId);
 
     console.log('Payment successfully synced to QuickBooks');
 
