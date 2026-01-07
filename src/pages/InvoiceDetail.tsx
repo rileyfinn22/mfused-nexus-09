@@ -852,20 +852,22 @@ const InvoiceDetail = () => {
     if (!invoice?.quickbooks_id) return;
     setRefreshingLink(true);
     try {
-      const isConnected = await checkConnection();
-      if (!isConnected) {
-        toast({
-          title: "Not Connected",
-          description: "QuickBooks is not connected",
-          variant: "destructive"
-        });
-        return;
+      // Customers may not have permission to read the QuickBooks connection row.
+      // Instead of blocking here, attempt the refresh; the backend function will fail if truly disconnected.
+      if (isVibeAdmin) {
+        const isConnected = await checkConnection();
+        if (!isConnected) {
+          toast({
+            title: "Not Connected",
+            description: "QuickBooks is not connected",
+            variant: "destructive"
+          });
+          return;
+        }
       }
 
       // Re-sync to get updated payment link
-      const {
-        error
-      } = await supabase.functions.invoke('quickbooks-sync-invoice', {
+      const { error } = await supabase.functions.invoke('quickbooks-sync-invoice', {
         body: {
           invoiceId,
           billingPercentage: invoice.billed_percentage || 100
