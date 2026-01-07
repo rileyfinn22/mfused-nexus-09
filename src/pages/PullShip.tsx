@@ -137,35 +137,37 @@ const PullShip = () => {
   };
   
   const stateAddressMapping = {
-    "WA": { address: "123 Main St", city: "Seattle", zip: "98101" },
-    "CA": { address: "456 Oak Ave", city: "Los Angeles", zip: "90210" },
     "NY": { address: "789 Broadway", city: "New York", zip: "10001" },
-    "AZ": { address: "321 Desert Rd", city: "Phoenix", zip: "85001" },
     "MD": { address: "654 Harbor Dr", city: "Baltimore", zip: "21201" },
-    "CO": { address: "987 Mountain View", city: "Denver", zip: "80202" },
-    "OR": { address: "147 Pine St", city: "Portland", zip: "97201" },
+    "AZ": { address: "321 Desert Rd", city: "Phoenix", zip: "85001" },
+    "MO": { address: "100 Market St", city: "St. Louis", zip: "63101" },
+    "WA": { address: "123 Main St", city: "Seattle", zip: "98101" },
     "Primary": { address: "", city: "", zip: "" }
   };
 
   const stateOptions = [...Object.keys(stateAddressMapping).filter(s => s !== "Primary"), "Primary"];
 
   // Fetch inventory from database for the selected state and company
+  // Also includes "General" state products which should be available for all states
   const fetchInventoryForState = async (state: string, companyId: string) => {
     if (!state || !companyId) return;
     
     setLoadingInventory(true);
     try {
-      console.log('Fetching inventory for state:', state, 'companyId:', companyId);
+      console.log('Fetching inventory for state:', state, 'and General, companyId:', companyId);
+      
+      // Fetch both state-specific inventory AND "General" inventory
       const { data, error } = await supabase
         .from('inventory')
         .select('*, products(image_url, item_id, name)')
-        .eq('state', state)
         .eq('company_id', companyId)
+        .in('state', [state, 'General'])
         .gt('available', 0)
+        .order('state', { ascending: true })
         .order('sku', { ascending: true });
 
       if (error) throw error;
-      console.log('Inventory fetched:', data?.length || 0, 'items');
+      console.log('Inventory fetched:', data?.length || 0, 'items (including General)');
       setInventory(data || []);
       
       if (!data || data.length === 0) {
