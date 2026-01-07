@@ -293,17 +293,17 @@ const Invoices = () => {
 
       {/* Summary Row */}
       <div className="grid grid-cols-3 gap-6">
-        <div className="bg-table-row border border-table-border rounded p-4">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Orders Total</p>
-          <p className="text-2xl font-semibold mt-1 text-yellow-600 dark:text-yellow-400">{formatCurrency(openAmount)}</p>
+          <p className="text-2xl font-bold mt-2 text-warning">{formatCurrency(openAmount)}</p>
         </div>
-        <div className="bg-table-row border border-table-border rounded p-4">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Billed Pending Due</p>
-          <p className="text-2xl font-semibold mt-1 text-blue-600 dark:text-blue-400">{formatCurrency(billedAmount)}</p>
+          <p className="text-2xl font-bold mt-2 text-info">{formatCurrency(billedAmount)}</p>
         </div>
-        <div className="bg-table-row border border-table-border rounded p-4">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Due Amount</p>
-          <p className="text-2xl font-semibold mt-1 text-red-600 dark:text-red-400">{formatCurrency(dueAmount)}</p>
+          <p className="text-2xl font-bold mt-2 text-danger">{formatCurrency(dueAmount)}</p>
         </div>
       </div>
 
@@ -386,9 +386,9 @@ const Invoices = () => {
       </div>
 
       {/* Invoices Table */}
-      <div className="border border-table-border rounded bg-table-row shadow-sm">
+      <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
         {/* Table Header */}
-        <div className="bg-table-header border-b border-table-border">
+        <div className="bg-muted/30 border-b border-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Due Date</div>
@@ -403,7 +403,7 @@ const Invoices = () => {
         </div>
 
         {/* Table Body */}
-        <div className="divide-y divide-table-border">
+        <div className="divide-y divide-border/50">
           {loading ? (
             <div className="text-center py-12 text-muted-foreground">
               Loading invoices...
@@ -439,9 +439,9 @@ const Invoices = () => {
               return (
                 <div 
                   key={invoice.id} 
-                  className={`grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors ${
-                    isChild ? 'bg-muted/30 border-l-4 border-l-blue-500/50' : 'odd:bg-table-row even:bg-table-row-alt'
-                  } ${isParent ? 'border-b-2 border-b-blue-500/20' : ''}`}
+                  className={`grid grid-cols-12 gap-4 px-4 py-3 transition-colors ${
+                    isChild ? 'bg-muted/20 border-l-4 border-l-primary/50' : 'hover:bg-muted/30'
+                  } ${isChild ? '' : 'even:bg-muted/10'}`}
                 >
                   <div className="col-span-2">
                     <div className="flex items-center gap-2">

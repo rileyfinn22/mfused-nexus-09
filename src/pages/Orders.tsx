@@ -284,7 +284,7 @@ const Orders = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-table-border pb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border pb-4">
         <div>
           <h1 className="text-2xl font-semibold">Orders & Production</h1>
           <p className="text-sm text-muted-foreground mt-1">Track order progress and production pipeline</p>
@@ -350,8 +350,8 @@ const Orders = () => {
         {draftOrders.length > 0 && (
           <div className="space-y-3">
             <h2 className="text-lg font-medium">Draft Orders - Incomplete</h2>
-            <div className="border border-table-border rounded bg-table-row shadow-sm">
-              <div className="bg-table-header border-b border-table-border">
+            <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
+              <div className="bg-muted/30 border-b border-border">
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
@@ -363,7 +363,7 @@ const Orders = () => {
                   <div className="col-span-2">Actions</div>
                 </div>
               </div>
-              <div className="divide-y divide-table-border">
+              <div className="divide-y divide-border/50">
                 {draftOrders.map((order) => {
                   const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
                   const orderTypeInfo = getOrderTypeDisplay(order.order_type);
@@ -372,7 +372,7 @@ const Orders = () => {
                   return (
                     <div 
                       key={order.id} 
-                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors odd:bg-table-row even:bg-table-row-alt"
+                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/30 transition-colors even:bg-muted/10"
                     >
                       <div className="col-span-2 space-y-1">
                         <div className="font-medium font-mono text-sm">{order.order_number}</div>
@@ -453,8 +453,8 @@ const Orders = () => {
         {/* Pending Orders (Awaiting Production) */}
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Pending Orders - Awaiting Production</h2>
-          <div className="border border-table-border rounded bg-table-row shadow-sm">
-              <div className="bg-table-header border-b border-table-border">
+          <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
+              <div className="bg-muted/30 border-b border-border">
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
@@ -466,7 +466,7 @@ const Orders = () => {
                   <div className="col-span-2">Actions</div>
                 </div>
               </div>
-            <div className="divide-y divide-table-border">
+            <div className="divide-y divide-border/50">
               {loading ? (
                 <div className="text-center py-12 text-muted-foreground">
                   Loading orders...
@@ -483,7 +483,7 @@ const Orders = () => {
                 return (
                   <div 
                     key={order.id} 
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors odd:bg-table-row even:bg-table-row-alt"
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/30 transition-colors even:bg-muted/10"
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-base">{order.order_number}</div>
@@ -581,8 +581,8 @@ const Orders = () => {
         {/* Production Orders */}
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Orders in Production</h2>
-          <div className="border border-table-border rounded bg-table-row shadow-sm">
-            <div className="bg-table-header border-b border-table-border">
+          <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
+            <div className="bg-muted/30 border-b border-border">
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-2">Order # / Type</div>
                 <div className="col-span-1">Date</div>
@@ -593,7 +593,7 @@ const Orders = () => {
                 <div className="col-span-2">Actions</div>
               </div>
             </div>
-            <div className="divide-y divide-table-border">
+            <div className="divide-y divide-border/50">
               {loading ? (
                 <div className="text-center py-12 text-muted-foreground">
                   Loading orders...
@@ -614,7 +614,7 @@ const Orders = () => {
                 return (
                   <div 
                     key={order.id} 
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors odd:bg-table-row even:bg-table-row-alt"
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/30 transition-colors even:bg-muted/10"
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-base">{order.order_number}</div>

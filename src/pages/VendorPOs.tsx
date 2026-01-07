@@ -230,7 +230,7 @@ const VendorPOs = () => {
                 filteredPOs.map((po) => (
                   <TableRow
                     key={po.id}
-                    className="cursor-pointer odd:bg-table-row even:bg-table-row-alt hover:bg-table-row-hover"
+                    className="cursor-pointer hover:bg-muted/40"
                     onClick={() => {
                       toast({ title: "Opening PO...", description: po.po_number });
                       navigate(`/vendor-pos/${po.id}`);
