@@ -268,7 +268,7 @@ export default function Production() {
                   {isVibeAdmin && (
                     <div className="col-span-2 text-left text-sm font-medium truncate">{order.companies?.name || '-'}</div>
                   )}
-                  <div className="col-span-3 text-left text-sm text-muted-foreground truncate" title={order.description || ''}>
+                  <div className="col-span-3 text-left text-sm text-muted-foreground whitespace-normal break-words" title={order.description || ''}>
                     {order.description || '-'}
                   </div>
                   <div className="col-span-1 text-left">

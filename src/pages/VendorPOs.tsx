@@ -253,8 +253,8 @@ const VendorPOs = () => {
                         : (po.orders?.order_number || '-')
                       }
                     </TableCell>
-                    <TableCell className="max-w-[200px]">
-                      <span className="text-sm text-muted-foreground truncate block">
+                    <TableCell className="max-w-[300px]">
+                      <span className="text-sm text-muted-foreground whitespace-normal break-words">
                         {po.orders?.description || po.description || '-'}
                       </span>
                     </TableCell>

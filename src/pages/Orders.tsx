@@ -499,13 +499,15 @@ const Orders = () => {
                       <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
                     )}
                     <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>
-                      <Input
-                        className="h-7 text-xs"
-                        placeholder="Add description..."
-                        defaultValue={order.description || ''}
-                        onBlur={(e) => handleDescriptionChange(order.id, e.target.value)}
+                      <div 
+                        className="text-sm text-muted-foreground whitespace-normal break-words cursor-text hover:bg-muted/50 rounded px-1 py-0.5 min-h-[28px]"
+                        contentEditable
+                        suppressContentEditableWarning
+                        onBlur={(e) => handleDescriptionChange(order.id, e.currentTarget.textContent || '')}
                         onClick={(e) => e.stopPropagation()}
-                      />
+                      >
+                        {order.description || 'Add description...'}
+                      </div>
                     </div>
                     <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
                     <div className="col-span-1">
