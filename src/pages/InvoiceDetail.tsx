@@ -1620,7 +1620,8 @@ const InvoiceDetail = () => {
                         {isEditMode ? <Input type="number" step="0.001" min="0" value={item.unit_price} onChange={e => handlePriceChange(item.id, parseFloat(e.target.value) || 0)} className="w-28 text-right" /> : formatUnitPrice(Number(item.unit_price))}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {formatCurrency(shippedQty * Number(item.unit_price))}
+                        {/* For blanket invoices, show total based on ordered qty; for partial/shipped, use shipped qty */}
+                        {formatCurrency((invoice?.invoice_type === 'full' ? orderedQty : shippedQty) * Number(item.unit_price))}
                       </TableCell>
                     </TableRow>;
               })}
