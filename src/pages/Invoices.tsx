@@ -386,7 +386,7 @@ const Invoices = () => {
       </div>
 
       {/* Invoices Table */}
-      <div className="border border-table-border rounded">
+      <div className="border border-table-border rounded bg-table-row shadow-sm">
         {/* Table Header */}
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -440,7 +440,7 @@ const Invoices = () => {
                 <div 
                   key={invoice.id} 
                   className={`grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors ${
-                    isChild ? 'bg-muted/30 border-l-4 border-l-blue-500/50' : ''
+                    isChild ? 'bg-muted/30 border-l-4 border-l-blue-500/50' : 'odd:bg-table-row even:bg-table-row-alt'
                   } ${isParent ? 'border-b-2 border-b-blue-500/20' : ''}`}
                 >
                   <div className="col-span-2">

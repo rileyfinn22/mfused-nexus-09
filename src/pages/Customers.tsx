@@ -283,7 +283,7 @@ const Customers = () => {
       </div>
 
       {/* Customers Table */}
-      <div className="border border-table-border rounded">
+      <div className="border border-table-border rounded bg-table-row shadow-sm">
         <div className="bg-table-header border-b border-table-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-3">Company Name</div>
@@ -307,7 +307,7 @@ const Customers = () => {
             filteredCustomers.map((customer) => (
               <div 
                 key={customer.id} 
-                className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer"
+                className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors cursor-pointer odd:bg-table-row even:bg-table-row-alt"
                 onClick={() => navigate(`/customers/${customer.id}`)}
               >
                 <div className="col-span-3">

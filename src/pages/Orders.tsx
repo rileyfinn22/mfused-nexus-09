@@ -350,7 +350,7 @@ const Orders = () => {
         {draftOrders.length > 0 && (
           <div className="space-y-3">
             <h2 className="text-lg font-medium">Draft Orders - Incomplete</h2>
-            <div className="border border-table-border rounded">
+            <div className="border border-table-border rounded bg-table-row shadow-sm">
               <div className="bg-table-header border-b border-table-border">
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
@@ -372,7 +372,7 @@ const Orders = () => {
                   return (
                     <div 
                       key={order.id} 
-                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
+                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors odd:bg-table-row even:bg-table-row-alt"
                     >
                       <div className="col-span-2 space-y-1">
                         <div className="font-medium font-mono text-sm">{order.order_number}</div>
@@ -453,7 +453,7 @@ const Orders = () => {
         {/* Pending Orders (Awaiting Production) */}
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Pending Orders - Awaiting Production</h2>
-          <div className="border border-table-border rounded">
+          <div className="border border-table-border rounded bg-table-row shadow-sm">
               <div className="bg-table-header border-b border-table-border">
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
@@ -483,7 +483,7 @@ const Orders = () => {
                 return (
                   <div 
                     key={order.id} 
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors odd:bg-table-row even:bg-table-row-alt"
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-base">{order.order_number}</div>
@@ -581,7 +581,7 @@ const Orders = () => {
         {/* Production Orders */}
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Orders in Production</h2>
-          <div className="border border-table-border rounded">
+          <div className="border border-table-border rounded bg-table-row shadow-sm">
             <div className="bg-table-header border-b border-table-border">
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-2">Order # / Type</div>
@@ -614,7 +614,7 @@ const Orders = () => {
                 return (
                   <div 
                     key={order.id} 
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors odd:bg-table-row even:bg-table-row-alt"
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-base">{order.order_number}</div>
