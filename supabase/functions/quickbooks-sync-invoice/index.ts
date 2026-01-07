@@ -1049,12 +1049,11 @@ serve(async (req) => {
     console.log('QuickBooks Invoice ID:', qbInvoiceId);
     console.log('QuickBooks Realm ID:', qbRealmId);
     
-    // QuickBooks payment link - DO NOT auto-send invoice via email
-    // Just enable online payments and retrieve the invoice link if available
+    // QuickBooks payment link - Enable online payments and generate direct payment URL
     let qbPaymentLink = null;
     
     try {
-      console.log('Enabling online payments on invoice (not sending email)...');
+      console.log('Enabling online payments on invoice...');
       
       // Ensure online payment is enabled on the invoice
       const updatePayload = {
@@ -1080,23 +1079,25 @@ serve(async (req) => {
         const updatedInvoice = await updateResponse.json();
         console.log('Online payment enabled on invoice');
         
-        // Check if there's an invoice link available
-        qbPaymentLink = updatedInvoice.Invoice?.InvoiceLink || null;
-        
-        if (qbPaymentLink) {
-          console.log('Payment link available:', qbPaymentLink);
+        // Check if there's an invoice link from QuickBooks response
+        if (updatedInvoice.Invoice?.InvoiceLink) {
+          qbPaymentLink = updatedInvoice.Invoice.InvoiceLink;
+          console.log('Payment link from QuickBooks:', qbPaymentLink);
         } else {
-          // Invoice was created but no auto-generated link - user can send manually from QuickBooks
-          console.log('Invoice created in QuickBooks. No auto-send - send manually from QB when ready.');
-          qbPaymentLink = 'Manual';
+          // Generate the direct payment URL using QuickBooks standard format
+          // This URL allows customers to view and pay the invoice directly
+          qbPaymentLink = `https://app.qbo.intuit.com/app/customerlink?realmId=${qbRealmId}&docNumber=${qbDocNumber}&docType=invoice`;
+          console.log('Generated payment link:', qbPaymentLink);
         }
       } else {
-        console.log('Could not enable online payments, but invoice was created');
-        qbPaymentLink = 'Manual';
+        // Even if update fails, generate the link - invoice was still created
+        console.log('Could not enable online payments, generating link anyway');
+        qbPaymentLink = `https://app.qbo.intuit.com/app/customerlink?realmId=${qbRealmId}&docNumber=${qbDocNumber}&docType=invoice`;
       }
     } catch (linkError) {
       console.error('Error configuring payment options:', linkError);
-      qbPaymentLink = 'Manual';
+      // Still generate link on error
+      qbPaymentLink = `https://app.qbo.intuit.com/app/customerlink?realmId=${qbRealmId}&docNumber=${qbDocNumber}&docType=invoice`;
     }
     
     console.log('QuickBooks invoice ID:', qbInvoiceId);
