@@ -68,6 +68,17 @@ const InvoiceDetail = () => {
       fetchInvoiceDetails();
     }
   }, [invoiceId]);
+
+  // If a customer opens the payment portal and we don't have a payment link yet,
+  // attempt to generate/refresh it automatically.
+  useEffect(() => {
+    const hasValidPaymentLink = !!invoice?.quickbooks_payment_link && invoice.quickbooks_payment_link.startsWith('http');
+    const isSyncedToQB = !!invoice?.quickbooks_id;
+
+    if (showPaymentPortal && !isVibeAdmin && isSyncedToQB && !hasValidPaymentLink && !refreshingLink) {
+      void handleRefreshPaymentLink();
+    }
+  }, [showPaymentPortal, isVibeAdmin, invoice?.quickbooks_id, invoice?.quickbooks_payment_link, refreshingLink]);
   const checkAdminStatus = async () => {
     const {
       data: {
@@ -1569,10 +1580,31 @@ const InvoiceDetail = () => {
                             </Button>
                           </div>
                         ) : (
-                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
                             <p className="text-sm text-muted-foreground">
-                              Payment link is being generated. Please check back shortly or contact us for payment options.
+                              {refreshingLink
+                                ? 'Generating secure payment link...'
+                                : 'Payment link is not available yet. Click below to generate it.'}
                             </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleRefreshPaymentLink}
+                              disabled={refreshingLink}
+                              className="gap-2"
+                            >
+                              {refreshingLink ? (
+                                <>
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="h-4 w-4" />
+                                  Generate Payment Link
+                                </>
+                              )}
+                            </Button>
                           </div>
                         )
                       ) : isVibeAdmin ? <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
