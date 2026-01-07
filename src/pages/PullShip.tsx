@@ -59,7 +59,6 @@ const PullShip = () => {
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
-  const [blanketOrders, setBlanketOrders] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [invoiceItemPrices, setInvoiceItemPrices] = useState<Record<string, number>>({});
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
@@ -90,40 +89,6 @@ const PullShip = () => {
       setLoadingOrders(false);
     }
   };
-
-  const fetchBlanketOrders = async (companyId: string) => {
-    if (!companyId) {
-      setBlanketOrders([]);
-      return;
-    }
-
-    try {
-      // Fetch orders with their items to filter by selected products later
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          id, 
-          order_number, 
-          customer_name, 
-          description,
-          created_at,
-          invoices!inner(invoice_type),
-          companies!company_id(name),
-          order_items(sku, product_id, products(item_id))
-        `)
-        .eq('company_id', companyId)
-        .eq('order_type', 'standard')
-        .eq('invoices.invoice_type', 'full')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-      setBlanketOrders(data || []);
-    } catch (error) {
-      console.error('Error fetching blanket orders:', error);
-    }
-  };
-
   const fetchSavedAddresses = async (companyId: string) => {
     if (!companyId) {
       setSavedAddresses([]);
@@ -172,6 +137,7 @@ const PullShip = () => {
 
   // Fetch inventory from database for the selected state and company
   // Also includes "General" state products which should be available for all states
+  // Now includes order_id for auto-linking to blanket orders
   const fetchInventoryForState = async (state: string, companyId: string) => {
     if (!state || !companyId) return;
     
@@ -179,10 +145,10 @@ const PullShip = () => {
     try {
       console.log('Fetching inventory for state:', state, 'and General, companyId:', companyId);
       
-      // Fetch both state-specific inventory AND "General" inventory
+      // Fetch both state-specific inventory AND "General" inventory, including linked order_id
       const { data, error } = await supabase
         .from('inventory')
-        .select('*, products(image_url, item_id, name)')
+        .select('*, products(image_url, item_id, name), orders:order_id(id, order_number, description)')
         .eq('company_id', companyId)
         .in('state', [state, 'General'])
         .gt('available', 0)
@@ -433,9 +399,7 @@ const PullShip = () => {
       parentOrderId: ""
     }));
     setInventory([]);
-    setBlanketOrders([]);
     setInvoiceItemPrices({});
-    fetchBlanketOrders(companyId);
     fetchSavedAddresses(companyId);
   };
 
@@ -452,15 +416,34 @@ const PullShip = () => {
     }
   };
 
-  // Filter blanket orders based on selected products
-  const filteredBlanketOrders = blanketOrders.filter(order => {
-    if (selectedSkus.size === 0) return true; // Show all if no products selected yet
+  // Auto-detect linked blanket orders from selected inventory items
+  const getLinkedOrdersFromSelection = () => {
+    const orderMap = new Map<string, { orderId: string; orderNumber: string; description: string; skus: string[] }>();
     
-    // Get all item_ids from the order's order_items
-    const orderItemIds = order.order_items?.map((item: any) => item.products?.item_id).filter(Boolean) || [];
+    Array.from(selectedSkus).forEach(sku => {
+      const inventoryItem = inventory.find(item => item.sku === sku);
+      if (inventoryItem?.order_id && inventoryItem?.orders) {
+        const existingEntry = orderMap.get(inventoryItem.order_id);
+        if (existingEntry) {
+          existingEntry.skus.push(sku);
+        } else {
+          orderMap.set(inventoryItem.order_id, {
+            orderId: inventoryItem.order_id,
+            orderNumber: inventoryItem.orders.order_number,
+            description: inventoryItem.orders.description || 'No description',
+            skus: [sku]
+          });
+        }
+      }
+    });
     
-    // Check if any selected SKU matches an order item
-    return Array.from(selectedSkus).some(sku => orderItemIds.includes(sku));
+    return Array.from(orderMap.values());
+  };
+
+  const linkedOrders = getLinkedOrdersFromSelection();
+  const unlinkedSkus = Array.from(selectedSkus).filter(sku => {
+    const inventoryItem = inventory.find(item => item.sku === sku);
+    return !inventoryItem?.order_id;
   });
 
   const fetchInvoiceItemPrices = async (parentOrderId: string) => {
@@ -671,13 +654,15 @@ const PullShip = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Build items with their linked order_ids from inventory
       const items = Array.from(selectedSkus).map(sku => {
         const inventoryItem = inventory.find(item => item.sku === sku);
         return {
           sku,
           itemId: inventoryItem?.products?.item_id,
           name: inventoryItem?.products?.name || sku,
-          quantity: skuQuantities[sku] || 1
+          quantity: skuQuantities[sku] || 1,
+          linkedOrderId: inventoryItem?.order_id || null
         };
       });
 
@@ -688,10 +673,12 @@ const PullShip = () => {
       const orderNum = 10699 + ((count || 0) + 1);
       const orderNumber = String(orderNum);
 
-      // Get parent order item prices if this is linked to a blanket order
+      // Get prices from all linked blanket orders
       let priceMap: Record<string, number> = {};
-      if (orderData.parentOrderId) {
-        const { data: parentData, error: parentError } = await supabase
+      const uniqueOrderIds = [...new Set(items.map(i => i.linkedOrderId).filter(Boolean))];
+      
+      for (const orderId of uniqueOrderIds) {
+        const { data: orderData, error: orderError } = await supabase
           .from('order_items')
           .select(`
             sku,
@@ -699,10 +686,10 @@ const PullShip = () => {
             product_id,
             products!inner(item_id)
           `)
-          .eq('order_id', orderData.parentOrderId);
+          .eq('order_id', orderId);
         
-        if (!parentError && parentData) {
-          parentData.forEach((item: any) => {
+        if (!orderError && orderData) {
+          orderData.forEach((item: any) => {
             const inventorySku = item.products?.item_id;
             if (inventorySku) {
               priceMap[inventorySku] = item.unit_price;
@@ -710,6 +697,9 @@ const PullShip = () => {
           });
         }
       }
+
+      // Use first linked order as parent (for backwards compatibility) or null if multiple
+      const primaryParentOrderId = uniqueOrderIds.length === 1 ? uniqueOrderIds[0] : null;
 
       // Calculate totals using parent order prices (or fallback to $1)
       const itemsWithPrices = items.map(item => {
@@ -732,7 +722,7 @@ const PullShip = () => {
           order_number: orderNumber,
           company_id: orderData.companyId,
           order_type: 'pull_ship',
-          parent_order_id: orderData.parentOrderId || null,
+          parent_order_id: primaryParentOrderId,
           customer_name: orderData.state,
           shipping_name: orderData.state,
           shipping_street: orderData.shippingAddress,
@@ -900,27 +890,29 @@ const PullShip = () => {
                         </Select>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Link to Blanket Order (Optional)</Label>
-                        <Select value={orderData.parentOrderId || "none"} onValueChange={(value) => handleInputChange('parentOrderId', value === "none" ? "" : value)}>
-                          <SelectTrigger className="h-10">
-                            <SelectValue placeholder="Select blanket order..." />
-                          </SelectTrigger>
-                          <SelectContent className="bg-background border border-border shadow-lg z-50">
-                            <SelectItem value="none">None (standalone order)</SelectItem>
-                            {filteredBlanketOrders.map(order => (
-                              <SelectItem key={order.id} value={order.id}>
-                                #{order.order_number} - {order.description || order.customer_name || 'No description'}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedSkus.size > 0 
-                            ? `Showing ${filteredBlanketOrders.length} orders containing selected products`
-                            : "Select products to filter matching blanket orders"}
-                        </p>
-                      </div>
+                      {/* Auto-detected linked orders display */}
+                      {selectedSkus.size > 0 && (
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">Linked Blanket Orders (Auto-detected)</Label>
+                          {linkedOrders.length > 0 ? (
+                            <div className="space-y-2">
+                              {linkedOrders.map(order => (
+                                <div key={order.orderId} className="p-2 bg-muted rounded text-sm">
+                                  <span className="font-medium">#{order.orderNumber}</span> - {order.description}
+                                  <span className="text-muted-foreground ml-2">({order.skus.length} items)</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">No linked orders - inventory was not linked to blanket orders</p>
+                          )}
+                          {unlinkedSkus.length > 0 && (
+                            <p className="text-xs text-warning">
+                              {unlinkedSkus.length} item(s) not linked to any blanket order
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

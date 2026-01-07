@@ -70,8 +70,10 @@ const Inventory = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
+  const [blanketOrders, setBlanketOrders] = useState<any[]>([]);
   const [newInventory, setNewInventory] = useState({
     product_id: '',
+    order_id: '',
     available: 0,
     in_production: 0,
     redline: 0
@@ -110,6 +112,34 @@ const Inventory = () => {
   const fetchCompanies = async () => {
     const { data } = await supabase.from('companies').select('*').order('name');
     if (data) setCompanies(data);
+  };
+
+  const fetchBlanketOrders = async (companyId: string) => {
+    if (!companyId) {
+      setBlanketOrders([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id, 
+          order_number, 
+          description,
+          customer_name,
+          invoices!inner(invoice_type)
+        `)
+        .eq('company_id', companyId)
+        .eq('order_type', 'standard')
+        .eq('invoices.invoice_type', 'full')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setBlanketOrders(data || []);
+    } catch (error) {
+      console.error('Error fetching blanket orders:', error);
+    }
   };
 
   const fetchInventory = async () => {
@@ -305,6 +335,15 @@ const Inventory = () => {
       return;
     }
 
+    if (isVibeAdmin && !newInventory.order_id) {
+      toast({
+        title: "Missing fields",
+        description: "Please select a blanket order to link this inventory.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       // Get the selected product with company_id and state
       const product = products.find(p => p.id === newInventory.product_id);
@@ -348,19 +387,21 @@ const Inventory = () => {
           in_production: newInventory.in_production,
           redline: newInventory.redline,
           product_id: newInventory.product_id,
-          company_id: targetCompanyId
+          company_id: targetCompanyId,
+          order_id: newInventory.order_id || null
         });
 
       if (error) throw error;
 
       toast({
         title: "Inventory added",
-        description: "Successfully added inventory item.",
+        description: "Successfully added inventory item linked to blanket order.",
       });
 
       setShowAddDialog(false);
       setNewInventory({
         product_id: '',
+        order_id: '',
         available: 0,
         in_production: 0,
         redline: 0
@@ -647,7 +688,14 @@ const Inventory = () => {
                 <Label>Product</Label>
                 <Select
                   value={newInventory.product_id}
-                  onValueChange={(value) => setNewInventory({...newInventory, product_id: value})}
+                  onValueChange={(value) => {
+                    const product = products.find(p => p.id === value);
+                    setNewInventory({...newInventory, product_id: value});
+                    // Fetch blanket orders for the product's company
+                    if (product?.company_id) {
+                      fetchBlanketOrders(product.company_id);
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select product" />
@@ -661,6 +709,30 @@ const Inventory = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              {isVibeAdmin && newInventory.product_id && (
+                <div className="space-y-2">
+                  <Label>Link to Blanket Order *</Label>
+                  <Select
+                    value={newInventory.order_id}
+                    onValueChange={(value) => setNewInventory({...newInventory, order_id: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select blanket order..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {blanketOrders.map((order) => (
+                        <SelectItem key={order.id} value={order.id}>
+                          #{order.order_number} - {order.description || order.customer_name || 'No description'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Inventory will be linked to this order for automatic invoicing when pulled
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">

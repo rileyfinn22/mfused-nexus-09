@@ -293,6 +293,7 @@ export type Database = {
           id: string
           in_production: number
           invoice_number: string | null
+          order_id: string | null
           product_id: string
           redline: number
           sku: string
@@ -308,6 +309,7 @@ export type Database = {
           id?: string
           in_production?: number
           invoice_number?: string | null
+          order_id?: string | null
           product_id: string
           redline?: number
           sku: string
@@ -323,6 +325,7 @@ export type Database = {
           id?: string
           in_production?: number
           invoice_number?: string | null
+          order_id?: string | null
           product_id?: string
           redline?: number
           sku?: string
@@ -337,6 +340,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
           {
