@@ -1375,10 +1375,12 @@ const InvoiceDetail = () => {
             )}
           </div>
 
-          {/* QuickBooks Payment Link - Show for admins OR if valid payment link exists for customers */}
+          {/* QuickBooks Payment Link - Show for admins OR for customers if invoice is synced to QB */}
           {(() => {
             const hasValidPaymentLink = invoice.quickbooks_payment_link && invoice.quickbooks_payment_link.startsWith('http');
-            const showSection = isVibeAdmin ? (invoice.quickbooks_id || invoice.quickbooks_payment_link) : hasValidPaymentLink;
+            const isSyncedToQB = !!invoice.quickbooks_id;
+            // Show for admins if any QB connection, show for customers if synced to QB (even without link yet)
+            const showSection = isVibeAdmin ? (invoice.quickbooks_id || invoice.quickbooks_payment_link) : isSyncedToQB;
             
             if (!showSection) return null;
             
@@ -1550,20 +1552,30 @@ const InvoiceDetail = () => {
                             {isVibeAdmin ? 'Preview' : 'Pay Now'}
                           </Button>
                         </div>
-                      </> : invoice.quickbooks_id && isVibeAdmin ? <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
-                        <p className="text-sm text-muted-foreground">
-                          Invoice synced to QuickBooks but payment link is not available yet.
-                        </p>
-                        <Button variant="outline" size="sm" onClick={handleRefreshPaymentLink} disabled={refreshingLink} className="gap-2">
-                          {refreshingLink ? <>
-                              <RefreshCw className="h-4 w-4 animate-spin" />
-                              Refreshing...
-                            </> : <>
-                              <RefreshCw className="h-4 w-4" />
-                              Refresh Payment Link
-                            </>}
-                        </Button>
-                      </div> : isVibeAdmin ? <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                      </> : invoice.quickbooks_id ? (
+                        isVibeAdmin ? (
+                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                              Invoice synced to QuickBooks but payment link is not available yet.
+                            </p>
+                            <Button variant="outline" size="sm" onClick={handleRefreshPaymentLink} disabled={refreshingLink} className="gap-2">
+                              {refreshingLink ? <>
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                  Refreshing...
+                                </> : <>
+                                  <RefreshCw className="h-4 w-4" />
+                                  Refresh Payment Link
+                                </>}
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                            <p className="text-sm text-muted-foreground">
+                              Payment link is being generated. Please check back shortly or contact us for payment options.
+                            </p>
+                          </div>
+                        )
+                      ) : isVibeAdmin ? <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
                         <p className="text-sm text-muted-foreground">
                           Payment link will be available after syncing. Click "Bill" above to sync this invoice to QuickBooks.
                         </p>
