@@ -60,7 +60,7 @@ const AddArtworkDialog = ({
     file: null as File | null,
     previewFile: null as File | null,
     notes: '',
-    artworkType: 'print_ready',
+    artworkType: 'customer',
   });
 
   useEffect(() => {
@@ -76,7 +76,7 @@ const AddArtworkDialog = ({
         file: null,
         previewFile: null,
         notes: '',
-        artworkType: 'print_ready',
+        artworkType: 'customer',
       });
     }
   }, [open, defaultSku, defaultCompanyId, defaultProductId, restrictToCompany]);
@@ -346,11 +346,8 @@ const AddArtworkDialog = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="print_ready">Print Ready</SelectItem>
-                <SelectItem value="proof">Proof</SelectItem>
-                <SelectItem value="mockup">Mockup</SelectItem>
-                <SelectItem value="source">Source File</SelectItem>
-                <SelectItem value="reference">Reference</SelectItem>
+                <SelectItem value="customer">Customer Artwork</SelectItem>
+                <SelectItem value="vibe_proof">Vibe Proof</SelectItem>
               </SelectContent>
             </Select>
           </div>
