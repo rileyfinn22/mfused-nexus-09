@@ -137,9 +137,21 @@ const VendorPOs = () => {
     }
   };
 
+  const handleDescriptionChange = async (poId: string, description: string) => {
+    const { error } = await supabase
+      .from("vendor_pos")
+      .update({ description })
+      .eq("id", poId);
+
+    if (error) {
+      console.error("Error updating vendor PO description:", error);
+    }
+  };
+
   const filteredPOs = pos.filter(po => {
     const matchesSearch = po.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (po.vendors?.name && po.vendors.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      (po.vendors?.name && po.vendors.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (po.description && po.description.toLowerCase().includes(searchQuery.toLowerCase()));
     
     const matchesType = typeFilter === "all" || 
       (typeFilter === "expense" && po.po_type === "expense") ||
@@ -191,9 +203,9 @@ const VendorPOs = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>PO Number</TableHead>
-                <TableHead>Type</TableHead>
                 <TableHead>Vendor</TableHead>
                 <TableHead>Customer/Order</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
@@ -234,22 +246,26 @@ const VendorPOs = () => {
                     }}
                   >
                     <TableCell className="font-medium">{po.po_number}</TableCell>
-                    <TableCell>
-                      <Badge variant={po.po_type === 'expense' ? 'secondary' : 'outline'}>
-                        {po.po_type === 'expense' ? 'Expense' : 'Production'}
-                      </Badge>
-                      {po.expense_category && (
-                        <span className="text-xs text-muted-foreground ml-1">
-                          ({po.expense_category})
-                        </span>
-                      )}
-                    </TableCell>
                     <TableCell>{po.vendors?.name || 'Unassigned'}</TableCell>
                     <TableCell>
                       {po.po_type === 'expense' 
                         ? (po.customer_company?.name || '-')
                         : (po.orders?.order_number || '-')
                       }
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        className="h-8 text-sm bg-transparent border-transparent hover:border-input focus:border-input"
+                        placeholder="Add description..."
+                        defaultValue={po.description || ''}
+                        onClick={(e) => e.stopPropagation()}
+                        onBlur={(e) => handleDescriptionChange(po.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
+                          }
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
                       {new Date(po.order_date).toLocaleDateString()}
