@@ -1375,8 +1375,8 @@ const InvoiceDetail = () => {
             )}
           </div>
 
-          {/* QuickBooks Payment Link */}
-          {invoice.quickbooks_id && (
+          {/* QuickBooks Payment Link - Show for admins OR if payment link exists for customers */}
+          {(invoice.quickbooks_id || invoice.quickbooks_payment_link) && (
             showPaymentPortal ? (
               <div className="p-8 border-b bg-gradient-to-r from-green-500/10 to-emerald-500/5">
                 <div className="flex items-start gap-6">
@@ -1386,10 +1386,12 @@ const InvoiceDetail = () => {
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-lg font-semibold flex items-center gap-2">
-                        Customer Payment Portal
-                        <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20">
-                          QuickBooks
-                        </Badge>
+                        {isVibeAdmin ? 'Customer Payment Portal' : 'Pay Invoice'}
+                        {isVibeAdmin && (
+                          <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20">
+                            QuickBooks
+                          </Badge>
+                        )}
                       </h3>
                       <Button variant="ghost" size="sm" onClick={() => setShowPaymentPortal(false)}>
                         Close
@@ -1457,68 +1459,93 @@ const InvoiceDetail = () => {
                       
                       <div className="bg-background/50 border rounded-lg p-4">
                         <div className="text-sm text-muted-foreground mb-1">Status</div>
-                        <Select
-                          value={invoice.status}
-                          onValueChange={async (value) => {
-                            const { error } = await supabase
-                              .from('invoices')
-                              .update({ status: value })
-                              .eq('id', invoice.id);
-                            
-                            if (error) {
-                              toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
-                            } else {
-                              setInvoice({ ...invoice, status: value });
-                              toast({ title: "Status updated" });
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="w-full text-xl font-semibold h-auto py-1">
-                            <SelectValue>
-                              {invoice.status === 'paid' && <span className="text-green-600">PAID</span>}
-                              {invoice.status === 'open' && <span className="text-yellow-600">OPEN</span>}
-                              {invoice.status === 'due' && <span className="text-red-600">DUE</span>}
-                              {!['paid', 'open', 'due'].includes(invoice.status) && <span>{invoice.status?.toUpperCase()}</span>}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="open">
-                              <span className="text-yellow-600 font-medium">OPEN</span>
-                            </SelectItem>
-                            <SelectItem value="due">
-                              <span className="text-red-600 font-medium">DUE</span>
-                            </SelectItem>
-                            <SelectItem value="paid">
-                              <span className="text-green-600 font-medium">PAID</span>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {isVibeAdmin ? (
+                          <Select
+                            value={invoice.status}
+                            onValueChange={async (value) => {
+                              const { error } = await supabase
+                                .from('invoices')
+                                .update({ status: value })
+                                .eq('id', invoice.id);
+                              
+                              if (error) {
+                                toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+                              } else {
+                                setInvoice({ ...invoice, status: value });
+                                toast({ title: "Status updated" });
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-full text-xl font-semibold h-auto py-1">
+                              <SelectValue>
+                                {invoice.status === 'paid' && <span className="text-green-600">PAID</span>}
+                                {invoice.status === 'open' && <span className="text-yellow-600">OPEN</span>}
+                                {invoice.status === 'due' && <span className="text-red-600">DUE</span>}
+                                {!['paid', 'open', 'due'].includes(invoice.status) && <span>{invoice.status?.toUpperCase()}</span>}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="open">
+                                <span className="text-yellow-600 font-medium">OPEN</span>
+                              </SelectItem>
+                              <SelectItem value="due">
+                                <span className="text-red-600 font-medium">DUE</span>
+                              </SelectItem>
+                              <SelectItem value="paid">
+                                <span className="text-green-600 font-medium">PAID</span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <p className="font-semibold text-xl">
+                            {invoice.status === 'paid' && <span className="text-green-600">PAID</span>}
+                            {invoice.status === 'open' && <span className="text-yellow-600">OPEN</span>}
+                            {invoice.status === 'due' && <span className="text-red-600">DUE</span>}
+                            {!['paid', 'open', 'due'].includes(invoice.status) && <span>{invoice.status?.toUpperCase()}</span>}
+                          </p>
+                        )}
                       </div>
                     </div>
                     
                     {invoice.quickbooks_payment_link && invoice.quickbooks_payment_link.startsWith('http') ? <>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Share this secure payment link with your customer to accept online payments through QuickBooks
-                        </p>
+                        {isVibeAdmin && (
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Share this secure payment link with your customer to accept online payments through QuickBooks
+                          </p>
+                        )}
+                        {!isVibeAdmin && (
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Click the button below to securely pay this invoice online
+                          </p>
+                        )}
                         <div className="flex items-center gap-3 flex-wrap">
-                          <div className="flex-1 min-w-[300px] bg-background border rounded-lg p-3 font-mono text-sm truncate">
-                            {invoice.quickbooks_payment_link}
-                          </div>
-                          <Button variant="default" size="sm" onClick={handleCopyPaymentLink} className="gap-2">
-                            {copiedLink ? <>
-                                <CheckCircle2 className="h-4 w-4" />
-                                Copied!
-                              </> : <>
-                                <Copy className="h-4 w-4" />
-                                Copy Link
-                              </>}
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => window.open(invoice.quickbooks_payment_link, '_blank')} className="gap-2">
+                          {isVibeAdmin && (
+                            <div className="flex-1 min-w-[300px] bg-background border rounded-lg p-3 font-mono text-sm truncate">
+                              {invoice.quickbooks_payment_link}
+                            </div>
+                          )}
+                          {isVibeAdmin && (
+                            <Button variant="default" size="sm" onClick={handleCopyPaymentLink} className="gap-2">
+                              {copiedLink ? <>
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  Copied!
+                                </> : <>
+                                  <Copy className="h-4 w-4" />
+                                  Copy Link
+                                </>}
+                            </Button>
+                          )}
+                          <Button 
+                            variant={isVibeAdmin ? "outline" : "default"} 
+                            size={isVibeAdmin ? "sm" : "lg"}
+                            onClick={() => window.open(invoice.quickbooks_payment_link, '_blank')} 
+                            className="gap-2"
+                          >
                             <ExternalLink className="h-4 w-4" />
-                            Preview
+                            {isVibeAdmin ? 'Preview' : 'Pay Now'}
                           </Button>
                         </div>
-                      </> : invoice.quickbooks_id ? <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
+                      </> : invoice.quickbooks_id && isVibeAdmin ? <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
                         <p className="text-sm text-muted-foreground">
                           Invoice synced to QuickBooks but payment link is not available yet.
                         </p>
@@ -1531,11 +1558,15 @@ const InvoiceDetail = () => {
                               Refresh Payment Link
                             </>}
                         </Button>
-                      </div> : <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                      </div> : !isVibeAdmin && !invoice.quickbooks_payment_link ? <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                        <p className="text-sm text-muted-foreground">
+                          Online payment is not yet available for this invoice. Please contact your account manager.
+                        </p>
+                      </div> : isVibeAdmin ? <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
                         <p className="text-sm text-muted-foreground">
                           Payment link will be available after syncing. Click "Bill" above to sync this invoice to QuickBooks.
                         </p>
-                      </div>}
+                      </div> : null}
                   </div>
                 </div>
               </div>
@@ -1544,10 +1575,10 @@ const InvoiceDetail = () => {
                 <Button 
                   onClick={() => setShowPaymentPortal(true)}
                   className="gap-2"
-                  variant="outline"
+                  variant={isVibeAdmin ? "outline" : "default"}
                 >
                   <DollarSign className="h-4 w-4" />
-                  Get Payment Link
+                  {isVibeAdmin ? 'Get Payment Link' : (invoice.quickbooks_payment_link ? 'Pay Invoice' : 'Payment Options')}
                 </Button>
               </div>
             )
