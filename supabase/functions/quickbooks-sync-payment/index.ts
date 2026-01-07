@@ -192,6 +192,12 @@ serve(async (req) => {
 
     console.log('Found QuickBooks customer ID from invoice:', qbCustomerId);
 
+    // QuickBooks PaymentRefNum (doc_num) max length is 21 chars
+    const paymentRefNumRaw = (payment.reference_number ?? '').toString().trim();
+    const paymentRefNum = paymentRefNumRaw.length > 21
+      ? paymentRefNumRaw.slice(0, 21)
+      : paymentRefNumRaw;
+
     // Create payment in QuickBooks
     const paymentData = {
       TotalAmt: parseFloat(payment.amount),
@@ -208,7 +214,7 @@ serve(async (req) => {
       TxnDate: payment.payment_date.split('T')[0],
       PaymentMethodRef: payment.payment_method === 'check' ? { value: "1" } : { value: "2" },
       PrivateNote: payment.notes || '',
-      PaymentRefNum: payment.reference_number || '',
+      PaymentRefNum: paymentRefNum,
     };
 
     console.log('Creating payment in QuickBooks:', JSON.stringify(paymentData, null, 2));
