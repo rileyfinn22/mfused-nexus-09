@@ -6,13 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Edit, Save, X, Plus, Send } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Download, Edit, Save, X, Plus, Send, DollarSign, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
 import { EmailPreviewDialog } from "@/components/EmailPreviewDialog";
+import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
@@ -23,6 +25,7 @@ const VendorPODetail = () => {
   const returnTo = searchParams.get('returnTo') || '/vendor-pos';
   const [po, setPO] = useState<any>(null);
   const [poItems, setPOItems] = useState<any[]>([]);
+  const [poPayments, setPOPayments] = useState<any[]>([]);
   const [vendor, setVendor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -30,6 +33,7 @@ const VendorPODetail = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -94,6 +98,17 @@ const VendorPODetail = () => {
 
     if (itemsData) {
       setPOItems(itemsData);
+    }
+
+    // Fetch PO payments
+    const { data: paymentsData } = await supabase
+      .from('vendor_po_payments')
+      .select('*')
+      .eq('vendor_po_id', poId)
+      .order('payment_date', { ascending: false });
+
+    if (paymentsData) {
+      setPOPayments(paymentsData);
     }
 
     setLoading(false);
@@ -775,6 +790,12 @@ Thank you for your business.`;
             <Download className="h-4 w-4 mr-2" />
             Download PDF
           </Button>
+          {isAdmin && (
+            <Button variant="outline" onClick={() => setShowPaymentDialog(true)}>
+              <DollarSign className="h-4 w-4 mr-2" />
+              Record Payment
+            </Button>
+          )}
           {vendor?.contact_email && (
             <Button onClick={() => setShowEmailPreview(true)}>
               <Send className="h-4 w-4 mr-2" />
@@ -800,30 +821,45 @@ Thank you for your business.`;
                 </p>
               </div>
               <div className="text-right">
-                {isEditMode ? (
-                  <Select
-                    value={editedPO.status}
-                    onValueChange={(value) => setEditedPO({...editedPO, status: value})}
-                  >
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {po.status === 'draft' ? (
-                        <>
-                          <SelectItem value="draft">Draft</SelectItem>
-                          <SelectItem value="submitted">Submitted</SelectItem>
-                        </>
-                      ) : (
-                        <SelectItem value="submitted">Submitted</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <span className="inline-block px-4 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary capitalize">
-                    {po.status.replace('_', ' ')}
-                  </span>
-                )}
+                {(() => {
+                  const getStatusBadge = () => {
+                    switch (po.status) {
+                      case 'paid':
+                        return <Badge className="bg-green-500 text-white">Paid</Badge>;
+                      case 'partial':
+                        return <Badge variant="default">Partial Paid</Badge>;
+                      case 'unpaid':
+                        return <Badge variant="destructive">Unpaid</Badge>;
+                      default:
+                        return <Badge variant="secondary">{po.status.replace('_', ' ')}</Badge>;
+                    }
+                  };
+                  return getStatusBadge();
+                })()}
+              </div>
+            </div>
+
+            {/* Payment Summary */}
+            <div className="mt-6 bg-background/80 backdrop-blur rounded-lg p-4">
+              <div className="grid grid-cols-4 gap-4 text-center">
+                <div>
+                  <p className="text-xs text-muted-foreground">PO Total</p>
+                  <p className="text-lg font-bold">${Number(po.total || 0).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Paid</p>
+                  <p className="text-lg font-bold text-green-600">${Number(po.total_paid || 0).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Amount Owed</p>
+                  <p className="text-lg font-bold text-destructive">
+                    ${(Number(po.total || 0) - Number(po.total_paid || 0)).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Payments</p>
+                  <p className="text-lg font-bold">{poPayments.length}</p>
+                </div>
               </div>
             </div>
 
@@ -1104,6 +1140,84 @@ Thank you for your business.`;
         </CardContent>
       </Card>
 
+      {/* Payments Section */}
+      {poPayments.length > 0 && (
+        <Card className="shadow-lg mt-6">
+          <CardContent className="p-6">
+            <h2 className="text-lg font-semibold mb-4">Payment History</h2>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead>Notes</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  {isAdmin && <TableHead className="text-center">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {poPayments.map((payment) => (
+                  <TableRow key={payment.id}>
+                    <TableCell>
+                      {new Date(payment.payment_date).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {payment.payment_method.replace('_', ' ')}
+                    </TableCell>
+                    <TableCell>
+                      {payment.reference_number || '-'}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate">
+                      {payment.notes || '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      ${Number(payment.amount).toFixed(2)}
+                    </TableCell>
+                    {isAdmin && (
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={async () => {
+                            if (!confirm('Delete this payment?')) return;
+                            const { error } = await supabase
+                              .from('vendor_po_payments')
+                              .delete()
+                              .eq('id', payment.id);
+                            if (error) {
+                              toast({
+                                title: "Error",
+                                description: "Failed to delete payment",
+                                variant: "destructive"
+                              });
+                            } else {
+                              toast({ title: "Payment deleted" });
+                              fetchPODetails();
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <div className="flex justify-end mt-4 pt-4 border-t">
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Total Payments</p>
+                <p className="text-xl font-bold text-green-600">
+                  ${poPayments.reduce((sum, p) => sum + Number(p.amount), 0).toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Email Preview Dialog */}
       <EmailPreviewDialog
         open={showEmailPreview}
@@ -1115,6 +1229,16 @@ Thank you for your business.`;
         attachmentName={`PO-${po?.po_number}.pdf`}
         onSend={handleSendEmail}
         sending={sendingEmail}
+      />
+
+      {/* Record Payment Dialog */}
+      <RecordVendorPOPaymentDialog
+        open={showPaymentDialog}
+        onOpenChange={setShowPaymentDialog}
+        vendorPO={po}
+        onSuccess={() => {
+          fetchPODetails();
+        }}
       />
     </div>
   );

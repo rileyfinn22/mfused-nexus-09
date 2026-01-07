@@ -20,6 +20,7 @@ interface ProjectSummary {
   total_revenue: number;
   total_paid: number;
   total_costs: number;
+  total_costs_paid: number;
   accrual_profit: number;
   cash_profit: number;
   invoice_count: number;
@@ -69,12 +70,13 @@ const Projects = () => {
         // Fetch vendor POs
         const { data: vendorPOs } = await supabase
           .from('vendor_pos')
-          .select('id, total')
+          .select('id, total, total_paid')
           .eq('order_id', order.id);
 
         const totalRevenue = (invoices || []).reduce((sum, inv) => sum + (inv.total || 0), 0);
         const totalPaid = (invoices || []).reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
         const totalCosts = (vendorPOs || []).reduce((sum, po) => sum + (po.total || 0), 0);
+        const totalCostsPaid = (vendorPOs || []).reduce((sum, po) => sum + (po.total_paid || 0), 0);
 
         return {
           id: order.id,
@@ -87,8 +89,9 @@ const Projects = () => {
           total_revenue: totalRevenue,
           total_paid: totalPaid,
           total_costs: totalCosts,
+          total_costs_paid: totalCostsPaid,
           accrual_profit: totalRevenue - totalCosts,
-          cash_profit: totalPaid - totalCosts,
+          cash_profit: totalPaid - totalCostsPaid,
           invoice_count: invoices?.length || 0,
           vendor_po_count: vendorPOs?.length || 0,
         };
@@ -261,7 +264,7 @@ const Projects = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">{formatCurrency(revenue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(project.total_costs)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(plView === "accrual" ? project.total_costs : project.total_costs_paid)}</TableCell>
                     <TableCell className={`text-right font-medium ${getProfitColor(profit)}`}>
                       {formatCurrency(profit)}
                     </TableCell>
