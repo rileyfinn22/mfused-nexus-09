@@ -284,8 +284,8 @@ const Customers = () => {
 
       {/* Customers Table */}
       <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-        <div className="bg-muted/30 border-b border-border">
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <div className="bg-muted border-b-2 border-border">
+          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <div className="col-span-3">Company Name</div>
             <div className="col-span-3">Contact</div>
             <div className="col-span-3">Billing Address</div>
@@ -294,7 +294,7 @@ const Customers = () => {
           </div>
         </div>
 
-        <div className="divide-y divide-border/50">
+        <div className="divide-y divide-border">
           {loading ? (
             <div className="text-center py-12 text-muted-foreground">
               Loading companies...
@@ -307,7 +307,7 @@ const Customers = () => {
             filteredCustomers.map((customer) => (
               <div 
                 key={customer.id} 
-                className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer even:bg-muted/10"
+                className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer even:bg-muted/40"
                 onClick={() => navigate(`/customers/${customer.id}`)}
               >
                 <div className="col-span-3">

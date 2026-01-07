@@ -236,8 +236,8 @@ export default function Production() {
         </div>
 
         <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-          <div className="bg-muted/30 border-b border-border">
-            <div className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider`}>
+          <div className="bg-muted border-b-2 border-border">
+            <div className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider`}>
               <div className="col-span-2 text-left">Order #</div>
               {isVibeAdmin && <div className="col-span-2 text-left">Company</div>}
               <div className="col-span-3 text-left">Description</div>
@@ -247,7 +247,7 @@ export default function Production() {
               <div className="col-span-1 text-left">Order Date</div>
             </div>
           </div>
-          <div className="divide-y divide-border/50">
+          <div className="divide-y divide-border">
             {loading ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
@@ -261,7 +261,7 @@ export default function Production() {
               filteredOrders.map((order) => (
                 <div
                   key={order.id}
-                  className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer even:bg-muted/10`}
+                  className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer even:bg-muted/40`}
                   onClick={() => navigate(`/orders/${order.id}`)}
                 >
                   <div className="col-span-2 text-left font-medium font-mono text-sm">{order.order_number}</div>
