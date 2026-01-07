@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, FolderKanban, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -15,14 +14,14 @@ interface ProjectSummary {
   customer_name: string;
   company_id: string;
   company_name: string;
+  description: string | null;
   order_date: string;
   status: string;
   total_revenue: number;
   total_paid: number;
   total_costs: number;
   total_costs_paid: number;
-  accrual_profit: number;
-  cash_profit: number;
+  profit: number;
   invoice_count: number;
   vendor_po_count: number;
 }
@@ -32,7 +31,6 @@ const Projects = () => {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [plView, setPlView] = useState<"accrual" | "cash">("accrual");
 
   useEffect(() => {
     fetchProjects();
@@ -49,6 +47,7 @@ const Projects = () => {
           order_number,
           customer_name,
           company_id,
+          description,
           order_date,
           status,
           companies(name)
@@ -84,14 +83,14 @@ const Projects = () => {
           customer_name: order.customer_name,
           company_id: order.company_id,
           company_name: (order.companies as any)?.name || 'Unknown',
+          description: order.description,
           order_date: order.order_date,
           status: order.status,
           total_revenue: totalRevenue,
           total_paid: totalPaid,
           total_costs: totalCosts,
           total_costs_paid: totalCostsPaid,
-          accrual_profit: totalRevenue - totalCosts,
-          cash_profit: totalPaid - totalCostsPaid,
+          profit: totalRevenue - totalCosts,
           invoice_count: invoices?.length || 0,
           vendor_po_count: vendorPOs?.length || 0,
         };
@@ -116,9 +115,8 @@ const Projects = () => {
     revenue: acc.revenue + project.total_revenue,
     paid: acc.paid + project.total_paid,
     costs: acc.costs + project.total_costs,
-    accrualProfit: acc.accrualProfit + project.accrual_profit,
-    cashProfit: acc.cashProfit + project.cash_profit,
-  }), { revenue: 0, paid: 0, costs: 0, accrualProfit: 0, cashProfit: 0 });
+    profit: acc.profit + project.profit,
+  }), { revenue: 0, paid: 0, costs: 0, profit: 0 });
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -155,7 +153,7 @@ const Projects = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -182,22 +180,9 @@ const Projects = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Accrual P&L</p>
-                <p className={`text-2xl font-bold ${getProfitColor(totals.accrualProfit)}`}>
-                  {formatCurrency(totals.accrualProfit)}
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-success/20" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Cash P&L</p>
-                <p className={`text-2xl font-bold ${getProfitColor(totals.cashProfit)}`}>
-                  {formatCurrency(totals.cashProfit)}
+                <p className="text-sm text-muted-foreground">Profit</p>
+                <p className={`text-2xl font-bold ${getProfitColor(totals.profit)}`}>
+                  {formatCurrency(totals.profit)}
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-success/20" />
@@ -206,8 +191,8 @@ const Projects = () => {
         </Card>
       </div>
 
-      {/* Search and View Toggle */}
-      <div className="flex items-center justify-between gap-4">
+      {/* Search */}
+      <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -217,12 +202,6 @@ const Projects = () => {
             className="pl-10"
           />
         </div>
-        <Tabs value={plView} onValueChange={(v) => setPlView(v as "accrual" | "cash")}>
-          <TabsList>
-            <TabsTrigger value="accrual">Accrual</TabsTrigger>
-            <TabsTrigger value="cash">Cash</TabsTrigger>
-          </TabsList>
-        </Tabs>
       </div>
 
       {/* Projects Table */}
@@ -232,20 +211,20 @@ const Projects = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Order #</TableHead>
-                <TableHead>Customer</TableHead>
                 <TableHead>Company</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Revenue</TableHead>
                 <TableHead className="text-right">Costs</TableHead>
-                <TableHead className="text-right">{plView === "accrual" ? "Accrual P&L" : "Cash P&L"}</TableHead>
+                <TableHead className="text-right">Profit</TableHead>
                 <TableHead className="text-right">Margin</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredProjects.map((project) => {
-                const profit = plView === "accrual" ? project.accrual_profit : project.cash_profit;
-                const revenue = plView === "accrual" ? project.total_revenue : project.total_paid;
+                const profit = project.profit;
+                const revenue = project.total_revenue;
                 const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
 
                 return (
@@ -255,8 +234,10 @@ const Projects = () => {
                     onClick={() => navigate(`/projects/${project.id}`)}
                   >
                     <TableCell className="font-medium">{project.order_number}</TableCell>
-                    <TableCell>{project.customer_name}</TableCell>
-                    <TableCell className="text-muted-foreground">{project.company_name}</TableCell>
+                    <TableCell>{project.company_name}</TableCell>
+                    <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                      {project.description || '-'}
+                    </TableCell>
                     <TableCell>{new Date(project.order_date).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Badge variant={project.status === 'completed' ? 'default' : 'secondary'}>
@@ -264,7 +245,7 @@ const Projects = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">{formatCurrency(revenue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(plView === "accrual" ? project.total_costs : project.total_costs_paid)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(project.total_costs)}</TableCell>
                     <TableCell className={`text-right font-medium ${getProfitColor(profit)}`}>
                       {formatCurrency(profit)}
                     </TableCell>
