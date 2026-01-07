@@ -823,6 +823,8 @@ serve(async (req) => {
       CustomerMemo: {
         value: invoice.orders?.memo || '',
       },
+      // Ensures the invoice can be "sent" to generate an InvoiceLink (and enables view/pay online experiences).
+      BillEmail: customerEmail ? { Address: customerEmail } : undefined,
       BillAddr: {
         Line1: invoice.orders?.billing_street || invoice.orders?.shipping_street || '',
         City: invoice.orders?.billing_city || invoice.orders?.shipping_city || '',
@@ -1049,13 +1051,14 @@ serve(async (req) => {
     console.log('QuickBooks Invoice ID:', qbInvoiceId);
     console.log('QuickBooks Realm ID:', qbRealmId);
     
-    // QuickBooks payment link - Enable online payments and generate direct payment URL
-    let qbPaymentLink = null;
-    
+    // QuickBooks payment link
+    // Note: QuickBooks only returns InvoiceLink in certain scenarios (commonly after "send").
+    // We attempt to enable online payments, then fetch, then send (once) to obtain the InvoiceLink.
+    let qbPaymentLink: string | null = null;
+
     try {
       console.log('Enabling online payments on invoice...');
-      
-      // Ensure online payment is enabled on the invoice
+
       const updatePayload = {
         Id: qbInvoiceId,
         SyncToken: qbData.Invoice.SyncToken,
@@ -1063,8 +1066,9 @@ serve(async (req) => {
         AllowOnlinePayment: true,
         AllowOnlineCreditCardPayment: true,
         AllowOnlineACHPayment: true,
+        BillEmail: customerEmail ? { Address: customerEmail } : undefined,
       };
-      
+
       const updateResponse = await fetch(`${qbApiUrl}/invoice?minorversion=73`, {
         method: 'POST',
         headers: {
@@ -1074,32 +1078,68 @@ serve(async (req) => {
         },
         body: JSON.stringify(updatePayload),
       });
-      
+
+      let updatedInvoice: any = null;
       if (updateResponse.ok) {
-        const updatedInvoice = await updateResponse.json();
+        updatedInvoice = await updateResponse.json();
         console.log('Online payment enabled on invoice');
-        
-        // Check if there's an invoice link from QuickBooks response
-        if (updatedInvoice.Invoice?.InvoiceLink) {
-          qbPaymentLink = updatedInvoice.Invoice.InvoiceLink;
-          console.log('Payment link from QuickBooks:', qbPaymentLink);
-        } else {
-          // Generate the direct payment URL using QuickBooks standard format
-          // This URL allows customers to view and pay the invoice directly
-          qbPaymentLink = `https://app.qbo.intuit.com/app/customerlink?realmId=${qbRealmId}&docNumber=${qbDocNumber}&docType=invoice`;
-          console.log('Generated payment link:', qbPaymentLink);
-        }
+        qbPaymentLink = updatedInvoice.Invoice?.InvoiceLink || null;
       } else {
-        // Even if update fails, generate the link - invoice was still created
-        console.log('Could not enable online payments, generating link anyway');
-        qbPaymentLink = `https://app.qbo.intuit.com/app/customerlink?realmId=${qbRealmId}&docNumber=${qbDocNumber}&docType=invoice`;
+        const err = await updateResponse.json().catch(() => ({}));
+        console.warn('Could not enable online payments on invoice:', JSON.stringify(err));
+      }
+
+      // If InvoiceLink still not present, fetch the invoice to check if it was generated asynchronously.
+      if (!qbPaymentLink) {
+        console.log('Fetching invoice to check for InvoiceLink...');
+        const getInvoiceResp = await fetch(`${qbApiUrl}/invoice/${qbInvoiceId}?minorversion=73`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (getInvoiceResp.ok) {
+          const fetched = await getInvoiceResp.json();
+          qbPaymentLink = fetched.Invoice?.InvoiceLink || null;
+
+          const emailStatus = fetched.Invoice?.EmailStatus;
+          console.log('Invoice EmailStatus:', emailStatus);
+
+          // If still missing, try "send" (generates customer-facing link in many setups).
+          // Guard to avoid repeated emails: only send if not already EmailSent.
+          if (!qbPaymentLink && customerEmail && emailStatus !== 'EmailSent') {
+            console.log('InvoiceLink missing; attempting to send invoice to generate link...');
+
+            const sendResp = await fetch(
+              `${qbApiUrl}/invoice/${qbInvoiceId}/send?sendTo=${encodeURIComponent(customerEmail)}&minorversion=73`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json',
+                },
+              }
+            );
+
+            if (sendResp.ok) {
+              const sent = await sendResp.json();
+              qbPaymentLink = sent.Invoice?.InvoiceLink || null;
+              console.log('Send invoice completed; InvoiceLink:', qbPaymentLink);
+            } else {
+              const sendErr = await sendResp.json().catch(() => ({}));
+              console.warn('Send invoice failed:', JSON.stringify(sendErr));
+            }
+          }
+        } else {
+          const getErr = await getInvoiceResp.json().catch(() => ({}));
+          console.warn('Failed to fetch invoice for InvoiceLink:', JSON.stringify(getErr));
+        }
       }
     } catch (linkError) {
-      console.error('Error configuring payment options:', linkError);
-      // Still generate link on error
-      qbPaymentLink = `https://app.qbo.intuit.com/app/customerlink?realmId=${qbRealmId}&docNumber=${qbDocNumber}&docType=invoice`;
+      console.error('Error configuring payment options / retrieving InvoiceLink:', linkError);
     }
-    
+
     console.log('QuickBooks invoice ID:', qbInvoiceId);
     console.log('QuickBooks DocNumber:', qbDocNumber);
     console.log('QuickBooks payment link:', qbPaymentLink);
