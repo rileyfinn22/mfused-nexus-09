@@ -225,8 +225,8 @@ const OrderDetail = () => {
   };
 
   const handleUploadVibeAttachment = async () => {
-    if (!vibeAttachmentFile) {
-      toast({ title: "Error", description: "Please select a file", variant: "destructive" });
+    if (!vibeAttachmentFile && !vibeAttachmentNote.trim()) {
+      toast({ title: "Error", description: "Please add a note or select a file", variant: "destructive" });
       return;
     }
 
@@ -235,40 +235,44 @@ const OrderDetail = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const fileExt = vibeAttachmentFile.name.split('.').pop();
-      const fileName = `${orderId}/${Date.now()}.${fileExt}`;
+      let fileName = null;
+      let fileType = null;
+      let originalFileName = null;
 
-      const { error: uploadError } = await supabase.storage
-        .from('vibe-attachments')
-        .upload(fileName, vibeAttachmentFile);
+      // Only upload file if one was selected
+      if (vibeAttachmentFile) {
+        const fileExt = vibeAttachmentFile.name.split('.').pop();
+        fileName = `${orderId}/${Date.now()}.${fileExt}`;
+        fileType = vibeAttachmentFile.type;
+        originalFileName = vibeAttachmentFile.name;
 
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from('vibe-attachments')
+          .upload(fileName, vibeAttachmentFile);
 
-      // Get signed URL for private bucket
-      const { data: urlData } = await supabase.storage
-        .from('vibe-attachments')
-        .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
+        if (uploadError) throw uploadError;
+      }
 
       const { error: insertError } = await supabase
         .from('vibe_note_attachments')
         .insert({
           order_id: orderId,
-          file_url: fileName, // Store path, not full URL
-          file_name: vibeAttachmentFile.name,
-          file_type: vibeAttachmentFile.type,
+          file_url: fileName || '', // Empty string for note-only entries
+          file_name: originalFileName || 'Note',
+          file_type: fileType,
           uploaded_by: user.id,
-          note: vibeAttachmentNote || null,
+          note: vibeAttachmentNote.trim() || null,
         });
 
       if (insertError) throw insertError;
 
-      toast({ title: "Success", description: "Attachment uploaded" });
+      toast({ title: "Success", description: vibeAttachmentFile ? "Attachment uploaded" : "Note added" });
       setVibeAttachmentFile(null);
       setVibeAttachmentNote('');
       fetchVibeAttachments();
     } catch (error: any) {
       console.error('Error uploading attachment:', error);
-      toast({ title: "Error", description: "Failed to upload attachment", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to save", variant: "destructive" });
     } finally {
       setUploadingVibeAttachment(false);
     }
@@ -1630,23 +1634,31 @@ const OrderDetail = () => {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Note (Optional)</Label>
+                    <Label className="text-xs">Note</Label>
                     <Textarea
                       value={vibeAttachmentNote}
                       onChange={(e) => setVibeAttachmentNote(e.target.value)}
-                      placeholder="Add a note about this attachment..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleUploadVibeAttachment();
+                        }
+                      }}
+                      placeholder="Add a note (press Enter to submit, Shift+Enter for new line)..."
                       rows={2}
                     />
                   </div>
                   <Button
                     onClick={handleUploadVibeAttachment}
-                    disabled={!vibeAttachmentFile || uploadingVibeAttachment}
+                    disabled={(!vibeAttachmentFile && !vibeAttachmentNote.trim()) || uploadingVibeAttachment}
                     size="sm"
                   >
                     {uploadingVibeAttachment ? (
-                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</>
-                    ) : (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
+                    ) : vibeAttachmentFile ? (
                       <><Paperclip className="h-4 w-4 mr-2" />Upload Attachment</>
+                    ) : (
+                      <><Plus className="h-4 w-4 mr-2" />Add Note</>
                     )}
                   </Button>
                 </div>
