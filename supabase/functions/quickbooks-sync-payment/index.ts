@@ -156,11 +156,47 @@ serve(async (req) => {
       accessToken = await refreshAccessToken(supabase, vibeCompanyId, qbSettings.refresh_token);
     }
 
+    const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
+
+    // Fetch the invoice from QuickBooks to get the actual CustomerRef
+    console.log('Fetching invoice from QuickBooks:', payment.invoices.quickbooks_id);
+    const invoiceResponse = await fetch(
+      `${qbApiUrl}/invoice/${payment.invoices.quickbooks_id}?minorversion=65`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json',
+        },
+      }
+    );
+
+    if (!invoiceResponse.ok) {
+      const errorText = await invoiceResponse.text();
+      console.error('Failed to fetch invoice from QuickBooks:', errorText);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch invoice from QuickBooks', details: errorText }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const invoiceData = await invoiceResponse.json();
+    const qbCustomerId = invoiceData.Invoice?.CustomerRef?.value;
+
+    if (!qbCustomerId) {
+      console.error('No CustomerRef found in QuickBooks invoice');
+      return new Response(
+        JSON.stringify({ error: 'Invoice in QuickBooks has no customer reference' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Found QuickBooks customer ID from invoice:', qbCustomerId);
+
     // Create payment in QuickBooks
     const paymentData = {
       TotalAmt: parseFloat(payment.amount),
       CustomerRef: {
-        value: payment.invoices.quickbooks_id.split('-')[0], // Extract customer ID from invoice
+        value: qbCustomerId,
       },
       Line: [{
         Amount: parseFloat(payment.amount),
