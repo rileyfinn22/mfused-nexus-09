@@ -198,8 +198,54 @@ serve(async (req) => {
       ? paymentRefNumRaw.slice(0, 21)
       : paymentRefNumRaw;
 
+    // Query QuickBooks for payment methods to find the correct one
+    let paymentMethodRef = undefined;
+    try {
+      const paymentMethodsResponse = await fetch(
+        `${qbApiUrl}/query?query=${encodeURIComponent("SELECT * FROM PaymentMethod")}&minorversion=65`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+      
+      if (paymentMethodsResponse.ok) {
+        const paymentMethodsData = await paymentMethodsResponse.json();
+        const paymentMethods = paymentMethodsData.QueryResponse?.PaymentMethod || [];
+        console.log('Available payment methods:', paymentMethods.map((pm: any) => ({ id: pm.Id, name: pm.Name })));
+        
+        // Map our payment method to QuickBooks payment method name
+        const methodMapping: { [key: string]: string[] } = {
+          'credit_card': ['Credit Card', 'Visa', 'MasterCard', 'Amex', 'American Express', 'Discover'],
+          'check': ['Check'],
+          'cash': ['Cash'],
+          'wire': ['Wire Transfer', 'Wire', 'Bank Transfer', 'ACH'],
+          'ach': ['ACH', 'Bank Transfer', 'Wire Transfer'],
+          'other': ['Other'],
+        };
+        
+        const searchNames = methodMapping[payment.payment_method] || [payment.payment_method];
+        
+        // Find matching payment method (case-insensitive)
+        const matchedMethod = paymentMethods.find((pm: any) => 
+          searchNames.some(name => pm.Name?.toLowerCase() === name.toLowerCase())
+        );
+        
+        if (matchedMethod) {
+          paymentMethodRef = { value: matchedMethod.Id };
+          console.log('Matched payment method:', matchedMethod.Name, 'ID:', matchedMethod.Id);
+        } else {
+          console.log('No matching payment method found for:', payment.payment_method);
+        }
+      }
+    } catch (pmError) {
+      console.log('Could not fetch payment methods, proceeding without:', pmError);
+    }
+
     // Create payment in QuickBooks
-    const paymentData = {
+    const paymentData: any = {
       TotalAmt: parseFloat(payment.amount),
       CustomerRef: {
         value: qbCustomerId,
@@ -212,10 +258,14 @@ serve(async (req) => {
         }]
       }],
       TxnDate: payment.payment_date.split('T')[0],
-      PaymentMethodRef: payment.payment_method === 'check' ? { value: "1" } : { value: "2" },
       PrivateNote: payment.notes || '',
       PaymentRefNum: paymentRefNum,
     };
+
+    // Only add PaymentMethodRef if we found a matching method
+    if (paymentMethodRef) {
+      paymentData.PaymentMethodRef = paymentMethodRef;
+    }
 
     console.log('Creating payment in QuickBooks:', JSON.stringify(paymentData, null, 2));
 
