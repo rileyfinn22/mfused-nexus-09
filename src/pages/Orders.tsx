@@ -355,8 +355,8 @@ const Orders = () => {
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
-                  {isVibeAdmin && <div className="col-span-1">Company</div>}
-                  <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>Description</div>
+                  {isVibeAdmin && <div className="col-span-2">Company</div>}
+                  <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>Description</div>
                   <div className="col-span-1">Total</div>
                   <div className="col-span-1">Status</div>
                   <div className="col-span-1">Due Date</div>
@@ -385,9 +385,9 @@ const Orders = () => {
                         {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
                       </div>
                       {isVibeAdmin && (
-                        <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
+                        <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
                       )}
-                      <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>
+                      <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
                         <Input
                           className="h-7 text-xs"
                           placeholder="Add description..."
@@ -458,8 +458,8 @@ const Orders = () => {
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
-                  {isVibeAdmin && <div className="col-span-1">Company</div>}
-                  <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>Description</div>
+                  {isVibeAdmin && <div className="col-span-2">Company</div>}
+                  <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>Description</div>
                   <div className="col-span-1">Total</div>
                   <div className="col-span-1">Checklist</div>
                   <div className="col-span-1">Due Date</div>
@@ -496,9 +496,9 @@ const Orders = () => {
                       {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
                     </div>
                     {isVibeAdmin && (
-                      <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
+                      <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
                     )}
-                    <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>
+                    <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
                       <div 
                         className="text-sm text-muted-foreground whitespace-normal break-words cursor-text hover:bg-muted/50 rounded px-1 py-0.5 min-h-[28px]"
                         contentEditable
@@ -586,8 +586,8 @@ const Orders = () => {
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-2">Order # / Type</div>
                 <div className="col-span-1">Date</div>
-                {isVibeAdmin && <div className="col-span-1">Company</div>}
-                <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>Description</div>
+                {isVibeAdmin && <div className="col-span-2">Company</div>}
+                <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>Description</div>
                 <div className="col-span-1">Total</div>
                 <div className="col-span-2">Progress</div>
                 <div className="col-span-2">Actions</div>
@@ -627,9 +627,9 @@ const Orders = () => {
                       {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
                     </div>
                     {isVibeAdmin && (
-                      <div className="col-span-1 text-sm font-medium">{order.companies?.name || '-'}</div>
+                      <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
                     )}
-                    <div className={isVibeAdmin ? "col-span-3" : "col-span-4"}>
+                    <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
                       <Input
                         className="h-7 text-xs"
                         placeholder="Add description..."

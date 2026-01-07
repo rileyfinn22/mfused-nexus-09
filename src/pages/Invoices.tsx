@@ -392,11 +392,10 @@ const Invoices = () => {
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Due Date</div>
-            <div className="col-span-1">Company</div>
+            <div className="col-span-2">Company</div>
             <div className="col-span-2">Description</div>
             <div className="col-span-1">Type</div>
             <div className="col-span-1">Amount</div>
-            <div className="col-span-1">PO Number</div>
             <div className="col-span-1">Status</div>
             <div className="col-span-2">Actions</div>
           </div>
@@ -509,8 +508,8 @@ const Invoices = () => {
                   <div className="col-span-1 text-sm text-muted-foreground">
                     {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
                   </div>
-                  <div className="col-span-1">
-                    <div className="font-medium text-sm truncate" title={invoice.companies?.name}>
+                  <div className="col-span-2">
+                    <div className="font-medium text-sm">
                       {invoice.companies?.name || 'N/A'}
                     </div>
                   </div>
@@ -541,7 +540,6 @@ const Invoices = () => {
                     </Badge>
                   </div>
                   <div className="col-span-1 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
-                  <div className="col-span-1 text-sm">{invoice.orders?.po_number || 'N/A'}</div>
                   <div className="col-span-1 text-sm font-medium">
                     <div className="flex items-center gap-1">
                       <StatusIcon className={`h-3 w-3 ${getStatusColor(displayStatus)}`} />
