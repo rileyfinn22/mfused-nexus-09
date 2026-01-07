@@ -230,26 +230,26 @@ const Projects = () => {
                 return (
                   <TableRow 
                     key={project.id} 
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted/50 h-14"
                     onClick={() => navigate(`/projects/${project.id}`)}
                   >
-                    <TableCell className="font-medium">{project.order_number}</TableCell>
-                    <TableCell>{project.company_name}</TableCell>
-                    <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                    <TableCell className="font-medium py-4">{project.order_number}</TableCell>
+                    <TableCell className="py-4">{project.company_name}</TableCell>
+                    <TableCell className="text-muted-foreground py-4 max-w-[300px]">
                       {project.description || '-'}
                     </TableCell>
-                    <TableCell>{new Date(project.order_date).toLocaleDateString()}</TableCell>
-                    <TableCell>
+                    <TableCell className="py-4">{new Date(project.order_date).toLocaleDateString()}</TableCell>
+                    <TableCell className="py-4">
                       <Badge variant={project.status === 'completed' ? 'default' : 'secondary'}>
                         {project.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">{formatCurrency(revenue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(project.total_costs)}</TableCell>
-                    <TableCell className={`text-right font-medium ${getProfitColor(profit)}`}>
+                    <TableCell className="text-right py-4">{formatCurrency(revenue)}</TableCell>
+                    <TableCell className="text-right py-4">{formatCurrency(project.total_costs)}</TableCell>
+                    <TableCell className={`text-right font-medium py-4 ${getProfitColor(profit)}`}>
                       {formatCurrency(profit)}
                     </TableCell>
-                    <TableCell className={`text-right ${getProfitColor(profit)}`}>
+                    <TableCell className={`text-right py-4 ${getProfitColor(profit)}`}>
                       {margin.toFixed(1)}%
                     </TableCell>
                   </TableRow>
