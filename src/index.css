@@ -56,13 +56,13 @@
     --table-row-hover: 220 14% 93%;
     --table-border: 220 13% 80%;
 
-    --sidebar-background: 0 0% 100%;
+    --sidebar-background: 220 14% 92%;
     --sidebar-foreground: 224 71% 4%;
     --sidebar-primary: 142 71% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 142 71% 45%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 220 13% 87%;
+    --sidebar-accent: 220 14% 86%;
+    --sidebar-accent-foreground: 224 71% 4%;
+    --sidebar-border: 220 13% 80%;
     --sidebar-ring: 142 71% 45%;
 
     --chart-1: 142 71% 45%;
