@@ -86,6 +86,14 @@ export default {
 					'3': 'hsl(var(--chart-3))',
 					'4': 'hsl(var(--chart-4))',
 					'5': 'hsl(var(--chart-5))'
+				},
+				// Table colors
+				table: {
+					header: 'hsl(var(--table-header))',
+					row: 'hsl(var(--table-row))',
+					'row-alt': 'hsl(var(--table-row-alt))',
+					'row-hover': 'hsl(var(--table-row-hover))',
+					border: 'hsl(var(--table-border))'
 				}
 			},
 			boxShadow: {

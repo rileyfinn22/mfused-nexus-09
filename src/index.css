@@ -9,8 +9,8 @@
 
 @layer base {
   :root {
-    /* Light mode - clean, professional whites and grays */
-    --background: 0 0% 100%;
+    /* Light mode - improved contrast and visual hierarchy */
+    --background: 220 20% 97%;
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -22,46 +22,53 @@
     --primary: 217 91% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 96%;
+    --secondary: 220 14% 94%;
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 220 14% 94%;
+    --muted-foreground: 220 9% 40%;
 
-    --accent: 220 14% 96%;
+    --accent: 220 14% 92%;
     --accent-foreground: 222 47% 11%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
+    --border: 220 13% 85%;
+    --input: 220 13% 88%;
     --ring: 217 91% 50%;
 
     --radius: 0.625rem;
 
-    --success: 142 71% 45%;
+    --success: 142 71% 40%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
+    --warning: 38 92% 45%;
     --warning-foreground: 222 47% 11%;
     --danger: 0 72% 51%;
     --danger-foreground: 0 0% 100%;
-    --info: 199 89% 48%;
+    --info: 199 89% 45%;
     --info-foreground: 0 0% 100%;
 
-    --sidebar-background: 220 14% 96%;
+    /* Table-specific tokens for light mode */
+    --table-header: 220 14% 92%;
+    --table-row: 0 0% 100%;
+    --table-row-alt: 220 14% 97%;
+    --table-row-hover: 220 14% 94%;
+    --table-border: 220 13% 85%;
+
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222 47% 11%;
     --sidebar-primary: 217 91% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 92%;
+    --sidebar-accent: 220 14% 94%;
     --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 220 13% 91%;
+    --sidebar-border: 220 13% 88%;
     --sidebar-ring: 217 91% 50%;
 
     --chart-1: 217 91% 50%;
-    --chart-2: 142 71% 45%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 280 67% 60%;
+    --chart-2: 142 71% 40%;
+    --chart-3: 38 92% 45%;
+    --chart-4: 280 67% 55%;
     --chart-5: 0 72% 51%;
   }
 
@@ -103,6 +110,13 @@
     --danger-foreground: 210 40% 98%;
     --info: 199 89% 48%;
     --info-foreground: 210 40% 98%;
+
+    /* Table-specific tokens for dark mode */
+    --table-header: 222 30% 12%;
+    --table-row: 222 41% 9%;
+    --table-row-alt: 222 35% 11%;
+    --table-row-hover: 222 30% 14%;
+    --table-border: 222 30% 18%;
 
     --sidebar-background: 222 47% 5%;
     --sidebar-foreground: 215 20% 65%;
@@ -198,17 +212,52 @@
     @apply text-sm text-muted-foreground mt-1;
   }
 
-  /* Data table styling */
+  /* Data table styling with improved visual hierarchy */
   .data-table {
-    @apply rounded-lg border border-border overflow-hidden;
+    @apply rounded-lg border border-table-border overflow-hidden bg-table-row shadow-sm;
   }
 
   .data-table-header {
-    @apply bg-muted/50 border-b border-border;
+    @apply bg-table-header border-b border-table-border font-medium;
   }
 
   .data-table-row {
-    @apply border-b border-border last:border-0 transition-colors hover:bg-accent/50;
+    @apply border-b border-table-border last:border-0 transition-colors;
+  }
+
+  .data-table-row:hover {
+    @apply bg-table-row-hover;
+  }
+
+  /* Alternating row colors for better readability */
+  .data-table-row:nth-child(even) {
+    @apply bg-table-row-alt;
+  }
+
+  /* Table utility classes for inline usage */
+  .bg-table-header {
+    background-color: hsl(var(--table-header));
+  }
+
+  .bg-table-row {
+    background-color: hsl(var(--table-row));
+  }
+
+  .bg-table-row-alt {
+    background-color: hsl(var(--table-row-alt));
+  }
+
+  .bg-table-row-hover {
+    background-color: hsl(var(--table-row-hover));
+  }
+
+  .border-table-border {
+    border-color: hsl(var(--table-border));
+  }
+
+  /* Card improvements for light mode */
+  .card-elevated {
+    @apply bg-card border border-border rounded-lg shadow-sm;
   }
 
   /* Metric cards */

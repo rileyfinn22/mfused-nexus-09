@@ -197,7 +197,7 @@ const VendorPOs = () => {
         </Select>
       </div>
 
-      <Card>
+      <Card className="shadow-sm">
         <div className="p-0">
           <Table>
             <TableHeader>
@@ -230,7 +230,7 @@ const VendorPOs = () => {
                 filteredPOs.map((po) => (
                   <TableRow
                     key={po.id}
-                    className="cursor-pointer"
+                    className="cursor-pointer odd:bg-table-row even:bg-table-row-alt hover:bg-table-row-hover"
                     onClick={() => {
                       toast({ title: "Opening PO...", description: po.po_number });
                       navigate(`/vendor-pos/${po.id}`);
