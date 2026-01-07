@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, Paperclip, Trash2, Lock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
@@ -63,6 +63,10 @@ const OrderDetail = () => {
   const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
   const [newItemPrice, setNewItemPrice] = useState<number>(0);
   const [productSearch, setProductSearch] = useState<string>('');
+  const [vibeAttachments, setVibeAttachments] = useState<any[]>([]);
+  const [vibeAttachmentFile, setVibeAttachmentFile] = useState<File | null>(null);
+  const [vibeAttachmentNote, setVibeAttachmentNote] = useState('');
+  const [uploadingVibeAttachment, setUploadingVibeAttachment] = useState(false);
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -70,6 +74,7 @@ const OrderDetail = () => {
       fetchProductionStages();
       fetchVendors();
       fetchInvoices();
+      fetchVibeAttachments();
     }
   }, [orderId]);
 
@@ -204,6 +209,94 @@ const OrderDetail = () => {
     
     if (data) {
       setInvoices(data);
+    }
+  };
+
+  const fetchVibeAttachments = async () => {
+    const { data } = await supabase
+      .from('vibe_note_attachments')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false });
+    
+    if (data) {
+      setVibeAttachments(data);
+    }
+  };
+
+  const handleUploadVibeAttachment = async () => {
+    if (!vibeAttachmentFile) {
+      toast({ title: "Error", description: "Please select a file", variant: "destructive" });
+      return;
+    }
+
+    setUploadingVibeAttachment(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const fileExt = vibeAttachmentFile.name.split('.').pop();
+      const fileName = `${orderId}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('vibe-attachments')
+        .upload(fileName, vibeAttachmentFile);
+
+      if (uploadError) throw uploadError;
+
+      // Get signed URL for private bucket
+      const { data: urlData } = await supabase.storage
+        .from('vibe-attachments')
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
+
+      const { error: insertError } = await supabase
+        .from('vibe_note_attachments')
+        .insert({
+          order_id: orderId,
+          file_url: fileName, // Store path, not full URL
+          file_name: vibeAttachmentFile.name,
+          file_type: vibeAttachmentFile.type,
+          uploaded_by: user.id,
+          note: vibeAttachmentNote || null,
+        });
+
+      if (insertError) throw insertError;
+
+      toast({ title: "Success", description: "Attachment uploaded" });
+      setVibeAttachmentFile(null);
+      setVibeAttachmentNote('');
+      fetchVibeAttachments();
+    } catch (error: any) {
+      console.error('Error uploading attachment:', error);
+      toast({ title: "Error", description: "Failed to upload attachment", variant: "destructive" });
+    } finally {
+      setUploadingVibeAttachment(false);
+    }
+  };
+
+  const handleDeleteVibeAttachment = async (attachmentId: string, filePath: string) => {
+    if (!confirm('Delete this attachment?')) return;
+
+    try {
+      await supabase.storage.from('vibe-attachments').remove([filePath]);
+      await supabase.from('vibe_note_attachments').delete().eq('id', attachmentId);
+      toast({ title: "Deleted", description: "Attachment removed" });
+      fetchVibeAttachments();
+    } catch (error) {
+      console.error('Error deleting attachment:', error);
+      toast({ title: "Error", description: "Failed to delete", variant: "destructive" });
+    }
+  };
+
+  const handleDownloadVibeAttachment = async (filePath: string, fileName: string) => {
+    const { data } = await supabase.storage
+      .from('vibe-attachments')
+      .createSignedUrl(filePath, 3600, { download: fileName });
+
+    if (data?.signedUrl) {
+      window.location.href = data.signedUrl;
+    } else {
+      toast({ title: "Error", description: "Failed to download", variant: "destructive" });
     }
   };
 
@@ -1508,6 +1601,104 @@ const OrderDetail = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Internal Vibe Notes with Attachments - Only for Vibe Admins when in production */}
+          {isVibeAdmin && order.status === 'in production' && (
+            <div className="border-t border-table-border bg-amber-50/50 dark:bg-amber-950/20 p-8">
+              <div className="flex items-center gap-2 mb-4">
+                <Lock className="h-5 w-5 text-amber-600" />
+                <h2 className="text-lg font-semibold text-amber-800 dark:text-amber-400">Internal Vibe Notes</h2>
+                <Badge variant="outline" className="text-xs border-amber-500 text-amber-700">Admin Only</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                These notes and attachments are only visible to Vibe Admins.
+              </p>
+
+              {/* Upload Section */}
+              <div className="p-4 bg-background rounded-lg border border-amber-200 dark:border-amber-800 mb-4">
+                <h3 className="font-medium text-sm mb-3">Add Attachment</h3>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs">File</Label>
+                    <Input
+                      type="file"
+                      onChange={(e) => setVibeAttachmentFile(e.target.files?.[0] || null)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Note (Optional)</Label>
+                    <Textarea
+                      value={vibeAttachmentNote}
+                      onChange={(e) => setVibeAttachmentNote(e.target.value)}
+                      placeholder="Add a note about this attachment..."
+                      rows={2}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleUploadVibeAttachment}
+                    disabled={!vibeAttachmentFile || uploadingVibeAttachment}
+                    size="sm"
+                  >
+                    {uploadingVibeAttachment ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</>
+                    ) : (
+                      <><Paperclip className="h-4 w-4 mr-2" />Upload Attachment</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Attachments List */}
+              <div className="space-y-2">
+                <h3 className="font-medium text-sm">Attachments ({vibeAttachments.length})</h3>
+                {vibeAttachments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground p-4 bg-background rounded border border-amber-200 dark:border-amber-800">
+                    No internal attachments yet
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {vibeAttachments.map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="flex items-center justify-between p-3 bg-background rounded-lg border border-amber-200 dark:border-amber-800"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-amber-600" />
+                          <div>
+                            <p className="text-sm font-medium">{attachment.file_name}</p>
+                            {attachment.note && (
+                              <p className="text-xs text-muted-foreground">{attachment.note}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(attachment.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownloadVibeAttachment(attachment.file_url, attachment.file_name)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteVibeAttachment(attachment.id, attachment.file_url)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
