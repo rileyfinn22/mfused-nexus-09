@@ -60,7 +60,7 @@ const VendorPOs = () => {
     setLoading(true);
     const { data, error } = await (supabase as any)
       .from('vendor_pos')
-      .select('*, vendors(name), orders(order_number), customer_company:companies!vendor_pos_customer_company_id_fkey(name)')
+      .select('*, vendors(name), orders(order_number, description), customer_company:companies!vendor_pos_customer_company_id_fkey(name)')
       .order('created_at', { ascending: false });
     
     if (!error && data) {
@@ -253,19 +253,10 @@ const VendorPOs = () => {
                         : (po.orders?.order_number || '-')
                       }
                     </TableCell>
-                    <TableCell>
-                      <Input
-                        className="h-8 text-sm bg-transparent border-transparent hover:border-input focus:border-input"
-                        placeholder="Add description..."
-                        defaultValue={po.description || ''}
-                        onClick={(e) => e.stopPropagation()}
-                        onBlur={(e) => handleDescriptionChange(po.id, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.currentTarget.blur();
-                          }
-                        }}
-                      />
+                    <TableCell className="max-w-[200px]">
+                      <span className="text-sm text-muted-foreground truncate block">
+                        {po.orders?.description || po.description || '-'}
+                      </span>
                     </TableCell>
                     <TableCell>
                       {new Date(po.order_date).toLocaleDateString()}
