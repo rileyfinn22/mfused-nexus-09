@@ -5,10 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { 
   Search, 
   Upload, 
@@ -17,16 +15,14 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  MessageSquare,
   FileImage,
   AlertTriangle,
-  ChevronsUpDown,
-  Check,
   Edit,
   Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import AddArtworkDialog from "@/components/AddArtworkDialog";
 
 const Artwork = () => {
   const [searchParams] = useSearchParams();
@@ -36,7 +32,6 @@ const Artwork = () => {
   const [companyFilter, setCompanyFilter] = useState("all");
   const [artworkFiles, setArtworkFiles] = useState<any[]>([]);
   const [rejectedFiles, setRejectedFiles] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
@@ -45,7 +40,6 @@ const Artwork = () => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
-  const [skuComboboxOpen, setSkuComboboxOpen] = useState(false);
   const [newThumbnailFile, setNewThumbnailFile] = useState<File | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [companies, setCompanies] = useState<any[]>([]);
@@ -54,12 +48,6 @@ const Artwork = () => {
     printName: '',
     signature: '',
     date: new Date().toISOString().split('T')[0]
-  });
-  const [uploadData, setUploadData] = useState({
-    sku: '',
-    file: null as File | null,
-    previewFile: null as File | null,
-    notes: ''
   });
   const { toast } = useToast();
 
@@ -71,7 +59,6 @@ const Artwork = () => {
     if (isVibeAdmin !== null) {
       fetchArtwork();
       fetchRejectedArtwork();
-      fetchProducts();
       if (isVibeAdmin) {
         fetchCompanies();
       }
@@ -143,144 +130,8 @@ const Artwork = () => {
     }
   };
 
-  const fetchProducts = async () => {
-    try {
-      let query = supabase
-        .from('products')
-        .select('item_id, name, company_id')
-        .order('name');
-
-      // Filter by company if not vibe_admin or if vibe_admin has selected a specific company
-      if (!isVibeAdmin) {
-        // Regular users only see their company's products
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: userRole } = await supabase
-            .from('user_roles')
-            .select('company_id')
-            .eq('user_id', user.id)
-            .single();
-          
-          if (userRole?.company_id) {
-            query = query.eq('company_id', userRole.company_id);
-          }
-        }
-      } else if (companyFilter !== 'all') {
-        // Vibe admin with company filter selected
-        query = query.eq('company_id', companyFilter);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      
-      // Map to the format expected by the rest of the component
-      const mappedProducts = data?.map(item => ({
-        sku: item.item_id,
-        products: { name: item.name }
-      })) || [];
-      
-      setProducts(mappedProducts);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!uploadData.file || !uploadData.sku) {
-      toast({
-        title: "Missing information",
-        description: "Please select a file and enter SKU",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Not authenticated",
-          description: "Please log in to upload artwork",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Upload main artwork file
-      const fileExt = uploadData.file.name.split('.').pop();
-      const fileName = `${uploadData.sku}/${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('artwork')
-        .upload(fileName, uploadData.file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl: artworkUrl } } = supabase.storage
-        .from('artwork')
-        .getPublicUrl(fileName);
-
-      // Upload preview if provided
-      let previewUrl = null;
-      if (uploadData.previewFile) {
-        const previewExt = uploadData.previewFile.name.split('.').pop();
-        const previewName = `${uploadData.sku}/preview-${Date.now()}.${previewExt}`;
-        
-        const { error: previewError } = await supabase.storage
-          .from('artwork')
-          .upload(previewName, uploadData.previewFile);
-
-        if (!previewError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('artwork')
-            .getPublicUrl(previewName);
-          previewUrl = publicUrl;
-        }
-      }
-
-      // Get user's company
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!userRole?.company_id) {
-        throw new Error('User not associated with a company');
-      }
-
-      // Create database record
-      const { error: insertError } = await supabase
-        .from('artwork_files')
-        .insert({
-          sku: uploadData.sku,
-          artwork_url: artworkUrl,
-          preview_url: previewUrl,
-          filename: uploadData.file.name,
-          notes: uploadData.notes,
-          is_approved: false,
-          company_id: userRole.company_id
-        });
-
-      if (insertError) throw insertError;
-
-      toast({
-        title: "Success",
-        description: "Artwork uploaded successfully",
-      });
-
-      setUploadDialogOpen(false);
-      setUploadData({ sku: '', file: null, previewFile: null, notes: '' });
-      fetchArtwork();
-    } catch (error) {
-      console.error('Error uploading artwork:', error);
-      toast({
-        title: "Upload failed",
-        description: "Please try again",
-        variant: "destructive",
-      });
-    }
+  const handleUploadSuccess = () => {
+    fetchArtwork();
   };
 
   const handleApprove = async () => {
@@ -555,67 +406,19 @@ const Artwork = () => {
           <h1 className="text-3xl font-bold">Artwork Library & Proofing</h1>
           <p className="text-muted-foreground mt-1">Manage artwork files, review process, and approval workflow</p>
         </div>
-        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Upload className="h-4 w-4 mr-2" />
-              Upload Artwork
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Upload Artwork</DialogTitle>
-              <DialogDescription>Upload artwork file for a specific SKU</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="sku">SKU *</Label>
-                <Input
-                  id="sku"
-                  value={uploadData.sku}
-                  onChange={(e) => setUploadData({...uploadData, sku: e.target.value.toUpperCase()})}
-                  placeholder="Enter SKU"
-                  list="sku-suggestions"
-                />
-                <datalist id="sku-suggestions">
-                  {products.map((product) => (
-                    <option key={product.sku} value={product.sku}>
-                      {product.products?.name ? `${product.sku} - ${product.products.name}` : product.sku}
-                    </option>
-                  ))}
-                </datalist>
-              </div>
-              <div>
-                <Label htmlFor="artwork">Artwork File</Label>
-                <Input
-                  id="artwork"
-                  type="file"
-                  onChange={(e) => setUploadData({...uploadData, file: e.target.files?.[0] || null})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="preview">Preview Image (Optional)</Label>
-                <Input
-                  id="preview"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setUploadData({...uploadData, previewFile: e.target.files?.[0] || null})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={uploadData.notes}
-                  onChange={(e) => setUploadData({...uploadData, notes: e.target.value})}
-                  placeholder="Add any notes about this artwork..."
-                />
-              </div>
-              <Button onClick={handleUpload} className="w-full">Upload</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setUploadDialogOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" />
+          Upload Artwork
+        </Button>
       </div>
+
+      {/* Add Artwork Dialog */}
+      <AddArtworkDialog
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
+        onSuccess={handleUploadSuccess}
+        defaultCompanyId={companyFilter !== 'all' ? companyFilter : undefined}
+      />
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
