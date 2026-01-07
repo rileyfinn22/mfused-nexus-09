@@ -1375,9 +1375,14 @@ const InvoiceDetail = () => {
             )}
           </div>
 
-          {/* QuickBooks Payment Link - Show for admins OR if payment link exists for customers */}
-          {(invoice.quickbooks_id || invoice.quickbooks_payment_link) && (
-            showPaymentPortal ? (
+          {/* QuickBooks Payment Link - Show for admins OR if valid payment link exists for customers */}
+          {(() => {
+            const hasValidPaymentLink = invoice.quickbooks_payment_link && invoice.quickbooks_payment_link.startsWith('http');
+            const showSection = isVibeAdmin ? (invoice.quickbooks_id || invoice.quickbooks_payment_link) : hasValidPaymentLink;
+            
+            if (!showSection) return null;
+            
+            return showPaymentPortal ? (
               <div className="p-8 border-b bg-gradient-to-r from-green-500/10 to-emerald-500/5">
                 <div className="flex items-start gap-6">
                   <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
@@ -1507,7 +1512,7 @@ const InvoiceDetail = () => {
                       </div>
                     </div>
                     
-                    {invoice.quickbooks_payment_link && invoice.quickbooks_payment_link.startsWith('http') ? <>
+                    {hasValidPaymentLink ? <>
                         {isVibeAdmin && (
                           <p className="text-sm text-muted-foreground mb-4">
                             Share this secure payment link with your customer to accept online payments through QuickBooks
@@ -1558,10 +1563,6 @@ const InvoiceDetail = () => {
                               Refresh Payment Link
                             </>}
                         </Button>
-                      </div> : !isVibeAdmin && !invoice.quickbooks_payment_link ? <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
-                        <p className="text-sm text-muted-foreground">
-                          Online payment is not yet available for this invoice. Please contact your account manager.
-                        </p>
                       </div> : isVibeAdmin ? <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
                         <p className="text-sm text-muted-foreground">
                           Payment link will be available after syncing. Click "Bill" above to sync this invoice to QuickBooks.
@@ -1578,11 +1579,11 @@ const InvoiceDetail = () => {
                   variant={isVibeAdmin ? "outline" : "default"}
                 >
                   <DollarSign className="h-4 w-4" />
-                  {isVibeAdmin ? 'Get Payment Link' : (invoice.quickbooks_payment_link ? 'Pay Invoice' : 'Payment Options')}
+                  {isVibeAdmin ? 'Get Payment Link' : 'Pay Invoice'}
                 </Button>
               </div>
-            )
-          )}
+            );
+          })()}
 
           {/* Order Items - Main Invoice View */}
           <div className="p-8">
