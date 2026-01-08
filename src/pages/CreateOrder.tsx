@@ -934,8 +934,8 @@ const CreateOrder = () => {
     setShowAddressDialog(true);
   };
 
-  const handleRemoveItem = (productId: string) => {
-    setSelectedItems(prev => prev.filter(item => item.productId !== productId));
+  const handleRemoveItem = (itemKey: string) => {
+    setSelectedItems(prev => prev.filter(item => getItemKey(item) !== itemKey));
   };
 
   const handleAddItem = (productId: string) => {
@@ -1044,9 +1044,12 @@ const CreateOrder = () => {
     });
   };
 
-  const handleQuantityChange = (productId: string, change: number) => {
+  // Generate unique key for each item (productId + price combo)
+  const getItemKey = (item: OrderItem) => `${item.productId}::${item.unit_price ?? 'default'}`;
+
+  const handleQuantityChange = (itemKey: string, change: number) => {
     setSelectedItems(selectedItems.map(item => {
-      if (item.productId === productId) {
+      if (getItemKey(item) === itemKey) {
         const newQuantity = Math.max(1, item.quantity + change);
         return { ...item, quantity: newQuantity };
       }
@@ -1054,28 +1057,28 @@ const CreateOrder = () => {
     }));
   };
 
-  const handleQuantityClick = (productId: string, currentQuantity: number) => {
-    setEditingQuantityId(productId);
+  const handleQuantityClick = (itemKey: string, currentQuantity: number) => {
+    setEditingQuantityId(itemKey);
     setTempQuantity(currentQuantity.toString());
   };
 
-  const handleQuantityBlur = (productId: string) => {
+  const handleQuantityBlur = (itemKey: string) => {
     const newQty = parseInt(tempQuantity) || 1;
     setSelectedItems(selectedItems.map(item => 
-      item.productId === productId ? { ...item, quantity: Math.max(1, newQty) } : item
+      getItemKey(item) === itemKey ? { ...item, quantity: Math.max(1, newQty) } : item
     ));
     setEditingQuantityId(null);
   };
 
-  const handlePriceClick = (productId: string, currentPrice: number) => {
-    setEditingPriceId(productId);
+  const handlePriceClick = (itemKey: string, currentPrice: number) => {
+    setEditingPriceId(itemKey);
     setTempPrice(currentPrice.toFixed(2));
   };
 
-  const handlePriceBlur = (productId: string) => {
+  const handlePriceBlur = (itemKey: string) => {
     const newPrice = parseFloat(tempPrice) || 0;
     setSelectedItems(selectedItems.map(item => 
-      item.productId === productId ? { ...item, unit_price: Math.max(0, newPrice) } : item
+      getItemKey(item) === itemKey ? { ...item, unit_price: Math.max(0, newPrice) } : item
     ));
     setEditingPriceId(null);
   };
@@ -2089,16 +2092,17 @@ const CreateOrder = () => {
                   // Use stored unit_price if available (from PO), otherwise use product cost
                   const price = item.unit_price ?? product.cost ?? 0;
                   const amount = price * item.quantity;
+                  const itemKey = getItemKey(item);
                   
                   return (
-                    <TableRow key={item.productId}>
+                    <TableRow key={itemKey}>
                       <TableCell>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 text-destructive"
-                          onClick={() => handleRemoveItem(item.productId)}
+                          onClick={() => handleRemoveItem(itemKey)}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -2111,14 +2115,14 @@ const CreateOrder = () => {
                         {product.description}
                       </TableCell>
                       <TableCell>
-                        {editingQuantityId === item.productId ? (
+                        {editingQuantityId === itemKey ? (
                           <Input
                             type="number"
                             value={tempQuantity}
                             onChange={(e) => setTempQuantity(e.target.value)}
-                            onBlur={() => handleQuantityBlur(item.productId)}
+                            onBlur={() => handleQuantityBlur(itemKey)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleQuantityBlur(item.productId);
+                              if (e.key === 'Enter') handleQuantityBlur(itemKey);
                               if (e.key === 'Escape') setEditingQuantityId(null);
                             }}
                             className="h-8 w-20 text-center"
@@ -2131,13 +2135,13 @@ const CreateOrder = () => {
                               variant="outline"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              onClick={() => handleQuantityChange(item.productId, -1)}
+                              onClick={() => handleQuantityChange(itemKey, -1)}
                             >
                               <Minus className="h-3 w-3" />
                             </Button>
                             <span 
                               className="w-12 text-center font-medium cursor-pointer hover:bg-muted px-2 py-1 rounded"
-                              onClick={() => handleQuantityClick(item.productId, item.quantity)}
+                              onClick={() => handleQuantityClick(itemKey, item.quantity)}
                             >
                               {item.quantity}
                             </span>
@@ -2146,7 +2150,7 @@ const CreateOrder = () => {
                               variant="outline"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              onClick={() => handleQuantityChange(item.productId, 1)}
+                              onClick={() => handleQuantityChange(itemKey, 1)}
                             >
                               <Plus className="h-3 w-3" />
                             </Button>
@@ -2154,15 +2158,15 @@ const CreateOrder = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {editingPriceId === item.productId ? (
+                        {editingPriceId === itemKey ? (
                           <Input
                             type="number"
                             step="0.01"
                             value={tempPrice}
                             onChange={(e) => setTempPrice(e.target.value)}
-                            onBlur={() => handlePriceBlur(item.productId)}
+                            onBlur={() => handlePriceBlur(itemKey)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') handlePriceBlur(item.productId);
+                              if (e.key === 'Enter') handlePriceBlur(itemKey);
                               if (e.key === 'Escape') setEditingPriceId(null);
                             }}
                             className="h-8 w-24 text-right"
@@ -2171,7 +2175,7 @@ const CreateOrder = () => {
                         ) : (
                           <span 
                             className="cursor-pointer hover:bg-muted px-2 py-1 rounded inline-block"
-                            onClick={() => handlePriceClick(item.productId, price)}
+                            onClick={() => handlePriceClick(itemKey, price)}
                           >
                             ${price.toFixed(3)}
                           </span>
