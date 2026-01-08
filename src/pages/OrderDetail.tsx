@@ -1305,7 +1305,7 @@ const OrderDetail = () => {
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead className="text-right">Rate</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
-                    {isEditMode && isVibeAdmin && <TableHead className="w-12"></TableHead>}
+                    {isEditMode && <TableHead className="w-12"></TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1346,7 +1346,7 @@ const OrderDetail = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium">${item.total?.toFixed(3)}</TableCell>
-                      {isEditMode && isVibeAdmin && (
+                      {isEditMode && (
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -1354,7 +1354,7 @@ const OrderDetail = () => {
                             className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => handleDeleteItem(item.id)}
                           >
-                            <X className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>
                       )}
