@@ -27,7 +27,8 @@ import {
   Trash2,
   Package,
   LayoutGrid,
-  List
+  List,
+  Layers
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AddProductDialog } from "@/components/AddProductDialog";
@@ -49,6 +50,7 @@ interface Product {
   item_id?: string | null;
   sku?: string;
   states: ProductState[];
+  template_id?: string | null;
 }
 
 interface ProductState {
@@ -80,6 +82,7 @@ const Products = () => {
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
   const [artworkThumbnails, setArtworkThumbnails] = useState<Record<string, string>>({});
   const [products, setProducts] = useState<Product[]>([]);
+  const [templates, setTemplates] = useState<ProductTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
@@ -87,7 +90,7 @@ const Products = () => {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [companies, setCompanies] = useState<any[]>([]);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
-  const [viewMode, setViewMode] = useState<"templates" | "list">("templates");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedTemplate, setSelectedTemplate] = useState<ProductTemplate | null>(null);
 
   useEffect(() => {
@@ -97,6 +100,7 @@ const Products = () => {
   useEffect(() => {
     if (isVibeAdmin !== null) {
       fetchProducts();
+      fetchTemplates();
       fetchArtworkStatus();
       fetchArtworkThumbnails();
       if (isVibeAdmin) {
@@ -170,7 +174,8 @@ const Products = () => {
             image_url: product.image_url,
             item_id: product.item_id,
             sku: inventoryData?.sku,
-            states: states || []
+            states: states || [],
+            template_id: product.template_id
           };
         })
       );
@@ -192,6 +197,47 @@ const Products = () => {
       console.error('Error fetching products:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      let templatesQuery = supabase
+        .from('product_templates')
+        .select('*');
+
+      if (companyFilter !== 'all') {
+        templatesQuery = templatesQuery.or(`company_id.eq.${companyFilter},company_id.is.null`);
+      }
+
+      const { data: templatesData, error: templatesError } = await templatesQuery.order('name');
+
+      if (templatesError) throw templatesError;
+
+      // Fetch product counts for each template
+      const templatesWithCounts = await Promise.all(
+        (templatesData || []).map(async (template) => {
+          let query = supabase
+            .from('products')
+            .select('id', { count: 'exact', head: true })
+            .eq('template_id', template.id);
+
+          if (companyFilter !== 'all') {
+            query = query.eq('company_id', companyFilter);
+          }
+
+          const { count } = await query;
+
+          return {
+            ...template,
+            product_count: count || 0
+          };
+        })
+      );
+
+      setTemplates(templatesWithCounts);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
     }
   };
 
@@ -322,7 +368,13 @@ const Products = () => {
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.id.toLowerCase().includes(searchQuery.toLowerCase())
+    product.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (product.item_id && product.item_id.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const filteredTemplates = templates.filter(template =>
+    template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   if (loading) {
@@ -395,17 +447,15 @@ const Products = () => {
       {/* Filters and View Toggle */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          {viewMode === "list" && (
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-          )}
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
           {isVibeAdmin && (
             <Select value={companyFilter} onValueChange={setCompanyFilter}>
               <SelectTrigger className="w-48">
@@ -426,13 +476,13 @@ const Products = () => {
         {/* View Toggle */}
         <div className="flex items-center border rounded-lg p-1 bg-muted/30">
           <Button
-            variant={viewMode === "templates" ? "secondary" : "ghost"}
+            variant={viewMode === "grid" ? "secondary" : "ghost"}
             size="sm"
             className="h-8"
-            onClick={() => setViewMode("templates")}
+            onClick={() => setViewMode("grid")}
           >
             <LayoutGrid className="h-4 w-4 mr-1.5" />
-            Templates
+            Grid
           </Button>
           <Button
             variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -441,19 +491,148 @@ const Products = () => {
             onClick={() => setViewMode("list")}
           >
             <List className="h-4 w-4 mr-1.5" />
-            All Products
+            List
           </Button>
         </div>
       </div>
 
-      {/* Template Grid View */}
-      {viewMode === "templates" && (
-        <ProductTemplateGrid
-          companyFilter={companyFilter}
-          isVibeAdmin={isVibeAdmin}
-          onSelectTemplate={setSelectedTemplate}
-          selectedTemplate={selectedTemplate}
-        />
+      {/* Unified Grid View */}
+      {viewMode === "grid" && (
+        <div className="space-y-8">
+          {/* Templates Section */}
+          {filteredTemplates.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Layers className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold">Templates</h2>
+                <Badge variant="secondary">{filteredTemplates.length}</Badge>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {filteredTemplates.map((template) => (
+                  <Card
+                    key={template.id}
+                    className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative"
+                    onClick={() => setSelectedTemplate(template)}
+                  >
+                    {/* Template Image/Icon Area */}
+                    <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+                      {template.thumbnail_url ? (
+                        <img 
+                          src={template.thumbnail_url} 
+                          alt={template.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package className="h-16 w-16 text-muted-foreground/30" />
+                      )}
+                      
+                      {/* Template badge */}
+                      <Badge 
+                        variant="default" 
+                        className="absolute top-2 left-2 bg-primary/90 backdrop-blur-sm text-xs"
+                      >
+                        Template
+                      </Badge>
+                      
+                      {/* Product count badge */}
+                      <Badge 
+                        variant="secondary" 
+                        className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm"
+                      >
+                        {template.product_count} SKU{template.product_count !== 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+
+                    {/* Template Info */}
+                    <div className="p-3 space-y-1">
+                      <h3 className="font-medium text-sm leading-snug truncate">{template.name}</h3>
+                      {template.state && (
+                        <Badge variant="outline" className="text-xs">{template.state}</Badge>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Individual Products Section (products without templates) */}
+          {filteredProducts.filter(p => !p.template_id).length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-muted-foreground" />
+                <h2 className="text-lg font-semibold">Individual Products</h2>
+                <Badge variant="secondary">{filteredProducts.filter(p => !p.template_id).length}</Badge>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {filteredProducts.filter(p => !p.template_id).map((product) => (
+                  <Card
+                    key={product.id}
+                    className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative"
+                    onClick={() => navigate(`/products/edit/${product.id}`)}
+                  >
+                    {/* Product Image/Icon Area */}
+                    <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+                      {product.sku && artworkThumbnails[product.sku] ? (
+                        <img 
+                          src={artworkThumbnails[product.sku]} 
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : product.image_url ? (
+                        <img 
+                          src={product.image_url} 
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package className="h-16 w-16 text-muted-foreground/30" />
+                      )}
+                      
+                      {/* Artwork warning */}
+                      {product.sku && !hasApprovedArtwork(product.sku) && (
+                        <div className="absolute top-2 left-2">
+                          <AlertTriangle className="h-5 w-5 text-warning" />
+                        </div>
+                      )}
+                      
+                      {/* State badge */}
+                      {product.state && (
+                        <Badge 
+                          variant="outline" 
+                          className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm text-xs"
+                        >
+                          {product.state}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Product Info */}
+                    <div className="p-3 space-y-1">
+                      <h3 className="font-medium text-sm leading-snug truncate">{product.name}</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {product.item_id || product.id.slice(0, 8)}
+                      </p>
+                      <p className="text-sm font-medium">
+                        {isVibeAdmin 
+                          ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
+                          : (product.price ? `$${product.price.toFixed(3)}` : '—')}
+                      </p>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filteredTemplates.length === 0 && filteredProducts.filter(p => !p.template_id).length === 0 && (
+            <div className="empty-state py-16">
+              <Package className="h-12 w-12 mb-4 text-muted-foreground/50" />
+              <p className="font-medium">No products found</p>
+              <p className="text-sm">{searchQuery ? 'Try adjusting your search.' : 'Add your first product to get started.'}</p>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Products Table/List View */}
