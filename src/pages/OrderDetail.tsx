@@ -946,33 +946,39 @@ const OrderDetail = () => {
           Back to Orders
         </Button>
         <div className="flex gap-3">
-          {isAdmin && (
-            <>
-              {isEditMode ? (
-                <>
-                  <Button variant="outline" onClick={() => {
-                    setIsEditMode(false);
-                    setEditedOrder(order);
-                    setEditedItems(order.order_items || []);
-                  }}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSaveOrder}>
-                    Save Changes
-                  </Button>
-                </>
-              ) : (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsEditMode(true)}
-                  disabled={!isVibeAdmin && !isAdmin}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Order
+          {/* Edit button logic:
+              - Vibe admins can edit pending/in production orders
+              - Company admins can only edit draft orders */}
+          {(() => {
+            const canEdit = isVibeAdmin 
+              ? (order.status === 'pending' || order.status === 'pending_pull' || order.status === 'in production')
+              : (isAdmin && order.status === 'draft');
+            
+            if (!canEdit) return null;
+            
+            return isEditMode ? (
+              <>
+                <Button variant="outline" onClick={() => {
+                  setIsEditMode(false);
+                  setEditedOrder(order);
+                  setEditedItems(order.order_items || []);
+                }}>
+                  Cancel
                 </Button>
-              )}
-            </>
-          )}
+                <Button onClick={handleSaveOrder}>
+                  Save Changes
+                </Button>
+              </>
+            ) : (
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditMode(true)}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Order
+              </Button>
+            );
+          })()}
           {isVibeAdmin && (
             <>
               <Button variant="outline" onClick={() => setShowVendorDialog(true)}>
