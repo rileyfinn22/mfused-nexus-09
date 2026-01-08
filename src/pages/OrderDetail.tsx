@@ -657,19 +657,33 @@ const OrderDetail = () => {
       const editedItemIds = editedItems.filter(item => !item.isNew).map(item => item.id);
       const itemsToDelete = originalItemIds.filter((id: string) => !editedItemIds.includes(id));
 
+      console.log('Save order - Original items:', originalItemIds.length, 'Edited items:', editedItemIds.length, 'To delete:', itemsToDelete.length);
+
       // Delete removed items - also need to handle related vendor_po_items
       if (itemsToDelete.length > 0) {
+        console.log('Deleting items:', itemsToDelete);
+        
         // First, nullify order_item_id in vendor_po_items for deleted items
-        await supabase
+        const { error: nullifyError } = await supabase
           .from('vendor_po_items')
           .update({ order_item_id: null })
           .in('order_item_id', itemsToDelete);
+        
+        if (nullifyError) {
+          console.error('Error nullifying vendor PO items:', nullifyError);
+        }
 
-        const { error: deleteError } = await supabase
+        const { error: deleteError, count } = await supabase
           .from('order_items')
           .delete()
           .in('id', itemsToDelete);
-        if (deleteError) throw deleteError;
+        
+        if (deleteError) {
+          console.error('Error deleting order items:', deleteError);
+          throw deleteError;
+        }
+        
+        console.log('Successfully deleted', itemsToDelete.length, 'order items');
       }
 
       // Insert new items
