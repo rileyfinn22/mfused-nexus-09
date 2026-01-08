@@ -1226,55 +1226,12 @@ const CreateOrder = () => {
           .select('*')
           .eq('order_id', orderId);
 
-        // Track existing items by ID (not product_id) to handle duplicates properly
-        // Group by product_id to find duplicates
-        const itemsByProductId = new Map<string, any[]>();
-        for (const item of (existingItems || [])) {
-          if (item.product_id) {
-            const existing = itemsByProductId.get(item.product_id) || [];
-            existing.push(item);
-            itemsByProductId.set(item.product_id, existing);
-          }
-        }
-        
-        // For each product_id with duplicates, keep only the first one and mark others for deletion
-        const duplicateItemIds: string[] = [];
-        existingItemsMap = new Map();
-        for (const [productId, items] of itemsByProductId.entries()) {
-          if (items.length > 1) {
-            // Keep the first item (by created_at or first in array), delete the rest
-            const sorted = items.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-            existingItemsMap.set(productId, sorted[0]);
-            for (let i = 1; i < sorted.length; i++) {
-              duplicateItemIds.push(sorted[i].id);
-            }
-            console.log(`Found ${items.length} duplicates for product ${productId}, keeping first, deleting ${items.length - 1}`);
-          } else {
-            existingItemsMap.set(productId, items[0]);
-          }
-        }
-        
-        // Also track unmatched items (null product_id) by their id for deletion
-        const unmatchedItemIds = (existingItems || [])
-          .filter(item => item.product_id === null)
-          .map(item => item.id);
-          
-        // Delete all unmatched items and duplicates immediately
-        const allItemsToDelete = [...unmatchedItemIds, ...duplicateItemIds];
-        if (allItemsToDelete.length > 0) {
-          // First nullify vendor_po_items references
-          await supabase
-            .from('vendor_po_items')
-            .update({ order_item_id: null })
-            .in('order_item_id', allItemsToDelete);
-            
-          await supabase
-            .from('order_items')
-            .delete()
-            .in('id', allItemsToDelete);
-            
-          console.log(`Deleted ${allItemsToDelete.length} items (${unmatchedItemIds.length} unmatched, ${duplicateItemIds.length} duplicates)`);
-        }
+        // Track existing items by their ID to preserve them during update
+        existingItemsMap = new Map(
+          (existingItems || [])
+            .filter(item => item.product_id !== null)
+            .map(item => [item.id, item])
+        );
       } else {
         // Create new order with sequential number - get max existing order number
         // Fetch recent orders and find the highest numeric order number
