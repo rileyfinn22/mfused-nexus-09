@@ -759,6 +759,7 @@ export type Database = {
           billing_zip: string | null
           company_id: string
           created_at: string
+          created_by: string | null
           customer_email: string | null
           customer_name: string
           customer_phone: string | null
@@ -809,6 +810,7 @@ export type Database = {
           billing_zip?: string | null
           company_id: string
           created_at?: string
+          created_by?: string | null
           customer_email?: string | null
           customer_name: string
           customer_phone?: string | null
@@ -859,6 +861,7 @@ export type Database = {
           billing_zip?: string | null
           company_id?: string
           created_at?: string
+          created_by?: string | null
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string | null
