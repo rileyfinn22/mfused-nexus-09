@@ -1364,7 +1364,7 @@ const OrderDetail = () => {
             </div>
 
             {/* Add Item Button */}
-            {isEditMode && isVibeAdmin && (
+            {isEditMode && (
               <div className="mt-4">
                 <Button variant="outline" onClick={() => setShowAddItemDialog(true)}>
                   <Plus className="h-4 w-4 mr-2" />
