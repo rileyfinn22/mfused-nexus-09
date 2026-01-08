@@ -105,8 +105,13 @@ const Orders = () => {
     const { data, error } = await query;
     
     if (!error && data) {
+      // For non-vibe admins, filter out draft orders (they can only see pending and later)
+      const filteredData = isVibeAdmin 
+        ? data 
+        : data.filter(order => order.status !== 'draft');
+      
       // Fetch artwork approval status and production stages for all orders
-      const ordersWithChecklist = await Promise.all(data.map(async (order) => {
+      const ordersWithChecklist = await Promise.all(filteredData.map(async (order) => {
         // Fetch production stages for progress calculation
         let productionProgress = 0;
         if (order.status === 'in production') {
