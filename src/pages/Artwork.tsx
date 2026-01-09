@@ -694,12 +694,24 @@ const Artwork = () => {
                 >
                   {(() => {
                     const thumbnail = getArtworkThumbnail(file);
-                    if (thumbnail.type === 'image') {
+                    if (thumbnail.type === 'image' && thumbnail.src) {
                       return (
                         <img 
                           src={thumbnail.src} 
                           alt={file.sku}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            // If image fails to load, show placeholder instead
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent && !parent.querySelector('.fallback-placeholder')) {
+                              const placeholder = document.createElement('div');
+                              placeholder.className = 'fallback-placeholder w-full h-full flex flex-col items-center justify-center bg-muted/50';
+                              placeholder.innerHTML = '<span class="text-xs text-muted-foreground">Image unavailable</span>';
+                              parent.appendChild(placeholder);
+                            }
+                          }}
                         />
                       );
                     } else {
