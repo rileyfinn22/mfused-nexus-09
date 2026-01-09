@@ -23,6 +23,8 @@ interface AddArtworkDialogProps {
   defaultProductId?: string;
   // If provided, show only this company's products
   restrictToCompany?: string;
+  // Default artwork type (customer or vibe_proof)
+  defaultArtworkType?: 'customer' | 'vibe_proof';
 }
 
 interface Product {
@@ -45,6 +47,7 @@ const AddArtworkDialog = ({
   defaultCompanyId = '',
   defaultProductId = '',
   restrictToCompany,
+  defaultArtworkType = 'customer',
 }: AddArtworkDialogProps) => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -61,7 +64,7 @@ const AddArtworkDialog = ({
     file: null as File | null,
     previewFile: null as File | null,
     notes: '',
-    artworkType: 'customer',
+    artworkType: defaultArtworkType,
   });
 
   useEffect(() => {
@@ -77,10 +80,10 @@ const AddArtworkDialog = ({
         file: null,
         previewFile: null,
         notes: '',
-        artworkType: 'customer',
+        artworkType: defaultArtworkType,
       });
     }
-  }, [open, defaultSku, defaultCompanyId, defaultProductId, restrictToCompany]);
+  }, [open, defaultSku, defaultCompanyId, defaultProductId, restrictToCompany, defaultArtworkType]);
 
   useEffect(() => {
     // Filter products based on selected company
@@ -374,22 +377,24 @@ const AddArtworkDialog = ({
             </div>
           )}
 
-          {/* Artwork Type */}
-          <div className="space-y-2">
-            <Label>Artwork Type</Label>
-            <Select
-              value={formData.artworkType}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, artworkType: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="customer">Customer Artwork</SelectItem>
-                <SelectItem value="vibe_proof">Vibe Proof</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Artwork Type - only vibe admins can change */}
+          {isVibeAdmin && (
+            <div className="space-y-2">
+              <Label>Artwork Type</Label>
+              <Select
+                value={formData.artworkType}
+                onValueChange={(value: 'customer' | 'vibe_proof') => setFormData(prev => ({ ...prev, artworkType: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer">Customer Artwork</SelectItem>
+                  <SelectItem value="vibe_proof">Vibe Proof</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Artwork File */}
           <div className="space-y-2">
