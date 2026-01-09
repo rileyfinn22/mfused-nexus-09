@@ -31,6 +31,7 @@ interface BulkArtworkUploadDialogProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   restrictToCompany?: string;
+  defaultArtworkType?: 'customer' | 'vibe_proof';
 }
 
 interface Company {
@@ -62,6 +63,7 @@ const BulkArtworkUploadDialog = ({
   onOpenChange,
   onSuccess,
   restrictToCompany,
+  defaultArtworkType = 'vibe_proof',
 }: BulkArtworkUploadDialogProps) => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -293,7 +295,7 @@ const BulkArtworkUploadDialog = ({
             artwork_url: publicUrl,
             preview_url: previewUrl,
             filename: match.filename,
-            artwork_type: 'customer',
+            artwork_type: defaultArtworkType,
             is_approved: false,
             company_id: companyId,
           });
