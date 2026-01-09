@@ -29,8 +29,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
 import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
+import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkViewerDialog";
 import { cn } from "@/lib/utils";
-import { FileArchive } from "lucide-react";
+import { FileArchive, FileCode } from "lucide-react";
 
 interface ProductTemplate {
   id: string;
@@ -691,23 +692,28 @@ const Artwork = () => {
                     setPreviewDialogOpen(true);
                   }}
                 >
-                  {file.preview_url ? (
-                    <img 
-                      src={file.preview_url} 
-                      alt={file.sku}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : file.artwork_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                    <img 
-                      src={file.artwork_url} 
-                      alt={file.sku}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <FileImage className="h-16 w-16 text-muted-foreground" />
-                    </div>
-                  )}
+                  {(() => {
+                    const thumbnail = getArtworkThumbnail(file);
+                    if (thumbnail.type === 'image') {
+                      return (
+                        <img 
+                          src={thumbnail.src} 
+                          alt={file.sku}
+                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                        />
+                      );
+                    } else {
+                      return (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-muted/50">
+                          <FileCode className="h-12 w-12 text-muted-foreground mb-2" />
+                          <Badge variant="secondary" className="text-xs">
+                            {thumbnail.label} File
+                          </Badge>
+                          <span className="text-xs text-muted-foreground mt-1">Click to view</span>
+                        </div>
+                      );
+                    }
+                  })()}
                   <Button
                     variant="secondary"
                     size="sm"
@@ -757,12 +763,27 @@ const Artwork = () => {
                       variant="outline" 
                       size="sm"
                       className="flex-1"
+                      onClick={() => {
+                        setSelectedFile(file);
+                        setPreviewDialogOpen(true);
+                      }}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="flex-1"
                       onClick={() => handleDownload(file.artwork_url, file.filename)}
                     >
                       <Download className="h-4 w-4 mr-1" />
                       Download
                     </Button>
-                    {!file.is_approved ? (
+                  </div>
+
+                  {!file.is_approved && (
+                    <div className="flex gap-2">
                       <Button 
                         variant="outline" 
                         size="sm"
@@ -775,21 +796,8 @@ const Artwork = () => {
                         <CheckCircle className="h-4 w-4 mr-1" />
                         Approve
                       </Button>
-                    ) : (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => {
-                          setSelectedFile(file);
-                          setPreviewDialogOpen(true);
-                        }}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {!file.is_approved && (
                     <div className="flex gap-2">
@@ -835,30 +843,13 @@ const Artwork = () => {
           defaultCompanyId={selectedProduct.company_id}
         />
 
-        {/* Preview Dialog */}
-        <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh]">
-            <DialogHeader>
-              <DialogTitle>{selectedFile?.filename}</DialogTitle>
-              <DialogDescription>SKU: {selectedFile?.sku}</DialogDescription>
-            </DialogHeader>
-            <div className="overflow-auto max-h-[70vh]">
-              {selectedFile?.preview_url ? (
-                <img src={selectedFile.preview_url} alt={selectedFile.filename} className="w-full h-auto" />
-              ) : selectedFile?.artwork_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                <img src={selectedFile.artwork_url} alt={selectedFile.filename} className="w-full h-auto" />
-              ) : (
-                <div className="text-center py-12">
-                  <FileImage className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Preview not available for this file type</p>
-                  <Button className="mt-4" onClick={() => handleDownload(selectedFile?.artwork_url, selectedFile?.filename)}>
-                    Download to View
-                  </Button>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Artwork Viewer Dialog */}
+        <ArtworkViewerDialog
+          open={previewDialogOpen}
+          onOpenChange={setPreviewDialogOpen}
+          file={selectedFile}
+          onDownload={handleDownload}
+        />
 
         {/* Approval Dialog */}
         <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
