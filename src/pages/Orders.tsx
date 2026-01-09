@@ -318,10 +318,17 @@ const Orders = () => {
   const pendingOrdersList = filteredOrders.filter(o => 
     ['pending', 'pending_pull'].includes(o.status.toLowerCase())
   );
+  const completedStatuses = ['shipped', 'delivered', 'completed'];
   const productionOrders = filteredOrders.filter(o => 
     !['draft', 'pending', 'pending_pull'].includes(o.status.toLowerCase()) &&
+    !completedStatuses.includes(o.status.toLowerCase()) &&
     o.order_type !== 'pull_ship' &&
     !o.parent_order_id  // Exclude child orders from blanket orders
+  );
+  const completedOrders = filteredOrders.filter(o => 
+    completedStatuses.includes(o.status.toLowerCase()) &&
+    o.order_type !== 'pull_ship' &&
+    !o.parent_order_id
   );
 
   return (
@@ -717,6 +724,79 @@ const Orders = () => {
             </div>
           </div>
         </div>
+
+        {/* Completed Orders */}
+        {completedOrders.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-medium">Completed Orders</h2>
+            <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
+              <div className="bg-muted border-b-2 border-border">
+                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <div className="col-span-2">Order # / Type</div>
+                  <div className="col-span-1">Date</div>
+                  {isVibeAdmin && <div className="col-span-2">Company</div>}
+                  <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>Description</div>
+                  <div className="col-span-1">Total</div>
+                  <div className="col-span-2">Status</div>
+                  <div className="col-span-2">Actions</div>
+                </div>
+              </div>
+              <div className="divide-y divide-border">
+                {completedOrders.map((order) => {
+                  const orderTypeInfo = getOrderTypeDisplay(order.order_type);
+                  const OrderIcon = orderTypeInfo.icon;
+                  
+                  return (
+                    <div 
+                      key={order.id} 
+                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors even:bg-muted/40"
+                    >
+                      <div className="col-span-2 space-y-1">
+                        <div className="font-medium font-mono text-base">{order.order_number}</div>
+                        <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit text-xs px-1.5 py-0`}>
+                          <OrderIcon className="h-2.5 w-2.5" />
+                          {orderTypeInfo.label}
+                        </Badge>
+                      </div>
+                      <div className="col-span-1 text-sm text-muted-foreground">
+                        {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
+                      </div>
+                      {isVibeAdmin && (
+                        <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
+                      )}
+                      <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
+                        <EditableDescription 
+                          value={order.description} 
+                          onSave={(text) => handleDescriptionChange(order.id, text)} 
+                        />
+                      </div>
+                      <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
+                      <div className="col-span-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="col-span-2 flex gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0"
+                          onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
+                          title="View Order"
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <AlertDialog open={deleteOrderId !== null} onOpenChange={(open) => !open && setDeleteOrderId(null)}>
