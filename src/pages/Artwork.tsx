@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,7 +25,9 @@ import {
   Package,
   LayoutGrid,
   List,
-  ImageIcon
+  ImageIcon,
+  FolderOpen,
+  Upload
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +35,7 @@ import { generatePdfThumbnailFromUrl } from "@/lib/pdfThumbnail";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
 import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
 import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkViewerDialog";
+import { CustomerArtworkTab } from "@/components/CustomerArtworkTab";
 import { cn } from "@/lib/utils";
 import { FileArchive, FileCode } from "lucide-react";
 
@@ -650,10 +654,12 @@ const Artwork = () => {
               </p>
             </div>
           </div>
-          <Button onClick={() => setUploadDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Art
-          </Button>
+          {isVibeAdmin && (
+            <Button onClick={() => setUploadDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Art
+            </Button>
+          )}
         </div>
 
         {/* Status Filter */}
@@ -676,12 +682,14 @@ const Artwork = () => {
             <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
             <p className="font-medium mb-2">No artwork files</p>
             <p className="text-sm text-muted-foreground mb-4">
-              Add artwork to this product to get started
+              {isVibeAdmin ? "Add artwork to this product to get started" : "No artwork files have been uploaded for this product yet"}
             </p>
-            <Button onClick={() => setUploadDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Art
-            </Button>
+            {isVibeAdmin && (
+              <Button onClick={() => setUploadDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Art
+              </Button>
+            )}
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -806,7 +814,7 @@ const Artwork = () => {
                     </Button>
                   </div>
 
-                  {!file.is_approved && (
+                  {!file.is_approved && isVibeAdmin && (
                     <div className="flex gap-2">
                       <Button 
                         variant="outline" 
@@ -823,7 +831,7 @@ const Artwork = () => {
                     </div>
                   )}
 
-                  {!file.is_approved && (
+                  {!file.is_approved && isVibeAdmin && (
                     <div className="flex gap-2">
                       <Button 
                         variant="outline" 
@@ -1143,17 +1151,35 @@ const Artwork = () => {
           <h1 className="text-3xl font-bold">Artwork Library</h1>
           <p className="text-muted-foreground mt-1">Browse templates and products to view artwork files</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setBulkUploadDialogOpen(true)}>
-            <FileArchive className="h-4 w-4 mr-2" />
-            AI Bulk Upload
-          </Button>
-          <Button onClick={() => setUploadDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Art
-          </Button>
-        </div>
       </div>
+
+      {/* Tabs for Vibe Proofs and Customer Art */}
+      <Tabs defaultValue="proofs" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="proofs" className="flex items-center gap-2">
+            <FolderOpen className="h-4 w-4" />
+            Vibe Proofs
+          </TabsTrigger>
+          <TabsTrigger value="customer" className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Customer Art
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="proofs" className="space-y-6">
+          {/* Vibe Proofs Header Actions */}
+          {isVibeAdmin && (
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setBulkUploadDialogOpen(true)}>
+                <FileArchive className="h-4 w-4 mr-2" />
+                AI Bulk Upload
+              </Button>
+              <Button onClick={() => setUploadDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Art
+              </Button>
+            </div>
+          )}
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1260,21 +1286,33 @@ const Artwork = () => {
         </div>
       )}
 
-      {/* Add Artwork Dialog */}
-      <AddArtworkDialog
-        open={uploadDialogOpen}
-        onOpenChange={setUploadDialogOpen}
-        onSuccess={handleUploadSuccess}
-        defaultCompanyId={companyFilter !== 'all' ? companyFilter : undefined}
-      />
+        {/* Add Artwork Dialog */}
+        <AddArtworkDialog
+          open={uploadDialogOpen}
+          onOpenChange={setUploadDialogOpen}
+          onSuccess={handleUploadSuccess}
+          defaultCompanyId={companyFilter !== 'all' ? companyFilter : undefined}
+        />
 
-      {/* Bulk Upload Dialog */}
-      <BulkArtworkUploadDialog
-        open={bulkUploadDialogOpen}
-        onOpenChange={setBulkUploadDialogOpen}
-        onSuccess={handleUploadSuccess}
-        restrictToCompany={companyFilter !== 'all' ? companyFilter : undefined}
-      />
+        {/* Bulk Upload Dialog */}
+        <BulkArtworkUploadDialog
+          open={bulkUploadDialogOpen}
+          onOpenChange={setBulkUploadDialogOpen}
+          onSuccess={handleUploadSuccess}
+          restrictToCompany={companyFilter !== 'all' ? companyFilter : undefined}
+        />
+        </TabsContent>
+
+        <TabsContent value="customer">
+          <CustomerArtworkTab
+            isVibeAdmin={isVibeAdmin}
+            userCompanyId={userCompanyId}
+            companies={companies}
+            companyFilter={companyFilter}
+            onCompanyFilterChange={setCompanyFilter}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
