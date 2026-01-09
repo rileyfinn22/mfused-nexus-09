@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Check, ChevronsUpDown, Upload, FileImage } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, FileImage, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -153,8 +153,14 @@ const AddArtworkDialog = ({
       return;
     }
 
+    // Product is now required
+    if (!formData.productId) {
+      toast.error("Please select a product to attach the artwork to");
+      return;
+    }
+
     if (!formData.sku.trim()) {
-      toast.error("Please enter a SKU or select a product");
+      toast.error("Selected product has no SKU. Please add a SKU to the product first.");
       return;
     }
 
@@ -220,7 +226,7 @@ const AddArtworkDialog = ({
 
       if (insertError) throw insertError;
 
-      toast.success("Artwork uploaded successfully");
+      toast.success("Artwork added successfully");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -232,14 +238,15 @@ const AddArtworkDialog = ({
   };
 
   const showCompanySelect = isVibeAdmin && !restrictToCompany;
+  const selectedProduct = filteredProducts.find(p => p.id === formData.productId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Upload Artwork</DialogTitle>
+          <DialogTitle>Add Art</DialogTitle>
           <DialogDescription>
-            Upload artwork files for a product. Select a product or enter SKU manually.
+            Select a product and upload artwork files to attach to it.
           </DialogDescription>
         </DialogHeader>
 
@@ -250,7 +257,7 @@ const AddArtworkDialog = ({
               <Label>Company *</Label>
               <Select
                 value={formData.companyId}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, companyId: value, productId: '' }))}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, companyId: value, productId: '', sku: '' }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select company" />
@@ -266,20 +273,23 @@ const AddArtworkDialog = ({
             </div>
           )}
 
-          {/* Product Selection */}
+          {/* Product Selection - REQUIRED */}
           <div className="space-y-2">
-            <Label>Select Product (Optional)</Label>
+            <Label>Select Product *</Label>
             <Popover open={productComboOpen} onOpenChange={setProductComboOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   role="combobox"
                   aria-expanded={productComboOpen}
-                  className="w-full justify-between"
+                  className={cn(
+                    "w-full justify-between",
+                    !formData.productId && "text-muted-foreground"
+                  )}
                   disabled={showCompanySelect && !formData.companyId}
                 >
                   {formData.productId
-                    ? filteredProducts.find(p => p.id === formData.productId)?.name || "Select product..."
+                    ? selectedProduct?.name || "Select product..."
                     : "Select product..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -317,23 +327,30 @@ const AddArtworkDialog = ({
                 </Command>
               </PopoverContent>
             </Popover>
-            <p className="text-xs text-muted-foreground">
-              {showCompanySelect && !formData.companyId
-                ? "Select a company first to see products"
-                : "Select a product to auto-fill SKU, or enter manually below"}
-            </p>
+            {showCompanySelect && !formData.companyId && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Select a company first to see products
+              </p>
+            )}
           </div>
 
-          {/* SKU */}
-          <div className="space-y-2">
-            <Label htmlFor="sku">SKU / Item ID *</Label>
-            <Input
-              id="sku"
-              value={formData.sku}
-              onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value.toUpperCase() }))}
-              placeholder="Enter SKU"
-            />
-          </div>
+          {/* Show selected product SKU */}
+          {selectedProduct && (
+            <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+              <p className="text-sm font-medium">{selectedProduct.name}</p>
+              {selectedProduct.item_id ? (
+                <p className="text-xs text-muted-foreground font-mono">
+                  SKU: {selectedProduct.item_id}
+                </p>
+              ) : (
+                <p className="text-xs text-warning flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  This product has no SKU assigned
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Artwork Type */}
           <div className="space-y-2">
@@ -402,13 +419,16 @@ const AddArtworkDialog = ({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpload} disabled={uploading}>
+            <Button 
+              onClick={handleUpload} 
+              disabled={uploading || !formData.productId || !formData.file}
+            >
               {uploading ? (
                 <>Uploading...</>
               ) : (
                 <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Artwork
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Art
                 </>
               )}
             </Button>
