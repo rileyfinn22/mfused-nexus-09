@@ -233,11 +233,16 @@ Return ONLY valid JSON, no other text.`;
       };
     });
 
-    // Encode file contents as base64 for transfer
+    // Encode file contents as base64 for transfer (using chunked approach for efficiency)
     const fileData: { [key: string]: string } = {};
     for (const [filename, content] of Object.entries(fileContents)) {
-      // Convert Uint8Array to base64
-      const binary = Array.from(content).map(b => String.fromCharCode(b)).join('');
+      // Convert Uint8Array to base64 in chunks to avoid CPU timeout
+      const CHUNK_SIZE = 32768; // 32KB chunks
+      let binary = '';
+      for (let i = 0; i < content.length; i += CHUNK_SIZE) {
+        const chunk = content.subarray(i, Math.min(i + CHUNK_SIZE, content.length));
+        binary += String.fromCharCode.apply(null, Array.from(chunk));
+      }
       fileData[filename] = btoa(binary);
     }
 
