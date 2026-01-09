@@ -56,3 +56,6 @@ verify_jwt = true
 
 [functions.quickbooks-query-projects]
 verify_jwt = true
+
+[functions.parse-artwork-zip]
+verify_jwt = false
