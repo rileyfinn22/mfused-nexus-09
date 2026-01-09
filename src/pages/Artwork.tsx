@@ -17,6 +17,7 @@ import {
   XCircle,
   Clock,
   FileImage,
+  FileText,
   Edit,
   Trash2,
   ArrowLeft,
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { generatePdfThumbnailFromUrl } from "@/lib/pdfThumbnail";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
 import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
 import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkViewerDialog";

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { generatePdfThumbnailFromArrayBuffer } from "@/lib/pdfThumbnail";
 import { toast } from "sonner";
 
 interface BulkArtworkUploadDialogProps {
@@ -240,10 +241,15 @@ const BulkArtworkUploadDialog = ({
         for (let j = 0; j < binary.length; j++) {
           bytes[j] = binary.charCodeAt(j);
         }
-        const blob = new Blob([bytes]);
+
+        const fileExt = (match.filename.split('.').pop() || '').toLowerCase();
+        const isPdf = fileExt === 'pdf';
+
+        const blob = new Blob([bytes], {
+          type: isPdf ? 'application/pdf' : 'application/octet-stream'
+        });
 
         // Upload to storage
-        const fileExt = match.filename.split('.').pop();
         const storagePath = `${match.selectedSku}/${Date.now()}-${match.filename}`;
 
         const { error: uploadError } = await supabase.storage
@@ -256,12 +262,36 @@ const BulkArtworkUploadDialog = ({
           .from('artwork')
           .getPublicUrl(storagePath);
 
+        // Auto-generate PDF thumbnail (first page) for better browsing
+        let previewUrl: string | null = null;
+        if (isPdf) {
+          try {
+            const pdfBuf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+            const thumbBlob = await generatePdfThumbnailFromArrayBuffer(pdfBuf, { maxWidth: 700 });
+            const previewPath = `${match.selectedSku}/preview-${Date.now()}.png`;
+
+            const { error: previewError } = await supabase.storage
+              .from('artwork')
+              .upload(previewPath, thumbBlob, { contentType: 'image/png' });
+
+            if (!previewError) {
+              const { data: { publicUrl: thumbUrl } } = supabase.storage
+                .from('artwork')
+                .getPublicUrl(previewPath);
+              previewUrl = thumbUrl;
+            }
+          } catch (e) {
+            console.warn('Failed to generate PDF thumbnail for', match.filename, e);
+          }
+        }
+
         // Create database record
         const { error: insertError } = await supabase
           .from('artwork_files')
           .insert({
             sku: match.selectedSku!.toUpperCase(),
             artwork_url: publicUrl,
+            preview_url: previewUrl,
             filename: match.filename,
             artwork_type: 'customer',
             is_approved: false,
