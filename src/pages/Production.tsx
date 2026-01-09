@@ -26,7 +26,8 @@ interface ProductionOrder {
 
 export default function Production() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<ProductionOrder[]>([]);
+const [orders, setOrders] = useState<ProductionOrder[]>([]);
+  const [completedOrders, setCompletedOrders] = useState<ProductionOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
@@ -78,6 +79,7 @@ export default function Production() {
   const fetchProductionOrders = async () => {
     try {
       let ordersData: any[] = [];
+      let completedOrdersData: any[] = [];
 
       if (isVendor && vendorId) {
         // Vendors: get orders where they have assigned stages (exclude pull_ship)
@@ -91,6 +93,7 @@ export default function Production() {
         const orderIds = [...new Set(stages?.map(s => s.order_id) || [])];
         
         if (orderIds.length > 0) {
+          // Fetch in-production orders
           const { data, error } = await supabase
             .from('orders')
             .select(`
@@ -115,6 +118,32 @@ export default function Production() {
 
           if (error) throw error;
           ordersData = data || [];
+
+          // Fetch completed orders
+          const { data: completedData, error: completedError } = await supabase
+            .from('orders')
+            .select(`
+              id,
+              order_number,
+              customer_name,
+              order_date,
+              company_id,
+              po_number,
+              description,
+              shipping_state,
+              total,
+              companies (
+                name
+              )
+            `)
+            .in('id', orderIds)
+            .in('status', ['shipped', 'delivered', 'completed'])
+            .neq('order_type', 'pull_ship')
+            .is('parent_order_id', null)
+            .order('order_date', { ascending: false });
+
+          if (completedError) throw completedError;
+          completedOrdersData = completedData || [];
         }
       } else {
         // Admin/Customer: get all production orders (exclude pull_ship and child orders)
@@ -141,6 +170,31 @@ export default function Production() {
 
         if (error) throw error;
         ordersData = data || [];
+
+        // Fetch completed orders for admin/customer
+        const { data: completedData, error: completedError } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            customer_name,
+            order_date,
+            company_id,
+            po_number,
+            description,
+            shipping_state,
+            total,
+            companies (
+              name
+            )
+          `)
+          .in('status', ['shipped', 'delivered', 'completed'])
+          .neq('order_type', 'pull_ship')
+          .is('parent_order_id', null)
+          .order('order_date', { ascending: false });
+
+        if (completedError) throw completedError;
+        completedOrdersData = completedData || [];
       }
       
       // Fetch production stages for each order to calculate progress
@@ -161,8 +215,15 @@ export default function Production() {
           return { ...order, production_progress: progress };
         })
       );
+
+      // Mark completed orders with 100% progress
+      const completedWithProgress = completedOrdersData.map(order => ({
+        ...order,
+        production_progress: 100
+      }));
       
       setOrders(ordersWithProgress);
+      setCompletedOrders(completedWithProgress);
     } catch (error: any) {
       console.error('Error fetching production orders:', error);
       toast({
@@ -199,6 +260,12 @@ export default function Production() {
     (isVibeAdmin && order.companies.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const filteredCompletedOrders = completedOrders.filter(order =>
+    order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (isVibeAdmin && order.companies.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -208,6 +275,63 @@ export default function Production() {
       </DashboardLayout>
     );
   }
+
+  const OrderTable = ({ orderList, title, emptyMessage }: { orderList: ProductionOrder[], title: string, emptyMessage: string }) => (
+    <div className="space-y-3">
+      <h2 className="text-lg font-medium">{title}</h2>
+      <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
+        <div className="bg-muted border-b-2 border-border">
+          <div className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider`}>
+            <div className="col-span-2 text-left">Order #</div>
+            {isVibeAdmin && <div className="col-span-2 text-left">Company</div>}
+            <div className="col-span-3 text-left">Description</div>
+            <div className="col-span-1 text-left">State</div>
+            <div className="col-span-1 text-left">Total</div>
+            <div className="col-span-2 text-left">Progress</div>
+            <div className="col-span-1 text-left">Order Date</div>
+          </div>
+        </div>
+        <div className="divide-y divide-border">
+          {orderList.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              {emptyMessage}
+            </div>
+          ) : (
+            orderList.map((order) => (
+              <div
+                key={order.id}
+                className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer even:bg-muted/40`}
+                onClick={() => navigate(`/orders/${order.id}`)}
+              >
+                <div className="col-span-2 text-left font-medium font-mono text-sm">{order.order_number}</div>
+                {isVibeAdmin && (
+                  <div className="col-span-2 text-left text-sm font-medium truncate">{order.companies?.name || '-'}</div>
+                )}
+                <div className="col-span-3 text-left text-sm text-muted-foreground whitespace-normal break-words" title={order.description || ''}>
+                  {order.description || '-'}
+                </div>
+                <div className="col-span-1 text-left">
+                  <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
+                </div>
+                <div className="col-span-1 text-left text-sm">${order.total?.toFixed(2)}</div>
+                <div className="col-span-2 text-left">
+                  <div className="flex items-center gap-2">
+                    <Progress value={order.production_progress || 0} className="h-2 flex-1" />
+                    <span className="text-xs font-medium text-muted-foreground w-8">
+                      {order.production_progress || 0}%
+                    </span>
+                  </div>
+                </div>
+                <div className="col-span-1 text-left text-sm text-muted-foreground">
+                  {new Date(order.order_date).toLocaleDateString()}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <DashboardLayout>
@@ -235,61 +359,22 @@ export default function Production() {
           />
         </div>
 
-        <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-          <div className="bg-muted border-b-2 border-border">
-            <div className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider`}>
-              <div className="col-span-2 text-left">Order #</div>
-              {isVibeAdmin && <div className="col-span-2 text-left">Company</div>}
-              <div className="col-span-3 text-left">Description</div>
-              <div className="col-span-1 text-left">State</div>
-              <div className="col-span-1 text-left">Total</div>
-              <div className="col-span-2 text-left">Progress</div>
-              <div className="col-span-1 text-left">Order Date</div>
-            </div>
-          </div>
-          <div className="divide-y divide-border">
-            {loading ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                Loading orders...
-              </div>
-            ) : filteredOrders.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                No orders in production
-              </div>
-            ) : (
-              filteredOrders.map((order) => (
-                <div
-                  key={order.id}
-                  className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer even:bg-muted/40`}
-                  onClick={() => navigate(`/orders/${order.id}`)}
-                >
-                  <div className="col-span-2 text-left font-medium font-mono text-sm">{order.order_number}</div>
-                  {isVibeAdmin && (
-                    <div className="col-span-2 text-left text-sm font-medium truncate">{order.companies?.name || '-'}</div>
-                  )}
-                  <div className="col-span-3 text-left text-sm text-muted-foreground whitespace-normal break-words" title={order.description || ''}>
-                    {order.description || '-'}
-                  </div>
-                  <div className="col-span-1 text-left">
-                    <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
-                  </div>
-                  <div className="col-span-1 text-left text-sm">${order.total?.toFixed(2)}</div>
-                  <div className="col-span-2 text-left">
-                    <div className="flex items-center gap-2">
-                      <Progress value={order.production_progress || 0} className="h-2 flex-1" />
-                      <span className="text-xs font-medium text-muted-foreground w-8">
-                        {order.production_progress || 0}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="col-span-1 text-left text-sm text-muted-foreground">
-                    {new Date(order.order_date).toLocaleDateString()}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+        <div className="space-y-8">
+          {/* In Production Orders */}
+          <OrderTable 
+            orderList={filteredOrders} 
+            title="Orders in Production" 
+            emptyMessage="No orders in production"
+          />
+
+          {/* Completed Orders */}
+          {filteredCompletedOrders.length > 0 && (
+            <OrderTable 
+              orderList={filteredCompletedOrders} 
+              title="Completed Orders" 
+              emptyMessage="No completed orders"
+            />
+          )}
         </div>
       </div>
     </DashboardLayout>
