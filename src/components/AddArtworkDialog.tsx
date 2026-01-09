@@ -294,28 +294,29 @@ const AddArtworkDialog = ({
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search products..." />
-                  <CommandList>
+              <PopoverContent className="w-[400px] p-0" align="start" sideOffset={4}>
+                <Command shouldFilter={true}>
+                  <CommandInput placeholder="Search products..." className="h-10" />
+                  <CommandList className="max-h-[300px] overflow-y-auto">
                     <CommandEmpty>No products found.</CommandEmpty>
-                    <CommandGroup className="max-h-64 overflow-auto">
+                    <CommandGroup>
                       {filteredProducts.map((product) => (
                         <CommandItem
                           key={product.id}
                           value={`${product.item_id || ''} ${product.name}`}
                           onSelect={() => handleProductSelect(product.id)}
+                          className="cursor-pointer"
                         >
                           <Check
                             className={cn(
-                              "mr-2 h-4 w-4",
+                              "mr-2 h-4 w-4 flex-shrink-0",
                               formData.productId === product.id ? "opacity-100" : "opacity-0"
                             )}
                           />
-                          <div className="flex flex-col">
-                            <span>{product.name}</span>
+                          <div className="flex flex-col min-w-0">
+                            <span className="truncate">{product.name}</span>
                             {product.item_id && (
-                              <span className="text-xs text-muted-foreground font-mono">
+                              <span className="text-xs text-muted-foreground font-mono truncate">
                                 {product.item_id}
                               </span>
                             )}

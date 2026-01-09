@@ -46,6 +46,9 @@ interface Product {
   image_url: string | null;
 }
 
+// Artwork status types
+type ArtworkStatus = 'approved' | 'pending' | 'no_art';
+
 interface ArtworkFile {
   id: string;
   sku: string;
@@ -79,7 +82,10 @@ const Artwork = () => {
   const [rejectedFiles, setRejectedFiles] = useState<any[]>([]);
   
   // Artwork counts per product SKU
-  const [artworkCounts, setArtworkCounts] = useState<Record<string, { total: number; approved: number }>>({});
+  const [artworkCounts, setArtworkCounts] = useState<Record<string, { total: number; approved: number; pending: number }>>({});
+  
+  // Template artwork status
+  const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
   
   // View mode
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -184,15 +190,45 @@ const Artwork = () => {
       
       const { data: artworkData } = await artworkQuery;
       
-      const counts: Record<string, { total: number; approved: number }> = {};
+      const counts: Record<string, { total: number; approved: number; pending: number }> = {};
       artworkData?.forEach(art => {
         if (!counts[art.sku]) {
-          counts[art.sku] = { total: 0, approved: 0 };
+          counts[art.sku] = { total: 0, approved: 0, pending: 0 };
         }
         counts[art.sku].total++;
-        if (art.is_approved) counts[art.sku].approved++;
+        if (art.is_approved) {
+          counts[art.sku].approved++;
+        } else {
+          counts[art.sku].pending++;
+        }
       });
       setArtworkCounts(counts);
+      
+      // Calculate template status based on product artwork
+      const templateStatusMap: Record<string, ArtworkStatus> = {};
+      templatesData?.forEach(template => {
+        const templateProducts = productsData?.filter(p => p.template_id === template.id) || [];
+        const templateSkus = templateProducts.map(p => p.item_id).filter(Boolean) as string[];
+        
+        let hasApproved = false;
+        let hasPending = false;
+        
+        templateSkus.forEach(sku => {
+          if (counts[sku]) {
+            if (counts[sku].approved > 0) hasApproved = true;
+            if (counts[sku].pending > 0) hasPending = true;
+          }
+        });
+        
+        if (hasApproved && !hasPending) {
+          templateStatusMap[template.id] = 'approved';
+        } else if (hasPending) {
+          templateStatusMap[template.id] = 'pending';
+        } else {
+          templateStatusMap[template.id] = 'no_art';
+        }
+      });
+      setTemplateStatus(templateStatusMap);
       
       setTemplates(templatesData || []);
     } catch (error) {
@@ -535,8 +571,42 @@ const Artwork = () => {
   };
 
   const getProductArtworkCount = (sku: string | null) => {
-    if (!sku) return { total: 0, approved: 0 };
-    return artworkCounts[sku] || { total: 0, approved: 0 };
+    if (!sku) return { total: 0, approved: 0, pending: 0 };
+    return artworkCounts[sku] || { total: 0, approved: 0, pending: 0 };
+  };
+  
+  const getProductArtworkStatus = (sku: string | null): ArtworkStatus => {
+    if (!sku) return 'no_art';
+    const counts = artworkCounts[sku];
+    if (!counts || counts.total === 0) return 'no_art';
+    if (counts.approved > 0 && counts.pending === 0) return 'approved';
+    return 'pending';
+  };
+  
+  const getStatusBadge = (status: ArtworkStatus) => {
+    switch (status) {
+      case 'approved':
+        return (
+          <Badge className="bg-green-600 text-white border-0">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Approved
+          </Badge>
+        );
+      case 'pending':
+        return (
+          <Badge variant="secondary" className="bg-yellow-500 text-white border-0">
+            <Clock className="h-3 w-3 mr-1" />
+            Proof Pending Approval
+          </Badge>
+        );
+      case 'no_art':
+        return (
+          <Badge variant="outline" className="bg-muted/50 text-muted-foreground border-muted-foreground/30">
+            <ImageIcon className="h-3 w-3 mr-1" />
+            No Art
+          </Badge>
+        );
+    }
   };
 
   const getDisplayName = (productName: string) => {
@@ -950,6 +1020,7 @@ const Artwork = () => {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredProducts.map((product) => {
               const artCount = getProductArtworkCount(product.item_id);
+              const status = getProductArtworkStatus(product.item_id);
               return (
                 <Card
                   key={product.id}
@@ -963,25 +1034,19 @@ const Artwork = () => {
                       <Package className="h-16 w-16 text-muted-foreground/30" />
                     )}
                     
+                    {/* Status badge */}
+                    <div className="absolute top-2 left-2">
+                      {getStatusBadge(status)}
+                    </div>
+                    
                     {/* Artwork count badge */}
-                    <div className="absolute top-2 right-2 flex gap-1">
-                      {artCount.total > 0 && (
+                    {artCount.total > 0 && (
+                      <div className="absolute top-2 right-2">
                         <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm">
                           <ImageIcon className="h-3 w-3 mr-1" />
                           {artCount.total}
                         </Badge>
-                      )}
-                      {artCount.approved > 0 && (
-                        <Badge className="bg-green-600 text-white border-0">
-                          <CheckCircle className="h-3 w-3" />
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    {artCount.total === 0 && (
-                      <Badge variant="outline" className="absolute top-2 left-2 bg-warning/10 text-warning border-warning/30">
-                        No Art
-                      </Badge>
+                      </div>
                     )}
                   </div>
                   <div className="p-3">
@@ -1031,19 +1096,7 @@ const Artwork = () => {
                       )}
                     </div>
                     <div className="col-span-2">
-                      {artCount.approved > 0 ? (
-                        <Badge className="bg-green-600 text-white border-0">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Approved
-                        </Badge>
-                      ) : artCount.total > 0 ? (
-                        <Badge variant="secondary" className="bg-yellow-500/90 text-white border-0">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Pending
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-warning border-warning/30">No Art</Badge>
-                      )}
+                      {getStatusBadge(getProductArtworkStatus(product.item_id))}
                     </div>
                   </div>
                 );
@@ -1149,6 +1202,10 @@ const Artwork = () => {
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
+                {/* Status badge */}
+                <div className="absolute top-2 left-2">
+                  {getStatusBadge(templateStatus[template.id] || 'no_art')}
+                </div>
               </div>
               <div className="p-3 space-y-1">
                 <h3 className="font-medium text-sm leading-snug">{template.name}</h3>
