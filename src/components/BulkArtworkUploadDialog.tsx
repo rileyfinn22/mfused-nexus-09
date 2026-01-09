@@ -421,20 +421,22 @@ const BulkArtworkUploadDialog = ({
               </div>
             </div>
 
-            <ScrollArea className="flex-1 border rounded-lg">
-              <div className="divide-y">
-                {matches.map((match) => (
-                  <MatchRow 
-                    key={match.filename}
-                    match={match}
-                    products={products}
-                    onProductChange={handleProductChange}
-                    onIncludeChange={handleIncludeChange}
-                    getConfidenceBadge={getConfidenceBadge}
-                  />
-                ))}
-              </div>
-            </ScrollArea>
+            <div className="flex-1 min-h-0 border rounded-lg overflow-hidden">
+              <ScrollArea className="h-full max-h-[50vh]">
+                <div className="divide-y">
+                  {matches.map((match) => (
+                    <MatchRow 
+                      key={match.filename}
+                      match={match}
+                      products={products}
+                      onProductChange={handleProductChange}
+                      onIncludeChange={handleIncludeChange}
+                      getConfidenceBadge={getConfidenceBadge}
+                    />
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
 
             <div className="flex justify-between items-center pt-4 border-t">
               <Button variant="outline" onClick={() => setStep('upload')}>
