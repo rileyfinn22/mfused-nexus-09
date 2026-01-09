@@ -958,6 +958,7 @@ export function CustomerArtworkTab({
         onOpenChange={setBulkUploadDialogOpen}
         onSuccess={handleUploadSuccess}
         restrictToCompany={companyFilter !== 'all' ? companyFilter : undefined}
+        defaultArtworkType="customer"
       />
     </div>
   );

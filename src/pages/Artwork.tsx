@@ -1305,6 +1305,7 @@ const Artwork = () => {
           onOpenChange={setBulkUploadDialogOpen}
           onSuccess={handleUploadSuccess}
           restrictToCompany={companyFilter !== 'all' ? companyFilter : undefined}
+          defaultArtworkType="vibe_proof"
         />
         </TabsContent>
 
