@@ -893,27 +893,15 @@ export function CompanyProductTemplates({
                   rows={3}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Price ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editProductPrice}
-                    onChange={(e) => setEditProductPrice(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Cost ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editProductCost}
-                    onChange={(e) => setEditProductCost(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Price ($)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={editProductPrice}
+                  onChange={(e) => setEditProductPrice(e.target.value)}
+                  placeholder="0.00"
+                />
               </div>
               <div className="flex justify-between pt-2">
                 <Button variant="outline" onClick={() => {

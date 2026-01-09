@@ -647,7 +647,7 @@ export function TemplateProductsView({
                 rows={3}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className={cn("grid gap-4", isVibeAdmin ? "grid-cols-2" : "grid-cols-1")}>
               <div className="space-y-2">
                 <Label htmlFor="edit-price">Price ($)</Label>
                 <Input
@@ -659,17 +659,20 @@ export function TemplateProductsView({
                   placeholder="0.00"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-cost">Cost ($)</Label>
-                <Input
-                  id="edit-cost"
-                  type="number"
-                  step="0.01"
-                  value={editCost}
-                  onChange={(e) => setEditCost(e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
+
+              {isVibeAdmin && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-cost">Cost ($)</Label>
+                  <Input
+                    id="edit-cost"
+                    type="number"
+                    step="0.01"
+                    value={editCost}
+                    onChange={(e) => setEditCost(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
             </div>
             <div className="flex justify-between pt-2">
               <Button variant="outline" size="sm" onClick={() => navigate(`/products/edit/${editingProduct?.id}`)}>
