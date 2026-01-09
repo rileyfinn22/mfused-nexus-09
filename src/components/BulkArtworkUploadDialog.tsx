@@ -421,8 +421,8 @@ const BulkArtworkUploadDialog = ({
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 border rounded-lg overflow-hidden">
-              <ScrollArea className="h-full max-h-[50vh]">
+            <div className="border rounded-lg overflow-hidden" style={{ height: '400px' }}>
+              <ScrollArea className="h-[400px]">
                 <div className="divide-y">
                   {matches.map((match) => (
                     <MatchRow 
