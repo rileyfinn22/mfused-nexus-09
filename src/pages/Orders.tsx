@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,44 @@ import {
   Download
 } from "lucide-react";
 import { exportToCSV } from "@/lib/exportUtils";
+
+// Editable description component with proper placeholder behavior
+const EditableDescription = ({ 
+  value, 
+  onSave 
+}: { 
+  value: string | null; 
+  onSave: (newValue: string) => void;
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isEmpty, setIsEmpty] = useState(!value);
+
+  const handleFocus = () => {
+    if (ref.current && isEmpty) {
+      ref.current.textContent = '';
+    }
+  };
+
+  const handleBlur = () => {
+    const text = ref.current?.textContent?.trim() || '';
+    setIsEmpty(!text);
+    onSave(text);
+  };
+
+  return (
+    <div 
+      ref={ref}
+      className={`text-sm whitespace-normal break-words cursor-text hover:bg-muted/50 rounded px-2 py-1 min-h-[32px] border border-transparent hover:border-border focus:border-primary focus:outline-none ${isEmpty ? 'text-muted-foreground/60 italic' : 'text-foreground'}`}
+      contentEditable
+      suppressContentEditableWarning
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {value || 'Add description...'}
+    </div>
+  );
+};
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -393,15 +431,10 @@ const Orders = () => {
                         <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
                       )}
                       <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
-                        <div 
-                          className="text-sm text-muted-foreground whitespace-normal break-words cursor-text hover:bg-muted/50 rounded px-1 py-0.5 min-h-[28px]"
-                          contentEditable
-                          suppressContentEditableWarning
-                          onBlur={(e) => handleDescriptionChange(order.id, e.currentTarget.textContent || '')}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {order.description || 'Add description...'}
-                        </div>
+                        <EditableDescription 
+                          value={order.description} 
+                          onSave={(text) => handleDescriptionChange(order.id, text)} 
+                        />
                       </div>
                       <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
                       <div className="col-span-1 text-sm capitalize text-muted-foreground">
@@ -506,15 +539,10 @@ const Orders = () => {
                       <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
                     )}
                     <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
-                      <div 
-                        className="text-sm text-muted-foreground whitespace-normal break-words cursor-text hover:bg-muted/50 rounded px-1 py-0.5 min-h-[28px]"
-                        contentEditable
-                        suppressContentEditableWarning
-                        onBlur={(e) => handleDescriptionChange(order.id, e.currentTarget.textContent || '')}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {order.description || 'Add description...'}
-                      </div>
+                      <EditableDescription 
+                        value={order.description} 
+                        onSave={(text) => handleDescriptionChange(order.id, text)} 
+                      />
                     </div>
                     <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
                     <div className="col-span-1">
@@ -637,15 +665,10 @@ const Orders = () => {
                       <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
                     )}
                     <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
-                      <div 
-                        className="text-sm text-muted-foreground whitespace-normal break-words cursor-text hover:bg-muted/50 rounded px-1 py-0.5 min-h-[28px]"
-                        contentEditable
-                        suppressContentEditableWarning
-                        onBlur={(e) => handleDescriptionChange(order.id, e.currentTarget.textContent || '')}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {order.description || 'Add description...'}
-                      </div>
+                      <EditableDescription 
+                        value={order.description} 
+                        onSave={(text) => handleDescriptionChange(order.id, text)} 
+                      />
                     </div>
                     <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
                     <div className="col-span-2 space-y-1">
