@@ -360,6 +360,7 @@ const EditProduct = () => {
           <h2 className="text-lg font-semibold mb-4">Pricing</h2>
           
           <div className={isVibeAdmin ? "grid grid-cols-2 gap-4" : ""}>
+            {/* Cost field - ONLY visible to vibe_admin */}
             {isVibeAdmin && (
               <div className="space-y-2">
                 <Label htmlFor="cost">Cost per Unit (Vendor Cost)</Label>
@@ -384,8 +385,10 @@ const EditProduct = () => {
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 placeholder="0.000"
+                disabled={!isVibeAdmin}
               />
               {isVibeAdmin && <p className="text-xs text-muted-foreground">What you charge the customer</p>}
+              {!isVibeAdmin && <p className="text-xs text-muted-foreground">Contact VibePKG to update pricing</p>}
             </div>
           </div>
 
