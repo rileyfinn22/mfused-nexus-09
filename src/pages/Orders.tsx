@@ -285,20 +285,24 @@ const Orders = () => {
     }
   };
 
-  const getOrderTypeDisplay = (orderType: string) => {
+  const getOrderTypeDisplay = (orderType: string, status?: string) => {
     if (orderType === 'pull_ship') {
       return {
         label: 'Pull & Ship',
         icon: Truck,
-        badgeColor: 'bg-blue-500 text-white hover:bg-blue-600',
+        badgeColor: 'bg-blue-100 text-blue-700 border border-blue-200',
         textColor: 'text-blue-600'
       };
     }
+    // Only show "In Production" when status is actually 'in production'
+    const isInProduction = status?.toLowerCase() === 'in production';
     return {
-      label: 'Production',
+      label: isInProduction ? 'In Production' : 'Standard',
       icon: Factory,
-      badgeColor: 'bg-purple-500 text-white hover:bg-purple-600',
-      textColor: 'text-purple-600'
+      badgeColor: isInProduction 
+        ? 'bg-purple-100 text-purple-700 border border-purple-200' 
+        : 'bg-muted text-muted-foreground border border-border',
+      textColor: isInProduction ? 'text-purple-600' : 'text-muted-foreground'
     };
   };
 
@@ -416,7 +420,7 @@ const Orders = () => {
               <div className="divide-y divide-border">
                 {draftOrders.map((order) => {
                   const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
-                  const orderTypeInfo = getOrderTypeDisplay(order.order_type);
+                  const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                   const OrderIcon = orderTypeInfo.icon;
                   
                   return (
@@ -524,7 +528,7 @@ const Orders = () => {
                 </div>
               ) : pendingOrdersList.map((order) => {
                 const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
-                const orderTypeInfo = getOrderTypeDisplay(order.order_type);
+                const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                 const OrderIcon = orderTypeInfo.icon;
                 
                 return (
@@ -650,7 +654,7 @@ const Orders = () => {
                   ? order.productionProgress 
                   : getProgressForStatus(order.status);
                 const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
-                const orderTypeInfo = getOrderTypeDisplay(order.order_type);
+                const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                 const OrderIcon = orderTypeInfo.icon;
                 
                 return (
@@ -743,7 +747,7 @@ const Orders = () => {
               </div>
               <div className="divide-y divide-border">
                 {completedOrders.map((order) => {
-                  const orderTypeInfo = getOrderTypeDisplay(order.order_type);
+                  const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                   const OrderIcon = orderTypeInfo.icon;
                   
                   return (
