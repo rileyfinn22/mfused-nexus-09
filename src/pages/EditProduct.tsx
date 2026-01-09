@@ -245,13 +245,13 @@ const EditProduct = () => {
           Back
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold">Edit Product</h1>
-          <p className="text-sm text-muted-foreground mt-1">Update product details and specifications</p>
+          <h1 className="text-2xl font-semibold">{isVibeAdmin ? "Edit Product" : "Product Details"}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{isVibeAdmin ? "Update product details and specifications" : "View product information"}</p>
           <p className="text-xs text-muted-foreground mt-1 font-mono">ID: {id}</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={isVibeAdmin ? handleSubmit : (e) => e.preventDefault()} className="space-y-8">
         {/* Product Section */}
         <div className="space-y-4 bg-card p-6 rounded-lg border">
           <h2 className="text-lg font-semibold mb-4">Product</h2>
@@ -263,6 +263,7 @@ const EditProduct = () => {
               value={formData.item_id}
               onChange={(e) => setFormData({ ...formData, item_id: e.target.value })}
               placeholder="e.g., SKU-12345"
+              disabled={!isVibeAdmin}
             />
           </div>
 
@@ -271,6 +272,7 @@ const EditProduct = () => {
             <Select
               value={formData.product_type}
               onValueChange={(value) => setFormData({ ...formData, product_type: value })}
+              disabled={!isVibeAdmin}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select product type" />
@@ -292,6 +294,7 @@ const EditProduct = () => {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
+              disabled={!isVibeAdmin}
             />
           </div>
 
@@ -308,6 +311,7 @@ const EditProduct = () => {
                 target.style.height = target.scrollHeight + 'px';
               }}
               className="min-h-[120px] resize-none overflow-hidden"
+              disabled={!isVibeAdmin}
             />
           </div>
         </div>
@@ -329,6 +333,7 @@ const EditProduct = () => {
                 type="number"
                 value={formData.units_per_case}
                 onChange={(e) => setFormData({ ...formData, units_per_case: e.target.value })}
+                disabled={!isVibeAdmin}
               />
             </div>
 
@@ -339,6 +344,7 @@ const EditProduct = () => {
                 type="number"
                 value={formData.cases_per_pallet}
                 onChange={(e) => setFormData({ ...formData, cases_per_pallet: e.target.value })}
+                disabled={!isVibeAdmin}
               />
             </div>
 
@@ -350,6 +356,7 @@ const EditProduct = () => {
                 step="0.01"
                 value={formData.weight_per_case}
                 onChange={(e) => setFormData({ ...formData, weight_per_case: e.target.value })}
+                disabled={!isVibeAdmin}
               />
             </div>
           </div>
@@ -422,16 +429,18 @@ const EditProduct = () => {
               Artwork Files {formData.item_id && `(${artworkFiles.length})`}
             </h2>
             <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="default"
-                size="sm"
-                onClick={() => setAddArtworkOpen(true)}
-                disabled={!formData.item_id}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Add Artwork
-              </Button>
+              {isVibeAdmin && (
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={() => setAddArtworkOpen(true)}
+                  disabled={!formData.item_id}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Add Artwork
+                </Button>
+              )}
               {formData.item_id && (
                 <Button
                   type="button"
@@ -455,15 +464,17 @@ const EditProduct = () => {
               <p className="text-sm text-muted-foreground mb-3">
                 No artwork files found for SKU: {formData.item_id}
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setAddArtworkOpen(true)}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload First Artwork
-              </Button>
+              {isVibeAdmin && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAddArtworkOpen(true)}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload First Artwork
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -516,15 +527,17 @@ const EditProduct = () => {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteArtwork(artwork.id, artwork.artwork_url, artwork.preview_url)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {isVibeAdmin && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteArtwork(artwork.id, artwork.artwork_url, artwork.preview_url)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -549,11 +562,13 @@ const EditProduct = () => {
             variant="outline"
             onClick={() => navigate('/products')}
           >
-            Cancel
+            {isVibeAdmin ? "Cancel" : "Back"}
           </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? "Saving..." : "Save Changes"}
-          </Button>
+          {isVibeAdmin && (
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          )}
         </div>
       </form>
     </div>

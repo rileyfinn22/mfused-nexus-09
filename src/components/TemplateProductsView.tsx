@@ -361,33 +361,39 @@ export function TemplateProductsView({
           </div>
         </div>
         <div className="flex gap-2">
-          {selectedProducts.size > 0 && (
+          {isVibeAdmin && selectedProducts.size > 0 && (
             <Button variant="destructive" size="sm" onClick={handleDeleteSelected}>
               <Trash2 className="h-4 w-4 mr-1.5" />
               Delete ({selectedProducts.size})
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setIsEditMode(!isEditMode);
-              if (isEditMode) setSelectedProducts(new Set());
-            }}
-          >
-            <Edit className="h-4 w-4 mr-1.5" />
-            {isEditMode ? "Done" : "Select"}
-          </Button>
-          {/* Quick Add Button */}
-          <Button size="sm" variant="outline" onClick={() => setQuickAddOpen(true)}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            Quick Add
-          </Button>
-          <AddProductToTemplateDialog 
-            template={template}
-            companyId={companyFilter !== 'all' ? companyFilter : (template.company_id || undefined)}
-            onProductsAdded={fetchProducts}
-          />
+          {isVibeAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsEditMode(!isEditMode);
+                if (isEditMode) setSelectedProducts(new Set());
+              }}
+            >
+              <Edit className="h-4 w-4 mr-1.5" />
+              {isEditMode ? "Done" : "Select"}
+            </Button>
+          )}
+          {isVibeAdmin && (
+            <>
+              {/* Quick Add Button */}
+              <Button size="sm" variant="outline" onClick={() => setQuickAddOpen(true)}>
+                <Plus className="h-4 w-4 mr-1.5" />
+                Quick Add
+              </Button>
+              <AddProductToTemplateDialog 
+                template={template}
+                companyId={companyFilter !== 'all' ? companyFilter : (template.company_id || undefined)}
+                onProductsAdded={fetchProducts}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -452,7 +458,7 @@ export function TemplateProductsView({
               className="group overflow-hidden transition-all hover:shadow-lg relative"
             >
               {/* Edit mode checkbox */}
-              {isEditMode && (
+              {isVibeAdmin && isEditMode && (
                 <div className="absolute top-2 left-2 z-10">
                   <Checkbox
                     checked={selectedProducts.has(product.id)}
@@ -464,8 +470,11 @@ export function TemplateProductsView({
 
               {/* Product Image */}
               <div 
-                className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative cursor-pointer"
-                onClick={() => openEditDialog(product)}
+                className={cn(
+                  "aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative",
+                  isVibeAdmin && "cursor-pointer"
+                )}
+                onClick={() => isVibeAdmin && openEditDialog(product)}
               >
                 {product.item_id && artworkThumbnails[product.item_id] ? (
                   <img 

@@ -407,16 +407,16 @@ const Products = () => {
       <div className="page-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="page-title">Product Catalog</h1>
-          <p className="page-subtitle">Manage SKUs and state-specific packaging requirements</p>
+          <p className="page-subtitle">{isVibeAdmin ? "Manage SKUs and state-specific packaging requirements" : "View your product catalog"}</p>
         </div>
         <div className="flex gap-2">
-          {viewMode === "list" && selectedProducts.size > 0 && (
+          {isVibeAdmin && viewMode === "list" && selectedProducts.size > 0 && (
             <Button variant="destructive" size="sm" onClick={handleDeleteSelected}>
               <Trash2 className="h-4 w-4 mr-1.5" />
               Delete ({selectedProducts.size})
             </Button>
           )}
-          {viewMode === "list" && (
+          {isVibeAdmin && viewMode === "list" && (
             <Button
               variant="outline"
               size="sm"
@@ -429,18 +429,22 @@ const Products = () => {
               {isEditMode ? "Done" : "Edit"}
             </Button>
           )}
-          <AnalyzePOProductsDialog 
-            onProductsAdded={fetchProducts}
-            selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
-          />
-          <QuickAddProductsDialog 
-            onProductsAdded={fetchProducts}
-            selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
-          />
-          <AddProductDialog 
-            onProductAdded={fetchProducts} 
-            selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
-          />
+          {isVibeAdmin && (
+            <>
+              <AnalyzePOProductsDialog 
+                onProductsAdded={fetchProducts}
+                selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
+              />
+              <QuickAddProductsDialog 
+                onProductsAdded={fetchProducts}
+                selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
+              />
+              <AddProductDialog 
+                onProductAdded={fetchProducts} 
+                selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
+              />
+            </>
+          )}
         </div>
       </div>
 
