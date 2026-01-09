@@ -551,41 +551,38 @@ export default function Settings() {
               <CardTitle>Team Management</CardTitle>
               <CardDescription>
                 {isCompanyUser 
-                  ? `Invite team members with @${companyDomain || "your company"} email addresses`
+                  ? "View your team members"
                   : "Manage your team members and their roles"
                 }
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Invite Section */}
-              <div className="space-y-4">
-                <Label>Invite Team Member</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="email"
-                    placeholder={isCompanyUser && companyDomain ? `name@${companyDomain}` : "email@company.com"}
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button onClick={handleInviteTeamMember} disabled={inviteLoading}>
-                    {inviteLoading ? (
-                      <span className="animate-spin mr-2">⏳</span>
-                    ) : (
-                      <UserPlus className="h-4 w-4 mr-2" />
-                    )}
-                    Invite
-                  </Button>
+              {/* Invite Section - Only for non-company users */}
+              {!isCompanyUser && (
+                <div className="space-y-4">
+                  <Label>Invite Team Member</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      placeholder="email@company.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleInviteTeamMember} disabled={inviteLoading}>
+                      {inviteLoading ? (
+                        <span className="animate-spin mr-2">⏳</span>
+                      ) : (
+                        <UserPlus className="h-4 w-4 mr-2" />
+                      )}
+                      Invite
+                    </Button>
+                  </div>
                 </div>
-                {isCompanyUser && companyDomain && (
-                  <p className="text-xs text-muted-foreground">
-                    Only @{companyDomain} email addresses can be invited to your team.
-                  </p>
-                )}
-              </div>
+              )}
 
               {/* Team Members List */}
-              {teamMembers.length > 0 && (
+              {teamMembers.length > 0 ? (
                 <div className="space-y-4">
                   <Label>Current Team Members</Label>
                   <div className="space-y-2">
@@ -606,6 +603,13 @@ export default function Settings() {
                     ))}
                   </div>
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {isCompanyUser 
+                    ? "Contact VibePKG to add team members to your account."
+                    : "No team members yet. Invite someone to get started."
+                  }
+                </p>
               )}
             </CardContent>
           </Card>
