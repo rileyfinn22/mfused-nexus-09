@@ -612,6 +612,7 @@ export function CustomerArtworkTab({
           defaultProductId={selectedProduct.id}
           defaultSku={selectedProduct.item_id || ''}
           defaultCompanyId={selectedProduct.company_id}
+          defaultArtworkType="customer"
         />
 
         {/* Artwork Viewer Dialog */}
@@ -820,6 +821,7 @@ export function CustomerArtworkTab({
           onOpenChange={setUploadDialogOpen}
           onSuccess={handleUploadSuccess}
           defaultCompanyId={companyFilter !== 'all' ? companyFilter : undefined}
+          defaultArtworkType="customer"
         />
       </div>
     );
@@ -947,6 +949,7 @@ export function CustomerArtworkTab({
         onOpenChange={setUploadDialogOpen}
         onSuccess={handleUploadSuccess}
         defaultCompanyId={companyFilter !== 'all' ? companyFilter : undefined}
+        defaultArtworkType="customer"
       />
 
       {/* Bulk Upload Dialog */}

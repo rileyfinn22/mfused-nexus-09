@@ -814,7 +814,8 @@ const Artwork = () => {
                     </Button>
                   </div>
 
-                  {!file.is_approved && isVibeAdmin && (
+                  {/* Customers and admins can approve/reject on Vibe Proofs */}
+                  {!file.is_approved && (
                     <div className="flex gap-2">
                       <Button 
                         variant="outline" 
@@ -828,11 +829,6 @@ const Artwork = () => {
                         <CheckCircle className="h-4 w-4 mr-1" />
                         Approve
                       </Button>
-                    </div>
-                  )}
-
-                  {!file.is_approved && isVibeAdmin && (
-                    <div className="flex gap-2">
                       <Button 
                         variant="outline" 
                         size="sm"
@@ -845,19 +841,23 @@ const Artwork = () => {
                         <XCircle className="h-4 w-4 mr-1" />
                         Reject
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="flex-1 text-destructive hover:bg-destructive/10"
-                        onClick={() => {
-                          setSelectedFile(file);
-                          setDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
                     </div>
+                  )}
+
+                  {/* Only vibe admins can delete */}
+                  {!file.is_approved && isVibeAdmin && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="w-full text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        setSelectedFile(file);
+                        setDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                   )}
                 </div>
               </Card>
@@ -865,7 +865,7 @@ const Artwork = () => {
           </div>
         )}
 
-        {/* Add Artwork Dialog - pre-filled with product */}
+        {/* Add Artwork Dialog - pre-filled with product, defaults to vibe_proof */}
         <AddArtworkDialog
           open={uploadDialogOpen}
           onOpenChange={setUploadDialogOpen}
@@ -873,6 +873,7 @@ const Artwork = () => {
           defaultProductId={selectedProduct.id}
           defaultSku={selectedProduct.item_id || ''}
           defaultCompanyId={selectedProduct.company_id}
+          defaultArtworkType="vibe_proof"
         />
 
         {/* Artwork Viewer Dialog */}
@@ -1004,12 +1005,14 @@ const Artwork = () => {
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setUploadDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Art
-            </Button>
-          </div>
+          {isVibeAdmin && (
+            <div className="flex gap-2">
+              <Button onClick={() => setUploadDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Art
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Search */}
@@ -1131,12 +1134,13 @@ const Artwork = () => {
           </Card>
         )}
 
-        {/* Add Artwork Dialog */}
+        {/* Add Artwork Dialog - defaults to vibe_proof */}
         <AddArtworkDialog
           open={uploadDialogOpen}
           onOpenChange={setUploadDialogOpen}
           onSuccess={handleUploadSuccess}
           defaultCompanyId={companyFilter !== 'all' ? companyFilter : undefined}
+          defaultArtworkType="vibe_proof"
         />
       </div>
     );
@@ -1286,12 +1290,13 @@ const Artwork = () => {
         </div>
       )}
 
-        {/* Add Artwork Dialog */}
+        {/* Add Artwork Dialog - defaults to vibe_proof for this tab */}
         <AddArtworkDialog
           open={uploadDialogOpen}
           onOpenChange={setUploadDialogOpen}
           onSuccess={handleUploadSuccess}
           defaultCompanyId={companyFilter !== 'all' ? companyFilter : undefined}
+          defaultArtworkType="vibe_proof"
         />
 
         {/* Bulk Upload Dialog */}
