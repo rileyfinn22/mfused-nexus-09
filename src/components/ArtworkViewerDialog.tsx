@@ -1,7 +1,8 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, FileImage, FileText, FileCode, CheckCircle, Clock } from "lucide-react";
+import { Download, FileImage, FileText, FileCode, CheckCircle, Clock, ExternalLink } from "lucide-react";
+import { useState } from "react";
 
 interface ArtworkFile {
   id: string;
@@ -45,13 +46,23 @@ const ArtworkViewerDialog = ({
   file,
   onDownload,
 }: ArtworkViewerDialogProps) => {
+  const [pdfLoadError, setPdfLoadError] = useState(false);
+
   if (!file) return null;
 
   const fileType = getFileType(file.filename);
   const fileTypeLabel = getFileTypeLabel(file.filename);
 
+  // Use Google Docs Viewer for PDFs as it works better across browsers
+  const googleDocsViewerUrl = fileType === 'pdf' 
+    ? `https://docs.google.com/viewer?url=${encodeURIComponent(file.artwork_url)}&embedded=true`
+    : null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      if (!isOpen) setPdfLoadError(false);
+      onOpenChange(isOpen);
+    }}>
       <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <div className="flex items-center justify-between">
@@ -110,29 +121,39 @@ const ArtworkViewerDialog = ({
               />
             </div>
           ) : fileType === 'pdf' ? (
-            /* PDF files - use object tag to prevent auto-download */
-            <div className="w-full h-[60vh] bg-muted/30 rounded-lg overflow-hidden flex items-center justify-center">
-              <object
-                data={file.artwork_url}
-                type="application/pdf"
-                className="w-full h-full"
-              >
-                {/* Fallback if PDF can't be displayed inline */}
-                <div className="flex flex-col items-center justify-center py-16">
+            /* PDF files - use Google Docs Viewer for better compatibility */
+            <div className="w-full h-[60vh] bg-muted/30 rounded-lg overflow-hidden">
+              {!pdfLoadError ? (
+                <iframe
+                  src={googleDocsViewerUrl!}
+                  className="w-full h-full border-0"
+                  title={file.filename}
+                  onError={() => setPdfLoadError(true)}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full py-16">
                   <FileText className="h-24 w-24 text-muted-foreground mb-6" />
                   <h3 className="text-lg font-semibold mb-2">PDF Document</h3>
                   <p className="text-muted-foreground text-center max-w-md mb-6">
-                    Your browser cannot display this PDF inline.
+                    Unable to display PDF inline. Use the buttons below to view or download.
                   </p>
-                  <Button 
-                    size="lg"
-                    onClick={() => onDownload(file.artwork_url, file.filename)}
-                  >
-                    <Download className="h-5 w-5 mr-2" />
-                    Download PDF
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button 
+                      variant="outline"
+                      onClick={() => window.open(file.artwork_url, '_blank')}
+                    >
+                      <ExternalLink className="h-5 w-5 mr-2" />
+                      Open in New Tab
+                    </Button>
+                    <Button 
+                      onClick={() => onDownload(file.artwork_url, file.filename)}
+                    >
+                      <Download className="h-5 w-5 mr-2" />
+                      Download PDF
+                    </Button>
+                  </div>
                 </div>
-              </object>
+              )}
             </div>
           ) : (
             /* Design files (AI, EPS, PSD, etc.) - show placeholder */
@@ -171,6 +192,15 @@ const ArtworkViewerDialog = ({
             )}
           </div>
           <div className="flex gap-2">
+            {fileType === 'pdf' && (
+              <Button 
+                variant="outline"
+                onClick={() => window.open(file.artwork_url, '_blank')}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open in Tab
+              </Button>
+            )}
             <Button 
               variant="outline"
               onClick={() => onDownload(file.artwork_url, file.filename)}
@@ -195,7 +225,7 @@ export const getArtworkThumbnail = (file: {
   preview_url: string | null; 
   artwork_url: string; 
   filename: string 
-}): { type: 'image' | 'placeholder'; src?: string; label?: string } => {
+}): { type: 'image' | 'pdf' | 'placeholder'; src?: string; label?: string } => {
   // Has preview URL
   if (file.preview_url) {
     return { type: 'image', src: file.preview_url };
@@ -204,6 +234,11 @@ export const getArtworkThumbnail = (file: {
   // Is an image file
   if (IMAGE_EXTENSIONS.test(file.filename)) {
     return { type: 'image', src: file.artwork_url };
+  }
+  
+  // Is a PDF file - show PDF placeholder
+  if (PDF_EXTENSION.test(file.filename)) {
+    return { type: 'pdf', label: 'PDF' };
   }
   
   // Is a design file - return placeholder with label
