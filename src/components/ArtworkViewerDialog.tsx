@@ -90,6 +90,10 @@ const ArtworkViewerDialog = ({
                 src={file.preview_url} 
                 alt={file.filename} 
                 className="max-w-full max-h-[60vh] object-contain rounded"
+                onError={(e) => {
+                  console.log('Preview image failed to load:', file.preview_url);
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             </div>
           ) : fileType === 'image' ? (
@@ -99,16 +103,36 @@ const ArtworkViewerDialog = ({
                 src={file.artwork_url} 
                 alt={file.filename} 
                 className="max-w-full max-h-[60vh] object-contain rounded"
+                onError={(e) => {
+                  console.log('Artwork image failed to load:', file.artwork_url);
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             </div>
           ) : fileType === 'pdf' ? (
-            /* PDF files - embed in iframe */
-            <div className="w-full h-[60vh] bg-muted/30 rounded-lg overflow-hidden">
-              <iframe
-                src={`${file.artwork_url}#toolbar=1&navpanes=0`}
-                className="w-full h-full border-0"
-                title={file.filename}
-              />
+            /* PDF files - use object tag to prevent auto-download */
+            <div className="w-full h-[60vh] bg-muted/30 rounded-lg overflow-hidden flex items-center justify-center">
+              <object
+                data={file.artwork_url}
+                type="application/pdf"
+                className="w-full h-full"
+              >
+                {/* Fallback if PDF can't be displayed inline */}
+                <div className="flex flex-col items-center justify-center py-16">
+                  <FileText className="h-24 w-24 text-muted-foreground mb-6" />
+                  <h3 className="text-lg font-semibold mb-2">PDF Document</h3>
+                  <p className="text-muted-foreground text-center max-w-md mb-6">
+                    Your browser cannot display this PDF inline.
+                  </p>
+                  <Button 
+                    size="lg"
+                    onClick={() => onDownload(file.artwork_url, file.filename)}
+                  >
+                    <Download className="h-5 w-5 mr-2" />
+                    Download PDF
+                  </Button>
+                </div>
+              </object>
             </div>
           ) : (
             /* Design files (AI, EPS, PSD, etc.) - show placeholder */
