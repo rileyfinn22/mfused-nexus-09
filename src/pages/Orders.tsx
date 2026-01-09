@@ -290,7 +290,7 @@ const Orders = () => {
       return {
         label: 'Pull & Ship',
         icon: Truck,
-        badgeColor: 'bg-blue-50 text-blue-600 text-[10px] px-1.5 py-0.5',
+        badgeColor: 'bg-blue-600 text-white text-[10px] px-1.5 py-0.5',
         textColor: 'text-blue-600',
         show: true
       };
@@ -300,7 +300,7 @@ const Orders = () => {
     return {
       label: 'Production',
       icon: Factory,
-      badgeColor: 'bg-purple-50 text-purple-600 text-[10px] px-1.5 py-0.5',
+      badgeColor: 'bg-purple-600 text-white text-[10px] px-1.5 py-0.5',
       textColor: 'text-purple-600',
       show: isInProduction
     };
