@@ -28,7 +28,9 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
+import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
 import { cn } from "@/lib/utils";
+import { FileArchive } from "lucide-react";
 
 interface ProductTemplate {
   id: string;
@@ -92,6 +94,7 @@ const Artwork = () => {
   
   // Dialogs
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [bulkUploadDialogOpen, setBulkUploadDialogOpen] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [editThumbnailDialogOpen, setEditThumbnailDialogOpen] = useState(false);
@@ -1125,10 +1128,16 @@ const Artwork = () => {
           <h1 className="text-3xl font-bold">Artwork Library</h1>
           <p className="text-muted-foreground mt-1">Browse templates and products to view artwork files</p>
         </div>
-        <Button onClick={() => setUploadDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Art
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setBulkUploadDialogOpen(true)}>
+            <FileArchive className="h-4 w-4 mr-2" />
+            AI Bulk Upload
+          </Button>
+          <Button onClick={() => setUploadDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Art
+          </Button>
+        </div>
       </div>
 
       {/* Summary Stats */}
@@ -1242,6 +1251,14 @@ const Artwork = () => {
         onOpenChange={setUploadDialogOpen}
         onSuccess={handleUploadSuccess}
         defaultCompanyId={companyFilter !== 'all' ? companyFilter : undefined}
+      />
+
+      {/* Bulk Upload Dialog */}
+      <BulkArtworkUploadDialog
+        open={bulkUploadDialogOpen}
+        onOpenChange={setBulkUploadDialogOpen}
+        onSuccess={handleUploadSuccess}
+        restrictToCompany={companyFilter !== 'all' ? companyFilter : undefined}
       />
     </div>
   );
