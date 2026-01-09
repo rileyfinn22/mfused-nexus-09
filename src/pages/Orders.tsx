@@ -290,19 +290,19 @@ const Orders = () => {
       return {
         label: 'Pull & Ship',
         icon: Truck,
-        badgeColor: 'bg-blue-100 text-blue-700 border border-blue-200',
-        textColor: 'text-blue-600'
+        badgeColor: 'bg-blue-50 text-blue-600 text-[10px] px-1.5 py-0.5',
+        textColor: 'text-blue-600',
+        show: true
       };
     }
-    // Only show "In Production" when status is actually 'in production'
+    // Only show badge when status is actually 'in production'
     const isInProduction = status?.toLowerCase() === 'in production';
     return {
-      label: isInProduction ? 'In Production' : 'Standard',
+      label: 'Production',
       icon: Factory,
-      badgeColor: isInProduction 
-        ? 'bg-purple-100 text-purple-700 border border-purple-200' 
-        : 'bg-muted text-muted-foreground border border-border',
-      textColor: isInProduction ? 'text-purple-600' : 'text-muted-foreground'
+      badgeColor: 'bg-purple-50 text-purple-600 text-[10px] px-1.5 py-0.5',
+      textColor: 'text-purple-600',
+      show: isInProduction
     };
   };
 
@@ -430,10 +430,12 @@ const Orders = () => {
                     >
                       <div className="col-span-2 space-y-1">
                         <div className="font-medium font-mono text-sm">{order.order_number}</div>
-                        <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-1 w-fit`}>
-                          <OrderIcon className="h-3 w-3" />
-                          {orderTypeInfo.label}
-                        </Badge>
+                        {orderTypeInfo.show && (
+                          <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
+                            <OrderIcon className="h-2.5 w-2.5" />
+                            {orderTypeInfo.label}
+                          </Badge>
+                        )}
                       </div>
                       <div className="col-span-1 text-sm text-muted-foreground">
                         {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
@@ -538,10 +540,12 @@ const Orders = () => {
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-base">{order.order_number}</div>
-                      <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit text-xs px-1.5 py-0`}>
-                        <OrderIcon className="h-2.5 w-2.5" />
-                        {orderTypeInfo.label}
-                      </Badge>
+                      {orderTypeInfo.show && (
+                        <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
+                          <OrderIcon className="h-2.5 w-2.5" />
+                          {orderTypeInfo.label}
+                        </Badge>
+                      )}
                     </div>
                     <div className="col-span-1 text-sm text-muted-foreground">
                       {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
@@ -664,10 +668,12 @@ const Orders = () => {
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-base">{order.order_number}</div>
-                      <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit text-xs px-1.5 py-0`}>
-                        <OrderIcon className="h-2.5 w-2.5" />
-                        {orderTypeInfo.label}
-                      </Badge>
+                      {orderTypeInfo.show && (
+                        <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
+                          <OrderIcon className="h-2.5 w-2.5" />
+                          {orderTypeInfo.label}
+                        </Badge>
+                      )}
                     </div>
                     <div className="col-span-1 text-sm text-muted-foreground">
                       {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
@@ -757,10 +763,12 @@ const Orders = () => {
                     >
                       <div className="col-span-2 space-y-1">
                         <div className="font-medium font-mono text-base">{order.order_number}</div>
-                        <Badge className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit text-xs px-1.5 py-0`}>
-                          <OrderIcon className="h-2.5 w-2.5" />
-                          {orderTypeInfo.label}
-                        </Badge>
+                        {orderTypeInfo.show && (
+                          <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
+                            <OrderIcon className="h-2.5 w-2.5" />
+                            {orderTypeInfo.label}
+                          </Badge>
+                        )}
                       </div>
                       <div className="col-span-1 text-sm text-muted-foreground">
                         {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
