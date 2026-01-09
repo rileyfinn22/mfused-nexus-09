@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Check, ChevronsUpDown, Plus, FileImage, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
 import { toast } from "sonner";
 
 interface AddArtworkDialogProps {
@@ -192,8 +193,8 @@ const AddArtworkDialog = ({
         .from('artwork')
         .getPublicUrl(fileName);
 
-      // Upload preview if provided
-      let previewUrl = null;
+      // Upload preview if provided, otherwise auto-generate a thumbnail for PDFs
+      let previewUrl: string | null = null;
       if (formData.previewFile) {
         const previewExt = formData.previewFile.name.split('.').pop();
         const previewName = `${formData.sku}/preview-${Date.now()}.${previewExt}`;
@@ -208,8 +209,28 @@ const AddArtworkDialog = ({
             .getPublicUrl(previewName);
           previewUrl = publicUrl;
         }
-      }
+      } else {
+        const artworkExt = (formData.file.name.split('.').pop() || '').toLowerCase();
+        if (artworkExt === 'pdf') {
+          try {
+            const thumbBlob = await generatePdfThumbnailFromFile(formData.file);
+            const previewName = `${formData.sku}/preview-${Date.now()}.png`;
 
+            const { error: previewError } = await supabase.storage
+              .from('artwork')
+              .upload(previewName, thumbBlob, { contentType: 'image/png' });
+
+            if (!previewError) {
+              const { data: { publicUrl } } = supabase.storage
+                .from('artwork')
+                .getPublicUrl(previewName);
+              previewUrl = publicUrl;
+            }
+          } catch (e) {
+            console.warn('Failed to auto-generate PDF thumbnail', e);
+          }
+        }
+      }
       // Create database record
       const { error: insertError } = await supabase
         .from('artwork_files')
