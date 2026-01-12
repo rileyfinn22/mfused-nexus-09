@@ -188,49 +188,46 @@ export default function MyPOs() {
             
             return (
               <Card key={order.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-1">
-                      <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        Order #{order.order_number}
-                        {order.invoices && order.invoices.length > 0 && (
-                          <span className="text-muted-foreground font-normal text-base">
-                            / Invoice #{order.invoices[0].invoice_number}
-                          </span>
-                        )}
-                      </CardTitle>
-                      <CardDescription>
-                        {order.customer_name} • {new Date(order.created_at).toLocaleDateString()}
-                      </CardDescription>
-                    </div>
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    {/* Customer PO Numbers */}
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Customer PO Numbers:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {poNumbers.map((po, index) => (
-                          <Badge 
-                            key={index} 
-                            variant="outline" 
-                            className="text-sm font-mono bg-primary/5"
-                          >
-                            {po}
-                          </Badge>
-                        ))}
-                      </div>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    {/* Customer PO Numbers - Main Focus */}
+                    <div className="flex flex-wrap gap-2">
+                      {poNumbers.map((po, index) => (
+                        <Badge 
+                          key={index} 
+                          variant="default" 
+                          className="text-base font-mono px-4 py-2 bg-primary text-primary-foreground"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          {po}
+                        </Badge>
+                      ))}
                     </div>
 
-                    {/* Order Total */}
+                    {/* Order Info - Secondary */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground border-t pt-4">
+                      <span className="font-medium text-foreground">
+                        Order #{order.order_number}
+                      </span>
+                      {order.invoices && order.invoices.length > 0 && (
+                        <>
+                          <span>•</span>
+                          <span>Invoice #{order.invoices[0].invoice_number}</span>
+                        </>
+                      )}
+                      <span>•</span>
+                      <span>{order.customer_name}</span>
+                      <span>•</span>
+                      <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                      <Badge className={`ml-auto ${getStatusColor(order.status)}`}>
+                        {order.status}
+                      </Badge>
+                    </div>
+
+                    {/* Actions Row */}
                     <div className="flex items-center justify-between pt-2 border-t">
                       <div>
-                        <p className="text-sm text-muted-foreground">Order Total</p>
+                        <p className="text-xs text-muted-foreground">Order Total</p>
                         <p className="font-semibold">${order.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                       </div>
                       
