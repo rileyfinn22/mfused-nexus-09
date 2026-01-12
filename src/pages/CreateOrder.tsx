@@ -2168,7 +2168,7 @@ const CreateOrder = () => {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-medium">${amount.toFixed(3)}</TableCell>
+                      <TableCell className="text-right font-medium">${amount.toFixed(2)}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -2303,7 +2303,7 @@ const CreateOrder = () => {
             <div className="w-80 space-y-2">
               <div className="flex justify-between">
                 <span className="font-semibold text-lg">Total:</span>
-                <span className="font-bold text-xl">${total.toFixed(3)}</span>
+                <span className="font-bold text-xl">${total.toFixed(2)}</span>
               </div>
             </div>
           </div>
