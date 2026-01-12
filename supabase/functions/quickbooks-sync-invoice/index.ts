@@ -1112,30 +1112,11 @@ serve(async (req) => {
           const emailStatus = fetched.Invoice?.EmailStatus;
           console.log('Invoice EmailStatus:', emailStatus);
 
-          // If still missing, try "send" (generates customer-facing link in many setups).
-          // Guard to avoid repeated emails: only send if not already EmailSent.
-          if (!qbPaymentLink && customerEmail && emailStatus !== 'EmailSent') {
-            console.log('InvoiceLink missing; attempting to send invoice to generate link...');
-
-            const sendResp = await fetch(
-              `${qbApiUrl}/invoice/${qbInvoiceId}/send?sendTo=${encodeURIComponent(customerEmail)}&minorversion=73`,
-              {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json',
-                },
-              }
-            );
-
-            if (sendResp.ok) {
-              const sent = await sendResp.json();
-              qbPaymentLink = sent.Invoice?.InvoiceLink || null;
-              console.log('Send invoice completed; InvoiceLink:', qbPaymentLink);
-            } else {
-              const sendErr = await sendResp.json().catch(() => ({}));
-              console.warn('Send invoice failed:', JSON.stringify(sendErr));
-            }
+          // NOTE: We intentionally do NOT call the "send" endpoint to avoid emailing the customer.
+          // The payment link should be available once online payments are enabled and BillEmail is set.
+          // If no link is available, the customer can still pay via the QuickBooks customer portal.
+          if (!qbPaymentLink) {
+            console.log('InvoiceLink not available. Payment link will be generated when customer accesses portal.');
           }
         } else {
           const getErr = await getInvoiceResp.json().catch(() => ({}));
