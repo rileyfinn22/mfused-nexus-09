@@ -532,7 +532,26 @@ const Invoices = () => {
                     )}
                   </div>
                   <div className="col-span-1 text-sm text-muted-foreground">
-                    {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
+                    {(() => {
+                      // For parent invoices, check if any child has a due date and show the soonest
+                      if (isParent && hasChildren) {
+                        const childInvoices = invoices.filter(inv => inv.parent_invoice_id === invoice.id);
+                        const childDueDates = childInvoices
+                          .filter(inv => inv.due_date)
+                          .map(inv => new Date(inv.due_date))
+                          .sort((a, b) => a.getTime() - b.getTime());
+                        
+                        if (childDueDates.length > 0) {
+                          return (
+                            <span>
+                              {childDueDates[0].toLocaleDateString()}
+                              <span className="text-xs text-muted-foreground/70 ml-1">(Partial)</span>
+                            </span>
+                          );
+                        }
+                      }
+                      return invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-';
+                    })()}
                   </div>
                   <div className="col-span-2">
                     <div className="font-medium text-sm">
