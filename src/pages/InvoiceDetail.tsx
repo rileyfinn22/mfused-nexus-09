@@ -55,6 +55,7 @@ const InvoiceDetail = () => {
   const [syncingPayment, setSyncingPayment] = useState<string | null>(null);
   const [showPaymentPortal, setShowPaymentPortal] = useState(false);
   const [showSendEmailDialog, setShowSendEmailDialog] = useState(false);
+  const [paymentLinkAttempted, setPaymentLinkAttempted] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
   const [currentUserName, setCurrentUserName] = useState<string>("");
   const [qbRealmId, setQbRealmId] = useState<string | null>(null);
@@ -72,15 +73,16 @@ const InvoiceDetail = () => {
   }, [invoiceId]);
 
   // If a customer opens the payment portal and we don't have a payment link yet,
-  // attempt to generate/refresh it automatically.
+  // attempt to generate/refresh it automatically (only once per session).
   useEffect(() => {
     const hasValidPaymentLink = !!invoice?.quickbooks_payment_link && invoice.quickbooks_payment_link.startsWith('http');
     const isSyncedToQB = !!invoice?.quickbooks_id;
 
-    if (showPaymentPortal && !isVibeAdmin && isSyncedToQB && !hasValidPaymentLink && !refreshingLink) {
+    if (showPaymentPortal && !isVibeAdmin && isSyncedToQB && !hasValidPaymentLink && !refreshingLink && !paymentLinkAttempted) {
+      setPaymentLinkAttempted(true);
       void handleRefreshPaymentLink();
     }
-  }, [showPaymentPortal, isVibeAdmin, invoice?.quickbooks_id, invoice?.quickbooks_payment_link, refreshingLink]);
+  }, [showPaymentPortal, isVibeAdmin, invoice?.quickbooks_id, invoice?.quickbooks_payment_link, refreshingLink, paymentLinkAttempted]);
   const checkAdminStatus = async () => {
     const {
       data: {
