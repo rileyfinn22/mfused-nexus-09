@@ -86,7 +86,7 @@ const handler = async (req: Request): Promise<Response> => {
       ? requestOrigin
       : defaultPortalUrl;
 
-    const invoiceUrl = `${portalUrl}/invoices/${invoiceId}`;
+    const invoiceUrl = `${portalUrl}/login?invoice=${invoiceId}&redirect=/invoices/${invoiceId}`;
     const emailHtml = `
       <!DOCTYPE html>
       <html>

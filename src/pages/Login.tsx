@@ -31,32 +31,66 @@ export default function Login() {
     }
   }, [invoiceId, redirectTo]);
 
+  // If the user is already logged in and this is an invoice deep-link, skip the login screen.
+  useEffect(() => {
+    if (!redirectTo) return;
+
+    let active = true;
+
+    const go = () => {
+      if (!active) return;
+      navigate(redirectTo);
+    };
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session) go();
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) go();
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [redirectTo, navigate]);
+
   const associateWithInvoice = async (userEmail: string) => {
     const pendingInvoiceId = sessionStorage.getItem("pendingInvoiceAccess");
-    if (!pendingInvoiceId) return null;
+    if (!pendingInvoiceId) return { invoiceId: null as string | null, error: null as string | null };
 
-    try {
-      const { data, error } = await supabase.rpc("associate_customer_with_invoice", {
-        p_invoice_id: pendingInvoiceId,
-        p_user_email: userEmail,
-      });
+    // Retry because right after sign-up the auth user may not be queryable by email yet.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const { data, error } = await supabase.rpc("associate_customer_with_invoice", {
+          p_invoice_id: pendingInvoiceId,
+          p_user_email: userEmail,
+        });
 
-      if (error) {
-        console.error("Error associating customer:", error);
-        return null;
+        if (error) {
+          return { invoiceId: null, error: error.message };
+        }
+
+        const result = data as { success: boolean; company_id?: string; error?: string } | null;
+
+        if (result?.success) {
+          sessionStorage.removeItem("pendingInvoiceAccess");
+          return { invoiceId: pendingInvoiceId, error: null };
+        }
+
+        if (result?.error === "User not found" && attempt < 4) {
+          await new Promise((r) => setTimeout(r, 400));
+          continue;
+        }
+
+        return { invoiceId: null, error: result?.error || "Failed to connect your account to this invoice." };
+      } catch (err: any) {
+        return { invoiceId: null, error: err?.message || "Failed to connect your account to this invoice." };
       }
-
-      const result = data as { success: boolean; company_id?: string; error?: string };
-      if (result.success) {
-        // Clear the pending invoice access
-        sessionStorage.removeItem("pendingInvoiceAccess");
-        return pendingInvoiceId;
-      }
-      return null;
-    } catch (err) {
-      console.error("Error associating customer:", err);
-      return null;
     }
+
+    return { invoiceId: null, error: "Failed to connect your account to this invoice." };
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -71,74 +105,94 @@ export default function Login() {
         if (password.length < 8) {
           throw new Error("Password must be at least 8 characters");
         }
-        
-        const { data: signUpData, error } = await supabase.auth.signUp({
+
+        const emailRedirectTo = `${window.location.origin}${redirectTo || "/dashboard"}`;
+
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`
-          }
+            emailRedirectTo,
+          },
         });
         if (error) throw error;
-        
-        // With auto-confirm, we should have a session immediately
-        // Try to auto-login right after signup
+
+        // With auto-confirm enabled, we should be able to sign-in immediately.
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-        
+
         if (!signInError && signInData.user) {
-          // Now the user exists in auth.users, we can associate
-          const associatedInvoiceId = await associateWithInvoice(email);
-          
-          toast({
-            title: "Account created!",
-            description: associatedInvoiceId 
-              ? "You now have access to view your invoice."
-              : "Welcome to your portal.",
-          });
-          
+          const association = await associateWithInvoice(email);
+          const associatedInvoiceId = association.invoiceId;
+
+          if (association.error) {
+            toast({
+              title: "Account created",
+              description: association.error,
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Account created!",
+              description: associatedInvoiceId
+                ? "You now have access to view your invoice."
+                : "Welcome to your portal.",
+            });
+          }
+
           const pendingRedirect = sessionStorage.getItem("pendingRedirect");
           sessionStorage.removeItem("pendingRedirect");
-          navigate(pendingRedirect || (associatedInvoiceId ? `/invoices/${associatedInvoiceId}` : '/dashboard'));
+
+          navigate(
+            pendingRedirect ||
+              (associatedInvoiceId ? `/invoices/${associatedInvoiceId}` : "/dashboard")
+          );
           return;
         }
-        
-        // If auto-login failed, just show success message
+
+        // If sign-in didn't work (e.g. email confirmation required), user must login after confirming email.
         toast({
           title: "Account created!",
-          description: "You can now log in with your credentials.",
+          description: "Check your email to confirm, then log in to view the invoice.",
         });
-        
+
         setIsSignUp(false);
         setPassword("");
         setConfirmPassword("");
       } else {
-        const { data: signInData, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        
-        // After successful login, try to associate with invoice if pending
-        const associatedInvoiceId = await associateWithInvoice(email);
-        
-        toast({
-          title: "Welcome back!",
-          description: "You've been logged in successfully",
-        });
-        
-        // Redirect to pending invoice or dashboard
+
+        const association = await associateWithInvoice(email);
+        const associatedInvoiceId = association.invoiceId;
+
+        if (association.error) {
+          toast({
+            title: "Logged in, but not linked",
+            description: association.error,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Welcome back!",
+            description: "You've been logged in successfully",
+          });
+        }
+
         const pendingRedirect = sessionStorage.getItem("pendingRedirect");
         sessionStorage.removeItem("pendingRedirect");
-        
+
         if (associatedInvoiceId) {
           navigate(pendingRedirect || `/invoices/${associatedInvoiceId}`);
         } else if (pendingRedirect) {
           navigate(pendingRedirect);
         } else {
-          navigate('/dashboard');
+          navigate("/dashboard");
         }
       }
     } catch (error: any) {
