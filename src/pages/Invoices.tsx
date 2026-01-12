@@ -286,17 +286,33 @@ const Invoices = () => {
       return sum + remaining;
     }, 0);
 
-  // Calculate BILLED amount - sum of all invoices with status = 'billed' (synced to QB, pending due date)
+  // Calculate BILLED amount - sum of all invoices with status = 'billed' that are NOT past due
   const billedAmount = filteredInvoices
-    .filter(inv => inv.status === 'billed')
+    .filter(inv => {
+      if (inv.status !== 'billed') return false;
+      // If past due date, it should be counted as DUE, not BILLED
+      if (inv.due_date) {
+        const daysUntilDue = getDaysUntilDue(inv.due_date);
+        if (daysUntilDue <= 0) return false;
+      }
+      return true;
+    })
     .reduce((sum, invoice) => {
       const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
       return sum + remaining;
     }, 0);
 
-  // Calculate DUE amount - sum of all invoices with status = 'due'
+  // Calculate DUE amount - sum of all invoices with status = 'due' OR billed invoices past due date
   const dueAmount = filteredInvoices
-    .filter(inv => inv.status === 'due')
+    .filter(inv => {
+      if (inv.status === 'due') return true;
+      // Billed invoices past due date count as DUE
+      if (inv.status === 'billed' && inv.due_date) {
+        const daysUntilDue = getDaysUntilDue(inv.due_date);
+        if (daysUntilDue <= 0) return true;
+      }
+      return false;
+    })
     .reduce((sum, invoice) => {
       const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
       return sum + remaining;
