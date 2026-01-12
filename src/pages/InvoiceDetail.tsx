@@ -1600,10 +1600,40 @@ const InvoiceDetail = () => {
                           >
                             <SelectTrigger className="w-full text-xl font-semibold h-auto py-1">
                               <SelectValue>
-                                {invoice.status === 'paid' && <span className="text-green-600">PAID</span>}
-                                {invoice.status === 'open' && <span className="text-yellow-600">OPEN</span>}
-                                {invoice.status === 'due' && <span className="text-red-600">DUE</span>}
-                                {!['paid', 'open', 'due'].includes(invoice.status) && <span>{invoice.status?.toUpperCase()}</span>}
+                                {(() => {
+                                  const raw = String(invoice.status || '').toLowerCase();
+                                  const today = new Date();
+                                  today.setHours(0, 0, 0, 0);
+
+                                  const due = invoice.due_date
+                                    ? (() => {
+                                        const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})/.exec(String(invoice.due_date));
+                                        if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+                                        return new Date(invoice.due_date);
+                                      })()
+                                    : null;
+                                  if (due) due.setHours(0, 0, 0, 0);
+
+                                  const computed =
+                                    raw === 'paid'
+                                      ? 'paid'
+                                      : raw === 'due'
+                                        ? 'due'
+                                        : raw === 'billed'
+                                          ? (due && due.getTime() <= today.getTime() ? 'due' : 'billed')
+                                          : raw || 'open';
+
+                                  const className =
+                                    computed === 'paid'
+                                      ? 'text-green-600'
+                                      : computed === 'due'
+                                        ? 'text-red-600'
+                                        : computed === 'billed'
+                                          ? 'text-blue-600'
+                                          : 'text-yellow-600';
+
+                                  return <span className={className}>{computed.toUpperCase()}</span>;
+                                })()}
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
@@ -1620,10 +1650,40 @@ const InvoiceDetail = () => {
                           </Select>
                         ) : (
                           <p className="font-semibold text-xl">
-                            {invoice.status === 'paid' && <span className="text-green-600">PAID</span>}
-                            {invoice.status === 'open' && <span className="text-yellow-600">OPEN</span>}
-                            {invoice.status === 'due' && <span className="text-red-600">DUE</span>}
-                            {!['paid', 'open', 'due'].includes(invoice.status) && <span>{invoice.status?.toUpperCase()}</span>}
+                            {(() => {
+                              const raw = String(invoice.status || '').toLowerCase();
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+
+                              const due = invoice.due_date
+                                ? (() => {
+                                    const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})/.exec(String(invoice.due_date));
+                                    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+                                    return new Date(invoice.due_date);
+                                  })()
+                                : null;
+                              if (due) due.setHours(0, 0, 0, 0);
+
+                              const computed =
+                                raw === 'paid'
+                                  ? 'paid'
+                                  : raw === 'due'
+                                    ? 'due'
+                                    : raw === 'billed'
+                                      ? (due && due.getTime() <= today.getTime() ? 'due' : 'billed')
+                                      : raw || 'open';
+
+                              const className =
+                                computed === 'paid'
+                                  ? 'text-green-600'
+                                  : computed === 'due'
+                                    ? 'text-red-600'
+                                    : computed === 'billed'
+                                      ? 'text-blue-600'
+                                      : 'text-yellow-600';
+
+                              return <span className={className}>{computed.toUpperCase()}</span>;
+                            })()}
                           </p>
                         )}
                       </div>
