@@ -105,17 +105,36 @@ const InvoiceDetail = () => {
     // First check if user is authenticated and has access
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      // Not logged in - redirect to login
-      navigate('/login');
+      // Not logged in - redirect to login with invoice context
+      navigate(`/login?invoice=${invoiceId}&redirect=/invoices/${invoiceId}`);
       return;
     }
 
     // Get user's company and role
-    const { data: userRole } = await supabase
+    let { data: userRole } = await supabase
       .from('user_roles')
       .select('company_id, role')
       .eq('user_id', user.id)
       .single();
+
+    // If user has no role, try to associate them with this invoice's company
+    if (!userRole && invoiceId) {
+      const { data: associateResult } = await supabase.rpc("associate_customer_with_invoice", {
+        p_invoice_id: invoiceId,
+        p_user_email: user.email,
+      });
+      
+      const result = associateResult as { success: boolean; company_id?: string; error?: string } | null;
+      if (result?.success && result?.company_id) {
+        // Refetch the user role after association
+        const { data: newRole } = await supabase
+          .from('user_roles')
+          .select('company_id, role')
+          .eq('user_id', user.id)
+          .single();
+        userRole = newRole;
+      }
+    }
 
     // Fetch invoice with order details and company info
     const {
@@ -159,7 +178,7 @@ const InvoiceDetail = () => {
         description: "You don't have permission to view this invoice",
         variant: "destructive"
       });
-      navigate('/login');
+      navigate(`/login?invoice=${invoiceId}&redirect=/invoices/${invoiceId}`);
       return;
     }
 
