@@ -323,11 +323,13 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
                 <SelectValue placeholder="Select state" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="General">General (All States)</SelectItem>
                 <SelectItem value="WA">Washington</SelectItem>
                 <SelectItem value="AZ">Arizona</SelectItem>
                 <SelectItem value="NY">New York</SelectItem>
                 <SelectItem value="CA">California</SelectItem>
                 <SelectItem value="MD">Maryland</SelectItem>
+                <SelectItem value="MO">Missouri</SelectItem>
               </SelectContent>
             </Select>
           </div>
