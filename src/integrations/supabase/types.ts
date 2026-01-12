@@ -2240,6 +2240,10 @@ export type Database = {
         Args: { invitation_token_param: string; user_email: string }
         Returns: Json
       }
+      associate_customer_with_invoice: {
+        Args: { p_invoice_id: string; p_user_email: string }
+        Returns: Json
+      }
       can_view_child_order: {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean

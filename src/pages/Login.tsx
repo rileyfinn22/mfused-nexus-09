@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -15,6 +16,48 @@ export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Check for invoice redirect context
+  const invoiceId = searchParams.get("invoice");
+  const redirectTo = searchParams.get("redirect");
+
+  // Store invoice context in sessionStorage when we have it from URL
+  useEffect(() => {
+    if (invoiceId) {
+      sessionStorage.setItem("pendingInvoiceAccess", invoiceId);
+      if (redirectTo) {
+        sessionStorage.setItem("pendingRedirect", redirectTo);
+      }
+    }
+  }, [invoiceId, redirectTo]);
+
+  const associateWithInvoice = async (userEmail: string) => {
+    const pendingInvoiceId = sessionStorage.getItem("pendingInvoiceAccess");
+    if (!pendingInvoiceId) return null;
+
+    try {
+      const { data, error } = await supabase.rpc("associate_customer_with_invoice", {
+        p_invoice_id: pendingInvoiceId,
+        p_user_email: userEmail,
+      });
+
+      if (error) {
+        console.error("Error associating customer:", error);
+        return null;
+      }
+
+      const result = data as { success: boolean; company_id?: string; error?: string };
+      if (result.success) {
+        // Clear the pending invoice access
+        sessionStorage.removeItem("pendingInvoiceAccess");
+        return pendingInvoiceId;
+      }
+      return null;
+    } catch (err) {
+      console.error("Error associating customer:", err);
+      return null;
+    }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,10 +81,30 @@ export default function Login() {
         });
         if (error) throw error;
         
+        // After signup, try to associate with invoice if pending
+        const associatedInvoiceId = await associateWithInvoice(email);
+        
         toast({
           title: "Account created!",
-          description: "You can now log in with your credentials.",
+          description: associatedInvoiceId 
+            ? "You now have access to view your invoice."
+            : "You can now log in with your credentials.",
         });
+        
+        // If we associated with an invoice, auto-login and redirect
+        if (associatedInvoiceId) {
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (!signInError) {
+            const pendingRedirect = sessionStorage.getItem("pendingRedirect");
+            sessionStorage.removeItem("pendingRedirect");
+            navigate(pendingRedirect || `/invoices/${associatedInvoiceId}`);
+            return;
+          }
+        }
+        
         setIsSignUp(false);
         setPassword("");
         setConfirmPassword("");
@@ -51,11 +114,26 @@ export default function Login() {
           password,
         });
         if (error) throw error;
+        
+        // After login, try to associate with invoice if pending
+        const associatedInvoiceId = await associateWithInvoice(email);
+        
         toast({
           title: "Welcome back!",
           description: "You've been logged in successfully",
         });
-        navigate('/dashboard');
+        
+        // Redirect to pending invoice or dashboard
+        const pendingRedirect = sessionStorage.getItem("pendingRedirect");
+        sessionStorage.removeItem("pendingRedirect");
+        
+        if (associatedInvoiceId) {
+          navigate(pendingRedirect || `/invoices/${associatedInvoiceId}`);
+        } else if (pendingRedirect) {
+          navigate(pendingRedirect);
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (error: any) {
       toast({
@@ -74,7 +152,14 @@ export default function Login() {
         <CardHeader>
           <CardTitle>{isSignUp ? "Sign Up" : "Login"}</CardTitle>
           <CardDescription>
-            {isSignUp ? "Create your account" : "Login to your company portal"}
+            {invoiceId 
+              ? (isSignUp 
+                  ? "Create an account to view your invoice" 
+                  : "Log in to view your invoice")
+              : (isSignUp 
+                  ? "Create your account" 
+                  : "Login to your company portal")
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
