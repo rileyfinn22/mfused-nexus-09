@@ -108,7 +108,14 @@ const Invoices = () => {
   const getStatusDisplay = (invoice: any) => {
     if (invoice.status === 'paid') return 'PAID';
     if (invoice.status === 'due') return 'DUE';
-    if (invoice.status === 'billed') return 'BILLED';
+    // If billed and past due date, show as DUE
+    if (invoice.status === 'billed') {
+      if (invoice.due_date) {
+        const daysUntilDue = getDaysUntilDue(invoice.due_date);
+        if (daysUntilDue <= 0) return 'DUE';
+      }
+      return 'BILLED';
+    }
     return 'OPEN';
   };
 
