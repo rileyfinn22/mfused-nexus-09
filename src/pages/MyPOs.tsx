@@ -1,23 +1,39 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { FileText, ExternalLink, Download } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+interface OrderWithPO {
+  id: string;
+  order_number: string;
+  po_number: string | null;
+  po_pdf_path: string | null;
+  status: string;
+  customer_name: string;
+  created_at: string;
+  total: number;
+  invoices: {
+    id: string;
+    invoice_number: string;
+    status: string;
+  }[];
+}
+
 export default function MyPOs() {
-  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [orders, setOrders] = useState<OrderWithPO[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchSubmissions();
+    fetchOrders();
   }, []);
 
-  const fetchSubmissions = async () => {
+  const fetchOrders = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -25,16 +41,44 @@ export default function MyPOs() {
         return;
       }
 
+      // Get user's company
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!userRole) {
+        setLoading(false);
+        return;
+      }
+
+      // Fetch orders with PO numbers for this company
       const { data, error } = await supabase
-        .from('po_submissions')
-        .select('*')
-        .eq('customer_id', user.id)
+        .from('orders')
+        .select(`
+          id,
+          order_number,
+          po_number,
+          po_pdf_path,
+          status,
+          customer_name,
+          created_at,
+          total,
+          invoices (
+            id,
+            invoice_number,
+            status
+          )
+        `)
+        .eq('company_id', userRole.company_id)
+        .not('po_number', 'is', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSubmissions(data || []);
+      setOrders(data || []);
     } catch (error) {
-      console.error('Error fetching submissions:', error);
+      console.error('Error fetching orders:', error);
       toast({
         title: "Error",
         description: "Failed to load purchase orders",
@@ -45,38 +89,73 @@ export default function MyPOs() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending_analysis':
-        return <Clock className="h-4 w-4" />;
-      case 'pending_approval':
-        return <AlertCircle className="h-4 w-4" />;
-      case 'approved':
-        return <CheckCircle className="h-4 w-4" />;
-      case 'rejected':
-        return <XCircle className="h-4 w-4" />;
-      default:
-        return <FileText className="h-4 w-4" />;
-    }
-  };
-
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending_analysis':
-        return 'bg-blue-500/10 text-blue-500';
-      case 'pending_approval':
-        return 'bg-yellow-500/10 text-yellow-500';
-      case 'approved':
-        return 'bg-green-500/10 text-green-500';
-      case 'rejected':
-        return 'bg-red-500/10 text-red-500';
+    switch (status.toLowerCase()) {
+      case 'draft':
+        return 'bg-muted text-muted-foreground';
+      case 'pending':
+        return 'bg-yellow-500/10 text-yellow-600';
+      case 'in production':
+        return 'bg-blue-500/10 text-blue-600';
+      case 'shipped':
+      case 'delivered':
+      case 'completed':
+        return 'bg-green-500/10 text-green-600';
       default:
-        return 'bg-gray-500/10 text-gray-500';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  const handleDownloadPO = async (poPdfPath: string, poNumber: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('customer-pos')
+        .download(poPdfPath);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `PO-${poNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading PO:', error);
+      toast({
+        title: "Error",
+        description: "Failed to download PO document",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewPO = async (poPdfPath: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('customer-pos')
+        .createSignedUrl(poPdfPath, 3600);
+
+      if (error) throw error;
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('Error viewing PO:', error);
+      toast({
+        title: "Error",
+        description: "Failed to open PO document",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Parse comma-separated PO numbers into array
+  const parsePONumbers = (poNumber: string | null): string[] => {
+    if (!poNumber) return [];
+    return poNumber.split(',').map(po => po.trim()).filter(Boolean);
   };
 
   if (loading) {
@@ -88,96 +167,108 @@ export default function MyPOs() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">My Purchase Orders</h1>
-          <p className="text-muted-foreground mt-1">Track your PO submissions and approvals</p>
+          <p className="text-muted-foreground mt-1">View customer POs attached to your orders</p>
         </div>
-        <Button onClick={() => navigate('/upload-po')}>
-          Upload New PO
-        </Button>
       </div>
 
       <div className="grid gap-4">
-        {submissions.length === 0 ? (
+        {orders.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-lg font-medium mb-2">No purchase orders yet</p>
-              <p className="text-muted-foreground mb-4">Upload your first PO to get started</p>
-              <Button onClick={() => navigate('/upload-po')}>Upload PO</Button>
+              <p className="text-muted-foreground">Orders with customer PO numbers will appear here</p>
             </CardContent>
           </Card>
         ) : (
-          submissions.map((submission) => (
-            <Card key={submission.id}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      {submission.original_filename}
-                    </CardTitle>
-                    <CardDescription>
-                      Submitted {new Date(submission.created_at).toLocaleDateString()}
-                    </CardDescription>
+          orders.map((order) => {
+            const poNumbers = parsePONumbers(order.po_number);
+            
+            return (
+              <Card key={order.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Order #{order.order_number}
+                        {order.invoices && order.invoices.length > 0 && (
+                          <span className="text-muted-foreground font-normal text-base">
+                            / Invoice #{order.invoices[0].invoice_number}
+                          </span>
+                        )}
+                      </CardTitle>
+                      <CardDescription>
+                        {order.customer_name} • {new Date(order.created_at).toLocaleDateString()}
+                      </CardDescription>
+                    </div>
+                    <Badge className={getStatusColor(order.status)}>
+                      {order.status}
+                    </Badge>
                   </div>
-                  <Badge className={getStatusColor(submission.status)}>
-                    {getStatusIcon(submission.status)}
-                    <span className="ml-1">{getStatusLabel(submission.status)}</span>
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {submission.extracted_data && (
-                  <div className="space-y-2 text-sm">
-                    <div className="grid grid-cols-2 gap-4">
-                      {submission.extracted_data.po_number && (
-                        <div>
-                          <p className="text-muted-foreground">PO Number</p>
-                          <p className="font-medium">{submission.extracted_data.po_number}</p>
-                        </div>
-                      )}
-                      {submission.extracted_data.total_amount && (
-                        <div>
-                          <p className="text-muted-foreground">Total Amount</p>
-                          <p className="font-medium">${submission.extracted_data.total_amount}</p>
-                        </div>
-                      )}
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    {/* Customer PO Numbers */}
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Customer PO Numbers:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {poNumbers.map((po, index) => (
+                          <Badge 
+                            key={index} 
+                            variant="outline" 
+                            className="text-sm font-mono bg-primary/5"
+                          >
+                            {po}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Order Total */}
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Order Total</p>
+                        <p className="font-semibold">${order.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        {/* View/Download PO PDF if available */}
+                        {order.po_pdf_path && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewPO(order.po_pdf_path!)}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-1" />
+                              View PO
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDownloadPO(order.po_pdf_path!, order.po_number || order.order_number)}
+                            >
+                              <Download className="h-4 w-4 mr-1" />
+                              Download
+                            </Button>
+                          </>
+                        )}
+                        
+                        {/* Navigate to order detail */}
+                        <Button
+                          size="sm"
+                          onClick={() => navigate(`/orders/${order.id}`)}
+                        >
+                          View Order
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                )}
-                {submission.status === 'approved' && (
-                  <div className="mt-4 p-4 bg-green-500/10 rounded-lg space-y-2 text-sm">
-                    <p className="font-medium text-green-600">Approved Details</p>
-                    <div className="grid grid-cols-3 gap-4">
-                      {submission.approved_pricing && (
-                        <div>
-                          <p className="text-muted-foreground">Pricing</p>
-                          <p className="font-medium">${submission.approved_pricing}</p>
-                        </div>
-                      )}
-                      {submission.approved_lead_time_days && (
-                        <div>
-                          <p className="text-muted-foreground">Lead Time</p>
-                          <p className="font-medium">{submission.approved_lead_time_days} days</p>
-                        </div>
-                      )}
-                      {submission.approved_cost && (
-                        <div>
-                          <p className="text-muted-foreground">Cost</p>
-                          <p className="font-medium">${submission.approved_cost}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {submission.status === 'rejected' && submission.rejection_reason && (
-                  <div className="mt-4 p-4 bg-red-500/10 rounded-lg text-sm">
-                    <p className="font-medium text-red-600 mb-1">Rejection Reason</p>
-                    <p className="text-muted-foreground">{submission.rejection_reason}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
     </div>
