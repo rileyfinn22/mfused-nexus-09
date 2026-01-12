@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,6 +35,11 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companyId, setCompanyId] = useState<string>(selectedCompanyId || "");
   const { syncProduct, checkConnection } = useQuickBooksAutoSync();
+  
+  // Manual fields for when no template is selected
+  const [manualState, setManualState] = useState<string>("");
+  const [manualPrice, setManualPrice] = useState<string>("");
+  const [manualCost, setManualCost] = useState<string>("");
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
@@ -103,8 +109,9 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedTemplate) {
-      toast.error("Please select a template");
+    // If no template selected, require manual state
+    if (!selectedTemplate && !manualState) {
+      toast.error("Please select a state when not using a template");
       return;
     }
 
@@ -138,6 +145,12 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
 
       const createdProducts: string[] = [];
 
+      // Use template values if selected, otherwise use manual values
+      const productDescription = selectedTemplate?.description || null;
+      const productCost = selectedTemplate?.cost ?? (manualCost ? parseFloat(manualCost) : null);
+      const productPrice = selectedTemplate?.price ?? (manualPrice ? parseFloat(manualPrice) : null);
+      const productState = selectedTemplate?.state || manualState;
+
       for (const name of names) {
         const tempSKU = generateTempSKU();
 
@@ -145,10 +158,10 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
           .from('products')
           .insert({
             name: name,
-            description: selectedTemplate.description,
-            cost: selectedTemplate.cost,
-            price: selectedTemplate.price,
-            state: selectedTemplate.state,
+            description: productDescription,
+            cost: productCost,
+            price: productPrice,
+            state: productState,
             item_id: tempSKU,
             company_id: finalCompanyId
           })
@@ -176,6 +189,9 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
       setOpen(false);
       setSkuNames("");
       setSelectedTemplateId("");
+      setManualState("");
+      setManualPrice("");
+      setManualCost("");
       if (!selectedCompanyId) setCompanyId("");
       onProductsAdded();
     } catch (error) {
@@ -198,7 +214,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
         <DialogHeader>
           <DialogTitle>Quick Add Products</DialogTitle>
           <DialogDescription>
-            Select a product template, then enter multiple product names (one per line) to bulk create products with the template's description and price.
+            Optionally select a template, or manually set state and pricing. Enter product names (one per line) to bulk create.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -226,14 +242,13 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="template">Product Template <span className="text-destructive">*</span></Label>
+            <Label htmlFor="template">Product Template (Optional)</Label>
             <Select
               value={selectedTemplateId}
               onValueChange={setSelectedTemplateId}
-              required
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a product template" />
+                <SelectValue placeholder="Select a template or leave empty" />
               </SelectTrigger>
               <SelectContent>
                 {templates.map((template) => (
@@ -263,6 +278,61 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
             </div>
           )}
 
+          {/* Manual fields when no template selected */}
+          {!selectedTemplate && (
+            <div className="space-y-4 p-3 border border-border rounded-lg bg-muted/30">
+              <p className="text-sm text-muted-foreground font-medium">Manual Product Settings</p>
+              
+              <div className="space-y-2">
+                <Label htmlFor="manualState">State <span className="text-destructive">*</span></Label>
+                <Select
+                  value={manualState}
+                  onValueChange={setManualState}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="General">General (All States)</SelectItem>
+                    <SelectItem value="WA">Washington</SelectItem>
+                    <SelectItem value="AZ">Arizona</SelectItem>
+                    <SelectItem value="NY">New York</SelectItem>
+                    <SelectItem value="CA">California</SelectItem>
+                    <SelectItem value="MD">Maryland</SelectItem>
+                    <SelectItem value="MO">Missouri</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="manualPrice">Price (Optional)</Label>
+                  <Input
+                    id="manualPrice"
+                    type="number"
+                    step="0.001"
+                    value={manualPrice}
+                    onChange={(e) => setManualPrice(e.target.value)}
+                    placeholder="0.000"
+                  />
+                </div>
+                {isVibeAdmin && (
+                  <div className="space-y-2">
+                    <Label htmlFor="manualCost">Cost (Optional)</Label>
+                    <Input
+                      id="manualCost"
+                      type="number"
+                      step="0.001"
+                      value={manualCost}
+                      onChange={(e) => setManualCost(e.target.value)}
+                      placeholder="0.000"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="skuNames">Product Names <span className="text-destructive">*</span></Label>
             <Textarea
@@ -270,7 +340,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
               value={skuNames}
               onChange={(e) => setSkuNames(e.target.value)}
               placeholder="Enter product names, one per line:&#10;Mfused Bag - Blue Dream&#10;Mfused Bag - OG Kush&#10;Mfused Bag - Gelato"
-              rows={8}
+              rows={6}
               required
             />
             <p className="text-xs text-muted-foreground">
@@ -278,7 +348,11 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
             </p>
           </div>
 
-          <Button type="submit" disabled={loading || !selectedTemplateId || (isVibeAdmin && !companyId)} className="w-full">
+          <Button 
+            type="submit" 
+            disabled={loading || (isVibeAdmin && !companyId) || (!selectedTemplate && !manualState)} 
+            className="w-full"
+          >
             {loading ? "Adding..." : "Add Products"}
           </Button>
         </form>
