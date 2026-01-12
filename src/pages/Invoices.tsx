@@ -610,19 +610,7 @@ const Invoices = () => {
                   <div className="col-span-2 flex gap-1">
                     {isVibeAdmin && (
                       <>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 w-6 p-0" 
-                          title="Edit Order"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/orders/${invoice.order_id}`);
-                          }}
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button 
+                        <Button
                           variant="ghost" 
                           size="sm" 
                           className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" 
