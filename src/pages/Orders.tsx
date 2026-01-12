@@ -320,14 +320,18 @@ const Orders = () => {
 
   const draftOrders = filteredOrders.filter(o => o.status.toLowerCase() === 'draft');
   const pendingOrdersList = filteredOrders.filter(o => 
-    ['pending', 'pending_pull'].includes(o.status.toLowerCase())
+    ['pending', 'pending_pull'].includes(o.status.toLowerCase()) ||
+    // Include "in production" orders with 0% progress in pending section
+    (o.status.toLowerCase() === 'in production' && o.productionProgress === 0 && o.order_type !== 'pull_ship' && !o.parent_order_id)
   );
   const completedStatuses = ['shipped', 'delivered', 'completed'];
   const productionOrders = filteredOrders.filter(o => 
     !['draft', 'pending', 'pending_pull'].includes(o.status.toLowerCase()) &&
     !completedStatuses.includes(o.status.toLowerCase()) &&
     o.order_type !== 'pull_ship' &&
-    !o.parent_order_id  // Exclude child orders from blanket orders
+    !o.parent_order_id &&
+    // Exclude 0% progress orders (they show in pending)
+    !(o.status.toLowerCase() === 'in production' && o.productionProgress === 0)
   );
   const completedOrders = filteredOrders.filter(o => 
     completedStatuses.includes(o.status.toLowerCase()) &&
