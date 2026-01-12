@@ -170,7 +170,7 @@ const Invoices = () => {
     );
   };
 
-  const handleDescriptionChange = async (invoiceId: string, description: string) => {
+  const handleInvoiceDescriptionChange = async (invoiceId: string, description: string) => {
     const { error } = await supabase
       .from("invoices")
       .update({ description: description || null })
@@ -183,6 +183,26 @@ const Invoices = () => {
 
     setInvoices((prev) =>
       prev.map((inv) => (inv.id === invoiceId ? { ...inv, description: description || null } : inv))
+    );
+  };
+
+  const handleOrderDescriptionChange = async (orderId: string, description: string) => {
+    const { error } = await supabase
+      .from("orders")
+      .update({ description: description || null })
+      .eq("id", orderId);
+
+    if (error) {
+      console.error("Error updating order description:", error);
+      return;
+    }
+
+    setInvoices((prev) =>
+      prev.map((inv) =>
+        inv.order_id === orderId
+          ? { ...inv, orders: { ...(inv.orders || {}), description: description || null } }
+          : inv
+      )
     );
   };
 
@@ -520,11 +540,40 @@ const Invoices = () => {
                     </div>
                   </div>
                   <div className="col-span-2">
-                    <EditableDescription
-                      value={invoice.description}
-                      placeholder="Add description…"
-                      onSave={(text) => handleDescriptionChange(invoice.id, text)}
-                    />
+                    {isVibeAdmin ? (
+                      <div className="space-y-2">
+                        <EditableDescription
+                          value={invoice.orders?.description}
+                          placeholder="Add description…"
+                          onSave={(text) => {
+                            if (!invoice.order_id) return;
+                            return handleOrderDescriptionChange(invoice.order_id, text);
+                          }}
+                        />
+
+                        {isChild && (
+                          <div className="pl-3 border-l border-border">
+                            <EditableDescription
+                              value={invoice.description}
+                              placeholder="Add invoice description…"
+                              className="text-xs"
+                              onSave={(text) => handleInvoiceDescriptionChange(invoice.id, text)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
+                          {invoice.orders?.description || "-"}
+                        </div>
+                        {isChild && invoice.description && (
+                          <div className="pl-3 border-l border-border text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                            {invoice.description}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="col-span-1">
                     <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>

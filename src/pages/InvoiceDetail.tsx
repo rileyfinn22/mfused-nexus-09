@@ -1240,32 +1240,87 @@ const InvoiceDetail = () => {
                     View Source Quote
                   </Button>
                 )}
-                {order?.po_number && <p className="text-sm text-muted-foreground">
-                    Customer PO: {order.po_number}
-                  </p>}
-                {/* Invoice Description - Editable */}
+                {order?.po_number && (
+                  <p className="text-sm text-muted-foreground">Customer PO: {order.po_number}</p>
+                )}
+
+                {/* Descriptions (match Orders: order-level description + optional invoice-level description for child invoices) */}
                 {isVibeAdmin ? (
-                  <div className="mt-3">
-                    <EditableDescription
-                      value={invoice.description}
-                      onSave={async (newValue) => {
-                        const { error } = await supabase
-                          .from('invoices')
-                          .update({ description: newValue || null })
-                          .eq('id', invoice.id);
-                        
-                        if (error) {
-                          toast({ title: "Error", description: "Failed to save description", variant: "destructive" });
-                        } else {
-                          setInvoice({ ...invoice, description: newValue || null });
-                        }
-                      }}
-                    />
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                        Order Description
+                      </div>
+                      <EditableDescription
+                        value={order?.description}
+                        placeholder="Add description…"
+                        onSave={async (newValue) => {
+                          if (!order?.id) return;
+
+                          const { error } = await supabase
+                            .from("orders")
+                            .update({ description: newValue || null })
+                            .eq("id", order.id);
+
+                          if (error) {
+                            toast({
+                              title: "Error",
+                              description: "Failed to save order description",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+
+                          setOrder({ ...order, description: newValue || null });
+                          setInvoice({
+                            ...invoice,
+                            orders: { ...(invoice?.orders || {}), description: newValue || null },
+                          });
+                        }}
+                      />
+                    </div>
+
+                    {invoice?.parent_invoice_id && (
+                      <div>
+                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                          Invoice Description
+                        </div>
+                        <EditableDescription
+                          value={invoice.description}
+                          placeholder="Add invoice description…"
+                          onSave={async (newValue) => {
+                            const { error } = await supabase
+                              .from("invoices")
+                              .update({ description: newValue || null })
+                              .eq("id", invoice.id);
+
+                            if (error) {
+                              toast({
+                                title: "Error",
+                                description: "Failed to save invoice description",
+                                variant: "destructive",
+                              });
+                            } else {
+                              setInvoice({ ...invoice, description: newValue || null });
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  invoice.description && (
-                    <p className="text-sm text-muted-foreground mt-3">{invoice.description}</p>
-                  )
+                  <div className="mt-3 space-y-2">
+                    {order?.description && (
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
+                        {order.description}
+                      </p>
+                    )}
+                    {invoice?.parent_invoice_id && invoice.description && (
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
+                        {invoice.description}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="text-right">
