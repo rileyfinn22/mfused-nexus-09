@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List } from "lucide-react";
+import { CompanyEmailsManager } from "@/components/CompanyEmailsManager";
 import { CompanyProductTemplates } from "@/components/CompanyProductTemplates";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -1006,6 +1007,24 @@ const CustomerDetail = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Additional Emails */}
+          {customerId && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Additional Emails
+                </CardTitle>
+                <CardDescription>
+                  Add multiple email addresses for different purposes (billing, orders, shipping, etc.)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CompanyEmailsManager companyId={customerId} />
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
