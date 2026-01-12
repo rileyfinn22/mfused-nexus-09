@@ -74,11 +74,17 @@ const handler = async (req: Request): Promise<Response> => {
       : "Upon Receipt";
 
     // Build the email HTML - link directly to the invoice
-    // IMPORTANT: use the calling app's Origin when available (preview vs production)
+    // NOTE: Lovable preview URLs require a Lovable login, so never send customers there.
+    // Prefer the public portal URL (published site/custom domain).
+    const defaultPortalUrl = Deno.env.get("PUBLIC_APP_URL") || "https://vibepkgportal.com";
     const requestOrigin = req.headers.get("origin");
-    const portalUrl = requestOrigin && requestOrigin.startsWith("http")
+
+    const isPreviewOrigin = !!requestOrigin && requestOrigin.includes("lovableproject.com");
+    const isLocalOrigin = !!requestOrigin && requestOrigin.includes("localhost");
+
+    const portalUrl = requestOrigin && requestOrigin.startsWith("http") && !isPreviewOrigin && !isLocalOrigin
       ? requestOrigin
-      : "https://vibepkgportal.com";
+      : defaultPortalUrl;
 
     const invoiceUrl = `${portalUrl}/invoices/${invoiceId}`;
     const emailHtml = `
