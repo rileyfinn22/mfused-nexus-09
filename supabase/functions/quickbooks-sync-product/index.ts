@@ -103,7 +103,11 @@ serve(async (req) => {
       .single();
 
     if (qbError || !qbSettings || !qbSettings.is_connected) {
-      throw new Error('QuickBooks not connected');
+      console.log('QuickBooks not connected for company:', product.company_id);
+      return new Response(
+        JSON.stringify({ skipped: true, reason: 'QuickBooks not connected' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Decrypt tokens from vault (fallback to plain text for backwards compatibility)
