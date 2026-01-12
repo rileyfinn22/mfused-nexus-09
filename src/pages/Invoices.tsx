@@ -105,26 +105,50 @@ const Invoices = () => {
     return Clock;
   };
 
-  const getStatusDisplay = (invoice: any) => {
-    if (invoice.status === 'paid') return 'PAID';
-    if (invoice.status === 'due') return 'DUE';
-    // If billed and past due date, show as DUE
-    if (invoice.status === 'billed') {
-      if (invoice.due_date) {
+  const getComputedStatus = (invoice: any): 'paid' | 'due' | 'billed' | 'open' => {
+    const status = String(invoice?.status || '').toLowerCase();
+
+    if (status === 'paid') return 'paid';
+    if (status === 'due') return 'due';
+
+    if (status === 'billed') {
+      if (invoice?.due_date) {
         const daysUntilDue = getDaysUntilDue(invoice.due_date);
-        if (daysUntilDue <= 0) return 'DUE';
+        if (daysUntilDue <= 0) return 'due';
       }
-      return 'BILLED';
+      return 'billed';
     }
-    return 'OPEN';
+
+    // Treat anything else (open/pending/etc.) as OPEN for display purposes
+    return 'open';
+  };
+
+  const getStatusDisplay = (invoice: any) => {
+    return getComputedStatus(invoice).toUpperCase();
+  };
+
+  const parseDateAsLocalDay = (value: string) => {
+    // If backend stores YYYY-MM-DD, parse as *local* date to avoid timezone shifts.
+    const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})/.exec(value);
+    if (m) {
+      const y = Number(m[1]);
+      const mo = Number(m[2]) - 1;
+      const d = Number(m[3]);
+      return new Date(y, mo, d);
+    }
+    return new Date(value);
   };
 
   const getDaysUntilDue = (dueDate: string) => {
+    // Compare by calendar day (local) to avoid time-of-day / timezone surprises
     const today = new Date();
-    const due = new Date(dueDate);
+    today.setHours(0, 0, 0, 0);
+
+    const due = parseDateAsLocalDay(dueDate);
+    due.setHours(0, 0, 0, 0);
+
     const diffTime = due.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
   };
 
   const toggleExpanded = (invoiceId: string) => {
@@ -141,15 +165,7 @@ const Invoices = () => {
 
   const hasOverdueChildren = (parentId: string) => {
     const children = invoices.filter(inv => inv.parent_invoice_id === parentId);
-    return children.some(child => {
-      if (child.status === 'open' || child.status === 'pending') {
-        if (child.due_date) {
-          const daysUntilDue = getDaysUntilDue(child.due_date);
-          return daysUntilDue < 0;
-        }
-      }
-      return false;
-    });
+    return children.some(child => getComputedStatus(child) === 'due');
   };
 
   // Get the highest priority status from child invoices
@@ -157,16 +173,16 @@ const Invoices = () => {
   const getChildrenPriorityStatus = (parentId: string): 'due' | 'billed' | 'open' | null => {
     const children = invoices.filter(inv => inv.parent_invoice_id === parentId);
     if (children.length === 0) return null;
-    
-    const hasDue = children.some(child => child.status === 'due');
+
+    const hasDue = children.some(child => getComputedStatus(child) === 'due');
     if (hasDue) return 'due';
-    
-    const hasBilled = children.some(child => child.status === 'billed');
+
+    const hasBilled = children.some(child => getComputedStatus(child) === 'billed');
     if (hasBilled) return 'billed';
-    
-    const hasOpen = children.some(child => child.status === 'open');
+
+    const hasOpen = children.some(child => getComputedStatus(child) === 'open');
     if (hasOpen) return 'open';
-    
+
     return null;
   };
 
@@ -228,16 +244,11 @@ const Invoices = () => {
                          invoice.orders?.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          invoice.orders?.customer_name?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    // Status filter logic - now uses the actual status field
+    // Status filter logic (includes billed invoices that are past due => treated as DUE)
     let matchesStatus = true;
-    if (statusFilter === "paid") {
-      matchesStatus = invoice.status === 'paid';
-    } else if (statusFilter === "due") {
-      matchesStatus = invoice.status === 'due';
-    } else if (statusFilter === "billed") {
-      matchesStatus = invoice.status === 'billed';
-    } else if (statusFilter === "open") {
-      matchesStatus = invoice.status === 'open';
+    if (statusFilter !== "all") {
+      const computedStatus = getComputedStatus(invoice);
+      matchesStatus = computedStatus === statusFilter;
     }
     
     const matchesCompany = companyFilter === "all" || invoice.company_id === companyFilter;
@@ -270,7 +281,7 @@ const Invoices = () => {
   const openAmount = filteredInvoices
     .filter(inv => {
       const isBlanket = inv.invoice_type === 'full' || !inv.invoice_type;
-      const isNotPaid = inv.status !== 'paid';
+      const isNotPaid = getComputedStatus(inv) !== 'paid';
       return isBlanket && isNotPaid;
     })
     .reduce((sum, invoice) => {
@@ -286,33 +297,17 @@ const Invoices = () => {
       return sum + remaining;
     }, 0);
 
-  // Calculate BILLED amount - sum of all invoices with status = 'billed' that are NOT past due
+  // Calculate BILLED amount - invoices that are billed and NOT past due
   const billedAmount = filteredInvoices
-    .filter(inv => {
-      if (inv.status !== 'billed') return false;
-      // If past due date, it should be counted as DUE, not BILLED
-      if (inv.due_date) {
-        const daysUntilDue = getDaysUntilDue(inv.due_date);
-        if (daysUntilDue <= 0) return false;
-      }
-      return true;
-    })
+    .filter(inv => getComputedStatus(inv) === 'billed')
     .reduce((sum, invoice) => {
       const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
       return sum + remaining;
     }, 0);
 
-  // Calculate DUE amount - sum of all invoices with status = 'due' OR billed invoices past due date
+  // Calculate DUE amount - invoices that are past due (including billed invoices past due date)
   const dueAmount = filteredInvoices
-    .filter(inv => {
-      if (inv.status === 'due') return true;
-      // Billed invoices past due date count as DUE
-      if (inv.status === 'billed' && inv.due_date) {
-        const daysUntilDue = getDaysUntilDue(inv.due_date);
-        if (daysUntilDue <= 0) return true;
-      }
-      return false;
-    })
+    .filter(inv => getComputedStatus(inv) === 'due')
     .reduce((sum, invoice) => {
       const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
       return sum + remaining;
