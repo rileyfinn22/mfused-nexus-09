@@ -72,7 +72,9 @@ export default function MyPOs() {
           )
         `)
         .eq('company_id', userRole.company_id)
+        .is('deleted_at', null)
         .not('po_number', 'is', null)
+        .neq('status', 'draft')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
