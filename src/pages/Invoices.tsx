@@ -464,9 +464,10 @@ const Invoices = () => {
               return (
                 <div 
                   key={invoice.id} 
-                  className={`grid grid-cols-12 gap-4 px-4 py-3 transition-colors ${
+                  className={`grid grid-cols-12 gap-4 px-4 py-3 transition-colors cursor-pointer ${
                     isChild ? 'bg-muted/60 border-l-4 border-l-primary/50' : 'hover:bg-muted/50'
                   } ${isChild ? '' : 'even:bg-muted/40'}`}
+                  onClick={() => navigate(`/invoices/${invoice.id}`)}
                 >
                   <div className="col-span-2">
                     <div className="flex items-center gap-2">
@@ -531,7 +532,7 @@ const Invoices = () => {
                       </div>
                     )}
                   </div>
-                  <div className="col-span-1 text-sm text-muted-foreground">
+                  <div className="col-span-1 text-sm text-muted-foreground truncate">
                     {(() => {
                       // For parent invoices, check if any child has a due date and show the soonest
                       if (isParent && hasChildren) {
@@ -543,9 +544,9 @@ const Invoices = () => {
                         
                         if (childDueDates.length > 0) {
                           return (
-                            <span>
+                            <span className="whitespace-nowrap" title={`${childDueDates[0].toLocaleDateString()} (Partial)`}>
                               {childDueDates[0].toLocaleDateString()}
-                              <span className="text-xs text-muted-foreground/70 ml-1">(Partial)</span>
+                              <span className="text-[10px] text-muted-foreground/70"> (P)</span>
                             </span>
                           );
                         }
@@ -607,18 +608,6 @@ const Invoices = () => {
                     </Badge>
                   </div>
                   <div className="col-span-2 flex gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-6 w-6 p-0" 
-                      title="View Invoice"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/invoices/${invoice.id}`);
-                      }}
-                    >
-                      <Eye className="h-3 w-3" />
-                    </Button>
                     {isVibeAdmin && (
                       <>
                         <Button 
