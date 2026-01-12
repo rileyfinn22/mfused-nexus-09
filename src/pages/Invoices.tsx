@@ -24,6 +24,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { exportToCSV } from "@/lib/exportUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
+import { EditableDescription } from "@/components/EditableDescription";
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -172,12 +173,17 @@ const Invoices = () => {
   const handleDescriptionChange = async (invoiceId: string, description: string) => {
     const { error } = await supabase
       .from("invoices")
-      .update({ description })
+      .update({ description: description || null })
       .eq("id", invoiceId);
 
     if (error) {
       console.error("Error updating invoice description:", error);
+      return;
     }
+
+    setInvoices((prev) =>
+      prev.map((inv) => (inv.id === invoiceId ? { ...inv, description: description || null } : inv))
+    );
   };
 
   // Using centralized formatCurrency from @/lib/utils
@@ -514,25 +520,11 @@ const Invoices = () => {
                     </div>
                   </div>
                   <div className="col-span-2">
-                    <div 
-                      className="text-sm text-muted-foreground whitespace-normal break-words cursor-text hover:bg-muted/50 rounded px-1 py-0.5 min-h-[28px]"
-                      contentEditable
-                      suppressContentEditableWarning
-                      onBlur={(e) => {
-                        if (invoice.order_id) {
-                          supabase
-                            .from("orders")
-                            .update({ description: e.currentTarget.textContent || '' })
-                            .eq("id", invoice.order_id)
-                            .then(({ error }) => {
-                              if (error) console.error("Error updating description:", error);
-                            });
-                        }
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {invoice.orders?.description || 'Add description...'}
-                    </div>
+                    <EditableDescription
+                      value={invoice.description}
+                      placeholder="Add description…"
+                      onSave={(text) => handleDescriptionChange(invoice.id, text)}
+                    />
                   </div>
                   <div className="col-span-1">
                     <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>
