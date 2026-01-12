@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
   const [existingInvoices, setExistingInvoices] = useState<any[]>([]);
   const [invoiceMode, setInvoiceMode] = useState<'deposit' | 'shipment'>(initialMode);
   const [depositPercentage, setDepositPercentage] = useState("30");
+  const [invoiceDescription, setInvoiceDescription] = useState("");
   const { syncInvoice, checkConnection } = useQuickBooksAutoSync();
   
   // Packing list upload states
@@ -51,6 +53,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       fetchAvailableInventory();
       initializeQuantities();
       setPackingListResult(null); // Reset packing list result when dialog opens
+      setInvoiceDescription(""); // Reset description when dialog opens
     }
   }, [open, order, initialMode]);
 
@@ -393,7 +396,8 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
           shipping_cost: shipping,
           total,
           created_by: user.id,
-          notes: invoiceMode === 'deposit' ? `${depositPercentage}% deposit payment` : null
+          notes: invoiceMode === 'deposit' ? `${depositPercentage}% deposit payment` : null,
+          description: invoiceDescription.trim() || null
         })
         .select()
         .single();
@@ -842,6 +846,18 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
               </div>
             </>
           )}
+
+          {/* Description field for all invoice types */}
+          <div className="space-y-2">
+            <Label htmlFor="invoice-description">Description (optional)</Label>
+            <Textarea
+              id="invoice-description"
+              value={invoiceDescription}
+              onChange={(e) => setInvoiceDescription(e.target.value)}
+              placeholder="Add a description for this invoice..."
+              className="min-h-[80px]"
+            />
+          </div>
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>

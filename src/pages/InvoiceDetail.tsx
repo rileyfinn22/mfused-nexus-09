@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +26,44 @@ import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addPdfBranding, addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
+
+// Editable description component with proper placeholder behavior
+const EditableDescription = ({ 
+  value, 
+  onSave 
+}: { 
+  value: string | null; 
+  onSave: (newValue: string) => void;
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isEmpty, setIsEmpty] = useState(!value);
+
+  const handleFocus = () => {
+    if (ref.current && isEmpty) {
+      ref.current.textContent = '';
+    }
+  };
+
+  const handleBlur = () => {
+    const text = ref.current?.textContent?.trim() || '';
+    setIsEmpty(!text);
+    onSave(text);
+  };
+
+  return (
+    <div 
+      ref={ref}
+      className={`text-sm whitespace-normal break-words cursor-text hover:bg-muted/50 rounded px-2 py-1 min-h-[32px] border border-transparent hover:border-border focus:border-primary focus:outline-none ${isEmpty ? 'text-muted-foreground/60 italic' : 'text-foreground'}`}
+      contentEditable
+      suppressContentEditableWarning
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {value || 'Add description...'}
+    </div>
+  );
+};
 const InvoiceDetail = () => {
   const {
     invoiceId
@@ -1241,6 +1279,30 @@ const InvoiceDetail = () => {
                 {order?.po_number && <p className="text-sm text-muted-foreground">
                     Customer PO: {order.po_number}
                   </p>}
+                {/* Invoice Description - Editable */}
+                {isVibeAdmin ? (
+                  <div className="mt-3">
+                    <EditableDescription
+                      value={invoice.description}
+                      onSave={async (newValue) => {
+                        const { error } = await supabase
+                          .from('invoices')
+                          .update({ description: newValue || null })
+                          .eq('id', invoice.id);
+                        
+                        if (error) {
+                          toast({ title: "Error", description: "Failed to save description", variant: "destructive" });
+                        } else {
+                          setInvoice({ ...invoice, description: newValue || null });
+                        }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  invoice.description && (
+                    <p className="text-sm text-muted-foreground mt-3">{invoice.description}</p>
+                  )
+                )}
               </div>
               <div className="text-right">
                 <Select
@@ -1677,8 +1739,29 @@ const InvoiceDetail = () => {
                 return <TableRow key={item.id}>
                       <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                       <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {item.description || '-'}
+                      <TableCell className="max-w-xs">
+                        {isVibeAdmin ? (
+                          <EditableDescription
+                            value={item.description}
+                            onSave={async (newValue) => {
+                              const { error } = await supabase
+                                .from('order_items')
+                                .update({ description: newValue || null })
+                                .eq('id', item.id);
+                              
+                              if (error) {
+                                toast({ title: "Error", description: "Failed to save description", variant: "destructive" });
+                              } else {
+                                // Update local state
+                                setEditedItems(items => items.map(i => 
+                                  i.id === item.id ? { ...i, description: newValue || null } : i
+                                ));
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span className="text-sm text-muted-foreground">{item.description || '-'}</span>
+                        )}
                       </TableCell>
                       {invoice?.invoice_type === 'full' ? (
                         <>
