@@ -420,9 +420,9 @@ const Invoices = () => {
             <div className="col-span-1">Due Date</div>
             <div className="col-span-2">Company</div>
             <div className="col-span-2">Description</div>
-            <div className="col-span-1">Type</div>
             <div className="col-span-1">Amount</div>
             <div className="col-span-1">Status</div>
+            <div className="col-span-1">Type</div>
             <div className="col-span-2">Actions</div>
           </div>
         </div>
@@ -575,17 +575,17 @@ const Invoices = () => {
                       </div>
                     )}
                   </div>
-                  <div className="col-span-1">
-                    <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>
-                      {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
-                    </Badge>
-                  </div>
                   <div className="col-span-1 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
                   <div className="col-span-1 text-sm font-medium">
                     <div className="flex items-center gap-1">
                       <StatusIcon className={`h-3 w-3 ${getStatusColor(displayStatus)}`} />
                       <span className={getStatusColor(displayStatus)}>{displayStatus}</span>
                     </div>
+                  </div>
+                  <div className="col-span-1">
+                    <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>
+                      {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
+                    </Badge>
                   </div>
                   <div className="col-span-2 flex gap-1">
                     <Button 
