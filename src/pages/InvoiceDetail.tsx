@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,44 +26,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addPdfBranding, addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
+import { EditableDescription } from "@/components/EditableDescription";
 
-// Editable description component with proper placeholder behavior
-const EditableDescription = ({ 
-  value, 
-  onSave 
-}: { 
-  value: string | null; 
-  onSave: (newValue: string) => void;
-}) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const [isEmpty, setIsEmpty] = useState(!value);
-
-  const handleFocus = () => {
-    if (ref.current && isEmpty) {
-      ref.current.textContent = '';
-    }
-  };
-
-  const handleBlur = () => {
-    const text = ref.current?.textContent?.trim() || '';
-    setIsEmpty(!text);
-    onSave(text);
-  };
-
-  return (
-    <div 
-      ref={ref}
-      className={`text-sm whitespace-normal break-words cursor-text hover:bg-muted/50 rounded px-2 py-1 min-h-[32px] border border-transparent hover:border-border focus:border-primary focus:outline-none ${isEmpty ? 'text-muted-foreground/60 italic' : 'text-foreground'}`}
-      contentEditable
-      suppressContentEditableWarning
-      onFocus={handleFocus}
-      onBlur={handleBlur}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {value || 'Add description...'}
-    </div>
-  );
-};
 const InvoiceDetail = () => {
   const {
     invoiceId

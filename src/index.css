@@ -301,4 +301,11 @@
     background-color: hsl(var(--border));
     border-radius: 3px;
   }
+
+  /* contentEditable placeholder (so placeholder isn't saved as text) */
+  .editable-description[data-placeholder]:empty:before {
+    content: attr(data-placeholder);
+    color: hsl(var(--muted-foreground) / 0.6);
+    font-style: italic;
+  }
 }
