@@ -74,7 +74,12 @@ const handler = async (req: Request): Promise<Response> => {
       : "Upon Receipt";
 
     // Build the email HTML - link directly to the invoice
-    const portalUrl = "https://vibepkgportal.com";
+    // IMPORTANT: use the calling app's Origin when available (preview vs production)
+    const requestOrigin = req.headers.get("origin");
+    const portalUrl = requestOrigin && requestOrigin.startsWith("http")
+      ? requestOrigin
+      : "https://vibepkgportal.com";
+
     const invoiceUrl = `${portalUrl}/invoices/${invoiceId}`;
     const emailHtml = `
       <!DOCTYPE html>
