@@ -133,6 +133,44 @@ export type Database = {
         }
         Relationships: []
       }
+      company_emails: {
+        Row: {
+          company_id: string
+          created_at: string
+          email: string
+          id: string
+          is_primary: boolean | null
+          label: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email: string
+          id?: string
+          is_primary?: boolean | null
+          label?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          is_primary?: boolean | null
+          label?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_emails_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_invitations: {
         Row: {
           accepted_at: string | null

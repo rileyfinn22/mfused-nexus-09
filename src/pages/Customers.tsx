@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit, Trash2, Building2, UserPlus } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Building2, UserPlus, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { InviteCompanyUserDialog } from "@/components/InviteCompanyUserDialog";
+import { CompanyEmailsManager } from "@/components/CompanyEmailsManager";
 import {
   Dialog,
   DialogContent,
@@ -412,7 +413,7 @@ const Customers = () => {
                   {formErrors.name && <p className="text-sm text-destructive mt-1">{formErrors.name}</p>}
                 </div>
                 <div>
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Primary Email</Label>
                   <Input
                     id="email"
                     type="email"
@@ -434,6 +435,17 @@ const Customers = () => {
                 </div>
               </div>
             </div>
+
+            {/* Additional Emails - Only show when editing existing company */}
+            {editingCustomer && (
+              <div className="space-y-4">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Additional Emails
+                </h3>
+                <CompanyEmailsManager companyId={editingCustomer.id} />
+              </div>
+            )}
 
             {/* Billing Address */}
             <div className="space-y-4">
