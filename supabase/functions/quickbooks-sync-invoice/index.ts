@@ -120,6 +120,12 @@ serve(async (req) => {
       const { data: userData } = await supabase.auth.admin.getUserById(companyUser.user_id);
       companyEmail = userData?.user?.email || '';
     }
+    
+    // Fallback to order's customer_email if no company user email found
+    if (!companyEmail && invoice.orders?.customer_email) {
+      companyEmail = invoice.orders.customer_email;
+      console.log('Using order customer_email as fallback:', companyEmail);
+    }
 
     // Get inventory allocations for this invoice to determine actual shipped quantities
     const { data: allocations } = await supabase
