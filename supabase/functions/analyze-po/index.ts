@@ -530,6 +530,58 @@ Return ONLY valid JSON:
         console.log(`✗ No partial name match found for: "${poName}"`);
       }
 
+      // STEP 4.5: Token-based fuzzy matching
+      // Handles cases like "AZ Sleeve - FIRE FATSO GAS" matching "AZ Sleeve - Fire - Fatso"
+      if (poName && poName.length > 5) {
+        console.log(`\n[STEP 4.5] Trying TOKEN-BASED fuzzy match for: "${poName}"`);
+        
+        // Tokenize: split on non-alphanumeric, lowercase, filter short tokens
+        const tokenize = (str: string): string[] => {
+          return str.toLowerCase()
+            .split(/[^a-z0-9]+/)
+            .map(t => t.trim())
+            .filter(t => t.length > 1); // ignore single chars
+        };
+        
+        const poTokens = tokenize(poName);
+        console.log(`  PO tokens: [${poTokens.join(', ')}]`);
+        
+        // Score each product by token overlap
+        let bestMatch: typeof products[0] | null = null;
+        let bestScore = 0;
+        
+        for (const p of products) {
+          if (!p.name) continue;
+          
+          // If we detected a state, require matching state
+          if (extractedState && p.state && p.state.toUpperCase() !== extractedState.toUpperCase()) {
+            continue;
+          }
+          
+          const productTokens = tokenize(p.name);
+          
+          // Count how many PO tokens appear in product tokens
+          const matchingTokens = poTokens.filter(pt => productTokens.includes(pt));
+          const matchCount = matchingTokens.length;
+          
+          // Score = matching tokens / product tokens (how well product is covered)
+          // Require at least 3 matching tokens and 60% coverage of product tokens
+          const coverage = productTokens.length > 0 ? matchCount / productTokens.length : 0;
+          
+          if (matchCount >= 3 && coverage >= 0.6 && coverage > bestScore) {
+            bestScore = coverage;
+            bestMatch = p;
+            console.log(`  Candidate: "${p.name}" - ${matchCount} matching tokens, ${(coverage * 100).toFixed(0)}% coverage`);
+          }
+        }
+        
+        if (bestMatch) {
+          console.log(`✓ TOKEN FUZZY MATCH FOUND: "${poName}" -> "${bestMatch.name}" (${(bestScore * 100).toFixed(0)}% coverage)`);
+          return bestMatch;
+        }
+        console.log(`✗ No token fuzzy match found for: "${poName}"`);
+      }
+
       // STEP 5: SMART SHORTHAND MATCHING
       // Handles formats like "Red Card - Vape 2g - Sleeve" or "Golden Glove - Ion 1g - Bag"
       // Maps to products like "AZ Sleeves - Red Card" or "WA Ion Bags - Golden Glove"
