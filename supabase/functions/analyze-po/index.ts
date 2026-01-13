@@ -107,8 +107,77 @@ serve(async (req) => {
       throw new Error('Either pdfPath or textContent must be provided');
     }
 
+    // --- Hint-based canonical naming (keeps AI from collapsing to generic names like "AZ Sleeves") ---
+    const US_STATES = [
+      'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
+    ] as const;
+    const STATE_CODES = new Set<string>(US_STATES);
+
+    const parseAnalysisHint = (hint: string | undefined | null): { forcedState: string | null; forcedType: 'sleeve' | 'bag' | null } => {
+      if (!hint) return { forcedState: null, forcedType: null };
+
+      const upper = String(hint).toUpperCase();
+      const foundStates = Array.from(new Set((upper.match(/\b[A-Z]{2}\b/g) || []).filter(s => STATE_CODES.has(s))));
+      const forcedState = foundStates.length === 1 ? foundStates[0] : null;
+
+      let forcedType: 'sleeve' | 'bag' | null = null;
+      if (/\bSLEEVE\b/i.test(hint) || /\bSLEEVES\b/i.test(hint)) forcedType = 'sleeve';
+      else if (/\bBAG\b/i.test(hint) || /\bBAGS\b/i.test(hint)) forcedType = 'bag';
+
+      return { forcedState, forcedType };
+    };
+
+    const extractMeaningfulPartsFromPoLine = (rawName: string): string[] => {
+      // Example:
+      // "SLEEVE - E2.5 XL - 2g (1 x 2g) - Super Fog - Fire - ATF - Citrus - Sat - AZ" -> ["Fire", "ATF"]
+      const parts = (rawName || '').split(/\s*[-–—]\s*/).map(p => p.trim()).filter(Boolean);
+
+      const dropPart = (p: string) => {
+        const v = p.toLowerCase().trim();
+        if (!v) return true;
+        if (v.includes('super fog')) return true;
+        if (v.includes('sleeve') || v.includes('bag')) return true;
+        if (/^e\d+(?:\.\d+)?/.test(v)) return true; // e2.5, e3.0, etc
+        if (/\d+(?:\.\d+)?\s*g/.test(v)) return true; // 2g, 1g, 2.5g
+        if (/\(\s*\d+\s*x\s*\d+(?:\.\d+)?\s*g\s*\)/.test(v)) return true; // (1 x 2g)
+        if (/(citrus|dessert|sweet)/.test(v)) return true;
+        if (/^(sat|hyb|ind|sativa|hybrid|indica)$/.test(v)) return true;
+        // Drop state codes
+        if (/^([a-z]{2})$/i.test(v) && STATE_CODES.has(v.toUpperCase())) return true;
+        // Drop size codes like XL, SM, LG, etc.
+        if (/^(xs|sm|md|lg|xl|xxl|xxxl)$/i.test(v)) return true;
+        if (/^e\d+(?:\.\d+)?\s*(xs|sm|md|lg|xl|xxl|xxxl)$/i.test(v)) return true;
+        return false;
+      };
+
+      return parts.filter(p => !dropPart(p));
+    };
+
+    const buildVariantLabelFromPoLine = (rawName: string): string => {
+      const kept = extractMeaningfulPartsFromPoLine(rawName);
+      if (!kept.length) return '';
+      return kept
+        .join(' ')
+        .replace(/[^A-Za-z0-9 ]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase();
+    };
+
+    const canonicalizeItemNameFromHint = (rawLine: string, hint: string | undefined | null): string | null => {
+      const ctx = parseAnalysisHint(hint);
+      if (!ctx.forcedState || !ctx.forcedType) return null;
+
+      const variant = buildVariantLabelFromPoLine(rawLine);
+      if (!variant) return null;
+
+      const typeLabel = ctx.forcedType === 'sleeve' ? 'Sleeve' : 'Bag';
+      return `${ctx.forcedState} ${typeLabel} - ${variant}`;
+    };
+
     // Analyze with Lovable AI
     console.log('Sending to AI for analysis...');
+
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -144,9 +213,15 @@ For simple text lists, each line typically contains:
 2. FOR EACH LINE ITEM, EXTRACT:
 - sku: The SKU code if present
 - item_id: Same as sku
-- name: The PRODUCT NAME/DESCRIPTION - INCLUDE STATE PREFIX if specified (e.g., "AZ", "WA", "NY", "MD")
+- name: The FULL product name/description as shown in the PO (do NOT replace it with a category like "AZ Sleeves")
+- description: If you normalize/shorten the name for matching, put the ORIGINAL raw PO line here; otherwise null
 - quantity: The numeric quantity
 - unit_price: The rate/price per unit - MUST be a decimal number
+
+CRITICAL:
+- Return ONE item per PO line item. Do NOT merge/aggregate items.
+- Do NOT output generic names like "AZ Sleeves" / "WA Sleeves".
+- Preserve key identifiers like "Fire" and "ATF" in either name or description so matching can work.
 
 CRITICAL FOR STATE-BASED PRODUCTS:
 If the input groups products by state (like "AZ", "WA", "NY", "MD"), you MUST include the state in the name.
@@ -223,6 +298,36 @@ Return ONLY valid JSON:
     
     const extractedData = JSON.parse(content);
     console.log('Extracted data:', JSON.stringify(extractedData, null, 2));
+
+    // Hint-based normalization pass: if the hint implies a canonical naming convention like
+    // "AZ Sleeve - FIRE ATF", compute it from the raw PO line so matching does not collapse
+    // to generic buckets like "AZ Sleeves".
+    if (extractedData?.items && Array.isArray(extractedData.items) && analysisHint) {
+      const before = extractedData.items.slice(0, 5).map((i: any) => i?.name);
+
+      extractedData.items = extractedData.items.map((item: any) => {
+        const name = String(item?.name || '');
+        const desc = item?.description ? String(item.description) : '';
+        const rawLine = desc || name;
+
+        const canonical = canonicalizeItemNameFromHint(rawLine, analysisHint);
+        if (!canonical) return item;
+
+        // Preserve the raw PO line for troubleshooting / later reference.
+        return {
+          ...item,
+          description: item?.description ?? name ?? null,
+          name: canonical,
+        };
+      });
+
+      const after = extractedData.items.slice(0, 5).map((i: any) => i?.name);
+      console.log('[hint-normalize]', {
+        hint: String(analysisHint).substring(0, 140),
+        sample_before: before,
+        sample_after: after,
+      });
+    }
     
     // Log first few items with prices
     if (extractedData.items && extractedData.items.length > 0) {
@@ -230,6 +335,7 @@ Return ONLY valid JSON:
       console.log('Unit price type:', typeof extractedData.items[0].unit_price);
       console.log('Unit price value:', extractedData.items[0].unit_price);
     }
+
 
     // Fetch products to try matching SKUs and names
     console.log(`\n========== FETCHING PRODUCTS ==========`);
