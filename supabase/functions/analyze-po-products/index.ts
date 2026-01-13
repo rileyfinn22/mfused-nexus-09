@@ -134,39 +134,42 @@ serve(async (req) => {
 5. product_type: Infer from context (e.g., "packaging", "label", "bag", "box", "jar", "sleeve", etc.)
 6. suggested_template: Match to one of the existing templates below
 
+${analysisHint ? `
+***** CRITICAL: USER-PROVIDED MATCHING INSTRUCTIONS *****
+The user has provided these EXACT instructions for how to match products. FOLLOW THEM PRECISELY:
+
+${analysisHint}
+
+This hint takes PRIORITY over all other matching rules below. Apply these instructions first!
+*********************************************************
+` : ''}
+
 EXISTING TEMPLATES IN SYSTEM:
 ${templateNames}
 
-${analysisHint ? `USER HINT FOR TEMPLATE MATCHING:
-${analysisHint}
-
-Use this hint to better match products to templates. The user knows their products best.
-` : ''}
-TEMPLATE MATCHING RULES (CRITICAL - FOLLOW STRICTLY):
-1. STATE CODE: Look for 2-letter state code at the END of product names (e.g., "- MD", "- MO", "- AZ")
-2. PRODUCT TYPE PATTERNS:
+TEMPLATE MATCHING RULES:
+1. **USER HINT PRIORITY**: If the user provided a hint above, follow it EXACTLY. The user knows their products best.
+2. STATE CODE: Look for 2-letter state code at the END of product names (e.g., "- AZ", "- MD", "- MO")
+3. PRODUCT TYPE PATTERNS:
+   - "SLEEVE" patterns = Sleeves (match to sleeve templates)
    - "BAG - Fatty - 2.5g (5 x 0.5g)" = 5pk Fatty Bags
    - "BAG - Fatty - 1g (2 x 0.5g)" = 2pk Fatty Bags  
-   - "SLEEVE - E2.5 - 1g (1 x 1g)" = Sleeves 1G
-   - "SLEEVE - E3.0" patterns = Sleeves (check gram size)
-   - "BAG" with quantities = Bags
-3. COMBINE STATE + TYPE: If product ends with "- MD" and is "BAG - Fatty - 2.5g (5 x 0.5g)", match to "MD 5pk Fatty Bags"
-4. MATCHING PRIORITY:
-   a. Extract state code from end of product name
-   b. Identify product type from pattern (Fatty 5pk, Fatty 2pk, Sleeve 1G, etc.)
-   c. Find template with format "[STATE] [TYPE]" (e.g., "MD 5pk Fatty Bags")
-5. NEVER match to generic templates if state-specific template exists
-6. The state code is almost always at the VERY END after the last dash (e.g., "... - Sat - MD" means state is MD)
+4. COMBINE STATE + TYPE: If product ends with "- AZ" and is "SLEEVE", match to "AZ Sleeve" templates
+5. MATCHING PRIORITY:
+   a. Apply user hint instructions first if provided
+   b. Extract state code from end of product name (after last dash)
+   c. Identify product type from pattern
+   d. Find template with matching state and type
+6. When matching to templates, look for templates that contain the STATE and the PRODUCT TYPE
+7. The state code is almost always at the VERY END after the last dash (e.g., "... - Sat - AZ" means state is AZ)
 
 IMPORTANT:
 - Extract ALL line items/products from the text
-- Even simple text lists of product names should be parsed (one per line, comma-separated, etc.)
+- Even simple text lists of product names should be parsed
 - DO NOT include SKUs or item IDs - we will generate our own
-- cost should be a number (e.g., 0.218) or null if not found
+- cost should be a number (e.g., 0.113) or null if not found
 - Be thorough - don't miss any products
-- For suggested_template, return the EXACT template name if you find a good match, or null if no match
-- Pay attention to any user hints provided above for template matching
-- For customer_name, extract ONLY the main company/brand name if visible, or null
+- For suggested_template, return the EXACT template name from the list above if you find a good match, or null if no match
 
 CONTENT TO ANALYZE:
 ${extractedText}
