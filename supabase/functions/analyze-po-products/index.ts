@@ -135,11 +135,12 @@ serve(async (req) => {
       return states.has(st) ? st : null;
     };
 
-    const extractMeaningfulTokensFromPoLine = (rawName: string): string[] => {
+    const extractMeaningfulPartsFromPoLine = (rawName: string): string[] => {
       // For lines like:
       // "SLEEVE - E2.5 XL - 2g (1 x 2g) - Super Fog - Fire - ATF - Citrus - Sat - AZ"
-      // we want to keep mostly: ["fire", "atf"] (and similar strain identifiers)
+      // we want to keep mostly: ["Fire", "ATF"] (and similar identifiers)
       const parts = (rawName || '').split(/\s*[-–—]\s*/).map(p => p.trim()).filter(Boolean);
+
       const dropPart = (p: string) => {
         const v = p.toLowerCase();
         if (!v) return true;
@@ -154,9 +155,26 @@ serve(async (req) => {
         return false;
       };
 
-      const kept = parts.filter(p => !dropPart(p));
+      return parts.filter(p => !dropPart(p));
+    };
+
+    const extractMeaningfulTokensFromPoLine = (rawName: string): string[] => {
+      const kept = extractMeaningfulPartsFromPoLine(rawName);
       // If nothing kept, fall back to full tokenization (still better than nothing)
       return kept.length ? tokenize(kept.join(' ')) : tokenize(rawName);
+    };
+
+    const buildVariantLabelFromPoLine = (rawName: string): string => {
+      const kept = extractMeaningfulPartsFromPoLine(rawName);
+      if (!kept.length) return '';
+
+      // Keep order, uppercase, and strip weird punctuation
+      return kept
+        .join(' ')
+        .replace(/[^A-Za-z0-9 ]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase();
     };
 
     const templateMatchesState = (t: any, state: string | null): boolean => {
@@ -377,11 +395,25 @@ Return ONLY valid JSON in this format:
 
       const matched = fromAiSuggestion || inferred;
 
+      // If we matched a template, standardize the product name to:
+      //   "<TEMPLATE NAME> - <KEY IDENTIFIERS>"  (e.g., "AZ Sleeve - FIRE ATF")
+      const normalizedName = (() => {
+        if (!matched) return poName;
+
+        const poNorm = normalizeLoose(poName);
+        const tplNorm = normalizeLoose(matched.name);
+        if (poNorm.startsWith(tplNorm)) return poName;
+
+        const variant = buildVariantLabelFromPoLine(poName);
+        return variant ? `${matched.name} - ${variant}` : String(matched.name);
+      })();
+
       // Helpful debug logs to understand mismatches
       try {
         const poTokens = extractMeaningfulTokensFromPoLine(poName);
         console.log('[template-match]', {
           poName: poName.substring(0, 140),
+          normalizedName,
           state,
           poTokens,
           aiSuggested: p?.suggested_template ?? null,
@@ -393,6 +425,7 @@ Return ONLY valid JSON in this format:
 
       return {
         ...p,
+        name: normalizedName,
         state: state || p?.state || null,
         suggested_template: matched ? matched.name : (p?.suggested_template ?? null),
         template_id: matched ? matched.id : null,
