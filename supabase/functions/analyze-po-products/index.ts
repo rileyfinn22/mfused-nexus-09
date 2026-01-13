@@ -108,6 +108,129 @@ serve(async (req) => {
 
     const templateNames = templates?.map(t => `- "${t.name}" (${t.state || 'no state'})`).join('\n') || 'No templates found';
 
+    // --- Deterministic template matching (post-processing) ---
+    // The AI may return a "suggested_template" that is close-but-not-exact, or miss it entirely.
+    // We apply lightweight normalization + scoring to consistently map extracted products to template IDs.
+    const normalizeLoose = (value: string): string => {
+      return (value || '')
+        .toLowerCase()
+        .replace(/\b(sleeves)\b/g, 'sleeve')
+        .replace(/\b(bags)\b/g, 'bag')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+    };
+
+    const tokenize = (value: string): string[] => {
+      const n = normalizeLoose(value);
+      return n ? n.split(/\s+/).filter(Boolean) : [];
+    };
+
+    const extractStateFromName = (name: string): string | null => {
+      // Matches end "- AZ" / " - AZ" or standalone last token "AZ"
+      const match = (name || '').trim().match(/(?:-|\s)([A-Z]{2})\s*$/i);
+      if (!match) return null;
+      const st = match[1].toUpperCase();
+      // Minimal validation: common 2-letter states
+      const states = new Set(['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']);
+      return states.has(st) ? st : null;
+    };
+
+    const extractMeaningfulTokensFromPoLine = (rawName: string): string[] => {
+      // For lines like:
+      // "SLEEVE - E2.5 XL - 2g (1 x 2g) - Super Fog - Fire - ATF - Citrus - Sat - AZ"
+      // we want to keep mostly: ["fire", "atf"] (and similar strain identifiers)
+      const parts = (rawName || '').split(/\s*[-–—]\s*/).map(p => p.trim()).filter(Boolean);
+      const dropPart = (p: string) => {
+        const v = p.toLowerCase();
+        if (!v) return true;
+        if (v.includes('super fog')) return true;
+        if (v.includes('sleeve') || v.includes('bag')) return true;
+        if (/^e\d+(?:\.\d+)?/.test(v)) return true; // e2.5, e3.0, etc
+        if (/\d+(?:\.\d+)?\s*g/.test(v)) return true; // 2g, 1g, 2.5g
+        if (/\(\s*\d+\s*x\s*\d+(?:\.\d+)?\s*g\s*\)/.test(v)) return true; // (1 x 2g)
+        if (/(citrus|dessert|sweet)/.test(v)) return true;
+        if (/^(sat|hyb|ind|sativa|hybrid|indica)$/.test(v)) return true;
+        if (/^(az|wa|md|mo|ca|or|ny|nj|il|co|nv|mi|ma|pa|tx|fl)$/i.test(v)) return true;
+        return false;
+      };
+
+      const kept = parts.filter(p => !dropPart(p));
+      // If nothing kept, fall back to full tokenization (still better than nothing)
+      return kept.length ? tokenize(kept.join(' ')) : tokenize(rawName);
+    };
+
+    const templateMatchesState = (t: any, state: string | null): boolean => {
+      if (!state) return true;
+      if (t?.state && String(t.state).toUpperCase() === state) return true;
+      const toks = tokenize(t?.name || '');
+      return toks.includes(state.toLowerCase());
+    };
+
+    const templateMatchesType = (t: any, poName: string): boolean => {
+      const name = (poName || '').toLowerCase();
+      const wantsSleeve = name.includes('sleeve');
+      const wantsBag = name.includes('bag');
+      if (!wantsSleeve && !wantsBag) return true;
+
+      const tName = normalizeLoose(t?.name || '');
+      if (wantsSleeve) return tName.includes('sleeve');
+      if (wantsBag) return tName.includes('bag');
+      return true;
+    };
+
+    const jaccardScore = (a: string[], b: string[]): number => {
+      const sa = new Set(a);
+      const sb = new Set(b);
+      const inter = [...sa].filter(x => sb.has(x)).length;
+      const union = new Set([...sa, ...sb]).size;
+      return union === 0 ? 0 : inter / union;
+    };
+
+    const bestTemplateByName = (wantedName: string, state: string | null): any | null => {
+      const wanted = normalizeLoose(wantedName);
+      if (!wanted) return null;
+
+      let best: { t: any; score: number } | null = null;
+      for (const t of (templates || [])) {
+        if (!templateMatchesState(t, state)) continue;
+        const cand = normalizeLoose(t.name);
+        // Strong preference for near-equality/containment
+        let score = 0;
+        if (cand === wanted) score = 1;
+        else if (cand.includes(wanted) || wanted.includes(cand)) score = 0.85;
+        else score = jaccardScore(tokenize(wanted), tokenize(cand));
+
+        if (!best || score > best.score) best = { t, score };
+      }
+
+      if (!best) return null;
+      // Guardrail: avoid random matches
+      if (best.score < 0.5) return null;
+      return best.t;
+    };
+
+    const bestTemplateByPoLine = (poName: string, state: string | null): any | null => {
+      const poTokens = extractMeaningfulTokensFromPoLine(poName);
+      if (poTokens.length === 0) return null;
+
+      let best: { t: any; score: number } | null = null;
+
+      for (const t of (templates || [])) {
+        if (!templateMatchesState(t, state)) continue;
+        if (!templateMatchesType(t, poName)) continue;
+
+        const tTokens = tokenize(t.name);
+        const score = jaccardScore(poTokens, tTokens);
+
+        if (!best || score > best.score) best = { t, score };
+      }
+
+      if (!best) return null;
+      // With short token sets (e.g. "fire atf"), require a stronger match
+      const minScore = poTokens.length <= 3 ? 0.6 : 0.35;
+      return best.score >= minScore ? best.t : null;
+    };
+
     // Analyze with Lovable AI to extract products
     console.log('Sending to AI for product extraction...');
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -222,9 +345,32 @@ Return ONLY valid JSON in this format:
     const extractedData = JSON.parse(content);
     console.log('Extracted products count:', extractedData.products?.length || 0);
 
+    // Post-process template matching so the UI can reliably pre-select templates.
+    const processedProducts = (extractedData.products || []).map((p: any) => {
+      const poName = String(p?.name || '');
+      const state = (p?.state ? String(p.state).toUpperCase() : null) || extractStateFromName(poName);
+
+      // 1) If AI suggested a template name, fuzzy-match it to a real template.
+      const fromAiSuggestion = p?.suggested_template
+        ? bestTemplateByName(String(p.suggested_template), state)
+        : null;
+
+      // 2) Otherwise, infer from the PO line itself.
+      const inferred = fromAiSuggestion ? null : bestTemplateByPoLine(poName, state);
+
+      const matched = fromAiSuggestion || inferred;
+
+      return {
+        ...p,
+        state: state || p?.state || null,
+        suggested_template: matched ? matched.name : (p?.suggested_template ?? null),
+        template_id: matched ? matched.id : null,
+      };
+    });
+
     return new Response(JSON.stringify({
       success: true,
-      products: extractedData.products || [],
+      products: processedProducts,
       customer_name: extractedData.customer_name || null,
       source: inputSource,
       templates: templates || []

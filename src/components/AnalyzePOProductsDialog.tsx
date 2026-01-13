@@ -207,20 +207,43 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
         setTemplates(returnedTemplates);
 
         // Match suggested templates to actual template IDs
+        const normalizeTemplate = (value: string) =>
+          (value || '')
+            .toLowerCase()
+            .replace(/\b(sleeves)\b/g, 'sleeve')
+            .replace(/\b(bags)\b/g, 'bag')
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
+
         const productsWithTemplates = result.products.map((p: ExtractedProduct) => {
           let matchedTemplateId: string | null = null;
-          
-          if (p.suggested_template) {
-            const matchedTemplate = returnedTemplates.find(
-              t => t.name.toLowerCase() === p.suggested_template?.toLowerCase()
+
+          // Prefer deterministic matching from the backend when available
+          if (p.template_id) {
+            matchedTemplateId = p.template_id;
+          } else if (p.suggested_template) {
+            const wanted = normalizeTemplate(p.suggested_template);
+
+            // Try exact-ish match first
+            let matchedTemplate = returnedTemplates.find(
+              t => normalizeTemplate(t.name) === wanted
             );
+
+            // Fallback: containment / closest token overlap
+            if (!matchedTemplate) {
+              matchedTemplate = returnedTemplates.find(t => {
+                const cand = normalizeTemplate(t.name);
+                return cand.includes(wanted) || wanted.includes(cand);
+              });
+            }
+
             if (matchedTemplate) {
               matchedTemplateId = matchedTemplate.id;
             }
           }
-          
-          return { 
-            ...p, 
+
+          return {
+            ...p,
             selected: true,
             template_id: matchedTemplateId
           };
