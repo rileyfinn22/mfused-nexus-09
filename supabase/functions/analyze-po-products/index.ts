@@ -155,11 +155,11 @@ serve(async (req) => {
     const extractMeaningfulPartsFromPoLine = (rawName: string): string[] => {
       // For lines like:
       // "SLEEVE - E2.5 XL - 2g (1 x 2g) - Super Fog - Fire - ATF - Citrus - Sat - AZ"
-      // we want to keep mostly: ["Fire", "ATF"] (and similar identifiers)
+      // we want to keep mostly: ["Fire", "ATF"] (the strain/flavor identifiers)
       const parts = (rawName || '').split(/\s*[-–—]\s*/).map(p => p.trim()).filter(Boolean);
 
       const dropPart = (p: string) => {
-        const v = p.toLowerCase();
+        const v = p.toLowerCase().trim();
         if (!v) return true;
         if (v.includes('super fog')) return true;
         if (v.includes('sleeve') || v.includes('bag')) return true;
@@ -168,7 +168,11 @@ serve(async (req) => {
         if (/\(\s*\d+\s*x\s*\d+(?:\.\d+)?\s*g\s*\)/.test(v)) return true; // (1 x 2g)
         if (/(citrus|dessert|sweet)/.test(v)) return true;
         if (/^(sat|hyb|ind|sativa|hybrid|indica)$/.test(v)) return true;
+        // Drop state codes
         if (/^(az|wa|md|mo|ca|or|ny|nj|il|co|nv|mi|ma|pa|tx|fl)$/i.test(v)) return true;
+        // Drop size codes like "XL", "SM", "LG", "XXL", "E2.5 XL"
+        if (/^(xs|sm|md|lg|xl|xxl|xxxl)$/i.test(v)) return true;
+        if (/^e\d+(?:\.\d+)?\s*(xs|sm|md|lg|xl|xxl|xxxl)$/i.test(v)) return true;
         return false;
       };
 
@@ -278,8 +282,9 @@ serve(async (req) => {
 
       if (!best) return null;
 
-      // Require strong token coverage, especially for short identifiers like "fire atf".
-      const minCoverage = poTokens.length <= 3 ? 0.95 : 0.65;
+      // For short token lists (like "fire atf"), we need 100% coverage.
+      // For longer lists, allow some slack.
+      const minCoverage = poTokens.length <= 2 ? 1.0 : (poTokens.length <= 4 ? 0.75 : 0.6);
       return best.coverage >= minCoverage ? best.t : null;
     };
 
@@ -302,7 +307,7 @@ serve(async (req) => {
             role: 'user',
              content: `Analyze this content and extract ALL product/item information. For each product found, extract:
 
-1. name: Copy the full line item text EXACTLY as written in the PO (do NOT shorten it)
+1. name: The product name/description as shown in the PO
 2. description: Additional description if available
 3. state: The US state code if mentioned (e.g., "WA", "CA", "OR", "MO", "AZ") - often embedded in SKU or product name
 4. cost: The unit price/rate as a decimal number (if available)
