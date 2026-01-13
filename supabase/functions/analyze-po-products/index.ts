@@ -414,7 +414,7 @@ Return ONLY valid JSON in this format:
 
       return {
         ...p,
-        name: poName, // Keep original PO line item name
+        name: matched ? matched.name : poName, // Use template name when matched, otherwise original PO line
         state: state || p?.state || null,
         suggested_template: matched ? matched.name : (p?.suggested_template ?? null),
         template_id: matched ? matched.id : null,
