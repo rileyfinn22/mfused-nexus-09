@@ -113,66 +113,120 @@ serve(async (req) => {
     ] as const;
     const STATE_CODES = new Set<string>(US_STATES);
 
-    const parseAnalysisHint = (hint: string | undefined | null): { forcedState: string | null; forcedType: 'sleeve' | 'bag' | null } => {
+    // All product types we support
+    type ProductType = 'sleeve' | 'bag' | 'box' | 'tin' | 'merch_pack' | 'fatty' | 'ion' | null;
+    const PRODUCT_TYPE_PATTERNS: { type: ProductType; patterns: RegExp[] }[] = [
+      { type: 'sleeve', patterns: [/\bsleeves?\b/i] },
+      { type: 'bag', patterns: [/\bbags?\b/i] },
+      { type: 'box', patterns: [/\bbox(?:es)?\b/i] },
+      { type: 'tin', patterns: [/\btins?\b/i] },
+      { type: 'merch_pack', patterns: [/\bmerch\s*packs?\b/i, /\bmerchandise\s*packs?\b/i] },
+      { type: 'fatty', patterns: [/\bfatty\b/i, /\bfattys\b/i, /\bfatties\b/i] },
+      { type: 'ion', patterns: [/\bion\b/i] },
+    ];
+
+    const detectProductType = (str: string): ProductType => {
+      if (!str) return null;
+      for (const { type, patterns } of PRODUCT_TYPE_PATTERNS) {
+        if (patterns.some(p => p.test(str))) return type;
+      }
+      return null;
+    };
+
+    const parseAnalysisHint = (hint: string | undefined | null): { forcedState: string | null; forcedType: ProductType } => {
       if (!hint) return { forcedState: null, forcedType: null };
 
       const upper = String(hint).toUpperCase();
       const foundStates = Array.from(new Set((upper.match(/\b[A-Z]{2}\b/g) || []).filter(s => STATE_CODES.has(s))));
       const forcedState = foundStates.length === 1 ? foundStates[0] : null;
-
-      let forcedType: 'sleeve' | 'bag' | null = null;
-      if (/\bSLEEVE\b/i.test(hint) || /\bSLEEVES\b/i.test(hint)) forcedType = 'sleeve';
-      else if (/\bBAG\b/i.test(hint) || /\bBAGS\b/i.test(hint)) forcedType = 'bag';
+      const forcedType = detectProductType(hint);
 
       return { forcedState, forcedType };
     };
 
-    const extractMeaningfulPartsFromPoLine = (rawName: string): string[] => {
-      // Example:
-      // "SLEEVE - E2.5 XL - 2g (1 x 2g) - Super Fog - Fire - ATF - Citrus - Sat - AZ" -> ["Fire", "ATF"]
-      const parts = (rawName || '').split(/\s*[-–—]\s*/).map(p => p.trim()).filter(Boolean);
+    // Extract state from any string (beginning, end, or standalone)
+    const extractStateFromAny = (str: string): string | null => {
+      if (!str) return null;
+      // Look for state codes at beginning, end, or as standalone word
+      const matches = str.toUpperCase().match(/\b([A-Z]{2})\b/g) || [];
+      for (const m of matches) {
+        if (STATE_CODES.has(m)) return m;
+      }
+      return null;
+    };
 
-      const dropPart = (p: string) => {
-        const v = p.toLowerCase().trim();
-        if (!v) return true;
-        if (v.includes('super fog')) return true;
-        if (v.includes('sleeve') || v.includes('bag')) return true;
-        if (/^e\d+(?:\.\d+)?/.test(v)) return true; // e2.5, e3.0, etc
-        if (/\d+(?:\.\d+)?\s*g/.test(v)) return true; // 2g, 1g, 2.5g
-        if (/\(\s*\d+\s*x\s*\d+(?:\.\d+)?\s*g\s*\)/.test(v)) return true; // (1 x 2g)
-        if (/(citrus|dessert|sweet)/.test(v)) return true;
-        if (/^(sat|hyb|ind|sativa|hybrid|indica)$/.test(v)) return true;
-        // Drop state codes
-        if (/^([a-z]{2})$/i.test(v) && STATE_CODES.has(v.toUpperCase())) return true;
-        // Drop size codes like XL, SM, LG, etc.
-        if (/^(xs|sm|md|lg|xl|xxl|xxxl)$/i.test(v)) return true;
-        if (/^e\d+(?:\.\d+)?\s*(xs|sm|md|lg|xl|xxl|xxxl)$/i.test(v)) return true;
+    // Extract type from any string
+    const extractTypeFromAny = (str: string): ProductType => {
+      return detectProductType(str);
+    };
+
+    // Extract meaningful identifier tokens (strain names, brand names, etc.)
+    // Drops: state codes, type names, sizes, weights, flavor categories
+    const extractIdentifierTokens = (rawName: string): string[] => {
+      const parts = (rawName || '').split(/[\s\-–—,;:]+/).map(p => p.trim().toLowerCase()).filter(Boolean);
+
+      const dropToken = (t: string): boolean => {
+        if (t.length < 2) return true;
+        // State codes
+        if (t.length === 2 && STATE_CODES.has(t.toUpperCase())) return true;
+        // Product types
+        if (/^(sleeve|sleeves|bag|bags|box|boxes|tin|tins|merch|pack|packs|fatty|fattys|fatties|ion)$/.test(t)) return true;
+        // Size codes
+        if (/^(xs|sm|md|lg|xl|xxl|xxxl)$/.test(t)) return true;
+        // Weight patterns
+        if (/^\d+(?:\.\d+)?g?$/.test(t)) return true;
+        // E-size codes like e2.5
+        if (/^e\d+(?:\.\d+)?/.test(t)) return true;
+        // Flavor categories
+        if (/^(citrus|dessert|sweet|fruity|earthy)$/.test(t)) return true;
+        // Strain type indicators
+        if (/^(sat|sativa|hyb|hybrid|ind|indica)$/.test(t)) return true;
+        // Common noise
+        if (/^(super|fog|vape|cart|cartridge|pre|roll|preroll)$/.test(t)) return true;
+        // Multipliers like "1x", "2x"
+        if (/^\d+x$/.test(t)) return true;
+        // Parenthetical content
+        if (/^\(.*\)$/.test(t)) return true;
         return false;
       };
 
-      return parts.filter(p => !dropPart(p));
+      return parts.filter(p => !dropToken(p));
+    };
+
+    // Type label mapping for canonical names
+    const typeToLabel = (type: ProductType): string => {
+      const map: Record<string, string> = {
+        sleeve: 'Sleeve',
+        bag: 'Bag',
+        box: 'Box',
+        tin: 'Tin',
+        merch_pack: 'Merch Pack',
+        fatty: 'Fatty',
+        ion: 'Ion',
+      };
+      return map[type || ''] || type || '';
     };
 
     const buildVariantLabelFromPoLine = (rawName: string): string => {
-      const kept = extractMeaningfulPartsFromPoLine(rawName);
-      if (!kept.length) return '';
-      return kept
-        .join(' ')
-        .replace(/[^A-Za-z0-9 ]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toUpperCase();
+      const tokens = extractIdentifierTokens(rawName);
+      if (!tokens.length) return '';
+      // Capitalize each token
+      return tokens.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' ');
     };
 
     const canonicalizeItemNameFromHint = (rawLine: string, hint: string | undefined | null): string | null => {
       const ctx = parseAnalysisHint(hint);
-      if (!ctx.forcedState || !ctx.forcedType) return null;
+      // Try to get state from hint, fallback to extracting from raw line
+      const state = ctx.forcedState || extractStateFromAny(rawLine);
+      // Try to get type from hint, fallback to extracting from raw line
+      const type = ctx.forcedType || extractTypeFromAny(rawLine);
+
+      if (!state || !type) return null;
 
       const variant = buildVariantLabelFromPoLine(rawLine);
       if (!variant) return null;
 
-      const typeLabel = ctx.forcedType === 'sleeve' ? 'Sleeve' : 'Bag';
-      return `${ctx.forcedState} ${typeLabel} - ${variant}`;
+      return `${state} ${typeToLabel(type)} - ${variant}`;
     };
 
     // Analyze with Lovable AI
@@ -352,338 +406,123 @@ Return ONLY valid JSON:
 
     console.log(`Found ${products?.length || 0} products for matching`);
 
-    // Function to find matching product - PRIORITIZES NAME MATCHING
+    // Function to find matching product using State + Type + Identifiers
     // Returns the full product object (not just ID) so we can access vendor_id, cost, etc.
-    const findMatchingProduct = (poItem: any) => {
+    const findMatchingProduct = (poItem: any, hintCtx?: { forcedState: string | null; forcedType: ProductType }) => {
       if (!products || products.length === 0) {
         console.log('No products available for matching');
         return null;
       }
 
-      console.log(`\n========== MATCHING ATTEMPT ==========`);
-      console.log(`PO Item Details:`, JSON.stringify({
-        item_id: poItem.item_id,
-        sku: poItem.sku,
-        name: poItem.name
-      }, null, 2));
-      console.log(`Total products in database: ${products.length}`);
+      const poItemId = poItem.item_id || '';
+      const poSku = poItem.sku || '';
+      const poName = poItem.name || '';
+      const poDesc = poItem.description || '';
+      const rawLine = poDesc || poName; // Use description if available (often has original PO line)
 
-      // Helper to normalize strings for better matching
+      console.log(`\n========== MATCHING ATTEMPT ==========`);
+      console.log(`PO: "${poName}"`);
+
+      // Helper to normalize strings for exact matching
       const normalize = (str: string): string => {
         if (!str) return '';
         return str.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
       };
 
-      // Helper to normalize name for flexible matching (handles spacing, dashes, etc)
-      const normalizeName = (str: string): string => {
-        if (!str) return '';
-        return str.toLowerCase().trim()
-          .replace(/\s+/g, ' ')  // normalize whitespace
-          .replace(/[-–—]/g, '-') // normalize dashes
-          .trim();
-      };
+      // STEP 0: Try exact/alphanumeric name match first (fast path)
+      const exactMatch = products.find(p => 
+        p.name && normalize(p.name) === normalize(poName)
+      );
+      if (exactMatch) {
+        console.log(`✓ EXACT MATCH: "${poName}" -> "${exactMatch.name}"`);
+        return exactMatch;
+      }
 
-      // Helper to extract state suffix from a string (e.g., "- NY", "- WA", "- AZ")
-      const extractStateFromString = (str: string): { state: string | null, nameWithoutState: string } => {
-        if (!str) return { state: null, nameWithoutState: str };
-        
-        // Common US state abbreviations
-        const stateAbbreviations = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 
-                                    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 
-                                    'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 
-                                    'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 
-                                    'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'];
-        
-        // Try to match " - XX" or "- XX" at the end where XX is a state
-        const stateMatch = str.match(/\s*[-–—]\s*([A-Z]{2})\s*$/i);
-        if (stateMatch) {
-          const potentialState = stateMatch[1].toUpperCase();
-          if (stateAbbreviations.includes(potentialState)) {
-            const nameWithoutState = str.replace(/\s*[-–—]\s*[A-Z]{2}\s*$/i, '').trim();
-            console.log(`  Extracted state "${potentialState}" from "${str}" -> name: "${nameWithoutState}"`);
-            return { state: potentialState, nameWithoutState };
+      // STEP 1: Extract State, Type, and Identifier tokens from PO item
+      const poState = hintCtx?.forcedState || extractStateFromAny(rawLine) || extractStateFromAny(poName);
+      const poType = hintCtx?.forcedType || extractTypeFromAny(rawLine) || extractTypeFromAny(poName);
+      const poTokens = extractIdentifierTokens(rawLine);
+
+      console.log(`  State: ${poState || 'none'}, Type: ${poType || 'none'}, Tokens: [${poTokens.join(', ')}]`);
+
+      if (!poState && !poType && poTokens.length === 0) {
+        console.log(`  No state/type/tokens extracted, falling back to fuzzy match`);
+      }
+
+      // STEP 2: Score each product based on State + Type + Token overlap
+      let bestMatch: typeof products[0] | null = null;
+      let bestScore = 0;
+
+      for (const p of products) {
+        if (!p.name) continue;
+
+        let score = 0;
+        const productState = p.state?.toUpperCase() || extractStateFromAny(p.name);
+        const productType = extractTypeFromAny(p.name);
+        const productTokens = extractIdentifierTokens(p.name);
+
+        // State matching (required if PO has state)
+        if (poState) {
+          if (productState?.toUpperCase() === poState.toUpperCase()) {
+            score += 30; // Strong boost for state match
+          } else if (productState) {
+            continue; // Wrong state = skip this product entirely
           }
         }
-        
-        return { state: null, nameWithoutState: str };
-      };
 
-      const poItemId = poItem.item_id || '';
-      const poSku = poItem.sku || '';
-      const poName = poItem.name || '';
-
-      // Extract state from the sku/item_id (often contains state suffix like "- NY")
-      const { state: stateFromSku } = extractStateFromString(poSku || poItemId);
-      // Also try to extract from name
-      const { state: stateFromName, nameWithoutState } = extractStateFromString(poName);
-      
-      // Use whichever state we found
-      const extractedState = stateFromSku || stateFromName;
-      
-      if (extractedState) {
-        console.log(`  Detected state: "${extractedState}" from PO item`);
-      }
-
-      // STEP 0: STATE-AWARE MATCHING (highest priority when state is detected)
-      if (extractedState && poName) {
-        console.log(`\n[STEP 0] Trying STATE-AWARE match for: "${poName}" with state "${extractedState}"`);
-        
-        // Try matching name (with or without state suffix) + product.state field
-        const match = products.find(p => {
-          if (!p.name || !p.state) return false;
-          
-          // Check if product state matches
-          if (p.state.toUpperCase() !== extractedState.toUpperCase()) return false;
-          
-          // Now match name (could be with or without state suffix)
-          const normalizedPoName = normalizeName(nameWithoutState || poName);
-          const normalizedProductName = normalizeName(p.name);
-          
-          // Try exact match
-          if (normalizedProductName === normalizedPoName) return true;
-          
-          // Try alphanumeric match
-          if (normalize(p.name) === normalize(nameWithoutState || poName)) return true;
-          
-          // Try partial match (PO name contains product name or vice versa)
-          if (normalizedProductName.includes(normalizedPoName) || normalizedPoName.includes(normalizedProductName)) return true;
-          
-          return false;
-        });
-        
-        if (match) {
-          console.log(`✓ STATE-AWARE MATCH FOUND: "${poName}" (state: ${extractedState}) -> product: ${match.name} (state: ${match.state}, ID: ${match.id})`);
-          return match;
-        }
-        console.log(`✗ No state-aware match found for: "${poName}" with state "${extractedState}"`);
-      }
-
-      // STEP 1: Try exact name match (including state in name if present)
-      if (poName) {
-        console.log(`\n[STEP 1] Trying exact name match for: "${poName}"`);
-        const match = products.find(p => 
-          p.name && p.name.toLowerCase().trim() === poName.toLowerCase().trim()
-        );
-        if (match) {
-          console.log(`✓ EXACT NAME MATCH FOUND: "${poName}" -> product: ${match.name} (ID: ${match.id})`);
-          return match;
-        }
-        console.log(`✗ No exact name match found for: "${poName}"`);
-      }
-
-      // STEP 2: Try normalized name match (handles minor formatting differences)
-      if (poName) {
-        console.log(`\n[STEP 2] Trying normalized name match for: "${poName}"`);
-        const normalizedPoName = normalizeName(poName);
-        console.log(`  Normalized PO name: "${normalizedPoName}"`);
-        const match = products.find(p => {
-          if (!p.name) return false;
-          const normalizedProductName = normalizeName(p.name);
-          return normalizedProductName === normalizedPoName;
-        });
-        if (match) {
-          console.log(`✓ NORMALIZED NAME MATCH FOUND: "${poName}" -> "${match.name}"`);
-          return match;
-        }
-        console.log(`✗ No normalized name match found for: "${poName}"`);
-      }
-
-      // STEP 3: Try alphanumeric-only name match (removes all special chars)
-      if (poName) {
-        console.log(`\n[STEP 3] Trying alphanumeric name match for: "${poName}"`);
-        const alphanumericPoName = normalize(poName);
-        console.log(`  Alphanumeric PO name: "${alphanumericPoName}"`);
-        const match = products.find(p => {
-          if (!p.name) return false;
-          const alphanumericProductName = normalize(p.name);
-          return alphanumericProductName === alphanumericPoName;
-        });
-        if (match) {
-          console.log(`✓ ALPHANUMERIC NAME MATCH FOUND: "${poName}" -> "${match.name}"`);
-          return match;
-        }
-        console.log(`✗ No alphanumeric name match found for: "${poName}"`);
-      }
-
-      // STEP 4: Try partial name match (PO name contains product name or vice versa)
-      // BUT only match products with the same state (or no state) when we have a detected state
-      if (poName && poName.length > 10) {
-        console.log(`\n[STEP 4] Trying partial name match for: "${poName}"`);
-        const normalizedPoName = normalizeName(nameWithoutState || poName);
-        const match = products.find(p => {
-          if (!p.name || p.name.length < 10) return false;
-          
-          // If we detected a state from PO, only match products with same state or no state
-          if (extractedState && p.state && p.state.toUpperCase() !== extractedState.toUpperCase()) {
-            return false;
+        // Type matching (required if PO has type)
+        if (poType) {
+          if (productType === poType) {
+            score += 20; // Good boost for type match
+          } else if (productType) {
+            continue; // Wrong type = skip this product entirely
           }
-          
-          const normalizedProductName = normalizeName(p.name);
-          // Check if one contains the other
-          return normalizedProductName.includes(normalizedPoName) || 
-                 normalizedPoName.includes(normalizedProductName);
-        });
-        if (match) {
-          console.log(`✓ PARTIAL NAME MATCH FOUND: "${poName}" -> "${match.name}" (state: ${match.state || 'none'})`);
-          return match;
         }
-        console.log(`✗ No partial name match found for: "${poName}"`);
-      }
 
-      // STEP 4.5: Token-based fuzzy matching
-      // Handles cases like "AZ Sleeve - FIRE FATSO GAS" matching "AZ Sleeve - Fire - Fatso"
-      if (poName && poName.length > 5) {
-        console.log(`\n[STEP 4.5] Trying TOKEN-BASED fuzzy match for: "${poName}"`);
-        
-        // Tokenize: split on non-alphanumeric, lowercase, filter short tokens
-        const tokenize = (str: string): string[] => {
-          return str.toLowerCase()
-            .split(/[^a-z0-9]+/)
-            .map(t => t.trim())
-            .filter(t => t.length > 1); // ignore single chars
-        };
-        
-        const poTokens = tokenize(poName);
-        console.log(`  PO tokens: [${poTokens.join(', ')}]`);
-        
-        // Score each product by token overlap
-        let bestMatch: typeof products[0] | null = null;
-        let bestScore = 0;
-        
-        for (const p of products) {
-          if (!p.name) continue;
-          
-          // If we detected a state, require matching state
-          if (extractedState && p.state && p.state.toUpperCase() !== extractedState.toUpperCase()) {
+        // Token matching - this is the key differentiator
+        if (poTokens.length > 0 && productTokens.length > 0) {
+          const matchingTokens = poTokens.filter(pt => productTokens.includes(pt));
+          const tokenCoverage = matchingTokens.length / productTokens.length;
+          const tokenScore = matchingTokens.length * 10 + (tokenCoverage * 20);
+          score += tokenScore;
+
+          // Require at least 50% of product tokens to be present in PO
+          if (tokenCoverage < 0.5 && productTokens.length > 1) {
             continue;
           }
-          
-          const productTokens = tokenize(p.name);
-          
-          // Count how many PO tokens appear in product tokens
-          const matchingTokens = poTokens.filter(pt => productTokens.includes(pt));
-          const matchCount = matchingTokens.length;
-          
-          // Score = matching tokens / product tokens (how well product is covered)
-          // Require at least 3 matching tokens and 60% coverage of product tokens
-          const coverage = productTokens.length > 0 ? matchCount / productTokens.length : 0;
-          
-          if (matchCount >= 3 && coverage >= 0.6 && coverage > bestScore) {
-            bestScore = coverage;
-            bestMatch = p;
-            console.log(`  Candidate: "${p.name}" - ${matchCount} matching tokens, ${(coverage * 100).toFixed(0)}% coverage`);
-          }
+        } else if (productTokens.length > 0 && poTokens.length === 0) {
+          // PO has no tokens but product does - weak match
+          score -= 10;
         }
-        
-        if (bestMatch) {
-          console.log(`✓ TOKEN FUZZY MATCH FOUND: "${poName}" -> "${bestMatch.name}" (${(bestScore * 100).toFixed(0)}% coverage)`);
-          return bestMatch;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = p;
+          console.log(`  Candidate: "${p.name}" (score: ${score})`);
         }
-        console.log(`✗ No token fuzzy match found for: "${poName}"`);
       }
 
-      // STEP 5: SMART SHORTHAND MATCHING
-      // Handles formats like "Red Card - Vape 2g - Sleeve" or "Golden Glove - Ion 1g - Bag"
-      // Maps to products like "AZ Sleeves - Red Card" or "WA Ion Bags - Golden Glove"
-      if (poName && extractedState) {
-        console.log(`\n[STEP 5] Trying SMART SHORTHAND match for: "${poName}" with state "${extractedState}"`);
-        
-        // Extract strain name and product type from shorthand format
-        // Common patterns: "Strain - Vape Xg - Sleeve", "Strain - Ion Xg - Bag", "Strain - Fatty Xg - Bag"
-        const strainPatterns = [
-          /^(.+?)\s*[-–—]\s*(?:Vape|Cart|Cartridge)\s*\d+g?\s*[-–—]\s*Sleeve/i,  // Sleeve products
-          /^(.+?)\s*[-–—]\s*(?:Ion)\s*\d+g?\s*[-–—]\s*Bag/i,                       // Ion Bag products  
-          /^(.+?)\s*[-–—]\s*(?:Fatty|Fattys?)\s*\d+g?\s*[-–—]\s*Bag/i,            // Fatty Bag products
-        ];
-        
-        let strainName: string | null = null;
-        let productTypeKey: string | null = null;
-        
-        for (const pattern of strainPatterns) {
-          const match = poName.match(pattern);
-          if (match) {
-            strainName = match[1].trim();
-            if (/Sleeve/i.test(poName)) productTypeKey = 'sleeve';
-            else if (/Ion/i.test(poName)) productTypeKey = 'ion';
-            else if (/Fatty|Fattys/i.test(poName)) productTypeKey = 'fatty';
-            break;
-          }
-        }
-        
-        if (strainName && productTypeKey) {
-          console.log(`  Detected strain: "${strainName}", type: "${productTypeKey}", state: "${extractedState}"`);
-          
-          // Map product type to expected name patterns in database
-          const typePatterns: Record<string, string[]> = {
-            'sleeve': ['Sleeves', 'Sleeve'],
-            'ion': ['Ion Bags', 'Ion'],
-            'fatty': ['2pk Fatty Bags', 'Fatty Bags', '5pk Fatty Bags', 'Fatty'],
-          };
-          
-          const patterns = typePatterns[productTypeKey] || [];
-          const normalizedStrain = strainName.toLowerCase().trim();
-          
-          // Look for products matching: [STATE] [TYPE] - [STRAIN]
-          const match = products.find(p => {
-            if (!p.name) return false;
-            const productNameLower = p.name.toLowerCase();
-            
-            // Check if product name starts with state
-            if (!productNameLower.startsWith(extractedState!.toLowerCase())) return false;
-            
-            // Check if product name contains one of the type patterns
-            const hasType = patterns.some(typePattern => 
-              productNameLower.includes(typePattern.toLowerCase())
-            );
-            if (!hasType) return false;
-            
-            // Check if product name contains the strain
-            if (!productNameLower.includes(normalizedStrain)) return false;
-            
-            console.log(`  Candidate match: "${p.name}"`);
-            return true;
-          });
-          
-          if (match) {
-            console.log(`✓ SMART SHORTHAND MATCH FOUND: "${poName}" -> "${match.name}" (ID: ${match.id})`);
-            return match;
-          }
-        }
-        console.log(`✗ No smart shorthand match found for: "${poName}"`);
+      // Require minimum score threshold
+      if (bestMatch && bestScore >= 30) {
+        console.log(`✓ SMART MATCH: "${poName}" -> "${bestMatch.name}" (score: ${bestScore})`);
+        return bestMatch;
       }
 
-      // STEP 6: FALLBACK - Try exact match on item_id (case insensitive)
-      if (poItemId) {
-        console.log(`\n[STEP 6] Trying exact item_id match for: "${poItemId}"`);
-        const match = products.find(p => {
-          return p.item_id && p.item_id.toLowerCase().trim() === poItemId.toLowerCase().trim();
-        });
-        if (match) {
-          console.log(`✓ EXACT ITEM_ID MATCH FOUND: "${poItemId}" -> product: ${match.name} (item_id: ${match.item_id})`);
-          return match;
-        }
-        console.log(`✗ No exact item_id match found for: "${poItemId}"`);
-      }
-
-      // STEP 7: Try exact match on SKU (case insensitive)
-      if (poSku && poSku !== poItemId) {
-        console.log(`\n[STEP 7] Trying exact SKU match for: "${poSku}"`);
+      // STEP 3: Fallback - Try exact match on item_id/SKU
+      if (poItemId || poSku) {
+        const idToMatch = poItemId || poSku;
+        console.log(`  Trying item_id/SKU match: "${idToMatch}"`);
         const match = products.find(p => 
-          p.item_id && p.item_id.toLowerCase().trim() === poSku.toLowerCase().trim()
+          p.item_id && p.item_id.toLowerCase().trim() === idToMatch.toLowerCase().trim()
         );
         if (match) {
-          console.log(`✓ EXACT SKU MATCH FOUND: "${poSku}" -> product: ${match.name}`);
+          console.log(`✓ ITEM_ID MATCH: "${idToMatch}" -> "${match.name}"`);
           return match;
         }
-        console.log(`✗ No exact SKU match found for: "${poSku}"`);
       }
 
-      console.log(`\n========== NO MATCH FOUND ==========`);
-      console.log(`✗ Failed to match: name="${poName}", item_id="${poItemId}", sku="${poSku}", detectedState="${extractedState || 'none'}"`);
-      console.log(`Sample products in database:`);
-      products.slice(0, 5).forEach(p => {
-        console.log(`  - ${p.name} (item_id: ${p.item_id}, state: ${p.state || 'none'})`);
-      });
+      console.log(`✗ NO MATCH for: "${poName}"`);
+      console.log(`  Sample products: ${products.slice(0, 3).map(p => p.name).join(', ')}`);
       return null;
     };
 
@@ -692,8 +531,11 @@ Return ONLY valid JSON:
     if (returnProductsOnly) {
       console.log('returnProductsOnly mode - returning extracted items without creating order');
       
+      // Parse hint for matching context
+      const hintCtx = parseAnalysisHint(analysisHint);
+      
       const matchedItems = (extractedData.items || []).map((item: any) => {
-        const matchedProduct = findMatchingProduct(item);
+        const matchedProduct = findMatchingProduct(item, hintCtx);
         return {
           product_id: matchedProduct?.id || null,
           sku: item.sku || 'UNKNOWN',
@@ -802,8 +644,11 @@ Return ONLY valid JSON:
 
     // Create order items with product matching
     if (extractedData.items && Array.isArray(extractedData.items)) {
+      // Parse hint for matching context
+      const hintCtx = parseAnalysisHint(analysisHint);
+      
       const orderItems = extractedData.items.map((item: any) => {
-        const matchedProduct = findMatchingProduct(item);
+        const matchedProduct = findMatchingProduct(item, hintCtx);
         
         // ALWAYS use PO unit_price, never pull from product cost
         const unitPrice = item.unit_price || 0;
