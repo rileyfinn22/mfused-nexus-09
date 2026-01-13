@@ -186,6 +186,18 @@ serve(async (req) => {
       return union === 0 ? 0 : inter / union;
     };
 
+    // Measures "did we cover all the important tokens from the PO line?"
+    // This is better than Jaccard for cases like:
+    //   PO tokens: [fire, atf]
+    //   Template tokens: [az, sleeve, fire, atf]
+    // Jaccard=0.5 but coverage=1.0 (which is what we want).
+    const coverageScore = (needles: string[], haystack: string[]): number => {
+      const n = new Set(needles);
+      const h = new Set(haystack);
+      const inter = [...n].filter(x => h.has(x)).length;
+      return n.size === 0 ? 0 : inter / n.size;
+    };
+
     const bestTemplateByName = (wantedName: string, state: string | null): any | null => {
       const wanted = normalizeLoose(wantedName);
       if (!wanted) return null;
@@ -213,22 +225,27 @@ serve(async (req) => {
       const poTokens = extractMeaningfulTokensFromPoLine(poName);
       if (poTokens.length === 0) return null;
 
-      let best: { t: any; score: number } | null = null;
+      let best: { t: any; score: number; coverage: number } | null = null;
 
       for (const t of (templates || [])) {
         if (!templateMatchesState(t, state)) continue;
         if (!templateMatchesType(t, poName)) continue;
 
         const tTokens = tokenize(t.name);
-        const score = jaccardScore(poTokens, tTokens);
+        const coverage = coverageScore(poTokens, tTokens);
+        const jacc = jaccardScore(poTokens, tTokens);
 
-        if (!best || score > best.score) best = { t, score };
+        // Primary signal: coverage. Tie-breaker: jaccard.
+        const score = coverage * 0.9 + jacc * 0.1;
+
+        if (!best || score > best.score) best = { t, score, coverage };
       }
 
       if (!best) return null;
-      // With short token sets (e.g. "fire atf"), require a stronger match
-      const minScore = poTokens.length <= 3 ? 0.6 : 0.35;
-      return best.score >= minScore ? best.t : null;
+
+      // Require strong token coverage, especially for short identifiers like "fire atf".
+      const minCoverage = poTokens.length <= 3 ? 0.95 : 0.65;
+      return best.coverage >= minCoverage ? best.t : null;
     };
 
     // Analyze with Lovable AI to extract products
@@ -359,6 +376,20 @@ Return ONLY valid JSON in this format:
       const inferred = fromAiSuggestion ? null : bestTemplateByPoLine(poName, state);
 
       const matched = fromAiSuggestion || inferred;
+
+      // Helpful debug logs to understand mismatches
+      try {
+        const poTokens = extractMeaningfulTokensFromPoLine(poName);
+        console.log('[template-match]', {
+          poName: poName.substring(0, 140),
+          state,
+          poTokens,
+          aiSuggested: p?.suggested_template ?? null,
+          matchedTemplate: matched?.name ?? null,
+        });
+      } catch (_) {
+        // ignore logging issues
+      }
 
       return {
         ...p,
