@@ -125,14 +125,31 @@ serve(async (req) => {
       return n ? n.split(/\s+/).filter(Boolean) : [];
     };
 
+    const STATE_CODES = new Set([
+      'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
+    ]);
+
     const extractStateFromName = (name: string): string | null => {
       // Matches end "- AZ" / " - AZ" or standalone last token "AZ"
       const match = (name || '').trim().match(/(?:-|\s)([A-Z]{2})\s*$/i);
       if (!match) return null;
       const st = match[1].toUpperCase();
-      // Minimal validation: common 2-letter states
-      const states = new Set(['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']);
-      return states.has(st) ? st : null;
+      return STATE_CODES.has(st) ? st : null;
+    };
+
+    const parseAnalysisHint = (hint: string | null): { forcedState: string | null; forcedType: 'sleeve' | 'bag' | null } => {
+      if (!hint) return { forcedState: null, forcedType: null };
+
+      const upper = String(hint).toUpperCase();
+      const foundStates = Array.from(new Set((upper.match(/\b[A-Z]{2}\b/g) || []).filter(s => STATE_CODES.has(s))));
+      const forcedState = foundStates.length === 1 ? foundStates[0] : null;
+
+      // If the hint is explicit about product family, use it as a fallback signal.
+      let forcedType: 'sleeve' | 'bag' | null = null;
+      if (/\bSLEEVE\b/i.test(hint) || /\bSLEEVES\b/i.test(hint)) forcedType = 'sleeve';
+      else if (/\bBAG\b/i.test(hint) || /\bBAGS\b/i.test(hint)) forcedType = 'bag';
+
+      return { forcedState, forcedType };
     };
 
     const extractMeaningfulPartsFromPoLine = (rawName: string): string[] => {
@@ -283,14 +300,15 @@ serve(async (req) => {
           },
           {
             role: 'user',
-            content: `Analyze this content and extract ALL product/item information. For each product found, extract:
+             content: `Analyze this content and extract ALL product/item information. For each product found, extract:
 
-1. name: The product name/description
+1. name: Copy the full line item text EXACTLY as written in the PO (do NOT shorten it)
 2. description: Additional description if available
 3. state: The US state code if mentioned (e.g., "WA", "CA", "OR", "MO", "AZ") - often embedded in SKU or product name
 4. cost: The unit price/rate as a decimal number (if available)
 5. product_type: Infer from context (e.g., "packaging", "label", "bag", "box", "jar", "sleeve", etc.)
 6. suggested_template: Match to one of the existing templates below
+
 
 ${analysisHint ? `
 ***** CRITICAL: USER-PROVIDED MATCHING INSTRUCTIONS *****
@@ -380,10 +398,24 @@ Return ONLY valid JSON in this format:
     const extractedData = JSON.parse(content);
     console.log('Extracted products count:', extractedData.products?.length || 0);
 
+    const hintCtx = parseAnalysisHint(analysisHint);
+
     // Post-process template matching so the UI can reliably pre-select templates.
     const processedProducts = (extractedData.products || []).map((p: any) => {
       const poName = String(p?.name || '');
-      const state = (p?.state ? String(p.state).toUpperCase() : null) || extractStateFromName(poName);
+
+      // Prefer explicit state on the item, then state embedded in the name, then a forced state from the hint.
+      const extractedState = (p?.state ? String(p.state).toUpperCase() : null) || extractStateFromName(poName);
+      const state = extractedState || hintCtx.forcedState;
+
+      // If the AI shortened the name and removed the type keyword (SLEEVE/BAG), re-inject it from the hint
+      // so deterministic matching can still filter to the right template family.
+      const poNameForType = (() => {
+        if (!hintCtx.forcedType) return poName;
+        const lower = poName.toLowerCase();
+        if (lower.includes('sleeve') || lower.includes('bag')) return poName;
+        return `${hintCtx.forcedType.toUpperCase()} - ${poName}`;
+      })();
 
       // 1) If AI suggested a template name, fuzzy-match it to a real template.
       const fromAiSuggestion = p?.suggested_template
@@ -391,7 +423,7 @@ Return ONLY valid JSON in this format:
         : null;
 
       // 2) Otherwise, infer from the PO line itself.
-      const inferred = fromAiSuggestion ? null : bestTemplateByPoLine(poName, state);
+      const inferred = fromAiSuggestion ? null : bestTemplateByPoLine(poNameForType, state);
 
       const matched = fromAiSuggestion || inferred;
 
