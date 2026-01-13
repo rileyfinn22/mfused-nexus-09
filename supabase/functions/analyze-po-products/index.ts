@@ -422,27 +422,40 @@ Return ONLY valid JSON in this format:
         return `${hintCtx.forcedType.toUpperCase()} - ${poName}`;
       })();
 
+      // Tokens from the *actual* PO-derived name (not the suggested template)
+      const poTokens = extractMeaningfulTokensFromPoLine(poNameForType);
+      const minCoverage = poTokens.length <= 2 ? 1.0 : (poTokens.length <= 4 ? 0.75 : 0.6);
+
+      const templatePassesCoverage = (t: any | null): boolean => {
+        if (!t) return false;
+        if (poTokens.length === 0) return false;
+        const tTokens = tokenize(String(t.name || ''));
+        const coverage = coverageScore(poTokens, tTokens);
+        return coverage >= minCoverage;
+      };
+
       // 1) If AI suggested a template name, fuzzy-match it to a real template.
-      const fromAiSuggestion = p?.suggested_template
+      // Guardrail: ignore generic/over-broad suggestions like "AZ Sleeves" unless it actually covers the PO identifiers.
+      const fromAiSuggestionRaw = p?.suggested_template
         ? bestTemplateByName(String(p.suggested_template), state)
         : null;
+      const fromAiSuggestion = templatePassesCoverage(fromAiSuggestionRaw) ? fromAiSuggestionRaw : null;
 
       // 2) Otherwise, infer from the PO line itself.
-      const inferred = fromAiSuggestion ? null : bestTemplateByPoLine(poNameForType, state);
+      const inferred = bestTemplateByPoLine(poNameForType, state);
 
-      const matched = fromAiSuggestion || inferred;
-
-      // Keep the original PO line item name as-is for the product
-      // The template matching is just for association, not for renaming
+      // Prefer deterministic inference (it uses token coverage), otherwise accept a vetted AI suggestion.
+      const matched = inferred || fromAiSuggestion;
 
       // Helpful debug logs to understand mismatches
       try {
-        const poTokens = extractMeaningfulTokensFromPoLine(poName);
         console.log('[template-match]', {
           poName: poName.substring(0, 140),
           state,
           poTokens,
+          minCoverage,
           aiSuggested: p?.suggested_template ?? null,
+          aiSuggestionAccepted: Boolean(fromAiSuggestion),
           matchedTemplate: matched?.name ?? null,
         });
       } catch (_) {
@@ -451,7 +464,9 @@ Return ONLY valid JSON in this format:
 
       return {
         ...p,
-        name: matched ? matched.name : poName, // Use template name when matched, otherwise original PO line
+        // Only rename to the template name when it truly matches the PO identifiers.
+        // Otherwise keep the PO-derived name so you don't end up with generic names like "AZ Sleeves".
+        name: matched ? matched.name : poName,
         state: state || p?.state || null,
         suggested_template: matched ? matched.name : (p?.suggested_template ?? null),
         template_id: matched ? matched.id : null,
