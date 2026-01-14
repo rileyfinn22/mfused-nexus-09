@@ -402,6 +402,79 @@ const Products = () => {
     }
   };
 
+  const handleEditTemplate = (template: ProductTemplate) => {
+    // Open template for viewing/editing
+    setSelectedTemplate(template);
+  };
+
+  const handleDuplicateTemplate = async (template: ProductTemplate) => {
+    try {
+      const { error } = await supabase
+        .from('product_templates')
+        .insert({
+          name: `${template.name} (Copy)`,
+          description: template.description,
+          price: template.price,
+          cost: template.cost,
+          company_id: template.company_id,
+          thumbnail_url: template.thumbnail_url,
+          state: template.state
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Template duplicated",
+        description: "Template has been duplicated successfully.",
+      });
+
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error duplicating template:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate template.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteTemplate = async (template: ProductTemplate) => {
+    if (!confirm(`Are you sure you want to delete "${template.name}"? Products will be unlinked from this template.`)) {
+      return;
+    }
+
+    try {
+      // First, unlink products from this template
+      await supabase
+        .from('products')
+        .update({ template_id: null })
+        .eq('template_id', template.id);
+
+      // Then delete the template
+      const { error } = await supabase
+        .from('product_templates')
+        .delete()
+        .eq('id', template.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Template deleted",
+        description: "Template has been deleted successfully.",
+      });
+
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete template.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'text-success';
@@ -563,6 +636,48 @@ const Products = () => {
                     className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative"
                     onClick={() => setSelectedTemplate(template)}
                   >
+                    {/* Admin action buttons - always visible for vibe admins */}
+                    {isVibeAdmin && (
+                      <div className="absolute top-2 left-2 z-10 flex gap-1">
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditTemplate(template);
+                          }}
+                          title="Edit template"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDuplicateTemplate(template);
+                          }}
+                          title="Duplicate template"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm hover:bg-destructive hover:text-destructive-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTemplate(template);
+                          }}
+                          title="Delete template"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+
                     {/* Template Image/Icon Area */}
                     <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
                       {template.thumbnail_url ? (
@@ -574,14 +689,6 @@ const Products = () => {
                       ) : (
                         <Package className="h-16 w-16 text-muted-foreground/30" />
                       )}
-                      
-                      {/* Template badge */}
-                      <Badge 
-                        variant="default" 
-                        className="absolute top-2 left-2 bg-primary/90 backdrop-blur-sm text-xs"
-                      >
-                        Template
-                      </Badge>
                       
                       {/* Product count badge */}
                       <Badge 
