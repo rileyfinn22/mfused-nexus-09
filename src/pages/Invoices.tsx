@@ -602,11 +602,11 @@ const Invoices = () => {
                       </div>
                     ) : (
                       <div className="space-y-1">
-                        <div className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
-                          {invoice.orders?.description || "-"}
+                        <div className="text-sm text-foreground whitespace-pre-wrap break-words">
+                          {invoice.orders?.description || <span className="text-muted-foreground">-</span>}
                         </div>
                         {isChild && invoice.description && (
-                          <div className="pl-3 border-l border-border text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                          <div className="pl-3 border-l border-border text-xs text-foreground whitespace-pre-wrap break-words">
                             {invoice.description}
                           </div>
                         )}

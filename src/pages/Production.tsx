@@ -307,8 +307,8 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
                 {isVibeAdmin && (
                   <div className="col-span-2 text-left text-sm font-medium truncate">{order.companies?.name || '-'}</div>
                 )}
-                <div className="col-span-3 text-left text-sm text-muted-foreground whitespace-normal break-words" title={order.description || ''}>
-                  {order.description || '-'}
+                <div className="col-span-3 text-left text-sm text-foreground whitespace-normal break-words" title={order.description || ''}>
+                  {order.description || <span className="text-muted-foreground">-</span>}
                 </div>
                 <div className="col-span-1 text-left">
                   <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
