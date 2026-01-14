@@ -235,8 +235,10 @@ const Projects = () => {
                   >
                     <TableCell className="font-medium py-4">{project.order_number}</TableCell>
                     <TableCell className="py-4">{project.company_name}</TableCell>
-                    <TableCell className="text-muted-foreground py-4 max-w-[300px]">
-                      {project.description || '-'}
+                    <TableCell className="py-4 max-w-[300px]">
+                      <span className="text-sm text-foreground whitespace-pre-wrap break-words">
+                        {project.description || <span className="text-muted-foreground">-</span>}
+                      </span>
                     </TableCell>
                     <TableCell className="py-4">{new Date(project.order_date).toLocaleDateString()}</TableCell>
                     <TableCell className="py-4">

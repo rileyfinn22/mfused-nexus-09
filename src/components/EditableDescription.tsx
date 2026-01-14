@@ -53,7 +53,8 @@ export function EditableDescription({
       onBlur={handleBlur}
       onClick={(e) => e.stopPropagation()}
       className={cn(
-        "editable-description text-sm whitespace-pre-wrap break-words cursor-text rounded px-2 py-1 min-h-[32px] border border-transparent hover:border-border hover:bg-muted/50 focus:border-primary focus:outline-none",
+        "editable-description text-sm text-foreground whitespace-pre-wrap break-words cursor-text rounded px-2 py-1.5 min-h-[32px] border border-transparent hover:border-border hover:bg-muted/50 focus:border-primary focus:outline-none transition-colors",
+        "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/60",
         (disabled || saving) && "opacity-70 cursor-not-allowed",
         className
       )}
