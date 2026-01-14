@@ -192,17 +192,51 @@ serve(async (req) => {
       // we want to keep: ["Fire", "ATF"] (strain/flavor identifiers)
       const parts = (rawName || '').split(/\s*[-–—]\s*/).map(p => p.trim()).filter(Boolean);
 
+      // IMPORTANT: These are key product line identifiers that must NEVER be dropped
+      const IMPORTANT_PRODUCT_LINES = ['ion', 'fatty', 'vape', 'live line', 'fire', 'atf'];
+      
+      // Common strain/flavor words that should be kept
+      const STRAIN_WORDS = [
+        'twisted', 'wild', 'watermelon', 'watermellon', 'strawberry', 'lemon', 'grape',
+        'mango', 'blueberry', 'cherry', 'orange', 'apple', 'peach', 'melon', 'banana',
+        'pineapple', 'raspberry', 'blackberry', 'mint', 'vanilla', 'chocolate', 'coffee',
+        'og', 'kush', 'haze', 'diesel', 'cookies', 'gelato', 'runtz', 'zkittlez',
+        'widow', 'dream', 'jack', 'gorilla', 'glue', 'cake', 'biscotti', 'sherbet'
+      ];
+
+      const isImportantIdentifier = (p: string) => {
+        const v = p.toLowerCase().trim();
+        // Check if it's a known product line
+        for (const line of IMPORTANT_PRODUCT_LINES) {
+          if (v === line || v.includes(line)) return true;
+        }
+        // Check if it contains strain words
+        for (const strain of STRAIN_WORDS) {
+          if (v.includes(strain)) return true;
+        }
+        // Multi-word identifiers like "Wild Watermelon"
+        const words = v.split(/\s+/);
+        for (const word of words) {
+          if (STRAIN_WORDS.includes(word)) return true;
+        }
+        return false;
+      };
+
       const dropPart = (p: string) => {
         const v = p.toLowerCase().trim();
         if (!v) return true;
+        
+        // NEVER drop important identifiers like "Ion", "Twisted", "Wild Watermelon"
+        if (isImportantIdentifier(p)) return false;
+        
         if (v.includes('super fog')) return true;
         // Only drop standalone "bag"/"sleeve", not "Ion" which is a product line!
         if (/^(bag|bags|sleeve|sleeves)$/i.test(v)) return true;
         if (/^e\d+(?:\.\d+)?/.test(v)) return true; // e2.5, e3.0, etc
         if (/\d+(?:\.\d+)?\s*g/.test(v)) return true; // 2g, 1g, 2.5g
         if (/\(\s*\d+\s*x\s*\d+(?:\.\d+)?\s*g\s*\)/.test(v)) return true; // (1 x 2g)
-        // Flavor categories that aren't strain names
-        if (/^(citrus|dessert|sweet|fruity|earthy|gas|kush|haze)$/i.test(v)) return true;
+        // Generic flavor CATEGORIES (not specific flavors) - be careful not to remove strain names
+        if (/^(citrus|dessert|sweet|fruity|earthy|gas)$/i.test(v)) return true;
         // Strain type indicators
         if (/^(sat|hyb|ind|sativa|hybrid|indica|tbd)$/i.test(v)) return true;
         // Drop state codes

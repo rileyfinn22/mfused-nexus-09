@@ -185,6 +185,27 @@ serve(async (req) => {
       return detectProductType(str);
     };
 
+    // IMPORTANT: These are key product line identifiers that must NEVER be dropped
+    const IMPORTANT_PRODUCT_LINES = ['ion', 'fatty', 'vape', 'live', 'line', 'fire', 'atf'];
+    
+    // Common strain/flavor words that should be kept
+    const STRAIN_WORDS = [
+      'twisted', 'wild', 'watermelon', 'watermellon', 'strawberry', 'lemon', 'grape',
+      'mango', 'blueberry', 'cherry', 'orange', 'apple', 'peach', 'melon', 'banana',
+      'pineapple', 'raspberry', 'blackberry', 'mint', 'vanilla', 'chocolate', 'coffee',
+      'og', 'kush', 'haze', 'diesel', 'cookies', 'gelato', 'runtz', 'zkittlez',
+      'widow', 'dream', 'jack', 'gorilla', 'glue', 'cake', 'biscotti', 'sherbet'
+    ];
+
+    const isImportantToken = (t: string): boolean => {
+      const v = t.toLowerCase().trim();
+      // Check if it's a known product line
+      if (IMPORTANT_PRODUCT_LINES.includes(v)) return true;
+      // Check if it's a strain word
+      if (STRAIN_WORDS.includes(v)) return true;
+      return false;
+    };
+
     // Extract meaningful identifier tokens (strain names, brand names, etc.)
     // Drops: state codes, sizes, weights, flavor categories - but KEEPS product line identifiers!
     const extractIdentifierTokens = (rawName: string): string[] => {
@@ -192,6 +213,10 @@ serve(async (req) => {
 
       const dropToken = (t: string): boolean => {
         if (t.length < 2) return true;
+        
+        // NEVER drop important tokens like "ion", "twisted", "wild", "watermelon"
+        if (isImportantToken(t)) return false;
+        
         // State codes
         if (t.length === 2 && STATE_CODES.has(t.toUpperCase())) return true;
         // Only drop standalone type keywords, NOT product line identifiers like "ion", "fire", "twisted"
@@ -202,12 +227,12 @@ serve(async (req) => {
         if (/^\d+(?:\.\d+)?g?$/.test(t)) return true;
         // E-size codes like e2.5
         if (/^e\d+(?:\.\d+)?/.test(t)) return true;
-        // Flavor categories (not strain names!)
-        if (/^(citrus|dessert|sweet|fruity|earthy|gas|kush|haze)$/.test(t)) return true;
+        // Generic flavor categories (not strain names!)
+        if (/^(citrus|dessert|sweet|fruity|earthy|gas)$/.test(t)) return true;
         // Strain type indicators
         if (/^(sat|sativa|hyb|hybrid|ind|indica|tbd)$/.test(t)) return true;
         // Common noise that isn't product-identifying
-        if (/^(super|fog|vape|cart|cartridge|pre|roll|preroll)$/.test(t)) return true;
+        if (/^(super|fog|cart|cartridge|pre|roll|preroll)$/.test(t)) return true;
         // Multipliers like "1x", "2x"
         if (/^\d+x$/.test(t)) return true;
         // Parenthetical content
