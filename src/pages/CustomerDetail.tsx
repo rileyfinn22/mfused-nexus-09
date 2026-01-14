@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List, Layers } from "lucide-react";
+import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
 import { CompanyEmailsManager } from "@/components/CompanyEmailsManager";
 import { CompanyProductTemplates } from "@/components/CompanyProductTemplates";
 import { supabase } from "@/integrations/supabase/client";
@@ -1350,6 +1351,12 @@ const CustomerDetail = () => {
                         {product.price ? `$${parseFloat(product.price).toFixed(3)}` : '—'}
                       </div>
                       <div className="col-span-1 flex items-center gap-1">
+                        <AssignTemplateDropdown
+                          productId={product.id}
+                          currentTemplateId={product.template_id || null}
+                          companyId={customerId}
+                          onTemplateAssigned={fetchCustomerProducts}
+                        />
                         <Button 
                           variant="ghost" 
                           size="icon" 
