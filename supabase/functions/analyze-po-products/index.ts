@@ -40,6 +40,57 @@ serve(async (req) => {
     let extractedText: string;
     let inputSource: string;
 
+    // Helper to extract state from filename or PO number patterns like:
+    // "Purchase_Order_NY-122325-APION_4.pdf" -> "NY"
+    // "WA-122225-APION" -> "WA"
+    const STATE_CODES_SET = new Set([
+      'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
+    ]);
+
+    const extractStateFromSource = (source: string, text: string): string | null => {
+      // Try to extract from filename first (e.g., "Purchase_Order_NY-..." or "PO_WA-...")
+      const fileMatch = source.match(/(?:Purchase_Order_|PO_)?([A-Z]{2})[-_]/i);
+      if (fileMatch) {
+        const st = fileMatch[1].toUpperCase();
+        if (STATE_CODES_SET.has(st)) {
+          console.log(`Extracted state '${st}' from filename: ${source}`);
+          return st;
+        }
+      }
+      
+      // Try to extract from beginning of filename
+      const startMatch = source.match(/^([A-Z]{2})[-_]/i);
+      if (startMatch) {
+        const st = startMatch[1].toUpperCase();
+        if (STATE_CODES_SET.has(st)) {
+          console.log(`Extracted state '${st}' from filename start: ${source}`);
+          return st;
+        }
+      }
+
+      // Try to find PO number pattern in text like "NY-122325-APION" at the start
+      const poNumberMatch = text.match(/(?:PO|Purchase Order|Order)[:\s#]*([A-Z]{2})[-]/i);
+      if (poNumberMatch) {
+        const st = poNumberMatch[1].toUpperCase();
+        if (STATE_CODES_SET.has(st)) {
+          console.log(`Extracted state '${st}' from PO number in text`);
+          return st;
+        }
+      }
+
+      // Look for standalone state code pattern at very beginning of text lines
+      const lineMatch = text.match(/^([A-Z]{2})[-]\d+/m);
+      if (lineMatch) {
+        const st = lineMatch[1].toUpperCase();
+        if (STATE_CODES_SET.has(st)) {
+          console.log(`Extracted state '${st}' from PO number line in text`);
+          return st;
+        }
+      }
+
+      return null;
+    };
+
     if (contentType.includes('application/json')) {
       // Text mode - parse JSON body
       const jsonBody = await req.json();
@@ -83,6 +134,10 @@ serve(async (req) => {
         throw new Error('Failed to parse PDF. Please ensure it is a valid PDF file.');
       }
     }
+
+    // Extract the PO-level state from filename or document
+    const poLevelState = extractStateFromSource(inputSource, extractedText);
+    console.log(`PO-level state detected: ${poLevelState || 'none'}`);
 
     // Validate user has access to this company
     const { data: userRole, error: roleError } = await supabase
@@ -478,9 +533,15 @@ Return ONLY valid JSON in this format:
     const processedProducts = (extractedData.products || []).map((p: any) => {
       const poName = String(p?.name || '');
 
-      // Prefer explicit state on the item, then state embedded in the name, then a forced state from the hint.
-      const extractedState = (p?.state ? String(p.state).toUpperCase() : null) || extractStateFromName(poName);
-      const state = extractedState || hintCtx.forcedState;
+      // STATE PRIORITY ORDER:
+      // 1. PO-level state (from filename like "Purchase_Order_NY-...") - THIS IS THE PRIMARY SOURCE
+      // 2. Hint-provided state (from user's analysis hint)
+      // 3. Item-level state (if AI extracted it from product line)
+      // 4. State embedded in product name (fallback)
+      const itemState = (p?.state ? String(p.state).toUpperCase() : null) || extractStateFromName(poName);
+      const state = poLevelState || hintCtx.forcedState || itemState;
+      
+      console.log(`[state-resolution] PO-level: ${poLevelState}, hint: ${hintCtx.forcedState}, item: ${itemState}, final: ${state}`);
 
       // If the AI shortened the name and removed the type keyword (SLEEVE/BAG), re-inject it from the hint
       // so deterministic matching can still filter to the right template family.

@@ -107,6 +107,59 @@ serve(async (req) => {
       throw new Error('Either pdfPath or textContent must be provided');
     }
 
+    // --- Extract PO-level state from filename or document ---
+    // This is the PRIMARY state source - e.g., "Purchase_Order_NY-122325-APION_4.pdf" -> "NY"
+    const extractStateFromSource = (source: string, text: string): string | null => {
+      const STATE_CODES_SET = new Set([
+        'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
+      ]);
+
+      // Try to extract from filename first (e.g., "Purchase_Order_NY-..." or "PO_WA-...")
+      const fileMatch = source.match(/(?:Purchase_Order_|PO_)?([A-Z]{2})[-_]/i);
+      if (fileMatch) {
+        const st = fileMatch[1].toUpperCase();
+        if (STATE_CODES_SET.has(st)) {
+          console.log(`Extracted state '${st}' from filename: ${source}`);
+          return st;
+        }
+      }
+      
+      // Try to extract from beginning of filename
+      const startMatch = source.match(/^([A-Z]{2})[-_]/i);
+      if (startMatch) {
+        const st = startMatch[1].toUpperCase();
+        if (STATE_CODES_SET.has(st)) {
+          console.log(`Extracted state '${st}' from filename start: ${source}`);
+          return st;
+        }
+      }
+
+      // Try to find PO number pattern in text like "NY-122325-APION"
+      const poNumberMatch = text.match(/(?:PO|Purchase Order|Order)[:\s#]*([A-Z]{2})[-]/i);
+      if (poNumberMatch) {
+        const st = poNumberMatch[1].toUpperCase();
+        if (STATE_CODES_SET.has(st)) {
+          console.log(`Extracted state '${st}' from PO number in text`);
+          return st;
+        }
+      }
+
+      // Look for standalone state code pattern at very beginning of text lines
+      const lineMatch = text.match(/^([A-Z]{2})[-]\d+/m);
+      if (lineMatch) {
+        const st = lineMatch[1].toUpperCase();
+        if (STATE_CODES_SET.has(st)) {
+          console.log(`Extracted state '${st}' from PO number line in text`);
+          return st;
+        }
+      }
+
+      return null;
+    };
+
+    const poLevelState = extractStateFromSource(filename || pdfPath || '', extractedText);
+    console.log(`PO-level state detected: ${poLevelState || 'none'}`);
+
     // --- Hint-based canonical naming (keeps AI from collapsing to generic names like "AZ Sleeves") ---
     const US_STATES = [
       'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
@@ -493,11 +546,15 @@ Return ONLY valid JSON:
       }
 
       // STEP 1: Extract State, Type, and Identifier tokens from PO item
-      const poState = hintCtx?.forcedState || extractStateFromAny(rawLine) || extractStateFromAny(poName);
+      // STATE PRIORITY ORDER:
+      // 1. PO-level state (from filename like "Purchase_Order_NY-...") - THIS IS THE PRIMARY SOURCE
+      // 2. Hint-provided state (from user's analysis hint)
+      // 3. State extracted from the item line itself (fallback)
+      const poState = poLevelState || hintCtx?.forcedState || extractStateFromAny(rawLine) || extractStateFromAny(poName);
       const poType = hintCtx?.forcedType || extractTypeFromAny(rawLine) || extractTypeFromAny(poName);
       const poTokens = extractIdentifierTokens(rawLine);
 
-      console.log(`  State: ${poState || 'none'}, Type: ${poType || 'none'}, Tokens: [${poTokens.join(', ')}]`);
+      console.log(`  PO-level state: ${poLevelState}, Hint state: ${hintCtx?.forcedState}, Final state: ${poState || 'none'}, Type: ${poType || 'none'}, Tokens: [${poTokens.join(', ')}]`);
 
       if (!poState && !poType && poTokens.length === 0) {
         console.log(`  No state/type/tokens extracted, falling back to fuzzy match`);
