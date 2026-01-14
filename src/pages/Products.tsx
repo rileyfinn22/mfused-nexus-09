@@ -5,6 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -94,6 +104,16 @@ const Products = () => {
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedTemplate, setSelectedTemplate] = useState<ProductTemplate | null>(null);
+
+  // Template edit dialog (for vibe admins)
+  const [templateEditOpen, setTemplateEditOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<ProductTemplate | null>(null);
+  const [templateEditName, setTemplateEditName] = useState("");
+  const [templateEditDescription, setTemplateEditDescription] = useState("");
+  const [templateEditPrice, setTemplateEditPrice] = useState("");
+  const [templateEditCost, setTemplateEditCost] = useState("");
+  const [templateEditState, setTemplateEditState] = useState("");
+  const [templateSaving, setTemplateSaving] = useState(false);
 
   useEffect(() => {
     checkRole();
@@ -403,8 +423,65 @@ const Products = () => {
   };
 
   const handleEditTemplate = (template: ProductTemplate) => {
-    // Open template for viewing/editing
-    setSelectedTemplate(template);
+    setEditingTemplate(template);
+    setTemplateEditName(template.name);
+    setTemplateEditDescription(template.description || "");
+    setTemplateEditPrice(template.price != null ? template.price.toString() : "");
+    setTemplateEditCost(template.cost != null ? template.cost.toString() : "");
+    setTemplateEditState(template.state || "");
+    setTemplateEditOpen(true);
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!editingTemplate) return;
+    if (!templateEditName.trim()) {
+      toast({
+        title: "Template name required",
+        description: "Please enter a template name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTemplateSaving(true);
+    try {
+      const updates = {
+        name: templateEditName.trim(),
+        description: templateEditDescription.trim() || null,
+        price: templateEditPrice ? parseFloat(templateEditPrice) : null,
+        cost: templateEditCost ? parseFloat(templateEditCost) : null,
+        state: templateEditState.trim() || null,
+      };
+
+      const { data, error } = await supabase
+        .from("product_templates")
+        .update(updates)
+        .eq("id", editingTemplate.id)
+        .select("id, name, description, price, cost, company_id, thumbnail_url, state")
+        .single();
+
+      if (error) throw error;
+
+      toast({ title: "Template updated", description: "Changes saved successfully." });
+
+      // Keep selectedTemplate in sync (so TemplateProductsView header updates too)
+      if (selectedTemplate?.id === editingTemplate.id && data) {
+        setSelectedTemplate({ ...selectedTemplate, ...data });
+      }
+
+      setTemplateEditOpen(false);
+      setEditingTemplate(null);
+      fetchTemplates();
+    } catch (error) {
+      console.error("Error updating template:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update template.",
+        variant: "destructive",
+      });
+    } finally {
+      setTemplateSaving(false);
+    }
   };
 
   const handleDuplicateTemplate = async (template: ProductTemplate) => {
@@ -991,6 +1068,81 @@ const Products = () => {
           </div>
         </Card>
       )}
+
+
+      {/* Edit Template Dialog */}
+      <Dialog
+        open={templateEditOpen}
+        onOpenChange={(open) => {
+          setTemplateEditOpen(open);
+          if (!open) setEditingTemplate(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit template</DialogTitle>
+            <DialogDescription>
+              Update template details. (Products already assigned to this template are unaffected unless you
+              re-apply the template to them.)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Template name</Label>
+              <Input value={templateEditName} onChange={(e) => setTemplateEditName(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={templateEditDescription}
+                onChange={(e) => setTemplateEditDescription(e.target.value)}
+                rows={5}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Price</Label>
+                <Input
+                  inputMode="decimal"
+                  placeholder="e.g. 1.250"
+                  value={templateEditPrice}
+                  onChange={(e) => setTemplateEditPrice(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cost</Label>
+                <Input
+                  inputMode="decimal"
+                  placeholder="e.g. 0.850"
+                  value={templateEditCost}
+                  onChange={(e) => setTemplateEditCost(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>State (optional)</Label>
+              <Input
+                placeholder="e.g. AZ"
+                value={templateEditState}
+                onChange={(e) => setTemplateEditState(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTemplateEditOpen(false)} disabled={templateSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveTemplate} disabled={templateSaving || !templateEditName.trim()}>
+              {templateSaving ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
