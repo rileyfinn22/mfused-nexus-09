@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List, Layers } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List, Layers, Copy } from "lucide-react";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
 import { CompanyEmailsManager } from "@/components/CompanyEmailsManager";
 import { CompanyProductTemplates } from "@/components/CompanyProductTemplates";
@@ -495,6 +495,41 @@ const CustomerDetail = () => {
       });
     } finally {
       setDeletingProduct(false);
+    }
+  };
+
+  const handleDuplicateProduct = async (product: any) => {
+    try {
+      const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
+      
+      const { error } = await supabase
+        .from('products')
+        .insert({
+          name: `${product.name} (Copy)`,
+          description: product.description,
+          price: product.price,
+          cost: product.cost,
+          state: product.state,
+          item_id: tempSKU,
+          template_id: product.template_id || null,
+          company_id: customerId
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Product duplicated",
+        description: "Product has been duplicated successfully.",
+      });
+
+      fetchCustomerProducts();
+    } catch (error) {
+      console.error('Error duplicating product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate product.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1357,6 +1392,15 @@ const CustomerDetail = () => {
                           companyId={customerId}
                           onTemplateAssigned={fetchCustomerProducts}
                         />
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => handleDuplicateProduct(product)}
+                          title="Duplicate product"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="icon" 
