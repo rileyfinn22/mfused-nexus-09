@@ -1,17 +1,16 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Upload, Plus, CheckCircle2, Circle, Clock, FileText, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Loader2, ArrowLeft, Upload, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
 
 interface Order {
   id: string;
@@ -72,6 +71,7 @@ export default function ProductionDetail() {
   const [isCustomer, setIsCustomer] = useState(false);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [selectedStage, setSelectedStage] = useState<ProductionStage | null>(null);
+  const [selectedStageDef, setSelectedStageDef] = useState<typeof STAGE_NAMES[0] | null>(null);
   const [updateNote, setUpdateNote] = useState("");
   const [updateImage, setUpdateImage] = useState<File | null>(null);
   const [updateFile, setUpdateFile] = useState<File | null>(null);
@@ -109,7 +109,6 @@ export default function ProductionDetail() {
 
   const fetchOrderAndStages = async () => {
     try {
-      // Fetch order
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
@@ -127,7 +126,6 @@ export default function ProductionDetail() {
       if (orderError) throw orderError;
       setOrder(orderData);
 
-      // Fetch stages
       const { data: stagesData, error: stagesError } = await (supabase as any)
         .from('production_stages')
         .select(`
@@ -231,7 +229,6 @@ export default function ProductionDetail() {
 
       let imageUrl = null;
 
-      // Upload image if provided (only for admins and vendors)
       if (updateImage && (isVibeAdmin || isVendor)) {
         const fileExt = updateImage.name.split('.').pop();
         const fileName = `${selectedStage.id}-${Date.now()}.${fileExt}`;
@@ -248,7 +245,6 @@ export default function ProductionDetail() {
         imageUrl = publicUrl;
       }
 
-      // Upload file (PDF/Excel) if provided - admin only
       let fileUrl = null;
       let uploadedFileName = null;
       if (isVibeAdmin && updateFile) {
@@ -268,7 +264,6 @@ export default function ProductionDetail() {
         fileUrl = publicUrl;
       }
 
-      // Create updates
       const updates = [];
 
       if (updateNote) {
@@ -308,7 +303,6 @@ export default function ProductionDetail() {
           new_status: newStatus,
         });
 
-        // Update stage status
         const { error: statusError } = await (supabase as any)
           .from('production_stages')
           .update({ status: newStatus })
@@ -349,226 +343,157 @@ export default function ProductionDetail() {
     }
   };
 
-  const getStageIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-      case 'in_progress':
-        return <Clock className="h-5 w-5 text-blue-500" />;
-      default:
-        return <Circle className="h-5 w-5 text-muted-foreground" />;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
-      pending: "outline",
-      in_progress: "default",
-      completed: "secondary",
-    };
-    return <Badge variant={variants[status] || "outline"}>{status.replace('_', ' ')}</Badge>;
+  const handleOpenUpdateDialog = (stage: ProductionStage, stageDef: typeof STAGE_NAMES[0]) => {
+    setSelectedStage(stage);
+    setSelectedStageDef(stageDef);
+    setNewStatus(stage.status);
+    setUpdateDialogOpen(true);
   };
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
     );
   }
 
   if (!order) {
     return (
-      <DashboardLayout>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Order not found</p>
-        </div>
-      </DashboardLayout>
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">Order not found</p>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/production')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        </div>
+    <div className="space-y-6 max-w-4xl mx-auto">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/production')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Production
+        </Button>
+      </div>
 
-        <div>
-          <h1 className="text-3xl font-bold">{order.order_number}</h1>
-          <p className="text-muted-foreground">{order.customer_name}</p>
-          {isVibeAdmin && <p className="text-sm text-muted-foreground">{order.companies.name}</p>}
-        </div>
-
-        {stages.length === 0 && (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground mb-4">No production stages initialized</p>
-              {isVibeAdmin && (
-                <Button onClick={initializeStages}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Initialize Stages
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="grid gap-4">
-          {STAGE_NAMES.map((stageDef) => {
-            const stage = stages.find(s => s.stage_name === stageDef.value);
-            if (!stage) return null;
-
-            return (
-              <Card key={stage.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      {getStageIcon(stage.status)}
-                      <div>
-                        <CardTitle>{stageDef.label}</CardTitle>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 items-center">
-                      {getStatusBadge(stage.status)}
-                      <Dialog open={updateDialogOpen && selectedStage?.id === stage.id} onOpenChange={(open) => {
-                        setUpdateDialogOpen(open);
-                        if (open) {
-                          setSelectedStage(stage);
-                          setNewStatus(stage.status);
-                        }
-                      }}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline">
-                            {isCustomer ? 'Add Note' : 'Update'}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                          <DialogHeader>
-                            <DialogTitle>
-                              {isCustomer ? 'Add Note to' : 'Update'} {stageDef.label} Stage
-                            </DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            {(isVibeAdmin || isVendor) && (
-                              <div>
-                                <Label>Status</Label>
-                                <Select value={newStatus} onValueChange={setNewStatus}>
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                    <SelectItem value="completed">Completed</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                            <div>
-                              <Label>Add Note</Label>
-                              <Textarea
-                                value={updateNote}
-                                onChange={(e) => setUpdateNote(e.target.value)}
-                                placeholder="Add update notes..."
-                                rows={3}
-                              />
-                            </div>
-                            {(isVibeAdmin || isVendor) && (
-                              <div>
-                                <Label>Upload Image</Label>
-                                <Input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => setUpdateImage(e.target.files?.[0] || null)}
-                                />
-                              </div>
-                            )}
-                            {isVibeAdmin && (
-                              <div>
-                                <Label>Upload Document (PDF/Excel)</Label>
-                                <Input
-                                  type="file"
-                                  accept=".pdf,.xlsx,.xls,.csv"
-                                  onChange={(e) => setUpdateFile(e.target.files?.[0] || null)}
-                                />
-                              </div>
-                            )}
-                            <Button onClick={handleUpdateStage} disabled={uploading} className="w-full">
-                              {uploading ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  Uploading...
-                                </>
-                              ) : (
-                                <>
-                                  <Upload className="h-4 w-4 mr-2" />
-                                  {isCustomer ? 'Add Note' : 'Save Update'}
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {stage.production_stage_updates.length > 0 && (
-                    <div className="space-y-3 mt-4">
-                      <h4 className="font-semibold text-sm">Updates:</h4>
-                      {stage.production_stage_updates.map((update) => (
-                        <div key={update.id} className="border rounded-lg p-3 space-y-2">
-                          <div className="flex justify-between items-start">
-                            <Badge variant="outline">{update.update_type.replace('_', ' ')}</Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(update.created_at).toLocaleString()}
-                            </span>
-                          </div>
-                          {update.note_text && (
-                            <p className="text-sm">{update.note_text}</p>
-                          )}
-                          {update.image_url && (
-                            <img
-                              src={update.image_url}
-                              alt="Stage update"
-                              className="rounded-lg max-h-48 object-cover"
-                            />
-                          )}
-                          {update.file_url && (
-                            <a
-                              href={update.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg border hover:border-primary transition-colors"
-                            >
-                              <FileText className="h-4 w-4 text-primary" />
-                              <span className="text-sm text-primary hover:underline">
-                                {update.file_name || 'Download Document'}
-                              </span>
-                              <Download className="h-3 w-3 text-muted-foreground ml-auto" />
-                            </a>
-                          )}
-                          {update.previous_status && update.new_status && (
-                            <p className="text-sm text-muted-foreground">
-                              Status changed: {update.previous_status} → {update.new_status}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+      <div className="border border-border rounded-xl p-5 bg-card">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">{order.order_number}</h1>
+            <p className="text-muted-foreground mt-1">{order.customer_name}</p>
+            {isVibeAdmin && (
+              <Badge variant="outline" className="mt-2">{order.companies.name}</Badge>
+            )}
+          </div>
+          <Badge 
+            variant={order.status === 'in production' ? 'default' : 'secondary'}
+            className="capitalize"
+          >
+            {order.status.replace('_', ' ')}
+          </Badge>
         </div>
       </div>
-    </DashboardLayout>
+
+      {stages.length === 0 ? (
+        <div className="border border-dashed border-border rounded-xl p-12 text-center">
+          <p className="text-muted-foreground mb-4">No production stages initialized</p>
+          {isVibeAdmin && (
+            <Button onClick={initializeStages}>
+              <Plus className="h-4 w-4 mr-2" />
+              Initialize Stages
+            </Button>
+          )}
+        </div>
+      ) : (
+        <ProductionStageTimeline
+          stages={stages}
+          stageDefinitions={STAGE_NAMES}
+          onUpdateClick={handleOpenUpdateDialog}
+          onVendorAssign={handleAssignVendor}
+          vendors={vendors}
+          isVibeAdmin={isVibeAdmin}
+          isVendor={isVendor}
+          isCustomer={isCustomer}
+        />
+      )}
+
+      <Dialog open={updateDialogOpen} onOpenChange={(open) => {
+        setUpdateDialogOpen(open);
+        if (!open) {
+          setSelectedStage(null);
+          setSelectedStageDef(null);
+          setUpdateNote("");
+          setUpdateImage(null);
+          setUpdateFile(null);
+          setNewStatus("");
+        }
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {isCustomer ? 'Add Note to' : 'Update'} {selectedStageDef?.label} Stage
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {(isVibeAdmin || isVendor) && (
+              <div>
+                <Label>Status</Label>
+                <Select value={newStatus} onValueChange={setNewStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div>
+              <Label>Add Note</Label>
+              <Textarea
+                value={updateNote}
+                onChange={(e) => setUpdateNote(e.target.value)}
+                placeholder="Add update notes..."
+                rows={3}
+              />
+            </div>
+            {(isVibeAdmin || isVendor) && (
+              <div>
+                <Label>Upload Image</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setUpdateImage(e.target.files?.[0] || null)}
+                />
+              </div>
+            )}
+            {isVibeAdmin && (
+              <div>
+                <Label>Upload Document (PDF/Excel)</Label>
+                <Input
+                  type="file"
+                  accept=".pdf,.xlsx,.xls,.csv"
+                  onChange={(e) => setUpdateFile(e.target.files?.[0] || null)}
+                />
+              </div>
+            )}
+            <Button onClick={handleUpdateStage} disabled={uploading} className="w-full">
+              {uploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  {isCustomer ? 'Add Note' : 'Save Update'}
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { ProductionProgressBar, ProductionStatusIndicator } from "@/components/ProductionProgressBar";
+import { cn } from "@/lib/utils";
 
 interface ProductionOrder {
   id: string;
@@ -276,60 +277,79 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
     );
   }
 
-  const OrderTable = ({ orderList, title, emptyMessage }: { orderList: ProductionOrder[], title: string, emptyMessage: string }) => (
-    <div className="space-y-3">
-      <h2 className="text-lg font-medium">{title}</h2>
-      <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-        <div className="bg-muted border-b-2 border-border">
-          <div className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider`}>
-            <div className="col-span-2 text-left">Order #</div>
-            {isVibeAdmin && <div className="col-span-2 text-left">Company</div>}
-            <div className="col-span-3 text-left">Description</div>
-            <div className="col-span-1 text-left">State</div>
-            <div className="col-span-1 text-left">Total</div>
-            <div className="col-span-2 text-left">Progress</div>
-            <div className="col-span-1 text-left">Order Date</div>
+  const getProgressStatus = (progress: number) => {
+    if (progress >= 100) return { icon: CheckCircle2, color: 'text-green-500', label: 'Complete' };
+    if (progress > 0) return { icon: Clock, color: 'text-blue-500', label: 'In Progress' };
+    return { icon: Circle, color: 'text-muted-foreground', label: 'Pending' };
+  };
+
+  const OrderCard = ({ order }: { order: ProductionOrder }) => {
+    const progress = order.production_progress || 0;
+    const status = getProgressStatus(progress);
+    const StatusIcon = status.icon;
+
+    return (
+      <div
+        className={cn(
+          "group border rounded-xl p-4 hover:shadow-md transition-all cursor-pointer",
+          progress >= 100 ? "border-green-500/30 bg-green-50/5" :
+          progress > 0 ? "border-blue-500/30 bg-blue-50/5" :
+          "border-border bg-card"
+        )}
+        onClick={() => navigate(`/production/${order.id}`)}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono font-semibold text-foreground">{order.order_number}</span>
+              <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
+            </div>
+            {isVibeAdmin && (
+              <p className="text-sm font-medium text-foreground truncate">{order.companies?.name || '-'}</p>
+            )}
+            <p className="text-sm text-muted-foreground truncate mt-0.5">{order.description || 'No description'}</p>
+          </div>
+          
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <ProductionStatusIndicator progress={progress} size="md" />
+            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
           </div>
         </div>
-        <div className="divide-y divide-border">
-          {orderList.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              {emptyMessage}
-            </div>
-          ) : (
-            orderList.map((order) => (
-              <div
-                key={order.id}
-                className={`grid ${isVibeAdmin ? 'grid-cols-12' : 'grid-cols-10'} gap-4 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer even:bg-muted/40`}
-                onClick={() => navigate(`/orders/${order.id}`)}
-              >
-                <div className="col-span-2 text-left font-medium font-mono text-sm">{order.order_number}</div>
-                {isVibeAdmin && (
-                  <div className="col-span-2 text-left text-sm font-medium truncate">{order.companies?.name || '-'}</div>
-                )}
-                <div className="col-span-3 text-left text-sm text-foreground whitespace-normal break-words" title={order.description || ''}>
-                  {order.description || <span className="text-muted-foreground">-</span>}
-                </div>
-                <div className="col-span-1 text-left">
-                  <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
-                </div>
-                <div className="col-span-1 text-left text-sm">${order.total?.toFixed(2)}</div>
-                <div className="col-span-2 text-left">
-                  <div className="flex items-center gap-2">
-                    <Progress value={order.production_progress || 0} className="h-2 flex-1" />
-                    <span className="text-xs font-medium text-muted-foreground w-8">
-                      {order.production_progress || 0}%
-                    </span>
-                  </div>
-                </div>
-                <div className="col-span-1 text-left text-sm text-muted-foreground">
-                  {new Date(order.order_date).toLocaleDateString()}
-                </div>
-              </div>
-            ))
-          )}
+        
+        <div className="mt-3">
+          <ProductionProgressBar progress={progress} size="sm" />
+        </div>
+        
+        <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+          <span>${order.total?.toFixed(2)}</span>
+          <span>{new Date(order.order_date).toLocaleDateString()}</span>
         </div>
       </div>
+    );
+  };
+
+  const OrderTable = ({ orderList, title, emptyMessage }: { orderList: ProductionOrder[], title: string, emptyMessage: string }) => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <Factory className="h-5 w-5 text-primary" />
+          {title}
+          <Badge variant="secondary" className="ml-2">{orderList.length}</Badge>
+        </h2>
+      </div>
+      
+      {orderList.length === 0 ? (
+        <div className="border border-dashed border-border rounded-xl p-12 text-center">
+          <Circle className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground">{emptyMessage}</p>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {orderList.map((order) => (
+            <OrderCard key={order.id} order={order} />
+          ))}
+        </div>
+      )}
     </div>
   );
 
