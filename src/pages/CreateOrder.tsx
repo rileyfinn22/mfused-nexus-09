@@ -95,6 +95,8 @@ const CreateOrder = () => {
   const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [roleChecked, setRoleChecked] = useState(false);
   const [sameAsBilling, setSameAsBilling] = useState(true);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [showAddressDialog, setShowAddressDialog] = useState(false);
@@ -146,22 +148,124 @@ const CreateOrder = () => {
     memo: "",
   });
 
+  // Initial data loading - runs once on mount
   useEffect(() => {
-    checkRole();
-  }, []);
+    let isMounted = true;
+    
+    const initializeData = async () => {
+      try {
+        setInitialLoading(true);
+        
+        // Check role first
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !isMounted) return;
 
-  useEffect(() => {
-    fetchProducts();
-    if (isVibeAdmin) {
-      fetchCompanies();
-    } else {
-      loadUserCompanyInfo();
-    }
-    fetchSavedAddresses();
-    if (orderId) {
-      loadExistingOrder(orderId);
-    }
-  }, [orderId, isVibeAdmin]);
+        const { data: userRole } = await supabase
+          .from('user_roles')
+          .select('role, company_id')
+          .eq('user_id', user.id)
+          .single();
+
+        const isAdmin = userRole?.role === 'vibe_admin';
+        if (isMounted) {
+          setIsVibeAdmin(isAdmin);
+          setRoleChecked(true);
+        }
+
+        // Fetch products
+        const { data: productsData } = await supabase
+          .from('products')
+          .select('id, name, item_id, cost, description, image_url, company_id, state')
+          .order('name');
+        
+        if (productsData && isMounted) {
+          setProducts(productsData);
+        }
+
+        // Fetch all companies for reference
+        const { data: companiesData } = await supabase
+          .from('companies')
+          .select('id, name');
+        
+        if (companiesData && isMounted) {
+          setAllCompanies(companiesData);
+        }
+
+        if (isAdmin) {
+          // For vibe admin, fetch all companies
+          const { data: allCompaniesData } = await supabase
+            .from('companies')
+            .select('*')
+            .order('name');
+          
+          if (allCompaniesData && isMounted) {
+            setCompanies(allCompaniesData);
+          }
+        } else {
+          // For regular users, load their company info
+          if (userRole?.company_id && isMounted) {
+            const { data: companyData } = await supabase
+              .from('companies')
+              .select('name')
+              .eq('id', userRole.company_id)
+              .single();
+
+            if (companyData && isMounted) {
+              setFormData(prev => ({
+                ...prev,
+                customerName: companyData.name,
+              }));
+            }
+            
+            // Load company addresses
+            const { data: addressData } = await supabase
+              .from('customer_addresses')
+              .select('*')
+              .eq('company_id', userRole.company_id)
+              .order('is_default', { ascending: false });
+            
+            if (addressData && isMounted) {
+              const defaultShipping = addressData.find(a => a.address_type === 'shipping' && a.is_default) || 
+                                      addressData.find(a => a.address_type === 'shipping');
+              
+              if (defaultShipping) {
+                setFormData(prev => ({
+                  ...prev,
+                  customerName: companyData?.name || prev.customerName,
+                  customerEmail: defaultShipping.customer_email || "",
+                  customerPhone: defaultShipping.customer_phone || "",
+                  shippingName: defaultShipping.name,
+                  shippingStreet: defaultShipping.street,
+                  shippingCity: defaultShipping.city,
+                  shippingState: defaultShipping.state,
+                  shippingZip: defaultShipping.zip,
+                }));
+              }
+              setSavedAddresses(addressData);
+            }
+          }
+        }
+
+        // Load existing order if editing
+        if (orderId && isMounted) {
+          await loadExistingOrder(orderId);
+        }
+
+      } catch (error) {
+        console.error('Error initializing order page:', error);
+      } finally {
+        if (isMounted) {
+          setInitialLoading(false);
+        }
+      }
+    };
+
+    initializeData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [orderId]);
 
   const loadUserCompanyInfo = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -209,11 +313,12 @@ const CreateOrder = () => {
     }
   };
 
+  // Only load company addresses when admin manually selects a company (not during initial load of existing order)
   useEffect(() => {
-    if (selectedCompanyId) {
+    if (selectedCompanyId && roleChecked && !initialLoading) {
       loadCompanyAddresses();
     }
-  }, [selectedCompanyId]);
+  }, [selectedCompanyId, roleChecked, initialLoading]);
 
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -1400,6 +1505,20 @@ const CreateOrder = () => {
     return sum + (price * item.quantity);
   }, 0);
   const total = subtotal;
+
+  // Show loading state while initializing
+  if (initialLoading) {
+    return (
+      <div className="max-w-7xl mx-auto pb-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading order form...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto pb-8">
