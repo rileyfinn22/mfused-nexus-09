@@ -16,6 +16,8 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
+import { BulkPriceEditDialog } from "@/components/BulkPriceEditDialog";
+import { DollarSign } from "lucide-react";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
@@ -37,6 +39,7 @@ const OrderDetail = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [showVendorDialog, setShowVendorDialog] = useState(false);
+  const [showPriceDialog, setShowPriceDialog] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [artApproved, setArtApproved] = useState(false);
@@ -995,6 +998,10 @@ const OrderDetail = () => {
           })()}
           {isVibeAdmin && (
             <>
+              <Button variant="outline" onClick={() => setShowPriceDialog(true)}>
+                <DollarSign className="h-4 w-4 mr-2" />
+                Edit Prices
+              </Button>
               <Button variant="outline" onClick={() => setShowVendorDialog(true)}>
                 <Package className="h-4 w-4 mr-2" />
                 Assign Vendors
@@ -1019,6 +1026,17 @@ const OrderDetail = () => {
           onOpenChange={setShowVendorDialog}
           orderId={orderId || ''}
           orderItems={order.order_items.filter((item: any) => item.product_id !== null)}
+          onSuccess={fetchOrder}
+        />
+      )}
+
+      {/* Bulk Price Edit Dialog */}
+      {isVibeAdmin && order?.order_items && (
+        <BulkPriceEditDialog
+          open={showPriceDialog}
+          onOpenChange={setShowPriceDialog}
+          orderId={orderId || ''}
+          orderItems={order.order_items}
           onSuccess={fetchOrder}
         />
       )}
