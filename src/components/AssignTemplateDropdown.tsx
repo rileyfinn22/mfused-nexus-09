@@ -8,6 +8,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { Layers, Check, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -97,56 +102,89 @@ export function AssignTemplateDropdown({
   const currentTemplate = templates.find((t) => t.id === currentTemplateId);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          disabled={loading}
-          title={currentTemplate ? `Template: ${currentTemplate.name}` : "Assign template"}
+    <HoverCard openDelay={200} closeDelay={100}>
+      <DropdownMenu>
+        <HoverCardTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              disabled={loading}
+              title={currentTemplate ? `Template: ${currentTemplate.name}` : "Assign template"}
+            >
+              <Layers
+                className={`h-3.5 w-3.5 ${
+                  currentTemplateId ? "text-primary" : "text-muted-foreground"
+                }`}
+              />
+            </Button>
+          </DropdownMenuTrigger>
+        </HoverCardTrigger>
+        <HoverCardContent 
+          align="start" 
+          side="top" 
+          className="w-64 p-3"
+          sideOffset={5}
         >
-          <Layers
-            className={`h-3.5 w-3.5 ${
-              currentTemplateId ? "text-primary" : "text-muted-foreground"
-            }`}
-          />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Assign Template</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {currentTemplateId && (
-          <>
-            <DropdownMenuItem
-              onClick={() => handleAssignTemplate(null)}
-              className="text-destructive"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Remove Template
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        )}
-        {templates.length === 0 ? (
-          <div className="px-2 py-3 text-sm text-muted-foreground text-center">
-            No templates available
-          </div>
-        ) : (
-          templates.map((template) => (
-            <DropdownMenuItem
-              key={template.id}
-              onClick={() => handleAssignTemplate(template)}
-              className="flex items-center justify-between"
-            >
-              <span className="truncate">{template.name}</span>
-              {template.id === currentTemplateId && (
-                <Check className="h-4 w-4 text-primary shrink-0 ml-2" />
+          {currentTemplate ? (
+            <div className="space-y-1">
+              <p className="text-sm font-medium">{currentTemplate.name}</p>
+              {currentTemplate.description && (
+                <p className="text-xs text-muted-foreground whitespace-pre-line">
+                  {currentTemplate.description}
+                </p>
               )}
-            </DropdownMenuItem>
-          ))
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+              {(currentTemplate.price || currentTemplate.cost) && (
+                <div className="flex gap-3 text-xs mt-2">
+                  {currentTemplate.price && (
+                    <span>Price: ${currentTemplate.price.toFixed(3)}</span>
+                  )}
+                  {currentTemplate.cost && (
+                    <span className="text-muted-foreground">Cost: ${currentTemplate.cost.toFixed(3)}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">No template assigned. Click to assign one.</p>
+          )}
+        </HoverCardContent>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>Assign Template</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {currentTemplateId && (
+            <>
+              <DropdownMenuItem
+                onClick={() => handleAssignTemplate(null)}
+                className="text-destructive"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Remove Template
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
+          {templates.length === 0 ? (
+            <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+              No templates available
+            </div>
+          ) : (
+            templates.map((template) => (
+              <DropdownMenuItem
+                key={template.id}
+                onClick={() => handleAssignTemplate(template)}
+                className="flex items-center justify-between"
+              >
+                <span className="truncate">{template.name}</span>
+                {template.id === currentTemplateId && (
+                  <Check className="h-4 w-4 text-primary shrink-0 ml-2" />
+                )}
+              </DropdownMenuItem>
+            ))
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </HoverCard>
   );
 }
