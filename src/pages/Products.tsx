@@ -36,6 +36,7 @@ import { AnalyzePOProductsDialog } from "@/components/AnalyzePOProductsDialog";
 import { QuickAddProductsDialog } from "@/components/QuickAddProductsDialog";
 import { ProductTemplateGrid } from "@/components/ProductTemplateGrid";
 import { TemplateProductsView } from "@/components/TemplateProductsView";
+import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -610,19 +611,30 @@ const Products = () => {
                         </Badge>
                       )}
 
-                      {/* Delete button on hover */}
+                      {/* Action buttons on hover */}
                       {isVibeAdmin && (
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="absolute bottom-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteClick(product.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <AssignTemplateDropdown
+                            productId={product.id}
+                            currentTemplateId={product.template_id || null}
+                            companyId={companyFilter !== 'all' ? companyFilter : undefined}
+                            onTemplateAssigned={() => {
+                              fetchProducts();
+                              fetchTemplates();
+                            }}
+                          />
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(product.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       )}
                     </div>
 
@@ -750,6 +762,17 @@ const Products = () => {
                       </div>
                       {!isEditMode && (
                         <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          {isVibeAdmin && (
+                            <AssignTemplateDropdown
+                              productId={product.id}
+                              currentTemplateId={product.template_id || null}
+                              companyId={companyFilter !== 'all' ? companyFilter : undefined}
+                              onTemplateAssigned={() => {
+                                fetchProducts();
+                                fetchTemplates();
+                              }}
+                            />
+                          )}
                           <Button 
                             variant="ghost" 
                             size="icon" 
