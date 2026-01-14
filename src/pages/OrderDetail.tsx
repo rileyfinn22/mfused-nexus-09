@@ -11,13 +11,12 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, Paperclip, Trash2, Lock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
-import { BulkPriceEditDialog } from "@/components/BulkPriceEditDialog";
-import { DollarSign } from "lucide-react";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
@@ -39,7 +38,6 @@ const OrderDetail = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [showVendorDialog, setShowVendorDialog] = useState(false);
-  const [showPriceDialog, setShowPriceDialog] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [artApproved, setArtApproved] = useState(false);
@@ -70,6 +68,8 @@ const OrderDetail = () => {
   const [vibeAttachmentFile, setVibeAttachmentFile] = useState<File | null>(null);
   const [vibeAttachmentNote, setVibeAttachmentNote] = useState('');
   const [uploadingVibeAttachment, setUploadingVibeAttachment] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [bulkPrice, setBulkPrice] = useState<string>('');
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -878,6 +878,51 @@ const OrderDetail = () => {
 
   const handleDeleteItem = (itemId: string) => {
     setEditedItems(items => items.filter(item => item.id !== itemId));
+    setSelectedItemIds(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(itemId);
+      return newSet;
+    });
+  };
+
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItemIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedItemIds.size === editedItems.length) {
+      setSelectedItemIds(new Set());
+    } else {
+      setSelectedItemIds(new Set(editedItems.map(item => item.id)));
+    }
+  };
+
+  const handleBulkPriceUpdate = () => {
+    if (selectedItemIds.size === 0 || !bulkPrice) return;
+    const newPrice = parseFloat(bulkPrice);
+    if (isNaN(newPrice)) return;
+    
+    setEditedItems(items =>
+      items.map(item =>
+        selectedItemIds.has(item.id)
+          ? { ...item, unit_price: newPrice, total: Number(item.quantity) * newPrice }
+          : item
+      )
+    );
+    setSelectedItemIds(new Set());
+    setBulkPrice('');
+    toast({
+      title: "Prices Updated",
+      description: `Updated ${selectedItemIds.size} item(s) to $${newPrice.toFixed(2)}`
+    });
   };
 
   const handleAddItem = () => {
@@ -998,10 +1043,6 @@ const OrderDetail = () => {
           })()}
           {isVibeAdmin && (
             <>
-              <Button variant="outline" onClick={() => setShowPriceDialog(true)}>
-                <DollarSign className="h-4 w-4 mr-2" />
-                Edit Prices
-              </Button>
               <Button variant="outline" onClick={() => setShowVendorDialog(true)}>
                 <Package className="h-4 w-4 mr-2" />
                 Assign Vendors
@@ -1026,17 +1067,6 @@ const OrderDetail = () => {
           onOpenChange={setShowVendorDialog}
           orderId={orderId || ''}
           orderItems={order.order_items.filter((item: any) => item.product_id !== null)}
-          onSuccess={fetchOrder}
-        />
-      )}
-
-      {/* Bulk Price Edit Dialog */}
-      {isVibeAdmin && order?.order_items && (
-        <BulkPriceEditDialog
-          open={showPriceDialog}
-          onOpenChange={setShowPriceDialog}
-          orderId={orderId || ''}
-          orderItems={order.order_items}
           onSuccess={fetchOrder}
         />
       )}
@@ -1332,11 +1362,54 @@ const OrderDetail = () => {
                 </span>
               )}
             </h2>
+
+            {/* Bulk Price Update Section - Only in Edit Mode */}
+            {isEditMode && (
+              <div className="mb-4 p-4 border rounded-lg bg-muted/30">
+                <div className="flex items-end gap-3">
+                  <div className="w-40">
+                    <label className="text-sm font-medium mb-1.5 block">Bulk Unit Price</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={bulkPrice}
+                      onChange={(e) => setBulkPrice(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleBulkPriceUpdate}
+                    disabled={selectedItemIds.size === 0 || !bulkPrice}
+                    className="px-6"
+                  >
+                    Update {selectedItemIds.size} Selected
+                  </Button>
+                  {selectedItemIds.size > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedItemIds(new Set())}
+                    >
+                      Clear Selection
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="border border-table-border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-table-header">
-             <TableHead className="w-16">Image</TableHead>
+                    {isEditMode && (
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={selectedItemIds.size === displayItems.length && displayItems.length > 0}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
+                    )}
+                    <TableHead className="w-16">Image</TableHead>
                     <TableHead>Item ID</TableHead>
                     <TableHead>Product/Service</TableHead>
                     <TableHead>Description</TableHead>
@@ -1347,7 +1420,16 @@ const OrderDetail = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayItems.map((item: any, index: number) => <TableRow key={item.id || index}>
+                  {displayItems.map((item: any, index: number) => (
+                    <TableRow key={item.id || index} className={selectedItemIds.has(item.id) ? 'bg-primary/5' : ''}>
+                      {isEditMode && (
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedItemIds.has(item.id)}
+                            onCheckedChange={() => toggleItemSelection(item.id)}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div className="w-12 h-12 bg-muted rounded border border-table-border flex items-center justify-center">
                           <Package className="h-6 w-6 text-muted-foreground" />
@@ -1396,7 +1478,8 @@ const OrderDetail = () => {
                           </Button>
                         </TableCell>
                       )}
-                    </TableRow>)}
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
