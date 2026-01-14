@@ -309,13 +309,15 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
 
     try {
       // Create products with template associations
+      // When a template is assigned, always use the template's description
       const productsToInsert = selectedProducts.map(p => {
         const selectedTemplate = p.template_id ? templates.find(t => t.id === p.template_id) : null;
         
         return {
           company_id: companyId,
           name: p.name,
-          description: p.description || selectedTemplate?.description || null,
+          // Always inherit template description when template is assigned
+          description: selectedTemplate?.description || p.description || null,
           state: p.state || selectedTemplate?.state || null,
           cost: p.cost || selectedTemplate?.cost || null,
           price: selectedTemplate?.price || null,
