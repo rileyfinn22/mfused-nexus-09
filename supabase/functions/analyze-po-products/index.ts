@@ -137,42 +137,81 @@ serve(async (req) => {
       return STATE_CODES.has(st) ? st : null;
     };
 
-    const parseAnalysisHint = (hint: string | null): { forcedState: string | null; forcedType: 'sleeve' | 'bag' | null } => {
+    // Extended product types for template matching
+    type ProductType = 'sleeve' | 'ion_bag' | 'fatty_bag_5pk' | 'fatty_bag_2pk' | 'vape_bag' | 'live_line_bag' | 'bag' | null;
+    
+    const detectProductType = (str: string): ProductType => {
+      if (!str) return null;
+      const lower = str.toLowerCase();
+      // More specific types first
+      if (/\bion\b/i.test(str) && /\bbags?\b/i.test(str)) return 'ion_bag';
+      if (/\bion\b/i.test(str)) return 'ion_bag'; // "BAG - Ion" pattern
+      if (/\bfatty\b/i.test(str) && /\(5\s*x/i.test(str)) return 'fatty_bag_5pk';
+      if (/\bfatty\b/i.test(str) && /\(2\s*x/i.test(str)) return 'fatty_bag_2pk';
+      if (/\bvape\s*bags?\b/i.test(str)) return 'vape_bag';
+      if (/\blive\s*line\b/i.test(str)) return 'live_line_bag';
+      if (/\bsleeves?\b/i.test(str)) return 'sleeve';
+      if (/\bbags?\b/i.test(str)) return 'bag';
+      return null;
+    };
+
+    const typeMatchesTemplate = (type: ProductType, templateName: string): boolean => {
+      if (!type || !templateName) return true;
+      const tLower = templateName.toLowerCase();
+      switch (type) {
+        case 'ion_bag': return tLower.includes('ion') && tLower.includes('bag');
+        case 'fatty_bag_5pk': return tLower.includes('5pk') && tLower.includes('fatty');
+        case 'fatty_bag_2pk': return tLower.includes('2pk') && tLower.includes('fatty');
+        case 'vape_bag': return tLower.includes('vape') && tLower.includes('bag');
+        case 'live_line_bag': return tLower.includes('live') && tLower.includes('line');
+        case 'sleeve': return tLower.includes('sleeve');
+        case 'bag': return tLower.includes('bag') && !tLower.includes('ion') && !tLower.includes('fatty') && !tLower.includes('vape');
+        default: return true;
+      }
+    };
+    
+    const parseAnalysisHint = (hint: string | null): { forcedState: string | null; forcedType: ProductType } => {
       if (!hint) return { forcedState: null, forcedType: null };
 
       const upper = String(hint).toUpperCase();
       const foundStates = Array.from(new Set((upper.match(/\b[A-Z]{2}\b/g) || []).filter(s => STATE_CODES.has(s))));
       const forcedState = foundStates.length === 1 ? foundStates[0] : null;
 
-      // If the hint is explicit about product family, use it as a fallback signal.
-      let forcedType: 'sleeve' | 'bag' | null = null;
-      if (/\bSLEEVE\b/i.test(hint) || /\bSLEEVES\b/i.test(hint)) forcedType = 'sleeve';
-      else if (/\bBAG\b/i.test(hint) || /\bBAGS\b/i.test(hint)) forcedType = 'bag';
+      // Detect product type from hint
+      const forcedType = detectProductType(hint);
 
       return { forcedState, forcedType };
     };
 
     const extractMeaningfulPartsFromPoLine = (rawName: string): string[] => {
       // For lines like:
+      // "BAG - Ion - 1g (1 x 1g) - Super Fog - Twisted - Wild Watermelon - Ind"
+      // we want to keep: ["Ion", "Twisted", "Wild Watermelon"] (product line + strain identifiers)
+      // 
       // "SLEEVE - E2.5 XL - 2g (1 x 2g) - Super Fog - Fire - ATF - Citrus - Sat - AZ"
-      // we want to keep mostly: ["Fire", "ATF"] (the strain/flavor identifiers)
+      // we want to keep: ["Fire", "ATF"] (strain/flavor identifiers)
       const parts = (rawName || '').split(/\s*[-–—]\s*/).map(p => p.trim()).filter(Boolean);
 
       const dropPart = (p: string) => {
         const v = p.toLowerCase().trim();
         if (!v) return true;
         if (v.includes('super fog')) return true;
-        if (v.includes('sleeve') || v.includes('bag')) return true;
+        // Only drop standalone "bag"/"sleeve", not "Ion" which is a product line!
+        if (/^(bag|bags|sleeve|sleeves)$/i.test(v)) return true;
         if (/^e\d+(?:\.\d+)?/.test(v)) return true; // e2.5, e3.0, etc
         if (/\d+(?:\.\d+)?\s*g/.test(v)) return true; // 2g, 1g, 2.5g
         if (/\(\s*\d+\s*x\s*\d+(?:\.\d+)?\s*g\s*\)/.test(v)) return true; // (1 x 2g)
-        if (/(citrus|dessert|sweet)/.test(v)) return true;
-        if (/^(sat|hyb|ind|sativa|hybrid|indica)$/.test(v)) return true;
+        // Flavor categories that aren't strain names
+        if (/^(citrus|dessert|sweet|fruity|earthy|gas|kush|haze)$/i.test(v)) return true;
+        // Strain type indicators
+        if (/^(sat|hyb|ind|sativa|hybrid|indica|tbd)$/i.test(v)) return true;
         // Drop state codes
         if (/^(az|wa|md|mo|ca|or|ny|nj|il|co|nv|mi|ma|pa|tx|fl)$/i.test(v)) return true;
         // Drop size codes like "XL", "SM", "LG", "XXL", "E2.5 XL"
         if (/^(xs|sm|md|lg|xl|xxl|xxxl)$/i.test(v)) return true;
         if (/^e\d+(?:\.\d+)?\s*(xs|sm|md|lg|xl|xxl|xxxl)$/i.test(v)) return true;
+        // Drop multiplier patterns like "1 x 2g"
+        if (/^\d+\s*x\s*\d+/i.test(v)) return true;
         return false;
       };
 
@@ -206,15 +245,11 @@ serve(async (req) => {
     };
 
     const templateMatchesType = (t: any, poName: string): boolean => {
-      const name = (poName || '').toLowerCase();
-      const wantsSleeve = name.includes('sleeve');
-      const wantsBag = name.includes('bag');
-      if (!wantsSleeve && !wantsBag) return true;
-
-      const tName = normalizeLoose(t?.name || '');
-      if (wantsSleeve) return tName.includes('sleeve');
-      if (wantsBag) return tName.includes('bag');
-      return true;
+      const poType = detectProductType(poName);
+      if (!poType) return true; // No type requirement, any template is fine
+      
+      const tName = t?.name || '';
+      return typeMatchesTemplate(poType, tName);
     };
 
     const jaccardScore = (a: string[], b: string[]): number => {

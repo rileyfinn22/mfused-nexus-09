@@ -113,16 +113,23 @@ serve(async (req) => {
     ] as const;
     const STATE_CODES = new Set<string>(US_STATES);
 
-    // All product types we support
-    type ProductType = 'sleeve' | 'bag' | 'box' | 'tin' | 'merch_pack' | 'fatty' | 'ion' | null;
+    // All product types we support - ORDER MATTERS: more specific types first!
+    // "ion_bag" must come before "bag" since Ion Bags are a distinct product family
+    type ProductType = 'sleeve' | 'ion_bag' | 'bag' | 'box' | 'tin' | 'merch_pack' | 'fatty' | 'fatty_bag_5pk' | 'fatty_bag_2pk' | 'vape_bag' | 'live_line_bag' | null;
     const PRODUCT_TYPE_PATTERNS: { type: ProductType; patterns: RegExp[] }[] = [
+      // Combined product families (most specific first)
+      { type: 'ion_bag', patterns: [/\bion\s*bags?\b/i, /\bbag\s*-?\s*ion\b/i, /\bion\b.*\bbag\b/i, /\bbag\b.*\bion\b/i] },
+      { type: 'fatty_bag_5pk', patterns: [/\bfatty.*5\s*(?:pk|pack)\b/i, /\b5\s*(?:pk|pack).*fatty\b/i, /\bfatty.*\(5\s*x/i] },
+      { type: 'fatty_bag_2pk', patterns: [/\bfatty.*2\s*(?:pk|pack)\b/i, /\b2\s*(?:pk|pack).*fatty\b/i, /\bfatty.*\(2\s*x/i] },
+      { type: 'vape_bag', patterns: [/\bvape\s*bags?\b/i] },
+      { type: 'live_line_bag', patterns: [/\blive\s*line\s*bags?\b/i] },
+      // Base types
       { type: 'sleeve', patterns: [/\bsleeves?\b/i] },
       { type: 'bag', patterns: [/\bbags?\b/i] },
       { type: 'box', patterns: [/\bbox(?:es)?\b/i] },
       { type: 'tin', patterns: [/\btins?\b/i] },
-      { type: 'merch_pack', patterns: [/\bmerch\s*packs?\b/i, /\bmerchandise\s*packs?\b/i] },
+      { type: 'merch_pack', patterns: [/\bmerch\s*packs?\b/i, /\bmerchandise\s*packs?\b/i, /\bion\s*merch\b/i] },
       { type: 'fatty', patterns: [/\bfatty\b/i, /\bfattys\b/i, /\bfatties\b/i] },
-      { type: 'ion', patterns: [/\bion\b/i] },
     ];
 
     const detectProductType = (str: string): ProductType => {
@@ -131,6 +138,24 @@ serve(async (req) => {
         if (patterns.some(p => p.test(str))) return type;
       }
       return null;
+    };
+
+    // Map product type to template name pattern for matching
+    const typeToTemplatePattern = (type: ProductType): string | null => {
+      const map: Record<string, string> = {
+        'ion_bag': 'ion bags',
+        'fatty_bag_5pk': '5pk fatty bags',
+        'fatty_bag_2pk': '2pk fatty bags',
+        'vape_bag': 'vape bags',
+        'live_line_bag': 'live line bags',
+        'sleeve': 'sleeve',
+        'bag': 'bag',
+        'box': 'box',
+        'tin': 'tin',
+        'merch_pack': 'merch pack',
+        'fatty': 'fatty',
+      };
+      return map[type || ''] || null;
     };
 
     const parseAnalysisHint = (hint: string | undefined | null): { forcedState: string | null; forcedType: ProductType } => {
@@ -161,7 +186,7 @@ serve(async (req) => {
     };
 
     // Extract meaningful identifier tokens (strain names, brand names, etc.)
-    // Drops: state codes, type names, sizes, weights, flavor categories
+    // Drops: state codes, sizes, weights, flavor categories - but KEEPS product line identifiers!
     const extractIdentifierTokens = (rawName: string): string[] => {
       const parts = (rawName || '').split(/[\s\-–—,;:]+/).map(p => p.trim().toLowerCase()).filter(Boolean);
 
@@ -169,19 +194,19 @@ serve(async (req) => {
         if (t.length < 2) return true;
         // State codes
         if (t.length === 2 && STATE_CODES.has(t.toUpperCase())) return true;
-        // Product types
-        if (/^(sleeve|sleeves|bag|bags|box|boxes|tin|tins|merch|pack|packs|fatty|fattys|fatties|ion)$/.test(t)) return true;
+        // Only drop standalone type keywords, NOT product line identifiers like "ion", "fire", "twisted"
+        if (/^(sleeve|sleeves|bag|bags|box|boxes|tin|tins|merch|pack|packs)$/.test(t)) return true;
         // Size codes
         if (/^(xs|sm|md|lg|xl|xxl|xxxl)$/.test(t)) return true;
         // Weight patterns
         if (/^\d+(?:\.\d+)?g?$/.test(t)) return true;
         // E-size codes like e2.5
         if (/^e\d+(?:\.\d+)?/.test(t)) return true;
-        // Flavor categories
-        if (/^(citrus|dessert|sweet|fruity|earthy)$/.test(t)) return true;
+        // Flavor categories (not strain names!)
+        if (/^(citrus|dessert|sweet|fruity|earthy|gas|kush|haze)$/.test(t)) return true;
         // Strain type indicators
-        if (/^(sat|sativa|hyb|hybrid|ind|indica)$/.test(t)) return true;
-        // Common noise
+        if (/^(sat|sativa|hyb|hybrid|ind|indica|tbd)$/.test(t)) return true;
+        // Common noise that isn't product-identifying
         if (/^(super|fog|vape|cart|cartridge|pre|roll|preroll)$/.test(t)) return true;
         // Multipliers like "1x", "2x"
         if (/^\d+x$/.test(t)) return true;
@@ -193,16 +218,20 @@ serve(async (req) => {
       return parts.filter(p => !dropToken(p));
     };
 
-    // Type label mapping for canonical names
+    // Type label mapping for canonical names  
     const typeToLabel = (type: ProductType): string => {
       const map: Record<string, string> = {
-        sleeve: 'Sleeve',
-        bag: 'Bag',
-        box: 'Box',
-        tin: 'Tin',
-        merch_pack: 'Merch Pack',
-        fatty: 'Fatty',
-        ion: 'Ion',
+        'sleeve': 'Sleeve',
+        'ion_bag': 'Ion Bags',
+        'bag': 'Bag',
+        'box': 'Box',
+        'tin': 'Tin',
+        'merch_pack': 'Merch Pack',
+        'fatty': 'Fatty',
+        'fatty_bag_5pk': '5pk Fatty Bags',
+        'fatty_bag_2pk': '2pk Fatty Bags',
+        'vape_bag': 'Vape Bags',
+        'live_line_bag': 'Live Line Bags',
       };
       return map[type || ''] || type || '';
     };
@@ -470,12 +499,22 @@ Return ONLY valid JSON:
           }
         }
 
-        // Type matching (required if PO has type)
+        // Type matching - must be compatible types
         if (poType) {
-          if (productType === poType) {
-            score += 20; // Good boost for type match
-          } else if (productType) {
-            continue; // Wrong type = skip this product entirely
+          // Check if product type is compatible with PO type
+          const typesCompatible = (): boolean => {
+            if (!productType) return true; // Product has no type = could be anything
+            if (productType === poType) return true; // Exact match
+            // ion_bag matches any bag/ion product
+            if (poType === 'ion_bag' && (productType === 'ion_bag' || productType === 'bag')) return true;
+            if (productType === 'ion_bag' && poType === 'bag') return true;
+            return false;
+          };
+          
+          if (typesCompatible()) {
+            score += productType === poType ? 25 : 15; // Full boost for exact, partial for compatible
+          } else {
+            continue; // Incompatible type = skip this product entirely
           }
         }
 
