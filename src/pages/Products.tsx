@@ -28,7 +28,8 @@ import {
   Package,
   LayoutGrid,
   List,
-  Layers
+  Layers,
+  Copy
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AddProductDialog } from "@/components/AddProductDialog";
@@ -358,6 +359,49 @@ const Products = () => {
     }
   };
 
+  const handleDuplicateProduct = async (product: Product) => {
+    try {
+      const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
+      
+      // Get the company_id from the original product
+      const { data: originalProduct } = await supabase
+        .from('products')
+        .select('company_id')
+        .eq('id', product.id)
+        .single();
+      
+      const { error } = await supabase
+        .from('products')
+        .insert({
+          name: `${product.name} (Copy)`,
+          description: product.description,
+          price: product.price,
+          cost: product.cost,
+          state: product.state,
+          item_id: tempSKU,
+          template_id: product.template_id || null,
+          company_id: originalProduct?.company_id
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Product duplicated",
+        description: "Product has been duplicated successfully.",
+      });
+
+      fetchProducts();
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error duplicating product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate product.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'text-success';
@@ -624,6 +668,18 @@ const Products = () => {
                             }}
                           />
                           <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDuplicateProduct(product);
+                            }}
+                            title="Duplicate product"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
                             variant="destructive"
                             size="icon"
                             className="h-8 w-8"
@@ -763,15 +819,26 @@ const Products = () => {
                       {!isEditMode && (
                         <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           {isVibeAdmin && (
-                            <AssignTemplateDropdown
-                              productId={product.id}
-                              currentTemplateId={product.template_id || null}
-                              companyId={companyFilter !== 'all' ? companyFilter : undefined}
-                              onTemplateAssigned={() => {
-                                fetchProducts();
-                                fetchTemplates();
-                              }}
-                            />
+                            <>
+                              <AssignTemplateDropdown
+                                productId={product.id}
+                                currentTemplateId={product.template_id || null}
+                                companyId={companyFilter !== 'all' ? companyFilter : undefined}
+                                onTemplateAssigned={() => {
+                                  fetchProducts();
+                                  fetchTemplates();
+                                }}
+                              />
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                onClick={() => handleDuplicateProduct(product)}
+                                title="Duplicate product"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
                           )}
                           <Button 
                             variant="ghost" 
@@ -781,14 +848,16 @@ const Products = () => {
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-muted-foreground hover:text-danger"
-                            onClick={() => handleDeleteClick(product.id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {isVibeAdmin && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-muted-foreground hover:text-danger"
+                              onClick={() => handleDeleteClick(product.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
