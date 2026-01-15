@@ -353,8 +353,16 @@ const Products = () => {
 
     try {
       for (const id of idsToDelete) {
+        // Unlink product from order_items to avoid foreign key constraint violation
+        await supabase
+          .from('order_items')
+          .update({ product_id: null })
+          .eq('product_id', id);
+        
+        // Delete related records
         await supabase.from('product_states').delete().eq('product_id', id);
         await supabase.from('inventory').delete().eq('product_id', id);
+        
         const { error } = await supabase.from('products').delete().eq('id', id);
         if (error) throw error;
       }
