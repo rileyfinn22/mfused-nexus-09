@@ -61,6 +61,7 @@ const InvoiceDetail = () => {
   const [qbRealmId, setQbRealmId] = useState<string | null>(null);
   const [unsyncingFromQB, setUnsyncingFromQB] = useState(false);
   const [showUnsyncDialog, setShowUnsyncDialog] = useState(false);
+  const [pullingPayments, setPullingPayments] = useState(false);
   const {
     syncInvoice,
     checkConnection
@@ -959,6 +960,59 @@ const InvoiceDetail = () => {
       setSyncingPayment(null);
     }
   };
+
+  const handlePullPayments = async () => {
+    setPullingPayments(true);
+    try {
+      const isConnected = await checkConnection();
+      if (!isConnected) {
+        toast({
+          title: "Not Connected",
+          description: "QuickBooks is not connected. Please connect in Settings.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!invoice?.quickbooks_id) {
+        toast({
+          title: "Invoice Not Synced",
+          description: "Invoice must be synced to QuickBooks first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('quickbooks-pull-payments', {
+        body: { invoiceId }
+      });
+
+      if (error) throw error;
+      
+      if (data?.newPaymentsCount > 0) {
+        toast({
+          title: "Payments Imported",
+          description: data.message
+        });
+        // Refresh to show new payments
+        fetchInvoiceDetails();
+      } else {
+        toast({
+          title: "No New Payments",
+          description: "No new payments found in QuickBooks for this invoice."
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Pull Failed",
+        description: error.message || "Failed to pull payments from QuickBooks",
+        variant: "destructive"
+      });
+    } finally {
+      setPullingPayments(false);
+    }
+  };
+
   const handleCloseInvoice = async () => {
     if (!confirm('Mark this invoice as closed? This indicates the blanket order is complete.')) {
       return;
@@ -1915,8 +1969,29 @@ const InvoiceDetail = () => {
       {/* Payment History */}
       <Card className="shadow-lg">
         <CardContent className="p-8">
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold mb-4">Payment History</h2>
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Payment History</h2>
+            {isVibeAdmin && invoice?.quickbooks_id && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handlePullPayments} 
+                disabled={pullingPayments}
+                className="gap-2"
+              >
+                {pullingPayments ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Checking QBO...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    Pull Payments from QBO
+                  </>
+                )}
+              </Button>
+            )}
             
             {/* Billing Against Blanket Invoice */}
             {(() => {
