@@ -592,11 +592,29 @@ Return ONLY valid JSON in this format:
         // ignore logging issues
       }
 
+      // Build the final product name with template prefix when matched
+      let finalName = poName;
+      if (matched) {
+        // Extract variant label from PO line (e.g., "Fire - Blue Dream" from "BAG - Ion - Fire - Blue Dream")
+        const variantLabel = buildVariantLabelFromPoLine(poName);
+        // Build full name: "WA Ion Bags - Fire - Blue Dream" (Template Name + Variant)
+        if (variantLabel && !variantLabel.toLowerCase().includes(matched.name.toLowerCase())) {
+          // Format variant label with proper casing (Title Case)
+          const formattedVariant = variantLabel
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+          finalName = `${matched.name} - ${formattedVariant}`;
+        } else {
+          // Variant already contains template name or is empty, just use template name + cleaned variant
+          finalName = variantLabel ? `${matched.name} - ${variantLabel.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}` : matched.name;
+        }
+      }
+
       return {
         ...p,
-        // Only rename to the template name when it truly matches the PO identifiers.
-        // Otherwise keep the PO-derived name so you don't end up with generic names like "AZ Sleeves".
-        name: matched ? matched.name : poName,
+        // Use the full product name with template prefix and variant
+        name: finalName,
         state: state || p?.state || null,
         suggested_template: matched ? matched.name : (p?.suggested_template ?? null),
         template_id: matched ? matched.id : null,

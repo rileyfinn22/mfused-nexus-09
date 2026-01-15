@@ -313,9 +313,19 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
       const productsToInsert = selectedProducts.map(p => {
         const selectedTemplate = p.template_id ? templates.find(t => t.id === p.template_id) : null;
         
+        // Ensure product name has template prefix when template is assigned
+        let finalName = p.name;
+        if (selectedTemplate) {
+          const templatePrefix = `${selectedTemplate.name} - `;
+          // Only add prefix if it's not already there
+          if (!p.name.startsWith(templatePrefix)) {
+            finalName = `${selectedTemplate.name} - ${p.name}`;
+          }
+        }
+        
         return {
           company_id: companyId,
-          name: p.name,
+          name: finalName,
           // Always inherit template description when template is assigned
           description: selectedTemplate?.description || p.description || null,
           state: p.state || selectedTemplate?.state || null,
