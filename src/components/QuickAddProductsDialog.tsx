@@ -153,17 +153,23 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
 
       for (const name of names) {
         const tempSKU = generateTempSKU();
+        
+        // Prepend template name to product name when template is selected
+        const fullProductName = selectedTemplate 
+          ? `${selectedTemplate.name} - ${name}`
+          : name;
 
         const { data: product, error: productError } = await supabase
           .from('products')
           .insert({
-            name: name,
+            name: fullProductName,
             description: productDescription,
             cost: productCost,
             price: productPrice,
             state: productState,
             item_id: tempSKU,
-            company_id: finalCompanyId
+            company_id: finalCompanyId,
+            template_id: selectedTemplate?.id || null
           })
           .select()
           .single();
