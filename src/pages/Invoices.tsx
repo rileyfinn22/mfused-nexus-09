@@ -248,7 +248,15 @@ const Invoices = () => {
     let matchesStatus = true;
     if (statusFilter !== "all") {
       const computedStatus = getComputedStatus(invoice);
-      matchesStatus = computedStatus === statusFilter;
+      
+      // For parent invoices, also check if any children match the filter
+      if (!invoice.parent_invoice_id) {
+        const children = invoices.filter(inv => inv.parent_invoice_id === invoice.id);
+        const childrenMatch = children.some(child => getComputedStatus(child) === statusFilter);
+        matchesStatus = computedStatus === statusFilter || childrenMatch;
+      } else {
+        matchesStatus = computedStatus === statusFilter;
+      }
     }
     
     const matchesCompany = companyFilter === "all" || invoice.company_id === companyFilter;
