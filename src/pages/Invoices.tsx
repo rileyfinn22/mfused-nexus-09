@@ -749,7 +749,7 @@ const Invoices = () => {
                       onClick={async (e) => {
                         e.stopPropagation();
                         try {
-                          // Fetch order items for the PDF
+                          // Fetch order data
                           const { data: orderData } = await supabase
                             .from('orders')
                             .select(`
@@ -759,13 +759,44 @@ const Invoices = () => {
                             .eq('id', invoice.order_id)
                             .single();
                           
-                          if (orderData) {
-                            await generateInvoicePDF(invoice, orderData);
-                            toast({
-                              title: "Success",
-                              description: "Invoice PDF downloaded"
-                            });
+                          if (!orderData) return;
+
+                          // Fetch inventory allocations for THIS specific invoice
+                          const { data: allocationsData } = await supabase
+                            .from('inventory_allocations')
+                            .select(`
+                              quantity_allocated,
+                              order_items (
+                                id, sku, name, unit_price, line_number
+                              )
+                            `)
+                            .eq('invoice_id', invoice.id);
+
+                          // Build the correct items list based on allocations
+                          let itemsForPdf = orderData.order_items || [];
+                          
+                          if (allocationsData && allocationsData.length > 0) {
+                            // Use allocated quantities for this specific invoice
+                            itemsForPdf = allocationsData
+                              .sort((a, b) => (a.order_items?.line_number ?? 999) - (b.order_items?.line_number ?? 999))
+                              .map((alloc: any) => ({
+                                ...alloc.order_items,
+                                quantity: alloc.quantity_allocated,
+                                unit_price: alloc.order_items?.unit_price || 0
+                              }));
                           }
+
+                          // Create order data with correct items
+                          const orderForPdf = {
+                            ...orderData,
+                            order_items: itemsForPdf
+                          };
+                          
+                          await generateInvoicePDF(invoice, orderForPdf);
+                          toast({
+                            title: "Success",
+                            description: "Invoice PDF downloaded"
+                          });
                         } catch (error) {
                           console.error('Download error:', error);
                           toast({
