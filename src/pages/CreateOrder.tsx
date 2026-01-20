@@ -1498,20 +1498,18 @@ const CreateOrder = () => {
     }
   };
 
-  // Calculate subtotal from matched items
-  const matchedSubtotal = selectedItems.reduce((sum, item) => {
+  // Calculate total from ALL listed items (matched + unmatched)
+  const itemsSubtotal = selectedItems.reduce((sum, item) => {
     const product = products.find(p => p.id === item.productId);
-    // Use stored unit_price if available (from PO), otherwise use product cost
     const price = item.unit_price ?? product?.cost ?? 0;
     return sum + (price * item.quantity);
   }, 0);
   
-  // Calculate subtotal from unmatched PO items (these still contribute to the total)
   const unmatchedSubtotal = unmatchedPoItems.reduce((sum, item) => {
     return sum + (Number(item.total) || (Number(item.unit_price) * Number(item.quantity)) || 0);
   }, 0);
   
-  const subtotal = matchedSubtotal + unmatchedSubtotal;
+  const subtotal = itemsSubtotal + unmatchedSubtotal;
   const total = subtotal;
 
   // Show loading state while initializing
@@ -2428,20 +2426,6 @@ const CreateOrder = () => {
           {/* Totals */}
           <div className="flex justify-end">
             <div className="w-80 space-y-2">
-              {/* Show breakdown when there are unmatched items */}
-              {unmatchedPoItems.length > 0 && (
-                <>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Matched Items:</span>
-                    <span>${matchedSubtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-warning">
-                    <span>Unmatched Items:</span>
-                    <span>${unmatchedSubtotal.toFixed(2)}</span>
-                  </div>
-                  <Separator className="my-1" />
-                </>
-              )}
               <div className="flex justify-between">
                 <span className="font-semibold text-lg">Total:</span>
                 <span className="font-bold text-xl">${total.toFixed(2)}</span>

@@ -229,20 +229,19 @@ serve(async (req) => {
       if (!type1 || !type2) return true; // No type = compatible with anything
       if (type1 === type2) return true; // Exact match
       
-      // Define type equivalence groups
-      const bagLikeTypes = ['bag', 'pouch', '7g_pouch', '14g_pouch'];
-      const pouchTypes = ['pouch', 'pen_pouch', '7g_pouch', '14g_pouch'];
+      // Define type equivalence groups - bag/pouch are HIGHLY interchangeable in cannabis packaging
+      const bagPouchTypes = ['bag', 'pouch', '7g_pouch', '14g_pouch'];
+      const penPouchTypes = ['pen_pouch', 'pouch'];
       
-      // Bag and pouch variants are compatible
-      if (bagLikeTypes.includes(type1) && bagLikeTypes.includes(type2)) return true;
+      // Generic bag and pouch variants are fully compatible (7G Bag = 7G Pouch in practice)
+      if (bagPouchTypes.includes(type1) && bagPouchTypes.includes(type2)) return true;
       
-      // Specific pouch types match generic pouch
-      if (type1 === 'pouch' && pouchTypes.includes(type2)) return true;
-      if (type2 === 'pouch' && pouchTypes.includes(type1)) return true;
+      // Pen pouch is compatible with generic pouch
+      if (penPouchTypes.includes(type1) && penPouchTypes.includes(type2)) return true;
       
-      // ion_bag matches bag types
-      if (type1 === 'ion_bag' && (type2 === 'ion_bag' || type2 === 'bag')) return true;
-      if (type2 === 'ion_bag' && (type1 === 'ion_bag' || type1 === 'bag')) return true;
+      // ion_bag matches bag/pouch types
+      if (type1 === 'ion_bag' && (type2 === 'bag' || type2 === 'pouch')) return true;
+      if (type2 === 'ion_bag' && (type1 === 'bag' || type1 === 'pouch')) return true;
       
       return false;
     };
@@ -607,7 +606,7 @@ Return ONLY valid JSON:
         console.log(`  No state/type/tokens extracted, falling back to fuzzy match`);
       }
 
-      // STEP 2: Score each product based on State + Type + Token overlap
+      // STEP 2: Score each product based on State + Type + Token overlap + Brand
       let bestMatch: typeof products[0] | null = null;
       let bestScore = 0;
 
@@ -642,10 +641,30 @@ Return ONLY valid JSON:
           score += 10; // Extra boost for exact type match
         }
 
-        // Token matching - this is the key differentiator
-        if (poTokens.length > 0 && productTokens.length > 0) {
-          const matchingTokens = poTokens.filter(pt => productTokens.includes(pt));
-          const tokenCoverage = matchingTokens.length / productTokens.length;
+        // Brand/product line matching - CRITICAL for correct matching
+        // Check if the key brand identifiers match (anthos, frx, rebel, cc, etc.)
+        const poBrands = poTokens.filter(t => IMPORTANT_PRODUCT_LINES.includes(t.toLowerCase()));
+        const productBrands = productTokens.filter(t => IMPORTANT_PRODUCT_LINES.includes(t.toLowerCase()));
+        
+        if (poBrands.length > 0) {
+          const brandMatch = poBrands.some(pb => productBrands.includes(pb));
+          if (brandMatch) {
+            score += 40; // STRONG boost for matching brand - this is the most important differentiator
+            console.log(`    Brand match: ${poBrands.join(',')} matches ${productBrands.join(',')}`);
+          } else if (productBrands.length > 0) {
+            // Different brand = significant penalty but don't skip (might still be best match)
+            score -= 50;
+            console.log(`    Brand MISMATCH: PO wants ${poBrands.join(',')} but product is ${productBrands.join(',')}`);
+          }
+        }
+
+        // Token matching - this is the key differentiator (excluding brands already counted)
+        const poNonBrandTokens = poTokens.filter(t => !IMPORTANT_PRODUCT_LINES.includes(t.toLowerCase()));
+        const productNonBrandTokens = productTokens.filter(t => !IMPORTANT_PRODUCT_LINES.includes(t.toLowerCase()));
+        
+        if (poNonBrandTokens.length > 0 && productNonBrandTokens.length > 0) {
+          const matchingTokens = poNonBrandTokens.filter(pt => productNonBrandTokens.includes(pt));
+          const tokenCoverage = matchingTokens.length / Math.max(productNonBrandTokens.length, 1);
           const tokenScore = matchingTokens.length * 10 + (tokenCoverage * 20);
           score += tokenScore;
           
@@ -655,19 +674,19 @@ Return ONLY valid JSON:
           if (poColors.length > 0 && productColors.length > 0) {
             const colorMatch = poColors.some(pc => productColors.includes(pc));
             if (colorMatch) {
-              score += 20; // Strong boost for matching color
+              score += 25; // Strong boost for matching color
+              console.log(`    Color match: ${poColors.join(',')} matches ${productColors.join(',')}`);
             } else {
-              score -= 30; // Strong penalty for mismatched color
+              score -= 40; // Strong penalty for mismatched color - wrong color variant
+              console.log(`    Color MISMATCH: PO wants ${poColors.join(',')} but product is ${productColors.join(',')}`);
             }
+          } else if (productColors.length > 0 && poColors.length === 0) {
+            // Product has color but PO doesn't specify - slight preference for non-color variants
+            score -= 5;
           }
-
-          // Require at least 50% of product tokens to be present in PO
-          if (tokenCoverage < 0.5 && productTokens.length > 1) {
-            continue;
-          }
-        } else if (productTokens.length > 0 && poTokens.length === 0) {
-          // PO has no tokens but product does - weak match
-          score -= 10;
+        } else if (productNonBrandTokens.length > 0 && poNonBrandTokens.length === 0) {
+          // PO has no extra tokens but product does - slight penalty
+          score -= 5;
         }
 
         if (score > bestScore) {
