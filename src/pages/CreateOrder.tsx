@@ -1278,14 +1278,23 @@ const CreateOrder = () => {
         companyId = userRole.company_id;
       }
 
-      let subtotal = 0;
+      // Calculate subtotal from matched items
+      let matchedSubtotal = 0;
       for (const item of selectedItems) {
         const product = products.find(p => p.id === item.productId);
-        // Use stored unit_price if available (from PO), otherwise use product cost
         const price = item.unit_price ?? product?.cost ?? 0;
-        subtotal += price * item.quantity;
+        matchedSubtotal += price * item.quantity;
+      }
+      
+      // Add unmatched items to subtotal (qty * unit_price)
+      let unmatchedSubtotalSave = 0;
+      for (const item of unmatchedPoItems) {
+        const qty = Number(item.quantity) || 0;
+        const unit = Number(item.unit_price) || 0;
+        unmatchedSubtotalSave += qty * unit;
       }
 
+      const subtotal = matchedSubtotal + unmatchedSubtotalSave;
       const total = subtotal;
 
       let order;
