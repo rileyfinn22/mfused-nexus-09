@@ -1506,7 +1506,10 @@ const CreateOrder = () => {
   }, 0);
   
   const unmatchedSubtotal = unmatchedPoItems.reduce((sum, item) => {
-    return sum + (Number(item.total) || (Number(item.unit_price) * Number(item.quantity)) || 0);
+    // Always compute from qty * unit price (ignore any AI-provided `total` field)
+    const qty = Number(item.quantity) || 0;
+    const unit = Number(item.unit_price) || 0;
+    return sum + (qty * unit);
   }, 0);
   
   const subtotal = itemsSubtotal + unmatchedSubtotal;
