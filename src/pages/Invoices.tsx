@@ -36,6 +36,7 @@ const Invoices = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
+  const [collapsedWhileFiltering, setCollapsedWhileFiltering] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     checkRole();
@@ -47,6 +48,11 @@ const Invoices = () => {
     }
     fetchInvoices();
   }, [isVibeAdmin]);
+
+  // Clear collapsed state when filter changes
+  useEffect(() => {
+    setCollapsedWhileFiltering(new Set());
+  }, [statusFilter]);
 
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -151,16 +157,30 @@ const Invoices = () => {
     return Math.floor(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const toggleExpanded = (invoiceId: string) => {
-    setExpandedInvoices(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(invoiceId)) {
-        newSet.delete(invoiceId);
-      } else {
-        newSet.add(invoiceId);
-      }
-      return newSet;
-    });
+  const toggleExpanded = (invoiceId: string, childrenMatchFilter: boolean = false) => {
+    if (childrenMatchFilter) {
+      // When filtering, track collapsed state separately
+      setCollapsedWhileFiltering(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(invoiceId)) {
+          newSet.delete(invoiceId);
+        } else {
+          newSet.add(invoiceId);
+        }
+        return newSet;
+      });
+    } else {
+      // Normal expand/collapse behavior
+      setExpandedInvoices(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(invoiceId)) {
+          newSet.delete(invoiceId);
+        } else {
+          newSet.add(invoiceId);
+        }
+        return newSet;
+      });
+    }
   };
 
   const hasOverdueChildren = (parentId: string) => {
@@ -274,16 +294,32 @@ const Invoices = () => {
     }));
 
   // Create display list based on expansion state
-  // Auto-expand parents when filtering by status and children match that status
+  // Auto-expand parents when filtering by status and children match that status (but allow manual collapse)
   const displayInvoices = invoiceGroups.flatMap(group => {
-    const items = [{ invoice: group.parent, isParent: true, isChild: false, hasChildren: group.children.length > 0 }];
-    
-    // Auto-expand if filtering by status and children match that status, OR if manually expanded
     const childrenMatchFilter = statusFilter !== "all" && group.children.some(child => getComputedStatus(child) === statusFilter);
-    const shouldShowChildren = expandedInvoices.has(group.parent.id) || childrenMatchFilter;
     
-    if (shouldShowChildren) {
-      items.push(...group.children.map(child => ({ invoice: child, isParent: false, isChild: true, hasChildren: false })));
+    // Determine if expanded: manually expanded, OR (children match filter AND not manually collapsed)
+    const isExpanded = expandedInvoices.has(group.parent.id) || 
+      (childrenMatchFilter && !collapsedWhileFiltering.has(group.parent.id));
+    
+    const items = [{ 
+      invoice: group.parent, 
+      isParent: true, 
+      isChild: false, 
+      hasChildren: group.children.length > 0,
+      isExpanded,
+      childrenMatchFilter
+    }];
+    
+    if (isExpanded) {
+      items.push(...group.children.map(child => ({ 
+        invoice: child, 
+        isParent: false, 
+        isChild: true, 
+        hasChildren: false,
+        isExpanded: false,
+        childrenMatchFilter: false
+      })));
     }
     
     return items;
@@ -468,10 +504,9 @@ const Invoices = () => {
               No invoices found matching your criteria.
             </div>
           ) : (
-            displayInvoices.map(({ invoice, isParent, isChild, hasChildren }) => {
+            displayInvoices.map(({ invoice, isParent, isChild, hasChildren, isExpanded, childrenMatchFilter }) => {
               const StatusIcon = getStatusIcon(invoice);
               const daysUntilDue = invoice.due_date ? getDaysUntilDue(invoice.due_date) : null;
-              const isExpanded = expandedInvoices.has(invoice.id);
               const showOverdueAlert = isParent && hasChildren && hasOverdueChildren(invoice.id);
               
               // Get priority status from children for parent display
@@ -508,7 +543,7 @@ const Invoices = () => {
                           className={`h-7 px-2 gap-1 ${getDropdownButtonColors()}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleExpanded(invoice.id);
+                            toggleExpanded(invoice.id, childrenMatchFilter);
                           }}
                         >
                           {isExpanded ? (
