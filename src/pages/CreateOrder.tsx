@@ -1457,6 +1457,39 @@ const CreateOrder = () => {
             .delete()
             .in('id', itemsToDelete.map(i => i.id));
         }
+
+        // Keep unmatched (product_id is null) line items in sync with the UI
+        await supabase
+          .from('order_items')
+          .delete()
+          .eq('order_id', order.id)
+          .is('product_id', null);
+
+        if (unmatchedPoItems.length > 0) {
+          const unmatchedOrderItems = unmatchedPoItems.map((item: any) => {
+            const qty = Number(item.quantity) || 0;
+            const unit = Number(item.unit_price) || 0;
+
+            return {
+              order_id: order.id,
+              product_id: null,
+              sku: item.sku || 'UNKNOWN',
+              item_id: item.item_id || null,
+              name: item.name || item.description || 'Unmatched Item',
+              description: item.description || null,
+              quantity: qty,
+              shipped_quantity: 0,
+              unit_price: unit,
+              total: qty * unit,
+            };
+          });
+
+          const { error: unmatchedInsertError } = await supabase
+            .from('order_items')
+            .insert(unmatchedOrderItems);
+
+          if (unmatchedInsertError) throw unmatchedInsertError;
+        }
       } else {
         // New order - insert all items
         const orderItems = selectedItems.map(item => {
@@ -1478,9 +1511,27 @@ const CreateOrder = () => {
           };
         });
 
+        const unmatchedOrderItems = unmatchedPoItems.map((item: any) => {
+          const qty = Number(item.quantity) || 0;
+          const unit = Number(item.unit_price) || 0;
+
+          return {
+            order_id: order.id,
+            product_id: null,
+            sku: item.sku || 'UNKNOWN',
+            item_id: item.item_id || null,
+            name: item.name || item.description || 'Unmatched Item',
+            description: item.description || null,
+            quantity: qty,
+            shipped_quantity: 0,
+            unit_price: unit,
+            total: qty * unit,
+          };
+        });
+
         const { error: itemsError } = await supabase
           .from('order_items')
-          .insert(orderItems);
+          .insert([...orderItems, ...unmatchedOrderItems]);
 
         if (itemsError) throw itemsError;
       }
