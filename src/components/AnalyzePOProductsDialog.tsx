@@ -377,6 +377,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
 
   const selectedCount = extractedProducts.filter(p => p.selected).length;
   const templatedCount = extractedProducts.filter(p => p.selected && p.template_id).length;
+  const singleCount = extractedProducts.filter(p => p.selected && !p.template_id).length;
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => isOpen ? setOpen(true) : handleClose()}>
@@ -519,7 +520,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                 <span className="text-sm">Select all</span>
               </div>
               <div className="text-sm text-muted-foreground">
-                {selectedCount} selected · {templatedCount} with templates
+                {selectedCount} selected · {templatedCount} templated · {singleCount} single
               </div>
             </div>
 
@@ -560,15 +561,18 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                         <div className="flex items-center gap-2">
                           <FolderTree className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                           <Select 
-                            value={product.template_id || "none"} 
-                            onValueChange={(val) => updateProductTemplate(index, val === "none" ? null : val)}
+                            value={product.template_id || "single"} 
+                            onValueChange={(val) => updateProductTemplate(index, val === "single" ? null : val)}
                           >
                             <SelectTrigger className="h-8 text-xs">
                               <SelectValue placeholder="Assign to template" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="none">
-                                <span className="text-muted-foreground">No template</span>
+                              <SelectItem value="single">
+                                <span className="flex items-center gap-1.5">
+                                  <Package className="h-3 w-3" />
+                                  Single Product (no template)
+                                </span>
                               </SelectItem>
                               {templates.map((template) => (
                                 <SelectItem key={template.id} value={template.id}>
@@ -577,8 +581,10 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                               ))}
                             </SelectContent>
                           </Select>
-                          {product.template_id && (
+                          {product.template_id ? (
                             <Check className="h-4 w-4 text-success shrink-0" />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Single</span>
                           )}
                         </div>
                       </div>
