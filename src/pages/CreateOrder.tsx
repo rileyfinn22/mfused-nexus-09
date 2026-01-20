@@ -54,6 +54,10 @@ interface OrderItem {
   productId: string;
   quantity: number;
   unit_price?: number; // Preserve PO prices
+  // Fallback display fields (when product catalog list doesn't include this product, e.g. query limits)
+  name?: string;
+  item_id?: string | null;
+  description?: string | null;
 }
 
 const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[] => {
@@ -66,6 +70,10 @@ const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[]
     const existing = merged.get(key);
     if (existing) {
       existing.quantity += item.quantity;
+      // Keep the most informative metadata
+      existing.name = existing.name || item.name;
+      existing.item_id = existing.item_id || item.item_id;
+      existing.description = existing.description || item.description;
     } else {
       merged.set(key, { ...item });
     }
@@ -572,6 +580,9 @@ const CreateOrder = () => {
                 productId: item.product_id,
                 quantity: item.quantity || 1,
                 unit_price: item.unit_price,
+                name: item.name || null,
+                item_id: item.item_id || null,
+                description: item.description || null,
               });
             } else {
               newUnmatched.push(item);
@@ -717,35 +728,27 @@ const CreateOrder = () => {
 
       // Add extracted products to order
       if (functionData?.items && Array.isArray(functionData.items)) {
-        const newItems: OrderItem[] = [];
+        const additions: OrderItem[] = [];
         const newUnmatched: any[] = [];
         
         for (const item of functionData.items) {
           if (item.product_id) {
-            // Check if already in selected items
-            const existingIdx = selectedItems.findIndex(si => si.productId === item.product_id);
-            if (existingIdx >= 0) {
-              // Add quantity to existing
-              setSelectedItems(prev => prev.map((si, idx) => 
-                idx === existingIdx 
-                  ? { ...si, quantity: si.quantity + (item.quantity || 1) }
-                  : si
-              ));
-            } else {
-              newItems.push({
-                productId: item.product_id,
-                quantity: item.quantity || 1,
-                unit_price: item.unit_price,
-              });
-            }
+            additions.push({
+              productId: item.product_id,
+              quantity: item.quantity || 1,
+              unit_price: item.unit_price,
+              name: item.name || null,
+              item_id: item.item_id || null,
+              description: item.description || null,
+            });
           } else {
             // Unmatched item
             newUnmatched.push(item);
           }
         }
         
-        if (newItems.length > 0) {
-          setSelectedItems(prev => [...prev, ...newItems]);
+        if (additions.length > 0) {
+          setSelectedItems((prev) => mergeOrderItems(prev, additions));
         }
         if (newUnmatched.length > 0) {
           setUnmatchedPoItems(prev => [...prev, ...newUnmatched]);
@@ -896,6 +899,9 @@ const CreateOrder = () => {
           productId: item.product_id,
           quantity: item.quantity,
           unit_price: item.unit_price, // Preserve PO prices
+          name: item.name || null,
+          item_id: item.item_id || null,
+          description: item.description || null,
         }));
       setSelectedItems(mergeOrderItems([], items));
       
@@ -2265,11 +2271,17 @@ const CreateOrder = () => {
               <TableBody>
                 {selectedItems.map((item) => {
                   const product = products.find(p => p.id === item.productId);
-                  if (!product) return null;
-                  // Use stored unit_price if available (from PO), otherwise use product cost
-                  const price = item.unit_price ?? product.cost ?? 0;
+                  // IMPORTANT: the total uses ALL selectedItems, so we must render rows even if the
+                  // product isn't currently in the loaded product list (e.g. query limit).
+                  const price = Number(item.unit_price ?? product?.cost ?? 0);
                   const amount = price * item.quantity;
                   const itemKey = getItemKey(item);
+
+                  const displayItemId = product?.item_id ?? item.item_id ?? '-';
+                  const displayName = product
+                    ? (product.state ? `${product.state} - ${product.name}` : product.name)
+                    : (item.name || `Product ${item.productId.substring(0, 8)}`);
+                  const displayDescription = product?.description ?? item.description ?? null;
                   
                   return (
                     <TableRow key={itemKey}>
@@ -2284,12 +2296,12 @@ const CreateOrder = () => {
                           <X className="h-4 w-4" />
                         </Button>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{product.item_id || '-'}</TableCell>
+                      <TableCell className="font-mono text-xs">{displayItemId}</TableCell>
                       <TableCell className="font-medium">
-                        {product.state ? `${product.state} - ${product.name}` : product.name}
+                        {displayName}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                        {product.description}
+                        {displayDescription}
                       </TableCell>
                       <TableCell>
                         {editingQuantityId === itemKey ? (
