@@ -705,31 +705,127 @@ const InvoiceDetail = () => {
     });
   };
 
-  const handleDownloadPackingList = () => {
+  const handleDownloadPackingList = async () => {
     if (!invoice || !order) return;
     
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     
-    // Add branding header
-    const headerY = addPdfBrandingSync(doc, { documentTitle: 'PACKING LIST' });
+    // Colors - match invoice PDF style
+    const primaryGreen = [76, 175, 80];
+    const darkGray = [51, 51, 51];
+    const mediumGray = [100, 100, 100];
+    const lightGray = [248, 248, 248];
     
-    let yPos = headerY + 5;
-    doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`Invoice: ${invoice.invoice_number}`, 14, yPos);
-    doc.text(`Order: ${order.order_number}`, 14, yPos + 7);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, yPos + 14);
+    // ============ HEADER SECTION ============
+    let yPos = 15;
     
-    // Ship To
-    yPos += 28;
+    // Company name and address on left
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('Ship To:', 14, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.text(order.shipping_name || '', 14, yPos + 7);
-    doc.text(order.shipping_street || '', 14, yPos + 14);
-    doc.text(`${order.shipping_city || ''}, ${order.shipping_state || ''} ${order.shipping_zip || ''}`, 14, yPos + 21);
+    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+    doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
     
-    // Items table - use editedItems which has the correct allocated quantities
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+    doc.text('1415 S 700 W', 14, yPos + 7);
+    doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
+    doc.text('www.vibepkg.com', 14, yPos + 17);
+    
+    // Logo on right side
+    try {
+      const logoResponse = await fetch('/images/vibe-logo.png');
+      const logoBlob = await logoResponse.blob();
+      const logoBase64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(logoBlob);
+      });
+      doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
+    } catch (error) {
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.text('VIBE', pageWidth - 14, yPos + 8, { align: 'right' });
+    }
+    
+    yPos += 28;
+    
+    // Divider line
+    doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+    doc.setLineWidth(0.5);
+    doc.line(14, yPos, pageWidth - 14, yPos);
+    
+    yPos += 12;
+    
+    // ============ PACKING LIST TITLE ============
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+    doc.text('Packing List', 14, yPos);
+    
+    yPos += 15;
+    
+    // ============ SHIP TO & DETAILS SECTION ============
+    const leftColX = 14;
+    const rightColX = pageWidth / 2 + 10;
+    
+    // Ship To section
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+    doc.text('Ship to', leftColX, yPos);
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+    doc.text(order.shipping_name || '', leftColX, yPos + 8);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+    
+    let shipY = yPos + 14;
+    if (order.shipping_street) {
+      doc.text(order.shipping_street, leftColX, shipY);
+      shipY += 5;
+    }
+    doc.text(`${order.shipping_city || ''}, ${order.shipping_state || ''} ${order.shipping_zip || ''}`, leftColX, shipY);
+    
+    // Details on right
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+    
+    const detailsStartY = yPos;
+    doc.text('Invoice #:', rightColX, detailsStartY);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+    doc.text(invoice.invoice_number, rightColX + 45, detailsStartY);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+    doc.text('Order #:', rightColX, detailsStartY + 7);
+    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+    doc.text(order.order_number, rightColX + 45, detailsStartY + 7);
+    
+    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+    doc.text('Date:', rightColX, detailsStartY + 14);
+    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+    doc.text(format(new Date(), 'MMM d, yyyy'), rightColX + 45, detailsStartY + 14);
+    
+    if (order.po_number) {
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text('PO #:', rightColX, detailsStartY + 21);
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text(order.po_number, rightColX + 45, detailsStartY + 21);
+    }
+    
+    yPos += 40;
+    
+    // ============ ITEMS TABLE ============
     const itemsForPacking = editedItems.length > 0 ? editedItems : (order?.order_items || []);
     const tableData = itemsForPacking.map((item: any) => [
       item.item_id || 'N/A',
@@ -739,25 +835,51 @@ const InvoiceDetail = () => {
     ]);
     
     autoTable(doc, {
-      head: [['Item ID', 'SKU', 'Description', 'Quantity']],
+      startY: yPos,
+      head: [['ITEM ID', 'SKU', 'DESCRIPTION', 'QTY']],
       body: tableData,
-      startY: yPos + 35,
-      theme: 'grid',
-      headStyles: { fillColor: [76, 175, 80] },
-      styles: {
+      theme: 'plain',
+      headStyles: { 
+        fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]], 
+        textColor: 255,
+        fontStyle: 'bold',
         fontSize: 9,
         cellPadding: 4
-      }
+      },
+      bodyStyles: {
+        fontSize: 9,
+        cellPadding: 4,
+        textColor: [darkGray[0], darkGray[1], darkGray[2]],
+        lineWidth: 0
+      },
+      alternateRowStyles: {
+        fillColor: [lightGray[0], lightGray[1], lightGray[2]]
+      },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 85 },
+        3: { cellWidth: 25, halign: 'center' }
+      },
+      margin: { left: 14, right: 14 },
+      showHead: 'firstPage',
+      tableLineWidth: 0
     });
     
     // Summary
     const totalItems = itemsForPacking.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
     const tableEndY = (doc as any).lastAutoTable.finalY + 15;
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Total Items: ${totalItems.toLocaleString()}`, 14, tableEndY);
     
-    // Footer
-    addPdfFooter(doc);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+    doc.text(`Total Quantity: ${totalItems.toLocaleString()}`, 14, tableEndY);
+    
+    // ============ FOOTER ============
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+    doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
     
     doc.save(`packing-list-${invoice.invoice_number}.pdf`);
     
