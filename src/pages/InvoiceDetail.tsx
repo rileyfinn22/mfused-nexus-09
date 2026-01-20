@@ -705,6 +705,68 @@ const InvoiceDetail = () => {
     });
   };
 
+  const handleDownloadPackingList = () => {
+    if (!invoice || !order) return;
+    
+    const doc = new jsPDF();
+    
+    // Add branding header
+    const headerY = addPdfBrandingSync(doc, { documentTitle: 'PACKING LIST' });
+    
+    let yPos = headerY + 5;
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Invoice: ${invoice.invoice_number}`, 14, yPos);
+    doc.text(`Order: ${order.order_number}`, 14, yPos + 7);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, yPos + 14);
+    
+    // Ship To
+    yPos += 28;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Ship To:', 14, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(order.shipping_name || '', 14, yPos + 7);
+    doc.text(order.shipping_street || '', 14, yPos + 14);
+    doc.text(`${order.shipping_city || ''}, ${order.shipping_state || ''} ${order.shipping_zip || ''}`, 14, yPos + 21);
+    
+    // Items table - use editedItems which has the correct allocated quantities
+    const itemsForPacking = editedItems.length > 0 ? editedItems : (order?.order_items || []);
+    const tableData = itemsForPacking.map((item: any) => [
+      item.item_id || 'N/A',
+      item.sku || '',
+      item.name || '',
+      (item.quantity || 0).toLocaleString()
+    ]);
+    
+    autoTable(doc, {
+      head: [['Item ID', 'SKU', 'Description', 'Quantity']],
+      body: tableData,
+      startY: yPos + 35,
+      theme: 'grid',
+      headStyles: { fillColor: [76, 175, 80] },
+      styles: {
+        fontSize: 9,
+        cellPadding: 4
+      }
+    });
+    
+    // Summary
+    const totalItems = itemsForPacking.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+    const tableEndY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total Items: ${totalItems.toLocaleString()}`, 14, tableEndY);
+    
+    // Footer
+    addPdfFooter(doc);
+    
+    doc.save(`packing-list-${invoice.invoice_number}.pdf`);
+    
+    toast({
+      title: "Packing List Downloaded",
+      description: `Packing list for ${invoice.invoice_number} has been downloaded`
+    });
+  };
+
   const handleSaveQuantities = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1251,8 +1313,14 @@ const InvoiceDetail = () => {
           )}
           <Button onClick={handleDownloadPDF}>
             <Download className="h-4 w-4 mr-2" />
-            Download PDF
+            Download Invoice
           </Button>
+          {(invoice.invoice_type === 'partial' || invoice.parent_invoice_id) && (
+            <Button variant="outline" onClick={handleDownloadPackingList}>
+              <FileText className="h-4 w-4 mr-2" />
+              Download Packing List
+            </Button>
+          )}
         </div>
       </div>
 
