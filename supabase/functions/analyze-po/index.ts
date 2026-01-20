@@ -168,7 +168,7 @@ serve(async (req) => {
 
     // All product types we support - ORDER MATTERS: more specific types first!
     // "ion_bag" must come before "bag" since Ion Bags are a distinct product family
-    type ProductType = 'sleeve' | 'ion_bag' | 'bag' | 'box' | 'tin' | 'merch_pack' | 'fatty' | 'fatty_bag_5pk' | 'fatty_bag_2pk' | 'vape_bag' | 'live_line_bag' | null;
+    type ProductType = 'sleeve' | 'ion_bag' | 'bag' | 'pouch' | 'box' | 'tin' | 'merch_pack' | 'fatty' | 'fatty_bag_5pk' | 'fatty_bag_2pk' | 'vape_bag' | 'live_line_bag' | 'pen_pouch' | '7g_pouch' | '14g_pouch' | 'label' | 'jar' | null;
     const PRODUCT_TYPE_PATTERNS: { type: ProductType; patterns: RegExp[] }[] = [
       // Combined product families (most specific first)
       { type: 'ion_bag', patterns: [/\bion\s*bags?\b/i, /\bbag\s*-?\s*ion\b/i, /\bion\b.*\bbag\b/i, /\bbag\b.*\bion\b/i] },
@@ -176,11 +176,18 @@ serve(async (req) => {
       { type: 'fatty_bag_2pk', patterns: [/\bfatty.*2\s*(?:pk|pack)\b/i, /\b2\s*(?:pk|pack).*fatty\b/i, /\bfatty.*\(2\s*x/i] },
       { type: 'vape_bag', patterns: [/\bvape\s*bags?\b/i] },
       { type: 'live_line_bag', patterns: [/\blive\s*line\s*bags?\b/i] },
+      // Specific pouch types (must come before generic pouch)
+      { type: 'pen_pouch', patterns: [/\bpen\s*pouch\b/i, /\bpouch\b.*\bpen\b/i] },
+      { type: '7g_pouch', patterns: [/\b7g?\s*pouch\b/i, /\bpouch\b.*\b7g?\b/i, /\b7\s*g\s*pouch\b/i] },
+      { type: '14g_pouch', patterns: [/\b14g?\s*pouch\b/i, /\bpouch\b.*\b14g?\b/i, /\b14\s*g\s*pouch\b/i, /\bflower.*label.*pouch\b/i] },
       // Base types
       { type: 'sleeve', patterns: [/\bsleeves?\b/i] },
+      { type: 'pouch', patterns: [/\bpouch(?:es)?\b/i] },
       { type: 'bag', patterns: [/\bbags?\b/i] },
       { type: 'box', patterns: [/\bbox(?:es)?\b/i] },
       { type: 'tin', patterns: [/\btins?\b/i] },
+      { type: 'jar', patterns: [/\bjars?\b/i] },
+      { type: 'label', patterns: [/\blabels?\b/i] },
       { type: 'merch_pack', patterns: [/\bmerch\s*packs?\b/i, /\bmerchandise\s*packs?\b/i, /\bion\s*merch\b/i] },
       { type: 'fatty', patterns: [/\bfatty\b/i, /\bfattys\b/i, /\bfatties\b/i] },
     ];
@@ -201,14 +208,43 @@ serve(async (req) => {
         'fatty_bag_2pk': '2pk fatty bags',
         'vape_bag': 'vape bags',
         'live_line_bag': 'live line bags',
+        'pen_pouch': 'pen pouch',
+        '7g_pouch': '7g pouch',
+        '14g_pouch': '14g pouch',
         'sleeve': 'sleeve',
+        'pouch': 'pouch',
         'bag': 'bag',
         'box': 'box',
         'tin': 'tin',
+        'jar': 'jar',
+        'label': 'label',
         'merch_pack': 'merch pack',
         'fatty': 'fatty',
       };
       return map[type || ''] || null;
+    };
+    
+    // Check if two product types are compatible (e.g., bag and pouch are often used interchangeably)
+    const areTypesCompatible = (type1: ProductType, type2: ProductType): boolean => {
+      if (!type1 || !type2) return true; // No type = compatible with anything
+      if (type1 === type2) return true; // Exact match
+      
+      // Define type equivalence groups
+      const bagLikeTypes = ['bag', 'pouch', '7g_pouch', '14g_pouch'];
+      const pouchTypes = ['pouch', 'pen_pouch', '7g_pouch', '14g_pouch'];
+      
+      // Bag and pouch variants are compatible
+      if (bagLikeTypes.includes(type1) && bagLikeTypes.includes(type2)) return true;
+      
+      // Specific pouch types match generic pouch
+      if (type1 === 'pouch' && pouchTypes.includes(type2)) return true;
+      if (type2 === 'pouch' && pouchTypes.includes(type1)) return true;
+      
+      // ion_bag matches bag types
+      if (type1 === 'ion_bag' && (type2 === 'ion_bag' || type2 === 'bag')) return true;
+      if (type2 === 'ion_bag' && (type1 === 'ion_bag' || type1 === 'bag')) return true;
+      
+      return false;
     };
 
     const parseAnalysisHint = (hint: string | undefined | null): { forcedState: string | null; forcedType: ProductType } => {
@@ -239,7 +275,10 @@ serve(async (req) => {
     };
 
     // IMPORTANT: These are key product line identifiers that must NEVER be dropped
-    const IMPORTANT_PRODUCT_LINES = ['ion', 'fatty', 'vape', 'live', 'line', 'fire', 'atf'];
+    const IMPORTANT_PRODUCT_LINES = ['ion', 'fatty', 'vape', 'live', 'line', 'fire', 'atf', 'anthos', 'frx', 'rebel', 'cc'];
+    
+    // Color variants - CRITICAL for matching different color products
+    const COLOR_WORDS = ['blue', 'green', 'orange', 'red', 'purple', 'pink', 'black', 'white', 'yellow', 'gold', 'silver', 'brown', 'grey', 'gray'];
     
     // Common strain/flavor words that should be kept
     const STRAIN_WORDS = [
@@ -254,6 +293,8 @@ serve(async (req) => {
       const v = t.toLowerCase().trim();
       // Check if it's a known product line
       if (IMPORTANT_PRODUCT_LINES.includes(v)) return true;
+      // Check if it's a color word - CRITICAL for matching color variants
+      if (COLOR_WORDS.includes(v)) return true;
       // Check if it's a strain word
       if (STRAIN_WORDS.includes(v)) return true;
       return false;
@@ -302,8 +343,14 @@ serve(async (req) => {
         'sleeve': 'Sleeve',
         'ion_bag': 'Ion Bags',
         'bag': 'Bag',
+        'pouch': 'Pouch',
+        'pen_pouch': 'Pen Pouch',
+        '7g_pouch': '7G Pouch',
+        '14g_pouch': '14G Pouch',
         'box': 'Box',
         'tin': 'Tin',
+        'jar': 'Jar',
+        'label': 'Label',
         'merch_pack': 'Merch Pack',
         'fatty': 'Fatty',
         'fatty_bag_5pk': '5pk Fatty Bags',
@@ -581,23 +628,18 @@ Return ONLY valid JSON:
           }
         }
 
-        // Type matching - must be compatible types
+        // Type matching - must be compatible types (using improved areTypesCompatible function)
         if (poType) {
-          // Check if product type is compatible with PO type
-          const typesCompatible = (): boolean => {
-            if (!productType) return true; // Product has no type = could be anything
-            if (productType === poType) return true; // Exact match
-            // ion_bag matches any bag/ion product
-            if (poType === 'ion_bag' && (productType === 'ion_bag' || productType === 'bag')) return true;
-            if (productType === 'ion_bag' && poType === 'bag') return true;
-            return false;
-          };
-          
-          if (typesCompatible()) {
+          if (areTypesCompatible(poType, productType)) {
             score += productType === poType ? 25 : 15; // Full boost for exact, partial for compatible
           } else {
             continue; // Incompatible type = skip this product entirely
           }
+        }
+        
+        // Extra boost for specific type matches (pen_pouch vs 7g_pouch differentiation)
+        if (poType && productType && poType === productType) {
+          score += 10; // Extra boost for exact type match
         }
 
         // Token matching - this is the key differentiator
@@ -606,6 +648,18 @@ Return ONLY valid JSON:
           const tokenCoverage = matchingTokens.length / productTokens.length;
           const tokenScore = matchingTokens.length * 10 + (tokenCoverage * 20);
           score += tokenScore;
+          
+          // Extra boost for color matches - colors are critical for variant differentiation
+          const poColors = poTokens.filter(t => COLOR_WORDS.includes(t.toLowerCase()));
+          const productColors = productTokens.filter(t => COLOR_WORDS.includes(t.toLowerCase()));
+          if (poColors.length > 0 && productColors.length > 0) {
+            const colorMatch = poColors.some(pc => productColors.includes(pc));
+            if (colorMatch) {
+              score += 20; // Strong boost for matching color
+            } else {
+              score -= 30; // Strong penalty for mismatched color
+            }
+          }
 
           // Require at least 50% of product tokens to be present in PO
           if (tokenCoverage < 0.5 && productTokens.length > 1) {
