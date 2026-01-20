@@ -274,11 +274,15 @@ const Invoices = () => {
     }));
 
   // Create display list based on expansion state
+  // Auto-expand parents when filtering by status and children match that status
   const displayInvoices = invoiceGroups.flatMap(group => {
     const items = [{ invoice: group.parent, isParent: true, isChild: false, hasChildren: group.children.length > 0 }];
     
-    // Only show children if parent is expanded
-    if (expandedInvoices.has(group.parent.id)) {
+    // Auto-expand if filtering by status and children match that status, OR if manually expanded
+    const childrenMatchFilter = statusFilter !== "all" && group.children.some(child => getComputedStatus(child) === statusFilter);
+    const shouldShowChildren = expandedInvoices.has(group.parent.id) || childrenMatchFilter;
+    
+    if (shouldShowChildren) {
       items.push(...group.children.map(child => ({ invoice: child, isParent: false, isChild: true, hasChildren: false })));
     }
     
