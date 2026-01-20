@@ -550,7 +550,8 @@ Return ONLY valid JSON:
     
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id, item_id, name, description, preferred_vendor_id, cost, state')
+      // Include template name so matching can use template identity (brand/line) even when product name is a color variant.
+      .select('id, item_id, name, description, preferred_vendor_id, cost, state, template_id, product_templates(name)')
       .eq('company_id', companyId);
 
     if (productsError) {
@@ -583,9 +584,15 @@ Return ONLY valid JSON:
       };
 
       // STEP 0: Try exact/alphanumeric name match first (fast path)
-      const exactMatch = products.find(p => 
-        p.name && normalize(p.name) === normalize(poName)
-      );
+      // Match against product name OR template name.
+      const exactMatch = products.find((p: any) => {
+        const productName = p?.name || '';
+        const templateName = p?.product_templates?.name || '';
+        return (
+          (productName && normalize(productName) === normalize(poName)) ||
+          (templateName && normalize(templateName) === normalize(poName))
+        );
+      });
       if (exactMatch) {
         console.log(`✓ EXACT MATCH: "${poName}" -> "${exactMatch.name}"`);
         return exactMatch;
@@ -610,13 +617,16 @@ Return ONLY valid JSON:
       let bestMatch: typeof products[0] | null = null;
       let bestScore = 0;
 
-      for (const p of products) {
-        if (!p.name) continue;
+      for (const p of products as any[]) {
+        if (!p?.name) continue;
 
         let score = 0;
-        const productState = p.state?.toUpperCase() || extractStateFromAny(p.name);
-        const productType = extractTypeFromAny(p.name);
-        const productTokens = extractIdentifierTokens(p.name);
+        const templateName = p?.product_templates?.name || '';
+        const productTextForMatch = `${p.name || ''} ${templateName}`.trim();
+
+        const productState = p.state?.toUpperCase() || extractStateFromAny(productTextForMatch);
+        const productType = extractTypeFromAny(productTextForMatch);
+        const productTokens = extractIdentifierTokens(productTextForMatch);
 
         // State matching (required if PO has state)
         if (poState) {
@@ -652,9 +662,13 @@ Return ONLY valid JSON:
             score += 40; // STRONG boost for matching brand - this is the most important differentiator
             console.log(`    Brand match: ${poBrands.join(',')} matches ${productBrands.join(',')}`);
           } else if (productBrands.length > 0) {
-            // Different brand = significant penalty but don't skip (might still be best match)
-            score -= 50;
-            console.log(`    Brand MISMATCH: PO wants ${poBrands.join(',')} but product is ${productBrands.join(',')}`);
+            // If the product clearly belongs to a different line, don't match it.
+            // This is better than a "best of bad" match; it will surface as an unmatched line item.
+            console.log(`    Brand MISMATCH (skipping): PO wants ${poBrands.join(',')} but product is ${productBrands.join(',')}`);
+            continue;
+          } else {
+            // PO has a brand but product doesn't — allow, but don't boost.
+            score -= 10;
           }
         }
 
@@ -681,8 +695,9 @@ Return ONLY valid JSON:
               console.log(`    Color MISMATCH: PO wants ${poColors.join(',')} but product is ${productColors.join(',')}`);
             }
           } else if (productColors.length > 0 && poColors.length === 0) {
-            // Product has color but PO doesn't specify - slight preference for non-color variants
-            score -= 5;
+            // Product has a specific color but PO doesn't specify.
+            // Prefer non-color (base) products for ambiguous POs.
+            score -= 20;
           }
         } else if (productNonBrandTokens.length > 0 && poNonBrandTokens.length === 0) {
           // PO has no extra tokens but product does - slight penalty
@@ -705,13 +720,20 @@ Return ONLY valid JSON:
       // STEP 3: Fallback - Try exact match on item_id/SKU
       if (poItemId || poSku) {
         const idToMatch = poItemId || poSku;
-        console.log(`  Trying item_id/SKU match: "${idToMatch}"`);
+        const idNorm = String(idToMatch || '').toLowerCase().trim();
+
+        // Guard: AI sometimes puts color words in SKU. Don't use that as an ID match.
+        if (!idNorm || idNorm.length < 3 || COLOR_WORDS.includes(idNorm)) {
+          console.log(`  Skipping item_id/SKU match (not an ID): "${idToMatch}"`);
+        } else {
+          console.log(`  Trying item_id/SKU match: "${idToMatch}"`);
         const match = products.find(p => 
           p.item_id && p.item_id.toLowerCase().trim() === idToMatch.toLowerCase().trim()
         );
         if (match) {
           console.log(`✓ ITEM_ID MATCH: "${idToMatch}" -> "${match.name}"`);
           return match;
+        }
         }
       }
 
