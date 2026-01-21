@@ -385,13 +385,13 @@ const Orders = () => {
                   <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>Description</div>
                   <div className="col-span-1">Total</div>
                   <div className="col-span-1">Status</div>
-                  <div className="col-span-1">Due Date</div>
+                  <div className="col-span-1">Est. Delivery</div>
                   <div className="col-span-2">Actions</div>
                 </div>
               </div>
               <div className="divide-y divide-border">
                 {draftOrders.map((order) => {
-                  const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
+                  const estDelivery = order.estimated_delivery_date ? new Date(order.estimated_delivery_date).toLocaleDateString() : 'Not set';
                   const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                   const OrderIcon = orderTypeInfo.icon;
                   
@@ -426,7 +426,7 @@ const Orders = () => {
                         Draft
                       </div>
                       <div className="col-span-1 text-sm text-muted-foreground">
-                        {dueDate}
+                        {estDelivery}
                       </div>
                       <div className="col-span-2 flex gap-1">
                         <Button 
@@ -487,7 +487,7 @@ const Orders = () => {
                   <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>Description</div>
                   <div className="col-span-1">Total</div>
                   <div className="col-span-1">Checklist</div>
-                  <div className="col-span-1">Due Date</div>
+                  <div className="col-span-1">Est. Delivery</div>
                   <div className="col-span-2">Actions</div>
                 </div>
               </div>
@@ -501,7 +501,7 @@ const Orders = () => {
                   No pending orders
                 </div>
               ) : pendingOrdersList.map((order) => {
-                const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
+                const estDelivery = order.estimated_delivery_date ? new Date(order.estimated_delivery_date).toLocaleDateString() : 'Not set';
                 const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                 const OrderIcon = orderTypeInfo.icon;
                 
@@ -558,7 +558,7 @@ const Orders = () => {
                       </div>
                     </div>
                     <div className="col-span-1 text-sm text-muted-foreground">
-                      {dueDate}
+                      {estDelivery}
                     </div>
                     <div className="col-span-2 flex gap-1">
                       <Button 
@@ -629,7 +629,7 @@ const Orders = () => {
                 const progress = order.status === 'in production' && order.productionProgress !== undefined 
                   ? order.productionProgress 
                   : getProgressForStatus(order.status);
-                const dueDate = order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set';
+                const estDelivery = order.estimated_delivery_date ? new Date(order.estimated_delivery_date).toLocaleDateString() : 'Not set';
                 const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                 const OrderIcon = orderTypeInfo.icon;
                 
