@@ -155,14 +155,23 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
   }, [billableInvoices]);
 
   // Calculate summary totals
+  // Total Open = All blanket (parent) invoices - Total paid
   const summaryTotals = useMemo(() => {
-    const totalBilled = billableInvoices.reduce((sum, inv) => sum + inv.total, 0);
+    // Get all blanket/parent invoices (parent_invoice_id is null)
+    const blanketInvoices = invoices.filter(inv => inv.parent_invoice_id === null);
+    const totalBlankets = blanketInvoices.reduce((sum, inv) => sum + inv.total, 0);
+    
+    // Total paid comes from payments on QBO-synced invoices
     const totalPaid = billableInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
-    const outstanding = totalBilled - totalPaid;
+    
+    // Total Open = All blankets - Total paid
+    const outstanding = totalBlankets - totalPaid;
+    
+    // Overdue is still based on QBO-synced invoices past due date
     const overdue = agingBuckets.days30 + agingBuckets.days60 + agingBuckets.days90Plus;
 
-    return { totalBilled, totalPaid, outstanding, overdue };
-  }, [billableInvoices, agingBuckets]);
+    return { totalBilled: totalBlankets, totalPaid, outstanding, overdue };
+  }, [invoices, billableInvoices, agingBuckets]);
 
   // Build transaction ledger
   const transactions = useMemo((): Transaction[] => {
