@@ -79,7 +79,7 @@ const handler = async (req: Request): Promise<Response> => {
     const defaultPortalUrl = Deno.env.get("PUBLIC_APP_URL") || "https://vibepkgportal.com";
     const requestOrigin = req.headers.get("origin");
 
-    const isPreviewOrigin = !!requestOrigin && requestOrigin.includes("lovableproject.com");
+    const isPreviewOrigin = !!requestOrigin && (requestOrigin.includes("lovable.app") || requestOrigin.includes("lovableproject.com"));
     const isLocalOrigin = !!requestOrigin && requestOrigin.includes("localhost");
 
     const portalUrl = requestOrigin && requestOrigin.startsWith("http") && !isPreviewOrigin && !isLocalOrigin
