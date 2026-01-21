@@ -43,14 +43,14 @@ interface Payment {
 interface Transaction {
   id: string;
   date: string;
-  type: 'invoice' | 'payment' | 'open_order';
-  description: string;
+  type: 'invoice' | 'payment';
   reference: string;
   debit: number;
   credit: number;
   balance: number;
   status?: string;
   dueDate?: string | null;
+  datePaid?: string | null;
 }
 
 const formatCurrency = (amount: number) => {
@@ -170,17 +170,23 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
 
     // Add invoices as debits (charges)
     billableInvoices.forEach(invoice => {
+      // Find if this invoice has payments to determine date paid
+      const invoicePayments = payments.filter(p => p.invoice_id === invoice.id);
+      const lastPaymentDate = invoicePayments.length > 0 
+        ? invoicePayments.sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())[0].payment_date
+        : null;
+      
       txns.push({
         id: invoice.id,
         date: invoice.invoice_date,
         type: 'invoice',
-        description: invoice.description || 'Invoice',
         reference: invoice.invoice_number,
         debit: invoice.total,
         credit: 0,
         balance: 0,
         status: invoice.status,
         dueDate: invoice.due_date,
+        datePaid: invoice.status === 'paid' ? lastPaymentDate : null,
       });
     });
 
@@ -191,11 +197,11 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
         id: payment.id,
         date: payment.payment_date,
         type: 'payment',
-        description: `Payment - ${payment.payment_method}${payment.reference_number ? ` (${payment.reference_number})` : ''}`,
         reference: relatedInvoice?.invoice_number || 'N/A',
         debit: 0,
         credit: payment.amount,
         balance: 0,
+        datePaid: payment.payment_date,
       });
     });
 
@@ -233,12 +239,13 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
 
   // Export to CSV
   const exportToCSV = () => {
-    const headers = ['Date', 'Type', 'Reference', 'Description', 'Debit', 'Credit', 'Balance'];
+    const headers = ['Date', 'Type', 'Reference', 'Due Date', 'Date Paid', 'Debit', 'Credit', 'Balance'];
     const rows = filteredTransactions.map(txn => [
       format(parseDateAsLocalDay(txn.date), 'MM/dd/yyyy'),
-      txn.type === 'invoice' ? 'Invoice' : txn.type === 'payment' ? 'Payment' : 'Open Order',
+      txn.type === 'invoice' ? 'Invoice' : 'Payment',
       txn.reference,
-      txn.description,
+      txn.dueDate ? format(parseDateAsLocalDay(txn.dueDate), 'MM/dd/yyyy') : '',
+      txn.datePaid ? format(parseDateAsLocalDay(txn.datePaid), 'MM/dd/yyyy') : '',
       txn.debit > 0 ? txn.debit.toFixed(2) : '',
       txn.credit > 0 ? txn.credit.toFixed(2) : '',
       txn.balance.toFixed(2),
@@ -489,7 +496,8 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
                   <TableHead>Date</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Reference</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead>Date Paid</TableHead>
                   <TableHead className="text-right">Debit</TableHead>
                   <TableHead className="text-right">Credit</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
@@ -511,7 +519,12 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">{txn.reference}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{txn.description}</TableCell>
+                    <TableCell>
+                      {txn.dueDate ? format(parseDateAsLocalDay(txn.dueDate), 'MM/dd/yyyy') : <Minus className="h-4 w-4 text-muted-foreground" />}
+                    </TableCell>
+                    <TableCell>
+                      {txn.datePaid ? format(parseDateAsLocalDay(txn.datePaid), 'MM/dd/yyyy') : <Minus className="h-4 w-4 text-muted-foreground" />}
+                    </TableCell>
                     <TableCell className="text-right text-destructive">
                       {txn.debit > 0 ? formatCurrency(txn.debit) : <Minus className="h-4 w-4 mx-auto text-muted-foreground" />}
                     </TableCell>
