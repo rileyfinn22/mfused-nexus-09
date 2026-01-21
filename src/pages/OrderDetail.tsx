@@ -1156,8 +1156,6 @@ const OrderDetail = () => {
                 <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                   <span>Order Date: {new Date(order.order_date || order.created_at).toLocaleDateString()}</span>
                   <span>•</span>
-                  <span>Due Date: {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set'}</span>
-                  <span>•</span>
                   {isEditMode ? (
                     <div className="flex items-center gap-2">
                       <span>Est. Delivery:</span>
