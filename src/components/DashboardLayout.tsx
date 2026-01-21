@@ -174,7 +174,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           
           {/* Main content with proper padding */}
           <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-7xl mx-auto animate-fade-in">
+            <div className="animate-fade-in">
               {children}
             </div>
           </main>
