@@ -380,45 +380,6 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
         </CardContent>
       </Card>
 
-      {/* Unbilled Orders Section - Blanket invoices not yet synced to QBO */}
-      {unbilledBlankets.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
-              Open Orders (Not Yet Billed to QBO)
-            </CardTitle>
-            <CardDescription>Orders with blanket invoices that haven't been synced to QuickBooks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {unbilledBlankets.map(invoice => (
-                  <TableRow key={invoice.id}>
-                    <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                    <TableCell>{format(parseDateAsLocalDay(invoice.invoice_date), 'MM/dd/yyyy')}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize">
-                        {invoice.status === 'paid' ? 'Paid' : (invoice.quickbooks_sync_status === 'synced' || invoice.quickbooks_id) ? 'Billed' : 'Open'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{formatCurrency(invoice.total)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Transaction Ledger */}
       <Card>
         <CardHeader>
@@ -556,6 +517,45 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
           )}
         </CardContent>
       </Card>
+
+      {/* Unbilled Orders Section - Blanket invoices not yet synced to QBO */}
+      {unbilledBlankets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              Open Orders (Not Yet Billed to QBO)
+            </CardTitle>
+            <CardDescription>Orders with blanket invoices that haven't been synced to QuickBooks</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Invoice #</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {unbilledBlankets.map(invoice => (
+                  <TableRow key={invoice.id}>
+                    <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                    <TableCell>{format(parseDateAsLocalDay(invoice.invoice_date), 'MM/dd/yyyy')}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {invoice.status === 'paid' ? 'Paid' : (invoice.quickbooks_sync_status === 'synced' || invoice.quickbooks_id) ? 'Billed' : 'Open'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{formatCurrency(invoice.total)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
