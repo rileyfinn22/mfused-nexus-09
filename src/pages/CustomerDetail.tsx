@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List, Layers, Copy } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List, Layers, Copy, Receipt } from "lucide-react";
+import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
 import { CompanyEmailsManager } from "@/components/CompanyEmailsManager";
 import { CompanyProductTemplates } from "@/components/CompanyProductTemplates";
@@ -996,6 +997,10 @@ const CustomerDetail = () => {
             <Package className="h-4 w-4 mr-2" />
             Products ({customerProducts.length})
           </TabsTrigger>
+          <TabsTrigger value="statement">
+            <Receipt className="h-4 w-4 mr-2" />
+            Statement
+          </TabsTrigger>
         </TabsList>
 
         {/* Information Tab */}
@@ -1423,6 +1428,16 @@ const CustomerDetail = () => {
                 )}
               </div>
             </Card>
+          )}
+        </TabsContent>
+
+        {/* Statement Tab */}
+        <TabsContent value="statement">
+          {customerId && (
+            <CustomerStatementTab 
+              companyId={customerId} 
+              companyName={customer.name} 
+            />
           )}
         </TabsContent>
       </Tabs>
