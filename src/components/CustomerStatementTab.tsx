@@ -312,7 +312,7 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Outstanding Balance</p>
+                <p className="text-sm text-muted-foreground">Total Open</p>
                 <p className="text-2xl font-bold">{formatCurrency(summaryTotals.outstanding)}</p>
               </div>
               <DollarSign className="h-8 w-8 text-muted-foreground" />
@@ -323,7 +323,7 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Current (Not Due)</p>
+                <p className="text-sm text-muted-foreground">Current Billed</p>
                 <p className="text-2xl font-bold text-success">{formatCurrency(agingBuckets.current)}</p>
               </div>
               <Clock className="h-8 w-8 text-success" />
