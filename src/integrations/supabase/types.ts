@@ -804,6 +804,7 @@ export type Database = {
           deleted_at: string | null
           description: string | null
           due_date: string | null
+          estimated_delivery_date: string | null
           fulfillment_vendor_id: string | null
           id: string
           memo: string | null
@@ -855,6 +856,7 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           due_date?: string | null
+          estimated_delivery_date?: string | null
           fulfillment_vendor_id?: string | null
           id?: string
           memo?: string | null
@@ -906,6 +908,7 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           due_date?: string | null
+          estimated_delivery_date?: string | null
           fulfillment_vendor_id?: string | null
           id?: string
           memo?: string | null
