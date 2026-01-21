@@ -59,10 +59,10 @@ const Projects = () => {
 
       // For each order, fetch invoices, payments, and vendor POs
       const projectPromises = (orders || []).map(async (order) => {
-        // Fetch invoices
+        // Fetch invoices with parent_invoice_id to detect blanket vs child invoices
         const { data: invoices } = await supabase
           .from('invoices')
-          .select('id, total, total_paid, status')
+          .select('id, total, total_paid, status, parent_invoice_id')
           .eq('order_id', order.id)
           .is('deleted_at', null);
 
@@ -72,8 +72,15 @@ const Projects = () => {
           .select('id, total, total_paid')
           .eq('order_id', order.id);
 
-        const totalRevenue = (invoices || []).reduce((sum, inv) => sum + (inv.total || 0), 0);
-        const totalPaid = (invoices || []).reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
+        // Determine which invoices to count for revenue:
+        // - If there are child invoices (parent_invoice_id is set), only count those
+        // - Otherwise, count all invoices (including blanket if no children exist)
+        const allInvoices = invoices || [];
+        const childInvoices = allInvoices.filter(inv => inv.parent_invoice_id !== null);
+        const invoicesToCount = childInvoices.length > 0 ? childInvoices : allInvoices;
+
+        const totalRevenue = invoicesToCount.reduce((sum, inv) => sum + (inv.total || 0), 0);
+        const totalPaid = invoicesToCount.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
         const totalCosts = (vendorPOs || []).reduce((sum, po) => sum + (po.total || 0), 0);
         const totalCostsPaid = (vendorPOs || []).reduce((sum, po) => sum + (po.total_paid || 0), 0);
 
