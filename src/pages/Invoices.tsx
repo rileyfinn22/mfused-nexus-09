@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Search, 
   Download, 
@@ -17,7 +18,8 @@ import {
   Link2,
   ChevronDown,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Receipt
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +27,7 @@ import { toast } from "@/hooks/use-toast";
 import { exportToCSV } from "@/lib/exportUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { EditableDescription } from "@/components/EditableDescription";
+import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -32,6 +35,9 @@ const Invoices = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [isCompanyUser, setIsCompanyUser] = useState(false);
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
+  const [userCompanyName, setUserCompanyName] = useState<string>("");
   const [companies, setCompanies] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,8 +63,21 @@ const Invoices = () => {
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
+      const { data } = await supabase.from('user_roles').select('role, company_id').eq('user_id', user.id).single();
       setIsVibeAdmin(data?.role === 'vibe_admin');
+      if (data?.role === 'company' && data?.company_id) {
+        setIsCompanyUser(true);
+        setUserCompanyId(data.company_id);
+        // Fetch company name
+        const { data: company } = await supabase
+          .from('companies')
+          .select('name')
+          .eq('id', data.company_id)
+          .single();
+        if (company) {
+          setUserCompanyName(company.name);
+        }
+      }
     }
   };
 
@@ -383,21 +402,37 @@ const Invoices = () => {
         </div>
       </div>
 
-      {/* Summary Row */}
-      <div className="grid grid-cols-3 gap-6">
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Orders Total</p>
-          <p className="text-2xl font-bold mt-2 text-warning">{formatCurrency(openAmount)}</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Billed Pending Due</p>
-          <p className="text-2xl font-bold mt-2 text-info">{formatCurrency(billedAmount)}</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Due Amount</p>
-          <p className="text-2xl font-bold mt-2 text-danger">{formatCurrency(dueAmount)}</p>
-        </div>
-      </div>
+      <Tabs defaultValue="invoices" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="invoices">
+            <FileText className="h-4 w-4 mr-2" />
+            Invoices
+          </TabsTrigger>
+          {isCompanyUser && (
+            <TabsTrigger value="statement">
+              <Receipt className="h-4 w-4 mr-2" />
+              Statement
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="invoices" className="space-y-6">
+          {/* Summary Row */}
+          <div className="grid grid-cols-3 gap-6">
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Orders Total</p>
+              <p className="text-2xl font-bold mt-2 text-warning">{formatCurrency(openAmount)}</p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Billed Pending Due</p>
+              <p className="text-2xl font-bold mt-2 text-info">{formatCurrency(billedAmount)}</p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Due Amount</p>
+              <p className="text-2xl font-bold mt-2 text-danger">{formatCurrency(dueAmount)}</p>
+            </div>
+          </div>
+
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -851,6 +886,17 @@ const Invoices = () => {
           )}
         </div>
       </div>
+        </TabsContent>
+
+        {isCompanyUser && userCompanyId && (
+          <TabsContent value="statement">
+            <CustomerStatementTab 
+              companyId={userCompanyId} 
+              companyName={userCompanyName} 
+            />
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 };
