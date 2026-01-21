@@ -662,38 +662,26 @@ const OrderDetail = () => {
       const originalItemIds = (order.order_items || []).map((item: any) => item.id);
       const editedItemIds = editedItems.filter(item => !item.isNew).map(item => item.id);
       const itemsToDelete = originalItemIds.filter((id: string) => !editedItemIds.includes(id));
+      const existingItems = editedItems.filter(item => !item.isNew);
+      const newItems = editedItems.filter(item => item.isNew);
 
-      console.log('Save order - Original items:', originalItemIds.length, 'Edited items:', editedItemIds.length, 'To delete:', itemsToDelete.length);
+      // PHASE 1: Delete, Insert, and fetch vendor PO items in parallel
+      const phase1Promises: Promise<any>[] = [];
 
-      // Delete removed items - also need to handle related vendor_po_items
+      // Delete removed items
       if (itemsToDelete.length > 0) {
-        console.log('Deleting items:', itemsToDelete);
-        
-        // First, nullify order_item_id in vendor_po_items for deleted items
-        const { error: nullifyError } = await supabase
-          .from('vendor_po_items')
-          .update({ order_item_id: null })
-          .in('order_item_id', itemsToDelete);
-        
-        if (nullifyError) {
-          console.error('Error nullifying vendor PO items:', nullifyError);
-        }
-
-        const { error: deleteError, count } = await supabase
-          .from('order_items')
-          .delete()
-          .in('id', itemsToDelete);
-        
-        if (deleteError) {
-          console.error('Error deleting order items:', deleteError);
-          throw deleteError;
-        }
-        
-        console.log('Successfully deleted', itemsToDelete.length, 'order items');
+        phase1Promises.push(
+          (async () => {
+            await supabase
+              .from('vendor_po_items')
+              .update({ order_item_id: null })
+              .in('order_item_id', itemsToDelete);
+            await supabase.from('order_items').delete().in('id', itemsToDelete);
+          })()
+        );
       }
 
       // Insert new items
-      const newItems = editedItems.filter(item => item.isNew);
       if (newItems.length > 0) {
         const itemsToInsert = newItems.map(item => ({
           order_id: orderId,
@@ -707,139 +695,136 @@ const OrderDetail = () => {
           total: Number(item.quantity) * Number(item.unit_price),
           shipped_quantity: 0
         }));
-        
-        const { error: insertError } = await supabase
-          .from('order_items')
-          .insert(itemsToInsert);
-        if (insertError) throw insertError;
+        phase1Promises.push(
+          (async () => { await supabase.from('order_items').insert(itemsToInsert); })()
+        );
       }
 
-      // Update existing items and sync vendor PO items
-      for (const item of editedItems.filter(item => !item.isNew)) {
-        const newTotal = Number(item.quantity) * Number(item.unit_price);
-        
-        const { error } = await supabase
-          .from('order_items')
-          .update({
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            total: newTotal,
-            description: item.description,
-            item_id: item.item_id,
-            name: item.name
-          })
-          .eq('id', item.id);
-
-        if (error) throw error;
-
-        // Update linked vendor_po_items with new quantity and details
-        const { data: vendorPoItems, error: fetchPoItemsError } = await supabase
-          .from('vendor_po_items')
-          .select('id, vendor_po_id, unit_cost')
-          .eq('order_item_id', item.id);
-
-        if (fetchPoItemsError) {
-          console.error('Error fetching vendor PO items for order_item_id:', item.id, fetchPoItemsError);
-        }
-
-        if (vendorPoItems && vendorPoItems.length > 0) {
-          console.log('Updating vendor PO items for order item:', item.id, 'Found:', vendorPoItems.length);
-          for (const poItem of vendorPoItems) {
-            const poItemTotal = Number(item.quantity) * Number(poItem.unit_cost);
-            const { error: updatePoItemError } = await supabase
+      // Fetch all vendor PO items for existing order items in one query
+      const existingItemIds = existingItems.map(item => item.id);
+      let allVendorPoItems: any[] = [];
+      if (existingItemIds.length > 0) {
+        phase1Promises.push(
+          (async () => {
+            const { data } = await supabase
               .from('vendor_po_items')
-              .update({
-                quantity: item.quantity,
-                name: item.name,
-                sku: item.sku || item.item_id,
-                total: poItemTotal
-              })
-              .eq('id', poItem.id);
-            
-            if (updatePoItemError) {
-              console.error('Error updating vendor PO item:', poItem.id, updatePoItemError);
-            } else {
-              console.log('Updated vendor PO item:', poItem.id, 'with quantity:', item.quantity, 'total:', poItemTotal);
-            }
-          }
-        } else {
-          console.log('No vendor PO items found for order_item_id:', item.id);
-        }
+              .select('id, vendor_po_id, unit_cost, order_item_id')
+              .in('order_item_id', existingItemIds);
+            allVendorPoItems = data || [];
+          })()
+        );
       }
 
-      // Recalculate order totals
+      await Promise.all(phase1Promises);
+
+      // Calculate new totals
       const newSubtotal = editedItems.reduce((sum, item) => 
         sum + (Number(item.quantity) * Number(item.unit_price)), 0
       );
       const newTotal = newSubtotal + Number(editedOrder.tax || 0);
 
-      // Update order
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({
-          customer_name: editedOrder.customer_name,
-          customer_email: editedOrder.customer_email,
-          customer_phone: editedOrder.customer_phone,
-          shipping_name: editedOrder.shipping_name,
-          shipping_street: editedOrder.shipping_street,
-          shipping_city: editedOrder.shipping_city,
-          shipping_state: editedOrder.shipping_state,
-          shipping_zip: editedOrder.shipping_zip,
-          billing_name: editedOrder.billing_name,
-          billing_street: editedOrder.billing_street,
-          billing_city: editedOrder.billing_city,
-          billing_state: editedOrder.billing_state,
-          billing_zip: editedOrder.billing_zip,
-          po_number: editedOrder.po_number,
-          memo: editedOrder.memo,
-          estimated_delivery_date: editedOrder.estimated_delivery_date,
-          subtotal: newSubtotal,
-          total: newTotal
-        })
-        .eq('id', orderId);
+      // PHASE 2: Update all existing items, vendor PO items, order, and invoice in parallel
+      const phase2Promises: Promise<any>[] = [];
 
-      if (orderError) throw orderError;
-
-      // Recalculate vendor PO totals
-      const { data: affectedPOs } = await supabase
-        .from('vendor_pos')
-        .select('id')
-        .eq('order_id', orderId);
-
-      if (affectedPOs && affectedPOs.length > 0) {
-        for (const po of affectedPOs) {
-          const { data: poItems } = await supabase
-            .from('vendor_po_items')
-            .select('total')
-            .eq('vendor_po_id', po.id);
-
-          if (poItems) {
-            const poTotal = poItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
+      // Update existing order items in parallel
+      for (const item of existingItems) {
+        const newItemTotal = Number(item.quantity) * Number(item.unit_price);
+        phase2Promises.push(
+          (async () => {
             await supabase
-              .from('vendor_pos')
-              .update({ total: poTotal })
-              .eq('id', po.id);
-          }
+              .from('order_items')
+              .update({
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                total: newItemTotal,
+                description: item.description,
+                item_id: item.item_id,
+                name: item.name
+              })
+              .eq('id', item.id);
+          })()
+        );
+
+        // Update linked vendor_po_items
+        const linkedPoItems = allVendorPoItems.filter(poi => poi.order_item_id === item.id);
+        for (const poItem of linkedPoItems) {
+          const poItemTotal = Number(item.quantity) * Number(poItem.unit_cost);
+          phase2Promises.push(
+            (async () => {
+              await supabase
+                .from('vendor_po_items')
+                .update({
+                  quantity: item.quantity,
+                  name: item.name,
+                  sku: item.sku || item.item_id,
+                  total: poItemTotal
+                })
+                .eq('id', poItem.id);
+            })()
+          );
         }
       }
 
-      // Update blanket invoice if exists (type = 'blanket')
-      const { data: blanketInvoice } = await supabase
-        .from('invoices')
-        .select('id, invoice_type')
-        .eq('order_id', orderId)
-        .eq('invoice_type', 'blanket')
-        .is('deleted_at', null)
-        .maybeSingle();
+      phase2Promises.push(
+        (async () => {
+          await supabase
+            .from('orders')
+            .update({
+              customer_name: editedOrder.customer_name,
+              customer_email: editedOrder.customer_email,
+              customer_phone: editedOrder.customer_phone,
+              shipping_name: editedOrder.shipping_name,
+              shipping_street: editedOrder.shipping_street,
+              shipping_city: editedOrder.shipping_city,
+              shipping_state: editedOrder.shipping_state,
+              shipping_zip: editedOrder.shipping_zip,
+              billing_name: editedOrder.billing_name,
+              billing_street: editedOrder.billing_street,
+              billing_city: editedOrder.billing_city,
+              billing_state: editedOrder.billing_state,
+              billing_zip: editedOrder.billing_zip,
+              po_number: editedOrder.po_number,
+              memo: editedOrder.memo,
+              estimated_delivery_date: editedOrder.estimated_delivery_date,
+              subtotal: newSubtotal,
+              total: newTotal
+            })
+            .eq('id', orderId);
+        })()
+      );
 
-      if (blanketInvoice) {
-        await supabase
-          .from('invoices')
-          .update({
-            subtotal: newSubtotal,
-            total: newTotal + Number(editedOrder.shipping_cost || 0)
-          })
-          .eq('id', blanketInvoice.id);
+      // Update blanket invoice in parallel
+      phase2Promises.push(
+        (async () => {
+          await supabase
+            .from('invoices')
+            .update({
+              subtotal: newSubtotal,
+              total: newTotal + Number(editedOrder.shipping_cost || 0)
+            })
+            .eq('order_id', orderId)
+            .eq('invoice_type', 'blanket')
+            .is('deleted_at', null);
+        })()
+      );
+
+      await Promise.all(phase2Promises);
+
+      // PHASE 3: Recalculate vendor PO totals in parallel
+      const affectedPoIds = [...new Set(allVendorPoItems.map(poi => poi.vendor_po_id))];
+      if (affectedPoIds.length > 0) {
+        const poUpdatePromises = affectedPoIds.map(async (poId) => {
+          const { data: poItems } = await supabase
+            .from('vendor_po_items')
+            .select('total')
+            .eq('vendor_po_id', poId);
+          
+          if (poItems) {
+            const poTotal = poItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
+            await supabase.from('vendor_pos').update({ total: poTotal }).eq('id', poId);
+          }
+        });
+        await Promise.all(poUpdatePromises);
       }
 
       toast({
@@ -850,6 +835,7 @@ const OrderDetail = () => {
       fetchOrder();
       fetchInvoices();
     } catch (error: any) {
+      console.error('Error saving order:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to update order",
