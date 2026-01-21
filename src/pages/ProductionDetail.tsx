@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Upload, Plus, CalendarClock, FileText } from "lucide-react";
+import { Loader2, ArrowLeft, Upload, Plus, CalendarClock, FileText, Package, Truck, CheckCircle2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
-
+import { cn } from "@/lib/utils";
 interface Order {
   id: string;
   order_number: string;
@@ -53,6 +53,24 @@ interface Vendor {
   name: string;
 }
 
+interface Shipment {
+  id: string;
+  invoice_number: string;
+  shipment_number: number | null;
+  invoice_type: string | null;
+  status: string;
+  total: number;
+  created_at: string;
+}
+
+interface OrderItem {
+  id: string;
+  sku: string;
+  name: string;
+  quantity: number;
+  shipped_quantity: number;
+}
+
 const STAGE_NAMES = [
   { value: 'production_proceeding_part_1', label: 'Material Order and Securing', order: 1 },
   { value: 'production_proceeding_part_2', label: 'Print and Converting', order: 2 },
@@ -79,11 +97,14 @@ export default function ProductionDetail() {
   const [updateFile, setUpdateFile] = useState<File | null>(null);
   const [newStatus, setNewStatus] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
   useEffect(() => {
     checkRole();
     fetchOrderAndStages();
     fetchVendors();
+    fetchFulfillmentData();
   }, [orderId]);
 
   const checkRole = async () => {
@@ -107,6 +128,31 @@ export default function ProductionDetail() {
       .select('id, name')
       .order('name');
     setVendors(data || []);
+  };
+
+  const fetchFulfillmentData = async () => {
+    try {
+      // Fetch shipments (invoices with shipment info)
+      const { data: shipmentsData } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, shipment_number, invoice_type, status, total, created_at')
+        .eq('order_id', orderId)
+        .is('deleted_at', null)
+        .order('shipment_number', { ascending: true });
+
+      setShipments(shipmentsData || []);
+
+      // Fetch order items with shipped quantities
+      const { data: itemsData } = await supabase
+        .from('order_items')
+        .select('id, sku, name, quantity, shipped_quantity')
+        .eq('order_id', orderId)
+        .order('line_number', { ascending: true });
+
+      setOrderItems(itemsData || []);
+    } catch (error: any) {
+      console.error('Error fetching fulfillment data:', error);
+    }
   };
 
   const fetchOrderAndStages = async () => {
@@ -445,6 +491,139 @@ export default function ProductionDetail() {
           isCustomer={isCustomer}
         />
       )}
+
+      {/* Fulfillment Section */}
+      <div className="border border-border rounded-xl bg-card overflow-hidden">
+        <div className="p-4 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-2">
+            <Truck className="h-5 w-5 text-primary" />
+            <h2 className="font-semibold text-foreground">Fulfillment Status</h2>
+            {shipments.length > 0 && (
+              <Badge variant="secondary" className="ml-2">{shipments.length} Shipment{shipments.length !== 1 ? 's' : ''}</Badge>
+            )}
+          </div>
+        </div>
+
+        {orderItems.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            <Package className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p>No items in this order</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {/* Items Fulfillment Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-table-header">
+                  <tr className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="px-4 py-3">SKU</th>
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3 text-right">Ordered</th>
+                    <th className="px-4 py-3 text-right">Shipped</th>
+                    <th className="px-4 py-3 text-right">Remaining</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {orderItems.map((item) => {
+                    const remaining = item.quantity - item.shipped_quantity;
+                    const isFullyShipped = remaining <= 0;
+                    const isPartiallyShipped = item.shipped_quantity > 0 && remaining > 0;
+                    
+                    return (
+                      <tr key={item.id} className="hover:bg-table-row-hover transition-colors">
+                        <td className="px-4 py-3">
+                          <span className="font-mono text-sm">{item.sku}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-foreground">{item.name}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-sm font-medium">{item.quantity.toLocaleString()}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={cn(
+                            "text-sm font-medium",
+                            isFullyShipped ? "text-success" : isPartiallyShipped ? "text-warning" : "text-muted-foreground"
+                          )}>
+                            {item.shipped_quantity.toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={cn(
+                            "text-sm font-medium",
+                            remaining > 0 ? "text-foreground" : "text-muted-foreground"
+                          )}>
+                            {remaining.toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {isFullyShipped ? (
+                            <Badge variant="outline" className="bg-success/10 text-success border-success/30">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Complete
+                            </Badge>
+                          ) : isPartiallyShipped ? (
+                            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
+                              Partial
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              Pending
+                            </Badge>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Shipments List */}
+            {shipments.length > 0 && (
+              <div className="p-4 bg-muted/20">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Shipment History</p>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {shipments.map((shipment) => (
+                    <div 
+                      key={shipment.id} 
+                      className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg hover:border-primary/30 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/invoices/${shipment.id}`)}
+                    >
+                      <div className={cn(
+                        "p-2 rounded-lg",
+                        shipment.status === 'paid' ? "bg-success/10" : "bg-primary/10"
+                      )}>
+                        <Package className={cn(
+                          "h-4 w-4",
+                          shipment.status === 'paid' ? "text-success" : "text-primary"
+                        )} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-mono text-sm font-medium truncate">{shipment.invoice_number}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Shipment #{shipment.shipment_number || 1} • ${shipment.total.toLocaleString()}
+                        </p>
+                      </div>
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "text-xs capitalize",
+                          shipment.status === 'paid' && "bg-success/10 text-success border-success/30",
+                          shipment.status === 'open' && "bg-info/10 text-info border-info/30"
+                        )}
+                      >
+                        {shipment.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <Dialog open={updateDialogOpen} onOpenChange={(open) => {
         setUpdateDialogOpen(open);
