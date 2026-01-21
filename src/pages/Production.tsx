@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { DashboardLayout } from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText } from "lucide-react";
@@ -274,11 +273,9 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
     );
   }
 
@@ -395,49 +392,47 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
   );
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border pb-4">
-          <div>
-            <h1 className="text-2xl font-semibold">
-              {isVendor ? "My Production Orders" : "Production Tracking"}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {isVendor 
-                ? "View and update your assigned production stages" 
-                : "Monitor orders in production and track stage progress"}
-            </p>
-          </div>
-        </div>
-
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search orders..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        <div className="space-y-8">
-          {/* In Production Orders */}
-          <OrderTable 
-            orderList={filteredOrders} 
-            title="Orders in Production" 
-            emptyMessage="No orders in production"
-          />
-
-          {/* Completed Orders */}
-          {filteredCompletedOrders.length > 0 && (
-            <OrderTable 
-              orderList={filteredCompletedOrders} 
-              title="Completed Orders" 
-              emptyMessage="No completed orders"
-            />
-          )}
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border pb-4">
+        <div>
+          <h1 className="text-2xl font-semibold">
+            {isVendor ? "My Production Orders" : "Production Tracking"}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {isVendor 
+              ? "View and update your assigned production stages" 
+              : "Monitor orders in production and track stage progress"}
+          </p>
         </div>
       </div>
-    </DashboardLayout>
+
+      <div className="relative flex-1 max-w-md">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search orders..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      <div className="space-y-8">
+        {/* In Production Orders */}
+        <OrderTable 
+          orderList={filteredOrders} 
+          title="Orders in Production" 
+          emptyMessage="No orders in production"
+        />
+
+        {/* Completed Orders */}
+        {filteredCompletedOrders.length > 0 && (
+          <OrderTable 
+            orderList={filteredCompletedOrders} 
+            title="Completed Orders" 
+            emptyMessage="No completed orders"
+          />
+        )}
+      </div>
+    </div>
   );
 }
