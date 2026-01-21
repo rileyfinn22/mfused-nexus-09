@@ -406,7 +406,9 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
                     <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
                     <TableCell>{format(parseDateAsLocalDay(invoice.invoice_date), 'MM/dd/yyyy')}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize">{invoice.status}</Badge>
+                      <Badge variant="outline" className="capitalize">
+                        {invoice.status === 'paid' ? 'Paid' : (invoice.quickbooks_sync_status === 'synced' || invoice.quickbooks_id) ? 'Billed' : 'Open'}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">{formatCurrency(invoice.total)}</TableCell>
                   </TableRow>
