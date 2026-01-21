@@ -26,6 +26,8 @@ interface Invoice {
   parent_invoice_id: string | null;
   description: string | null;
   order_id: string;
+  quickbooks_sync_status: string | null;
+  quickbooks_id: string | null;
 }
 
 interface Payment {
@@ -36,15 +38,6 @@ interface Payment {
   payment_method: string;
   reference_number: string | null;
   invoice?: Invoice;
-}
-
-interface Order {
-  id: string;
-  order_number: string;
-  order_date: string;
-  total: number;
-  status: string;
-  customer_name: string;
 }
 
 interface Transaction {
@@ -73,7 +66,6 @@ const parseDateAsLocalDay = (dateString: string): Date => {
 export const CustomerStatementTab = ({ companyId, companyName }: CustomerStatementTabProps) => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [openOrders, setOpenOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
     from: subMonths(startOfMonth(new Date()), 3),
@@ -90,7 +82,7 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
       // Fetch all invoices for this company (non-deleted)
       const { data: invoicesData, error: invoicesError } = await supabase
         .from('invoices')
-        .select('id, invoice_number, invoice_date, due_date, total, total_paid, status, parent_invoice_id, description, order_id')
+        .select('id, invoice_number, invoice_date, due_date, total, total_paid, status, parent_invoice_id, description, order_id, quickbooks_sync_status, quickbooks_id')
         .eq('company_id', companyId)
         .is('deleted_at', null)
         .order('invoice_date', { ascending: true });
@@ -106,20 +98,8 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
 
       if (paymentsError) throw paymentsError;
 
-      // Fetch open orders (not yet invoiced or partially invoiced)
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('id, order_number, order_date, total, status, customer_name')
-        .eq('company_id', companyId)
-        .in('status', ['pending', 'in production', 'artwork', 'approved'])
-        .is('deleted_at', null)
-        .order('order_date', { ascending: false });
-
-      if (ordersError) throw ordersError;
-
       setInvoices(invoicesData || []);
       setPayments(paymentsData || []);
-      setOpenOrders(ordersData || []);
     } catch (error) {
       console.error('Error fetching statement data:', error);
     } finally {
@@ -127,18 +107,20 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
     }
   };
 
-  // Filter invoices to only count "billable" ones (child invoices if they exist, otherwise blanket)
+  // Filter invoices to only include those synced to QuickBooks (billed to QBO)
   const billableInvoices = useMemo(() => {
-    const childInvoices = invoices.filter(inv => inv.parent_invoice_id !== null);
-    // If there are child invoices, only count those; otherwise count all
-    if (childInvoices.length > 0) {
-      // Group by parent and only include children
-      const parentIds = new Set(childInvoices.map(inv => inv.parent_invoice_id));
-      return invoices.filter(inv => 
-        inv.parent_invoice_id !== null || !parentIds.has(inv.id)
-      );
-    }
-    return invoices;
+    return invoices.filter(inv => 
+      inv.quickbooks_sync_status === 'synced' || inv.quickbooks_id
+    );
+  }, [invoices]);
+
+  // Blanket invoices not yet synced to QBO (show as "open orders not yet invoiced")
+  const unbilledBlankets = useMemo(() => {
+    return invoices.filter(inv => 
+      inv.parent_invoice_id === null && 
+      inv.quickbooks_sync_status !== 'synced' && 
+      !inv.quickbooks_id
+    );
   }, [invoices]);
 
   // Calculate aging buckets
@@ -382,35 +364,35 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
         </CardContent>
       </Card>
 
-      {/* Open Orders Section */}
-      {openOrders.length > 0 && (
+      {/* Unbilled Orders Section - Blanket invoices not yet synced to QBO */}
+      {unbilledBlankets.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <ShoppingCart className="h-5 w-5" />
-              Open Orders (Not Yet Invoiced)
+              Open Orders (Not Yet Billed to QBO)
             </CardTitle>
-            <CardDescription>Orders in progress that haven't been fully invoiced</CardDescription>
+            <CardDescription>Orders with blanket invoices that haven't been synced to QuickBooks</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Order #</TableHead>
+                  <TableHead>Invoice #</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {openOrders.map(order => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.order_number}</TableCell>
-                    <TableCell>{format(parseDateAsLocalDay(order.order_date), 'MM/dd/yyyy')}</TableCell>
+                {unbilledBlankets.map(invoice => (
+                  <TableRow key={invoice.id}>
+                    <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                    <TableCell>{format(parseDateAsLocalDay(invoice.invoice_date), 'MM/dd/yyyy')}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize">{order.status}</Badge>
+                      <Badge variant="outline" className="capitalize">{invoice.status}</Badge>
                     </TableCell>
-                    <TableCell className="text-right">{formatCurrency(order.total)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(invoice.total)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
