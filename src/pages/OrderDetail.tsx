@@ -70,6 +70,7 @@ const OrderDetail = () => {
   const [uploadingVibeAttachment, setUploadingVibeAttachment] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [bulkPrice, setBulkPrice] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -653,7 +654,9 @@ const OrderDetail = () => {
 
   const handleSaveOrder = async () => {
     if (!isAdmin && !isVibeAdmin) return;
+    if (isSaving) return; // Prevent multiple clicks
 
+    setIsSaving(true);
     try {
       // Find items to delete (in original but not in edited)
       const originalItemIds = (order.order_items || []).map((item: any) => item.id);
@@ -789,6 +792,7 @@ const OrderDetail = () => {
           billing_zip: editedOrder.billing_zip,
           po_number: editedOrder.po_number,
           memo: editedOrder.memo,
+          estimated_delivery_date: editedOrder.estimated_delivery_date,
           subtotal: newSubtotal,
           total: newTotal
         })
@@ -851,6 +855,8 @@ const OrderDetail = () => {
         description: error.message || "Failed to update order",
         variant: "destructive"
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1024,11 +1030,18 @@ const OrderDetail = () => {
                   setIsEditMode(false);
                   setEditedOrder(order);
                   setEditedItems(order.order_items || []);
-                }}>
+                }} disabled={isSaving}>
                   Cancel
                 </Button>
-                <Button onClick={handleSaveOrder}>
-                  Save Changes
+                <Button onClick={handleSaveOrder} disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
                 </Button>
               </>
             ) : (
