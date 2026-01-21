@@ -8,10 +8,11 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, Bell, Users, Save, Link2, Shield, Download, UserPlus, Trash2 } from "lucide-react";
+import { Building2, Bell, Users, Save, Link2, Shield, Download, UserPlus, Trash2, Receipt } from "lucide-react";
 import { QuickBooksConnect } from "@/components/QuickBooksConnect";
 import { VibeAdminManagement } from "@/components/VibeAdminManagement";
 import { QBImportManager } from "@/components/QBImportManager";
+import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 
 interface CompanyInfo {
   name: string;
@@ -383,6 +384,12 @@ export default function Settings() {
             <Users className="h-4 w-4" />
             Team
           </TabsTrigger>
+          {isCompanyUser && (
+            <TabsTrigger value="statement" className="gap-2">
+              <Receipt className="h-4 w-4" />
+              Statement
+            </TabsTrigger>
+          )}
           {isVibeAdmin && (
             <TabsTrigger value="vibe-admin" className="gap-2">
               <Shield className="h-4 w-4" />
@@ -618,6 +625,15 @@ export default function Settings() {
         {isVibeAdmin && (
           <TabsContent value="vibe-admin" className="space-y-4">
             <VibeAdminManagement />
+          </TabsContent>
+        )}
+
+        {isCompanyUser && companyId && (
+          <TabsContent value="statement" className="space-y-4">
+            <CustomerStatementTab 
+              companyId={companyId} 
+              companyName={companyName} 
+            />
           </TabsContent>
         )}
       </Tabs>
