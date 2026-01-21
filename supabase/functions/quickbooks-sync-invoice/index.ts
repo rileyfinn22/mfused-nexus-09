@@ -220,53 +220,32 @@ serve(async (req) => {
       }
     }
 
-    // Find or create customer in QuickBooks using company name and email
+    // Find or create customer in QuickBooks using company name ONLY
+    // We intentionally do NOT search by email to avoid matching the wrong customer
     const customerName = (invoice.companies as any)?.name || 'Unknown Customer';
     const customerEmail = companyEmail || '';
 
-    console.log('Looking for customer (company):', customerName, 'Email:', customerEmail);
+    console.log('Looking for customer (company) by name only:', customerName);
     console.log('Order customer_name (ship-to):', invoice.orders?.customer_name);
     
     let customerId;
     
-    // Strategy 1: Search by email if available (most reliable)
-    if (customerEmail) {
-      console.log('Searching by email...');
-      const emailSearchResponse = await fetch(
-        `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE PrimaryEmailAddr='${customerEmail}' MAXRESULTS 1&minorversion=65`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json',
-          },
-        }
-      );
-      const emailSearchData = await emailSearchResponse.json();
-      
-      if (emailSearchData.QueryResponse?.Customer?.length > 0) {
-        customerId = emailSearchData.QueryResponse.Customer[0].Id;
-        console.log('Found customer by email:', customerId);
+    // Search by company name only (not email - to avoid matching wrong customers like personal accounts)
+    console.log('Searching by company name...');
+    const nameSearchResponse = await fetch(
+      `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName='${customerName.replace(/'/g, "\\'")}' MAXRESULTS 1&minorversion=65`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json',
+        },
       }
-    }
+    );
+    const nameSearchData = await nameSearchResponse.json();
     
-    // Strategy 2: Search by name if email search didn't find anything
-    if (!customerId) {
-      console.log('Searching by name...');
-      const nameSearchResponse = await fetch(
-        `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName='${customerName.replace(/'/g, "\\'")}' MAXRESULTS 1&minorversion=65`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json',
-          },
-        }
-      );
-      const nameSearchData = await nameSearchResponse.json();
-      
-      if (nameSearchData.QueryResponse?.Customer?.length > 0) {
-        customerId = nameSearchData.QueryResponse.Customer[0].Id;
-        console.log('Found customer by name:', customerId);
-      }
+    if (nameSearchData.QueryResponse?.Customer?.length > 0) {
+      customerId = nameSearchData.QueryResponse.Customer[0].Id;
+      console.log('Found customer by name:', customerId);
     }
     
     // Strategy 3: Create customer if not found
@@ -302,58 +281,37 @@ serve(async (req) => {
         if (newCustomer.Fault?.Error?.[0]?.Message?.includes('Duplicate')) {
           console.log('Duplicate detected - customer was just created, searching again...');
           
-          // Try email search first
-          if (customerEmail) {
-            const retryEmailSearch = await fetch(
-              `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE PrimaryEmailAddr='${customerEmail}' MAXRESULTS 1&minorversion=65`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json',
-                },
-              }
-            );
-            const retryEmailData = await retryEmailSearch.json();
-            
-            if (retryEmailData.QueryResponse?.Customer?.length > 0) {
-              customerId = retryEmailData.QueryResponse.Customer[0].Id;
-              console.log('Found customer on retry by email:', customerId);
+          // Try fuzzy LIKE search by name (not email)
+          console.log('Trying fuzzy LIKE search by name...');
+          const likeSearch = await fetch(
+            `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName LIKE '%${customerName.replace(/'/g, "\\'")}%' MAXRESULTS 10&minorversion=65`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json',
+              },
             }
+          );
+          const likeData = await likeSearch.json();
+          const likeCustomers = likeData.QueryResponse?.Customer || [];
+          
+          console.log(`LIKE search found ${likeCustomers.length} customers`);
+          if (likeCustomers.length > 0) {
+            likeCustomers.forEach((c: any) => console.log('  - ', c.DisplayName));
           }
           
-          // If still not found, try fuzzy LIKE search
-          if (!customerId) {
-            console.log('Trying fuzzy LIKE search...');
-            const likeSearch = await fetch(
-              `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName LIKE '%${customerName.replace(/'/g, "\\'")}%' MAXRESULTS 10&minorversion=65`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json',
-                },
-              }
-            );
-            const likeData = await likeSearch.json();
-            const likeCustomers = likeData.QueryResponse?.Customer || [];
-            
-            console.log(`LIKE search found ${likeCustomers.length} customers`);
-            if (likeCustomers.length > 0) {
-              likeCustomers.forEach((c: any) => console.log('  - ', c.DisplayName));
-            }
-            
-            // Find exact match (case-insensitive)
-            const exactMatch = likeCustomers.find(
-              (c: any) => c.DisplayName?.toLowerCase().trim() === customerName.toLowerCase().trim()
-            );
-            
-            if (exactMatch) {
-              customerId = exactMatch.Id;
-              console.log('Found exact match in LIKE results:', customerId, exactMatch.DisplayName);
-            } else if (likeCustomers.length === 1) {
-              // If only one result, use it
-              customerId = likeCustomers[0].Id;
-              console.log('Using single LIKE result:', customerId, likeCustomers[0].DisplayName);
-            }
+          // Find exact match (case-insensitive)
+          const exactMatch = likeCustomers.find(
+            (c: any) => c.DisplayName?.toLowerCase().trim() === customerName.toLowerCase().trim()
+          );
+          
+          if (exactMatch) {
+            customerId = exactMatch.Id;
+            console.log('Found exact match in LIKE results:', customerId, exactMatch.DisplayName);
+          } else if (likeCustomers.length === 1) {
+            // If only one result, use it
+            customerId = likeCustomers[0].Id;
+            console.log('Using single LIKE result:', customerId, likeCustomers[0].DisplayName);
           }
           
           // If still not found, try paginated broad search
@@ -829,8 +787,10 @@ serve(async (req) => {
       CustomerMemo: {
         value: invoice.orders?.memo || '',
       },
-      // Ensures the invoice can be "sent" to generate an InvoiceLink (and enables view/pay online experiences).
+      // Set email but mark as NotSet so QBO does NOT auto-send emails
+      // The invoice will be accessible via the payment link but no email goes out from QBO
       BillEmail: customerEmail ? { Address: customerEmail } : undefined,
+      EmailStatus: 'NotSet', // CRITICAL: Prevents QBO from sending invoice emails
       BillAddr: {
         Line1: invoice.orders?.billing_street || invoice.orders?.shipping_street || '',
         City: invoice.orders?.billing_city || invoice.orders?.shipping_city || '',
