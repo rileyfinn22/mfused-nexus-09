@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Upload, Plus } from "lucide-react";
+import { Loader2, ArrowLeft, Upload, Plus, CalendarClock, FileText } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
 
@@ -17,6 +17,8 @@ interface Order {
   order_number: string;
   customer_name: string;
   status: string;
+  description: string | null;
+  estimated_delivery_date: string | null;
   companies: {
     name: string;
   };
@@ -116,6 +118,8 @@ export default function ProductionDetail() {
           order_number,
           customer_name,
           status,
+          description,
+          estimated_delivery_date,
           companies (
             name
           )
@@ -375,7 +379,7 @@ export default function ProductionDetail() {
         </Button>
       </div>
 
-      <div className="border border-border rounded-xl p-5 bg-card">
+      <div className="border border-border rounded-xl p-5 bg-card space-y-4">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{order.order_number}</h1>
@@ -384,13 +388,39 @@ export default function ProductionDetail() {
               <Badge variant="outline" className="mt-2">{order.companies.name}</Badge>
             )}
           </div>
-          <Badge 
-            variant={order.status === 'in production' ? 'default' : 'secondary'}
-            className="capitalize"
-          >
-            {order.status.replace('_', ' ')}
-          </Badge>
+          <div className="flex flex-col items-end gap-2">
+            <Badge 
+              variant={order.status === 'in production' ? 'default' : 'secondary'}
+              className="capitalize"
+            >
+              {order.status.replace('_', ' ')}
+            </Badge>
+            {order.estimated_delivery_date && (
+              <div className="flex items-center gap-1.5 text-sm">
+                <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Est. Delivery:</span>
+                <span className="font-medium">
+                  {new Date(order.estimated_delivery_date).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
+        
+        {/* Description - Prominent Display */}
+        {order.description && (
+          <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg border border-border/50">
+            <FileText className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Description</p>
+              <p className="text-sm text-foreground">{order.description}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {stages.length === 0 ? (

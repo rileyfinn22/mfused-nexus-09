@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory } from "lucide-react";
+import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductionProgressBar, ProductionStatusIndicator } from "@/components/ProductionProgressBar";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ interface ProductionOrder {
   description: string | null;
   shipping_state: string;
   total: number;
+  estimated_delivery_date: string | null;
   companies: {
     name: string;
   };
@@ -107,6 +108,7 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
               description,
               shipping_state,
               total,
+              estimated_delivery_date,
               companies (
                 name
               )
@@ -133,6 +135,7 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
               description,
               shipping_state,
               total,
+              estimated_delivery_date,
               companies (
                 name
               )
@@ -160,6 +163,7 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
             description,
             shipping_state,
             total,
+            estimated_delivery_date,
             companies (
               name
             )
@@ -185,6 +189,7 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
             description,
             shipping_state,
             total,
+            estimated_delivery_date,
             companies (
               name
             )
@@ -288,6 +293,22 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
     const status = getProgressStatus(progress);
     const StatusIcon = status.icon;
 
+    const formatDeliveryDate = (dateStr: string | null) => {
+      if (!dateStr) return null;
+      const date = new Date(dateStr);
+      const today = new Date();
+      const diffTime = date.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      if (diffDays < 0) return { text: formatted, status: 'overdue' as const };
+      if (diffDays <= 7) return { text: formatted, status: 'soon' as const };
+      return { text: formatted, status: 'normal' as const };
+    };
+
+    const deliveryInfo = formatDeliveryDate(order.estimated_delivery_date);
+
     return (
       <div
         className={cn(
@@ -307,7 +328,6 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
             {isVibeAdmin && (
               <p className="text-sm font-medium text-foreground truncate">{order.companies?.name || '-'}</p>
             )}
-            <p className="text-sm text-muted-foreground truncate mt-0.5">{order.description || 'No description'}</p>
           </div>
           
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -316,13 +336,34 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
           </div>
         </div>
         
+        {/* Description - More Prominent */}
+        {order.description && (
+          <div className="mt-2 flex items-start gap-2 p-2 bg-muted/50 rounded-lg">
+            <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-foreground leading-snug">{order.description}</p>
+          </div>
+        )}
+        
         <div className="mt-3">
           <ProductionProgressBar progress={progress} size="sm" />
         </div>
         
         <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
           <span>${order.total?.toFixed(2)}</span>
-          <span>{new Date(order.order_date).toLocaleDateString()}</span>
+          <div className="flex items-center gap-3">
+            {deliveryInfo && (
+              <span className={cn(
+                "flex items-center gap-1 font-medium",
+                deliveryInfo.status === 'overdue' && "text-red-600",
+                deliveryInfo.status === 'soon' && "text-amber-600",
+                deliveryInfo.status === 'normal' && "text-muted-foreground"
+              )}>
+                <CalendarClock className="h-3.5 w-3.5" />
+                Est. {deliveryInfo.text}
+              </span>
+            )}
+            <span>{new Date(order.order_date).toLocaleDateString()}</span>
+          </div>
         </div>
       </div>
     );
