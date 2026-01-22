@@ -10,6 +10,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+interface Attachment {
+  filename: string;
+  content: string; // base64 encoded
+}
+
 interface SendInvoiceRequest {
   invoiceId: string;
   recipientEmails: string[];
@@ -17,10 +22,12 @@ interface SendInvoiceRequest {
   senderEmail: string;
   customMessage?: string;
   pdfBase64: string;
+  pdfFilename?: string;
   invoiceNumber: string;
   dueDate: string;
   totalAmount: number;
   customerName: string;
+  additionalAttachments?: Attachment[];
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -39,10 +46,12 @@ const handler = async (req: Request): Promise<Response> => {
       senderEmail,
       customMessage,
       pdfBase64,
+      pdfFilename,
       invoiceNumber,
       dueDate,
       totalAmount,
       customerName,
+      additionalAttachments,
     }: SendInvoiceRequest = await req.json();
 
     // Validate required fields
@@ -213,6 +222,26 @@ const handler = async (req: Request): Promise<Response> => {
       </html>
     `;
 
+    // Build attachments array - primary PDF + any additional attachments
+    const attachments: Attachment[] = [
+      {
+        filename: pdfFilename || `Invoice-${invoiceNumber}.pdf`,
+        content: pdfBase64,
+      },
+    ];
+
+    // Add any additional attachments
+    if (additionalAttachments && additionalAttachments.length > 0) {
+      for (const attachment of additionalAttachments) {
+        attachments.push({
+          filename: attachment.filename,
+          content: attachment.content,
+        });
+      }
+    }
+
+    console.log(`Sending email with ${attachments.length} attachment(s)`);
+
     // Send the email - use verified domain for sending
     const emailResponse = await resend.emails.send({
       from: `VibePKG <invoices@vibepkgportal.com>`,
@@ -220,12 +249,7 @@ const handler = async (req: Request): Promise<Response> => {
       to: recipientEmails,
       subject: `Invoice ${invoiceNumber} from VibePKG - ${formattedAmount} Due ${formattedDueDate}`,
       html: emailHtml,
-      attachments: [
-        {
-          filename: `Invoice-${invoiceNumber}.pdf`,
-          content: pdfBase64,
-        },
-      ],
+      attachments,
     });
 
     console.log("Resend response:", emailResponse);

@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
-import { EmailPreviewDialog } from "@/components/EmailPreviewDialog";
+import { EmailPreviewDialog, AdditionalAttachment } from "@/components/EmailPreviewDialog";
 import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
 import { UpdateBillDialog } from "@/components/UpdateBillDialog";
 
@@ -775,7 +775,7 @@ const VendorPODetail = () => {
     return doc.output('datauristring').split(',')[1];
   };
 
-  const handleSendEmail = async (data: { to: string[]; subject: string; message: string }) => {
+  const handleSendEmail = async (data: { to: string[]; subject: string; message: string; additionalAttachments?: AdditionalAttachment[] }) => {
     setSendingEmail(true);
     try {
       const pdfBase64 = await generatePdfBase64();
@@ -785,6 +785,12 @@ const VendorPODetail = () => {
         .split('\n')
         .map(line => line.trim() === '' ? '<br/>' : `<p style="margin: 8px 0;">${line}</p>`)
         .join('');
+
+      // Build additional attachments array
+      const additionalAttachmentsData = data.additionalAttachments?.map(a => ({
+        filename: a.file.name,
+        content: a.base64,
+      }));
       
       const response = await supabase.functions.invoke('send-invoice-email', {
         body: {
@@ -803,7 +809,8 @@ const VendorPODetail = () => {
             </div>
           `,
           pdfBase64,
-          pdfFilename: `PO-${po.po_number}.pdf`
+          pdfFilename: `PO-${po.po_number}.pdf`,
+          additionalAttachments: additionalAttachmentsData && additionalAttachmentsData.length > 0 ? additionalAttachmentsData : undefined,
         }
       });
 

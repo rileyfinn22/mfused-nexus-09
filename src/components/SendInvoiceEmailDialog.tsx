@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { X, Mail, Plus, Send, Loader2, Eye, FileText, Paperclip } from "lucide-react";
+import { X, Mail, Plus, Send, Loader2, Eye, FileText, Paperclip, Upload, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -16,6 +16,11 @@ import autoTable from "jspdf-autotable";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+interface AdditionalAttachment {
+  file: File;
+  base64: string;
+}
 
 interface SendInvoiceEmailDialogProps {
   open: boolean;
@@ -45,7 +50,9 @@ export function SendInvoiceEmailDialog({
   const [emailHistory, setEmailHistory] = useState<string[]>([]);
   const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [additionalAttachments, setAdditionalAttachments] = useState<AdditionalAttachment[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -123,6 +130,7 @@ Thank you for your business.`;
       setCurrentEmail("");
       setActiveTab("compose");
       setShowEmailSuggestions(false);
+      setAdditionalAttachments([]);
     }
   }, [open, invoice, order]);
 
@@ -207,6 +215,76 @@ Thank you for your business.`;
       e.preventDefault();
       addEmail();
     }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+    const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB total
+
+    // Calculate current total size
+    const currentTotalSize = additionalAttachments.reduce((sum, a) => sum + a.file.size, 0);
+
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds 10MB limit`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      if (currentTotalSize + file.size > MAX_TOTAL_SIZE) {
+        toast({
+          title: "Total size limit reached",
+          description: "Total attachments cannot exceed 25MB",
+          variant: "destructive",
+        });
+        break;
+      }
+
+      // Check for duplicates
+      if (additionalAttachments.some(a => a.file.name === file.name)) {
+        toast({
+          title: "Duplicate file",
+          description: `${file.name} is already attached`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      // Convert to base64
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          // Remove data URL prefix to get just the base64
+          const base64Data = result.split(',')[1] || result;
+          resolve(base64Data);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      setAdditionalAttachments(prev => [...prev, { file, base64 }]);
+    }
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (fileName: string) => {
+    setAdditionalAttachments(prev => prev.filter(a => a.file.name !== fileName));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const generatePdfBase64 = async (): Promise<string> => {
@@ -483,6 +561,12 @@ Thank you for your business.`;
         .map(line => line.trim() === '' ? '<br/>' : `<p style="margin: 8px 0;">${line}</p>`)
         .join('');
       
+      // Build additional attachments array
+      const additionalAttachmentsData = additionalAttachments.map(a => ({
+        filename: a.file.name,
+        content: a.base64,
+      }));
+
       const { data, error } = await supabase.functions.invoke("send-invoice-email", {
         body: {
           invoiceId: invoice.id,
@@ -507,6 +591,7 @@ Thank you for your business.`;
           dueDate: invoice.due_date,
           totalAmount: invoice.total,
           customerName: order?.shipping_name || order?.customer_name,
+          additionalAttachments: additionalAttachmentsData.length > 0 ? additionalAttachmentsData : undefined,
         },
       });
       
@@ -522,6 +607,7 @@ Thank you for your business.`;
       
       setEmails([]);
       setMessage("");
+      setAdditionalAttachments([]);
       onOpenChange(false);
     } catch (error: any) {
       console.error("Error sending invoice email:", error);
@@ -668,11 +754,64 @@ Thank you for your business.`;
               />
             </div>
             
-            {/* Attachment indicator */}
-            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-              <Paperclip className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
-              <Badge variant="outline" className="ml-auto">PDF</Badge>
+            {/* Attachments Section */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Attachments</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Add Files
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
+                />
+              </div>
+              
+              {/* Primary attachment - Invoice PDF */}
+              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm flex-1">Invoice-{invoice?.invoice_number}.pdf</span>
+                <Badge variant="outline">PDF</Badge>
+              </div>
+              
+              {/* Additional attachments */}
+              {additionalAttachments.map((attachment) => (
+                <div key={attachment.file.name} className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+                  <Paperclip className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm flex-1 truncate" title={attachment.file.name}>
+                    {attachment.file.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatFileSize(attachment.file.size)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => removeAttachment(attachment.file.name)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              
+              {additionalAttachments.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {additionalAttachments.length} additional file{additionalAttachments.length > 1 ? 's' : ''} • 
+                  Total: {formatFileSize(additionalAttachments.reduce((sum, a) => sum + a.file.size, 0))}
+                </p>
+              )}
             </div>
             
             {/* Sender Info */}
@@ -706,9 +845,17 @@ Thank you for your business.`;
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="text-sm text-muted-foreground w-16">Attach:</span>
-                    <div className="flex items-center gap-2">
-                      <Paperclip className="h-3 w-3" />
-                      <span className="text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <Paperclip className="h-3 w-3" />
+                        <span className="text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
+                      </div>
+                      {additionalAttachments.map((attachment) => (
+                        <div key={attachment.file.name} className="flex items-center gap-2">
+                          <Paperclip className="h-3 w-3" />
+                          <span className="text-sm">{attachment.file.name}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
