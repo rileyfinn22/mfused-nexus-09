@@ -203,76 +203,76 @@ export function ProductionStageTimeline({
           <span className="text-2xl font-bold text-primary">{progressPercent}%</span>
         </div>
         
-        {/* Visual Timeline Header - Weighted Segments */}
-        <div className="flex items-center gap-0.5 mb-2">
-          {stageDefinitions.map((def) => {
-            const status = getStageStatus(def.value);
-            const weight = def.weight ?? (100 / stageDefinitions.length);
-            return (
-              <div 
-                key={def.value} 
-                className={cn(
-                  "h-3 rounded-sm transition-colors relative group",
-                  status === 'completed' ? 'bg-green-500' :
-                  status === 'in_progress' ? 'bg-blue-500 animate-pulse' :
-                  'bg-muted'
-                )}
-                style={{ width: `${weight}%` }}
-                title={isCustomer ? def.label : `${def.label}: ${weight}%`}
-              />
-            );
-          })}
-        </div>
-        
-        {/* Stage Labels under progress bar - Hidden from customers */}
-        {!isCustomer && (
-          <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-            {stageDefinitions.map((def) => {
-              const status = getStageStatus(def.value);
-              const weight = def.weight ?? (100 / stageDefinitions.length);
-              return (
-                <div 
-                  key={def.value} 
-                  className={cn(
-                    "truncate text-center",
-                    status === 'completed' && 'text-green-600 font-medium',
-                    status === 'in_progress' && 'text-blue-600 font-medium'
-                  )}
-                  style={{ width: `${weight}%` }}
-                >
-                  {weight}%
-                </div>
-              );
-            })}
-          </div>
-        )}
-        
-        {/* Stage Labels - Show stage names for customers, Start/Complete for admin */}
+        {/* Progress Bar - Smooth continuous for customers, Segmented for admin/vendor */}
         {isCustomer ? (
-          <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground mt-1">
-            {stageDefinitions.map((def) => {
-              const status = getStageStatus(def.value);
-              const weight = def.weight ?? (100 / stageDefinitions.length);
-              return (
-                <div 
-                  key={def.value} 
-                  className={cn(
-                    "truncate text-center",
-                    status === 'completed' && 'text-green-600 font-medium',
-                    status === 'in_progress' && 'text-blue-600 font-medium'
-                  )}
-                  style={{ width: `${weight}%` }}
-                >
-                  {def.label.split(' ')[0]}
-                </div>
-              );
-            })}
-          </div>
+          <>
+            {/* Simple continuous progress bar for customers */}
+            <div className="w-full h-3 bg-muted rounded-full overflow-hidden mb-2">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500 bg-gradient-to-r",
+                  progressPercent >= 100 ? 'from-green-400 to-green-600' :
+                  progressPercent >= 60 ? 'from-blue-400 to-blue-600' :
+                  progressPercent >= 30 ? 'from-amber-400 to-amber-600' :
+                  'from-gray-300 to-gray-500'
+                )}
+                style={{ width: `${Math.min(progressPercent, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Start</span>
+              <span>Complete</span>
+            </div>
+          </>
         ) : (
-          <div className="flex justify-between text-xs text-muted-foreground mt-2">
-            <span>Start</span>
-            <span>Complete</span>
-          </div>
+          <>
+            {/* Segmented progress bar for admin/vendor */}
+            <div className="flex items-center gap-0.5 mb-2">
+              {stageDefinitions.map((def) => {
+                const status = getStageStatus(def.value);
+                const weight = def.weight ?? (100 / stageDefinitions.length);
+                return (
+                  <div 
+                    key={def.value} 
+                    className={cn(
+                      "h-3 rounded-sm transition-colors relative group",
+                      status === 'completed' ? 'bg-green-500' :
+                      status === 'in_progress' ? 'bg-blue-500 animate-pulse' :
+                      'bg-muted'
+                    )}
+                    style={{ width: `${weight}%` }}
+                    title={`${def.label}: ${weight}%`}
+                  />
+                );
+              })}
+            </div>
+            
+            {/* Stage weight labels for admin/vendor */}
+            <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              {stageDefinitions.map((def) => {
+                const status = getStageStatus(def.value);
+                const weight = def.weight ?? (100 / stageDefinitions.length);
+                return (
+                  <div 
+                    key={def.value} 
+                    className={cn(
+                      "truncate text-center",
+                      status === 'completed' && 'text-green-600 font-medium',
+                      status === 'in_progress' && 'text-blue-600 font-medium'
+                    )}
+                    style={{ width: `${weight}%` }}
+                  >
+                    {weight}%
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="flex justify-between text-xs text-muted-foreground mt-2">
+              <span>Start</span>
+              <span>Complete</span>
+            </div>
+          </>
         )}
       </div>
 
