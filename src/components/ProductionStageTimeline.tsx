@@ -314,6 +314,7 @@ export function ProductionStageTimeline({
                         </h5>
                         <div className="space-y-3">
                           {stage.production_stage_updates
+                            .filter((update) => update.update_type !== 'status_change')
                             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                             .map((update) => (
                             <div
@@ -355,21 +356,11 @@ export function ProductionStageTimeline({
                                   <Download className="h-3 w-3 text-muted-foreground" />
                                 </a>
                               )}
-                              
-                              {update.previous_status && update.new_status && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <span className="text-muted-foreground">Status:</span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {update.previous_status.replace('_', ' ')}
-                                  </Badge>
-                                  <span className="text-muted-foreground">→</span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {update.new_status.replace('_', ' ')}
-                                  </Badge>
-                                </div>
-                              )}
                             </div>
                           ))}
+                          {stage.production_stage_updates.filter(u => u.update_type !== 'status_change').length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-2">No notes or attachments yet</p>
+                          )}
                         </div>
                       </div>
                     </CollapsibleContent>
