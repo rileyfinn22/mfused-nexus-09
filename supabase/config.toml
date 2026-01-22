@@ -45,6 +45,9 @@ verify_jwt = true
 [functions.send-invoice-email]
 verify_jwt = true
 
+[functions.send-vendor-po-email]
+verify_jwt = true
+
 [functions.quickbooks-pull-project]
 verify_jwt = true
 

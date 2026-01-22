@@ -779,12 +779,6 @@ const VendorPODetail = () => {
     setSendingEmail(true);
     try {
       const pdfBase64 = await generatePdfBase64();
-      
-      // Convert plain text message to HTML
-      const htmlMessage = data.message
-        .split('\n')
-        .map(line => line.trim() === '' ? '<br/>' : `<p style="margin: 8px 0;">${line}</p>`)
-        .join('');
 
       // Build additional attachments array
       const additionalAttachmentsData = data.additionalAttachments?.map(a => ({
@@ -794,19 +788,21 @@ const VendorPODetail = () => {
       
       const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
       
-      const response = await supabase.functions.invoke('send-invoice-email', {
+      // Use the dedicated vendor PO email function
+      const response = await supabase.functions.invoke('send-vendor-po-email', {
         body: {
-          invoiceId: poId, // Required field - using PO ID
+          poId: poId,
           recipientEmails: data.to,
           senderName: VIBE_COMPANY.name,
           senderEmail: 'accounting@vibepkg.com',
           customMessage: data.message,
           pdfBase64,
           pdfFilename: `PO-${po.po_number}.pdf`,
-          invoiceNumber: po.po_number, // Required field - using PO number
-          dueDate: po.expected_delivery_date || new Date().toISOString(),
+          poNumber: po.po_number,
+          orderDate: po.order_date,
+          expectedDeliveryDate: po.expected_delivery_date,
           totalAmount: totalAmount,
-          customerName: vendor?.name || 'Vendor',
+          vendorName: vendor?.contact_name || vendor?.name || 'Vendor',
           additionalAttachments: additionalAttachmentsData && additionalAttachmentsData.length > 0 ? additionalAttachmentsData : undefined,
         }
       });
