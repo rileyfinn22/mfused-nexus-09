@@ -318,6 +318,7 @@ const VendorPOs = () => {
                 vendors={vendorBalances}
                 selectedVendorId={vendorFilter}
                 onVendorSelect={setVendorFilter}
+                onPaymentRecorded={fetchVendorPOs}
               />
             </div>
 
