@@ -228,21 +228,8 @@ export function ProductionStageTimeline({
           <span className="text-2xl font-bold text-primary">{progressPercent}%</span>
         </div>
         
-        {/* Progress Bar - Smooth continuous for customers, Segmented for admin/vendor */}
-        {isCustomer ? (
-          <>
-            {/* Simple continuous progress bar for customers */}
-            <div className="w-full h-3 bg-muted rounded-full overflow-hidden mb-2">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all duration-500",
-                  getCustomerProgressFill(progressPercent)
-                )}
-                style={{ width: `${Math.min(progressPercent, 100)}%` }}
-              />
-            </div>
-          </>
-        ) : (
+        {/* Progress Bar - Segmented for vibe_admin/vendor, Smooth continuous for everyone else */}
+        {(isVibeAdmin || isVendor) ? (
           <>
             {/* Segmented progress bar for admin/vendor */}
             <div className="flex items-center gap-0.5 mb-2">
@@ -287,6 +274,23 @@ export function ProductionStageTimeline({
             </div>
             
             <div className="flex justify-between text-xs text-muted-foreground mt-2">
+              <span>Start</span>
+              <span>Complete</span>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Simple continuous progress bar for customers/company users */}
+            <div className="w-full h-3 bg-muted rounded-full overflow-hidden mb-2">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  getCustomerProgressFill(progressPercent)
+                )}
+                style={{ width: `${Math.min(progressPercent, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
               <span>Start</span>
               <span>Complete</span>
             </div>
