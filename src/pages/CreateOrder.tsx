@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles } from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles, Paperclip, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -135,6 +135,16 @@ const CreateOrder = () => {
   const [inputMode, setInputMode] = useState<"pdf" | "text">("pdf");
   const [textInput, setTextInput] = useState<string>("");
   const [analysisHint, setAnalysisHint] = useState<string>("");
+
+  // Customer PO attachment state
+  const [customerPoFile, setCustomerPoFile] = useState<File | null>(null);
+  const [uploadingCustomerPo, setUploadingCustomerPo] = useState(false);
+  
+  // Auto-save state
+  const [autoSavedOrderId, setAutoSavedOrderId] = useState<string | null>(null);
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -328,6 +338,178 @@ const CreateOrder = () => {
     }
   }, [selectedCompanyId, roleChecked, initialLoading]);
 
+  // Auto-save draft every 1 minute
+  const performAutoSave = useCallback(async () => {
+    // Only auto-save if there's meaningful data
+    const hasItems = selectedItems.length > 0 || unmatchedPoItems.length > 0;
+    const hasAddress = formData.shippingStreet.trim() !== '';
+    
+    if (!hasItems && !hasAddress) return;
+    if (loading || isAutoSaving) return;
+    
+    setIsAutoSaving(true);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      let companyId: string;
+      if (isVibeAdmin) {
+        if (!selectedCompanyId) return; // Can't auto-save without company
+        companyId = selectedCompanyId;
+      } else {
+        const { data: userRole } = await supabase
+          .from('user_roles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
+        if (!userRole?.company_id) return;
+        companyId = userRole.company_id;
+      }
+
+      // Calculate subtotal
+      let matchedSubtotal = 0;
+      for (const item of selectedItems) {
+        const product = products.find(p => p.id === item.productId);
+        const price = item.unit_price ?? product?.cost ?? 0;
+        matchedSubtotal += price * item.quantity;
+      }
+      let unmatchedSubtotalCalc = 0;
+      for (const item of unmatchedPoItems) {
+        unmatchedSubtotalCalc += (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
+      }
+      const subtotalCalc = matchedSubtotal + unmatchedSubtotalCalc;
+
+      const currentOrderId = orderId || autoSavedOrderId;
+      
+      if (currentOrderId) {
+        // Update existing draft
+        await supabase
+          .from('orders')
+          .update({
+            po_number: formData.poNumber || null,
+            customer_name: formData.customerName || 'Draft Order',
+            customer_email: formData.customerEmail || null,
+            customer_phone: formData.customerPhone || null,
+            shipping_name: formData.shippingName || 'TBD',
+            shipping_street: formData.shippingStreet || 'TBD',
+            shipping_city: formData.shippingCity || 'TBD',
+            shipping_state: formData.shippingState || 'XX',
+            shipping_zip: formData.shippingZip || '00000',
+            billing_name: sameAsBilling ? (formData.shippingName || 'TBD') : formData.billingName,
+            billing_street: sameAsBilling ? (formData.shippingStreet || 'TBD') : formData.billingStreet,
+            billing_city: sameAsBilling ? (formData.shippingCity || 'TBD') : formData.billingCity,
+            billing_state: sameAsBilling ? (formData.shippingState || 'XX') : formData.billingState,
+            billing_zip: sameAsBilling ? (formData.shippingZip || '00000') : formData.billingZip,
+            subtotal: subtotalCalc,
+            total: subtotalCalc,
+            terms: formData.terms,
+            memo: formData.memo || null,
+            due_date: formData.dueDate || null,
+          })
+          .eq('id', currentOrderId);
+      } else {
+        // Create new draft
+        const { data: recentOrders } = await supabase
+          .from('orders')
+          .select('order_number')
+          .order('created_at', { ascending: false })
+          .limit(100);
+        
+        let maxOrderNum = 10699;
+        if (recentOrders && recentOrders.length > 0) {
+          for (const order of recentOrders) {
+            const match = order.order_number.match(/(\d+)$/);
+            if (match) {
+              const num = parseInt(match[1], 10);
+              if (!isNaN(num) && num > maxOrderNum) {
+                maxOrderNum = num;
+              }
+            }
+          }
+        }
+        const orderNumber = String(maxOrderNum + 1);
+
+        const { data: newOrder, error } = await supabase
+          .from('orders')
+          .insert({
+            order_number: orderNumber,
+            po_number: formData.poNumber || null,
+            company_id: companyId,
+            customer_name: formData.customerName || 'Draft Order',
+            customer_email: formData.customerEmail || null,
+            customer_phone: formData.customerPhone || null,
+            status: 'draft',
+            shipping_name: formData.shippingName || 'TBD',
+            shipping_street: formData.shippingStreet || 'TBD',
+            shipping_city: formData.shippingCity || 'TBD',
+            shipping_state: formData.shippingState || 'XX',
+            shipping_zip: formData.shippingZip || '00000',
+            billing_name: sameAsBilling ? (formData.shippingName || 'TBD') : formData.billingName,
+            billing_street: sameAsBilling ? (formData.shippingStreet || 'TBD') : formData.billingStreet,
+            billing_city: sameAsBilling ? (formData.shippingCity || 'TBD') : formData.billingCity,
+            billing_state: sameAsBilling ? (formData.shippingState || 'XX') : formData.billingState,
+            billing_zip: sameAsBilling ? (formData.shippingZip || '00000') : formData.billingZip,
+            subtotal: subtotalCalc,
+            total: subtotalCalc,
+            terms: formData.terms,
+            memo: formData.memo || null,
+            due_date: formData.dueDate || null,
+            order_type: 'standard',
+          })
+          .select()
+          .single();
+
+        if (!error && newOrder) {
+          setAutoSavedOrderId(newOrder.id);
+          setExistingOrderNumber(newOrder.order_number);
+          
+          // Insert order items for the new draft
+          const orderItems = selectedItems.map(item => {
+            const product = products.find(p => p.id === item.productId);
+            const price = item.unit_price ?? product?.cost ?? 0;
+            return {
+              order_id: newOrder.id,
+              product_id: item.productId,
+              sku: product?.item_id || `SKU-${product?.id.substring(0, 8)}`,
+              item_id: product?.item_id || null,
+              name: product?.name || "",
+              description: product?.description || null,
+              quantity: item.quantity,
+              shipped_quantity: 0,
+              unit_price: price,
+              total: price * item.quantity,
+            };
+          });
+
+          if (orderItems.length > 0) {
+            await supabase.from('order_items').insert(orderItems);
+          }
+        }
+      }
+      
+      setLastAutoSave(new Date());
+    } catch (error) {
+      console.error('Auto-save error:', error);
+    } finally {
+      setIsAutoSaving(false);
+    }
+  }, [selectedItems, unmatchedPoItems, formData, products, isVibeAdmin, selectedCompanyId, loading, isAutoSaving, orderId, autoSavedOrderId, sameAsBilling]);
+
+  // Set up auto-save interval
+  useEffect(() => {
+    // Start auto-save interval (every 1 minute)
+    autoSaveIntervalRef.current = setInterval(() => {
+      performAutoSave();
+    }, 60000); // 60 seconds
+
+    return () => {
+      if (autoSaveIntervalRef.current) {
+        clearInterval(autoSaveIntervalRef.current);
+      }
+    };
+  }, [performAutoSave]);
+
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -473,6 +655,66 @@ const CreateOrder = () => {
 
   const removeSelectedFile = (index: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Handle Customer PO file selection
+  const handleCustomerPoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCustomerPoFile(file);
+    }
+    e.target.value = '';
+  };
+
+  // Upload Customer PO attachment to order
+  const uploadCustomerPoAttachment = async (orderId: string): Promise<void> => {
+    if (!customerPoFile) return;
+    
+    try {
+      setUploadingCustomerPo(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Upload to storage
+      const fileExt = customerPoFile.name.split('.').pop();
+      const fileName = `${orderId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('po-documents')
+        .upload(fileName, customerPoFile);
+
+      if (uploadError) {
+        console.error('Customer PO upload error:', uploadError);
+        toast({
+          title: "Upload failed",
+          description: "Failed to upload Customer PO attachment",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create attachment record
+      const { error: attachmentError } = await supabase
+        .from('order_attachments')
+        .insert({
+          order_id: orderId,
+          file_name: customerPoFile.name,
+          file_path: fileName,
+          file_size: customerPoFile.size,
+          file_type: customerPoFile.type,
+          description: 'Customer PO',
+          uploaded_by: user.id,
+        });
+
+      if (attachmentError) {
+        console.error('Attachment record error:', attachmentError);
+      }
+    } catch (error) {
+      console.error('Error uploading Customer PO:', error);
+    } finally {
+      setUploadingCustomerPo(false);
+    }
   };
 
   const handlePOUpload = async () => {
@@ -1552,6 +1794,11 @@ const CreateOrder = () => {
         if (itemsError) throw itemsError;
       }
 
+      // Upload Customer PO attachment if provided
+      if (customerPoFile) {
+        await uploadCustomerPoAttachment(order.id);
+      }
+
       const actionText = orderId 
         ? (isDraft ? "updated as draft" : "updated")
         : (isDraft ? "saved as draft" : "placed");
@@ -1617,9 +1864,26 @@ const CreateOrder = () => {
             </Button>
             <div>
               <h1 className="text-2xl font-semibold">{orderId ? 'Edit Draft Order' : 'Create New Order'}</h1>
-              <p className="text-sm text-muted-foreground">
-                {orderId ? `Editing ${existingOrderNumber}` : 'Fill in the details below'}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground">
+                  {orderId ? `Editing ${existingOrderNumber}` : (autoSavedOrderId ? `Draft ${existingOrderNumber}` : 'Fill in the details below')}
+                </p>
+                {(lastAutoSave || isAutoSaving) && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    {isAutoSaving ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="h-3 w-3" />
+                        Auto-saved {lastAutoSave?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </>
+                    )}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex gap-3">
@@ -1894,6 +2158,41 @@ const CreateOrder = () => {
                   onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
                   className="h-9"
                 />
+              </div>
+              
+              {/* Customer PO Attachment */}
+              <div className="space-y-1">
+                <Label className="text-xs">Attach Customer PO</Label>
+                {customerPoFile ? (
+                  <div className="flex items-center gap-2 p-2 bg-primary/5 border border-primary/30 rounded-md">
+                    <Paperclip className="h-4 w-4 text-primary" />
+                    <span className="text-sm truncate flex-1">{customerPoFile.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => setCustomerPoFile(null)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                      onChange={handleCustomerPoSelect}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <Button variant="outline" size="sm" className="h-9 w-full justify-start">
+                      <Paperclip className="h-4 w-4 mr-2" />
+                      Select File
+                    </Button>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  PDF, Word, Excel, or image
+                </p>
               </div>
             </div>
           </div>
