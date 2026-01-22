@@ -62,6 +62,7 @@ const InvoiceDetail = () => {
   const [unsyncingFromQB, setUnsyncingFromQB] = useState(false);
   const [showUnsyncDialog, setShowUnsyncDialog] = useState(false);
   const [pullingPayments, setPullingPayments] = useState(false);
+  const [orderAttachments, setOrderAttachments] = useState<any[]>([]);
   const {
     syncInvoice,
     checkConnection
@@ -347,8 +348,34 @@ const InvoiceDetail = () => {
       setQbRealmId(qbSettings.realm_id);
     }
 
+    // Fetch order attachments (to display Customer PO, etc.)
+    if (invoiceData.order_id) {
+      const { data: attachmentsData } = await supabase
+        .from('order_attachments')
+        .select('*')
+        .eq('order_id', invoiceData.order_id)
+        .order('created_at', { ascending: false });
+      
+      if (attachmentsData) {
+        setOrderAttachments(attachmentsData);
+      }
+    }
+
     setLoading(false);
   };
+
+  const handleDownloadOrderAttachment = async (filePath: string, fileName: string) => {
+    const { data } = await supabase.storage
+      .from('po-documents')
+      .createSignedUrl(filePath, 3600, { download: fileName });
+
+    if (data?.signedUrl) {
+      window.location.href = data.signedUrl;
+    } else {
+      toast({ title: "Error", description: "Failed to download", variant: "destructive" });
+    }
+  };
+
   const handleDeleteInvoice = async () => {
     try {
       // If invoice is synced to QuickBooks, delete from QB first
@@ -2701,6 +2728,103 @@ const InvoiceDetail = () => {
             </div>
           </CardContent>
         </Card>}
+
+      {/* Order Attachments - Including Customer PO */}
+      {(orderAttachments.length > 0 || order?.po_pdf_path) && (
+        <Card className="shadow-lg">
+          <CardContent className="p-8">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Order Attachments</h2>
+              <Badge variant="secondary">{orderAttachments.length + (order?.po_pdf_path ? 1 : 0)}</Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Legacy PO if exists */}
+              {order?.po_pdf_path && (
+                <div className="p-4 bg-background rounded-lg border border-border flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-14 rounded border border-border bg-muted flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">Purchase Order (Original)</p>
+                    <p className="text-xs text-muted-foreground mb-2">Primary PO document</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={async () => {
+                        const fileName = typeof order.po_pdf_path === "string"
+                          ? order.po_pdf_path.split("/").pop() || "purchase-order.pdf"
+                          : "purchase-order.pdf";
+                        const { data } = await supabase.storage
+                          .from("po-documents")
+                          .createSignedUrl(order.po_pdf_path, 3600, { download: fileName });
+                        if (data?.signedUrl) {
+                          window.location.href = data.signedUrl;
+                        } else {
+                          toast({ title: "Error", description: "Failed to load PO", variant: "destructive" });
+                        }
+                      }}
+                    >
+                      <Download className="h-3 w-3 mr-1" />
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Order attachments - Customer PO highlighted */}
+              {orderAttachments.map((attachment) => {
+                const isCustomerPO = attachment.description?.toLowerCase() === 'customer po';
+                return (
+                  <div 
+                    key={attachment.id} 
+                    className={cn(
+                      "p-4 rounded-lg border flex items-start gap-4",
+                      isCustomerPO 
+                        ? "bg-primary/5 border-primary/30" 
+                        : "bg-background border-border"
+                    )}
+                  >
+                    <div className={cn(
+                      "flex-shrink-0 w-12 h-14 rounded border flex items-center justify-center",
+                      isCustomerPO 
+                        ? "border-primary/30 bg-primary/10" 
+                        : "border-border bg-muted"
+                    )}>
+                      <FileText className={cn(
+                        "h-6 w-6",
+                        isCustomerPO ? "text-primary" : "text-muted-foreground"
+                      )} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate" title={attachment.file_name}>{attachment.file_name}</p>
+                        {isCustomerPO && (
+                          <Badge variant="default" className="text-[10px] px-1.5 py-0">Customer PO</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {isCustomerPO ? 'Customer Purchase Order' : (attachment.description || 'No description')}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={() => handleDownloadOrderAttachment(attachment.file_path, attachment.file_name)}
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        Download
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Audit Log - Only visible to vibe_admin */}
       {invoice && isVibeAdmin && (
