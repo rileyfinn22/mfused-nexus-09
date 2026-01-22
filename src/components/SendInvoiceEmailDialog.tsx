@@ -221,8 +221,8 @@ Thank you for your business.`;
     const files = e.target.files;
     if (!files) return;
 
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
-    const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB total
+    const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB per file
+    const MAX_TOTAL_SIZE = 40 * 1024 * 1024; // 40MB total
 
     // Calculate current total size
     const currentTotalSize = additionalAttachments.reduce((sum, a) => sum + a.file.size, 0);
@@ -231,7 +231,7 @@ Thank you for your business.`;
       if (file.size > MAX_FILE_SIZE) {
         toast({
           title: "File too large",
-          description: `${file.name} exceeds 10MB limit`,
+          description: `${file.name} exceeds 25MB limit`,
           variant: "destructive",
         });
         continue;
@@ -240,7 +240,7 @@ Thank you for your business.`;
       if (currentTotalSize + file.size > MAX_TOTAL_SIZE) {
         toast({
           title: "Total size limit reached",
-          description: "Total attachments cannot exceed 25MB",
+          description: "Total attachments cannot exceed 40MB",
           variant: "destructive",
         });
         break;
