@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List, Layers, Copy, Receipt } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List, Layers, Copy, Receipt, UserCircle } from "lucide-react";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
 import { CompanyEmailsManager } from "@/components/CompanyEmailsManager";
+import { CompanyContactsManager } from "@/components/CompanyContactsManager";
 import { CompanyProductTemplates } from "@/components/CompanyProductTemplates";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -989,6 +990,10 @@ const CustomerDetail = () => {
             <Building2 className="h-4 w-4 mr-2" />
             Information
           </TabsTrigger>
+          <TabsTrigger value="contacts">
+            <UserCircle className="h-4 w-4 mr-2" />
+            Contacts
+          </TabsTrigger>
           <TabsTrigger value="addresses">
             <MapPin className="h-4 w-4 mr-2" />
             Addresses ({savedAddresses.length})
@@ -1168,6 +1173,24 @@ const CustomerDetail = () => {
                 placeholder="Additional notes about this customer..."
                 rows={4}
               />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Contacts Tab */}
+        <TabsContent value="contacts" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserCircle className="h-5 w-5" />
+                Company Contacts
+              </CardTitle>
+              <CardDescription>
+                Manage contact people for this company. Set a primary contact for default communications.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {customerId && <CompanyContactsManager companyId={customerId} />}
             </CardContent>
           </Card>
         </TabsContent>
