@@ -469,29 +469,6 @@ export default function ProductionDetail() {
         )}
       </div>
 
-      {stages.length === 0 ? (
-        <div className="border border-dashed border-border rounded-xl p-12 text-center">
-          <p className="text-muted-foreground mb-4">No production stages initialized</p>
-          {isVibeAdmin && (
-            <Button onClick={initializeStages}>
-              <Plus className="h-4 w-4 mr-2" />
-              Initialize Stages
-            </Button>
-          )}
-        </div>
-      ) : (
-        <ProductionStageTimeline
-          stages={stages}
-          stageDefinitions={STAGE_NAMES}
-          onUpdateClick={handleOpenUpdateDialog}
-          onVendorAssign={handleAssignVendor}
-          vendors={vendors}
-          isVibeAdmin={isVibeAdmin}
-          isVendor={isVendor}
-          isCustomer={isCustomer}
-        />
-      )}
-
       {/* Fulfillment Section */}
       <div className="border border-border rounded-xl bg-card overflow-hidden">
         <div className="p-4 border-b border-border bg-muted/30">
@@ -624,6 +601,29 @@ export default function ProductionDetail() {
           </div>
         )}
       </div>
+
+      {stages.length === 0 ? (
+        <div className="border border-dashed border-border rounded-xl p-12 text-center">
+          <p className="text-muted-foreground mb-4">No production stages initialized</p>
+          {isVibeAdmin && (
+            <Button onClick={initializeStages}>
+              <Plus className="h-4 w-4 mr-2" />
+              Initialize Stages
+            </Button>
+          )}
+        </div>
+      ) : (
+        <ProductionStageTimeline
+          stages={stages}
+          stageDefinitions={STAGE_NAMES}
+          onUpdateClick={handleOpenUpdateDialog}
+          onVendorAssign={handleAssignVendor}
+          vendors={vendors}
+          isVibeAdmin={isVibeAdmin}
+          isVendor={isVendor}
+          isCustomer={isCustomer}
+        />
+      )}
 
       <Dialog open={updateDialogOpen} onOpenChange={(open) => {
         setUpdateDialogOpen(open);
