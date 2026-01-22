@@ -30,6 +30,7 @@ interface ProductionStage {
   status: string;
   vendor_id: string | null;
   sequence_order: number;
+  internal_notes: string | null;
   vendors: {
     name: string;
   } | null;
@@ -188,6 +189,7 @@ export default function ProductionDetail() {
           status,
           vendor_id,
           sequence_order,
+          internal_notes,
           vendors (
             name
           ),
@@ -531,6 +533,34 @@ export default function ProductionDetail() {
     }
   };
 
+  const handleInternalNotesChange = async (stageId: string, notes: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('production_stages')
+        .update({ internal_notes: notes })
+        .eq('id', stageId);
+
+      if (error) throw error;
+
+      // Update local state
+      setStages(prev => prev.map(s => 
+        s.id === stageId ? { ...s, internal_notes: notes } : s
+      ));
+
+      toast({
+        title: "Saved",
+        description: "Internal notes updated",
+      });
+    } catch (error: any) {
+      console.error('Error saving internal notes:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save internal notes",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -619,6 +649,7 @@ export default function ProductionDetail() {
           onQuickStatusChange={handleQuickStatusChange}
           onSubstageComplete={handleSubstageComplete}
           onDeleteUpdate={handleDeleteUpdate}
+          onInternalNotesChange={handleInternalNotesChange}
           onVendorAssign={handleAssignVendor}
           vendors={vendors}
           isVibeAdmin={isVibeAdmin}

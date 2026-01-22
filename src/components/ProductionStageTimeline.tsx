@@ -1,7 +1,8 @@
-import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package, Trash2 } from "lucide-react";
+import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package, Trash2, StickyNote, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -24,6 +25,7 @@ interface ProductionStage {
   status: string;
   vendor_id: string | null;
   sequence_order: number;
+  internal_notes: string | null;
   vendors: {
     name: string;
   } | null;
@@ -50,6 +52,7 @@ interface ProductionStageTimelineProps {
   onQuickStatusChange?: (stageId: string, newStatus: string) => Promise<void>;
   onSubstageComplete?: (stageId: string, substage: SubstageDefinition) => Promise<void>;
   onDeleteUpdate?: (updateId: string) => Promise<void>;
+  onInternalNotesChange?: (stageId: string, notes: string) => Promise<void>;
   onVendorAssign?: (stageId: string, vendorId: string) => void;
   vendors?: { id: string; name: string }[];
   isVibeAdmin: boolean;
@@ -80,6 +83,7 @@ export function ProductionStageTimeline({
   onQuickStatusChange,
   onSubstageComplete,
   onDeleteUpdate,
+  onInternalNotesChange,
   onVendorAssign,
   vendors = [],
   isVibeAdmin,
@@ -90,6 +94,41 @@ export function ProductionStageTimeline({
   const [updatingStages, setUpdatingStages] = useState<Set<string>>(new Set());
   const [updatingSubstages, setUpdatingSubstages] = useState<Set<string>>(new Set());
   const [deletingUpdates, setDeletingUpdates] = useState<Set<string>>(new Set());
+  const [internalNotesEdits, setInternalNotesEdits] = useState<Record<string, string>>({});
+  const [savingNotes, setSavingNotes] = useState<Set<string>>(new Set());
+
+  const handleSaveInternalNotes = async (stageId: string) => {
+    if (!onInternalNotesChange) return;
+    
+    setSavingNotes(prev => new Set(prev).add(stageId));
+    try {
+      await onInternalNotesChange(stageId, internalNotesEdits[stageId] || '');
+      // Clear the edit state after successful save
+      setInternalNotesEdits(prev => {
+        const next = { ...prev };
+        delete next[stageId];
+        return next;
+      });
+    } finally {
+      setSavingNotes(prev => {
+        const next = new Set(prev);
+        next.delete(stageId);
+        return next;
+      });
+    }
+  };
+
+  const getInternalNotesValue = (stage: ProductionStage) => {
+    if (stage.id in internalNotesEdits) {
+      return internalNotesEdits[stage.id];
+    }
+    return stage.internal_notes || '';
+  };
+
+  const hasUnsavedNotes = (stageId: string, currentNotes: string | null) => {
+    if (!(stageId in internalNotesEdits)) return false;
+    return internalNotesEdits[stageId] !== (currentNotes || '');
+  };
 
   const handleDeleteUpdate = async (updateId: string) => {
     if (!onDeleteUpdate) return;
@@ -559,6 +598,42 @@ export function ProductionStageTimeline({
                                 Add Note
                               </Button>
                             </>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Internal Notes Section - Vibe Admin Only */}
+                      {isVibeAdmin && onInternalNotesChange && (
+                        <div className="mt-4 p-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg border border-amber-200/50 dark:border-amber-800/30">
+                          <div className="flex items-center gap-2 mb-2">
+                            <StickyNote className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                            <Label className="text-xs font-medium text-amber-700 dark:text-amber-300">Internal Notes</Label>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                              Admin Only
+                            </Badge>
+                          </div>
+                          <Textarea
+                            placeholder="Add internal notes about this stage's progress..."
+                            value={getInternalNotesValue(stage)}
+                            onChange={(e) => setInternalNotesEdits(prev => ({ ...prev, [stage.id]: e.target.value }))}
+                            className="min-h-[60px] text-sm bg-background/80 border-amber-200/50 dark:border-amber-800/30 focus:border-amber-400 dark:focus:border-amber-600"
+                          />
+                          {hasUnsavedNotes(stage.id, stage.internal_notes) && (
+                            <div className="flex justify-end mt-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveInternalNotes(stage.id)}
+                                disabled={savingNotes.has(stage.id)}
+                                className="h-7 bg-amber-500 hover:bg-amber-600 text-white"
+                              >
+                                {savingNotes.has(stage.id) ? (
+                                  <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                ) : (
+                                  <Save className="h-3 w-3 mr-1.5" />
+                                )}
+                                Save Notes
+                              </Button>
+                            </div>
                           )}
                         </div>
                       )}
