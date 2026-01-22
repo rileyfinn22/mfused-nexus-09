@@ -25,12 +25,13 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Eye, FileText, Trash2, Receipt, CreditCard } from "lucide-react";
+import { Search, Eye, FileText, Trash2, Receipt, CreditCard, ClipboardList } from "lucide-react";
 import { CreateExpensePODialog } from "@/components/CreateExpensePODialog";
 import { VendorBillsSummary } from "@/components/VendorBillsSummary";
 import { VendorBillsAgingBuckets } from "@/components/VendorBillsAgingBuckets";
 import { VendorPaymentsLedger } from "@/components/VendorPaymentsLedger";
 import { VendorBalanceBreakdown } from "@/components/VendorBalanceBreakdown";
+import { VendorAPStatementTab } from "@/components/VendorAPStatementTab";
 
 const VendorPOs = () => {
   const navigate = useNavigate();
@@ -293,7 +294,7 @@ const VendorPOs = () => {
         activeFilter={paymentStatusFilter}
       />
 
-      {/* Tabs for Bills and Payments */}
+      {/* Tabs for Bills, Payments, and AP Statement */}
       <Tabs defaultValue="bills" className="space-y-4">
         <TabsList>
           <TabsTrigger value="bills" className="flex items-center gap-2">
@@ -303,6 +304,10 @@ const VendorPOs = () => {
           <TabsTrigger value="payments" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
             Payments
+          </TabsTrigger>
+          <TabsTrigger value="statement" className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
+            AP Statement
           </TabsTrigger>
         </TabsList>
 
@@ -471,6 +476,10 @@ const VendorPOs = () => {
 
         <TabsContent value="payments">
           <VendorPaymentsLedger />
+        </TabsContent>
+
+        <TabsContent value="statement">
+          <VendorAPStatementTab />
         </TabsContent>
       </Tabs>
 
