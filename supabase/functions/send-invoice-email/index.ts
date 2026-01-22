@@ -242,11 +242,19 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Sending email with ${attachments.length} attachment(s)`);
 
+    // Internal team members to BCC on all emails
+    const internalBccRecipients = [
+      'Justin@vibepkg.com',
+      'Riley@vibepkg.com',
+      'Carrie@vibepkg.com',
+    ];
+
     // Send the email - use verified domain for sending
     const emailResponse = await resend.emails.send({
       from: `VibePKG <invoices@vibepkgportal.com>`,
       replyTo: senderEmail,
       to: recipientEmails,
+      bcc: internalBccRecipients,
       subject: `Invoice ${invoiceNumber} from VibePKG - ${formattedAmount} Due ${formattedDueDate}`,
       html: emailHtml,
       attachments,
