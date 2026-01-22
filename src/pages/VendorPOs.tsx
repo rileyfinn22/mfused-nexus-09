@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Eye, FileText, Trash2, Receipt, CreditCard, ClipboardList } from "lucide-react";
+import { Search, Eye, FileText, Trash2, Receipt, CreditCard, ClipboardList, Building2 } from "lucide-react";
 import { CreateExpensePODialog } from "@/components/CreateExpensePODialog";
 import { VendorBillsSummary } from "@/components/VendorBillsSummary";
 import { VendorBillsAgingBuckets } from "@/components/VendorBillsAgingBuckets";
@@ -312,12 +312,16 @@ const VendorPOs = () => {
         activeFilter={paymentStatusFilter}
       />
 
-      {/* Tabs for Bills, Payments, and AP Statement */}
+      {/* Tabs for Bills, Vendor Balances, Payments, and AP Statement */}
       <Tabs defaultValue="bills" className="space-y-4">
         <TabsList>
           <TabsTrigger value="bills" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Vendor PO / Bills
+          </TabsTrigger>
+          <TabsTrigger value="vendors" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Vendor Balances
           </TabsTrigger>
           <TabsTrigger value="payments" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
@@ -490,6 +494,16 @@ const VendorPOs = () => {
               </Card>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="vendors">
+          <VendorBalanceBreakdown
+            vendors={vendorBalances}
+            selectedVendorId={vendorFilter}
+            onVendorSelect={setVendorFilter}
+            onPaymentRecorded={fetchVendorPOs}
+            isFullWidth={true}
+          />
         </TabsContent>
 
         <TabsContent value="payments">
