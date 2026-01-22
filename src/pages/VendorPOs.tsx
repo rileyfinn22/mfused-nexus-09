@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,14 +25,18 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Eye, FileText, Trash2, Plus, Receipt } from "lucide-react";
+import { Search, Eye, FileText, Trash2, Receipt, CreditCard } from "lucide-react";
 import { CreateExpensePODialog } from "@/components/CreateExpensePODialog";
+import { VendorBillsSummary } from "@/components/VendorBillsSummary";
+import { VendorBillsAgingBuckets } from "@/components/VendorBillsAgingBuckets";
+import { VendorPaymentsLedger } from "@/components/VendorPaymentsLedger";
 
 const VendorPOs = () => {
   const navigate = useNavigate();
   const [pos, setPOs] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [poToDelete, setPOToDelete] = useState<any>(null);
@@ -78,7 +83,6 @@ const VendorPOs = () => {
     if (!poToDelete) return;
 
     try {
-      // First delete all vendor PO items
       const { error: itemsError } = await supabase
         .from('vendor_po_items')
         .delete()
@@ -86,7 +90,6 @@ const VendorPOs = () => {
 
       if (itemsError) throw itemsError;
 
-      // Then delete the vendor PO
       const { error: poError } = await supabase
         .from('vendor_pos')
         .delete()
@@ -99,7 +102,6 @@ const VendorPOs = () => {
         description: "Vendor purchase order has been deleted"
       });
 
-      // Refresh the list
       fetchVendorPOs();
     } catch (error: any) {
       toast({
@@ -119,11 +121,6 @@ const VendorPOs = () => {
       case 'partial': return 'default';
       case 'paid': return 'default';
       case 'draft': return 'secondary';
-      case 'submitted': return 'secondary';
-      case 'confirmed': return 'secondary';
-      case 'in_production': return 'secondary';
-      case 'received': return 'secondary';
-      case 'cancelled': return 'destructive';
       default: return 'secondary';
     }
   };
@@ -137,16 +134,68 @@ const VendorPOs = () => {
     }
   };
 
-  const handleDescriptionChange = async (poId: string, description: string) => {
-    const { error } = await supabase
-      .from("vendor_pos")
-      .update({ description })
-      .eq("id", poId);
+  // Calculate summary amounts
+  const summaryAmounts = useMemo(() => {
+    const nonDraftPOs = pos.filter(po => po.status !== 'draft');
+    
+    const unpaidPOs = nonDraftPOs.filter(po => po.status === 'unpaid' || (!po.total_paid || po.total_paid === 0));
+    const partialPOs = nonDraftPOs.filter(po => po.status === 'partial');
+    const paidPOs = nonDraftPOs.filter(po => po.status === 'paid');
 
-    if (error) {
-      console.error("Error updating vendor PO description:", error);
-    }
-  };
+    const unpaidAmount = unpaidPOs.reduce((sum, po) => {
+      const total = po.final_total ?? po.total ?? 0;
+      return sum + total;
+    }, 0);
+
+    const partialAmount = partialPOs.reduce((sum, po) => {
+      const total = po.final_total ?? po.total ?? 0;
+      const paid = po.total_paid || 0;
+      return sum + (total - paid);
+    }, 0);
+
+    const paidAmount = paidPOs.reduce((sum, po) => {
+      return sum + (po.total_paid || 0);
+    }, 0);
+
+    const totalOutstanding = unpaidAmount + partialAmount;
+
+    return { totalOutstanding, unpaidAmount, partialAmount, paidAmount };
+  }, [pos]);
+
+  // Calculate aging buckets
+  const agingBuckets = useMemo(() => {
+    const today = new Date();
+    const nonDraftPOs = pos.filter(po => po.status !== 'draft' && po.status !== 'paid');
+
+    const buckets = [
+      { label: 'Current (0-30 days)', amount: 0, count: 0, color: 'hsl(var(--success))' },
+      { label: '31-60 days', amount: 0, count: 0, color: 'hsl(var(--warning))' },
+      { label: '61-90 days', amount: 0, count: 0, color: 'hsl(217, 91%, 60%)' },
+      { label: '90+ days', amount: 0, count: 0, color: 'hsl(var(--destructive))' },
+    ];
+
+    nonDraftPOs.forEach(po => {
+      const orderDate = new Date(po.order_date);
+      const daysDiff = Math.floor((today.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
+      const remaining = (po.final_total ?? po.total ?? 0) - (po.total_paid || 0);
+
+      if (daysDiff <= 30) {
+        buckets[0].amount += remaining;
+        buckets[0].count++;
+      } else if (daysDiff <= 60) {
+        buckets[1].amount += remaining;
+        buckets[1].count++;
+      } else if (daysDiff <= 90) {
+        buckets[2].amount += remaining;
+        buckets[2].count++;
+      } else {
+        buckets[3].amount += remaining;
+        buckets[3].count++;
+      }
+    });
+
+    return buckets;
+  }, [pos]);
 
   const filteredPOs = pos.filter(po => {
     const matchesSearch = po.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -156,16 +205,34 @@ const VendorPOs = () => {
     const matchesType = typeFilter === "all" || 
       (typeFilter === "expense" && po.po_type === "expense") ||
       (typeFilter === "production" && (po.po_type === "production" || !po.po_type));
+
+    // Payment status filter
+    let matchesPaymentStatus = true;
+    if (paymentStatusFilter !== "all") {
+      if (paymentStatusFilter === "unpaid") {
+        matchesPaymentStatus = po.status === 'unpaid' || (!po.total_paid || po.total_paid === 0);
+      } else {
+        matchesPaymentStatus = po.status === paymentStatusFilter;
+      }
+    }
     
-    return matchesSearch && matchesType;
+    return matchesSearch && matchesType && matchesPaymentStatus;
   });
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(amount);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center border-b border-table-border pb-4">
         <div>
-          <h1 className="text-2xl font-semibold">Vendor Purchase Orders</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage purchase orders and expenses to vendors</p>
+          <h1 className="text-2xl font-semibold">Vendor Bills</h1>
+          <p className="text-sm text-muted-foreground mt-1">Track and manage accounts payable to vendors</p>
         </div>
         {isVibeAdmin && (
           <Button onClick={() => setShowExpenseDialog(true)}>
@@ -175,141 +242,190 @@ const VendorPOs = () => {
         )}
       </div>
 
-      <div className="flex gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search POs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Types" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="production">Production</SelectItem>
-            <SelectItem value="expense">Expense</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Summary Tiles */}
+      <VendorBillsSummary
+        totalOutstanding={summaryAmounts.totalOutstanding}
+        unpaidAmount={summaryAmounts.unpaidAmount}
+        partialAmount={summaryAmounts.partialAmount}
+        paidAmount={summaryAmounts.paidAmount}
+        onFilterChange={setPaymentStatusFilter}
+        activeFilter={paymentStatusFilter}
+      />
 
-      <Card className="shadow-sm">
-        <div className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>PO Number</TableHead>
-                <TableHead>Vendor</TableHead>
-                <TableHead>Customer/Order</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center">Loading POs...</TableCell>
-                </TableRow>
-              ) : filteredPOs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center">
-                    <div className="py-8">
-                      <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-muted-foreground">No vendor POs found</p>
+      {/* Tabs for Bills and Payments */}
+      <Tabs defaultValue="bills" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="bills" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Bills
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Payments
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="bills" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            {/* Aging Buckets */}
+            <div className="lg:col-span-1">
+              <VendorBillsAgingBuckets 
+                buckets={agingBuckets} 
+                totalOutstanding={summaryAmounts.totalOutstanding} 
+              />
+            </div>
+
+            {/* Bills Table */}
+            <div className="lg:col-span-3">
+              <Card className="shadow-sm">
+                <div className="p-4 border-b">
+                  <div className="flex gap-4">
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search POs..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
                     </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredPOs.map((po) => (
-                  <TableRow
-                    key={po.id}
-                    className="cursor-pointer hover:bg-muted/40"
-                    onClick={() => {
-                      toast({ title: "Opening PO...", description: po.po_number });
-                      navigate(`/vendor-pos/${po.id}`);
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        toast({ title: "Opening PO...", description: po.po_number });
-                        navigate(`/vendor-pos/${po.id}`);
-                      }
-                    }}
-                  >
-                    <TableCell className="font-medium">{po.po_number}</TableCell>
-                    <TableCell>{po.vendors?.name || 'Unassigned'}</TableCell>
-                    <TableCell>
-                      {po.po_type === 'expense' 
-                        ? (po.customer_company?.name || '-')
-                        : (po.orders?.order_number || '-')
-                      }
-                    </TableCell>
-                    <TableCell className="max-w-[300px]">
-                      <span className="text-sm text-muted-foreground whitespace-normal break-words">
-                        {po.orders?.description || po.description || '-'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(po.order_date).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>${po.total?.toFixed(2) || '0.00'}</div>
-                        {(po.total_paid || 0) > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            Paid: ${(po.total_paid || 0).toFixed(2)}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusColor(po.status)}>
-                        {getStatusLabel(po.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-2 justify-end">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/vendor-pos/${po.id}`);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {isVibeAdmin && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteClick(po);
-                            }}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="All Types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="production">Production</SelectItem>
+                        <SelectItem value="expense">Expense</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>PO Number</TableHead>
+                        <TableHead>Vendor</TableHead>
+                        <TableHead>Customer/Order</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Paid</TableHead>
+                        <TableHead>Balance</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loading ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center">Loading bills...</TableCell>
+                        </TableRow>
+                      ) : filteredPOs.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center">
+                            <div className="py-8">
+                              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                              <p className="text-muted-foreground">No vendor bills found</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredPOs.map((po) => {
+                          const total = po.final_total ?? po.total ?? 0;
+                          const paid = po.total_paid || 0;
+                          const balance = total - paid;
+
+                          return (
+                            <TableRow
+                              key={po.id}
+                              className="cursor-pointer hover:bg-muted/40"
+                              onClick={() => {
+                                toast({ title: "Opening PO...", description: po.po_number });
+                                navigate(`/vendor-pos/${po.id}`);
+                              }}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  navigate(`/vendor-pos/${po.id}`);
+                                }
+                              }}
+                            >
+                              <TableCell className="font-medium">{po.po_number}</TableCell>
+                              <TableCell>{po.vendors?.name || 'Unassigned'}</TableCell>
+                              <TableCell>
+                                <div className="text-sm">
+                                  <div>{po.po_type === 'expense' 
+                                    ? (po.customer_company?.name || '-')
+                                    : (po.orders?.order_number || '-')
+                                  }</div>
+                                  {po.orders?.description && (
+                                    <div className="text-xs text-muted-foreground truncate max-w-[150px]">
+                                      {po.orders.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {new Date(po.order_date).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>{formatCurrency(total)}</TableCell>
+                              <TableCell className="text-success">
+                                {paid > 0 ? formatCurrency(paid) : '-'}
+                              </TableCell>
+                              <TableCell className={balance > 0 ? 'text-destructive font-medium' : ''}>
+                                {balance > 0 ? formatCurrency(balance) : '-'}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={getStatusColor(po.status)}>
+                                  {getStatusLabel(po.status)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex gap-2 justify-end">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/vendor-pos/${po.id}`);
+                                    }}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  {isVibeAdmin && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteClick(po);
+                                      }}
+                                      className="text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="payments">
+          <VendorPaymentsLedger />
+        </TabsContent>
+      </Tabs>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
