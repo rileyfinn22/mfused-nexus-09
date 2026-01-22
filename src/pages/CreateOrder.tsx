@@ -338,8 +338,11 @@ const CreateOrder = () => {
     }
   }, [selectedCompanyId, roleChecked, initialLoading]);
 
-  // Auto-save draft every 1 minute
+  // Auto-save draft every 1 minute - ONLY for new orders (not editing existing)
   const performAutoSave = useCallback(async () => {
+    // Skip auto-save if editing an existing order (orderId is set from URL params)
+    if (orderId) return;
+    
     // Only auto-save if there's meaningful data
     const hasItems = selectedItems.length > 0 || unmatchedPoItems.length > 0;
     const hasAddress = formData.shippingStreet.trim() !== '';
