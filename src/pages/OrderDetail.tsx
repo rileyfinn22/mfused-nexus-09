@@ -19,6 +19,7 @@ import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Cir
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
+import { CreateCustomVendorPODialog } from "@/components/CreateCustomVendorPODialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
 import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
 import { cn } from "@/lib/utils";
@@ -97,6 +98,7 @@ const OrderDetail = () => {
   const [uploadingOrderAttachment, setUploadingOrderAttachment] = useState(false);
   const [orderAttachmentDescription, setOrderAttachmentDescription] = useState('');
   const [uploadingCustomerPO, setUploadingCustomerPO] = useState(false);
+  const [showCustomPODialog, setShowCustomPODialog] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -1545,6 +1547,10 @@ const OrderDetail = () => {
                 <Package className="h-4 w-4 mr-2" />
                 Assign Vendors
               </Button>
+              <Button variant="outline" onClick={() => setShowCustomPODialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Custom Vendor PO
+              </Button>
             </>
           )}
           <Button variant="outline" onClick={handleDownloadPackingList}>
@@ -1672,6 +1678,18 @@ const OrderDetail = () => {
           orderId={orderId || ''}
           orderItems={order.order_items.filter((item: any) => item.product_id !== null)}
           onSuccess={fetchOrder}
+        />
+      )}
+
+      {/* Custom Vendor PO Dialog */}
+      {isVibeAdmin && order && (
+        <CreateCustomVendorPODialog
+          open={showCustomPODialog}
+          onOpenChange={setShowCustomPODialog}
+          orderId={orderId || ''}
+          orderNumber={order.order_number}
+          companyId={order.company_id}
+          onCreated={fetchOrder}
         />
       )}
 
