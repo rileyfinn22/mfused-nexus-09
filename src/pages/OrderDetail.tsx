@@ -17,23 +17,21 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
+import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
 
-const STAGE_NAMES = [
-  { value: 'production_proceeding_part_1', label: 'Material Order and Securing', order: 1 },
-  { value: 'production_proceeding_part_2', label: 'Print and Converting', order: 2 },
-  { value: 'complete_qc', label: 'Packing and QC', order: 3 },
-  { value: 'shipped', label: 'Shipped', order: 4 },
-  { value: 'delivered', label: 'Delivered', order: 5 },
+const STAGE_DEFINITIONS = [
+  { value: 'production_proceeding_part_1', label: 'Material Order and Securing', order: 1, weight: 20 },
+  { value: 'production_proceeding_part_2', label: 'Print and Converting', order: 2, weight: 50 },
+  { value: 'complete_qc', label: 'Packing and QC', order: 3, weight: 15 },
+  { value: 'shipped', label: 'Shipped', order: 4, weight: 10 },
+  { value: 'delivered', label: 'Delivered', order: 5, weight: 5 },
 ];
 
-const PRINT_SUBSTAGES = [
-  { key: 'print_film', label: 'Print Film', percent: 25 },
-  { key: 'lamination_curing', label: 'Lamination + Curing', percent: 10 },
-  { key: 'converting', label: 'Converting', percent: 15 },
-];
+// Keep STAGE_NAMES for backward compatibility
+const STAGE_NAMES = STAGE_DEFINITIONS;
 
 const OrderDetail = () => {
   const {
@@ -56,6 +54,7 @@ const OrderDetail = () => {
   const [vendors, setVendors] = useState<any[]>([]);
   const [stageUpdates, setStageUpdates] = useState<{[key: string]: any[]}>({});
   const [isVendor, setIsVendor] = useState(false);
+  const [isCustomer, setIsCustomer] = useState(false);
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [stageNotes, setStageNotes] = useState<{[key: string]: string}>({});
@@ -115,6 +114,8 @@ const OrderDetail = () => {
       setIsAdmin(role === 'admin' || role === 'vibe_admin');
       setIsVibeAdmin(role === 'vibe_admin');
       setIsVendor(role === 'vendor');
+      // Company-side users (admin/customer/company) should see the simplified customer view
+      setIsCustomer(role === 'admin' || role === 'customer' || role === 'company');
 
       if (role === 'vendor') {
         const { data: vendorData } = await supabase
@@ -512,7 +513,7 @@ const OrderDetail = () => {
   };
 
   // Handle sub-stage completion with auto-note
-  const handleSubstageComplete = async (stageId: string, substage: typeof PRINT_SUBSTAGES[0]) => {
+  const handleSubstageComplete = async (stageId: string, substage: { key: string; label: string; percent: number }) => {
     if (!isVibeAdmin) return;
     
     // Check if already completed
@@ -593,6 +594,36 @@ const OrderDetail = () => {
       });
     }
   };
+
+  const handleInternalNotesChange = async (stageId: string, notes: string) => {
+    if (!isVibeAdmin) return;
+    
+    try {
+      const { error } = await supabase
+        .from('production_stages')
+        .update({ internal_notes: notes })
+        .eq('id', stageId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Saved",
+        description: "Internal notes updated",
+      });
+      
+      fetchProductionStages();
+    } catch (error: any) {
+      console.error('Error saving internal notes:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save internal notes",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Placeholder for update dialog - ProductionStageTimeline handles updates inline
+  const handleOpenUpdateDialog = () => {};
 
   const handleAddVibeNote = async () => {
     if (!vibeNotes.trim()) return;
@@ -1955,20 +1986,6 @@ const OrderDetail = () => {
           {/* Production Stages Section */}
           {order.status === 'in production' && (
             <div className="border-t border-table-border bg-muted/30 p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-primary" />
-                  <h2 className="text-lg font-semibold">Production Stages</h2>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground">Overall Progress:</span>
-                  <div className="flex items-center gap-2 w-48">
-                    <Progress value={calculateProductionProgress()} className="h-2 flex-1" />
-                    <span className="text-sm font-semibold">{calculateProductionProgress()}%</span>
-                  </div>
-                </div>
-              </div>
-
               {productionStages.length === 0 ? (
                 <div className="text-center py-8 p-4 bg-background rounded-lg border border-table-border">
                   <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
@@ -1981,301 +1998,34 @@ const OrderDetail = () => {
                   )}
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {productionStages.map((stage, index) => (
-                    <div key={stage.id} className="p-4 bg-background rounded-lg border border-table-border">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                            stage.status === 'completed' ? 'bg-green-500 text-white' :
-                            stage.status === 'in_progress' ? 'bg-blue-500 text-white' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <div>
-                            <h3 className="font-medium">{STAGE_NAMES.find(s => s.value === stage.stage_name)?.label || stage.stage_name.replace(/_/g, ' ')}</h3>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge className={
-                            stage.status === 'completed' ? 'bg-green-500' :
-                            stage.status === 'in_progress' ? 'bg-blue-500' :
-                            'bg-muted-foreground'
-                          }>
-                            {stage.status.replace('_', ' ')}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      {(isVibeAdmin || (isVendor && stage.vendor_id === vendorId)) && (
-                        <div className="mt-4 pt-4 border-t border-table-border">
-                          {/* Quick Status Buttons */}
-                          <div className="mb-4">
-                            <Label className="text-xs text-muted-foreground mb-2 block">Quick Update Status</Label>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant={stage.status === 'pending' ? 'default' : 'outline'}
-                                className={`flex-1 h-9 ${stage.status === 'pending' ? 'bg-muted-foreground hover:bg-muted-foreground/90' : ''}`}
-                                disabled={updatingStages[stage.id]}
-                                onClick={() => {
-                                  if (stage.status !== 'pending') {
-                                    handleStageStatusChange(stage.id, 'pending');
-                                  }
-                                }}
-                              >
-                                <Circle className="h-3 w-3 mr-1.5" />
-                                Pending
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={stage.status === 'in_progress' ? 'default' : 'outline'}
-                                className={`flex-1 h-9 ${stage.status === 'in_progress' ? 'bg-blue-500 hover:bg-blue-600' : ''}`}
-                                disabled={updatingStages[stage.id]}
-                                onClick={() => {
-                                  if (stage.status !== 'in_progress') {
-                                    handleStageStatusChange(stage.id, 'in_progress');
-                                  }
-                                }}
-                              >
-                                {updatingStages[stage.id] && stage.status !== 'in_progress' ? (
-                                  <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                                ) : (
-                                  <Truck className="h-3 w-3 mr-1.5" />
-                                )}
-                                In Progress
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={stage.status === 'completed' ? 'default' : 'outline'}
-                                className={`flex-1 h-9 ${stage.status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''}`}
-                                disabled={updatingStages[stage.id]}
-                                onClick={() => {
-                                  if (stage.status !== 'completed') {
-                                    handleStageStatusChange(stage.id, 'completed');
-                                  }
-                                }}
-                              >
-                                <CheckCircle2 className="h-3 w-3 mr-1.5" />
-                                Complete
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Sub-stages for Print and Converting */}
-                          {isVibeAdmin && stage.stage_name === 'production_proceeding_part_2' && (
-                            <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
-                              <Label className="text-xs text-muted-foreground mb-2 block">Production Sub-stages</Label>
-                              <div className="flex gap-2 flex-wrap">
-                                {PRINT_SUBSTAGES.map((substage) => {
-                                  const isComplete = isSubstageComplete(stage.id, substage.key);
-                                  return (
-                                    <Button
-                                      key={substage.key}
-                                      size="sm"
-                                      variant={isComplete ? 'default' : 'outline'}
-                                      className={`h-9 ${isComplete ? 'bg-green-500 hover:bg-green-500/90 cursor-default' : 'hover:bg-primary/10'}`}
-                                      disabled={updatingStages[stage.id] || isComplete}
-                                      onClick={() => handleSubstageComplete(stage.id, substage)}
-                                    >
-                                      {isComplete ? (
-                                        <CheckCircle2 className="h-3 w-3 mr-1.5" />
-                                      ) : updatingStages[stage.id] ? (
-                                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                                      ) : (
-                                        <Circle className="h-3 w-3 mr-1.5" />
-                                      )}
-                                      {substage.label}
-                                      <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">
-                                        {substage.percent}%
-                                      </Badge>
-                                    </Button>
-                                  );
-                                })}
-                              </div>
-                              <p className="text-[10px] text-muted-foreground mt-2">
-                                Click to mark sub-stages as complete and auto-add progress notes
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Collapsible Add Details Section */}
-                          <details className="group">
-                            <summary className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
-                              <Plus className="h-3 w-3 transition-transform group-open:rotate-45" />
-                              Add note, image, or document
-                            </summary>
-                            <div className="mt-3 space-y-3 pl-4 border-l-2 border-muted">
-                              <div>
-                                <Label htmlFor={`note-${stage.id}`} className="text-xs">Note</Label>
-                                <Textarea
-                                  id={`note-${stage.id}`}
-                                  value={stageNotes[stage.id] || ""}
-                                  onChange={(e) => setStageNotes(prev => ({ ...prev, [stage.id]: e.target.value }))}
-                                  placeholder="Add notes about this stage..."
-                                  rows={2}
-                                  className="mt-1 text-sm"
-                                />
-                              </div>
-                              
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label htmlFor={`image-${stage.id}`} className="text-xs">Image</Label>
-                                  <Input
-                                    id={`image-${stage.id}`}
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => setStageImages(prev => ({ ...prev, [stage.id]: e.target.files?.[0] || null }))}
-                                    className="mt-1 text-xs h-9"
-                                  />
-                                  {stageImages[stage.id] && (
-                                    <p className="text-xs text-green-600 mt-1 truncate">
-                                      ✓ {stageImages[stage.id]!.name}
-                                    </p>
-                                  )}
-                                </div>
-                                
-                                {isVibeAdmin && (
-                                  <div>
-                                    <Label htmlFor={`file-${stage.id}`} className="text-xs">Document</Label>
-                                    <Input
-                                      id={`file-${stage.id}`}
-                                      type="file"
-                                      accept=".pdf,.xlsx,.xls,.csv"
-                                      onChange={(e) => setStageFiles(prev => ({ ...prev, [stage.id]: e.target.files?.[0] || null }))}
-                                      className="mt-1 text-xs h-9"
-                                    />
-                                    {stageFiles[stage.id] && (
-                                      <p className="text-xs text-green-600 mt-1 truncate">
-                                        ✓ {stageFiles[stage.id]!.name}
-                                      </p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {(stageNotes[stage.id] || stageImages[stage.id] || stageFiles[stage.id]) && (
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={() => handleStageStatusChange(stage.id, stage.status)}
-                                  disabled={updatingStages[stage.id]}
-                                  className="w-full"
-                                >
-                                  {updatingStages[stage.id] ? (
-                                    <>
-                                      <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                                      Saving...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Upload className="h-3 w-3 mr-1.5" />
-                                      Save Attachments
-                                    </>
-                                  )}
-                                </Button>
-                              )}
-                            </div>
-                          </details>
-                        </div>
-                      )}
-
-                      {/* Stage Updates History */}
-                      {stageUpdates[stage.id] && stageUpdates[stage.id].length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-table-border">
-                          <p className="text-xs font-medium text-muted-foreground mb-3">Activity History</p>
-                          <div className="space-y-3">
-                            {stageUpdates[stage.id].slice(0, 3).map((update, idx) => (
-                              <div key={idx} className="flex gap-3">
-                                {/* Timeline indicator */}
-                                <div className="flex flex-col items-center">
-                                  <div className={`w-2 h-2 rounded-full ${
-                                    update.new_status === 'completed' ? 'bg-green-500' :
-                                    update.new_status === 'in_progress' ? 'bg-blue-500' :
-                                    'bg-muted-foreground'
-                                  }`} />
-                                  {idx < stageUpdates[stage.id].slice(0, 3).length - 1 && (
-                                    <div className="w-0.5 h-full bg-border flex-1 mt-1" />
-                                  )}
-                                </div>
-                                
-                                {/* Update content */}
-                                <div className="flex-1 pb-3">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    {update.previous_status && update.new_status && (
-                                      <div className="flex items-center gap-1.5 text-xs">
-                                        <Badge variant="outline" className="h-5 px-1.5 capitalize text-[10px]">
-                                          {update.previous_status.replace('_', ' ')}
-                                        </Badge>
-                                        <span className="text-muted-foreground">→</span>
-                                        <Badge className={`h-5 px-1.5 capitalize text-[10px] ${
-                                          update.new_status === 'completed' ? 'bg-green-500' :
-                                          update.new_status === 'in_progress' ? 'bg-blue-500' :
-                                          'bg-muted-foreground'
-                                        }`}>
-                                          {update.new_status.replace('_', ' ')}
-                                        </Badge>
-                                      </div>
-                                    )}
-                                    <span className="text-[10px] text-muted-foreground ml-auto">
-                                      {new Date(update.created_at).toLocaleDateString()} at {new Date(update.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  </div>
-                                  {update.note_text && (
-                                    <p className="text-sm text-foreground bg-muted/50 rounded-md px-2 py-1.5 mt-1">{formatNoteText(update.note_text)}</p>
-                                  )}
-                                  {update.image_url && (
-                                    <div 
-                                      className="relative group cursor-pointer mt-2"
-                                      onClick={() => setPreviewImage(update.image_url)}
-                                    >
-                                      <img 
-                                        src={update.image_url} 
-                                        alt="Production update" 
-                                        className="w-full max-w-xs h-24 object-cover rounded-md border border-table-border transition-opacity group-hover:opacity-80"
-                                      />
-                                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-md">
-                                        <span className="text-white text-xs font-medium">Click to preview</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                  {update.file_url && (
-                                    <a
-                                      href={update.file_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-2 mt-2 p-2 bg-background rounded-md border border-table-border hover:border-primary transition-colors"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <FileText className="h-4 w-4 text-primary" />
-                                      <span className="text-xs text-primary hover:underline">
-                                        {update.file_name || 'Download Document'}
-                                      </span>
-                                      <Download className="h-3 w-3 text-muted-foreground ml-auto" />
-                                    </a>
-                                  )}
-                                  {/* Delete button for Vibe Admins */}
-                                  {isVibeAdmin && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 mt-1"
-                                      onClick={() => handleDeleteStageUpdate(update.id, stage.id)}
-                                    >
-                                      <Trash2 className="h-3 w-3 mr-1" />
-                                      Delete
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <ProductionStageTimeline
+                  stages={productionStages.map(stage => ({
+                    ...stage,
+                    production_stage_updates: stageUpdates[stage.id] || []
+                  }))}
+                  stageDefinitions={STAGE_DEFINITIONS}
+                  onUpdateClick={handleOpenUpdateDialog}
+                  onQuickStatusChange={async (stageId, newStatus) => {
+                    await handleStageStatusChange(stageId, newStatus);
+                  }}
+                  onSubstageComplete={handleSubstageComplete}
+                  onDeleteUpdate={async (updateId) => {
+                    // Find the stage this update belongs to
+                    for (const stageId of Object.keys(stageUpdates)) {
+                      const updates = stageUpdates[stageId];
+                      if (updates?.find(u => u.id === updateId)) {
+                        await handleDeleteStageUpdate(updateId, stageId);
+                        break;
+                      }
+                    }
+                  }}
+                  onInternalNotesChange={handleInternalNotesChange}
+                  onVendorAssign={handleAssignVendor}
+                  vendors={vendors}
+                  isVibeAdmin={isVibeAdmin}
+                  isVendor={isVendor}
+                  isCustomer={isCustomer}
+                />
               )}
             </div>
           )}
