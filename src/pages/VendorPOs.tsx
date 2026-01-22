@@ -44,7 +44,7 @@ const VendorPOs = () => {
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [poToDelete, setPOToDelete] = useState<any>(null);
-  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [isVibeAdmin, setIsVibeAdmin] = useState<boolean | null>(null);
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
 
   const setVendorFilter = (value: string) => {
@@ -58,8 +58,17 @@ const VendorPOs = () => {
 
   useEffect(() => {
     checkAdminStatus();
-    fetchVendorPOs();
   }, []);
+
+  useEffect(() => {
+    // Only fetch data if user is confirmed as vibe admin
+    if (isVibeAdmin === true) {
+      fetchVendorPOs();
+    } else if (isVibeAdmin === false) {
+      // Redirect non-admins to dashboard
+      navigate('/dashboard');
+    }
+  }, [isVibeAdmin]);
 
   const checkAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -268,6 +277,15 @@ const VendorPOs = () => {
       minimumFractionDigits: 2,
     }).format(amount);
   };
+
+  // Show loading while checking admin status
+  if (isVibeAdmin === null) {
+    return (
+      <div className="max-w-7xl mx-auto py-12 text-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
