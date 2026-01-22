@@ -29,12 +29,30 @@ const ProjectDetail = () => {
   const [vendorPayments, setVendorPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [plView, setPlView] = useState<"accrual" | "cash">("accrual");
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+
+  useEffect(() => {
+    checkAdminStatus();
+  }, []);
 
   useEffect(() => {
     if (projectId) {
       fetchProjectData();
     }
-  }, [projectId]);
+  }, [projectId, isVibeAdmin]);
+
+  const checkAdminStatus = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      const role = data?.role as string;
+      setIsVibeAdmin(role === 'vibe_admin');
+    }
+  };
 
   const fetchProjectData = async () => {
     setLoading(true);
@@ -73,30 +91,36 @@ const ProjectDetail = () => {
         setPayments(paymentData || []);
       }
 
-      // Fetch vendor POs
-      const { data: vendorPOData } = await supabase
-        .from('vendor_pos')
-        .select(`
-          *,
-          vendors(name),
-          vendor_po_items(*)
-        `)
-        .eq('order_id', projectId)
-        .order('created_at', { ascending: false });
-      setVendorPOs(vendorPOData || []);
-
-      // Fetch vendor PO payments
-      if (vendorPOData && vendorPOData.length > 0) {
-        const vendorPOIds = vendorPOData.map(po => po.id);
-        const { data: vendorPaymentData } = await supabase
-          .from('vendor_po_payments')
+      // Fetch vendor POs - ONLY for Vibe Admins
+      if (isVibeAdmin) {
+        const { data: vendorPOData } = await supabase
+          .from('vendor_pos')
           .select(`
             *,
-            vendor_pos!vendor_po_payments_vendor_po_id_fkey(po_number, vendors(name))
+            vendors(name),
+            vendor_po_items(*)
           `)
-          .in('vendor_po_id', vendorPOIds)
-          .order('payment_date', { ascending: false });
-        setVendorPayments(vendorPaymentData || []);
+          .eq('order_id', projectId)
+          .order('created_at', { ascending: false });
+        setVendorPOs(vendorPOData || []);
+
+        // Fetch vendor PO payments
+        if (vendorPOData && vendorPOData.length > 0) {
+          const vendorPOIds = vendorPOData.map(po => po.id);
+          const { data: vendorPaymentData } = await supabase
+            .from('vendor_po_payments')
+            .select(`
+              *,
+              vendor_pos!vendor_po_payments_vendor_po_id_fkey(po_number, vendors(name))
+            `)
+            .in('vendor_po_id', vendorPOIds)
+            .order('payment_date', { ascending: false });
+          setVendorPayments(vendorPaymentData || []);
+        }
+      } else {
+        // Clear vendor data for non-admins
+        setVendorPOs([]);
+        setVendorPayments([]);
       }
 
     } catch (error) {
@@ -177,7 +201,7 @@ const ProjectDetail = () => {
       </div>
 
       {/* P&L Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${isVibeAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4`}>
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -186,77 +210,100 @@ const ProjectDetail = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {plView === "accrual" ? "Total Revenue (Invoiced)" : "Total Received (Cash)"}
+                  {isVibeAdmin && plView === "accrual" ? "Total Revenue (Invoiced)" : isVibeAdmin ? "Total Received (Cash)" : "Total Invoiced"}
                 </p>
                 <p className="text-xl font-bold">
-                  {formatCurrency(plView === "accrual" ? totalRevenue : totalPaid)}
+                  {formatCurrency(isVibeAdmin ? (plView === "accrual" ? totalRevenue : totalPaid) : totalRevenue)}
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center">
-                <TrendingDown className="h-5 w-5 text-destructive" />
+        {/* Total Paid - for customers only when not admin */}
+        {!isVibeAdmin && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-success/10 flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-success" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Paid</p>
+                  <p className="text-xl font-bold text-success">{formatCurrency(totalPaid)}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Costs</p>
-                <p className="text-xl font-bold">{formatCurrency(totalCosts)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                (plView === "accrual" ? accrualProfit : cashProfit) >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
-              }`}>
-                <TrendingUp className={`h-5 w-5 ${
-                  (plView === "accrual" ? accrualProfit : cashProfit) >= 0 ? 'text-green-600' : 'text-red-600'
-                }`} />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  {plView === "accrual" ? "Accrual P&L" : "Cash P&L"}
-                </p>
-                <p className={`text-xl font-bold ${getProfitColor(plView === "accrual" ? accrualProfit : cashProfit)}`}>
-                  {formatCurrency(plView === "accrual" ? accrualProfit : cashProfit)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                <span className="text-sm font-bold text-muted-foreground">%</span>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  {plView === "accrual" ? "Accrual Margin" : "Cash Margin"}
-                </p>
-                <p className={`text-xl font-bold ${getProfitColor(plView === "accrual" ? accrualMargin : cashMargin)}`}>
-                  {(plView === "accrual" ? accrualMargin : cashMargin).toFixed(1)}%
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
+        {/* Costs, P&L, and Margin - Vibe Admin only */}
+        {isVibeAdmin && (
+          <>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+                    <TrendingDown className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Costs</p>
+                    <p className="text-xl font-bold">{formatCurrency(totalCosts)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                    (plView === "accrual" ? accrualProfit : cashProfit) >= 0 ? 'bg-success/10' : 'bg-destructive/10'
+                  }`}>
+                    <TrendingUp className={`h-5 w-5 ${
+                      (plView === "accrual" ? accrualProfit : cashProfit) >= 0 ? 'text-success' : 'text-destructive'
+                    }`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {plView === "accrual" ? "Accrual P&L" : "Cash P&L"}
+                    </p>
+                    <p className={`text-xl font-bold ${getProfitColor(plView === "accrual" ? accrualProfit : cashProfit)}`}>
+                      {formatCurrency(plView === "accrual" ? accrualProfit : cashProfit)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                    <span className="text-sm font-bold text-muted-foreground">%</span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {plView === "accrual" ? "Accrual Margin" : "Cash Margin"}
+                    </p>
+                    <p className={`text-xl font-bold ${getProfitColor(plView === "accrual" ? accrualMargin : cashMargin)}`}>
+                      {(plView === "accrual" ? accrualMargin : cashMargin).toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
-      {/* View Toggle */}
-      <div className="flex justify-end">
-        <Tabs value={plView} onValueChange={(v) => setPlView(v as "accrual" | "cash")}>
-          <TabsList>
-            <TabsTrigger value="accrual">Accrual View</TabsTrigger>
-            <TabsTrigger value="cash">Cash View</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+      {/* View Toggle - Vibe Admin only */}
+      {isVibeAdmin && (
+        <div className="flex justify-end">
+          <Tabs value={plView} onValueChange={(v) => setPlView(v as "accrual" | "cash")}>
+            <TabsList>
+              <TabsTrigger value="accrual">Accrual View</TabsTrigger>
+              <TabsTrigger value="cash">Cash View</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
 
       {/* Details Sections */}
       <Tabs defaultValue="overview" className="space-y-4">
@@ -273,10 +320,12 @@ const ProjectDetail = () => {
             <Receipt className="h-4 w-4" />
             Payments ({payments.length})
           </TabsTrigger>
-          <TabsTrigger value="costs" className="gap-2">
-            <Package className="h-4 w-4" />
-            Vendor POs ({vendorPOs.length})
-          </TabsTrigger>
+          {isVibeAdmin && (
+            <TabsTrigger value="costs" className="gap-2">
+              <Package className="h-4 w-4" />
+              Vendor POs ({vendorPOs.length})
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Overview Tab */}
