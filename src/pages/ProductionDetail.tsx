@@ -447,6 +447,64 @@ export default function ProductionDetail() {
     }
   };
 
+  const handleSubstageComplete = async (stageId: string, substage: { key: string; label: string; percent: number }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const stage = stages.find(s => s.id === stageId);
+      if (!stage) throw new Error("Stage not found");
+
+      // Check if already completed
+      const noteMarker = `<!--${substage.key.toUpperCase()}-->`;
+      const alreadyComplete = stage.production_stage_updates.some(u => u.note_text?.includes(noteMarker));
+      
+      if (alreadyComplete) {
+        toast({
+          title: "Already Completed",
+          description: `${substage.label} has already been marked as complete`,
+        });
+        return;
+      }
+
+      // Ensure stage is at least in_progress
+      if (stage.status === 'pending') {
+        await (supabase as any)
+          .from('production_stages')
+          .update({ status: 'in_progress' })
+          .eq('id', stageId);
+      }
+
+      // Create auto-note with hidden marker for detection + clean display text
+      const noteText = `<!--${substage.key.toUpperCase()}-->${substage.label} Complete`;
+      
+      const { error } = await (supabase as any)
+        .from('production_stage_updates')
+        .insert({
+          stage_id: stageId,
+          updated_by: user.id,
+          update_type: 'note',
+          note_text: noteText,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Sub-stage Complete",
+        description: `${substage.label} marked as complete`,
+      });
+      
+      await fetchOrderAndStages();
+    } catch (error: any) {
+      console.error('Error completing substage:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete sub-stage",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -533,6 +591,7 @@ export default function ProductionDetail() {
           stageDefinitions={STAGE_NAMES}
           onUpdateClick={handleOpenUpdateDialog}
           onQuickStatusChange={handleQuickStatusChange}
+          onSubstageComplete={handleSubstageComplete}
           onVendorAssign={handleAssignVendor}
           vendors={vendors}
           isVibeAdmin={isVibeAdmin}
