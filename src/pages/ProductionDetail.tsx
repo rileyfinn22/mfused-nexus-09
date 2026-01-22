@@ -403,6 +403,50 @@ export default function ProductionDetail() {
     setUpdateDialogOpen(true);
   };
 
+  const handleQuickStatusChange = async (stageId: string, newStatus: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const stage = stages.find(s => s.id === stageId);
+      if (!stage) throw new Error("Stage not found");
+
+      // Update stage status
+      const { error: statusError } = await (supabase as any)
+        .from('production_stages')
+        .update({ status: newStatus })
+        .eq('id', stageId);
+
+      if (statusError) throw statusError;
+
+      // Create status change update record
+      const { error: updateError } = await (supabase as any)
+        .from('production_stage_updates')
+        .insert({
+          stage_id: stageId,
+          updated_by: user.id,
+          update_type: 'status_change',
+          previous_status: stage.status,
+          new_status: newStatus,
+        });
+
+      if (updateError) throw updateError;
+
+      await fetchOrderAndStages();
+      toast({
+        title: "Success",
+        description: `Stage updated to ${newStatus.replace('_', ' ')}`,
+      });
+    } catch (error: any) {
+      console.error('Error updating stage:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update stage",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -488,6 +532,7 @@ export default function ProductionDetail() {
           stages={stages}
           stageDefinitions={STAGE_NAMES}
           onUpdateClick={handleOpenUpdateDialog}
+          onQuickStatusChange={handleQuickStatusChange}
           onVendorAssign={handleAssignVendor}
           vendors={vendors}
           isVibeAdmin={isVibeAdmin}

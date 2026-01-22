@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare } from "lucide-react";
+import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,7 @@ interface ProductionStageTimelineProps {
   stages: ProductionStage[];
   stageDefinitions: StageDefinition[];
   onUpdateClick: (stage: ProductionStage, stageDef: StageDefinition) => void;
+  onQuickStatusChange?: (stageId: string, newStatus: string) => Promise<void>;
   onVendorAssign?: (stageId: string, vendorId: string) => void;
   vendors?: { id: string; name: string }[];
   isVibeAdmin: boolean;
@@ -51,6 +52,7 @@ export function ProductionStageTimeline({
   stages,
   stageDefinitions,
   onUpdateClick,
+  onQuickStatusChange,
   onVendorAssign,
   vendors = [],
   isVibeAdmin,
@@ -58,6 +60,22 @@ export function ProductionStageTimeline({
   isCustomer,
 }: ProductionStageTimelineProps) {
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
+  const [updatingStages, setUpdatingStages] = useState<Set<string>>(new Set());
+
+  const handleQuickStatus = async (stageId: string, newStatus: string) => {
+    if (!onQuickStatusChange) return;
+    
+    setUpdatingStages(prev => new Set(prev).add(stageId));
+    try {
+      await onQuickStatusChange(stageId, newStatus);
+    } finally {
+      setUpdatingStages(prev => {
+        const next = new Set(prev);
+        next.delete(stageId);
+        return next;
+      });
+    }
+  };
 
   const toggleExpand = (stageId: string) => {
     setExpandedStages(prev => {
@@ -210,6 +228,7 @@ export function ProductionStageTimeline({
             const hasUpdates = stage.production_stage_updates.length > 0;
             const isActive = stage.status === 'in_progress';
             const isComplete = stage.status === 'completed';
+            const isUpdating = updatingStages.has(stage.id);
             
             return (
               <div key={stage.id} className="relative pl-12">
@@ -253,17 +272,6 @@ export function ProductionStageTimeline({
                         </div>
                         
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button
-                            size="sm"
-                            variant={isActive ? "default" : "outline"}
-                            onClick={() => onUpdateClick(stage, stageDef)}
-                            className={cn(
-                              isActive && "bg-blue-500 hover:bg-blue-600"
-                            )}
-                          >
-                            {isCustomer ? 'Add Note' : 'Update'}
-                          </Button>
-                          
                           {hasUpdates && (
                             <CollapsibleTrigger asChild>
                               <Button variant="ghost" size="sm" className="px-2">
@@ -280,6 +288,83 @@ export function ProductionStageTimeline({
                           )}
                         </div>
                       </div>
+                      
+                      {/* Quick Status Buttons - For Admin/Vendor */}
+                      {(isVibeAdmin || isVendor) && onQuickStatusChange && (
+                        <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-border/50">
+                          {isUpdating ? (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-sm">Updating...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant={stage.status === 'pending' ? 'default' : 'outline'}
+                                className={cn(
+                                  "h-8",
+                                  stage.status === 'pending' && "bg-muted-foreground hover:bg-muted-foreground/90"
+                                )}
+                                onClick={() => handleQuickStatus(stage.id, 'pending')}
+                                disabled={stage.status === 'pending'}
+                              >
+                                <Circle className="h-3 w-3 mr-1.5" />
+                                Pending
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={stage.status === 'in_progress' ? 'default' : 'outline'}
+                                className={cn(
+                                  "h-8",
+                                  stage.status === 'in_progress' && "bg-blue-500 hover:bg-blue-600"
+                                )}
+                                onClick={() => handleQuickStatus(stage.id, 'in_progress')}
+                                disabled={stage.status === 'in_progress'}
+                              >
+                                <Truck className="h-3 w-3 mr-1.5" />
+                                In Progress
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={stage.status === 'completed' ? 'default' : 'outline'}
+                                className={cn(
+                                  "h-8",
+                                  stage.status === 'completed' && "bg-green-500 hover:bg-green-600"
+                                )}
+                                onClick={() => handleQuickStatus(stage.id, 'completed')}
+                                disabled={stage.status === 'completed'}
+                              >
+                                <CheckCircle2 className="h-3 w-3 mr-1.5" />
+                                Complete
+                              </Button>
+                              <div className="flex-1" />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => onUpdateClick(stage, stageDef)}
+                              >
+                                <MessageSquare className="h-3 w-3 mr-1.5" />
+                                Add Note
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Customer view - just add note button */}
+                      {isCustomer && !isVibeAdmin && !isVendor && (
+                        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/50">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onUpdateClick(stage, stageDef)}
+                          >
+                            <MessageSquare className="h-3 w-3 mr-1.5" />
+                            Add Note
+                          </Button>
+                        </div>
+                      )}
                       
                       {/* Quick Stats */}
                       {hasUpdates && !isExpanded && (
