@@ -495,10 +495,10 @@ export function ProductionStageTimeline({
                     {/* Expandable Updates Section */}
                     <CollapsibleContent>
                       <div className="border-t border-border px-4 py-4 bg-muted/20">
-                        <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                        <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                           Activity History
                         </h5>
-                        <div className="space-y-4">
+                        <div className="flex flex-wrap gap-2">
                           {stage.production_stage_updates
                             .filter((update) => {
                               // Show all non-status-change updates
@@ -514,95 +514,72 @@ export function ProductionStageTimeline({
                               const hasFile = !!update.file_url;
                               const updateTypeLabel = update.update_type === 'status_change' && hasNote ? 'note' : update.update_type.replace('_', ' ');
                               
+                              // Determine primary type for styling
+                              const primaryType = hasImage ? 'image' : hasFile ? 'document' : 'note';
+                              
                               return (
-                                <div key={update.id} className="flex gap-3">
-                                  {/* Avatar/Icon bubble */}
+                                <div
+                                  key={update.id}
+                                  className={cn(
+                                    "inline-flex items-center gap-2 px-3 py-2 rounded-full border transition-all",
+                                    "hover:shadow-sm cursor-default",
+                                    primaryType === 'note' && "bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800",
+                                    primaryType === 'image' && "bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:border-purple-800",
+                                    primaryType === 'document' && "bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800"
+                                  )}
+                                  title={`${new Date(update.created_at).toLocaleString()}${hasNote ? `: ${cleanNoteText}` : ''}`}
+                                >
+                                  {/* Icon */}
                                   <div className={cn(
-                                    "flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center",
-                                    updateTypeLabel === 'note' ? "bg-blue-100 dark:bg-blue-900/30" :
-                                    updateTypeLabel === 'image' ? "bg-purple-100 dark:bg-purple-900/30" :
-                                    updateTypeLabel === 'document' ? "bg-amber-100 dark:bg-amber-900/30" :
-                                    "bg-muted"
+                                    "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center",
+                                    primaryType === 'note' && "bg-blue-100 dark:bg-blue-900/50",
+                                    primaryType === 'image' && "bg-purple-100 dark:bg-purple-900/50",
+                                    primaryType === 'document' && "bg-amber-100 dark:bg-amber-900/50"
                                   )}>
-                                    {updateTypeLabel === 'note' && <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
-                                    {updateTypeLabel === 'image' && <ImageIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />}
-                                    {updateTypeLabel === 'document' && <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
-                                    {!['note', 'image', 'document'].includes(updateTypeLabel) && <MessageSquare className="h-4 w-4 text-muted-foreground" />}
+                                    {primaryType === 'note' && <MessageSquare className="h-3 w-3 text-blue-600 dark:text-blue-400" />}
+                                    {primaryType === 'image' && <ImageIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />}
+                                    {primaryType === 'document' && <FileText className="h-3 w-3 text-amber-600 dark:text-amber-400" />}
                                   </div>
                                   
-                                  {/* Message bubble */}
-                                  <div className="flex-1 min-w-0">
-                                    <div className={cn(
-                                      "rounded-2xl rounded-tl-md p-4 shadow-sm",
-                                      "bg-gradient-to-br from-card to-muted/50 border border-border/60"
-                                    )}>
-                                      {/* Header */}
-                                      <div className="flex items-center justify-between gap-2 mb-2">
-                                        <Badge 
-                                          variant="secondary" 
-                                          className={cn(
-                                            "text-[10px] font-medium capitalize px-2 py-0.5",
-                                            updateTypeLabel === 'note' && "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-                                            updateTypeLabel === 'image' && "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-                                            updateTypeLabel === 'document' && "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                                          )}
-                                        >
-                                          {updateTypeLabel}
-                                        </Badge>
-                                        <span className="text-[11px] text-muted-foreground">
-                                          {new Date(update.created_at).toLocaleString(undefined, {
-                                            month: 'short',
-                                            day: 'numeric',
-                                            hour: 'numeric',
-                                            minute: '2-digit'
-                                          })}
-                                        </span>
-                                      </div>
-                                      
-                                      {/* Note text */}
-                                      {hasNote && (
-                                        <p className="text-sm text-foreground leading-relaxed">{cleanNoteText}</p>
+                                  {/* Label */}
+                                  <span className={cn(
+                                    "text-xs font-medium max-w-[120px] truncate",
+                                    primaryType === 'note' && "text-blue-700 dark:text-blue-300",
+                                    primaryType === 'image' && "text-purple-700 dark:text-purple-300",
+                                    primaryType === 'document' && "text-amber-700 dark:text-amber-300"
+                                  )}>
+                                    {hasNote ? cleanNoteText : hasFile ? (update.file_name || 'Document') : 'Image'}
+                                  </span>
+                                  
+                                  {/* Date badge */}
+                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-background/60">
+                                    {new Date(update.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                  </Badge>
+                                  
+                                  {/* Action buttons for image/file */}
+                                  {(hasImage || hasFile) && (
+                                    <a
+                                      href={hasImage ? update.image_url! : update.file_url!}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={cn(
+                                        "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors",
+                                        "hover:bg-background/80",
+                                        primaryType === 'image' && "text-purple-600 dark:text-purple-400",
+                                        primaryType === 'document' && "text-amber-600 dark:text-amber-400"
                                       )}
-                                      
-                                      {/* Image */}
-                                      {hasImage && (
-                                        <div className={cn(hasNote && "mt-3")}>
-                                          <img
-                                            src={update.image_url}
-                                            alt="Stage update"
-                                            className="rounded-xl max-h-56 object-cover border border-border/60 shadow-sm"
-                                          />
-                                        </div>
-                                      )}
-                                      
-                                      {/* File */}
-                                      {hasFile && (
-                                        <div className={cn((hasNote || hasImage) && "mt-3")}>
-                                          <a
-                                            href={update.file_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-3 p-3 bg-background/80 rounded-xl border border-border/60 hover:border-primary/50 hover:bg-background transition-all group"
-                                          >
-                                            <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                                              <FileText className="h-5 w-5 text-primary" />
-                                            </div>
-                                            <span className="text-sm font-medium text-foreground flex-1 truncate">
-                                              {update.file_name || 'Download Document'}
-                                            </span>
-                                            <Download className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                          </a>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Download className="h-3 w-3" />
+                                    </a>
+                                  )}
                                 </div>
                               );
                             })}
                           {stage.production_stage_updates.filter(u => u.update_type !== 'status_change' || u.note_text || u.image_url || u.file_url).length === 0 && (
-                            <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                              <MessageSquare className="h-8 w-8 mb-2 opacity-40" />
-                              <p className="text-sm">No notes or attachments yet</p>
+                            <div className="flex items-center gap-2 text-muted-foreground py-2">
+                              <Circle className="h-4 w-4 opacity-40" />
+                              <span className="text-sm">No activity yet</span>
                             </div>
                           )}
                         </div>
