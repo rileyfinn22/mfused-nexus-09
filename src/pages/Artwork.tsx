@@ -84,7 +84,9 @@ const Artwork = () => {
   
   // Template/Product hierarchy
   const [templates, setTemplates] = useState<ProductTemplate[]>([]);
+  const [singleProducts, setSingleProducts] = useState<Product[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<ProductTemplate | null>(null);
+  const [showingSingleProducts, setShowingSingleProducts] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [artworkFiles, setArtworkFiles] = useState<ArtworkFile[]>([]);
@@ -165,10 +167,10 @@ const Artwork = () => {
 
   const fetchTemplates = async () => {
     try {
-      // Get templates that have products with artwork
+      // Get all products
       let productsQuery = supabase
         .from('products')
-        .select('template_id, item_id');
+        .select('id, name, item_id, template_id, company_id, image_url');
       
       if (!isVibeAdmin && userCompanyId) {
         productsQuery = productsQuery.eq('company_id', userCompanyId);
@@ -178,7 +180,10 @@ const Artwork = () => {
       
       const { data: productsData } = await productsQuery;
       const templateIds = [...new Set(productsData?.filter(p => p.template_id).map(p => p.template_id))];
-      const productSkus = productsData?.filter(p => p.item_id).map(p => p.item_id) || [];
+      
+      // Get single products (no template)
+      const singleProds = productsData?.filter(p => !p.template_id) || [];
+      setSingleProducts(singleProds);
       
       // Fetch templates
       const { data: templatesData } = await supabase
@@ -577,6 +582,8 @@ const Artwork = () => {
     } else if (selectedTemplate) {
       setSelectedTemplate(null);
       setProducts([]);
+    } else if (showingSingleProducts) {
+      setShowingSingleProducts(false);
     }
   };
 
@@ -983,9 +990,10 @@ const Artwork = () => {
     );
   }
 
-  // PRODUCTS LIST VIEW (when template is selected)
-  if (selectedTemplate) {
-    const filteredProducts = products.filter(product =>
+  // PRODUCTS LIST VIEW (when template is selected OR showing single products)
+  if (selectedTemplate || showingSingleProducts) {
+    const displayProducts = showingSingleProducts ? singleProducts : products;
+    const filteredProducts = displayProducts.filter(product =>
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (product.item_id && product.item_id.toLowerCase().includes(searchQuery.toLowerCase()))
     );
@@ -999,9 +1007,11 @@ const Artwork = () => {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">{selectedTemplate.name}</h1>
+              <h1 className="text-2xl font-bold">
+                {showingSingleProducts ? 'Single Products' : selectedTemplate?.name}
+              </h1>
               <p className="text-sm text-muted-foreground">
-                {products.length} product{products.length !== 1 ? 's' : ''} in this template
+                {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} {showingSingleProducts ? '(no template)' : 'in this template'}
               </p>
             </div>
           </div>
@@ -1232,16 +1242,40 @@ const Artwork = () => {
       </div>
 
       {/* Templates Grid */}
-      {templates.length === 0 ? (
+      {templates.length === 0 && singleProducts.length === 0 ? (
         <Card className="p-12 text-center">
           <Package className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-          <p className="font-medium mb-2">No templates with products</p>
+          <p className="font-medium mb-2">No products found</p>
           <p className="text-sm text-muted-foreground">
             Create products and organize them into templates to manage artwork
           </p>
         </Card>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {/* Single Products Card */}
+          {singleProducts.length > 0 && (
+            <Card
+              className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 border-dashed"
+              onClick={() => setShowingSingleProducts(true)}
+            >
+              <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+                <Package className="h-16 w-16 text-muted-foreground/50" />
+                <div className="absolute top-2 right-2">
+                  <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm">
+                    {singleProducts.length}
+                  </Badge>
+                </div>
+              </div>
+              <div className="p-3 space-y-1">
+                <h3 className="font-medium text-sm leading-snug">Single Products</h3>
+                <p className="text-xs text-muted-foreground">
+                  Products without a template
+                </p>
+              </div>
+            </Card>
+          )}
+          
+          {/* Template Cards */}
           {templates
             .filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
             .map((template) => (
