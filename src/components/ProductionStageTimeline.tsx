@@ -33,6 +33,7 @@ interface StageDefinition {
   value: string;
   label: string;
   order: number;
+  weight?: number; // Percentage weight for progress calculation (default: equal distribution)
 }
 
 interface ProductionStageTimelineProps {
@@ -115,8 +116,27 @@ export function ProductionStageTimeline({
     );
   };
 
-  const completedCount = stageDefinitions.filter(def => getStageStatus(def.value) === 'completed').length;
-  const progressPercent = Math.round((completedCount / stageDefinitions.length) * 100);
+  // Calculate weighted progress based on stage weights
+  const calculateWeightedProgress = () => {
+    let completedWeight = 0;
+    let inProgressWeight = 0;
+    
+    stageDefinitions.forEach(def => {
+      const status = getStageStatus(def.value);
+      const weight = def.weight ?? (100 / stageDefinitions.length);
+      
+      if (status === 'completed') {
+        completedWeight += weight;
+      } else if (status === 'in_progress') {
+        // In-progress stages count as 50% of their weight
+        inProgressWeight += weight * 0.5;
+      }
+    });
+    
+    return Math.round(completedWeight + inProgressWeight);
+  };
+
+  const progressPercent = calculateWeightedProgress();
 
   return (
     <div className="space-y-6">
@@ -127,23 +147,43 @@ export function ProductionStageTimeline({
           <span className="text-2xl font-bold text-primary">{progressPercent}%</span>
         </div>
         
-        {/* Visual Timeline Header */}
-        <div className="flex items-center gap-1 mb-2">
-          {stageDefinitions.map((def, index) => {
+        {/* Visual Timeline Header - Weighted Segments */}
+        <div className="flex items-center gap-0.5 mb-2">
+          {stageDefinitions.map((def) => {
             const status = getStageStatus(def.value);
+            const weight = def.weight ?? (100 / stageDefinitions.length);
             return (
-              <div key={def.value} className="flex items-center flex-1">
-                <div
-                  className={cn(
-                    "h-2 flex-1 rounded-full transition-colors",
-                    status === 'completed' ? 'bg-green-500' :
-                    status === 'in_progress' ? 'bg-blue-500' :
-                    'bg-muted'
-                  )}
-                />
-                {index < stageDefinitions.length - 1 && (
-                  <div className="w-1" />
+              <div 
+                key={def.value} 
+                className={cn(
+                  "h-3 rounded-sm transition-colors relative group",
+                  status === 'completed' ? 'bg-green-500' :
+                  status === 'in_progress' ? 'bg-blue-500 animate-pulse' :
+                  'bg-muted'
                 )}
+                style={{ width: `${weight}%` }}
+                title={`${def.label}: ${weight}%`}
+              />
+            );
+          })}
+        </div>
+        
+        {/* Stage Labels under progress bar */}
+        <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+          {stageDefinitions.map((def) => {
+            const status = getStageStatus(def.value);
+            const weight = def.weight ?? (100 / stageDefinitions.length);
+            return (
+              <div 
+                key={def.value} 
+                className={cn(
+                  "truncate text-center",
+                  status === 'completed' && 'text-green-600 font-medium',
+                  status === 'in_progress' && 'text-blue-600 font-medium'
+                )}
+                style={{ width: `${weight}%` }}
+              >
+                {weight}%
               </div>
             );
           })}

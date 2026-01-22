@@ -207,7 +207,7 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
         ordersData.map(async (order) => {
           let stagesQuery = supabase
             .from('production_stages')
-            .select('status')
+            .select('status, stage_name')
             .eq('order_id', order.id);
 
           // Vendors only see their assigned stages
@@ -241,18 +241,25 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
     }
   };
 
+  // Weighted progress calculation: Material 20%, Print 50%, QC 15%, Shipped 10%, Delivered 5%
+  const STAGE_WEIGHTS: Record<string, number> = {
+    'production_proceeding_part_1': 20,
+    'production_proceeding_part_2': 50,
+    'complete_qc': 15,
+    'shipped': 10,
+    'delivered': 5,
+  };
+
   const calculateProgress = (stages: any[]) => {
     if (stages.length === 0) return 0;
-    // Each stage contributes 20% max: 10% for in_progress, 20% for completed
-    const maxPerStage = 100 / stages.length;
-    const progressPerStage = maxPerStage / 2; // Half for in_progress, full for completed
     
     let totalProgress = 0;
     stages.forEach(stage => {
+      const weight = STAGE_WEIGHTS[stage.stage_name] || (100 / stages.length);
       if (stage.status === 'completed') {
-        totalProgress += maxPerStage; // Full 20% (or proportional amount)
+        totalProgress += weight;
       } else if (stage.status === 'in_progress') {
-        totalProgress += progressPerStage; // Half = 10% (or proportional amount)
+        totalProgress += weight * 0.5; // In-progress = 50% of stage weight
       }
     });
     
