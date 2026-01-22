@@ -222,11 +222,11 @@ export function ProductionStageTimeline({
 
   const progressPercent = calculateWeightedProgress();
 
-  const getCustomerProgressFill = (percent: number) => {
-    if (percent >= 100) return "bg-success";
-    if (percent >= 60) return "bg-info";
-    if (percent >= 30) return "bg-warning";
-    return "bg-muted-foreground/40";
+  const getProgressGradient = (percent: number) => {
+    if (percent >= 100) return "from-green-400 to-green-600";
+    if (percent >= 60) return "from-blue-400 to-blue-600";
+    if (percent >= 30) return "from-amber-400 to-amber-600";
+    return "from-gray-300 to-gray-500";
   };
 
   return (
@@ -284,25 +284,25 @@ export function ProductionStageTimeline({
             </div>
             
             <div className="flex justify-between text-xs text-muted-foreground mt-2">
-              <span>Start</span>
-              <span>Complete</span>
+              <span>0%</span>
+              <span>100%</span>
             </div>
           </>
         ) : (
           <>
             {/* Simple continuous progress bar for customers/company users */}
-            <div className="w-full h-3 bg-muted rounded-full overflow-hidden mb-2">
+            <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden mb-2">
               <div
                 className={cn(
-                  "h-full rounded-full transition-all duration-500",
-                  getCustomerProgressFill(progressPercent)
+                  "h-full rounded-full transition-all duration-500 bg-gradient-to-r",
+                  getProgressGradient(progressPercent)
                 )}
                 style={{ width: `${Math.min(progressPercent, 100)}%` }}
               />
             </div>
             <div className="flex justify-between text-xs text-muted-foreground mt-1">
-              <span>Start</span>
-              <span>Complete</span>
+              <span>0%</span>
+              <span>100%</span>
             </div>
           </>
         )}
