@@ -597,17 +597,31 @@ Return ONLY valid JSON in this format:
       if (matched) {
         // Extract variant label from PO line (e.g., "Fire - Blue Dream" from "BAG - Ion - Fire - Blue Dream")
         const variantLabel = buildVariantLabelFromPoLine(poName);
-        // Build full name: "WA Ion Bags - Fire - Blue Dream" (Template Name + Variant)
-        if (variantLabel && !variantLabel.toLowerCase().includes(matched.name.toLowerCase())) {
+        
+        // Strip any template-like patterns from the variant to avoid duplication
+        // e.g., "MD SLEEVES 1G LOUD NOTORIOUS THC" -> "LOUD NOTORIOUS THC"
+        const templateTokens = tokenize(matched.name);
+        const variantTokens = tokenize(variantLabel);
+        
+        // Remove tokens that appear in the template name (to avoid "MD Sleeves 2G - MD Sleeves 1G - Loud")
+        const cleanedVariantTokens = variantTokens.filter(vt => !templateTokens.includes(vt));
+        
+        // Also remove common template-related tokens that might be from other templates
+        const templatePatterns = ['sleeves', 'sleeve', 'bags', 'bag', 'pouch', 'pouches', 'box', 'boxes', 'tin', 'tins', 'jar', 'jars', 'label', 'labels'];
+        const sizePatterns = ['1g', '2g', '3g', '5g', '7g', '14g', '28g'];
+        const filteredVariantTokens = cleanedVariantTokens.filter(vt => 
+          !templatePatterns.includes(vt) && !sizePatterns.includes(vt)
+        );
+        
+        if (filteredVariantTokens.length > 0) {
           // Format variant label with proper casing (Title Case)
-          const formattedVariant = variantLabel
-            .split(' ')
+          const formattedVariant = filteredVariantTokens
             .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
             .join(' ');
           finalName = `${matched.name} - ${formattedVariant}`;
         } else {
-          // Variant already contains template name or is empty, just use template name + cleaned variant
-          finalName = variantLabel ? `${matched.name} - ${variantLabel.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}` : matched.name;
+          // No variant tokens left after cleaning, just use template name
+          finalName = matched.name;
         }
       }
 
