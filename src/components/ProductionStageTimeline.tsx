@@ -328,7 +328,7 @@ export function ProductionStageTimeline({
                             >
                               <div className="flex items-center justify-between">
                                 <Badge variant="outline" className="text-xs capitalize">
-                                  {update.update_type.replace('_', ' ')}
+                                  {update.update_type === 'status_change' && update.note_text ? 'note' : update.update_type.replace('_', ' ')}
                                 </Badge>
                                 <span className="text-xs text-muted-foreground">
                                   {new Date(update.created_at).toLocaleString()}
