@@ -91,6 +91,12 @@ const OrderDetail = () => {
   const [unmatchedPoItems, setUnmatchedPoItems] = useState<any[]>([]);
   const [matchingProductId, setMatchingProductId] = useState<Record<string, string>>({});
   const [openCombobox, setOpenCombobox] = useState<Record<string, boolean>>({});
+  
+  // Order attachments states
+  const [orderAttachments, setOrderAttachments] = useState<any[]>([]);
+  const [uploadingOrderAttachment, setUploadingOrderAttachment] = useState(false);
+  const [orderAttachmentDescription, setOrderAttachmentDescription] = useState('');
+
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -99,6 +105,7 @@ const OrderDetail = () => {
       fetchVendors();
       fetchInvoices();
       fetchVibeAttachments();
+      fetchOrderAttachments();
     }
   }, [orderId]);
 
@@ -321,6 +328,87 @@ const OrderDetail = () => {
   const handleDownloadVibeAttachment = async (filePath: string, fileName: string) => {
     const { data } = await supabase.storage
       .from('vibe-attachments')
+      .createSignedUrl(filePath, 3600, { download: fileName });
+
+    if (data?.signedUrl) {
+      window.location.href = data.signedUrl;
+    } else {
+      toast({ title: "Error", description: "Failed to download", variant: "destructive" });
+    }
+  };
+
+  // Order Attachments Functions
+  const fetchOrderAttachments = async () => {
+    const { data } = await supabase
+      .from('order_attachments')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false });
+    
+    if (data) {
+      setOrderAttachments(data);
+    }
+  };
+
+  const handleUploadOrderAttachment = async (file: File) => {
+    if (!file) return;
+
+    setUploadingOrderAttachment(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${orderId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('po-documents')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { error: insertError } = await supabase
+        .from('order_attachments')
+        .insert({
+          order_id: orderId,
+          file_path: filePath,
+          file_name: file.name,
+          file_type: file.type,
+          file_size: file.size,
+          description: orderAttachmentDescription.trim() || null,
+          uploaded_by: user.id,
+        });
+
+      if (insertError) throw insertError;
+
+      toast({ title: "Success", description: "Attachment uploaded" });
+      setOrderAttachmentDescription('');
+      fetchOrderAttachments();
+    } catch (error: any) {
+      console.error('Error uploading attachment:', error);
+      toast({ title: "Error", description: "Failed to upload attachment", variant: "destructive" });
+    } finally {
+      setUploadingOrderAttachment(false);
+    }
+  };
+
+  const handleDeleteOrderAttachment = async (attachmentId: string, filePath: string) => {
+    if (!confirm('Delete this attachment?')) return;
+
+    try {
+      await supabase.storage.from('po-documents').remove([filePath]);
+      await supabase.from('order_attachments').delete().eq('id', attachmentId);
+      toast({ title: "Deleted", description: "Attachment removed" });
+      fetchOrderAttachments();
+    } catch (error) {
+      console.error('Error deleting attachment:', error);
+      toast({ title: "Error", description: "Failed to delete", variant: "destructive" });
+    }
+  };
+
+  const handleDownloadOrderAttachment = async (filePath: string, fileName: string) => {
+    const { data } = await supabase.storage
+      .from('po-documents')
       .createSignedUrl(filePath, 3600, { download: fileName });
 
     if (data?.signedUrl) {
@@ -2206,60 +2294,141 @@ const OrderDetail = () => {
             </div>
           </div>
 
-          {/* Purchase Order Attachment */}
-          {order.po_pdf_path && (
-            <div className="border-t border-table-border bg-muted/30 p-8">
-              <div className="flex items-center gap-6">
-                {/* PDF Thumbnail */}
-                <div className="flex-shrink-0">
-                  <div className="w-24 h-32 rounded-lg border-2 border-border bg-background flex items-center justify-center shadow-sm hover:shadow-md transition-shadow">
-                    <FileText className="h-12 w-12 text-primary" />
+          {/* Order Attachments Section */}
+          <div className="border-t border-table-border bg-muted/30 p-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold">Order Attachments</h2>
+                {(orderAttachments.length > 0 || order.po_pdf_path) && (
+                  <Badge variant="secondary">{orderAttachments.length + (order.po_pdf_path ? 1 : 0)}</Badge>
+                )}
+              </div>
+              {isAdmin && (
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Description (optional)"
+                    value={orderAttachmentDescription}
+                    onChange={(e) => setOrderAttachmentDescription(e.target.value)}
+                    className="w-48"
+                  />
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadOrderAttachment(file);
+                        e.target.value = '';
+                      }}
+                      disabled={uploadingOrderAttachment}
+                    />
+                    <Button variant="outline" size="sm" disabled={uploadingOrderAttachment} asChild>
+                      <span>
+                        {uploadingOrderAttachment ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Plus className="h-4 w-4 mr-2" />
+                        )}
+                        Add Attachment
+                      </span>
+                    </Button>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Attachments Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Original PO - if exists */}
+              {order.po_pdf_path && (
+                <div className="p-4 bg-background rounded-lg border border-border flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-14 rounded border border-border bg-muted flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">Purchase Order (Original)</p>
+                    <p className="text-xs text-muted-foreground mb-2">Primary PO document</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={async () => {
+                        const fileName =
+                          typeof order.po_pdf_path === "string"
+                            ? order.po_pdf_path.split("/").pop() || "purchase-order.pdf"
+                            : "purchase-order.pdf";
+
+                        const { data } = await supabase.storage
+                          .from("po-documents")
+                          .createSignedUrl(order.po_pdf_path, 3600, {
+                            download: fileName,
+                          });
+
+                        if (data?.signedUrl) {
+                          window.location.href = data.signedUrl;
+                        } else {
+                          toast({
+                            title: "Error",
+                            description: "Failed to load PO",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
+                      <Download className="h-3 w-3 mr-1" />
+                      Download
+                    </Button>
                   </div>
                 </div>
-                
-                {/* PO Details */}
-                <div className="flex-1">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h2 className="text-lg font-semibold mb-1">Purchase Order</h2>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Original PO document used to create this order
-                      </p>
+              )}
+
+              {/* Additional Attachments */}
+              {orderAttachments.map((attachment) => (
+                <div key={attachment.id} className="p-4 bg-background rounded-lg border border-border flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-14 rounded border border-border bg-muted flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate" title={attachment.file_name}>{attachment.file_name}</p>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {attachment.description || 'No description'}
+                    </p>
+                    <div className="flex items-center gap-1">
                       <Button
-                        variant="outline"
-                        onClick={async () => {
-                          const fileName =
-                            typeof order.po_pdf_path === "string"
-                              ? order.po_pdf_path.split("/").pop() || "purchase-order.pdf"
-                              : "purchase-order.pdf";
-
-                          const { data, error } = await supabase.storage
-                            .from("po-documents")
-                            .createSignedUrl(order.po_pdf_path, 3600, {
-                              download: fileName,
-                            });
-
-                          if (data?.signedUrl) {
-                            // Navigate directly to the signed URL to trigger a download
-                            window.location.href = data.signedUrl;
-                          } else {
-                            toast({
-                              title: "Error",
-                              description: "Failed to load PO",
-                              variant: "destructive",
-                            });
-                          }
-                        }}
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={() => handleDownloadOrderAttachment(attachment.file_path, attachment.file_name)}
                       >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Download PO
+                        <Download className="h-3 w-3 mr-1" />
+                        Download
                       </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteOrderAttachment(attachment.id, attachment.file_path)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
-              </div>
+              ))}
+
+              {/* Empty state */}
+              {!order.po_pdf_path && orderAttachments.length === 0 && (
+                <div className="col-span-full p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
+                  <Paperclip className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No attachments yet</p>
+                  {isAdmin && <p className="text-xs mt-1">Click "Add Attachment" to upload files</p>}
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Internal Vibe Notes with Attachments - Only for Vibe Admins when in production */}
           {isVibeAdmin && order.status === 'in production' && (
