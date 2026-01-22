@@ -135,6 +135,7 @@ export type Database = {
       }
       company_contacts: {
         Row: {
+          city: string | null
           company_id: string
           created_at: string
           email: string | null
@@ -144,9 +145,13 @@ export type Database = {
           notes: string | null
           phone: string | null
           role: string | null
+          state: string | null
+          street: string | null
           updated_at: string
+          zip: string | null
         }
         Insert: {
+          city?: string | null
           company_id: string
           created_at?: string
           email?: string | null
@@ -156,9 +161,13 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           role?: string | null
+          state?: string | null
+          street?: string | null
           updated_at?: string
+          zip?: string | null
         }
         Update: {
+          city?: string | null
           company_id?: string
           created_at?: string
           email?: string | null
@@ -168,7 +177,10 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           role?: string | null
+          state?: string | null
+          street?: string | null
           updated_at?: string
+          zip?: string | null
         }
         Relationships: [
           {

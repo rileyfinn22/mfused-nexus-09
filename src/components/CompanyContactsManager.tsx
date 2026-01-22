@@ -38,6 +38,10 @@ interface CompanyContact {
   role: string | null;
   is_primary: boolean;
   notes: string | null;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +65,10 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
     phone: "",
     role: "",
     is_primary: false,
+    street: "",
+    city: "",
+    state: "",
+    zip: "",
     notes: "",
   });
 
@@ -99,6 +107,10 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
       phone: "",
       role: "",
       is_primary: false,
+      street: "",
+      city: "",
+      state: "",
+      zip: "",
       notes: "",
     });
   };
@@ -116,6 +128,10 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
       phone: contact.phone || "",
       role: contact.role || "",
       is_primary: contact.is_primary,
+      street: contact.street || "",
+      city: contact.city || "",
+      state: contact.state || "",
+      zip: contact.zip || "",
       notes: contact.notes || "",
     });
     setShowEditDialog(true);
@@ -153,6 +169,10 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
         phone: formData.phone.trim() || null,
         role: formData.role.trim() || null,
         is_primary: formData.is_primary,
+        street: formData.street.trim() || null,
+        city: formData.city.trim() || null,
+        state: formData.state.trim().toUpperCase() || null,
+        zip: formData.zip.trim() || null,
         notes: formData.notes.trim() || null,
       });
 
@@ -205,6 +225,10 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
           phone: formData.phone.trim() || null,
           role: formData.role.trim() || null,
           is_primary: formData.is_primary,
+          street: formData.street.trim() || null,
+          city: formData.city.trim() || null,
+          state: formData.state.trim().toUpperCase() || null,
+          zip: formData.zip.trim() || null,
           notes: formData.notes.trim() || null,
         })
         .eq("id", selectedContact.id);
@@ -319,22 +343,13 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
           </CardContent>
         </Card>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {contacts.map((contact) => (
-              <TableRow key={contact.id}>
-                <TableCell>
+        <div className="space-y-3">
+          {contacts.map((contact) => (
+            <div key={contact.id} className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{contact.name}</span>
+                    <span className="font-medium text-lg">{contact.name}</span>
                     {contact.is_primary && (
                       <Badge variant="secondary" className="text-xs">
                         <Star className="h-3 w-3 mr-1 fill-current" />
@@ -342,68 +357,81 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
                       </Badge>
                     )}
                   </div>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {contact.role || "-"}
-                </TableCell>
-                <TableCell>
-                  {contact.email ? (
-                    <a href={`mailto:${contact.email}`} className="text-primary hover:underline flex items-center gap-1">
-                      <Mail className="h-3 w-3" />
+                  {contact.role && (
+                    <p className="text-sm text-muted-foreground">{contact.role}</p>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  {!contact.is_primary && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSetPrimary(contact)}
+                      title="Set as Primary"
+                    >
+                      <Star className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openEditDialog(contact)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openDeleteDialog(contact)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="space-y-1">
+                  {contact.email && (
+                    <a href={`mailto:${contact.email}`} className="text-primary hover:underline flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
                       {contact.email}
                     </a>
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
                   )}
-                </TableCell>
-                <TableCell>
-                  {contact.phone ? (
-                    <a href={`tel:${contact.phone}`} className="text-primary hover:underline flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
+                  {contact.phone && (
+                    <a href={`tel:${contact.phone}`} className="text-primary hover:underline flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
                       {contact.phone}
                     </a>
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
                   )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    {!contact.is_primary && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSetPrimary(contact)}
-                        title="Set as Primary"
-                      >
-                        <Star className="h-4 w-4" />
-                      </Button>
+                </div>
+                
+                {(contact.street || contact.city) && (
+                  <div className="text-muted-foreground">
+                    {contact.street && <p>{contact.street}</p>}
+                    {(contact.city || contact.state || contact.zip) && (
+                      <p>
+                        {[contact.city, contact.state].filter(Boolean).join(", ")}
+                        {contact.zip && ` ${contact.zip}`}
+                      </p>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEditDialog(contact)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openDeleteDialog(contact)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
                   </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                )}
+              </div>
+              
+              {contact.notes && (
+                <p className="text-sm text-muted-foreground bg-muted/50 rounded p-2 mt-2">
+                  {contact.notes}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Add Contact Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Contact</DialogTitle>
             <DialogDescription>
@@ -411,24 +439,27 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Contact name"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Name *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Contact name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="role">Role / Title</Label>
+                <Input
+                  id="role"
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  placeholder="e.g. Purchasing Manager"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Role / Title</Label>
-              <Input
-                id="role"
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                placeholder="e.g. Purchasing Manager, CEO"
-              />
-            </div>
+            
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -450,17 +481,60 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
                 />
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="street">Street Address</Label>
+              <Input
+                id="street"
+                value={formData.street}
+                onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                placeholder="123 Main St"
+              />
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  placeholder="City"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state">State</Label>
+                <Input
+                  id="state"
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase() })}
+                  placeholder="CA"
+                  maxLength={2}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="zip">ZIP</Label>
+                <Input
+                  id="zip"
+                  value={formData.zip}
+                  onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
+                  placeholder="12345"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>
               <Textarea
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Additional notes about this contact..."
-                rows={2}
+                placeholder="Additional notes about this contact (preferred contact method, availability, etc.)"
+                rows={3}
               />
             </div>
-            <div className="flex items-center gap-2">
+            
+            <div className="flex items-center gap-2 pt-2">
               <Checkbox
                 id="is_primary"
                 checked={formData.is_primary}
@@ -484,7 +558,7 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
 
       {/* Edit Contact Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Contact</DialogTitle>
             <DialogDescription>
@@ -492,24 +566,27 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Name *</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Contact name"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Contact name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-role">Role / Title</Label>
+                <Input
+                  id="edit-role"
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  placeholder="e.g. Purchasing Manager"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-role">Role / Title</Label>
-              <Input
-                id="edit-role"
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                placeholder="e.g. Purchasing Manager, CEO"
-              />
-            </div>
+            
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-email">Email</Label>
@@ -531,17 +608,60 @@ export function CompanyContactsManager({ companyId }: CompanyContactsManagerProp
                 />
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-street">Street Address</Label>
+              <Input
+                id="edit-street"
+                value={formData.street}
+                onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                placeholder="123 Main St"
+              />
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-city">City</Label>
+                <Input
+                  id="edit-city"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  placeholder="City"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-state">State</Label>
+                <Input
+                  id="edit-state"
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase() })}
+                  placeholder="CA"
+                  maxLength={2}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-zip">ZIP</Label>
+                <Input
+                  id="edit-zip"
+                  value={formData.zip}
+                  onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
+                  placeholder="12345"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="edit-notes">Notes</Label>
               <Textarea
                 id="edit-notes"
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Additional notes about this contact..."
-                rows={2}
+                placeholder="Additional notes about this contact (preferred contact method, availability, etc.)"
+                rows={3}
               />
             </div>
-            <div className="flex items-center gap-2">
+            
+            <div className="flex items-center gap-2 pt-2">
               <Checkbox
                 id="edit-is_primary"
                 checked={formData.is_primary}
