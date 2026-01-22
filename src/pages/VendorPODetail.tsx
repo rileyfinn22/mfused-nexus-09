@@ -15,7 +15,7 @@ import autoTable from "jspdf-autotable";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
 import { EmailPreviewDialog } from "@/components/EmailPreviewDialog";
 import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
-import { FinalizeBillDialog } from "@/components/FinalizeBillDialog";
+import { UpdateBillDialog } from "@/components/UpdateBillDialog";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
@@ -796,7 +796,7 @@ Thank you for your business.`;
             <>
               <Button variant="outline" onClick={() => setShowFinalizeDialog(true)}>
                 <FileCheck className="h-4 w-4 mr-2" />
-                Finalize Bill
+                Update Bill
               </Button>
               <Button variant="outline" onClick={() => setShowPaymentDialog(true)}>
                 <DollarSign className="h-4 w-4 mr-2" />
@@ -1261,8 +1261,8 @@ Thank you for your business.`;
         }}
       />
 
-      {/* Finalize Bill Dialog */}
-      <FinalizeBillDialog
+      {/* Update Bill Dialog */}
+      <UpdateBillDialog
         open={showFinalizeDialog}
         onOpenChange={setShowFinalizeDialog}
         vendorPO={po}

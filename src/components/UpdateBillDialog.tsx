@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Package, Truck } from "lucide-react";
+import { Loader2, Package, Truck, Plus, Trash2 } from "lucide-react";
 
 interface POItem {
   id: string;
@@ -18,9 +18,10 @@ interface POItem {
   shipped_quantity?: number;
   final_quantity?: number | null;
   final_unit_cost?: number | null;
+  isNew?: boolean;
 }
 
-interface FinalizeBillDialogProps {
+interface UpdateBillDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   vendorPO: any;
@@ -28,17 +29,29 @@ interface FinalizeBillDialogProps {
   onSuccess: () => void;
 }
 
-export function FinalizeBillDialog({ open, onOpenChange, vendorPO, poItems, onSuccess }: FinalizeBillDialogProps) {
+interface EditableItem extends POItem {
+  editedQty: number;
+  editedCost: number;
+  editedSku: string;
+  editedName: string;
+  isNew?: boolean;
+  tempId?: string;
+}
+
+export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSuccess }: UpdateBillDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<(POItem & { editedQty: number; editedCost: number })[]>([]);
+  const [items, setItems] = useState<EditableItem[]>([]);
   const [shippingCost, setShippingCost] = useState<string>("");
+  const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (open && poItems) {
       setItems(poItems.map(item => ({
         ...item,
         editedQty: item.final_quantity ?? item.shipped_quantity ?? item.quantity,
-        editedCost: item.final_unit_cost ?? item.unit_cost
+        editedCost: item.final_unit_cost ?? item.unit_cost,
+        editedSku: item.sku,
+        editedName: item.name
       })));
       // Check for existing shipping line item
       const existingShipping = poItems.find(item => item.sku === 'SHIPPING');
@@ -47,6 +60,7 @@ export function FinalizeBillDialog({ open, onOpenChange, vendorPO, poItems, onSu
       } else {
         setShippingCost("");
       }
+      setDeletedItemIds([]);
     }
   }, [open, poItems]);
 
@@ -58,17 +72,45 @@ export function FinalizeBillDialog({ open, onOpenChange, vendorPO, poItems, onSu
     }).format(amount);
   };
 
-  const updateItem = (itemId: string, field: 'editedQty' | 'editedCost', value: string) => {
+  const updateItem = (itemId: string, field: keyof EditableItem, value: string | number) => {
     setItems(prev => prev.map(item => {
-      if (item.id === itemId) {
-        return { ...item, [field]: parseFloat(value) || 0 };
+      const idMatch = item.isNew ? item.tempId === itemId : item.id === itemId;
+      if (idMatch) {
+        return { ...item, [field]: typeof value === 'string' ? value : parseFloat(String(value)) || 0 };
       }
       return item;
     }));
   };
 
+  const addNewItem = () => {
+    const tempId = `new-${Date.now()}`;
+    setItems(prev => [...prev, {
+      id: '',
+      tempId,
+      sku: '',
+      name: '',
+      quantity: 0,
+      unit_cost: 0,
+      total: 0,
+      editedQty: 1,
+      editedCost: 0,
+      editedSku: '',
+      editedName: '',
+      isNew: true
+    }]);
+  };
+
+  const removeItem = (itemId: string, isNew?: boolean) => {
+    if (isNew) {
+      setItems(prev => prev.filter(item => item.tempId !== itemId));
+    } else {
+      setItems(prev => prev.filter(item => item.id !== itemId));
+      setDeletedItemIds(prev => [...prev, itemId]);
+    }
+  };
+
   // Calculate totals
-  const productItems = items.filter(item => item.sku !== 'SHIPPING');
+  const productItems = items.filter(item => item.editedSku !== 'SHIPPING' && item.sku !== 'SHIPPING');
   const subtotal = productItems.reduce((sum, item) => sum + (item.editedQty * item.editedCost), 0);
   const shippingAmount = parseFloat(shippingCost) || 0;
   const finalTotal = subtotal + shippingAmount;
@@ -77,19 +119,52 @@ export function FinalizeBillDialog({ open, onOpenChange, vendorPO, poItems, onSu
   const originalTotal = vendorPO?.total || 0;
   const difference = finalTotal - originalTotal;
 
-  const handleFinalize = async () => {
+  const handleSave = async () => {
     try {
       setLoading(true);
 
-      // Update each item with final values
-      for (const item of productItems) {
+      // Delete removed items
+      for (const itemId of deletedItemIds) {
+        await supabase
+          .from('vendor_po_items')
+          .delete()
+          .eq('id', itemId);
+      }
+
+      // Update existing items with final values
+      for (const item of productItems.filter(i => !i.isNew)) {
         const { error } = await supabase
           .from('vendor_po_items')
           .update({
+            sku: item.editedSku,
+            name: item.editedName,
+            quantity: item.editedQty,
+            unit_cost: item.editedCost,
+            total: item.editedQty * item.editedCost,
             final_quantity: item.editedQty,
             final_unit_cost: item.editedCost
           })
           .eq('id', item.id);
+
+        if (error) throw error;
+      }
+
+      // Insert new items
+      const newItems = productItems.filter(i => i.isNew && i.editedSku.trim());
+      for (const item of newItems) {
+        const { error } = await supabase
+          .from('vendor_po_items')
+          .insert({
+            vendor_po_id: vendorPO.id,
+            sku: item.editedSku,
+            name: item.editedName,
+            quantity: item.editedQty,
+            unit_cost: item.editedCost,
+            total: item.editedQty * item.editedCost,
+            shipped_quantity: item.editedQty,
+            final_quantity: item.editedQty,
+            final_unit_cost: item.editedCost
+          });
 
         if (error) throw error;
       }
@@ -147,17 +222,17 @@ export function FinalizeBillDialog({ open, onOpenChange, vendorPO, poItems, onSu
       if (poError) throw poError;
 
       toast({
-        title: "Bill Finalized",
-        description: `Final bill amount: ${formatCurrency(finalTotal)}`
+        title: "Bill Updated",
+        description: `Bill total: ${formatCurrency(finalTotal)}`
       });
 
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
-      console.error('Error finalizing bill:', error);
+      console.error('Error updating bill:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to finalize bill",
+        description: error.message || "Failed to update bill",
         variant: "destructive"
       });
     } finally {
@@ -169,14 +244,14 @@ export function FinalizeBillDialog({ open, onOpenChange, vendorPO, poItems, onSu
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Finalize Bill - {vendorPO.po_number}
+            Update Bill - {vendorPO.po_number}
           </DialogTitle>
           <DialogDescription>
-            Update shipped quantities and actual costs to create the final bill amount.
+            Edit line items, add new products, and update costs for the bill.
           </DialogDescription>
         </DialogHeader>
 
@@ -186,53 +261,85 @@ export function FinalizeBillDialog({ open, onOpenChange, vendorPO, poItems, onSu
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>SKU</TableHead>
+                  <TableHead className="w-[140px]">SKU</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead className="text-center">Original Qty</TableHead>
-                  <TableHead className="text-center">Shipped Qty</TableHead>
-                  <TableHead className="text-right">Original Cost</TableHead>
-                  <TableHead className="text-right">Final Cost</TableHead>
-                  <TableHead className="text-right">Line Total</TableHead>
+                  <TableHead className="text-center w-[100px]">Qty</TableHead>
+                  <TableHead className="text-right w-[120px]">Unit Cost</TableHead>
+                  <TableHead className="text-right w-[120px]">Line Total</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {productItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-mono text-sm">{item.sku}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{item.name}</TableCell>
-                    <TableCell className="text-center text-muted-foreground">
-                      {item.quantity}
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={item.editedQty}
-                        onChange={(e) => updateItem(item.id, 'editedQty', e.target.value)}
-                        className="w-20 text-center mx-auto"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      ${Number(item.unit_cost).toFixed(3)}
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        value={item.editedCost}
-                        onChange={(e) => updateItem(item.id, 'editedCost', e.target.value)}
-                        className="w-24 text-right ml-auto"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(item.editedQty * item.editedCost)}
+                {productItems.map((item) => {
+                  const itemKey = item.isNew ? item.tempId! : item.id;
+                  return (
+                    <TableRow key={itemKey}>
+                      <TableCell>
+                        <Input
+                          value={item.editedSku}
+                          onChange={(e) => updateItem(itemKey, 'editedSku', e.target.value)}
+                          placeholder="SKU"
+                          className="font-mono text-sm"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={item.editedName}
+                          onChange={(e) => updateItem(itemKey, 'editedName', e.target.value)}
+                          placeholder="Description"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.editedQty}
+                          onChange={(e) => updateItem(itemKey, 'editedQty', e.target.value)}
+                          className="w-20 text-center mx-auto"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          value={item.editedCost}
+                          onChange={(e) => updateItem(itemKey, 'editedCost', e.target.value)}
+                          className="w-24 text-right ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(item.editedQty * item.editedCost)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => removeItem(itemKey, item.isNew)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {productItems.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      No line items. Click "Add Line Item" to add products.
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </div>
+
+          {/* Add Item Button */}
+          <Button variant="outline" onClick={addNewItem} className="w-full">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Line Item
+          </Button>
 
           {/* Shipping Cost */}
           <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
@@ -266,12 +373,12 @@ export function FinalizeBillDialog({ open, onOpenChange, vendorPO, poItems, onSu
               <span>{formatCurrency(shippingAmount)}</span>
             </div>
             <div className="flex justify-between pt-2 border-t">
-              <span className="font-semibold">Final Bill Total</span>
+              <span className="font-semibold">Bill Total</span>
               <span className="text-xl font-bold">{formatCurrency(finalTotal)}</span>
             </div>
             {difference !== 0 && (
               <div className={`flex justify-between text-sm pt-2 ${difference > 0 ? 'text-destructive' : 'text-success'}`}>
-                <span>Difference from Original</span>
+                <span>Difference from Original PO</span>
                 <span>{difference > 0 ? '+' : ''}{formatCurrency(difference)}</span>
               </div>
             )}
@@ -282,9 +389,9 @@ export function FinalizeBillDialog({ open, onOpenChange, vendorPO, poItems, onSu
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
               Cancel
             </Button>
-            <Button onClick={handleFinalize} disabled={loading}>
+            <Button onClick={handleSave} disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Finalize Bill
+              Save Bill
             </Button>
           </div>
         </div>
