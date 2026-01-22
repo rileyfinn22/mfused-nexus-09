@@ -223,7 +223,7 @@ const VendorPOs = () => {
   const vendorBalances = useMemo(() => {
     const vendorMap = new Map<string, { id: string; name: string; totalOwed: number; totalPaid: number; poCount: number }>();
     
-    pos.filter(po => po.status !== 'draft' && po.vendors?.id).forEach(po => {
+    pos.filter(po => po.vendors?.id).forEach(po => {
       const vendorId = po.vendors.id;
       const vendorName = po.vendors.name || 'Unknown';
       const total = po.final_total ?? po.total ?? 0;
