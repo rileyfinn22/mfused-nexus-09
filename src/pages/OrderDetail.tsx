@@ -83,7 +83,7 @@ const OrderDetail = () => {
   
   // Re-upload PO states
   const [showReuploadDialog, setShowReuploadDialog] = useState(false);
-  const [reuploadFile, setReuploadFile] = useState<File | null>(null);
+  const [reuploadFiles, setReuploadFiles] = useState<File[]>([]);
   const [reuploadTextInput, setReuploadTextInput] = useState('');
   const [reuploadInputMode, setReuploadInputMode] = useState<'pdf' | 'text'>('pdf');
   const [reuploadAnalysisHint, setReuploadAnalysisHint] = useState('');
@@ -1188,26 +1188,32 @@ const OrderDetail = () => {
 
   // Re-upload PO handlers
   const handleReuploadFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = Array.from(e.target.files || []);
+    const validFiles: File[] = [];
+    
+    for (const file of files) {
       if (file.type !== 'application/pdf') {
         toast({
           title: "Invalid file type",
-          description: "Please select a PDF file",
+          description: `${file.name} is not a PDF file`,
           variant: "destructive",
         });
-        return;
+        continue;
       }
-      setReuploadFile(file);
+      validFiles.push(file);
+    }
+    
+    if (validFiles.length > 0) {
+      setReuploadFiles(prev => [...prev, ...validFiles]);
     }
     e.target.value = '';
   };
 
   const handleReuploadAnalyze = async () => {
-    if (reuploadInputMode === 'pdf' && !reuploadFile) {
+    if (reuploadInputMode === 'pdf' && reuploadFiles.length === 0) {
       toast({
-        title: "No file selected",
-        description: "Please select a PDF file to analyze",
+        title: "No files selected",
+        description: "Please select at least one PDF file to analyze",
         variant: "destructive",
       });
       return;
@@ -1227,33 +1233,66 @@ const OrderDetail = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      let functionData;
+      let allNewItems: any[] = [];
+      let allUnmatched: any[] = [];
 
-      if (reuploadInputMode === 'pdf' && reuploadFile) {
-        // Upload to storage
-        const fileExt = reuploadFile.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('po-documents')
-          .upload(fileName, reuploadFile);
+      if (reuploadInputMode === 'pdf' && reuploadFiles.length > 0) {
+        // Process each file
+        for (const file of reuploadFiles) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('po-documents')
+            .upload(fileName, file);
 
-        if (uploadError) throw uploadError;
-
-        // Trigger AI analysis
-        const { data, error } = await supabase.functions.invoke('analyze-po', {
-          body: { 
-            pdfPath: fileName,
-            companyId: order.company_id,
-            filename: reuploadFile.name,
-            orderType: 'standard',
-            returnProductsOnly: true,
-            analysisHint: reuploadAnalysisHint.trim() || undefined
+          if (uploadError) {
+            console.error(`Error uploading ${file.name}:`, uploadError);
+            continue;
           }
-        });
 
-        if (error) throw error;
-        functionData = data;
+          // Trigger AI analysis
+          const { data, error } = await supabase.functions.invoke('analyze-po', {
+            body: { 
+              pdfPath: fileName,
+              companyId: order.company_id,
+              filename: file.name,
+              orderType: 'standard',
+              returnProductsOnly: true,
+              analysisHint: reuploadAnalysisHint.trim() || undefined
+            }
+          });
+
+          if (error) {
+            console.error(`Error analyzing ${file.name}:`, error);
+            continue;
+          }
+
+          // Process extracted items from this file
+          if (data?.items && Array.isArray(data.items)) {
+            for (const item of data.items) {
+              if (item.product_id) {
+                const product = products.find(p => p.id === item.product_id);
+                allNewItems.push({
+                  id: `new-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                  order_id: orderId,
+                  product_id: item.product_id,
+                  sku: item.item_id || product?.item_id || item.product_id.slice(0, 8),
+                  item_id: item.item_id || product?.item_id || null,
+                  name: item.name || product?.name || 'Unknown Product',
+                  description: item.description || product?.description || '',
+                  quantity: item.quantity || 1,
+                  unit_price: item.unit_price || product?.price || 0,
+                  total: (item.quantity || 1) * (item.unit_price || product?.price || 0),
+                  shipped_quantity: 0,
+                  isNew: true
+                });
+              } else {
+                allUnmatched.push(item);
+              }
+            }
+          }
+        }
       } else {
         // Text analysis
         const { data, error } = await supabase.functions.invoke('analyze-po', {
@@ -1267,55 +1306,51 @@ const OrderDetail = () => {
         });
 
         if (error) throw error;
-        functionData = data;
-      }
 
-      // Process extracted items
-      if (functionData?.items && Array.isArray(functionData.items)) {
-        const newItems: any[] = [];
-        const newUnmatched: any[] = [];
-
-        for (const item of functionData.items) {
-          if (item.product_id) {
-            const product = products.find(p => p.id === item.product_id);
-            newItems.push({
-              id: `new-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-              order_id: orderId,
-              product_id: item.product_id,
-              sku: item.item_id || product?.item_id || item.product_id.slice(0, 8),
-              item_id: item.item_id || product?.item_id || null,
-              name: item.name || product?.name || 'Unknown Product',
-              description: item.description || product?.description || '',
-              quantity: item.quantity || 1,
-              unit_price: item.unit_price || product?.price || 0,
-              total: (item.quantity || 1) * (item.unit_price || product?.price || 0),
-              shipped_quantity: 0,
-              isNew: true
-            });
-          } else {
-            newUnmatched.push(item);
+        // Process extracted items
+        if (data?.items && Array.isArray(data.items)) {
+          for (const item of data.items) {
+            if (item.product_id) {
+              const product = products.find(p => p.id === item.product_id);
+              allNewItems.push({
+                id: `new-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                order_id: orderId,
+                product_id: item.product_id,
+                sku: item.item_id || product?.item_id || item.product_id.slice(0, 8),
+                item_id: item.item_id || product?.item_id || null,
+                name: item.name || product?.name || 'Unknown Product',
+                description: item.description || product?.description || '',
+                quantity: item.quantity || 1,
+                unit_price: item.unit_price || product?.price || 0,
+                total: (item.quantity || 1) * (item.unit_price || product?.price || 0),
+                shipped_quantity: 0,
+                isNew: true
+              });
+            } else {
+              allUnmatched.push(item);
+            }
           }
         }
-
-        // Add new items to edited items
-        if (newItems.length > 0) {
-          setEditedItems(prev => [...prev, ...newItems]);
-          setIsEditMode(true);
-        }
-        
-        if (newUnmatched.length > 0) {
-          setUnmatchedPoItems(prev => [...prev, ...newUnmatched]);
-        }
-
-        toast({
-          title: "PO Analyzed",
-          description: `Added ${newItems.length} item(s). ${newUnmatched.length > 0 ? `${newUnmatched.length} item(s) need manual matching.` : ''}`,
-        });
       }
+
+      // Add new items to edited items
+      if (allNewItems.length > 0) {
+        setEditedItems(prev => [...prev, ...allNewItems]);
+        setIsEditMode(true);
+      }
+      
+      if (allUnmatched.length > 0) {
+        setUnmatchedPoItems(prev => [...prev, ...allUnmatched]);
+      }
+
+      toast({
+        title: "PO Analyzed",
+        description: `Added ${allNewItems.length} item(s). ${allUnmatched.length > 0 ? `${allUnmatched.length} item(s) need manual matching.` : ''}`,
+      });
 
       // Close dialog and reset
       setShowReuploadDialog(false);
-      setReuploadFile(null);
+      setReuploadFiles([]);
       setReuploadTextInput('');
       setReuploadAnalysisHint('');
 
@@ -1502,26 +1537,39 @@ const OrderDetail = () => {
             
             <TabsContent value="pdf" className="space-y-4 mt-4">
               <div className="space-y-2">
-                <Label>Select PDF File</Label>
+                <Label>Select PDF Files</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     type="file"
                     accept=".pdf"
+                    multiple
                     onChange={handleReuploadFileSelect}
                     className="flex-1"
                   />
                 </div>
-                {reuploadFile && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileText className="h-4 w-4" />
-                    {reuploadFile.name}
+                {reuploadFiles.length > 0 && (
+                  <div className="space-y-1">
+                    {reuploadFiles.map((file, index) => (
+                      <div key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <FileText className="h-4 w-4" />
+                        {file.name}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => setReuploadFiles(prev => prev.filter((_, i) => i !== index))}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => setReuploadFile(null)}
+                      className="text-xs"
+                      onClick={() => setReuploadFiles([])}
                     >
-                      <X className="h-3 w-3" />
+                      Clear all
                     </Button>
                   </div>
                 )}
