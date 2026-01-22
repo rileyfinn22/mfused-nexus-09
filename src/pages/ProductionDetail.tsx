@@ -122,7 +122,8 @@ export default function ProductionDetail() {
     const roles = data?.map(r => r.role as string) || [];
     setIsVibeAdmin(roles.includes('vibe_admin'));
     setIsVendor(roles.includes('vendor'));
-    setIsCustomer(roles.includes('admin') || roles.includes('customer'));
+    // Company-side users (admin/customer/company) should see the simplified customer view.
+    setIsCustomer(roles.includes('admin') || roles.includes('customer') || roles.includes('company'));
   };
 
   const fetchVendors = async () => {
