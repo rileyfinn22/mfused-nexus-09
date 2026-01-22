@@ -46,6 +46,7 @@ const VendorPOs = () => {
   const [poToDelete, setPOToDelete] = useState<any>(null);
   const [isVibeAdmin, setIsVibeAdmin] = useState<boolean | null>(null);
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState("bills");
 
   const setVendorFilter = (value: string) => {
     if (value === "all") {
@@ -313,7 +314,7 @@ const VendorPOs = () => {
       />
 
       {/* Tabs for Bills, Vendor Balances, Payments, and AP Statement */}
-      <Tabs defaultValue="bills" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="bills" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
@@ -500,7 +501,13 @@ const VendorPOs = () => {
           <VendorBalanceBreakdown
             vendors={vendorBalances}
             selectedVendorId={vendorFilter}
-            onVendorSelect={setVendorFilter}
+            onVendorSelect={(vendorId) => {
+              setVendorFilter(vendorId);
+              // Switch to bills tab to show filtered POs
+              if (vendorId !== 'all') {
+                setActiveTab("bills");
+              }
+            }}
             onPaymentRecorded={fetchVendorPOs}
             isFullWidth={true}
           />
