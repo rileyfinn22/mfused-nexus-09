@@ -521,7 +521,7 @@ const OrderDetail = () => {
         .insert({
           stage_id: stageId,
           updated_by: user.id,
-          update_type: 'substage_complete',
+          update_type: 'note',
           note_text: noteText,
         });
 
