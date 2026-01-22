@@ -247,9 +247,12 @@ const VendorPOs = () => {
   }, [pos]);
 
   const filteredPOs = pos.filter(po => {
-    const matchesSearch = po.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (po.vendors?.name && po.vendors.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (po.description && po.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = po.po_number.toLowerCase().includes(q) ||
+      (po.vendors?.name && po.vendors.name.toLowerCase().includes(q)) ||
+      (po.description && po.description.toLowerCase().includes(q)) ||
+      (po.orders?.order_number && po.orders.order_number.toLowerCase().includes(q)) ||
+      (po.orders?.description && po.orders.description.toLowerCase().includes(q));
     
     const matchesType = typeFilter === "all" || 
       (typeFilter === "expense" && po.po_type === "expense") ||
@@ -358,7 +361,7 @@ const VendorPOs = () => {
                     <div className="relative flex-1 max-w-md">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Search POs..."
+                        placeholder="Search POs, order #, description..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-10"
