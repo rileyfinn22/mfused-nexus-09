@@ -434,67 +434,91 @@ export function BulkVendorPaymentDialog({
               </div>
             </div>
 
-            {/* PO Selection */}
+            {/* PO Selection - Table Style */}
             <div className="flex-1 overflow-hidden">
-              <Label className="mb-2 block">Select POs to Pay *</Label>
-              <ScrollArea className="h-[250px] border rounded-lg">
-                {pos.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                    <AlertCircle className="h-8 w-8 mb-2" />
-                    <p>No unpaid POs for this vendor</p>
-                  </div>
-                ) : (
-                  <div className="p-2 space-y-2">
-                    {pos.map((po) => {
-                      const balance = getBalance(po);
-                      const isSelected = selectedPOs.has(po.id);
-                      const orderInfo = po.po_type === 'expense' 
-                        ? po.customer_company?.name 
-                        : po.orders?.order_number;
-                      const orderDesc = po.po_type === 'expense'
-                        ? po.description
-                        : po.orders?.description || po.description;
+              <div className="flex items-center justify-between mb-2">
+                <Label>Select POs to Pay *</Label>
+                <span className="text-xs text-muted-foreground">{selectedPOs.size} selected</span>
+              </div>
+              <div className="border rounded-lg overflow-hidden">
+                {/* Header */}
+                <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/50 text-xs font-medium text-muted-foreground border-b">
+                  <div className="col-span-1"></div>
+                  <div className="col-span-2">PO #</div>
+                  <div className="col-span-4">Order / Description</div>
+                  <div className="col-span-2 text-right">Balance</div>
+                  <div className="col-span-3 text-right">Payment</div>
+                </div>
+                
+                <ScrollArea className="h-[220px]">
+                  {pos.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <AlertCircle className="h-8 w-8 mb-2" />
+                      <p className="text-sm">No unpaid POs for this vendor</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {pos.map((po) => {
+                        const balance = getBalance(po);
+                        const isSelected = selectedPOs.has(po.id);
+                        const orderInfo = po.po_type === 'expense' 
+                          ? po.customer_company?.name 
+                          : po.orders?.order_number;
+                        const orderDesc = po.po_type === 'expense'
+                          ? po.description
+                          : po.orders?.description || po.description;
 
-                      return (
-                        <div
-                          key={po.id}
-                          className={`p-3 rounded-lg border transition-colors ${
-                            isSelected ? 'bg-primary/5 border-primary/30' : 'bg-card hover:bg-muted/50'
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <Checkbox
-                              id={`po-${po.id}`}
-                              checked={isSelected}
-                              onCheckedChange={(checked) => handlePOToggle(po.id, checked as boolean)}
-                              className="mt-1"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2">
-                                <label
-                                  htmlFor={`po-${po.id}`}
-                                  className="font-medium text-sm cursor-pointer"
-                                >
-                                  {po.po_number}
-                                </label>
-                                <span className="text-sm text-destructive font-medium">
-                                  {formatCurrency(balance)} due
-                                </span>
+                        return (
+                          <div
+                            key={po.id}
+                            className={`grid grid-cols-12 gap-2 px-3 py-2.5 items-center transition-colors cursor-pointer ${
+                              isSelected ? 'bg-primary/5' : 'hover:bg-muted/30'
+                            }`}
+                            onClick={() => handlePOToggle(po.id, !isSelected)}
+                          >
+                            {/* Checkbox */}
+                            <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => handlePOToggle(po.id, checked as boolean)}
+                              />
+                            </div>
+                            
+                            {/* PO Number */}
+                            <div className="col-span-2">
+                              <span className="font-medium text-sm">{po.po_number}</span>
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(po.order_date).toLocaleDateString()}
                               </div>
-                              <div className="text-xs text-muted-foreground mt-0.5">
-                                {orderInfo && <span className="mr-2">{orderInfo}</span>}
-                                <span>{new Date(po.order_date).toLocaleDateString()}</span>
-                              </div>
-                              {orderDesc && (
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                  {orderDesc}
-                                </p>
+                            </div>
+                            
+                            {/* Order / Description */}
+                            <div className="col-span-4 min-w-0">
+                              {orderInfo && (
+                                <div className="text-sm font-medium truncate">{orderInfo}</div>
                               )}
-                              
-                              {isSelected && (
-                                <div className="mt-2 flex items-center gap-2">
-                                  <Label className="text-xs whitespace-nowrap">Allocate:</Label>
-                                  <div className="relative flex-1 max-w-[150px]">
+                              {orderDesc && (
+                                <div className="text-xs text-muted-foreground truncate" title={orderDesc}>
+                                  {orderDesc}
+                                </div>
+                              )}
+                              {!orderInfo && !orderDesc && (
+                                <span className="text-xs text-muted-foreground">-</span>
+                              )}
+                            </div>
+                            
+                            {/* Balance */}
+                            <div className="col-span-2 text-right">
+                              <span className="text-sm font-medium text-destructive">
+                                {formatCurrency(balance)}
+                              </span>
+                            </div>
+                            
+                            {/* Payment Input */}
+                            <div className="col-span-3 flex items-center gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+                              {isSelected ? (
+                                <>
+                                  <div className="relative w-24">
                                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                                     <Input
                                       type="number"
@@ -503,28 +527,31 @@ export function BulkVendorPaymentDialog({
                                       max={balance}
                                       value={allocations[po.id] || ""}
                                       onChange={(e) => handleAllocationChange(po.id, e.target.value)}
-                                      className="h-7 pl-5 text-sm"
+                                      className="h-7 pl-5 text-sm text-right pr-2"
                                       placeholder="0.00"
                                     />
                                   </div>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-7 text-xs px-2"
+                                    className="h-7 text-xs px-2 shrink-0"
                                     onClick={() => handleAllocationChange(po.id, balance.toFixed(2))}
+                                    title="Pay full balance"
                                   >
-                                    Pay Full
+                                    Full
                                   </Button>
-                                </div>
+                                </>
+                              ) : (
+                                <span className="text-xs text-muted-foreground pr-2">—</span>
                               )}
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </ScrollArea>
+                        );
+                      })}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
             </div>
 
             {/* Footer */}
