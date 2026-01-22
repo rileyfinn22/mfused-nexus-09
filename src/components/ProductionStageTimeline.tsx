@@ -194,6 +194,13 @@ export function ProductionStageTimeline({
 
   const progressPercent = calculateWeightedProgress();
 
+  const getCustomerProgressFill = (percent: number) => {
+    if (percent >= 100) return "bg-success";
+    if (percent >= 60) return "bg-info";
+    if (percent >= 30) return "bg-warning";
+    return "bg-muted-foreground/40";
+  };
+
   return (
     <div className="space-y-6">
       {/* Progress Overview */}
@@ -210,18 +217,11 @@ export function ProductionStageTimeline({
             <div className="w-full h-3 bg-muted rounded-full overflow-hidden mb-2">
               <div
                 className={cn(
-                  "h-full rounded-full transition-all duration-500 bg-gradient-to-r",
-                  progressPercent >= 100 ? 'from-green-400 to-green-600' :
-                  progressPercent >= 60 ? 'from-blue-400 to-blue-600' :
-                  progressPercent >= 30 ? 'from-amber-400 to-amber-600' :
-                  'from-gray-300 to-gray-500'
+                  "h-full rounded-full transition-all duration-500",
+                  getCustomerProgressFill(progressPercent)
                 )}
                 style={{ width: `${Math.min(progressPercent, 100)}%` }}
               />
-            </div>
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Start</span>
-              <span>Complete</span>
             </div>
           </>
         ) : (
@@ -517,6 +517,12 @@ export function ProductionStageTimeline({
                               // Determine primary type for styling
                               const primaryType = hasImage ? 'image' : hasFile ? 'document' : 'note';
                               const isStageComplete = stage.status === 'completed';
+
+                              // Note bubbles should turn green when the stage is complete OR when the note represents a
+                              // sub-stage completion auto-note (e.g., <!--PRINT_FILM-->Print Film Complete).
+                              const hasAutoMarker = !!update.note_text?.match(/<!--[A-Z0-9_]+-->/);
+                              const isCompletionNote = !!cleanNoteText?.match(/\bcomplete\b/i);
+                              const isNoteComplete = isStageComplete || (hasAutoMarker && isCompletionNote);
                               
                               return (
                                 <div
@@ -524,8 +530,8 @@ export function ProductionStageTimeline({
                                   className={cn(
                                     "inline-flex items-center gap-2 px-3 py-2 rounded-full border transition-all",
                                     "hover:shadow-sm cursor-default",
-                                    primaryType === 'note' && isStageComplete && "bg-green-50 border-green-300 dark:bg-green-950/40 dark:border-green-700",
-                                    primaryType === 'note' && !isStageComplete && "bg-slate-100 border-slate-300 dark:bg-slate-800/60 dark:border-slate-600",
+                                    primaryType === 'note' && isNoteComplete && "bg-success/15 border-success/30",
+                                    primaryType === 'note' && !isNoteComplete && "bg-muted/60 border-border",
                                     primaryType === 'image' && "bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:border-purple-800",
                                     primaryType === 'document' && "bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800"
                                   )}
@@ -534,12 +540,19 @@ export function ProductionStageTimeline({
                                   {/* Icon */}
                                   <div className={cn(
                                     "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center",
-                                    primaryType === 'note' && isStageComplete && "bg-green-100 dark:bg-green-900/50",
-                                    primaryType === 'note' && !isStageComplete && "bg-slate-200 dark:bg-slate-700",
+                                    primaryType === 'note' && isNoteComplete && "bg-success/20",
+                                    primaryType === 'note' && !isNoteComplete && "bg-background/60",
                                     primaryType === 'image' && "bg-purple-100 dark:bg-purple-900/50",
                                     primaryType === 'document' && "bg-amber-100 dark:bg-amber-900/50"
                                   )}>
-                                    {primaryType === 'note' && <MessageSquare className={cn("h-3 w-3", isStageComplete ? "text-green-600 dark:text-green-400" : "text-slate-600 dark:text-slate-300")} />}
+                                    {primaryType === 'note' && (
+                                      <MessageSquare
+                                        className={cn(
+                                          "h-3 w-3",
+                                          isNoteComplete ? "text-success" : "text-muted-foreground"
+                                        )}
+                                      />
+                                    )}
                                     {primaryType === 'image' && <ImageIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />}
                                     {primaryType === 'document' && <FileText className="h-3 w-3 text-amber-600 dark:text-amber-400" />}
                                   </div>
@@ -547,8 +560,8 @@ export function ProductionStageTimeline({
                                   {/* Label */}
                                   <span className={cn(
                                     "text-xs font-medium max-w-[120px] truncate",
-                                    primaryType === 'note' && isStageComplete && "text-green-700 dark:text-green-300",
-                                    primaryType === 'note' && !isStageComplete && "text-slate-700 dark:text-slate-200",
+                                    primaryType === 'note' && isNoteComplete && "text-success",
+                                    primaryType === 'note' && !isNoteComplete && "text-foreground",
                                     primaryType === 'image' && "text-purple-700 dark:text-purple-300",
                                     primaryType === 'document' && "text-amber-700 dark:text-amber-300"
                                   )}>
