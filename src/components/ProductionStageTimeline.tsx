@@ -218,7 +218,7 @@ export function ProductionStageTimeline({
                   'bg-muted'
                 )}
                 style={{ width: `${weight}%` }}
-                title={`${def.label}: ${weight}%`}
+                title={isCustomer ? def.label : `${def.label}: ${weight}%`}
               />
             );
           })}
@@ -247,11 +247,33 @@ export function ProductionStageTimeline({
           </div>
         )}
         
-        {/* Stage Labels */}
-        <div className="flex justify-between text-xs text-muted-foreground mt-2">
-          <span>Start</span>
-          <span>Complete</span>
-        </div>
+        {/* Stage Labels - Show stage names for customers, Start/Complete for admin */}
+        {isCustomer ? (
+          <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground mt-1">
+            {stageDefinitions.map((def) => {
+              const status = getStageStatus(def.value);
+              const weight = def.weight ?? (100 / stageDefinitions.length);
+              return (
+                <div 
+                  key={def.value} 
+                  className={cn(
+                    "truncate text-center",
+                    status === 'completed' && 'text-green-600 font-medium',
+                    status === 'in_progress' && 'text-blue-600 font-medium'
+                  )}
+                  style={{ width: `${weight}%` }}
+                >
+                  {def.label.split(' ')[0]}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex justify-between text-xs text-muted-foreground mt-2">
+            <span>Start</span>
+            <span>Complete</span>
+          </div>
+        )}
       </div>
 
       {/* Stage Cards */}
@@ -472,11 +494,11 @@ export function ProductionStageTimeline({
                     
                     {/* Expandable Updates Section */}
                     <CollapsibleContent>
-                      <div className="border-t border-border px-4 py-3 bg-muted/30">
-                        <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                      <div className="border-t border-border px-4 py-4 bg-muted/20">
+                        <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
                           Activity History
                         </h5>
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                           {stage.production_stage_updates
                             .filter((update) => {
                               // Show all non-status-change updates
@@ -485,50 +507,103 @@ export function ProductionStageTimeline({
                               return update.note_text || update.image_url || update.file_url;
                             })
                             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                            .map((update) => (
-                            <div
-                              key={update.id}
-                              className="bg-background border border-border rounded-lg p-3 space-y-2"
-                            >
-                              <div className="flex items-center justify-between">
-                                <Badge variant="outline" className="text-xs capitalize">
-                                  {update.update_type === 'status_change' && update.note_text ? 'note' : update.update_type.replace('_', ' ')}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(update.created_at).toLocaleString()}
-                                </span>
-                              </div>
+                            .map((update) => {
+                              const cleanNoteText = update.note_text?.replace(/<!--[A-Z_]+-->/g, '');
+                              const hasNote = cleanNoteText && cleanNoteText.trim().length > 0;
+                              const hasImage = !!update.image_url;
+                              const hasFile = !!update.file_url;
+                              const updateTypeLabel = update.update_type === 'status_change' && hasNote ? 'note' : update.update_type.replace('_', ' ');
                               
-                              {update.note_text && (
-                                <p className="text-sm text-foreground">{update.note_text.replace(/<!--[A-Z_]+-->/g, '')}</p>
-                              )}
-                              
-                              {update.image_url && (
-                                <img
-                                  src={update.image_url}
-                                  alt="Stage update"
-                                  className="rounded-lg max-h-48 object-cover border border-border"
-                                />
-                              )}
-                              
-                              {update.file_url && (
-                                <a
-                                  href={update.file_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 p-2 bg-muted rounded-lg border border-border hover:border-primary transition-colors"
-                                >
-                                  <FileText className="h-4 w-4 text-primary" />
-                                  <span className="text-sm text-primary hover:underline flex-1">
-                                    {update.file_name || 'Download Document'}
-                                  </span>
-                                  <Download className="h-3 w-3 text-muted-foreground" />
-                                </a>
-                              )}
-                            </div>
-                          ))}
+                              return (
+                                <div key={update.id} className="flex gap-3">
+                                  {/* Avatar/Icon bubble */}
+                                  <div className={cn(
+                                    "flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center",
+                                    updateTypeLabel === 'note' ? "bg-blue-100 dark:bg-blue-900/30" :
+                                    updateTypeLabel === 'image' ? "bg-purple-100 dark:bg-purple-900/30" :
+                                    updateTypeLabel === 'document' ? "bg-amber-100 dark:bg-amber-900/30" :
+                                    "bg-muted"
+                                  )}>
+                                    {updateTypeLabel === 'note' && <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                                    {updateTypeLabel === 'image' && <ImageIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />}
+                                    {updateTypeLabel === 'document' && <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
+                                    {!['note', 'image', 'document'].includes(updateTypeLabel) && <MessageSquare className="h-4 w-4 text-muted-foreground" />}
+                                  </div>
+                                  
+                                  {/* Message bubble */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className={cn(
+                                      "rounded-2xl rounded-tl-md p-4 shadow-sm",
+                                      "bg-gradient-to-br from-card to-muted/50 border border-border/60"
+                                    )}>
+                                      {/* Header */}
+                                      <div className="flex items-center justify-between gap-2 mb-2">
+                                        <Badge 
+                                          variant="secondary" 
+                                          className={cn(
+                                            "text-[10px] font-medium capitalize px-2 py-0.5",
+                                            updateTypeLabel === 'note' && "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+                                            updateTypeLabel === 'image' && "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+                                            updateTypeLabel === 'document' && "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                          )}
+                                        >
+                                          {updateTypeLabel}
+                                        </Badge>
+                                        <span className="text-[11px] text-muted-foreground">
+                                          {new Date(update.created_at).toLocaleString(undefined, {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: 'numeric',
+                                            minute: '2-digit'
+                                          })}
+                                        </span>
+                                      </div>
+                                      
+                                      {/* Note text */}
+                                      {hasNote && (
+                                        <p className="text-sm text-foreground leading-relaxed">{cleanNoteText}</p>
+                                      )}
+                                      
+                                      {/* Image */}
+                                      {hasImage && (
+                                        <div className={cn(hasNote && "mt-3")}>
+                                          <img
+                                            src={update.image_url}
+                                            alt="Stage update"
+                                            className="rounded-xl max-h-56 object-cover border border-border/60 shadow-sm"
+                                          />
+                                        </div>
+                                      )}
+                                      
+                                      {/* File */}
+                                      {hasFile && (
+                                        <div className={cn((hasNote || hasImage) && "mt-3")}>
+                                          <a
+                                            href={update.file_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-3 p-3 bg-background/80 rounded-xl border border-border/60 hover:border-primary/50 hover:bg-background transition-all group"
+                                          >
+                                            <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                                              <FileText className="h-5 w-5 text-primary" />
+                                            </div>
+                                            <span className="text-sm font-medium text-foreground flex-1 truncate">
+                                              {update.file_name || 'Download Document'}
+                                            </span>
+                                            <Download className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                          </a>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           {stage.production_stage_updates.filter(u => u.update_type !== 'status_change' || u.note_text || u.image_url || u.file_url).length === 0 && (
-                            <p className="text-sm text-muted-foreground text-center py-2">No notes or attachments yet</p>
+                            <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                              <MessageSquare className="h-8 w-8 mb-2 opacity-40" />
+                              <p className="text-sm">No notes or attachments yet</p>
+                            </div>
                           )}
                         </div>
                       </div>
