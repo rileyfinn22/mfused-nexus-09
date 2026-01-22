@@ -1912,141 +1912,216 @@ const OrderDetail = () => {
                       </div>
 
                       {(isVibeAdmin || (isVendor && stage.vendor_id === vendorId)) && (
-                        <div className="space-y-3 mt-3 pt-3 border-t border-table-border">
-                          <div>
-                            <Label className="text-xs">Status</Label>
-                            <Select
-                              value={stage.status}
-                              onValueChange={(value) => {
-                                setProductionStages(prev => 
-                                  prev.map(s => s.id === stage.id ? { ...s, status: value } : s)
-                                );
-                              }}
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="in_progress">In Progress</SelectItem>
-                                <SelectItem value="completed">Completed</SelectItem>
-                              </SelectContent>
-                            </Select>
+                        <div className="mt-4 pt-4 border-t border-table-border">
+                          {/* Quick Status Buttons */}
+                          <div className="mb-4">
+                            <Label className="text-xs text-muted-foreground mb-2 block">Quick Update Status</Label>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant={stage.status === 'pending' ? 'default' : 'outline'}
+                                className={`flex-1 h-9 ${stage.status === 'pending' ? 'bg-muted-foreground hover:bg-muted-foreground/90' : ''}`}
+                                disabled={updatingStages[stage.id]}
+                                onClick={() => {
+                                  if (stage.status !== 'pending') {
+                                    handleStageStatusChange(stage.id, 'pending');
+                                  }
+                                }}
+                              >
+                                <Circle className="h-3 w-3 mr-1.5" />
+                                Pending
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={stage.status === 'in_progress' ? 'default' : 'outline'}
+                                className={`flex-1 h-9 ${stage.status === 'in_progress' ? 'bg-blue-500 hover:bg-blue-600' : ''}`}
+                                disabled={updatingStages[stage.id]}
+                                onClick={() => {
+                                  if (stage.status !== 'in_progress') {
+                                    handleStageStatusChange(stage.id, 'in_progress');
+                                  }
+                                }}
+                              >
+                                {updatingStages[stage.id] && stage.status !== 'in_progress' ? (
+                                  <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                ) : (
+                                  <Truck className="h-3 w-3 mr-1.5" />
+                                )}
+                                In Progress
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={stage.status === 'completed' ? 'default' : 'outline'}
+                                className={`flex-1 h-9 ${stage.status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''}`}
+                                disabled={updatingStages[stage.id]}
+                                onClick={() => {
+                                  if (stage.status !== 'completed') {
+                                    handleStageStatusChange(stage.id, 'completed');
+                                  }
+                                }}
+                              >
+                                <CheckCircle2 className="h-3 w-3 mr-1.5" />
+                                Complete
+                              </Button>
+                            </div>
                           </div>
-                          
-                          <div>
-                            <Label htmlFor={`note-${stage.id}`} className="text-xs">Add Note (Optional)</Label>
-                            <Textarea
-                              id={`note-${stage.id}`}
-                              value={stageNotes[stage.id] || ""}
-                              onChange={(e) => setStageNotes(prev => ({ ...prev, [stage.id]: e.target.value }))}
-                              placeholder="Add notes about the update..."
-                              rows={2}
-                              className="mt-1 text-xs"
-                            />
-                          </div>
-                          
-                          <div>
-                            <Label htmlFor={`image-${stage.id}`} className="text-xs">Add Image (Optional)</Label>
-                            <Input
-                              id={`image-${stage.id}`}
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => setStageImages(prev => ({ ...prev, [stage.id]: e.target.files?.[0] || null }))}
-                              className="mt-1 text-xs"
-                            />
-                            {stageImages[stage.id] && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Selected: {stageImages[stage.id]!.name}
-                              </p>
-                            )}
-                          </div>
-                          
-                          {isVibeAdmin && (
-                            <div>
-                              <Label htmlFor={`file-${stage.id}`} className="text-xs">Add Document (PDF/Excel - Optional)</Label>
-                              <Input
-                                id={`file-${stage.id}`}
-                                type="file"
-                                accept=".pdf,.xlsx,.xls,.csv"
-                                onChange={(e) => setStageFiles(prev => ({ ...prev, [stage.id]: e.target.files?.[0] || null }))}
-                                className="mt-1 text-xs"
-                              />
-                              {stageFiles[stage.id] && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Selected: {stageFiles[stage.id]!.name}
-                                </p>
+
+                          {/* Collapsible Add Details Section */}
+                          <details className="group">
+                            <summary className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
+                              <Plus className="h-3 w-3 transition-transform group-open:rotate-45" />
+                              Add note, image, or document
+                            </summary>
+                            <div className="mt-3 space-y-3 pl-4 border-l-2 border-muted">
+                              <div>
+                                <Label htmlFor={`note-${stage.id}`} className="text-xs">Note</Label>
+                                <Textarea
+                                  id={`note-${stage.id}`}
+                                  value={stageNotes[stage.id] || ""}
+                                  onChange={(e) => setStageNotes(prev => ({ ...prev, [stage.id]: e.target.value }))}
+                                  placeholder="Add notes about this stage..."
+                                  rows={2}
+                                  className="mt-1 text-sm"
+                                />
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label htmlFor={`image-${stage.id}`} className="text-xs">Image</Label>
+                                  <Input
+                                    id={`image-${stage.id}`}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => setStageImages(prev => ({ ...prev, [stage.id]: e.target.files?.[0] || null }))}
+                                    className="mt-1 text-xs h-9"
+                                  />
+                                  {stageImages[stage.id] && (
+                                    <p className="text-xs text-green-600 mt-1 truncate">
+                                      ✓ {stageImages[stage.id]!.name}
+                                    </p>
+                                  )}
+                                </div>
+                                
+                                {isVibeAdmin && (
+                                  <div>
+                                    <Label htmlFor={`file-${stage.id}`} className="text-xs">Document</Label>
+                                    <Input
+                                      id={`file-${stage.id}`}
+                                      type="file"
+                                      accept=".pdf,.xlsx,.xls,.csv"
+                                      onChange={(e) => setStageFiles(prev => ({ ...prev, [stage.id]: e.target.files?.[0] || null }))}
+                                      className="mt-1 text-xs h-9"
+                                    />
+                                    {stageFiles[stage.id] && (
+                                      <p className="text-xs text-green-600 mt-1 truncate">
+                                        ✓ {stageFiles[stage.id]!.name}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {(stageNotes[stage.id] || stageImages[stage.id] || stageFiles[stage.id]) && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handleStageStatusChange(stage.id, stage.status)}
+                                  disabled={updatingStages[stage.id]}
+                                  className="w-full"
+                                >
+                                  {updatingStages[stage.id] ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                      Saving...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="h-3 w-3 mr-1.5" />
+                                      Save Attachments
+                                    </>
+                                  )}
+                                </Button>
                               )}
                             </div>
-                          )}
-                          
-                          <Button
-                            size="sm"
-                            onClick={() => handleStageStatusChange(stage.id, stage.status)}
-                            disabled={updatingStages[stage.id]}
-                            className="w-full"
-                          >
-                            {updatingStages[stage.id] ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Updating...
-                              </>
-                            ) : (
-                              "Update Stage"
-                            )}
-                          </Button>
+                          </details>
                         </div>
                       )}
 
-                      {/* Stage Updates */}
+                      {/* Stage Updates History */}
                       {stageUpdates[stage.id] && stageUpdates[stage.id].length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-table-border">
-                          <p className="text-xs font-medium mb-2">Recent Updates:</p>
-                          <div className="space-y-2">
+                        <div className="mt-4 pt-4 border-t border-table-border">
+                          <p className="text-xs font-medium text-muted-foreground mb-3">Activity History</p>
+                          <div className="space-y-3">
                             {stageUpdates[stage.id].slice(0, 3).map((update, idx) => (
-                              <div key={idx} className="text-xs p-2 bg-muted/50 rounded">
-                                <div className="flex justify-between items-start mb-1">
-                                  <span className="font-medium capitalize">{update.update_type.replace('_', ' ')}</span>
-                                  <span className="text-muted-foreground">
-                                    {new Date(update.created_at).toLocaleDateString()}
-                                  </span>
+                              <div key={idx} className="flex gap-3">
+                                {/* Timeline indicator */}
+                                <div className="flex flex-col items-center">
+                                  <div className={`w-2 h-2 rounded-full ${
+                                    update.new_status === 'completed' ? 'bg-green-500' :
+                                    update.new_status === 'in_progress' ? 'bg-blue-500' :
+                                    'bg-muted-foreground'
+                                  }`} />
+                                  {idx < stageUpdates[stage.id].slice(0, 3).length - 1 && (
+                                    <div className="w-0.5 h-full bg-border flex-1 mt-1" />
+                                  )}
                                 </div>
-                                {update.note_text && <p className="text-muted-foreground mb-1">{update.note_text}</p>}
-                                {update.image_url && (
-                                  <div 
-                                    className="relative group cursor-pointer"
-                                    onClick={() => setPreviewImage(update.image_url)}
-                                  >
-                                    <img 
-                                      src={update.image_url} 
-                                      alt="Production update" 
-                                      className="w-full h-32 object-cover rounded border border-table-border mt-1 transition-opacity group-hover:opacity-80"
-                                    />
-                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded">
-                                      <span className="text-white text-sm font-medium">Click to preview</span>
-                                    </div>
-                                  </div>
-                                )}
-                                {update.file_url && (
-                                  <a
-                                    href={update.file_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 mt-2 p-2 bg-background rounded border border-table-border hover:border-primary transition-colors"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <FileText className="h-4 w-4 text-primary" />
-                                    <span className="text-xs text-primary hover:underline">
-                                      {update.file_name || 'Download Document'}
+                                
+                                {/* Update content */}
+                                <div className="flex-1 pb-3">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    {update.previous_status && update.new_status && (
+                                      <div className="flex items-center gap-1.5 text-xs">
+                                        <Badge variant="outline" className="h-5 px-1.5 capitalize text-[10px]">
+                                          {update.previous_status.replace('_', ' ')}
+                                        </Badge>
+                                        <span className="text-muted-foreground">→</span>
+                                        <Badge className={`h-5 px-1.5 capitalize text-[10px] ${
+                                          update.new_status === 'completed' ? 'bg-green-500' :
+                                          update.new_status === 'in_progress' ? 'bg-blue-500' :
+                                          'bg-muted-foreground'
+                                        }`}>
+                                          {update.new_status.replace('_', ' ')}
+                                        </Badge>
+                                      </div>
+                                    )}
+                                    <span className="text-[10px] text-muted-foreground ml-auto">
+                                      {new Date(update.created_at).toLocaleDateString()} at {new Date(update.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
-                                    <Download className="h-3 w-3 text-muted-foreground ml-auto" />
-                                  </a>
-                                )}
-                                {update.previous_status && update.new_status && (
-                                  <p className="text-muted-foreground">
-                                    Status changed: {update.previous_status} → {update.new_status}
-                                  </p>
-                                )}
+                                  </div>
+                                  {update.note_text && (
+                                    <p className="text-sm text-foreground bg-muted/50 rounded-md px-2 py-1.5 mt-1">{update.note_text}</p>
+                                  )}
+                                  {update.image_url && (
+                                    <div 
+                                      className="relative group cursor-pointer mt-2"
+                                      onClick={() => setPreviewImage(update.image_url)}
+                                    >
+                                      <img 
+                                        src={update.image_url} 
+                                        alt="Production update" 
+                                        className="w-full max-w-xs h-24 object-cover rounded-md border border-table-border transition-opacity group-hover:opacity-80"
+                                      />
+                                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-md">
+                                        <span className="text-white text-xs font-medium">Click to preview</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {update.file_url && (
+                                    <a
+                                      href={update.file_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-2 mt-2 p-2 bg-background rounded-md border border-table-border hover:border-primary transition-colors"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <FileText className="h-4 w-4 text-primary" />
+                                      <span className="text-xs text-primary hover:underline">
+                                        {update.file_name || 'Download Document'}
+                                      </span>
+                                      <Download className="h-3 w-3 text-muted-foreground ml-auto" />
+                                    </a>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
