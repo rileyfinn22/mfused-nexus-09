@@ -403,15 +403,15 @@ export function BulkVendorPaymentDialog({
               )}
             </div>
 
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
+            {/* Notes - Compact */}
+            <div className="flex items-center gap-3">
+              <Label htmlFor="notes" className="shrink-0 text-sm">Notes</Label>
+              <Input
                 id="notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Optional payment notes"
-                rows={2}
+                className="flex-1"
               />
             </div>
 
@@ -450,7 +450,7 @@ export function BulkVendorPaymentDialog({
                   <div className="col-span-3 text-right">Payment</div>
                 </div>
                 
-                <ScrollArea className="h-[220px]">
+                <ScrollArea className="h-[300px]">
                   {pos.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                       <AlertCircle className="h-8 w-8 mb-2" />
