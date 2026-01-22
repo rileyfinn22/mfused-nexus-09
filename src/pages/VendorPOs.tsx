@@ -77,7 +77,7 @@ const VendorPOs = () => {
     setLoading(true);
     const { data, error } = await (supabase as any)
       .from('vendor_pos')
-      .select('*, vendors(name), orders(order_number, description), customer_company:companies!vendor_pos_customer_company_id_fkey(name)')
+      .select('*, vendors(id, name), orders(order_number, description), customer_company:companies!vendor_pos_customer_company_id_fkey(name)')
       .order('created_at', { ascending: false });
     
     if (!error && data) {
