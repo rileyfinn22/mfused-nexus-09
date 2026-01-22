@@ -314,7 +314,12 @@ export function ProductionStageTimeline({
                         </h5>
                         <div className="space-y-3">
                           {stage.production_stage_updates
-                            .filter((update) => update.update_type !== 'status_change')
+                            .filter((update) => {
+                              // Show all non-status-change updates
+                              if (update.update_type !== 'status_change') return true;
+                              // For status_change, only show if it has actual content (note/image/file)
+                              return update.note_text || update.image_url || update.file_url;
+                            })
                             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                             .map((update) => (
                             <div
@@ -358,7 +363,7 @@ export function ProductionStageTimeline({
                               )}
                             </div>
                           ))}
-                          {stage.production_stage_updates.filter(u => u.update_type !== 'status_change').length === 0 && (
+                          {stage.production_stage_updates.filter(u => u.update_type !== 'status_change' || u.note_text || u.image_url || u.file_url).length === 0 && (
                             <p className="text-sm text-muted-foreground text-center py-2">No notes or attachments yet</p>
                           )}
                         </div>
