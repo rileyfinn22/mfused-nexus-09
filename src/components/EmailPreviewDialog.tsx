@@ -305,7 +305,7 @@ export function EmailPreviewDialog({
                   multiple
                   className="hidden"
                   onChange={handleFileSelect}
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.zip"
                 />
               </div>
               
