@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, Edit, Save, X, Plus, Send, DollarSign, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Edit, Save, X, Plus, Send, DollarSign, Trash2, FileCheck } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -15,6 +15,7 @@ import autoTable from "jspdf-autotable";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
 import { EmailPreviewDialog } from "@/components/EmailPreviewDialog";
 import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
+import { FinalizeBillDialog } from "@/components/FinalizeBillDialog";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
@@ -34,6 +35,7 @@ const VendorPODetail = () => {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -791,10 +793,16 @@ Thank you for your business.`;
             Download PDF
           </Button>
           {isAdmin && (
-            <Button variant="outline" onClick={() => setShowPaymentDialog(true)}>
-              <DollarSign className="h-4 w-4 mr-2" />
-              Record Payment
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => setShowFinalizeDialog(true)}>
+                <FileCheck className="h-4 w-4 mr-2" />
+                Finalize Bill
+              </Button>
+              <Button variant="outline" onClick={() => setShowPaymentDialog(true)}>
+                <DollarSign className="h-4 w-4 mr-2" />
+                Record Payment
+              </Button>
+            </>
           )}
           {vendor?.contact_email && (
             <Button onClick={() => setShowEmailPreview(true)}>
@@ -841,19 +849,25 @@ Thank you for your business.`;
 
             {/* Payment Summary */}
             <div className="mt-6 bg-background/80 backdrop-blur rounded-lg p-4">
-              <div className="grid grid-cols-4 gap-4 text-center">
+              <div className="grid grid-cols-5 gap-4 text-center">
                 <div>
-                  <p className="text-xs text-muted-foreground">PO Total</p>
+                  <p className="text-xs text-muted-foreground">Original PO</p>
                   <p className="text-lg font-bold">${Number(po.total || 0).toFixed(2)}</p>
                 </div>
                 <div>
+                  <p className="text-xs text-muted-foreground">Final Bill</p>
+                  <p className={`text-lg font-bold ${po.final_total ? 'text-primary' : 'text-muted-foreground'}`}>
+                    {po.final_total ? `$${Number(po.final_total).toFixed(2)}` : 'Not finalized'}
+                  </p>
+                </div>
+                <div>
                   <p className="text-xs text-muted-foreground">Total Paid</p>
-                  <p className="text-lg font-bold text-green-600">${Number(po.total_paid || 0).toFixed(2)}</p>
+                  <p className="text-lg font-bold text-success">${Number(po.total_paid || 0).toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Amount Owed</p>
                   <p className="text-lg font-bold text-destructive">
-                    ${(Number(po.total || 0) - Number(po.total_paid || 0)).toFixed(2)}
+                    ${((po.final_total ?? po.total ?? 0) - Number(po.total_paid || 0)).toFixed(2)}
                   </p>
                 </div>
                 <div>
@@ -1004,17 +1018,18 @@ Thank you for your business.`;
                 <TableRow>
                   <TableHead>SKU</TableHead>
                   <TableHead>Product</TableHead>
-                  <TableHead>Description</TableHead>
                   <TableHead className="text-center">Ordered</TableHead>
                   <TableHead className="text-center">Shipped</TableHead>
+                  {po.final_total && <TableHead className="text-center">Final Qty</TableHead>}
                   <TableHead className="text-right">Unit Cost</TableHead>
+                  {po.final_total && <TableHead className="text-right">Final Cost</TableHead>}
                   <TableHead className="text-right">Total</TableHead>
                   {isAdmin && isEditMode && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {poItems.map((item, index) => (
-                  <TableRow key={item.id}>
+                  <TableRow key={item.id} className={item.sku === 'SHIPPING' ? 'bg-muted/50' : ''}>
                     <TableCell>
                       {isEditMode && item.isNew ? (
                         <Input
@@ -1043,51 +1058,46 @@ Thank you for your business.`;
                           placeholder="Product name"
                         />
                       ) : (
-                        item.name
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditMode && item.isNew ? (
-                        <Input
-                          value={item.description || ''}
-                          onChange={(e) => {
-                            const updated = [...poItems];
-                            updated[index].description = e.target.value;
-                            setPOItems(updated);
-                          }}
-                          placeholder="Description (optional)"
-                        />
-                      ) : (
-                        <span className="text-sm text-muted-foreground">{item.description || '-'}</span>
+                        <div>
+                          <span>{item.name}</span>
+                          {item.description && (
+                            <span className="block text-xs text-muted-foreground">{item.description}</span>
+                          )}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell className="text-center">
-                      {item.quantity}
+                      {item.sku === 'SHIPPING' ? '-' : item.quantity}
                     </TableCell>
                     <TableCell className="text-center">
-                      {isEditMode ? (
-                        <Input
-                          type="number"
-                          min="0"
-                          value={item.shipped_quantity}
-                          onChange={(e) => {
-                            const updated = [...poItems];
-                            const newQuantity = parseInt(e.target.value) || 0;
-                            updated[index].shipped_quantity = newQuantity;
-                            // For new items, also update the ordered quantity
-                            if (updated[index].isNew) {
-                              updated[index].quantity = newQuantity;
-                            }
-                            // Calculate total based on ordered quantity, not shipped
-                            updated[index].total = updated[index].quantity * Number(updated[index].unit_cost);
-                            setPOItems(updated);
-                          }}
-                          className="w-24 text-center"
-                        />
-                      ) : (
-                        item.shipped_quantity
+                      {item.sku === 'SHIPPING' ? '-' : (
+                        isEditMode ? (
+                          <Input
+                            type="number"
+                            min="0"
+                            value={item.shipped_quantity}
+                            onChange={(e) => {
+                              const updated = [...poItems];
+                              const newQuantity = parseInt(e.target.value) || 0;
+                              updated[index].shipped_quantity = newQuantity;
+                              if (updated[index].isNew) {
+                                updated[index].quantity = newQuantity;
+                              }
+                              updated[index].total = updated[index].quantity * Number(updated[index].unit_cost);
+                              setPOItems(updated);
+                            }}
+                            className="w-24 text-center"
+                          />
+                        ) : (
+                          item.shipped_quantity
+                        )
                       )}
                     </TableCell>
+                    {po.final_total && (
+                      <TableCell className="text-center font-medium">
+                        {item.sku === 'SHIPPING' ? '-' : (item.final_quantity ?? '-')}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">
                       {isEditMode && item.isNew ? (
                         <Input
@@ -1107,7 +1117,17 @@ Thank you for your business.`;
                         `$${Number(item.unit_cost).toFixed(3)}`
                       )}
                     </TableCell>
-                    <TableCell className="text-right">${Number(item.total).toFixed(2)}</TableCell>
+                    {po.final_total && (
+                      <TableCell className="text-right font-medium">
+                        {item.final_unit_cost ? `$${Number(item.final_unit_cost).toFixed(3)}` : '-'}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-right font-medium">
+                      ${po.final_total && item.final_quantity != null && item.final_unit_cost != null
+                        ? (Number(item.final_quantity) * Number(item.final_unit_cost)).toFixed(2)
+                        : Number(item.total).toFixed(2)
+                      }
+                    </TableCell>
                     {isAdmin && isEditMode && (
                       <TableCell className="text-center">
                         {item.isNew && (
@@ -1236,6 +1256,17 @@ Thank you for your business.`;
         open={showPaymentDialog}
         onOpenChange={setShowPaymentDialog}
         vendorPO={po}
+        onSuccess={() => {
+          fetchPODetails();
+        }}
+      />
+
+      {/* Finalize Bill Dialog */}
+      <FinalizeBillDialog
+        open={showFinalizeDialog}
+        onOpenChange={setShowFinalizeDialog}
+        vendorPO={po}
+        poItems={poItems}
         onSuccess={() => {
           fetchPODetails();
         }}

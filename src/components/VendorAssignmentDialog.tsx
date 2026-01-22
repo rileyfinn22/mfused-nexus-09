@@ -124,10 +124,30 @@ export const VendorAssignmentDialog = ({
     setAssignments(existing);
   };
 
-  const generatePONumber = () => {
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000);
-    return `VP-${timestamp}-${random}`;
+  const generatePONumber = async () => {
+    // Get the highest numeric PO number from existing records
+    const { data } = await supabase
+      .from("vendor_pos")
+      .select("po_number")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    
+    let maxNumber = 3000; // Start at 3000 so first PO is 3001
+    if (data) {
+      for (const po of data) {
+        // Extract numeric part from various formats
+        const match = po.po_number.match(/(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num >= 3001 && num > maxNumber) {
+            maxNumber = num;
+          }
+        }
+      }
+    }
+    
+    const nextNumber = maxNumber + 1;
+    return String(nextNumber);
   };
 
   const handleAssignSingle = async (itemId: string) => {
@@ -273,7 +293,7 @@ export const VendorAssignmentDialog = ({
         }
       } else {
         // Create new vendor PO
-        const poNumber = generatePONumber();
+        const poNumber = await generatePONumber();
         const { data: newPO, error: poError } = await supabase
           .from('vendor_pos')
           .insert({
@@ -522,7 +542,7 @@ export const VendorAssignmentDialog = ({
           }
         } else {
           // Create new vendor PO
-          const poNumber = generatePONumber();
+          const poNumber = await generatePONumber();
           const { data: newPO, error: poError } = await supabase
             .from('vendor_pos')
             .insert({

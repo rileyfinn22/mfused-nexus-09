@@ -104,12 +104,29 @@ export function CreateExpensePODialog({ open, onOpenChange, onCreated }: CreateE
   };
 
   const generatePONumber = async () => {
-    const { count } = await supabase
+    // Get the highest numeric PO number from existing records
+    const { data } = await supabase
       .from("vendor_pos")
-      .select("*", { count: "exact", head: true });
+      .select("po_number")
+      .order("created_at", { ascending: false })
+      .limit(100);
     
-    const nextNumber = (count || 0) + 1;
-    return `EXP-${String(nextNumber).padStart(5, "0")}`;
+    let maxNumber = 3000; // Start at 3000 so first PO is 3001
+    if (data) {
+      for (const po of data) {
+        // Extract numeric part from various formats
+        const match = po.po_number.match(/(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num >= 3001 && num > maxNumber) {
+            maxNumber = num;
+          }
+        }
+      }
+    }
+    
+    const nextNumber = maxNumber + 1;
+    return String(nextNumber);
   };
 
   const addItem = () => {
