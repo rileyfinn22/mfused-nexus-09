@@ -506,6 +506,31 @@ export default function ProductionDetail() {
     }
   };
 
+  const handleDeleteUpdate = async (updateId: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('production_stage_updates')
+        .delete()
+        .eq('id', updateId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Deleted",
+        description: "Activity update removed successfully",
+      });
+      
+      await fetchOrderAndStages();
+    } catch (error: any) {
+      console.error('Error deleting update:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete update",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -593,6 +618,7 @@ export default function ProductionDetail() {
           onUpdateClick={handleOpenUpdateDialog}
           onQuickStatusChange={handleQuickStatusChange}
           onSubstageComplete={handleSubstageComplete}
+          onDeleteUpdate={handleDeleteUpdate}
           onVendorAssign={handleAssignVendor}
           vendors={vendors}
           isVibeAdmin={isVibeAdmin}
