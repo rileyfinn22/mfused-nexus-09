@@ -1,6 +1,7 @@
 import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -36,11 +37,18 @@ interface StageDefinition {
   weight?: number; // Percentage weight for progress calculation (default: equal distribution)
 }
 
+interface SubstageDefinition {
+  key: string;
+  label: string;
+  percent: number;
+}
+
 interface ProductionStageTimelineProps {
   stages: ProductionStage[];
   stageDefinitions: StageDefinition[];
   onUpdateClick: (stage: ProductionStage, stageDef: StageDefinition) => void;
   onQuickStatusChange?: (stageId: string, newStatus: string) => Promise<void>;
+  onSubstageComplete?: (stageId: string, substage: SubstageDefinition) => Promise<void>;
   onVendorAssign?: (stageId: string, vendorId: string) => void;
   vendors?: { id: string; name: string }[];
   isVibeAdmin: boolean;
@@ -48,11 +56,18 @@ interface ProductionStageTimelineProps {
   isCustomer: boolean;
 }
 
+const PRINT_SUBSTAGES: SubstageDefinition[] = [
+  { key: 'print_film', label: 'Print Film', percent: 25 },
+  { key: 'lamination_curing', label: 'Lamination + Curing', percent: 10 },
+  { key: 'converting', label: 'Converting', percent: 15 },
+];
+
 export function ProductionStageTimeline({
   stages,
   stageDefinitions,
   onUpdateClick,
   onQuickStatusChange,
+  onSubstageComplete,
   onVendorAssign,
   vendors = [],
   isVibeAdmin,
@@ -61,6 +76,7 @@ export function ProductionStageTimeline({
 }: ProductionStageTimelineProps) {
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
   const [updatingStages, setUpdatingStages] = useState<Set<string>>(new Set());
+  const [updatingSubstages, setUpdatingSubstages] = useState<Set<string>>(new Set());
 
   const handleQuickStatus = async (stageId: string, newStatus: string) => {
     if (!onQuickStatusChange) return;
@@ -75,6 +91,28 @@ export function ProductionStageTimeline({
         return next;
       });
     }
+  };
+
+  const handleSubstageClick = async (stageId: string, substage: SubstageDefinition) => {
+    if (!onSubstageComplete) return;
+    
+    const substageKey = `${stageId}-${substage.key}`;
+    setUpdatingSubstages(prev => new Set(prev).add(substageKey));
+    try {
+      await onSubstageComplete(stageId, substage);
+    } finally {
+      setUpdatingSubstages(prev => {
+        const next = new Set(prev);
+        next.delete(substageKey);
+        return next;
+      });
+    }
+  };
+
+  // Check if a sub-stage is completed by looking for the auto-note marker
+  const isSubstageComplete = (stage: ProductionStage, substageKey: string) => {
+    const noteMarker = `<!--${substageKey.toUpperCase()}-->`;
+    return stage.production_stage_updates.some(u => u.note_text?.includes(noteMarker));
   };
 
   const toggleExpand = (stageId: string) => {
@@ -289,6 +327,45 @@ export function ProductionStageTimeline({
                         </div>
                       </div>
                       
+                      {/* Sub-stages for Print and Converting */}
+                      {(isVibeAdmin || isVendor) && stageDef.value === 'production_proceeding_part_2' && onSubstageComplete && (
+                        <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
+                          <Label className="text-xs text-muted-foreground mb-2 block">Production Sub-stages</Label>
+                          <div className="flex gap-2 flex-wrap">
+                            {PRINT_SUBSTAGES.map((substage) => {
+                              const isComplete = isSubstageComplete(stage, substage.key);
+                              const substageKey = `${stage.id}-${substage.key}`;
+                              const isSubstageUpdating = updatingSubstages.has(substageKey);
+                              return (
+                                <Button
+                                  key={substage.key}
+                                  size="sm"
+                                  variant={isComplete ? 'default' : 'outline'}
+                                  className={cn(
+                                    "h-9",
+                                    isComplete && "bg-green-500 hover:bg-green-500/90 cursor-default"
+                                  )}
+                                  disabled={isSubstageUpdating || isComplete}
+                                  onClick={() => handleSubstageClick(stage.id, substage)}
+                                >
+                                  {isComplete ? (
+                                    <CheckCircle2 className="h-3 w-3 mr-1.5" />
+                                  ) : isSubstageUpdating ? (
+                                    <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                  ) : (
+                                    <Circle className="h-3 w-3 mr-1.5" />
+                                  )}
+                                  {substage.label}
+                                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">
+                                    {substage.percent}%
+                                  </Badge>
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Quick Status Buttons - For Admin/Vendor */}
                       {(isVibeAdmin || isVendor) && onQuickStatusChange && (
                         <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-border/50">
