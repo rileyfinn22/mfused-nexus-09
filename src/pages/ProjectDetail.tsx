@@ -26,6 +26,7 @@ const ProjectDetail = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [vendorPOs, setVendorPOs] = useState<any[]>([]);
+  const [vendorPayments, setVendorPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [plView, setPlView] = useState<"accrual" | "cash">("accrual");
 
@@ -83,6 +84,20 @@ const ProjectDetail = () => {
         .eq('order_id', projectId)
         .order('created_at', { ascending: false });
       setVendorPOs(vendorPOData || []);
+
+      // Fetch vendor PO payments
+      if (vendorPOData && vendorPOData.length > 0) {
+        const vendorPOIds = vendorPOData.map(po => po.id);
+        const { data: vendorPaymentData } = await supabase
+          .from('vendor_po_payments')
+          .select(`
+            *,
+            vendor_pos!vendor_po_payments_vendor_po_id_fkey(po_number, vendors(name))
+          `)
+          .in('vendor_po_id', vendorPOIds)
+          .order('payment_date', { ascending: false });
+        setVendorPayments(vendorPaymentData || []);
+      }
 
     } catch (error) {
       console.error('Error fetching project data:', error);
@@ -320,17 +335,32 @@ const ProjectDetail = () => {
                       amount: po.total || 0,
                       isOrder: false,
                       onClick: () => navigate(`/vendor-pos/${po.id}`)
-                    }))
+                    })),
+                    ...vendorPayments.map(vp => {
+                      const po = vp.vendor_pos;
+                      return {
+                        type: 'vendor_payment' as const,
+                        id: vp.id,
+                        reference: vp.reference_number || `Payment for ${po?.po_number || '-'}`,
+                        date: new Date(vp.payment_date),
+                        details: `${po?.vendors?.name || 'Vendor'} • ${vp.payment_method?.replace('_', ' ')}`,
+                        status: 'paid',
+                        amount: vp.amount,
+                        isOrder: false,
+                        onClick: () => navigate(`/vendor-pos/${vp.vendor_po_id}`)
+                      };
+                    })
                   ]
                     .sort((a, b) => b.date.getTime() - a.date.getTime())
                     .map((item, idx) => (
                       <TableRow 
                         key={`${item.type}-${item.id}`}
                         className={`cursor-pointer hover:bg-muted/50 ${
-                          item.isOrder ? 'bg-gray-500/5' :
-                          item.type === 'invoice' ? 'bg-blue-500/5' : 
-                          item.type === 'payment' ? 'bg-green-500/5' : 
-                          'bg-orange-500/5'
+                          item.isOrder ? 'bg-muted/30' :
+                          item.type === 'invoice' ? 'bg-primary/5' : 
+                          item.type === 'payment' ? 'bg-success/5' : 
+                          item.type === 'vendor_payment' ? 'bg-destructive/5' :
+                          'bg-warning/5'
                         }`}
                         onClick={item.onClick}
                       >
@@ -338,13 +368,18 @@ const ProjectDetail = () => {
                           <Badge 
                             variant="outline" 
                             className={`
-                              ${item.isOrder ? 'border-gray-400/50 text-gray-500 bg-gray-500/10' : ''}
-                              ${!item.isOrder && item.type === 'invoice' ? 'border-blue-500/50 text-blue-600 bg-blue-500/10' : ''}
-                              ${item.type === 'payment' ? 'border-green-500/50 text-green-600 bg-green-500/10' : ''}
-                              ${item.type === 'vendor_po' ? 'border-orange-500/50 text-orange-600 bg-orange-500/10' : ''}
+                              ${item.isOrder ? 'border-muted-foreground/50 text-muted-foreground bg-muted/30' : ''}
+                              ${!item.isOrder && item.type === 'invoice' ? 'border-primary/50 text-primary bg-primary/10' : ''}
+                              ${item.type === 'payment' ? 'border-success/50 text-success bg-success/10' : ''}
+                              ${item.type === 'vendor_po' ? 'border-warning/50 text-warning bg-warning/10' : ''}
+                              ${item.type === 'vendor_payment' ? 'border-destructive/50 text-destructive bg-destructive/10' : ''}
                             `}
                           >
-                            {item.isOrder ? 'Order' : item.type === 'invoice' ? 'Invoice' : item.type === 'payment' ? 'Payment' : 'Vendor PO'}
+                            {item.isOrder ? 'Order' : 
+                             item.type === 'invoice' ? 'Invoice' : 
+                             item.type === 'payment' ? 'Payment In' : 
+                             item.type === 'vendor_payment' ? 'Payment Out' :
+                             'Vendor PO'}
                           </Badge>
                         </TableCell>
                         <TableCell className="font-medium">{item.reference}</TableCell>
@@ -357,16 +392,17 @@ const ProjectDetail = () => {
                         </TableCell>
                         <TableCell className={`text-right font-medium ${
                           item.isOrder ? 'text-muted-foreground' :
-                          item.type === 'invoice' ? 'text-blue-600' : 
-                          item.type === 'payment' ? 'text-green-600' : 
-                          'text-orange-600'
+                          item.type === 'invoice' ? 'text-primary' : 
+                          item.type === 'payment' ? 'text-success' : 
+                          item.type === 'vendor_payment' ? 'text-destructive' :
+                          'text-warning'
                         }`}>
-                          {item.type === 'vendor_po' ? '-' : ''}{formatCurrency(item.amount)}
+                          {(item.type === 'vendor_po' || item.type === 'vendor_payment') ? '-' : ''}{formatCurrency(item.amount)}
                         </TableCell>
                       </TableRow>
                     ))
                   }
-                  {invoices.length === 0 && payments.length === 0 && vendorPOs.length === 0 && (
+                  {invoices.length === 0 && payments.length === 0 && vendorPOs.length === 0 && vendorPayments.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         No transactions for this project
