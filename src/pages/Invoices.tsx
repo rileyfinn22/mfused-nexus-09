@@ -22,7 +22,7 @@ import {
   Receipt
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { exportToCSV } from "@/lib/exportUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
@@ -31,9 +31,11 @@ import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 
 const Invoices = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [companyFilter, setCompanyFilter] = useState("all");
+  // Read company filter from URL, default to "all"
+  const companyFilter = searchParams.get("company") || "all";
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isCompanyUser, setIsCompanyUser] = useState(false);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
@@ -43,6 +45,16 @@ const Invoices = () => {
   const [loading, setLoading] = useState(true);
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
   const [collapsedWhileFiltering, setCollapsedWhileFiltering] = useState<Set<string>>(new Set());
+
+  // Update URL when company filter changes
+  const setCompanyFilter = (value: string) => {
+    if (value === "all") {
+      searchParams.delete("company");
+    } else {
+      searchParams.set("company", value);
+    }
+    setSearchParams(searchParams, { replace: true });
+  };
 
   useEffect(() => {
     checkRole();

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,14 +33,26 @@ import { EditableDescription } from "@/components/EditableDescription";
 
 const Orders = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [companyFilter, setCompanyFilter] = useState("all");
+  // Read company filter from URL, default to "all"
+  const companyFilter = searchParams.get("company") || "all";
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState<any[]>([]);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+
+  // Update URL when company filter changes
+  const setCompanyFilter = (value: string) => {
+    if (value === "all") {
+      searchParams.delete("company");
+    } else {
+      searchParams.set("company", value);
+    }
+    setSearchParams(searchParams, { replace: true });
+  };
 
   useEffect(() => {
     checkRole();
