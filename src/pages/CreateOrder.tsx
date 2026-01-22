@@ -873,6 +873,16 @@ const CreateOrder = () => {
 
       setExistingOrderNumber(order.order_number);
       setSelectedCompanyId(order.company_id); // Set company when loading existing order
+      
+      // Check if billing matches shipping to set the toggle correctly
+      const billingMatchesShipping = 
+        order.billing_name === order.shipping_name &&
+        order.billing_street === order.shipping_street &&
+        order.billing_city === order.shipping_city &&
+        order.billing_state === order.shipping_state &&
+        order.billing_zip === order.shipping_zip;
+      setSameAsBilling(billingMatchesShipping || !order.billing_street);
+      
       setFormData({
         customerName: order.customer_name,
         customerEmail: order.customer_email || "",
@@ -2001,7 +2011,7 @@ const CreateOrder = () => {
                 checked={sameAsBilling}
                 onCheckedChange={(checked) => setSameAsBilling(checked as boolean)}
               />
-              <Label htmlFor="sameAsBilling" className="text-xs cursor-pointer">Same as shipping</Label>
+              <Label htmlFor="sameAsBilling" className="text-xs cursor-pointer">Same as ship to</Label>
             </div>
             {!sameAsBilling && (
               <div className="space-y-3">
