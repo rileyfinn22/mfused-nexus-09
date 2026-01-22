@@ -53,7 +53,7 @@ const vibeAdminNavigationItems = [
   { title: "Create Pull & Ship", url: "/pull-ship", icon: Truck },
   { title: "Pull & Ship Orders", url: "/pull-ship-orders", icon: FileText },
   { title: "Vendors", url: "/vendors", icon: Building2 },
-  { title: "Vendor POs", url: "/vendor-pos", icon: Package },
+  { title: "Vendor PO / Bills", url: "/vendor-pos", icon: Package },
   { title: "Invoices", url: "/invoices", icon: FileText },
   { title: "Companies", url: "/customers", icon: Building2 },
   { title: "Products", url: "/products", icon: Package },
