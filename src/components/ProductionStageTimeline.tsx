@@ -57,10 +57,20 @@ interface ProductionStageTimelineProps {
   isCustomer: boolean;
 }
 
+const MATERIAL_SUBSTAGES: SubstageDefinition[] = [
+  { key: 'material_ordered', label: 'Material Ordered', percent: 10 },
+  { key: 'material_secured', label: 'Material Secured', percent: 10 },
+];
+
 const PRINT_SUBSTAGES: SubstageDefinition[] = [
   { key: 'print_film', label: 'Print Film', percent: 25 },
   { key: 'lamination_curing', label: 'Lamination + Curing', percent: 10 },
   { key: 'converting', label: 'Converting', percent: 15 },
+];
+
+const QC_SUBSTAGES: SubstageDefinition[] = [
+  { key: 'packing_sorting', label: 'Packing/Sorting', percent: 8 },
+  { key: 'qc_completed', label: 'QC Completed', percent: 7 },
 ];
 
 export function ProductionStageTimeline({
@@ -373,12 +383,90 @@ export function ProductionStageTimeline({
                         </div>
                       </div>
                       
+                      {/* Sub-stages for Material Order and Securing */}
+                      {(isVibeAdmin || isVendor) && stageDef.value === 'production_proceeding_part_1' && onSubstageComplete && (
+                        <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
+                          <Label className="text-xs text-muted-foreground mb-2 block">Material Sub-stages</Label>
+                          <div className="flex gap-2 flex-wrap">
+                            {MATERIAL_SUBSTAGES.map((substage) => {
+                              const isComplete = isSubstageComplete(stage, substage.key);
+                              const substageKey = `${stage.id}-${substage.key}`;
+                              const isSubstageUpdating = updatingSubstages.has(substageKey);
+                              return (
+                                <Button
+                                  key={substage.key}
+                                  size="sm"
+                                  variant={isComplete ? 'default' : 'outline'}
+                                  className={cn(
+                                    "h-9",
+                                    isComplete && "bg-green-500 hover:bg-green-500/90 cursor-default"
+                                  )}
+                                  disabled={isSubstageUpdating || isComplete}
+                                  onClick={() => handleSubstageClick(stage.id, substage)}
+                                >
+                                  {isComplete ? (
+                                    <CheckCircle2 className="h-3 w-3 mr-1.5" />
+                                  ) : isSubstageUpdating ? (
+                                    <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                  ) : (
+                                    <Circle className="h-3 w-3 mr-1.5" />
+                                  )}
+                                  {substage.label}
+                                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">
+                                    {substage.percent}%
+                                  </Badge>
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Sub-stages for Print and Converting */}
                       {(isVibeAdmin || isVendor) && stageDef.value === 'production_proceeding_part_2' && onSubstageComplete && (
                         <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
                           <Label className="text-xs text-muted-foreground mb-2 block">Production Sub-stages</Label>
                           <div className="flex gap-2 flex-wrap">
                             {PRINT_SUBSTAGES.map((substage) => {
+                              const isComplete = isSubstageComplete(stage, substage.key);
+                              const substageKey = `${stage.id}-${substage.key}`;
+                              const isSubstageUpdating = updatingSubstages.has(substageKey);
+                              return (
+                                <Button
+                                  key={substage.key}
+                                  size="sm"
+                                  variant={isComplete ? 'default' : 'outline'}
+                                  className={cn(
+                                    "h-9",
+                                    isComplete && "bg-green-500 hover:bg-green-500/90 cursor-default"
+                                  )}
+                                  disabled={isSubstageUpdating || isComplete}
+                                  onClick={() => handleSubstageClick(stage.id, substage)}
+                                >
+                                  {isComplete ? (
+                                    <CheckCircle2 className="h-3 w-3 mr-1.5" />
+                                  ) : isSubstageUpdating ? (
+                                    <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                  ) : (
+                                    <Circle className="h-3 w-3 mr-1.5" />
+                                  )}
+                                  {substage.label}
+                                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">
+                                    {substage.percent}%
+                                  </Badge>
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sub-stages for Packing and QC */}
+                      {(isVibeAdmin || isVendor) && stageDef.value === 'complete_qc' && onSubstageComplete && (
+                        <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
+                          <Label className="text-xs text-muted-foreground mb-2 block">QC Sub-stages</Label>
+                          <div className="flex gap-2 flex-wrap">
+                            {QC_SUBSTAGES.map((substage) => {
                               const isComplete = isSubstageComplete(stage, substage.key);
                               const substageKey = `${stage.id}-${substage.key}`;
                               const isSubstageUpdating = updatingSubstages.has(substageKey);
