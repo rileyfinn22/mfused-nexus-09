@@ -29,6 +29,12 @@ const STAGE_NAMES = [
   { value: 'delivered', label: 'Delivered', order: 5 },
 ];
 
+const PRINT_SUBSTAGES = [
+  { key: 'print_film', label: 'Print Film', percent: 25 },
+  { key: 'lamination_curing', label: 'Lamination + Curing', percent: 10 },
+  { key: 'converting', label: 'Converting', percent: 15 },
+];
+
 const OrderDetail = () => {
   const {
     orderId
@@ -466,6 +472,72 @@ const OrderDetail = () => {
       toast({
         title: "Error",
         description: "Failed to update stage",
+        variant: "destructive"
+      });
+    } finally {
+      setUpdatingStages(prev => ({ ...prev, [stageId]: false }));
+    }
+  };
+
+  // Check if a sub-stage is completed by looking for the auto-note
+  const isSubstageComplete = (stageId: string, substageKey: string) => {
+    const updates = stageUpdates[stageId] || [];
+    const noteMarker = `[${substageKey.toUpperCase()}]`;
+    return updates.some(u => u.note_text?.includes(noteMarker));
+  };
+
+  // Handle sub-stage completion with auto-note
+  const handleSubstageComplete = async (stageId: string, substage: typeof PRINT_SUBSTAGES[0]) => {
+    if (!isVibeAdmin) return;
+    
+    // Check if already completed
+    if (isSubstageComplete(stageId, substage.key)) {
+      toast({
+        title: "Already Completed",
+        description: `${substage.label} has already been marked as complete`,
+      });
+      return;
+    }
+
+    try {
+      setUpdatingStages(prev => ({ ...prev, [stageId]: true }));
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Ensure stage is at least in_progress
+      const stage = productionStages.find(s => s.id === stageId);
+      if (stage?.status === 'pending') {
+        await supabase
+          .from('production_stages')
+          .update({ status: 'in_progress' })
+          .eq('id', stageId);
+      }
+
+      // Create auto-note with marker
+      const noteText = `[${substage.key.toUpperCase()}] ${substage.label} completed (${substage.percent}% of stage)`;
+      
+      const { error } = await supabase
+        .from('production_stage_updates')
+        .insert({
+          stage_id: stageId,
+          updated_by: user.id,
+          update_type: 'substage_complete',
+          note_text: noteText,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Sub-stage Complete",
+        description: `${substage.label} marked as complete`,
+      });
+      
+      fetchProductionStages();
+    } catch (error: any) {
+      console.error('Error completing sub-stage:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update sub-stage",
         variant: "destructive"
       });
     } finally {
@@ -1965,6 +2037,43 @@ const OrderDetail = () => {
                               </Button>
                             </div>
                           </div>
+
+                          {/* Sub-stages for Print and Converting */}
+                          {isVibeAdmin && stage.stage_name === 'production_proceeding_part_2' && (
+                            <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
+                              <Label className="text-xs text-muted-foreground mb-2 block">Production Sub-stages</Label>
+                              <div className="flex gap-2 flex-wrap">
+                                {PRINT_SUBSTAGES.map((substage) => {
+                                  const isComplete = isSubstageComplete(stage.id, substage.key);
+                                  return (
+                                    <Button
+                                      key={substage.key}
+                                      size="sm"
+                                      variant={isComplete ? 'default' : 'outline'}
+                                      className={`h-9 ${isComplete ? 'bg-green-500 hover:bg-green-500/90 cursor-default' : 'hover:bg-primary/10'}`}
+                                      disabled={updatingStages[stage.id] || isComplete}
+                                      onClick={() => handleSubstageComplete(stage.id, substage)}
+                                    >
+                                      {isComplete ? (
+                                        <CheckCircle2 className="h-3 w-3 mr-1.5" />
+                                      ) : updatingStages[stage.id] ? (
+                                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                      ) : (
+                                        <Circle className="h-3 w-3 mr-1.5" />
+                                      )}
+                                      {substage.label}
+                                      <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">
+                                        {substage.percent}%
+                                      </Badge>
+                                    </Button>
+                                  );
+                                })}
+                              </div>
+                              <p className="text-[10px] text-muted-foreground mt-2">
+                                Click to mark sub-stages as complete and auto-add progress notes
+                              </p>
+                            </div>
+                          )}
 
                           {/* Collapsible Add Details Section */}
                           <details className="group">
