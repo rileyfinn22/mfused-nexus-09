@@ -9,15 +9,19 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, Paperclip, Trash2, Lock } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, Paperclip, Trash2, Lock, Sparkles, ChevronsUpDown, Check } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
 import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
+import { cn } from "@/lib/utils";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
@@ -76,6 +80,17 @@ const OrderDetail = () => {
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [bulkPrice, setBulkPrice] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Re-upload PO states
+  const [showReuploadDialog, setShowReuploadDialog] = useState(false);
+  const [reuploadFile, setReuploadFile] = useState<File | null>(null);
+  const [reuploadTextInput, setReuploadTextInput] = useState('');
+  const [reuploadInputMode, setReuploadInputMode] = useState<'pdf' | 'text'>('pdf');
+  const [reuploadAnalysisHint, setReuploadAnalysisHint] = useState('');
+  const [analyzingReupload, setAnalyzingReupload] = useState(false);
+  const [unmatchedPoItems, setUnmatchedPoItems] = useState<any[]>([]);
+  const [matchingProductId, setMatchingProductId] = useState<Record<string, string>>({});
+  const [openCombobox, setOpenCombobox] = useState<Record<string, boolean>>({});
   useEffect(() => {
     checkAdminStatus();
     if (orderId) {
@@ -1083,6 +1098,193 @@ const OrderDetail = () => {
     });
   };
 
+  // Re-upload PO handlers
+  const handleReuploadFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: "Invalid file type",
+          description: "Please select a PDF file",
+          variant: "destructive",
+        });
+        return;
+      }
+      setReuploadFile(file);
+    }
+    e.target.value = '';
+  };
+
+  const handleReuploadAnalyze = async () => {
+    if (reuploadInputMode === 'pdf' && !reuploadFile) {
+      toast({
+        title: "No file selected",
+        description: "Please select a PDF file to analyze",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (reuploadInputMode === 'text' && !reuploadTextInput.trim()) {
+      toast({
+        title: "No text provided",
+        description: "Please paste some text to analyze",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAnalyzingReupload(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      let functionData;
+
+      if (reuploadInputMode === 'pdf' && reuploadFile) {
+        // Upload to storage
+        const fileExt = reuploadFile.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('po-documents')
+          .upload(fileName, reuploadFile);
+
+        if (uploadError) throw uploadError;
+
+        // Trigger AI analysis
+        const { data, error } = await supabase.functions.invoke('analyze-po', {
+          body: { 
+            pdfPath: fileName,
+            companyId: order.company_id,
+            filename: reuploadFile.name,
+            orderType: 'standard',
+            returnProductsOnly: true,
+            analysisHint: reuploadAnalysisHint.trim() || undefined
+          }
+        });
+
+        if (error) throw error;
+        functionData = data;
+      } else {
+        // Text analysis
+        const { data, error } = await supabase.functions.invoke('analyze-po', {
+          body: { 
+            textContent: reuploadTextInput,
+            companyId: order.company_id,
+            orderType: 'standard',
+            returnProductsOnly: true,
+            analysisHint: reuploadAnalysisHint.trim() || undefined
+          }
+        });
+
+        if (error) throw error;
+        functionData = data;
+      }
+
+      // Process extracted items
+      if (functionData?.items && Array.isArray(functionData.items)) {
+        const newItems: any[] = [];
+        const newUnmatched: any[] = [];
+
+        for (const item of functionData.items) {
+          if (item.product_id) {
+            const product = products.find(p => p.id === item.product_id);
+            newItems.push({
+              id: `new-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+              order_id: orderId,
+              product_id: item.product_id,
+              sku: item.item_id || product?.item_id || item.product_id.slice(0, 8),
+              item_id: item.item_id || product?.item_id || null,
+              name: item.name || product?.name || 'Unknown Product',
+              description: item.description || product?.description || '',
+              quantity: item.quantity || 1,
+              unit_price: item.unit_price || product?.price || 0,
+              total: (item.quantity || 1) * (item.unit_price || product?.price || 0),
+              shipped_quantity: 0,
+              isNew: true
+            });
+          } else {
+            newUnmatched.push(item);
+          }
+        }
+
+        // Add new items to edited items
+        if (newItems.length > 0) {
+          setEditedItems(prev => [...prev, ...newItems]);
+          setIsEditMode(true);
+        }
+        
+        if (newUnmatched.length > 0) {
+          setUnmatchedPoItems(prev => [...prev, ...newUnmatched]);
+        }
+
+        toast({
+          title: "PO Analyzed",
+          description: `Added ${newItems.length} item(s). ${newUnmatched.length > 0 ? `${newUnmatched.length} item(s) need manual matching.` : ''}`,
+        });
+      }
+
+      // Close dialog and reset
+      setShowReuploadDialog(false);
+      setReuploadFile(null);
+      setReuploadTextInput('');
+      setReuploadAnalysisHint('');
+
+    } catch (error: any) {
+      console.error('Error analyzing PO:', error);
+      toast({
+        title: "Analysis failed",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalyzingReupload(false);
+    }
+  };
+
+  const handleMatchUnmatchedItem = (index: number) => {
+    const productId = matchingProductId[`unmatched-${index}`];
+    if (!productId) return;
+
+    const item = unmatchedPoItems[index];
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    const newItem = {
+      id: `new-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      order_id: orderId,
+      product_id: product.id,
+      sku: product.item_id || product.id.slice(0, 8),
+      item_id: product.item_id || null,
+      name: product.name,
+      description: product.description || '',
+      quantity: item.quantity || 1,
+      unit_price: item.unit_price || product.price || 0,
+      total: (item.quantity || 1) * (item.unit_price || product.price || 0),
+      shipped_quantity: 0,
+      isNew: true
+    };
+
+    setEditedItems(prev => [...prev, newItem]);
+    setUnmatchedPoItems(prev => prev.filter((_, i) => i !== index));
+    setMatchingProductId(prev => {
+      const updated = { ...prev };
+      delete updated[`unmatched-${index}`];
+      return updated;
+    });
+    setIsEditMode(true);
+
+    toast({
+      title: "Item Matched",
+      description: `Added ${product.name} to order`,
+    });
+  };
+
+  const handleRemoveUnmatchedItem = (index: number) => {
+    setUnmatchedPoItems(prev => prev.filter((_, i) => i !== index));
+  };
+
   if (loading) {
     return <div className="max-w-7xl mx-auto py-12 text-center">
         <p className="text-muted-foreground">Loading order...</p>
@@ -1170,6 +1372,10 @@ const OrderDetail = () => {
           })()}
           {isVibeAdmin && (
             <>
+              <Button variant="outline" onClick={() => setShowReuploadDialog(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Re-upload PO
+              </Button>
               <Button variant="outline" onClick={() => setShowVendorDialog(true)}>
                 <Package className="h-4 w-4 mr-2" />
                 Assign Vendors
@@ -1187,6 +1393,99 @@ const OrderDetail = () => {
         </div>
       </div>
 
+      {/* Re-upload PO Dialog */}
+      <Dialog open={showReuploadDialog} onOpenChange={setShowReuploadDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Re-upload Customer PO
+            </DialogTitle>
+            <DialogDescription>
+              Upload a new PO PDF or paste text to add/update order items using AI analysis.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Tabs value={reuploadInputMode} onValueChange={(v) => setReuploadInputMode(v as 'pdf' | 'text')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="pdf">Upload PDF</TabsTrigger>
+              <TabsTrigger value="text">Paste Text</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="pdf" className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Select PDF File</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleReuploadFileSelect}
+                    className="flex-1"
+                  />
+                </div>
+                {reuploadFile && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileText className="h-4 w-4" />
+                    {reuploadFile.name}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => setReuploadFile(null)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="text" className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Paste PO Text</Label>
+                <Textarea
+                  value={reuploadTextInput}
+                  onChange={(e) => setReuploadTextInput(e.target.value)}
+                  placeholder="Paste order items here..."
+                  className="min-h-[150px]"
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+          
+          <div className="space-y-2">
+            <Label>Analysis Hint (Optional)</Label>
+            <Input
+              value={reuploadAnalysisHint}
+              onChange={(e) => setReuploadAnalysisHint(e.target.value)}
+              placeholder="e.g., NY state products, Anthos brand..."
+            />
+            <p className="text-xs text-muted-foreground">
+              Help the AI match products by providing context about state, brand, or product type.
+            </p>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReuploadDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleReuploadAnalyze} disabled={analyzingReupload}>
+              {analyzingReupload ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Analyze & Add Items
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Vendor Assignment Dialog */}
       {isVibeAdmin && order?.order_items && (
         <VendorAssignmentDialog
@@ -1198,6 +1497,91 @@ const OrderDetail = () => {
         />
       )}
 
+      {/* Unmatched PO Items Section */}
+      {unmatchedPoItems.length > 0 && (
+        <Card className="mb-6 border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+              <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+                Unmatched PO Items ({unmatchedPoItems.length})
+              </h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              These items from the PO couldn't be automatically matched. Select a product to add them to the order.
+            </p>
+            <div className="space-y-3">
+              {unmatchedPoItems.map((item, index) => (
+                <div key={index} className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+                  <div className="flex-1">
+                    <p className="font-medium">{item.name || item.raw_name || 'Unknown Item'}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Qty: {item.quantity || 1} {item.unit_price ? `• $${item.unit_price.toFixed(2)}` : ''}
+                    </p>
+                  </div>
+                  <Popover open={openCombobox[`unmatched-${index}`]} onOpenChange={(open) => setOpenCombobox(prev => ({ ...prev, [`unmatched-${index}`]: open }))}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-[200px] justify-between">
+                        {matchingProductId[`unmatched-${index}`] 
+                          ? products.find(p => p.id === matchingProductId[`unmatched-${index}`])?.name?.slice(0, 20) + '...'
+                          : 'Select product...'}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Search products..." />
+                        <CommandList>
+                          <CommandEmpty>No product found.</CommandEmpty>
+                          <CommandGroup>
+                            {products.slice(0, 50).map((product) => (
+                              <CommandItem
+                                key={product.id}
+                                value={product.name}
+                                onSelect={() => {
+                                  setMatchingProductId(prev => ({ ...prev, [`unmatched-${index}`]: product.id }));
+                                  setOpenCombobox(prev => ({ ...prev, [`unmatched-${index}`]: false }));
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    matchingProductId[`unmatched-${index}`] === product.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex-1">
+                                  <p className="text-sm">{product.name}</p>
+                                  {product.item_id && (
+                                    <p className="text-xs text-muted-foreground">{product.item_id}</p>
+                                  )}
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    size="sm"
+                    onClick={() => handleMatchUnmatchedItem(index)}
+                    disabled={!matchingProductId[`unmatched-${index}`]}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleRemoveUnmatchedItem(index)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Order Checklist */}
       <Card className="mb-6 shadow-md">
