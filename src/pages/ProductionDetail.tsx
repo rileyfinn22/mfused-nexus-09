@@ -71,13 +71,16 @@ interface OrderItem {
   shipped_quantity: number;
 }
 
-const STAGE_NAMES = [
-  { value: 'production_proceeding_part_1', label: 'Material Order and Securing', order: 1 },
-  { value: 'production_proceeding_part_2', label: 'Print and Converting', order: 2 },
-  { value: 'complete_qc', label: 'Completed & QC', order: 3 },
-  { value: 'shipped', label: 'Shipped', order: 4 },
-  { value: 'delivered', label: 'Delivered', order: 5 },
+const STAGE_DEFINITIONS = [
+  { value: 'production_proceeding_part_1', label: 'Material Order and Securing', order: 1, weight: 20 },
+  { value: 'production_proceeding_part_2', label: 'Print and Converting', order: 2, weight: 50 },
+  { value: 'complete_qc', label: 'Completed & QC', order: 3, weight: 15 },
+  { value: 'shipped', label: 'Shipped', order: 4, weight: 10 },
+  { value: 'delivered', label: 'Delivered', order: 5, weight: 5 },
 ];
+
+// Keep STAGE_NAMES for backward compatibility
+const STAGE_NAMES = STAGE_DEFINITIONS;
 
 export default function ProductionDetail() {
   const { orderId } = useParams();
