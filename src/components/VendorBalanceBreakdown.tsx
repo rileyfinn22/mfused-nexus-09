@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Building2, DollarSign } from "lucide-react";
+import { BulkVendorPaymentDialog } from "./BulkVendorPaymentDialog";
 
 interface VendorBalance {
   id: string;
@@ -15,13 +18,29 @@ interface VendorBalanceBreakdownProps {
   vendors: VendorBalance[];
   selectedVendorId: string;
   onVendorSelect: (vendorId: string) => void;
+  onPaymentRecorded?: () => void;
 }
 
 export function VendorBalanceBreakdown({
   vendors,
   selectedVendorId,
-  onVendorSelect
+  onVendorSelect,
+  onPaymentRecorded
 }: VendorBalanceBreakdownProps) {
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [selectedVendorForPayment, setSelectedVendorForPayment] = useState<VendorBalance | null>(null);
+
+  const handleMakePayment = (vendor: VendorBalance, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedVendorForPayment(vendor);
+    setPaymentDialogOpen(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    setPaymentDialogOpen(false);
+    setSelectedVendorForPayment(null);
+    onPaymentRecorded?.();
+  };
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -99,12 +118,23 @@ export function VendorBalanceBreakdown({
               </div>
             </div>
             {vendor.balance > 0 && (
-              <div className="mt-2 pt-2 border-t border-border/50 flex justify-between text-xs">
-                <span className="text-muted-foreground">Balance Due:</span>
-                <span className="font-semibold text-destructive">
-                  {formatCurrency(vendor.balance)}
-                </span>
-              </div>
+              <>
+                <div className="mt-2 pt-2 border-t border-border/50 flex justify-between text-xs">
+                  <span className="text-muted-foreground">Balance Due:</span>
+                  <span className="font-semibold text-destructive">
+                    {formatCurrency(vendor.balance)}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full mt-2 h-7 text-xs"
+                  onClick={(e) => handleMakePayment(vendor, e)}
+                >
+                  <DollarSign className="h-3 w-3 mr-1" />
+                  Make Payment
+                </Button>
+              </>
             )}
           </div>
         ))}
@@ -115,6 +145,17 @@ export function VendorBalanceBreakdown({
           </div>
         )}
       </CardContent>
+
+      {/* Bulk Payment Dialog */}
+      {selectedVendorForPayment && (
+        <BulkVendorPaymentDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          vendorId={selectedVendorForPayment.id}
+          vendorName={selectedVendorForPayment.name}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
     </Card>
   );
 }
