@@ -31,10 +31,36 @@ const Projects = () => {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isVibeAdmin, setIsVibeAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {
-    fetchProjects();
+    checkAdminStatus();
   }, []);
+
+  useEffect(() => {
+    // Only fetch projects if user is confirmed as vibe admin
+    if (isVibeAdmin === true) {
+      fetchProjects();
+    } else if (isVibeAdmin === false) {
+      // Redirect non-admins to dashboard
+      navigate('/dashboard');
+    }
+  }, [isVibeAdmin]);
+
+  const checkAdminStatus = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      const role = data?.role as string;
+      setIsVibeAdmin(role === 'vibe_admin');
+    } else {
+      setIsVibeAdmin(false);
+    }
+  };
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -133,12 +159,13 @@ const Projects = () => {
   };
 
   const getProfitColor = (profit: number) => {
-    if (profit > 0) return "text-green-600";
-    if (profit < 0) return "text-red-600";
+    if (profit > 0) return "text-success";
+    if (profit < 0) return "text-destructive";
     return "text-muted-foreground";
   };
 
-  if (loading) {
+  // Show loading while checking admin status or loading projects
+  if (isVibeAdmin === null || loading) {
     return (
       <div className="max-w-7xl mx-auto py-12 text-center">
         <p className="text-muted-foreground">Loading projects...</p>

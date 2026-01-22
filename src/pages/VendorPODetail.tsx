@@ -31,7 +31,7 @@ const VendorPODetail = () => {
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedPO, setEditedPO] = useState<any>({});
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -40,10 +40,17 @@ const VendorPODetail = () => {
 
   useEffect(() => {
     checkAdminStatus();
-    if (poId) {
+  }, []);
+
+  useEffect(() => {
+    // Only fetch data if user is confirmed as admin
+    if (isAdmin === true && poId) {
       fetchPODetails();
+    } else if (isAdmin === false) {
+      // Redirect non-admins to dashboard
+      navigate('/dashboard');
     }
-  }, [poId]);
+  }, [isAdmin, poId]);
 
   const checkAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -55,6 +62,8 @@ const VendorPODetail = () => {
         .single();
       const role = data?.role as string;
       setIsAdmin(role === 'admin' || role === 'vibe_admin');
+    } else {
+      setIsAdmin(false);
     }
   };
 
@@ -841,7 +850,8 @@ Please confirm receipt of this order and provide an estimated delivery date.
 Thank you for your business.`;
   };
 
-  if (loading) {
+  // Show loading while checking admin status or loading PO data
+  if (isAdmin === null || loading) {
     return (
       <div className="max-w-7xl mx-auto py-12 text-center">
         <p className="text-muted-foreground">Loading vendor PO...</p>
