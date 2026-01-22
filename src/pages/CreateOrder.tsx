@@ -1932,17 +1932,17 @@ const CreateOrder = () => {
           </div>
         )}
 
-        {/* Order Entry - Upload PO or Paste Text */}
-        {!orderId && (
+        {/* Re-upload PO - Only show when editing existing order */}
+        {orderId && (
           <div className="bg-muted/30 backdrop-blur rounded-lg p-4 border border-table-border">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className="text-sm font-medium flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  AI Order Entry
+                  <Upload className="h-4 w-4 text-primary" />
+                  Re-upload PO
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Upload POs or paste text from email to automatically fill the order
+                  Upload updated POs to update order items and quantities
                 </p>
               </div>
             </div>
