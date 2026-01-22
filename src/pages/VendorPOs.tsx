@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -30,18 +30,30 @@ import { CreateExpensePODialog } from "@/components/CreateExpensePODialog";
 import { VendorBillsSummary } from "@/components/VendorBillsSummary";
 import { VendorBillsAgingBuckets } from "@/components/VendorBillsAgingBuckets";
 import { VendorPaymentsLedger } from "@/components/VendorPaymentsLedger";
+import { VendorBalanceBreakdown } from "@/components/VendorBalanceBreakdown";
 
 const VendorPOs = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [pos, setPOs] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
+  const vendorFilter = searchParams.get("vendor") || "all";
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [poToDelete, setPOToDelete] = useState<any>(null);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
+
+  const setVendorFilter = (value: string) => {
+    if (value === "all") {
+      searchParams.delete("vendor");
+    } else {
+      searchParams.set("vendor", value);
+    }
+    setSearchParams(searchParams, { replace: true });
+  };
 
   useEffect(() => {
     checkAdminStatus();
@@ -194,7 +206,33 @@ const VendorPOs = () => {
       }
     });
 
-    return buckets;
+  return buckets;
+  }, [pos]);
+
+  // Calculate vendor balances for breakdown
+  const vendorBalances = useMemo(() => {
+    const vendorMap = new Map<string, { id: string; name: string; totalOwed: number; totalPaid: number; poCount: number }>();
+    
+    pos.filter(po => po.status !== 'draft' && po.vendors?.id).forEach(po => {
+      const vendorId = po.vendors.id;
+      const vendorName = po.vendors.name || 'Unknown';
+      const total = po.final_total ?? po.total ?? 0;
+      const paid = po.total_paid || 0;
+      
+      if (!vendorMap.has(vendorId)) {
+        vendorMap.set(vendorId, { id: vendorId, name: vendorName, totalOwed: 0, totalPaid: 0, poCount: 0 });
+      }
+      
+      const vendor = vendorMap.get(vendorId)!;
+      vendor.totalOwed += total;
+      vendor.totalPaid += paid;
+      vendor.poCount++;
+    });
+    
+    return Array.from(vendorMap.values()).map(v => ({
+      ...v,
+      balance: v.totalOwed - v.totalPaid
+    }));
   }, [pos]);
 
   const filteredPOs = pos.filter(po => {
@@ -215,8 +253,11 @@ const VendorPOs = () => {
         matchesPaymentStatus = po.status === paymentStatusFilter;
       }
     }
+
+    // Vendor filter
+    const matchesVendor = vendorFilter === "all" || po.vendors?.id === vendorFilter;
     
-    return matchesSearch && matchesType && matchesPaymentStatus;
+    return matchesSearch && matchesType && matchesPaymentStatus && matchesVendor;
   });
 
   const formatCurrency = (amount: number) => {
@@ -266,17 +307,22 @@ const VendorPOs = () => {
         </TabsList>
 
         <TabsContent value="bills" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            {/* Aging Buckets */}
-            <div className="lg:col-span-1">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            {/* Sidebar: Aging + Vendor Breakdown */}
+            <div className="lg:col-span-1 space-y-4">
               <VendorBillsAgingBuckets 
                 buckets={agingBuckets} 
                 totalOutstanding={summaryAmounts.totalOutstanding} 
               />
+              <VendorBalanceBreakdown
+                vendors={vendorBalances}
+                selectedVendorId={vendorFilter}
+                onVendorSelect={setVendorFilter}
+              />
             </div>
 
             {/* Bills Table */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-4">
               <Card className="shadow-sm">
                 <div className="p-4 border-b">
                   <div className="flex gap-4">
