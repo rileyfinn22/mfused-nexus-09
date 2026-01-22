@@ -331,7 +331,7 @@ export function ProductionStageTimeline({
                               </div>
                               
                               {update.note_text && (
-                                <p className="text-sm text-foreground">{update.note_text}</p>
+                                <p className="text-sm text-foreground">{update.note_text.replace(/<!--[A-Z_]+-->/g, '')}</p>
                               )}
                               
                               {update.image_url && (
