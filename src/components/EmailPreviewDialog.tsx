@@ -113,8 +113,8 @@ export function EmailPreviewDialog({
     const files = e.target.files;
     if (!files) return;
 
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB per file
-    const MAX_TOTAL_SIZE = 75 * 1024 * 1024; // 75MB total
+    const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB per file (practical email limit)
+    const MAX_TOTAL_SIZE = 40 * 1024 * 1024; // 40MB total
 
     // Calculate current total size
     const currentTotalSize = additionalAttachments.reduce((sum, a) => sum + a.file.size, 0);
@@ -123,7 +123,7 @@ export function EmailPreviewDialog({
       if (file.size > MAX_FILE_SIZE) {
         toast({
           title: "File too large",
-          description: `${file.name} exceeds 50MB limit`,
+          description: `${file.name} exceeds 30MB limit`,
           variant: "destructive",
         });
         continue;
@@ -132,7 +132,7 @@ export function EmailPreviewDialog({
       if (currentTotalSize + file.size > MAX_TOTAL_SIZE) {
         toast({
           title: "Total size limit reached",
-          description: "Total attachments cannot exceed 75MB",
+          description: "Total attachments cannot exceed 40MB",
           variant: "destructive",
         });
         break;
@@ -341,10 +341,17 @@ export function EmailPreviewDialog({
               ))}
               
               {additionalAttachments.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {additionalAttachments.length} additional file{additionalAttachments.length > 1 ? 's' : ''} • 
-                  Total: {formatFileSize(additionalAttachments.reduce((sum, a) => sum + a.file.size, 0))}
-                </p>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    {additionalAttachments.length} additional file{additionalAttachments.length > 1 ? 's' : ''} • 
+                    Total: {formatFileSize(additionalAttachments.reduce((sum, a) => sum + a.file.size, 0))}
+                  </p>
+                  {additionalAttachments.reduce((sum, a) => sum + a.file.size, 0) > 10 * 1024 * 1024 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      ⚠️ Large attachments may take a minute to send
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </TabsContent>
@@ -413,7 +420,9 @@ export function EmailPreviewDialog({
             {sending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Sending...
+                {additionalAttachments.length > 0 
+                  ? `Sending ${formatFileSize(additionalAttachments.reduce((s, a) => s + a.file.size, 0))}...`
+                  : 'Sending...'}
               </>
             ) : (
               <>
