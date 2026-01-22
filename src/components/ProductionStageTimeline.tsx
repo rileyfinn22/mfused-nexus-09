@@ -224,26 +224,28 @@ export function ProductionStageTimeline({
           })}
         </div>
         
-        {/* Stage Labels under progress bar */}
-        <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-          {stageDefinitions.map((def) => {
-            const status = getStageStatus(def.value);
-            const weight = def.weight ?? (100 / stageDefinitions.length);
-            return (
-              <div 
-                key={def.value} 
-                className={cn(
-                  "truncate text-center",
-                  status === 'completed' && 'text-green-600 font-medium',
-                  status === 'in_progress' && 'text-blue-600 font-medium'
-                )}
-                style={{ width: `${weight}%` }}
-              >
-                {weight}%
-              </div>
-            );
-          })}
-        </div>
+        {/* Stage Labels under progress bar - Hidden from customers */}
+        {!isCustomer && (
+          <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+            {stageDefinitions.map((def) => {
+              const status = getStageStatus(def.value);
+              const weight = def.weight ?? (100 / stageDefinitions.length);
+              return (
+                <div 
+                  key={def.value} 
+                  className={cn(
+                    "truncate text-center",
+                    status === 'completed' && 'text-green-600 font-medium',
+                    status === 'in_progress' && 'text-blue-600 font-medium'
+                  )}
+                  style={{ width: `${weight}%` }}
+                >
+                  {weight}%
+                </div>
+              );
+            })}
+          </div>
+        )}
         
         {/* Stage Labels */}
         <div className="flex justify-between text-xs text-muted-foreground mt-2">
