@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package } from "lucide-react";
+import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -49,6 +49,7 @@ interface ProductionStageTimelineProps {
   onUpdateClick: (stage: ProductionStage, stageDef: StageDefinition) => void;
   onQuickStatusChange?: (stageId: string, newStatus: string) => Promise<void>;
   onSubstageComplete?: (stageId: string, substage: SubstageDefinition) => Promise<void>;
+  onDeleteUpdate?: (updateId: string) => Promise<void>;
   onVendorAssign?: (stageId: string, vendorId: string) => void;
   vendors?: { id: string; name: string }[];
   isVibeAdmin: boolean;
@@ -68,6 +69,7 @@ export function ProductionStageTimeline({
   onUpdateClick,
   onQuickStatusChange,
   onSubstageComplete,
+  onDeleteUpdate,
   onVendorAssign,
   vendors = [],
   isVibeAdmin,
@@ -77,6 +79,22 @@ export function ProductionStageTimeline({
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
   const [updatingStages, setUpdatingStages] = useState<Set<string>>(new Set());
   const [updatingSubstages, setUpdatingSubstages] = useState<Set<string>>(new Set());
+  const [deletingUpdates, setDeletingUpdates] = useState<Set<string>>(new Set());
+
+  const handleDeleteUpdate = async (updateId: string) => {
+    if (!onDeleteUpdate) return;
+    
+    setDeletingUpdates(prev => new Set(prev).add(updateId));
+    try {
+      await onDeleteUpdate(updateId);
+    } finally {
+      setDeletingUpdates(prev => {
+        const next = new Set(prev);
+        next.delete(updateId);
+        return next;
+      });
+    }
+  };
 
   const handleQuickStatus = async (stageId: string, newStatus: string) => {
     if (!onQuickStatusChange) return;
@@ -583,6 +601,29 @@ export function ProductionStageTimeline({
                                     >
                                       <Download className="h-3 w-3" />
                                     </a>
+                                  )}
+                                  
+                                  {/* Delete button for Vibe Admins */}
+                                  {isVibeAdmin && onDeleteUpdate && (
+                                    <button
+                                      type="button"
+                                      disabled={deletingUpdates.has(update.id)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteUpdate(update.id);
+                                      }}
+                                      className={cn(
+                                        "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors",
+                                        "hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
+                                      )}
+                                      title="Delete this update"
+                                    >
+                                      {deletingUpdates.has(update.id) ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="h-3 w-3" />
+                                      )}
+                                    </button>
                                   )}
                                 </div>
                               );
