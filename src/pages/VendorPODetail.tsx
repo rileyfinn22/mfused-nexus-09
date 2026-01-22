@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, Edit, Save, X, Plus, Send, DollarSign, Trash2, FileCheck } from "lucide-react";
+import { ArrowLeft, Download, Edit, Save, X, Plus, Send, DollarSign, Trash2, FileCheck, Paperclip, Upload, FileText, ExternalLink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -36,6 +36,7 @@ const VendorPODetail = () => {
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -197,6 +198,107 @@ const VendorPODetail = () => {
       toast({
         title: "Error",
         description: error.message || "Failed to update purchase order",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !po) return;
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please upload a file smaller than 10MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setUploadingFile(true);
+      
+      // Create a unique file path
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${po.id}/${Date.now()}.${fileExt}`;
+      
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('po-documents')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('po-documents')
+        .getPublicUrl(fileName);
+
+      // Update vendor PO with attachment info
+      const { error: updateError } = await supabase
+        .from('vendor_pos')
+        .update({
+          attachment_url: urlData.publicUrl,
+          attachment_name: file.name
+        })
+        .eq('id', po.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "File Uploaded",
+        description: `${file.name} attached successfully`
+      });
+
+      fetchPODetails();
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload file",
+        variant: "destructive"
+      });
+    } finally {
+      setUploadingFile(false);
+      // Reset the input
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveAttachment = async () => {
+    if (!po?.attachment_url) return;
+
+    try {
+      // Extract file path from URL
+      const urlParts = po.attachment_url.split('/po-documents/');
+      if (urlParts[1]) {
+        await supabase.storage
+          .from('po-documents')
+          .remove([urlParts[1]]);
+      }
+
+      // Clear attachment from vendor PO
+      await supabase
+        .from('vendor_pos')
+        .update({
+          attachment_url: null,
+          attachment_name: null
+        })
+        .eq('id', po.id);
+
+      toast({
+        title: "Attachment Removed",
+        description: "File has been removed"
+      });
+
+      fetchPODetails();
+    } catch (error: any) {
+      console.error('Remove error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove attachment",
         variant: "destructive"
       });
     }
@@ -985,6 +1087,109 @@ Thank you for your business.`;
             ) : (
               <p className="text-muted-foreground">Vendor information not available</p>
             )}
+          </div>
+
+          {/* Attachments Section */}
+          <div className="p-8 border-b">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Paperclip className="h-5 w-5" />
+              Attachments
+            </h2>
+            <div className="space-y-4">
+              {po?.attachment_url ? (
+                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-8 w-8 text-primary" />
+                    <div>
+                      <p className="font-medium">{po.attachment_name || 'Attached File'}</p>
+                      <p className="text-xs text-muted-foreground">Vendor PI / Invoice</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(po.attachment_url, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View
+                    </Button>
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={handleRemoveAttachment}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                  <Paperclip className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    No file attached. Upload vendor PI or invoice.
+                  </p>
+                  {isAdmin && (
+                    <div>
+                      <input
+                        type="file"
+                        id="file-upload"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                        onChange={handleFileUpload}
+                        disabled={uploadingFile}
+                      />
+                      <label htmlFor="file-upload">
+                        <Button
+                          variant="outline"
+                          disabled={uploadingFile}
+                          asChild
+                        >
+                          <span className="cursor-pointer">
+                            {uploadingFile ? (
+                              <>Uploading...</>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 mr-2" />
+                                Upload File
+                              </>
+                            )}
+                          </span>
+                        </Button>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
+              {isAdmin && po?.attachment_url && (
+                <div>
+                  <input
+                    type="file"
+                    id="file-replace"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                    onChange={handleFileUpload}
+                    disabled={uploadingFile}
+                  />
+                  <label htmlFor="file-replace">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={uploadingFile}
+                      asChild
+                    >
+                      <span className="cursor-pointer">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Replace File
+                      </span>
+                    </Button>
+                  </label>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Items Table */}

@@ -1990,6 +1990,8 @@ export type Database = {
       }
       vendor_pos: {
         Row: {
+          attachment_name: string | null
+          attachment_url: string | null
           company_id: string
           created_at: string
           customer_company_id: string | null
@@ -2018,6 +2020,8 @@ export type Database = {
           vendor_id: string
         }
         Insert: {
+          attachment_name?: string | null
+          attachment_url?: string | null
           company_id: string
           created_at?: string
           customer_company_id?: string | null
@@ -2046,6 +2050,8 @@ export type Database = {
           vendor_id: string
         }
         Update: {
+          attachment_name?: string | null
+          attachment_url?: string | null
           company_id?: string
           created_at?: string
           customer_company_id?: string | null
