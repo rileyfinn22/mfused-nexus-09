@@ -293,6 +293,18 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     );
   };
 
+  const stripAnyTemplatePrefix = (name: string, allTemplates: Template[], keepTemplateId?: string | null) => {
+    const n = String(name || '').trim();
+    if (!n) return n;
+
+    for (const t of allTemplates) {
+      if (keepTemplateId && t.id === keepTemplateId) continue;
+      const prefix = `${t.name} - `;
+      if (n.startsWith(prefix)) return n.slice(prefix.length).trim();
+    }
+    return n;
+  };
+
   const handleImport = async () => {
     const selectedProducts = extractedProducts.filter(p => p.selected);
     
@@ -317,9 +329,13 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
         let finalName = p.name;
         if (selectedTemplate) {
           const templatePrefix = `${selectedTemplate.name} - `;
-          // Only add prefix if it's not already there
-          if (!p.name.startsWith(templatePrefix)) {
-            finalName = `${selectedTemplate.name} - ${p.name}`;
+
+          // If the name already has the selected template prefix, keep as-is.
+          // Otherwise, strip any OTHER template prefix first to avoid
+          // "Template A - Template B - Variant".
+          if (!String(p.name || '').startsWith(templatePrefix)) {
+            const baseName = stripAnyTemplatePrefix(p.name, templates, selectedTemplate.id);
+            finalName = `${selectedTemplate.name} - ${baseName}`;
           }
         }
         
