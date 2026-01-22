@@ -69,31 +69,31 @@ export function VendorBalanceBreakdown({
         {sortedVendors.map((vendor) => (
           <div
             key={vendor.id}
-            className={`p-3 rounded-lg cursor-pointer transition-all border ${
+            className={`p-4 rounded-lg cursor-pointer transition-all border ${
               selectedVendorId === vendor.id
                 ? 'bg-primary/10 border-primary'
                 : 'bg-muted/30 border-transparent hover:bg-muted/50'
             }`}
             onClick={() => onVendorSelect(vendor.id)}
           >
-            <div className="flex justify-between items-center">
-              <span className="font-medium text-sm truncate max-w-[150px]" title={vendor.name}>
+            <div className="flex justify-between items-center gap-2 mb-2">
+              <span className="font-medium text-sm truncate flex-1" title={vendor.name}>
                 {vendor.name}
               </span>
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs shrink-0">
                 {vendor.poCount} PO{vendor.poCount !== 1 ? 's' : ''}
               </Badge>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-              <div>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Owed:</span>
-                <span className="ml-1 text-destructive font-medium">
+                <span className="text-destructive font-medium">
                   {formatCurrency(vendor.totalOwed)}
                 </span>
               </div>
-              <div>
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Paid:</span>
-                <span className="ml-1 text-success font-medium">
+                <span className="text-success font-medium">
                   {formatCurrency(vendor.totalPaid)}
                 </span>
               </div>
