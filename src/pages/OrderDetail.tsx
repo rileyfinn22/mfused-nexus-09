@@ -96,6 +96,7 @@ const OrderDetail = () => {
   const [orderAttachments, setOrderAttachments] = useState<any[]>([]);
   const [uploadingOrderAttachment, setUploadingOrderAttachment] = useState(false);
   const [orderAttachmentDescription, setOrderAttachmentDescription] = useState('');
+  const [uploadingCustomerPO, setUploadingCustomerPO] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -389,6 +390,47 @@ const OrderDetail = () => {
       toast({ title: "Error", description: "Failed to upload attachment", variant: "destructive" });
     } finally {
       setUploadingOrderAttachment(false);
+    }
+  };
+
+  const handleUploadCustomerPO = async (file: File) => {
+    if (!file) return;
+
+    setUploadingCustomerPO(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${orderId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('po-documents')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { error: insertError } = await supabase
+        .from('order_attachments')
+        .insert({
+          order_id: orderId,
+          file_path: filePath,
+          file_name: file.name,
+          file_type: file.type,
+          file_size: file.size,
+          description: 'Customer PO',
+          uploaded_by: user.id,
+        });
+
+      if (insertError) throw insertError;
+
+      toast({ title: "Success", description: "Customer PO attached" });
+      fetchOrderAttachments();
+    } catch (error: any) {
+      console.error('Error uploading Customer PO:', error);
+      toast({ title: "Error", description: "Failed to upload Customer PO", variant: "destructive" });
+    } finally {
+      setUploadingCustomerPO(false);
     }
   };
 
@@ -2354,6 +2396,32 @@ const OrderDetail = () => {
               </div>
               {isAdmin && (
                 <div className="flex items-center gap-2">
+                  {/* Dedicated Customer PO Upload */}
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadCustomerPO(file);
+                        e.target.value = '';
+                      }}
+                      disabled={uploadingCustomerPO}
+                    />
+                    <Button variant="default" size="sm" disabled={uploadingCustomerPO} asChild>
+                      <span>
+                        {uploadingCustomerPO ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <FileText className="h-4 w-4 mr-2" />
+                        )}
+                        Attach Customer PO
+                      </span>
+                    </Button>
+                  </label>
+                  
+                  {/* General attachment upload */}
                   <Input
                     placeholder="Description (optional)"
                     value={orderAttachmentDescription}
@@ -2378,7 +2446,7 @@ const OrderDetail = () => {
                         ) : (
                           <Plus className="h-4 w-4 mr-2" />
                         )}
-                        Add Attachment
+                        Add Other
                       </span>
                     </Button>
                   </label>
@@ -2431,48 +2499,72 @@ const OrderDetail = () => {
                 </div>
               )}
 
-              {/* Additional Attachments */}
-              {orderAttachments.map((attachment) => (
-                <div key={attachment.id} className="p-4 bg-background rounded-lg border border-border flex items-start gap-4">
-                  <div className="flex-shrink-0 w-12 h-14 rounded border border-border bg-muted flex items-center justify-center">
-                    <FileText className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate" title={attachment.file_name}>{attachment.file_name}</p>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      {attachment.description || 'No description'}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2"
-                        onClick={() => handleDownloadOrderAttachment(attachment.file_path, attachment.file_name)}
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Download
-                      </Button>
-                      {isAdmin && (
+              {/* Additional Attachments - Customer PO highlighted */}
+              {orderAttachments.map((attachment) => {
+                const isCustomerPO = attachment.description?.toLowerCase() === 'customer po';
+                return (
+                  <div 
+                    key={attachment.id} 
+                    className={cn(
+                      "p-4 rounded-lg border flex items-start gap-4",
+                      isCustomerPO 
+                        ? "bg-primary/5 border-primary/30" 
+                        : "bg-background border-border"
+                    )}
+                  >
+                    <div className={cn(
+                      "flex-shrink-0 w-12 h-14 rounded border flex items-center justify-center",
+                      isCustomerPO 
+                        ? "border-primary/30 bg-primary/10" 
+                        : "border-border bg-muted"
+                    )}>
+                      <FileText className={cn(
+                        "h-6 w-6",
+                        isCustomerPO ? "text-primary" : "text-muted-foreground"
+                      )} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate" title={attachment.file_name}>{attachment.file_name}</p>
+                        {isCustomerPO && (
+                          <Badge variant="default" className="text-[10px] px-1.5 py-0">Customer PO</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {isCustomerPO ? 'Customer Purchase Order' : (attachment.description || 'No description')}
+                      </p>
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteOrderAttachment(attachment.id, attachment.file_path)}
+                          className="h-7 px-2"
+                          onClick={() => handleDownloadOrderAttachment(attachment.file_path, attachment.file_name)}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Download className="h-3 w-3 mr-1" />
+                          Download
                         </Button>
-                      )}
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteOrderAttachment(attachment.id, attachment.file_path)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* Empty state */}
               {!order.po_pdf_path && orderAttachments.length === 0 && (
                 <div className="col-span-full p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
                   <Paperclip className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No attachments yet</p>
-                  {isAdmin && <p className="text-xs mt-1">Click "Add Attachment" to upload files</p>}
+                  {isAdmin && <p className="text-xs mt-1">Use "Attach Customer PO" to add the customer's purchase order</p>}
                 </div>
               )}
             </div>
