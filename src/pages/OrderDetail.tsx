@@ -479,11 +479,36 @@ const OrderDetail = () => {
     }
   };
 
-  // Check if a sub-stage is completed by looking for the auto-note
+  // Check if a sub-stage is completed by looking for the auto-note marker
   const isSubstageComplete = (stageId: string, substageKey: string) => {
     const updates = stageUpdates[stageId] || [];
-    const noteMarker = `[${substageKey.toUpperCase()}]`;
+    const noteMarker = `<!--${substageKey.toUpperCase()}-->`;
     return updates.some(u => u.note_text?.includes(noteMarker));
+  };
+
+  // Delete a production stage update
+  const handleDeleteStageUpdate = async (updateId: string, stageId: string) => {
+    if (!confirm('Delete this update?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('production_stage_updates')
+        .delete()
+        .eq('id', updateId);
+      
+      if (error) throw error;
+      
+      toast({ title: "Deleted", description: "Update removed" });
+      fetchProductionStages();
+    } catch (error) {
+      console.error('Error deleting update:', error);
+      toast({ title: "Error", description: "Failed to delete", variant: "destructive" });
+    }
+  };
+
+  // Format note text for display (strips hidden markers)
+  const formatNoteText = (noteText: string) => {
+    return noteText.replace(/<!--[A-Z_]+-->/g, '');
   };
 
   // Handle sub-stage completion with auto-note
@@ -513,8 +538,8 @@ const OrderDetail = () => {
           .eq('id', stageId);
       }
 
-      // Create auto-note with marker
-      const noteText = `[${substage.key.toUpperCase()}] ${substage.label} completed (${substage.percent}% of stage)`;
+      // Create auto-note with hidden marker for detection + clean display text
+      const noteText = `<!--${substage.key.toUpperCase()}-->${substage.label} Complete`;
       
       const { error } = await supabase
         .from('production_stage_updates')
@@ -2198,7 +2223,7 @@ const OrderDetail = () => {
                                     </span>
                                   </div>
                                   {update.note_text && (
-                                    <p className="text-sm text-foreground bg-muted/50 rounded-md px-2 py-1.5 mt-1">{update.note_text}</p>
+                                    <p className="text-sm text-foreground bg-muted/50 rounded-md px-2 py-1.5 mt-1">{formatNoteText(update.note_text)}</p>
                                   )}
                                   {update.image_url && (
                                     <div 
@@ -2229,6 +2254,18 @@ const OrderDetail = () => {
                                       </span>
                                       <Download className="h-3 w-3 text-muted-foreground ml-auto" />
                                     </a>
+                                  )}
+                                  {/* Delete button for Vibe Admins */}
+                                  {isVibeAdmin && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 mt-1"
+                                      onClick={() => handleDeleteStageUpdate(update.id, stage.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3 mr-1" />
+                                      Delete
+                                    </Button>
                                   )}
                                 </div>
                               </div>
