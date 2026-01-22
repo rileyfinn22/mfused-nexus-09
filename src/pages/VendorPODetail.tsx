@@ -792,24 +792,21 @@ const VendorPODetail = () => {
         content: a.base64,
       }));
       
+      const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+      
       const response = await supabase.functions.invoke('send-invoice-email', {
         body: {
-          to: data.to[0], // Primary recipient
+          invoiceId: poId, // Required field - using PO ID
           recipientEmails: data.to,
-          subject: data.subject,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              ${htmlMessage}
-              <br/>
-              <p style="color: #666; margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee;">
-                ${VIBE_COMPANY.name}<br/>
-                ${VIBE_COMPANY.address.street}<br/>
-                ${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}
-              </p>
-            </div>
-          `,
+          senderName: VIBE_COMPANY.name,
+          senderEmail: 'accounting@vibepkg.com',
+          customMessage: data.message,
           pdfBase64,
           pdfFilename: `PO-${po.po_number}.pdf`,
+          invoiceNumber: po.po_number, // Required field - using PO number
+          dueDate: po.expected_delivery_date || new Date().toISOString(),
+          totalAmount: totalAmount,
+          customerName: vendor?.name || 'Vendor',
           additionalAttachments: additionalAttachmentsData && additionalAttachmentsData.length > 0 ? additionalAttachmentsData : undefined,
         }
       });
