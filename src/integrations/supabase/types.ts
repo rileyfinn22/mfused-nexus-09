@@ -1301,6 +1301,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          internal_notes: string | null
           order_id: string
           sequence_order: number
           stage_name: string
@@ -1311,6 +1312,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          internal_notes?: string | null
           order_id: string
           sequence_order: number
           stage_name: string
@@ -1321,6 +1323,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          internal_notes?: string | null
           order_id?: string
           sequence_order?: number
           stage_name?: string
