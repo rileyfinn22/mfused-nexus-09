@@ -146,6 +146,29 @@ const Invoices = () => {
     const status = String(invoice?.status || '').toLowerCase();
 
     if (status === 'paid') return 'paid';
+    
+    // For blanket/parent invoices, check if children fully cover and are all paid
+    const isBlanket = !invoice.parent_invoice_id && (invoice.invoice_type === 'full' || !invoice.invoice_type);
+    if (isBlanket) {
+      const children = invoices.filter(inv => inv.parent_invoice_id === invoice.id);
+      if (children.length > 0) {
+        // Check if all children are paid
+        const allChildrenPaid = children.every(child => {
+          const childStatus = String(child?.status || '').toLowerCase();
+          return childStatus === 'paid';
+        });
+        
+        // Check if children cover the blanket total
+        const childrenTotal = children.reduce((sum, child) => sum + (Number(child.total) || 0), 0);
+        const blanketTotal = Number(invoice.total) || 0;
+        const childrenCoverBlanket = childrenTotal >= blanketTotal;
+        
+        if (allChildrenPaid && childrenCoverBlanket) {
+          return 'paid';
+        }
+      }
+    }
+    
     if (status === 'due') return 'due';
 
     if (status === 'billed') {
@@ -220,8 +243,8 @@ const Invoices = () => {
   };
 
   // Get the highest priority status from child invoices
-  // Priority: due > billed > open
-  const getChildrenPriorityStatus = (parentId: string): 'due' | 'billed' | 'open' | null => {
+  // Priority: due > billed > open > paid
+  const getChildrenPriorityStatus = (parentId: string): 'paid' | 'due' | 'billed' | 'open' | null => {
     const children = invoices.filter(inv => inv.parent_invoice_id === parentId);
     if (children.length === 0) return null;
 
@@ -233,6 +256,10 @@ const Invoices = () => {
 
     const hasOpen = children.some(child => getComputedStatus(child) === 'open');
     if (hasOpen) return 'open';
+
+    // If all children are paid
+    const allPaid = children.every(child => getComputedStatus(child) === 'paid');
+    if (allPaid) return 'paid';
 
     return null;
   };
