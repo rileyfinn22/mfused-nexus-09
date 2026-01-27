@@ -3,10 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductionProgressBar, ProductionStatusIndicator } from "@/components/ProductionProgressBar";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 interface ProductionOrder {
   id: string;
@@ -241,9 +245,10 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
     }
   };
 
-  // Weighted progress calculation: Material 20%, Print 50%, QC 15%, Shipped 10%, Delivered 5%
+  // Weighted progress calculation: PO Sent 5% (admin only), Material 15%, Print 50%, QC 15%, Shipped 10%, Delivered 5%
   const STAGE_WEIGHTS: Record<string, number> = {
-    'production_proceeding_part_1': 20,
+    'po_sent': 5,
+    'production_proceeding_part_1': 15,
     'production_proceeding_part_2': 50,
     'complete_qc': 15,
     'shipped': 10,
@@ -292,7 +297,45 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
     return { icon: Circle, color: 'text-muted-foreground', label: 'Pending' };
   };
 
+  const handleUpdateDeliveryDate = async (orderId: string, date: Date | undefined) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          estimated_delivery_date: date ? format(date, 'yyyy-MM-dd') : null 
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Update local state
+      setOrders(prev => prev.map(o => 
+        o.id === orderId 
+          ? { ...o, estimated_delivery_date: date ? format(date, 'yyyy-MM-dd') : null }
+          : o
+      ));
+      setCompletedOrders(prev => prev.map(o => 
+        o.id === orderId 
+          ? { ...o, estimated_delivery_date: date ? format(date, 'yyyy-MM-dd') : null }
+          : o
+      ));
+
+      toast({
+        title: "Updated",
+        description: date ? `Delivery date set to ${format(date, 'MMM d, yyyy')}` : "Delivery date cleared",
+      });
+    } catch (error: any) {
+      console.error('Error updating delivery date:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update delivery date",
+        variant: "destructive",
+      });
+    }
+  };
+
   const OrderCard = ({ order }: { order: ProductionOrder }) => {
+    const [datePickerOpen, setDatePickerOpen] = useState(false);
     const progress = order.production_progress || 0;
     const status = getProgressStatus(progress);
     const StatusIcon = status.icon;
@@ -306,9 +349,9 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
       
       const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       
-      if (diffDays < 0) return { text: formatted, status: 'overdue' as const };
-      if (diffDays <= 7) return { text: formatted, status: 'soon' as const };
-      return { text: formatted, status: 'normal' as const };
+      if (diffDays < 0) return { text: formatted, status: 'overdue' as const, date };
+      if (diffDays <= 7) return { text: formatted, status: 'soon' as const, date };
+      return { text: formatted, status: 'normal' as const, date };
     };
 
     const deliveryInfo = formatDeliveryDate(order.estimated_delivery_date);
@@ -347,6 +390,55 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
             <p className="text-sm text-foreground leading-snug">{order.description}</p>
           </div>
         )}
+
+        {/* Editable Delivery Date for Vibe Admins */}
+        {isVibeAdmin && (
+          <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "h-8 text-xs gap-1.5 font-normal",
+                    deliveryInfo?.status === 'overdue' && "border-red-300 text-red-600 hover:bg-red-50",
+                    deliveryInfo?.status === 'soon' && "border-amber-300 text-amber-600 hover:bg-amber-50",
+                    !deliveryInfo && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  {deliveryInfo ? `Est. ${deliveryInfo.text}` : "Set Delivery Date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={order.estimated_delivery_date ? new Date(order.estimated_delivery_date) : undefined}
+                  onSelect={(date) => {
+                    handleUpdateDeliveryDate(order.id, date);
+                    setDatePickerOpen(false);
+                  }}
+                  initialFocus
+                />
+                {order.estimated_delivery_date && (
+                  <div className="p-2 border-t">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs text-muted-foreground"
+                      onClick={() => {
+                        handleUpdateDeliveryDate(order.id, undefined);
+                        setDatePickerOpen(false);
+                      }}
+                    >
+                      Clear Date
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
         
         <div className="mt-3">
           <ProductionProgressBar progress={progress} size="sm" />
@@ -355,7 +447,7 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
         <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
           <span>${order.total?.toFixed(2)}</span>
           <div className="flex items-center gap-3">
-            {deliveryInfo && (
+            {!isVibeAdmin && deliveryInfo && (
               <span className={cn(
                 "flex items-center gap-1 font-medium",
                 deliveryInfo.status === 'overdue' && "text-red-600",
