@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, Paperclip, Trash2, Lock, Sparkles, ChevronsUpDown, Check } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, Paperclip, Trash2, Lock, Sparkles, ChevronsUpDown, Check, Image, ExternalLink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
@@ -99,6 +99,9 @@ const OrderDetail = () => {
   const [uploadingOrderAttachment, setUploadingOrderAttachment] = useState(false);
   const [orderAttachmentDescription, setOrderAttachmentDescription] = useState('');
   const [uploadingCustomerPO, setUploadingCustomerPO] = useState(false);
+  
+  // Artwork files state
+  const [orderArtwork, setOrderArtwork] = useState<any[]>([]);
   const [showCustomPODialog, setShowCustomPODialog] = useState(false);
 
   useEffect(() => {
@@ -112,6 +115,13 @@ const OrderDetail = () => {
       fetchOrderAttachments();
     }
   }, [orderId]);
+  
+  // Fetch artwork when order items are loaded
+  useEffect(() => {
+    if (order?.order_items && order.order_items.length > 0) {
+      fetchOrderArtwork();
+    }
+  }, [order?.order_items]);
 
   useEffect(() => {
     if (order?.company_id) {
@@ -351,6 +361,28 @@ const OrderDetail = () => {
     
     if (data) {
       setOrderAttachments(data);
+    }
+  };
+
+  // Fetch artwork files for products in this order
+  const fetchOrderArtwork = async () => {
+    if (!order?.order_items || order.order_items.length === 0) return;
+    
+    // Get unique SKUs from order items
+    const skus = order.order_items
+      .map((item: any) => item.sku)
+      .filter((sku: string) => sku);
+    
+    if (skus.length === 0) return;
+    
+    const { data } = await supabase
+      .from('artwork_files')
+      .select('*')
+      .in('sku', skus)
+      .order('created_at', { ascending: false });
+    
+    if (data) {
+      setOrderArtwork(data);
     }
   };
 
@@ -2587,6 +2619,116 @@ const OrderDetail = () => {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Product Artwork Section */}
+          <div className="border-t border-table-border bg-muted/30 p-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Image className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Product Artwork</h2>
+              {orderArtwork.length > 0 && (
+                <Badge variant="secondary">{orderArtwork.length}</Badge>
+              )}
+            </div>
+
+            {orderArtwork.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
+                <Image className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No artwork files found for products in this order</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {orderArtwork.map((artwork) => {
+                  const matchingItem = order.order_items?.find((item: any) => item.sku === artwork.sku);
+                  const previewSrc = artwork.preview_url || artwork.artwork_url;
+                  const isImage = artwork.artwork_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                  
+                  return (
+                    <div 
+                      key={artwork.id} 
+                      className={cn(
+                        "p-4 rounded-lg border flex items-start gap-4",
+                        artwork.is_approved 
+                          ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800" 
+                          : "bg-background border-border"
+                      )}
+                    >
+                      {/* Preview thumbnail */}
+                      <div className="flex-shrink-0 w-16 h-16 rounded border border-border bg-muted flex items-center justify-center overflow-hidden">
+                        {previewSrc && isImage ? (
+                          <img 
+                            src={previewSrc} 
+                            alt={artwork.filename} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : artwork.preview_url ? (
+                          <img 
+                            src={artwork.preview_url} 
+                            alt={artwork.filename} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <FileText className="h-6 w-6 text-muted-foreground" />
+                        )}
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-sm truncate" title={artwork.filename}>
+                            {artwork.filename}
+                          </p>
+                          {artwork.is_approved && (
+                            <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-green-600">
+                              Approved
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {artwork.artwork_type === 'vibe_proof' ? 'Vibe Proof' : 'Customer'}
+                          </Badge>
+                        </div>
+                        
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          SKU: {artwork.sku}
+                          {matchingItem && ` • ${matchingItem.name}`}
+                        </p>
+                        
+                        {artwork.notes && (
+                          <p className="text-xs text-muted-foreground mt-1 truncate" title={artwork.notes}>
+                            {artwork.notes}
+                          </p>
+                        )}
+                        
+                        <div className="flex items-center gap-1 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2"
+                            onClick={() => window.open(artwork.artwork_url, '_blank')}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = artwork.artwork_url;
+                              link.download = artwork.filename;
+                              link.click();
+                            }}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            Download
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Internal Vibe Notes with Attachments - Only for Vibe Admins when in production */}
