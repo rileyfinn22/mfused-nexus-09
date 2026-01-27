@@ -27,6 +27,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addPdfBranding, addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
 import { EditableDescription } from "@/components/EditableDescription";
+import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
 
 const InvoiceDetail = () => {
   const {
@@ -2700,6 +2701,18 @@ const InvoiceDetail = () => {
               </div>}
           </CardContent>
         </Card>}
+
+      {/* Packing Lists Section - For shipped/partial invoices */}
+      {invoice && order && (invoice.invoice_type === 'partial' || invoice.status === 'shipped' || invoice.shipment_number) && (
+        <InvoicePackingListSection
+          invoiceId={invoiceId!}
+          invoice={invoice}
+          order={order}
+          editedItems={editedItems}
+          isVibeAdmin={isVibeAdmin}
+          onRefresh={fetchInvoiceDetails}
+        />
+      )}
 
       {/* Related Invoices - For Multiple Shipments */}
       {relatedInvoices.length > 0 && <Card className="shadow-lg">
