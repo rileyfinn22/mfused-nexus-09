@@ -73,9 +73,12 @@ export function AssignTemplateDropdown({
         template_id: template?.id || null,
       };
 
-      // When assigning a template, also update the description
+      // When assigning a template, also update the description and state
       if (template) {
         updateData.description = template.description;
+        if (template.state) {
+          updateData.state = template.state;
+        }
       }
 
       const { error } = await supabase

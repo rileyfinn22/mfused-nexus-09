@@ -344,7 +344,8 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
           name: finalName,
           // Always inherit template description when template is assigned
           description: selectedTemplate?.description || p.description || null,
-          state: p.state || selectedTemplate?.state || null,
+          // Prioritize template state when template is assigned
+          state: selectedTemplate?.state || p.state || null,
           cost: p.cost || selectedTemplate?.cost || null,
           price: selectedTemplate?.price || null,
           product_type: p.product_type || null,
