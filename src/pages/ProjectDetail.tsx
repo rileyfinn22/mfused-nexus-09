@@ -15,7 +15,9 @@ import {
   TrendingDown, 
   DollarSign,
   ExternalLink,
-  LayoutList
+  LayoutList,
+  Paperclip,
+  Download
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -27,6 +29,7 @@ const ProjectDetail = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [vendorPOs, setVendorPOs] = useState<any[]>([]);
   const [vendorPayments, setVendorPayments] = useState<any[]>([]);
+  const [customerPOs, setCustomerPOs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [plView, setPlView] = useState<"accrual" | "cash">("accrual");
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
@@ -79,6 +82,15 @@ const ProjectDetail = () => {
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
       setInvoices(invoiceData || []);
+
+      // Fetch customer POs (attachments with description 'Customer PO')
+      const { data: customerPOData } = await supabase
+        .from('order_attachments')
+        .select('*')
+        .eq('order_id', projectId)
+        .eq('description', 'Customer PO')
+        .order('created_at', { ascending: false });
+      setCustomerPOs(customerPOData || []);
 
       // Fetch payments for all invoices
       if (invoiceData && invoiceData.length > 0) {
@@ -320,10 +332,14 @@ const ProjectDetail = () => {
             <Receipt className="h-4 w-4" />
             Payments ({payments.length})
           </TabsTrigger>
+          <TabsTrigger value="customer-pos" className="gap-2">
+            <Paperclip className="h-4 w-4" />
+            Customer POs ({customerPOs.length})
+          </TabsTrigger>
           {isVibeAdmin && (
             <TabsTrigger value="costs" className="gap-2">
               <Package className="h-4 w-4" />
-              Vendor POs ({vendorPOs.length})
+              Vendor Bills ({vendorPOs.length})
             </TabsTrigger>
           )}
         </TabsList>
@@ -605,11 +621,76 @@ const ProjectDetail = () => {
           </Card>
         </TabsContent>
 
-        {/* Vendor POs Tab */}
+        {/* Customer POs Tab */}
+        <TabsContent value="customer-pos">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Customer Purchase Orders</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>File Name</TableHead>
+                    <TableHead>Uploaded</TableHead>
+                    <TableHead>Size</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {customerPOs.map((po) => {
+                    const fileSizeKB = po.file_size ? (po.file_size / 1024).toFixed(1) : '-';
+                    return (
+                      <TableRow key={po.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Paperclip className="h-4 w-4 text-primary" />
+                            {po.file_name}
+                          </div>
+                        </TableCell>
+                        <TableCell>{new Date(po.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {po.file_size ? `${fileSizeKB} KB` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const { data } = await supabase.storage
+                                .from('vibe-attachments')
+                                .createSignedUrl(po.file_path, 3600);
+                              if (data?.signedUrl) {
+                                window.open(data.signedUrl, '_blank');
+                              }
+                            }}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {customerPOs.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        No customer POs attached to this project
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Vendor Bills Tab */}
         <TabsContent value="costs">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Vendor POs (Costs)</CardTitle>
+              <CardTitle className="text-lg">Vendor Bills (Costs)</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -666,7 +747,7 @@ const ProjectDetail = () => {
                   {vendorPOs.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        No vendor POs for this project
+                        No vendor bills for this project
                       </TableCell>
                     </TableRow>
                   )}
