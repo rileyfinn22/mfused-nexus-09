@@ -115,6 +115,15 @@ const Products = () => {
   const [templateEditState, setTemplateEditState] = useState("");
   const [templateSaving, setTemplateSaving] = useState(false);
 
+  // Create template dialog (for vibe admins)
+  const [createTemplateOpen, setCreateTemplateOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [newTemplateDescription, setNewTemplateDescription] = useState("");
+  const [newTemplatePrice, setNewTemplatePrice] = useState("");
+  const [newTemplateCost, setNewTemplateCost] = useState("");
+  const [newTemplateState, setNewTemplateState] = useState("");
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
+
   useEffect(() => {
     checkRole();
   }, []);
@@ -560,6 +569,55 @@ const Products = () => {
     }
   };
 
+  const handleCreateTemplate = async () => {
+    if (!newTemplateName.trim()) return;
+    
+    if (!companyFilter || companyFilter === 'all') {
+      toast({
+        title: "Company required",
+        description: "Please select a company before creating a template.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setCreatingTemplate(true);
+    try {
+      const { error } = await supabase.from('product_templates').insert({
+        name: newTemplateName.trim(),
+        description: newTemplateDescription.trim() || null,
+        price: newTemplatePrice ? parseFloat(newTemplatePrice) : null,
+        cost: newTemplateCost ? parseFloat(newTemplateCost) : null,
+        state: newTemplateState.trim() || null,
+        company_id: companyFilter,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Template created",
+        description: `"${newTemplateName}" has been created.`,
+      });
+
+      setCreateTemplateOpen(false);
+      setNewTemplateName("");
+      setNewTemplateDescription("");
+      setNewTemplatePrice("");
+      setNewTemplateCost("");
+      setNewTemplateState("");
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error creating template:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create template.",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingTemplate(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'text-success';
@@ -634,6 +692,15 @@ const Products = () => {
           )}
           {isVibeAdmin && (
             <>
+              <Button 
+                variant="outline" 
+                onClick={() => setCreateTemplateOpen(true)}
+                disabled={companyFilter === 'all'}
+                title={companyFilter === 'all' ? 'Select a company first' : 'Create new template'}
+              >
+                <Layers className="h-4 w-4 mr-1.5" />
+                Add Template
+              </Button>
               <AnalyzePOProductsDialog 
                 onProductsAdded={fetchProducts}
                 selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
@@ -1150,6 +1217,131 @@ const Products = () => {
             </Button>
             <Button onClick={handleSaveTemplate} disabled={templateSaving || !templateEditName.trim()}>
               {templateSaving ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Template Dialog */}
+      <Dialog open={createTemplateOpen} onOpenChange={setCreateTemplateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Template</DialogTitle>
+            <DialogDescription>
+              Create a new product template for organizing related SKUs.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Template name <span className="text-destructive">*</span></Label>
+              <Input 
+                value={newTemplateName} 
+                onChange={(e) => setNewTemplateName(e.target.value)} 
+                placeholder="e.g., 1g Disposable Vape"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={newTemplateDescription}
+                onChange={(e) => setNewTemplateDescription(e.target.value)}
+                placeholder="Template description for all products in this group..."
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Price</Label>
+                <Input
+                  inputMode="decimal"
+                  placeholder="e.g. 1.250"
+                  value={newTemplatePrice}
+                  onChange={(e) => setNewTemplatePrice(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cost</Label>
+                <Input
+                  inputMode="decimal"
+                  placeholder="e.g. 0.850"
+                  value={newTemplateCost}
+                  onChange={(e) => setNewTemplateCost(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>State</Label>
+              <Select value={newTemplateState} onValueChange={setNewTemplateState}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select state (optional)" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="General">General (All States)</SelectItem>
+                  <SelectItem value="AL">Alabama</SelectItem>
+                  <SelectItem value="AK">Alaska</SelectItem>
+                  <SelectItem value="AZ">Arizona</SelectItem>
+                  <SelectItem value="AR">Arkansas</SelectItem>
+                  <SelectItem value="CA">California</SelectItem>
+                  <SelectItem value="CO">Colorado</SelectItem>
+                  <SelectItem value="CT">Connecticut</SelectItem>
+                  <SelectItem value="DE">Delaware</SelectItem>
+                  <SelectItem value="FL">Florida</SelectItem>
+                  <SelectItem value="GA">Georgia</SelectItem>
+                  <SelectItem value="HI">Hawaii</SelectItem>
+                  <SelectItem value="ID">Idaho</SelectItem>
+                  <SelectItem value="IL">Illinois</SelectItem>
+                  <SelectItem value="IN">Indiana</SelectItem>
+                  <SelectItem value="IA">Iowa</SelectItem>
+                  <SelectItem value="KS">Kansas</SelectItem>
+                  <SelectItem value="KY">Kentucky</SelectItem>
+                  <SelectItem value="LA">Louisiana</SelectItem>
+                  <SelectItem value="ME">Maine</SelectItem>
+                  <SelectItem value="MD">Maryland</SelectItem>
+                  <SelectItem value="MA">Massachusetts</SelectItem>
+                  <SelectItem value="MI">Michigan</SelectItem>
+                  <SelectItem value="MN">Minnesota</SelectItem>
+                  <SelectItem value="MS">Mississippi</SelectItem>
+                  <SelectItem value="MO">Missouri</SelectItem>
+                  <SelectItem value="MT">Montana</SelectItem>
+                  <SelectItem value="NE">Nebraska</SelectItem>
+                  <SelectItem value="NV">Nevada</SelectItem>
+                  <SelectItem value="NH">New Hampshire</SelectItem>
+                  <SelectItem value="NJ">New Jersey</SelectItem>
+                  <SelectItem value="NM">New Mexico</SelectItem>
+                  <SelectItem value="NY">New York</SelectItem>
+                  <SelectItem value="NC">North Carolina</SelectItem>
+                  <SelectItem value="ND">North Dakota</SelectItem>
+                  <SelectItem value="OH">Ohio</SelectItem>
+                  <SelectItem value="OK">Oklahoma</SelectItem>
+                  <SelectItem value="OR">Oregon</SelectItem>
+                  <SelectItem value="PA">Pennsylvania</SelectItem>
+                  <SelectItem value="RI">Rhode Island</SelectItem>
+                  <SelectItem value="SC">South Carolina</SelectItem>
+                  <SelectItem value="SD">South Dakota</SelectItem>
+                  <SelectItem value="TN">Tennessee</SelectItem>
+                  <SelectItem value="TX">Texas</SelectItem>
+                  <SelectItem value="UT">Utah</SelectItem>
+                  <SelectItem value="VT">Vermont</SelectItem>
+                  <SelectItem value="VA">Virginia</SelectItem>
+                  <SelectItem value="WA">Washington</SelectItem>
+                  <SelectItem value="WV">West Virginia</SelectItem>
+                  <SelectItem value="WI">Wisconsin</SelectItem>
+                  <SelectItem value="WY">Wyoming</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateTemplateOpen(false)} disabled={creatingTemplate}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateTemplate} disabled={creatingTemplate || !newTemplateName.trim()}>
+              {creatingTemplate ? "Creating..." : "Create Template"}
             </Button>
           </DialogFooter>
         </DialogContent>
