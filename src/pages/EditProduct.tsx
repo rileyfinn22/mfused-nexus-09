@@ -553,6 +553,7 @@ const EditProduct = () => {
           defaultSku={formData.item_id}
           defaultProductId={id}
           restrictToCompany={productCompanyId || undefined}
+          defaultArtworkType={isVibeAdmin ? 'vibe_proof' : 'customer'}
         />
 
         {/* Actions */}
