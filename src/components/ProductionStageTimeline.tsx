@@ -37,6 +37,7 @@ interface StageDefinition {
   label: string;
   order: number;
   weight?: number; // Percentage weight for progress calculation (default: equal distribution)
+  adminOnly?: boolean; // Only visible/counted for Vibe Admins
 }
 
 interface SubstageDefinition {
@@ -239,14 +240,20 @@ export function ProductionStageTimeline({
     );
   };
 
+  // Filter stages based on admin-only visibility
+  const visibleStageDefinitions = stageDefinitions.filter(def => 
+    !def.adminOnly || isVibeAdmin
+  );
+
   // Calculate weighted progress based on stage weights
   const calculateWeightedProgress = () => {
     let completedWeight = 0;
     let inProgressWeight = 0;
     
-    stageDefinitions.forEach(def => {
+    // Only count visible stages for progress
+    visibleStageDefinitions.forEach(def => {
       const status = getStageStatus(def.value);
-      const weight = def.weight ?? (100 / stageDefinitions.length);
+      const weight = def.weight ?? (100 / visibleStageDefinitions.length);
       
       if (status === 'completed') {
         completedWeight += weight;
@@ -282,9 +289,9 @@ export function ProductionStageTimeline({
           <>
             {/* Segmented progress bar for admin/vendor */}
             <div className="flex items-center gap-0.5 mb-2">
-              {stageDefinitions.map((def) => {
+              {visibleStageDefinitions.map((def) => {
                 const status = getStageStatus(def.value);
-                const weight = def.weight ?? (100 / stageDefinitions.length);
+                const weight = def.weight ?? (100 / visibleStageDefinitions.length);
                 return (
                   <div 
                     key={def.value} 
@@ -303,9 +310,9 @@ export function ProductionStageTimeline({
             
             {/* Stage weight labels for admin/vendor */}
             <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-              {stageDefinitions.map((def) => {
+              {visibleStageDefinitions.map((def) => {
                 const status = getStageStatus(def.value);
-                const weight = def.weight ?? (100 / stageDefinitions.length);
+                const weight = def.weight ?? (100 / visibleStageDefinitions.length);
                 return (
                   <div 
                     key={def.value} 
@@ -353,7 +360,7 @@ export function ProductionStageTimeline({
         <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border" />
         
         <div className="space-y-3">
-          {stageDefinitions.map((stageDef, index) => {
+          {visibleStageDefinitions.map((stageDef, index) => {
             const stage = getStageData(stageDef.value);
             if (!stage) return null;
             
