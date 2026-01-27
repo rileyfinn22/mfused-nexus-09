@@ -23,7 +23,7 @@ interface AddArtworkDialogProps {
   defaultProductId?: string;
   // If provided, show only this company's products
   restrictToCompany?: string;
-  // Default artwork type (customer or vibe_proof)
+  // Default artwork type - if not provided, vibe_admin defaults to 'vibe_proof', others default to 'customer'
   defaultArtworkType?: 'customer' | 'vibe_proof';
 }
 
@@ -47,7 +47,7 @@ const AddArtworkDialog = ({
   defaultCompanyId = '',
   defaultProductId = '',
   restrictToCompany,
-  defaultArtworkType = 'customer',
+  defaultArtworkType,
 }: AddArtworkDialogProps) => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -56,6 +56,7 @@ const AddArtworkDialog = ({
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [productComboOpen, setProductComboOpen] = useState(false);
+  const [resolvedArtworkType, setResolvedArtworkType] = useState<'customer' | 'vibe_proof'>(defaultArtworkType || 'customer');
 
   const [formData, setFormData] = useState({
     companyId: defaultCompanyId || restrictToCompany || '',
@@ -64,7 +65,7 @@ const AddArtworkDialog = ({
     file: null as File | null,
     previewFile: null as File | null,
     notes: '',
-    artworkType: defaultArtworkType,
+    artworkType: defaultArtworkType || 'customer' as 'customer' | 'vibe_proof',
   });
 
   useEffect(() => {
@@ -72,7 +73,15 @@ const AddArtworkDialog = ({
       checkRole();
       fetchCompanies();
       fetchProducts();
-      // Reset form with defaults when opening
+    }
+  }, [open]);
+
+  // Reset form with proper defaults when opening - determine artwork type based on role
+  useEffect(() => {
+    if (open) {
+      // Use provided defaultArtworkType, or determine based on role (vibe_admin defaults to vibe_proof)
+      const artworkType = defaultArtworkType || (isVibeAdmin ? 'vibe_proof' : 'customer');
+      setResolvedArtworkType(artworkType);
       setFormData({
         companyId: defaultCompanyId || restrictToCompany || '',
         sku: defaultSku,
@@ -80,10 +89,10 @@ const AddArtworkDialog = ({
         file: null,
         previewFile: null,
         notes: '',
-        artworkType: defaultArtworkType,
+        artworkType: artworkType,
       });
     }
-  }, [open, defaultSku, defaultCompanyId, defaultProductId, restrictToCompany, defaultArtworkType]);
+  }, [open, defaultSku, defaultCompanyId, defaultProductId, restrictToCompany, defaultArtworkType, isVibeAdmin]);
 
   useEffect(() => {
     // Filter products based on selected company
