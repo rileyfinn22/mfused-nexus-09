@@ -1932,36 +1932,37 @@ const CreateOrder = () => {
           </div>
         )}
 
-        {/* Re-upload PO - Only show when editing existing order */}
-        {orderId && (
-          <div className="bg-muted/30 backdrop-blur rounded-lg p-4 border border-table-border">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h3 className="text-sm font-medium flex items-center gap-2">
-                  <Upload className="h-4 w-4 text-primary" />
-                  Re-upload PO
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Upload updated POs to update order items and quantities
-                </p>
-              </div>
+        {/* AI Order Entry / Re-upload PO */}
+        <div className="bg-muted/30 backdrop-blur rounded-lg p-4 border border-table-border">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                {orderId ? 'Re-upload PO' : 'AI Order Entry'}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {orderId 
+                  ? 'Upload updated POs to update order items and quantities'
+                  : 'Upload a customer PO or paste text to auto-fill order items'}
+              </p>
             </div>
-            
-            {/* Analysis Hint */}
-            <div className="mb-3">
-              <Label className="text-xs text-muted-foreground mb-1 block">
-                AI Matching Hint (optional)
-              </Label>
-              <Input
-                value={analysisHint}
-                onChange={(e) => setAnalysisHint(e.target.value)}
-                placeholder="e.g., 'All items are for California warehouse' or 'SKUs start with ABC-'"
-                className="h-8 text-sm"
-                disabled={analyzing || (isVibeAdmin && !selectedCompanyId)}
-              />
-            </div>
-            
-            <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as "pdf" | "text")} className="w-full">
+          </div>
+          
+          {/* Analysis Hint */}
+          <div className="mb-3">
+            <Label className="text-xs text-muted-foreground mb-1 block">
+              AI Matching Hint (optional)
+            </Label>
+            <Input
+              value={analysisHint}
+              onChange={(e) => setAnalysisHint(e.target.value)}
+              placeholder="e.g., 'All items are for California warehouse' or 'SKUs start with ABC-'"
+              className="h-8 text-sm"
+              disabled={analyzing || (isVibeAdmin && !selectedCompanyId)}
+            />
+          </div>
+          
+          <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as "pdf" | "text")} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-3">
                 <TabsTrigger value="pdf" className="flex items-center gap-1.5">
                   <Upload className="h-4 w-4" />
@@ -2065,10 +2066,10 @@ const CreateOrder = () => {
                   </div>
                 </div>
               </TabsContent>
-            </Tabs>
-            
-            {/* Show already processed POs with clear option */}
-            {(uploadedPOs.length > 0 || selectedItems.length > 0 || unmatchedPoItems.length > 0) && (
+          </Tabs>
+          
+          {/* Show already processed POs with clear option */}
+          {(uploadedPOs.length > 0 || selectedItems.length > 0 || unmatchedPoItems.length > 0) && (
               <div className="mt-3 border-t pt-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-muted-foreground">
@@ -2112,8 +2113,7 @@ const CreateOrder = () => {
                 )}
               </div>
             )}
-          </div>
-        )}
+        </div>
 
         {/* Customer & Address Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-muted/30 backdrop-blur rounded-lg p-6 border border-table-border">
