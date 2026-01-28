@@ -458,15 +458,15 @@ export default function Production() {
         </div>
 
         {/* Date Badges Row - Side by Side */}
-        <div className="mt-3 flex flex-wrap gap-3">
-          {/* Est. Delivery Date */}
+        <div className="mt-3 flex items-center gap-3">
+          {/* Delivery Date */}
           {deliveryInfo && (
             <Badge 
-              variant={isCompleted ? "success" : "outline"}
+              variant={isCompleted ? "success" : "secondary"}
               className="text-xs px-2.5 py-1 flex items-center gap-1.5"
             >
               <CalendarClock className="h-3.5 w-3.5" />
-              <span className="font-medium">Est. Delivery:</span> {deliveryInfo.text}
+              <span>Delivery:</span> {deliveryInfo.text}
             </Badge>
           )}
           
@@ -477,7 +477,7 @@ export default function Production() {
               className="text-xs px-2.5 py-1 flex items-center gap-1.5"
             >
               <CheckCircle2 className="h-3.5 w-3.5" />
-              <span className="font-medium">Completion Date:</span> {completionDate}
+              <span>Completion:</span> {completionDate}
             </Badge>
           )}
         </div>
