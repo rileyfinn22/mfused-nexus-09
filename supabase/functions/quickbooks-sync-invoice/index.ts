@@ -670,36 +670,43 @@ serve(async (req) => {
 
     console.log(`Total line items: ${lineItems.length}`);
 
-    // For partial billing, add a line item to subtract the unbilled portion
+    // For partial billing (deposits), we need to show ONLY the deposit amount due
+    // Instead of showing full price minus credit (which is confusing), we'll recalculate
+    // line items to show the proportional deposit amounts
     if (billingPercentage < 100) {
-      const unbilledPercentage = 100 - billingPercentage;
-      const unbilledAmount = -(calculatedSubtotal * (unbilledPercentage / 100));
+      console.log(`Deposit billing at ${billingPercentage}% - recalculating line items to show deposit amounts only`);
       
-      console.log(`Adding credit line: -${unbilledPercentage}% = $${Math.abs(unbilledAmount).toFixed(2)}`);
+      // Recalculate each line item to show only the deposit portion
+      // This avoids the confusing "full price minus credit" display in QuickBooks
+      const depositMultiplier = billingPercentage / 100;
       
-      // Determine description based on invoice type
-      const isDeposit = invoice.notes && invoice.notes.includes('deposit payment');
-      const creditDescription = isDeposit 
-        ? `Balance Due on Delivery (${unbilledPercentage}% of order)`
-        : `Credit Applied (Deposit/Previous Payments)`;
+      // Replace line items with deposit-adjusted amounts
+      for (let i = 0; i < lineItems.length; i++) {
+        const item = lineItems[i];
+        if (item.DetailType === 'SalesItemLineDetail' && item.Amount > 0) {
+          const originalAmount = item.Amount;
+          const depositAmount = Number((originalAmount * depositMultiplier).toFixed(2));
+          
+          // Update the line item to show deposit amount
+          lineItems[i] = {
+            ...item,
+            Amount: depositAmount,
+            Description: `${item.Description || item.SalesItemLineDetail?.ItemRef?.name} (${billingPercentage}% Deposit)`,
+          };
+          
+          console.log(`  Line item adjusted: ${originalAmount} -> ${depositAmount} (${billingPercentage}% deposit)`);
+        }
+      }
       
-      // Find or create an adjustment item
-      const adjustmentItemId = await findOrCreateQBItem('Invoice Adjustment', 'Balance adjustments and credits', 0);
+      // Recalculate the subtotal based on deposit amounts
+      calculatedSubtotal = lineItems.reduce((sum, item) => {
+        if (item.DetailType === 'SalesItemLineDetail') {
+          return sum + (item.Amount || 0);
+        }
+        return sum;
+      }, 0);
       
-      lineItems.push({
-        DetailType: 'SalesItemLineDetail',
-        Amount: unbilledAmount,
-        Description: creditDescription,
-        SalesItemLineDetail: {
-          ItemRef: { 
-            value: adjustmentItemId,
-            name: 'Invoice Adjustment',
-          },
-        },
-      });
-      
-      // Adjust calculated subtotal for the balance line
-      calculatedSubtotal += unbilledAmount;
+      console.log(`Deposit subtotal: $${calculatedSubtotal.toFixed(2)}`);
     }
 
     // Validate calculated total matches database total
