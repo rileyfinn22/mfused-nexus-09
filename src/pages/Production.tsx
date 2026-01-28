@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays, Building2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductionProgressBar, ProductionStatusIndicator } from "@/components/ProductionProgressBar";
 import { cn } from "@/lib/utils";
@@ -29,9 +30,15 @@ interface ProductionOrder {
   production_progress?: number;
 }
 
+interface Company {
+  id: string;
+  name: string;
+}
+
 export default function Production() {
   const navigate = useNavigate();
-const [orders, setOrders] = useState<ProductionOrder[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [completedOrders, setCompletedOrders] = useState<ProductionOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,16 +46,49 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [isVendor, setIsVendor] = useState(false);
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [roleChecked, setRoleChecked] = useState(false);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(searchParams.get('company') || 'all');
 
   useEffect(() => {
     checkRole();
   }, []);
 
   useEffect(() => {
+    if (roleChecked && isVibeAdmin) {
+      fetchCompanies();
+    }
+  }, [roleChecked, isVibeAdmin]);
+
+  useEffect(() => {
     if (roleChecked) {
       fetchProductionOrders();
     }
-  }, [roleChecked, isVibeAdmin, isVendor, vendorId]);
+  }, [roleChecked, isVibeAdmin, isVendor, vendorId, selectedCompanyId]);
+
+  const handleCompanyChange = (value: string) => {
+    setSelectedCompanyId(value);
+    if (value === 'all') {
+      searchParams.delete('company');
+    } else {
+      searchParams.set('company', value);
+    }
+    setSearchParams(searchParams);
+  };
+
+  const fetchCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setCompanies(data || []);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+    }
+  };
 
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -154,7 +194,7 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
         }
       } else {
         // Admin/Customer: get all production orders (exclude pull_ship and child orders)
-        const { data, error } = await supabase
+        let query = supabase
           .from('orders')
           .select(`
             id,
@@ -173,14 +213,20 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
           `)
           .eq('status', 'in production')
           .neq('order_type', 'pull_ship')
-          .is('parent_order_id', null)
-          .order('order_date', { ascending: false });
+          .is('parent_order_id', null);
+
+        // Apply company filter if selected
+        if (selectedCompanyId && selectedCompanyId !== 'all') {
+          query = query.eq('company_id', selectedCompanyId);
+        }
+
+        const { data, error } = await query.order('order_date', { ascending: false });
 
         if (error) throw error;
         ordersData = data || [];
 
         // Fetch completed orders for admin/customer
-        const { data: completedData, error: completedError } = await supabase
+        let completedQuery = supabase
           .from('orders')
           .select(`
             id,
@@ -199,8 +245,14 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
           `)
           .in('status', ['shipped', 'delivered', 'completed'])
           .neq('order_type', 'pull_ship')
-          .is('parent_order_id', null)
-          .order('order_date', { ascending: false });
+          .is('parent_order_id', null);
+
+        // Apply company filter if selected
+        if (selectedCompanyId && selectedCompanyId !== 'all') {
+          completedQuery = completedQuery.eq('company_id', selectedCompanyId);
+        }
+
+        const { data: completedData, error: completedError } = await completedQuery.order('order_date', { ascending: false });
 
         if (completedError) throw completedError;
         completedOrdersData = completedData || [];
@@ -505,14 +557,32 @@ const [orders, setOrders] = useState<ProductionOrder[]>([]);
         </div>
       </div>
 
-      <div className="relative flex-1 max-w-md">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search orders..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      <div className="flex flex-col sm:flex-row gap-3">
+        {isVibeAdmin && (
+          <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
+            <SelectTrigger className="w-full sm:w-[220px]">
+              <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="All Companies" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Companies</SelectItem>
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={company.id}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search orders..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
       </div>
 
       <div className="space-y-8">
