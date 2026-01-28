@@ -439,11 +439,15 @@ export default function Production() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="font-mono font-semibold text-foreground">{order.order_number}</span>
-              <Badge variant="outline" className="text-xs">{order.shipping_state}</Badge>
+              <span className="font-mono font-bold text-lg text-foreground">{order.order_number}</span>
+              {isVibeAdmin && (
+                <span className="text-xs text-muted-foreground">({order.companies?.name || '-'})</span>
+              )}
             </div>
-            {isVibeAdmin && (
-              <p className="text-sm font-medium text-foreground truncate">{order.companies?.name || '-'}</p>
+            
+            {/* Description - Prominent */}
+            {order.description && (
+              <p className="text-sm text-foreground leading-snug line-clamp-2">{order.description}</p>
             )}
           </div>
           
@@ -455,33 +459,25 @@ export default function Production() {
 
         {/* Date Badges Row */}
         <div className="mt-3 flex flex-wrap gap-2">
-          {/* Completion Date Badge - Green for completed orders */}
+          {/* Completion Date Badge - Green and slightly larger for completed orders */}
           {completionDate && (
-            <Badge variant="success" className="text-xs flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3" />
-              Completed {completionDate}
+            <Badge variant="success" className="text-sm px-3 py-1 flex items-center gap-1.5">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="font-medium">Completed:</span> {completionDate}
             </Badge>
           )}
           
-          {/* Est. Delivery Date Badge */}
+          {/* Est. Delivery Date Badge with label */}
           {deliveryInfo && !isCompleted && (
             <Badge 
               variant={deliveryInfo.status === 'overdue' ? 'danger' : deliveryInfo.status === 'soon' ? 'warning' : 'info'}
               className="text-xs flex items-center gap-1"
             >
               <CalendarClock className="h-3 w-3" />
-              Est. {deliveryInfo.text}
+              <span className="font-medium">Delivery:</span> {deliveryInfo.text}
             </Badge>
           )}
         </div>
-        
-        {/* Description - More Prominent */}
-        {order.description && (
-          <div className="mt-2 flex items-start gap-2 p-2 bg-muted/50 rounded-lg">
-            <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-foreground leading-snug">{order.description}</p>
-          </div>
-        )}
 
         {/* Editable Delivery Date for Vibe Admins */}
         {isVibeAdmin && !isCompleted && (
