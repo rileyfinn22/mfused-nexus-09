@@ -24,6 +24,7 @@ interface ProductionOrder {
   shipping_state: string;
   total: number;
   estimated_delivery_date: string | null;
+  order_finalized_at: string | null;
   updated_at: string;
   status: string;
   companies: {
@@ -213,6 +214,7 @@ export default function Production() {
             shipping_state,
             total,
             estimated_delivery_date,
+            order_finalized_at,
             updated_at,
             status,
             companies (
@@ -247,6 +249,7 @@ export default function Production() {
             shipping_state,
             total,
             estimated_delivery_date,
+            order_finalized_at,
             updated_at,
             status,
             companies (
@@ -397,8 +400,46 @@ export default function Production() {
     }
   };
 
+  const handleUpdateCompletionDate = async (orderId: string, date: Date | undefined) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          order_finalized_at: date ? format(date, 'yyyy-MM-dd') : null 
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Update local state
+      setOrders(prev => prev.map(o => 
+        o.id === orderId 
+          ? { ...o, order_finalized_at: date ? format(date, 'yyyy-MM-dd') : null }
+          : o
+      ));
+      setCompletedOrders(prev => prev.map(o => 
+        o.id === orderId 
+          ? { ...o, order_finalized_at: date ? format(date, 'yyyy-MM-dd') : null }
+          : o
+      ));
+
+      toast({
+        title: "Updated",
+        description: date ? `Completion date set to ${format(date, 'MMM d, yyyy')}` : "Completion date cleared",
+      });
+    } catch (error: any) {
+      console.error('Error updating completion date:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update completion date",
+        variant: "destructive",
+      });
+    }
+  };
+
   const OrderCard = ({ order }: { order: ProductionOrder }) => {
     const [datePickerOpen, setDatePickerOpen] = useState(false);
+    const [completionPickerOpen, setCompletionPickerOpen] = useState(false);
     const progress = order.production_progress || 0;
     const status = getProgressStatus(progress);
     const StatusIcon = status.icon;
@@ -425,7 +466,10 @@ export default function Production() {
     };
 
     const deliveryInfo = formatDeliveryDate(order.estimated_delivery_date);
-    const completionDate = isCompleted ? formatCompletionDate(order.updated_at) : null;
+    // Use order_finalized_at if available, fallback to updated_at for completed orders
+    const completionDate = order.order_finalized_at 
+      ? formatCompletionDate(order.order_finalized_at) 
+      : (isCompleted ? formatCompletionDate(order.updated_at) : null);
     const deliveryText = deliveryInfo?.text ?? 'TBD';
     const completionText = completionDate ?? '—';
     const dateBadgeVariant = isCompleted ? 'success' : 'outline';
@@ -527,20 +571,66 @@ export default function Production() {
             </Badge>
           )}
 
-          {/* Completion Badge - Read-only */}
-          <Badge
-            variant={(isCompleted ? 'success' : 'outline') as any}
-            className={cn(
-              "text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 w-full",
-              !isCompleted && "bg-background"
-            )}
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            <span className="font-medium">Completion:</span>
-            <span className="truncate">{completionText}</span>
-          </Badge>
+          {/* Completion Badge - Editable for Vibe Admins */}
+          {isVibeAdmin ? (
+            <Popover open={completionPickerOpen} onOpenChange={setCompletionPickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(
+                    badgeVariants({ variant: (isCompleted ? 'success' : 'outline') as any }),
+                    "w-full text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 cursor-pointer hover:opacity-80",
+                    !isCompleted && "bg-background"
+                  )}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span className="font-medium">Completion:</span>
+                  <span className="truncate">{completionText}</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={order.order_finalized_at ? new Date(order.order_finalized_at) : undefined}
+                  onSelect={(date) => {
+                    handleUpdateCompletionDate(order.id, date);
+                    setCompletionPickerOpen(false);
+                  }}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+                <div className="p-2 border-t">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-muted-foreground"
+                    disabled={!order.order_finalized_at}
+                    onClick={() => {
+                      handleUpdateCompletionDate(order.id, undefined);
+                      setCompletionPickerOpen(false);
+                    }}
+                  >
+                    Clear Date
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Badge
+              variant={(isCompleted ? 'success' : 'outline') as any}
+              className={cn(
+                "text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 w-full",
+                !isCompleted && "bg-background"
+              )}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span className="font-medium">Completion:</span>
+              <span className="truncate">{completionText}</span>
+            </Badge>
+          )}
         </div>
-        
         <div className="mt-3">
           <ProductionProgressBar progress={progress} size="sm" />
         </div>
