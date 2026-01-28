@@ -354,8 +354,9 @@ export default function Production() {
   }
 
   const getProgressStatus = (progress: number) => {
-    if (progress >= 100) return { icon: CheckCircle2, color: 'text-green-500', label: 'Complete' };
-    if (progress > 0) return { icon: Clock, color: 'text-blue-500', label: 'In Progress' };
+    // Use semantic tokens (no raw Tailwind palette colors)
+    if (progress >= 100) return { icon: CheckCircle2, color: 'text-success', label: 'Complete' };
+    if (progress > 0) return { icon: Clock, color: 'text-info', label: 'In Progress' };
     return { icon: Circle, color: 'text-muted-foreground', label: 'Pending' };
   };
 
@@ -384,7 +385,7 @@ export default function Production() {
 
       toast({
         title: "Updated",
-        description: date ? `Delivery date set to ${format(date, 'MMM d, yyyy')}` : "Delivery date cleared",
+        description: date ? `Delivery date set to ${format(date, 'MMM d, yyyy')}` : "Delivery set to TBD",
       });
     } catch (error: any) {
       console.error('Error updating delivery date:', error);
@@ -425,6 +426,9 @@ export default function Production() {
 
     const deliveryInfo = formatDeliveryDate(order.estimated_delivery_date);
     const completionDate = isCompleted ? formatCompletionDate(order.updated_at) : null;
+    const deliveryText = deliveryInfo?.text ?? 'TBD';
+    const completionText = completionDate ?? '—';
+    const dateBadgeVariant = isCompleted ? 'success' : 'outline';
 
     return (
       <div
@@ -458,28 +462,31 @@ export default function Production() {
         </div>
 
         {/* Date Badges Row - Side by Side */}
-        <div className="mt-3 flex items-center gap-3">
-          {/* Delivery Date */}
-          {deliveryInfo && (
-            <Badge 
-              variant={isCompleted ? "success" : "secondary"}
-              className="text-xs px-2.5 py-1 flex items-center gap-1.5"
-            >
-              <CalendarClock className="h-3.5 w-3.5" />
-              <span>Delivery:</span> {deliveryInfo.text}
-            </Badge>
-          )}
-          
-          {/* Completion Date */}
-          {completionDate && (
-            <Badge 
-              variant="success"
-              className="text-xs px-2.5 py-1 flex items-center gap-1.5"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              <span>Completion:</span> {completionDate}
-            </Badge>
-          )}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Badge
+            // White/neutral when not complete; green when complete
+            variant={dateBadgeVariant as any}
+            className={cn(
+              "text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 w-full",
+              !isCompleted && "bg-background"
+            )}
+          >
+            <CalendarClock className="h-3.5 w-3.5" />
+            <span className="font-medium">Delivery:</span>
+            <span className="truncate">{deliveryText}</span>
+          </Badge>
+
+          <Badge
+            variant={(isCompleted ? 'success' : 'outline') as any}
+            className={cn(
+              "text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 w-full",
+              !isCompleted && "bg-background"
+            )}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span className="font-medium">Completion:</span>
+            <span className="truncate">{completionText}</span>
+          </Badge>
         </div>
 
         {/* Editable Delivery Date for Vibe Admins */}
@@ -490,15 +497,10 @@ export default function Production() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className={cn(
-                    "h-8 text-xs gap-1.5 font-normal",
-                    deliveryInfo?.status === 'overdue' && "border-danger/50 text-danger hover:bg-danger/10",
-                    deliveryInfo?.status === 'soon' && "border-warning/50 text-warning hover:bg-warning/10",
-                    !deliveryInfo && "text-muted-foreground"
-                  )}
+                  className="h-8 text-xs gap-1.5 font-normal"
                 >
                   <CalendarDays className="h-3.5 w-3.5" />
-                  {deliveryInfo ? `Est. ${deliveryInfo.text}` : "Set Delivery Date"}
+                  {`Delivery: ${deliveryText}`}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -511,21 +513,20 @@ export default function Production() {
                   }}
                   initialFocus
                 />
-                {order.estimated_delivery_date && (
-                  <div className="p-2 border-t">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full text-xs text-muted-foreground"
-                      onClick={() => {
-                        handleUpdateDeliveryDate(order.id, undefined);
-                        setDatePickerOpen(false);
-                      }}
-                    >
-                      Clear Date
-                    </Button>
-                  </div>
-                )}
+                <div className="p-2 border-t">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-muted-foreground"
+                    disabled={!order.estimated_delivery_date}
+                    onClick={() => {
+                      handleUpdateDeliveryDate(order.id, undefined);
+                      setDatePickerOpen(false);
+                    }}
+                  >
+                    Set as TBD
+                  </Button>
+                </div>
               </PopoverContent>
             </Popover>
           </div>
