@@ -145,10 +145,25 @@ serve(async (req) => {
     console.log('Inventory allocations found:', allocations?.length || 0);
 
     // Determine the effective billing percentage:
-    // - Use stored billed_percentage if invoice already has one (for re-syncs)
-    // - Otherwise use requested percentage (for new syncs)
-    // - Default to 100 if neither is set
-    const billingPercentage = invoice.billed_percentage || requestedPercentage || 100;
+    // 1. Calculate from actual invoice/order totals (most accurate)
+    // 2. Fall back to stored billed_percentage if calculation isn't possible
+    // 3. Use requested percentage for new syncs
+    // 4. Default to 100 if nothing else
+    const orderTotal = Number(invoice.orders?.total || 0);
+    const invoiceTotal = Number(invoice.total || 0);
+    
+    let billingPercentage = 100;
+    if (orderTotal > 0 && invoiceTotal > 0 && invoiceTotal < orderTotal) {
+      // Calculate actual percentage from totals
+      billingPercentage = Math.round((invoiceTotal / orderTotal) * 100);
+      console.log(`Calculated billing percentage from totals: ${invoiceTotal}/${orderTotal} = ${billingPercentage}%`);
+    } else if (invoice.billed_percentage && invoice.billed_percentage < 100) {
+      billingPercentage = invoice.billed_percentage;
+      console.log('Using stored billed_percentage:', billingPercentage);
+    } else if (requestedPercentage && requestedPercentage < 100) {
+      billingPercentage = requestedPercentage;
+      console.log('Using requested billing percentage:', billingPercentage);
+    }
     console.log('Effective billing percentage:', billingPercentage);
 
     // Get VibePKG's company_id (the vibe_admin's company that manages QuickBooks)
