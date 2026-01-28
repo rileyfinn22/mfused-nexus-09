@@ -695,43 +695,42 @@ serve(async (req) => {
 
     console.log(`Total line items: ${lineItems.length}`);
 
-    // For partial billing (deposits), we need to show ONLY the deposit amount due
-    // Instead of showing full price minus credit (which is confusing), we'll recalculate
-    // line items to show the proportional deposit amounts
+    // For partial billing (deposits), QuickBooks requires Amount = Qty × UnitPrice
+    // Instead of adjusting each line item (which breaks validation), we'll replace
+    // all line items with a single deposit line item
     if (billingPercentage < 100) {
-      console.log(`Deposit billing at ${billingPercentage}% - recalculating line items to show deposit amounts only`);
+      console.log(`Deposit billing at ${billingPercentage}% - creating single deposit line item`);
       
-      // Recalculate each line item to show only the deposit portion
-      // This avoids the confusing "full price minus credit" display in QuickBooks
-      const depositMultiplier = billingPercentage / 100;
+      const depositAmount = Number(invoice.total);
+      const orderNumber = invoice.orders?.order_number || invoice.invoice_number;
       
-      // Replace line items with deposit-adjusted amounts
-      for (let i = 0; i < lineItems.length; i++) {
-        const item = lineItems[i];
-        if (item.DetailType === 'SalesItemLineDetail' && item.Amount > 0) {
-          const originalAmount = item.Amount;
-          const depositAmount = Number((originalAmount * depositMultiplier).toFixed(2));
-          
-          // Update the line item to show deposit amount
-          lineItems[i] = {
-            ...item,
-            Amount: depositAmount,
-            Description: `${item.Description || item.SalesItemLineDetail?.ItemRef?.name} (${billingPercentage}% Deposit)`,
-          };
-          
-          console.log(`  Line item adjusted: ${originalAmount} -> ${depositAmount} (${billingPercentage}% deposit)`);
-        }
-      }
+      // Build description listing all items in the deposit
+      const itemDescriptions = (invoice.orders?.order_items || [])
+        .map((item: any) => `${item.name} (${item.quantity} units)`)
+        .join(', ');
       
-      // Recalculate the subtotal based on deposit amounts
-      calculatedSubtotal = lineItems.reduce((sum, item) => {
-        if (item.DetailType === 'SalesItemLineDetail') {
-          return sum + (item.Amount || 0);
-        }
-        return sum;
-      }, 0);
+      const depositDescription = `${billingPercentage}% Deposit for Order #${orderNumber}${itemDescriptions ? ': ' + itemDescriptions : ''}`;
       
-      console.log(`Deposit subtotal: $${calculatedSubtotal.toFixed(2)}`);
+      // Find or create a Deposit item in QuickBooks
+      const depositItemId = await findOrCreateQBItem('Deposit', 'Customer deposit payment', depositAmount);
+      
+      // Replace all line items with a single deposit line
+      lineItems = [{
+        DetailType: 'SalesItemLineDetail',
+        Amount: depositAmount,
+        Description: depositDescription.substring(0, 4000), // QB max description length
+        SalesItemLineDetail: {
+          ItemRef: {
+            value: depositItemId,
+            name: 'Deposit',
+          },
+          Qty: 1,
+          UnitPrice: depositAmount,
+        },
+      }];
+      
+      calculatedSubtotal = depositAmount;
+      console.log(`Created deposit line item: $${depositAmount} - ${depositDescription.substring(0, 100)}...`);
     }
 
     // Validate calculated total matches database total (for logging purposes)
