@@ -462,46 +462,22 @@ export default function Production() {
         </div>
 
         {/* Date Badges Row - Side by Side */}
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <Badge
-            // White/neutral when not complete; green when complete
-            variant={dateBadgeVariant as any}
-            className={cn(
-              "text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 w-full",
-              !isCompleted && "bg-background"
-            )}
-          >
-            <CalendarClock className="h-3.5 w-3.5" />
-            <span className="font-medium">Delivery:</span>
-            <span className="truncate">{deliveryText}</span>
-          </Badge>
-
-          <Badge
-            variant={(isCompleted ? 'success' : 'outline') as any}
-            className={cn(
-              "text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 w-full",
-              !isCompleted && "bg-background"
-            )}
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            <span className="font-medium">Completion:</span>
-            <span className="truncate">{completionText}</span>
-          </Badge>
-        </div>
-
-        {/* Editable Delivery Date for Vibe Admins */}
-        {isVibeAdmin && !isCompleted && (
-          <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="mt-3 grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
+          {/* Delivery Badge - Editable for Vibe Admins */}
+          {isVibeAdmin && !isCompleted ? (
             <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs gap-1.5 font-normal"
+                <Badge
+                  variant={dateBadgeVariant as any}
+                  className={cn(
+                    "text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 w-full cursor-pointer hover:opacity-80",
+                    !isCompleted && "bg-background"
+                  )}
                 >
-                  <CalendarDays className="h-3.5 w-3.5" />
-                  {`Delivery: ${deliveryText}`}
-                </Button>
+                  <CalendarClock className="h-3.5 w-3.5" />
+                  <span className="font-medium">Delivery:</span>
+                  <span className="truncate">{deliveryText}</span>
+                </Badge>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
@@ -512,6 +488,7 @@ export default function Production() {
                     setDatePickerOpen(false);
                   }}
                   initialFocus
+                  className="p-3 pointer-events-auto"
                 />
                 <div className="p-2 border-t">
                   <Button
@@ -529,8 +506,33 @@ export default function Production() {
                 </div>
               </PopoverContent>
             </Popover>
-          </div>
-        )}
+          ) : (
+            <Badge
+              variant={dateBadgeVariant as any}
+              className={cn(
+                "text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 w-full",
+                !isCompleted && "bg-background"
+              )}
+            >
+              <CalendarClock className="h-3.5 w-3.5" />
+              <span className="font-medium">Delivery:</span>
+              <span className="truncate">{deliveryText}</span>
+            </Badge>
+          )}
+
+          {/* Completion Badge - Read-only */}
+          <Badge
+            variant={(isCompleted ? 'success' : 'outline') as any}
+            className={cn(
+              "text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 w-full",
+              !isCompleted && "bg-background"
+            )}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span className="font-medium">Completion:</span>
+            <span className="truncate">{completionText}</span>
+          </Badge>
+        </div>
         
         <div className="mt-3">
           <ProductionProgressBar progress={progress} size="sm" />
