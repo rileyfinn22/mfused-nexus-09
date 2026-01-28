@@ -548,21 +548,21 @@ const Orders = () => {
                       <div className="flex gap-1 items-center">
                         <div className="flex items-center" title="Art Approved">
                           {order.artApproved ? (
-                            <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                            <CheckCircle className="h-3.5 w-3.5 text-success" />
                           ) : (
                             <Circle className="h-3.5 w-3.5 text-muted-foreground" />
                           )}
                         </div>
                         <div className="flex items-center" title="Order Finalized">
                           {order.order_finalized ? (
-                            <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                            <CheckCircle className="h-3.5 w-3.5 text-success" />
                           ) : (
                             <Circle className="h-3.5 w-3.5 text-muted-foreground" />
                           )}
                         </div>
                         <div className="flex items-center" title="Vibe Processed">
                           {order.vibe_processed ? (
-                            <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                            <CheckCircle className="h-3.5 w-3.5 text-success" />
                           ) : (
                             <Circle className="h-3.5 w-3.5 text-muted-foreground" />
                           )}
@@ -616,14 +616,15 @@ const Orders = () => {
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Orders in Production</h2>
           <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-            <div className="bg-muted border-b-2 border-border">
+          <div className="bg-muted border-b-2 border-border">
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-2">Order # / Type</div>
                 <div className="col-span-1">Date</div>
-                {isVibeAdmin && <div className="col-span-2">Company</div>}
-                <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>Description</div>
+                {isVibeAdmin && <div className="col-span-1">Company</div>}
+                <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Description</div>
                 <div className="col-span-1">Total</div>
                 <div className="col-span-2">Progress</div>
+                <div className="col-span-1">Est. Delivery</div>
                 <div className="col-span-2">Actions</div>
               </div>
             </div>
@@ -641,7 +642,12 @@ const Orders = () => {
                 const progress = order.status === 'in production' && order.productionProgress !== undefined 
                   ? order.productionProgress 
                   : getProgressForStatus(order.status);
-                const estDelivery = order.estimated_delivery_date ? new Date(order.estimated_delivery_date).toLocaleDateString() : 'Not set';
+                const estDelivery = order.estimated_delivery_date ? new Date(order.estimated_delivery_date) : null;
+                const today = new Date();
+                const diffDays = estDelivery ? Math.ceil((estDelivery.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                const deliveryStatus = diffDays !== null 
+                  ? diffDays < 0 ? 'overdue' : diffDays <= 7 ? 'soon' : 'normal'
+                  : null;
                 const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                 const OrderIcon = orderTypeInfo.icon;
                 
@@ -663,9 +669,9 @@ const Orders = () => {
                       {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
                     </div>
                     {isVibeAdmin && (
-                      <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
+                      <div className="col-span-1 text-sm font-medium truncate">{order.companies?.name || '-'}</div>
                     )}
-                    <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
+                    <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>
                       <EditableDescription 
                         value={order.description} 
                         onSave={(text) => handleDescriptionChange(order.id, text)} 
@@ -678,6 +684,18 @@ const Orders = () => {
                         <span className="text-muted-foreground">{progress}%</span>
                       </div>
                       <Progress value={progress} className="h-1" />
+                    </div>
+                    <div className="col-span-1">
+                      {estDelivery ? (
+                        <Badge 
+                          variant={deliveryStatus === 'overdue' ? 'danger' : deliveryStatus === 'soon' ? 'warning' : 'info'}
+                          className="text-xs"
+                        >
+                          {estDelivery.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not set</span>
+                      )}
                     </div>
                     <div className="col-span-2 flex gap-1">
                       <Button 
@@ -728,10 +746,11 @@ const Orders = () => {
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
-                  {isVibeAdmin && <div className="col-span-2">Company</div>}
-                  <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>Description</div>
+                  {isVibeAdmin && <div className="col-span-1">Company</div>}
+                  <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Description</div>
                   <div className="col-span-1">Total</div>
                   <div className="col-span-2">Status</div>
+                  <div className="col-span-1">Completed</div>
                   <div className="col-span-2">Actions</div>
                 </div>
               </div>
@@ -739,6 +758,7 @@ const Orders = () => {
                 {completedOrders.map((order) => {
                   const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                   const OrderIcon = orderTypeInfo.icon;
+                  const completionDate = order.updated_at ? new Date(order.updated_at).toLocaleDateString() : '-';
                   
                   return (
                     <div 
@@ -758,9 +778,9 @@ const Orders = () => {
                         {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
                       </div>
                       {isVibeAdmin && (
-                        <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
+                        <div className="col-span-1 text-sm font-medium truncate">{order.companies?.name || '-'}</div>
                       )}
-                      <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
+                      <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>
                         <EditableDescription 
                           value={order.description} 
                           onSave={(text) => handleDescriptionChange(order.id, text)} 
@@ -769,11 +789,14 @@ const Orders = () => {
                       <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
                       <div className="col-span-2 space-y-1">
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
-                            <CheckCircle className="h-3 w-3 mr-1" />
+                          <Badge variant="success" className="flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" />
                             {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                           </Badge>
                         </div>
+                      </div>
+                      <div className="col-span-1 text-sm text-success font-medium">
+                        {completionDate}
                       </div>
                       <div className="col-span-2 flex gap-1">
                         <Button 

@@ -24,6 +24,8 @@ interface ProductionOrder {
   shipping_state: string;
   total: number;
   estimated_delivery_date: string | null;
+  updated_at: string;
+  status: string;
   companies: {
     name: string;
   };
@@ -152,6 +154,8 @@ export default function Production() {
               shipping_state,
               total,
               estimated_delivery_date,
+              updated_at,
+              status,
               companies (
                 name
               )
@@ -179,6 +183,8 @@ export default function Production() {
               shipping_state,
               total,
               estimated_delivery_date,
+              updated_at,
+              status,
               companies (
                 name
               )
@@ -207,6 +213,8 @@ export default function Production() {
             shipping_state,
             total,
             estimated_delivery_date,
+            updated_at,
+            status,
             companies (
               name
             )
@@ -239,6 +247,8 @@ export default function Production() {
             shipping_state,
             total,
             estimated_delivery_date,
+            updated_at,
+            status,
             companies (
               name
             )
@@ -391,6 +401,7 @@ export default function Production() {
     const progress = order.production_progress || 0;
     const status = getProgressStatus(progress);
     const StatusIcon = status.icon;
+    const isCompleted = ['shipped', 'delivered', 'completed'].includes(order.status);
 
     const formatDeliveryDate = (dateStr: string | null) => {
       if (!dateStr) return null;
@@ -406,14 +417,21 @@ export default function Production() {
       return { text: formatted, status: 'normal' as const, date };
     };
 
+    const formatCompletionDate = (dateStr: string | null) => {
+      if (!dateStr) return null;
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
     const deliveryInfo = formatDeliveryDate(order.estimated_delivery_date);
+    const completionDate = isCompleted ? formatCompletionDate(order.updated_at) : null;
 
     return (
       <div
         className={cn(
           "group border rounded-xl p-4 hover:shadow-md transition-all cursor-pointer",
-          progress >= 100 ? "border-green-500/30 bg-green-50/5" :
-          progress > 0 ? "border-blue-500/30 bg-blue-50/5" :
+          progress >= 100 ? "border-success/30 bg-success/5" :
+          progress > 0 ? "border-info/30 bg-info/5" :
           "border-border bg-card"
         )}
         onClick={() => navigate(`/production/${order.id}`)}
@@ -434,6 +452,28 @@ export default function Production() {
             <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
           </div>
         </div>
+
+        {/* Date Badges Row */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {/* Completion Date Badge - Green for completed orders */}
+          {completionDate && (
+            <Badge variant="success" className="text-xs flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3" />
+              Completed {completionDate}
+            </Badge>
+          )}
+          
+          {/* Est. Delivery Date Badge */}
+          {deliveryInfo && !isCompleted && (
+            <Badge 
+              variant={deliveryInfo.status === 'overdue' ? 'danger' : deliveryInfo.status === 'soon' ? 'warning' : 'info'}
+              className="text-xs flex items-center gap-1"
+            >
+              <CalendarClock className="h-3 w-3" />
+              Est. {deliveryInfo.text}
+            </Badge>
+          )}
+        </div>
         
         {/* Description - More Prominent */}
         {order.description && (
@@ -444,7 +484,7 @@ export default function Production() {
         )}
 
         {/* Editable Delivery Date for Vibe Admins */}
-        {isVibeAdmin && (
+        {isVibeAdmin && !isCompleted && (
           <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
               <PopoverTrigger asChild>
@@ -453,8 +493,8 @@ export default function Production() {
                   size="sm"
                   className={cn(
                     "h-8 text-xs gap-1.5 font-normal",
-                    deliveryInfo?.status === 'overdue' && "border-red-300 text-red-600 hover:bg-red-50",
-                    deliveryInfo?.status === 'soon' && "border-amber-300 text-amber-600 hover:bg-amber-50",
+                    deliveryInfo?.status === 'overdue' && "border-danger/50 text-danger hover:bg-danger/10",
+                    deliveryInfo?.status === 'soon' && "border-warning/50 text-warning hover:bg-warning/10",
                     !deliveryInfo && "text-muted-foreground"
                   )}
                 >
@@ -498,20 +538,7 @@ export default function Production() {
         
         <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
           <span>${order.total?.toFixed(2)}</span>
-          <div className="flex items-center gap-3">
-            {!isVibeAdmin && deliveryInfo && (
-              <span className={cn(
-                "flex items-center gap-1 font-medium",
-                deliveryInfo.status === 'overdue' && "text-red-600",
-                deliveryInfo.status === 'soon' && "text-amber-600",
-                deliveryInfo.status === 'normal' && "text-muted-foreground"
-              )}>
-                <CalendarClock className="h-3.5 w-3.5" />
-                Est. {deliveryInfo.text}
-              </span>
-            )}
-            <span>{new Date(order.order_date).toLocaleDateString()}</span>
-          </div>
+          <span>{new Date(order.order_date).toLocaleDateString()}</span>
         </div>
       </div>
     );
