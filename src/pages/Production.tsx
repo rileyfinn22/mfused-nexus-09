@@ -402,11 +402,19 @@ export default function Production() {
 
   const handleUpdateCompletionDate = async (orderId: string, date: Date | undefined) => {
     try {
+      // Get current user for tracking who made the change
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const updateData: Record<string, any> = { 
+        order_finalized_at: date ? format(date, 'yyyy-MM-dd') : null,
+        order_finalized: date ? true : false,
+        order_finalized_by: date ? user?.id : null,
+        updated_at: new Date().toISOString()
+      };
+
       const { error } = await supabase
         .from('orders')
-        .update({ 
-          order_finalized_at: date ? format(date, 'yyyy-MM-dd') : null 
-        })
+        .update(updateData)
         .eq('id', orderId);
 
       if (error) throw error;
