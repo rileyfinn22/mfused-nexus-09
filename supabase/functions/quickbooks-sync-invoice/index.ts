@@ -87,9 +87,11 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { invoiceId, billingPercentage = 100 } = await req.json();
+    const { invoiceId, billingPercentage: requestedPercentage } = await req.json();
 
-    console.log('Syncing invoice:', invoiceId, 'with billing percentage:', billingPercentage);
+    // Note: billingPercentage from request is only used for NEW syncs
+    // For re-syncs, we'll use the stored billed_percentage from the invoice
+    console.log('Syncing invoice:', invoiceId, 'with requested billing percentage:', requestedPercentage);
 
     // Get invoice with items, allocations, company info, and order's QB project
     const { data: invoice, error: invoiceError } = await supabase
@@ -139,7 +141,15 @@ serve(async (req) => {
 
     console.log('Invoice total from DB:', invoice.total);
     console.log('Invoice type:', invoice.invoice_type);
+    console.log('Invoice stored billed_percentage:', invoice.billed_percentage);
     console.log('Inventory allocations found:', allocations?.length || 0);
+
+    // Determine the effective billing percentage:
+    // - Use stored billed_percentage if invoice already has one (for re-syncs)
+    // - Otherwise use requested percentage (for new syncs)
+    // - Default to 100 if neither is set
+    const billingPercentage = invoice.billed_percentage || requestedPercentage || 100;
+    console.log('Effective billing percentage:', billingPercentage);
 
     // Get VibePKG's company_id (the vibe_admin's company that manages QuickBooks)
     const { data: vibeAdmin, error: vibeAdminError } = await supabase
@@ -709,7 +719,7 @@ serve(async (req) => {
       console.log(`Deposit subtotal: $${calculatedSubtotal.toFixed(2)}`);
     }
 
-    // Validate calculated total matches database total
+    // Validate calculated total matches database total (for logging purposes)
     const calculatedTotal = calculatedSubtotal + Number(invoice.tax || 0);
     const dbTotal = Number(invoice.total);
     
@@ -718,31 +728,19 @@ serve(async (req) => {
     console.log('Database total:', dbTotal);
     console.log('Difference:', Math.abs(calculatedTotal - dbTotal));
 
-    // If calculated total exceeds database total, add deposit credit line
-    if (calculatedTotal > dbTotal + 0.01) {
-      const depositCreditAmount = -(calculatedTotal - dbTotal);
-      console.log(`Adding deposit credit line: $${Math.abs(depositCreditAmount).toFixed(2)}`);
-      
-      // Find or create a deposit credit item
-      const depositCreditItemId = await findOrCreateQBItem('Deposit Credit Applied', 'Credit for deposits previously applied', 0);
-      
-      lineItems.push({
-        DetailType: 'SalesItemLineDetail',
-        Amount: depositCreditAmount,
-        Description: 'Less: Deposit Credit Applied',
-        SalesItemLineDetail: {
-          ItemRef: { 
-            value: depositCreditItemId,
-            name: 'Deposit Credit Applied',
-          },
-        },
-      });
-      
-      // Adjust calculated subtotal
-      calculatedSubtotal += depositCreditAmount;
-    } else if (Math.abs(calculatedTotal - dbTotal) > 0.01) {
-      console.warn('WARNING: Database total exceeds calculated total!');
-      console.warn(`Calculated: ${calculatedTotal}, Database: ${dbTotal}, Diff: ${dbTotal - calculatedTotal}`);
+    // NOTE: We no longer add "Deposit Credit Applied" lines for partial invoices.
+    // Instead, for partial billing, the line items themselves are adjusted to show
+    // only the deposit amounts (handled above when billingPercentage < 100).
+    // This creates a cleaner invoice in QuickBooks without confusing credit lines.
+    
+    if (Math.abs(calculatedTotal - dbTotal) > 1) {
+      // Only warn if difference is significant (> $1) and not explained by partial billing
+      if (billingPercentage === 100) {
+        console.warn('WARNING: Significant difference between calculated and database total');
+        console.warn(`Calculated: ${calculatedTotal}, Database: ${dbTotal}, Diff: ${Math.abs(calculatedTotal - dbTotal)}`);
+      } else {
+        console.log('Difference expected due to partial billing at', billingPercentage + '%');
+      }
     }
 
     // For partial billing, we'll show full invoice then subtract the unbilled portion
