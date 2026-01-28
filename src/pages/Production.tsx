@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -462,22 +462,29 @@ export default function Production() {
         </div>
 
         {/* Date Badges Row - Side by Side */}
-        <div className="mt-3 grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="mt-3 grid grid-cols-2 gap-2"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Delivery Badge - Editable for Vibe Admins */}
           {isVibeAdmin && !isCompleted ? (
             <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
               <PopoverTrigger asChild>
-                <Badge
-                  variant={dateBadgeVariant as any}
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                   className={cn(
-                    "text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 w-full cursor-pointer hover:opacity-80",
+                    badgeVariants({ variant: dateBadgeVariant as any }),
+                    "w-full text-xs px-2.5 py-1 flex items-center justify-center gap-1.5 cursor-pointer hover:opacity-80",
                     !isCompleted && "bg-background"
                   )}
                 >
                   <CalendarClock className="h-3.5 w-3.5" />
                   <span className="font-medium">Delivery:</span>
                   <span className="truncate">{deliveryText}</span>
-                </Badge>
+                </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
