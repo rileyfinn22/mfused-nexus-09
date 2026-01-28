@@ -457,24 +457,27 @@ export default function Production() {
           </div>
         </div>
 
-        {/* Date Badges Row */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {/* Completion Date Badge - Green and slightly larger for completed orders */}
-          {completionDate && (
-            <Badge variant="success" className="text-sm px-3 py-1 flex items-center gap-1.5">
-              <CheckCircle2 className="h-4 w-4" />
-              <span className="font-medium">Completed:</span> {completionDate}
+        {/* Date Badges Row - Side by Side */}
+        <div className="mt-3 flex flex-wrap gap-3">
+          {/* Est. Delivery Date */}
+          {deliveryInfo && (
+            <Badge 
+              variant={isCompleted ? "success" : "outline"}
+              className="text-xs px-2.5 py-1 flex items-center gap-1.5"
+            >
+              <CalendarClock className="h-3.5 w-3.5" />
+              <span className="font-medium">Est. Delivery:</span> {deliveryInfo.text}
             </Badge>
           )}
           
-          {/* Est. Delivery Date Badge with label */}
-          {deliveryInfo && !isCompleted && (
+          {/* Completion Date */}
+          {completionDate && (
             <Badge 
-              variant={deliveryInfo.status === 'overdue' ? 'danger' : deliveryInfo.status === 'soon' ? 'warning' : 'info'}
-              className="text-xs flex items-center gap-1"
+              variant="success"
+              className="text-xs px-2.5 py-1 flex items-center gap-1.5"
             >
-              <CalendarClock className="h-3 w-3" />
-              <span className="font-medium">Delivery:</span> {deliveryInfo.text}
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span className="font-medium">Completion Date:</span> {completionDate}
             </Badge>
           )}
         </div>
