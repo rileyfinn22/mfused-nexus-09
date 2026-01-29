@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 interface LowStockItem {
   sku: string;
   state: string;
@@ -30,6 +30,7 @@ interface RecentOrder {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [loading, setLoading] = useState(true);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [openOrdersCount, setOpenOrdersCount] = useState(0);
@@ -38,16 +39,26 @@ const Dashboard = () => {
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (activeCompanyId || isVibeAdmin) {
+      fetchDashboardData();
+    }
+  }, [activeCompanyId, isVibeAdmin]);
 
   const fetchDashboardData = async () => {
     try {
+      // Build base query conditions
+      const companyFilter = !isVibeAdmin && activeCompanyId ? activeCompanyId : null;
+
       // Fetch low stock items (where available < redline)
-      const { data: inventoryData } = await supabase
+      let inventoryQuery = supabase
         .from('inventory')
-        .select('sku, state, available, redline')
-        .lt('available', supabase.rpc ? 100000 : 100000); // Get all, filter client-side
+        .select('sku, state, available, redline, company_id');
+
+      if (companyFilter) {
+        inventoryQuery = inventoryQuery.eq('company_id', companyFilter);
+      }
+
+      const { data: inventoryData } = await inventoryQuery;
 
       const lowStock = (inventoryData || [])
         .filter(item => item.available < item.redline)
@@ -64,22 +75,35 @@ const Dashboard = () => {
       setLowStockCount((inventoryData || []).filter(item => item.available < item.redline).length);
 
       // Fetch open orders count
-      const { count: ordersCount } = await supabase
+      let ordersCountQuery = supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .in('status', ['pending', 'in_production', 'approved'])
         .is('deleted_at', null);
 
+      if (companyFilter) {
+        ordersCountQuery = ordersCountQuery.eq('company_id', companyFilter);
+      }
+
+      const { count: ordersCount } = await ordersCountQuery;
       setOpenOrdersCount(ordersCount || 0);
 
       // Calculate inventory value
-      const { data: inventoryValueData } = await supabase
+      let inventoryValueQuery = supabase
         .from('inventory')
-        .select('available, product_id');
+        .select('available, product_id, company_id');
 
-      const { data: productsData } = await supabase
-        .from('products')
-        .select('id, cost');
+      if (companyFilter) {
+        inventoryValueQuery = inventoryValueQuery.eq('company_id', companyFilter);
+      }
+
+      const { data: inventoryValueData } = await inventoryValueQuery;
+
+      let productsQuery = supabase.from('products').select('id, cost, company_id');
+      if (companyFilter) {
+        productsQuery = productsQuery.eq('company_id', companyFilter);
+      }
+      const { data: productsData } = await productsQuery;
 
       const productCostMap = new Map((productsData || []).map(p => [p.id, p.cost || 0]));
       const totalValue = (inventoryValueData || []).reduce((sum, item) => {
@@ -90,12 +114,18 @@ const Dashboard = () => {
       setInventoryValue(totalValue);
 
       // Fetch recent orders
-      const { data: ordersData } = await supabase
+      let ordersDataQuery = supabase
         .from('orders')
         .select('id, order_number, status, customer_name')
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(5);
+
+      if (companyFilter) {
+        ordersDataQuery = ordersDataQuery.eq('company_id', companyFilter);
+      }
+
+      const { data: ordersData } = await ordersDataQuery;
 
       setRecentOrders((ordersData || []).map(order => ({
         id: order.id,
