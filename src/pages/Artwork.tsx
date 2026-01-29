@@ -95,8 +95,11 @@ const Artwork = () => {
   // Artwork counts per product SKU
   const [artworkCounts, setArtworkCounts] = useState<Record<string, { total: number; approved: number; pending: number }>>({});
   
-  // Template thumbnail from first artwork (fallback if no template.thumbnail_url)
-  const [templateArtworkThumbnails, setTemplateArtworkThumbnails] = useState<Record<string, string | null>>({});
+  // Artwork thumbnails per SKU (for product tiles)
+  const [skuArtworkThumbnails, setSkuArtworkThumbnails] = useState<Record<string, string | null>>({});
+  
+  // Template total artwork file counts
+  const [templateArtworkCounts, setTemplateArtworkCounts] = useState<Record<string, number>>({});
   
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
@@ -236,10 +239,11 @@ const Artwork = () => {
         }
       });
       setArtworkCounts(counts);
+      setSkuArtworkThumbnails(skuThumbnails);
       
-      // Calculate template status and first artwork thumbnail based on product artwork
+      // Calculate template status and total artwork count based on product artwork
       const templateStatusMap: Record<string, ArtworkStatus> = {};
-      const templateThumbnailMap: Record<string, string | null> = {};
+      const templateArtCountMap: Record<string, number> = {};
       
       templatesData?.forEach(template => {
         const templateProducts = productsData?.filter(p => p.template_id === template.id) || [];
@@ -247,21 +251,18 @@ const Artwork = () => {
         
         let hasApproved = false;
         let hasPending = false;
-        let firstThumbnail: string | null = null;
+        let totalArtCount = 0;
         
         templateSkus.forEach(sku => {
           if (counts[sku]) {
             if (counts[sku].approved > 0) hasApproved = true;
             if (counts[sku].pending > 0) hasPending = true;
-          }
-          // Get first available thumbnail for template
-          if (!firstThumbnail && skuThumbnails[sku]) {
-            firstThumbnail = skuThumbnails[sku];
+            totalArtCount += counts[sku].total;
           }
         });
         
-        // Store the thumbnail (or null)
-        templateThumbnailMap[template.id] = firstThumbnail;
+        // Store the total artwork count for the template
+        templateArtCountMap[template.id] = totalArtCount;
         
         if (hasApproved && !hasPending) {
           templateStatusMap[template.id] = 'approved';
@@ -272,7 +273,7 @@ const Artwork = () => {
         }
       });
       setTemplateStatus(templateStatusMap);
-      setTemplateArtworkThumbnails(templateThumbnailMap);
+      setTemplateArtworkCounts(templateArtCountMap);
       
       setTemplates(templatesData || []);
     } catch (error) {
@@ -1096,7 +1097,17 @@ const Artwork = () => {
                   onClick={() => setSelectedProduct(product)}
                 >
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
-                    {product.image_url ? (
+                    {/* Priority: artwork thumbnail > product image > package icon */}
+                    {skuArtworkThumbnails[product.item_id || ''] ? (
+                      <img 
+                        src={skuArtworkThumbnails[product.item_id || '']!} 
+                        alt={product.name} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    ) : product.image_url ? (
                       <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="h-16 w-16 text-muted-foreground/30" />
@@ -1146,7 +1157,17 @@ const Artwork = () => {
                     onClick={() => setSelectedProduct(product)}
                   >
                     <div className="col-span-1">
-                      {product.image_url ? (
+                      {/* Priority: artwork thumbnail > product image > package icon */}
+                      {skuArtworkThumbnails[product.item_id || ''] ? (
+                        <img 
+                          src={skuArtworkThumbnails[product.item_id || '']!} 
+                          alt={product.name} 
+                          className="w-10 h-10 rounded object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : product.image_url ? (
                         <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
                       ) : (
                         <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
@@ -1314,25 +1335,18 @@ const Artwork = () => {
               onClick={() => setSelectedTemplate(template)}
             >
               <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                {/* Priority: template.thumbnail_url > artwork thumbnail > package icon */}
+                {/* Show template thumbnail if available, otherwise package icon */}
                 {template.thumbnail_url ? (
                   <img src={template.thumbnail_url} alt={template.name} className="w-full h-full object-cover" />
-                ) : templateArtworkThumbnails[template.id] ? (
-                  <img 
-                    src={templateArtworkThumbnails[template.id]!} 
-                    alt={template.name} 
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      // If artwork thumbnail fails, hide it and let the Package icon show
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
-                {/* Status badge */}
+                {/* Artwork count badge */}
                 <div className="absolute top-2 left-2">
-                  {getStatusBadge(templateStatus[template.id] || 'no_art')}
+                  <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm">
+                    <ImageIcon className="h-3 w-3 mr-1" />
+                    {templateArtworkCounts[template.id] || 0} Art Files
+                  </Badge>
                 </div>
               </div>
               <div className="p-3 space-y-1">
