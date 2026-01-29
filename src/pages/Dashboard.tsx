@@ -40,14 +40,15 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (activeCompanyId || isVibeAdmin) {
-      fetchDashboardData();
+      setLoading(true);
+      fetchDashboardData(activeCompanyId, isVibeAdmin);
     }
   }, [activeCompanyId, isVibeAdmin]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (companyId: string | null, isAdmin: boolean) => {
     try {
-      // Build base query conditions
-      const companyFilter = !isVibeAdmin && activeCompanyId ? activeCompanyId : null;
+      // Build base query conditions - filter by company unless vibe admin
+      const companyFilter = !isAdmin && companyId ? companyId : null;
 
       // Fetch low stock items (where available < redline)
       let inventoryQuery = supabase
