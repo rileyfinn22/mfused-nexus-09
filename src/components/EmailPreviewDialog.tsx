@@ -15,12 +15,22 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { X, Mail, Plus, Send, Loader2, Eye, FileText, Paperclip, Upload, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { X, Mail, Plus, Send, Loader2, Eye, FileText, Paperclip, Upload, Trash2, Image, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export interface AdditionalAttachment {
   file: File;
   base64: string;
+}
+
+export interface ArtworkFile {
+  id: string;
+  sku: string;
+  filename: string;
+  artwork_url: string;
+  artwork_type: string;
+  is_approved: boolean;
 }
 
 interface EmailPreviewDialogProps {
@@ -31,6 +41,10 @@ interface EmailPreviewDialogProps {
   defaultSubject: string;
   defaultMessage: string;
   attachmentName?: string;
+  /** Artwork files available for attachment */
+  artworkFiles?: ArtworkFile[];
+  /** Loading state for artwork files */
+  loadingArtwork?: boolean;
   onSend: (data: {
     to: string[];
     subject: string;
@@ -48,6 +62,8 @@ export function EmailPreviewDialog({
   defaultSubject,
   defaultMessage,
   attachmentName,
+  artworkFiles = [],
+  loadingArtwork = false,
   onSend,
   sending = false,
 }: EmailPreviewDialogProps) {
@@ -57,6 +73,8 @@ export function EmailPreviewDialog({
   const [message, setMessage] = useState(defaultMessage);
   const [activeTab, setActiveTab] = useState("compose");
   const [additionalAttachments, setAdditionalAttachments] = useState<AdditionalAttachment[]>([]);
+  const [selectedArtworkIds, setSelectedArtworkIds] = useState<Set<string>>(new Set());
+  const [loadingArtworkFiles, setLoadingArtworkFiles] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset state when dialog opens
@@ -68,6 +86,8 @@ export function EmailPreviewDialog({
       setCurrentEmail("");
       setActiveTab("compose");
       setAdditionalAttachments([]);
+      setSelectedArtworkIds(new Set());
+      setLoadingArtworkFiles(new Set());
     }
   }, [open, defaultSubject, defaultMessage, defaultTo]);
 
@@ -179,6 +199,66 @@ export function EmailPreviewDialog({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  // Toggle artwork selection and fetch its base64 content
+  const toggleArtworkSelection = async (artwork: ArtworkFile) => {
+    const isSelected = selectedArtworkIds.has(artwork.id);
+    
+    if (isSelected) {
+      // Remove from selection and attachments
+      setSelectedArtworkIds(prev => {
+        const next = new Set(prev);
+        next.delete(artwork.id);
+        return next;
+      });
+      setAdditionalAttachments(prev => prev.filter(a => a.file.name !== artwork.filename));
+    } else {
+      // Add to selection and fetch file
+      setSelectedArtworkIds(prev => new Set(prev).add(artwork.id));
+      setLoadingArtworkFiles(prev => new Set(prev).add(artwork.id));
+      
+      try {
+        // Fetch the file from the URL
+        const response = await fetch(artwork.artwork_url);
+        if (!response.ok) throw new Error('Failed to fetch artwork file');
+        
+        const blob = await response.blob();
+        const file = new File([blob], artwork.filename, { type: blob.type || 'application/pdf' });
+        
+        // Convert to base64
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            const base64Data = result.split(',')[1] || result;
+            resolve(base64Data);
+          };
+          reader.readAsDataURL(blob);
+        });
+        
+        setAdditionalAttachments(prev => [...prev, { file, base64 }]);
+      } catch (error) {
+        console.error('Error fetching artwork file:', error);
+        toast({
+          title: "Error",
+          description: `Failed to attach ${artwork.filename}`,
+          variant: "destructive",
+        });
+        // Remove from selection on error
+        setSelectedArtworkIds(prev => {
+          const next = new Set(prev);
+          next.delete(artwork.id);
+          return next;
+        });
+      } finally {
+        setLoadingArtworkFiles(prev => {
+          const next = new Set(prev);
+          next.delete(artwork.id);
+          return next;
+        });
+      }
+    }
+  };
+
   const handleSend = async () => {
     if (emails.length === 0) {
       toast({
@@ -287,7 +367,7 @@ export function EmailPreviewDialog({
             </div>
 
             {/* Attachments Section */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>Attachments</Label>
                 <Button
@@ -317,28 +397,97 @@ export function EmailPreviewDialog({
                   <Badge variant="outline">PDF</Badge>
                 </div>
               )}
-              
-              {/* Additional attachments */}
-              {additionalAttachments.map((attachment) => (
-                <div key={attachment.file.name} className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
-                  <Paperclip className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm flex-1 truncate" title={attachment.file.name}>
-                    {attachment.file.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatFileSize(attachment.file.size)}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => removeAttachment(attachment.file.name)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+
+              {/* Artwork Files Section */}
+              {(artworkFiles.length > 0 || loadingArtwork) && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Image className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm text-muted-foreground">Product Artwork</Label>
+                  </div>
+                  
+                  {loadingArtwork ? (
+                    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Loading artwork files...</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-[160px] overflow-y-auto">
+                      {artworkFiles.map((artwork) => {
+                        const isSelected = selectedArtworkIds.has(artwork.id);
+                        const isLoading = loadingArtworkFiles.has(artwork.id);
+                        
+                        return (
+                          <div
+                            key={artwork.id}
+                            className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                              isSelected 
+                                ? 'bg-primary/10 border-primary/50' 
+                                : 'bg-muted/20 border-transparent hover:bg-muted/40'
+                            }`}
+                            onClick={() => !isLoading && toggleArtworkSelection(artwork)}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              disabled={isLoading}
+                              className="pointer-events-none"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate" title={artwork.filename}>
+                                {artwork.filename}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-xs text-muted-foreground">{artwork.sku}</span>
+                                {artwork.is_approved ? (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-success text-success">
+                                    <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                                    Approved
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                                    {artwork.artwork_type === 'vibe_proof' ? 'Vibe Proof' : 'Customer'}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            {isLoading && (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              ))}
+              )}
+              
+              {/* Additional uploaded attachments (not from artwork) */}
+              {additionalAttachments.filter(a => !artworkFiles.some(art => art.filename === a.file.name)).length > 0 && (
+                <div className="space-y-1.5">
+                  {additionalAttachments
+                    .filter(a => !artworkFiles.some(art => art.filename === a.file.name))
+                    .map((attachment) => (
+                    <div key={attachment.file.name} className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+                      <Paperclip className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm flex-1 truncate" title={attachment.file.name}>
+                        {attachment.file.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatFileSize(attachment.file.size)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => removeAttachment(attachment.file.name)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
               
               {additionalAttachments.length > 0 && (
                 <div className="space-y-1">
@@ -347,7 +496,7 @@ export function EmailPreviewDialog({
                     Total: {formatFileSize(additionalAttachments.reduce((sum, a) => sum + a.file.size, 0))}
                   </p>
                   {additionalAttachments.reduce((sum, a) => sum + a.file.size, 0) > 10 * 1024 * 1024 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                    <p className="text-xs text-warning">
                       ⚠️ Large attachments may take a minute to send
                     </p>
                   )}
