@@ -2423,6 +2423,7 @@ export type Database = {
         Args: { p_company_id: string; p_token_type: string }
         Returns: string
       }
+      get_user_companies: { Args: { _user_id: string }; Returns: string[] }
       get_user_company: { Args: { _user_id: string }; Returns: string }
       get_vibe_admins: {
         Args: never
@@ -2446,6 +2447,10 @@ export type Database = {
           p_token_value: string
         }
         Returns: string
+      }
+      user_has_company_access: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
       }
       user_in_company: {
         Args: { _company_id: string; _user_id: string }

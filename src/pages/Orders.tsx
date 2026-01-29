@@ -30,18 +30,19 @@ import {
 } from "lucide-react";
 import { exportToCSV } from "@/lib/exportUtils";
 import { EditableDescription } from "@/components/EditableDescription";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 const Orders = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  // Read company filter from URL, default to "all"
+  // Read company filter from URL, default to "all" (only for vibe admins)
   const companyFilter = searchParams.get("company") || "all";
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState<any[]>([]);
-  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
 
   // Update URL when company filter changes
@@ -55,30 +56,11 @@ const Orders = () => {
   };
 
   useEffect(() => {
-    checkRole();
-  }, []);
-
-  useEffect(() => {
-    if (isVibeAdmin !== null) {
-      fetchOrders();
-      if (isVibeAdmin) {
-        fetchCompanies();
-      }
+    fetchOrders();
+    if (isVibeAdmin) {
+      fetchCompanies();
     }
-  }, [isVibeAdmin, companyFilter]);
-
-  const checkRole = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
-
-    setIsVibeAdmin(userRole?.role === 'vibe_admin');
-  };
+  }, [isVibeAdmin, companyFilter, activeCompanyId]);
 
   const handleDescriptionChange = async (orderId: string, description: string) => {
     const { error } = await supabase
@@ -115,9 +97,15 @@ const Orders = () => {
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
-    // Filter by company if not "all" and user is vibe_admin
-    if (isVibeAdmin && companyFilter !== 'all') {
-      query = query.eq('company_id', companyFilter);
+    // For vibe admins: use URL company filter if set
+    // For regular users: always filter by their active company
+    if (isVibeAdmin) {
+      if (companyFilter !== 'all') {
+        query = query.eq('company_id', companyFilter);
+      }
+    } else if (activeCompanyId) {
+      // Non-admin users: filter by their active company
+      query = query.eq('company_id', activeCompanyId);
     }
 
     const { data, error } = await query;

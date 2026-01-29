@@ -28,15 +28,16 @@ import { exportToCSV } from "@/lib/exportUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 const Invoices = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  // Read company filter from URL, default to "all"
+  // Read company filter from URL, default to "all" (only for vibe admins)
   const companyFilter = searchParams.get("company") || "all";
-  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isCompanyUser, setIsCompanyUser] = useState(false);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [userCompanyName, setUserCompanyName] = useState<string>("");
@@ -59,41 +60,16 @@ const Invoices = () => {
   };
 
   useEffect(() => {
-    checkRole();
-  }, []);
-
-  useEffect(() => {
     if (isVibeAdmin) {
       fetchCompanies();
     }
     fetchInvoices();
-  }, [isVibeAdmin]);
+  }, [isVibeAdmin, activeCompanyId, companyFilter]);
 
   // Clear collapsed state when filter changes
   useEffect(() => {
     setCollapsedWhileFiltering(new Set());
   }, [statusFilter]);
-
-  const checkRole = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase.from('user_roles').select('role, company_id').eq('user_id', user.id).single();
-      setIsVibeAdmin(data?.role === 'vibe_admin');
-      if (data?.role === 'company' && data?.company_id) {
-        setIsCompanyUser(true);
-        setUserCompanyId(data.company_id);
-        // Fetch company name
-        const { data: company } = await supabase
-          .from('companies')
-          .select('name')
-          .eq('id', data.company_id)
-          .single();
-        if (company) {
-          setUserCompanyName(company.name);
-        }
-      }
-    }
-  };
 
   const fetchCompanies = async () => {
     const { data } = await supabase.from('companies').select('*').order('name');
@@ -102,15 +78,27 @@ const Invoices = () => {
 
   const fetchInvoices = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('invoices')
       .select(`
         *,
         orders(order_number, customer_name, po_number, description),
         companies(name)
       `)
-      .is('deleted_at', null) // Only show non-deleted invoices
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
+
+    // For vibe admins: use URL company filter if set
+    // For regular users: always filter by their active company
+    if (isVibeAdmin) {
+      if (companyFilter !== 'all') {
+        query = query.eq('company_id', companyFilter);
+      }
+    } else if (activeCompanyId) {
+      query = query.eq('company_id', activeCompanyId);
+    }
+
+    const { data, error } = await query;
     
     if (data) {
       setInvoices(data);
