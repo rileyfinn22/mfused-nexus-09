@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
-import { EmailPreviewDialog, AdditionalAttachment } from "@/components/EmailPreviewDialog";
+import { EmailPreviewDialog, AdditionalAttachment, ArtworkFile } from "@/components/EmailPreviewDialog";
 import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
 import { UpdateBillDialog } from "@/components/UpdateBillDialog";
 
@@ -37,6 +37,8 @@ const VendorPODetail = () => {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [artworkFiles, setArtworkFiles] = useState<ArtworkFile[]>([]);
+  const [loadingArtwork, setLoadingArtwork] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -850,6 +852,48 @@ Please confirm receipt of this order and provide an estimated delivery date.
 Thank you for your business.`;
   };
 
+  // Fetch artwork files for all SKUs in this PO
+  const fetchArtworkFiles = async () => {
+    if (poItems.length === 0) return;
+    
+    setLoadingArtwork(true);
+    try {
+      // Get unique SKUs from PO items
+      const skus = [...new Set(poItems.map(item => item.sku).filter(Boolean))];
+      
+      if (skus.length === 0) {
+        setArtworkFiles([]);
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from('artwork_files')
+        .select('id, sku, filename, artwork_url, artwork_type, is_approved')
+        .in('sku', skus)
+        .order('sku')
+        .order('is_approved', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching artwork:', error);
+        setArtworkFiles([]);
+        return;
+      }
+      
+      setArtworkFiles(data || []);
+    } catch (error) {
+      console.error('Error fetching artwork files:', error);
+      setArtworkFiles([]);
+    } finally {
+      setLoadingArtwork(false);
+    }
+  };
+
+  // Fetch artwork when email dialog opens
+  const handleOpenEmailDialog = () => {
+    setShowEmailPreview(true);
+    fetchArtworkFiles();
+  };
+
   // Show loading while checking admin status or loading PO data
   if (isAdmin === null || loading) {
     return (
@@ -917,7 +961,7 @@ Thank you for your business.`;
             </>
           )}
           {vendor?.contact_email && (
-            <Button onClick={() => setShowEmailPreview(true)}>
+            <Button onClick={handleOpenEmailDialog}>
               <Send className="h-4 w-4 mr-2" />
               Send to Vendor
             </Button>
@@ -1462,6 +1506,8 @@ Thank you for your business.`;
         defaultSubject={`Purchase Order ${po?.po_number} from ${VIBE_COMPANY.name}`}
         defaultMessage={getDefaultEmailMessage()}
         attachmentName={`PO-${po?.po_number}.pdf`}
+        artworkFiles={artworkFiles}
+        loadingArtwork={loadingArtwork}
         onSend={handleSendEmail}
         sending={sendingEmail}
       />
