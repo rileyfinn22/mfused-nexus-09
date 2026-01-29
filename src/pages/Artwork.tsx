@@ -1370,6 +1370,15 @@ const Artwork = () => {
                     {templateArtworkCounts[template.id] || 0} Art Files
                   </Badge>
                 </div>
+                {/* Pending artwork indicator */}
+                {templateStatus[template.id] === 'pending' && (
+                  <div className="absolute top-2 right-2">
+                    <Badge variant="warning" className="bg-warning/90 text-warning-foreground backdrop-blur-sm">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Pending
+                    </Badge>
+                  </div>
+                )}
               </div>
               <div className="p-3 space-y-1">
                 <h3 className="font-medium text-sm leading-snug">{template.name}</h3>
