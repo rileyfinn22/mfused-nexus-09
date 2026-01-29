@@ -11,7 +11,6 @@ import {
   Factory,
   Settings,
   BarChart3,
-  Users,
   ChevronRight,
   Calculator
 } from "lucide-react";
@@ -29,6 +28,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import { CompanySwitcher } from "./CompanySwitcher";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const customerNavigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -67,29 +68,35 @@ const vendorNavigationItems = [
   { title: "My Production", url: "/production", icon: Factory },
 ];
 
-interface AppSidebarProps {
-  companyName: string;
-}
-
-export function AppSidebar({ companyName }: AppSidebarProps) {
+export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
+  const { activeCompany } = useCompany();
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
 
   useEffect(() => {
     checkRole();
-  }, []);
+  }, [activeCompany]);
 
   const checkRole = async () => {
+    // Use the active company's role if available
+    if (activeCompany) {
+      setIsVibeAdmin(activeCompany.role === 'vibe_admin');
+      setIsVendor(activeCompany.role === 'vendor');
+      return;
+    }
+
+    // Fallback to fetching from DB
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .single();
+        .limit(1)
+        .maybeSingle();
       const role = data?.role as string;
       setIsVibeAdmin(role === 'vibe_admin');
       setIsVendor(role === 'vendor');
@@ -102,7 +109,6 @@ export function AppSidebar({ companyName }: AppSidebarProps) {
 
   const isActive = (path: string) => currentPath === path;
   const isCollapsed = state === "collapsed";
-  const companyInitial = companyName.charAt(0).toUpperCase();
 
   return (
     <Sidebar
@@ -113,25 +119,12 @@ export function AppSidebar({ companyName }: AppSidebarProps) {
       collapsible="icon"
     >
       <SidebarContent className="py-4">
-        {/* Logo/Brand area */}
+        {/* Company Switcher */}
         <div className={cn(
           "px-4 mb-6 transition-all duration-200",
           isCollapsed ? "px-2" : "px-4"
         )}>
-          <div className={cn(
-            "flex items-center gap-3",
-            isCollapsed && "justify-center"
-          )}>
-            <div className="w-9 h-9 bg-gradient-primary rounded-lg flex items-center justify-center shadow-glow shrink-0">
-              <span className="text-primary-foreground font-bold text-sm">{companyInitial}</span>
-            </div>
-            {!isCollapsed && (
-              <div className="min-w-0 flex-1">
-                <h2 className="font-semibold text-sidebar-foreground text-sm truncate">{companyName}</h2>
-                <p className="text-[10px] text-muted-foreground">Invoice Portal</p>
-              </div>
-            )}
-          </div>
+          <CompanySwitcher collapsed={isCollapsed} />
         </div>
 
         {/* Navigation */}
