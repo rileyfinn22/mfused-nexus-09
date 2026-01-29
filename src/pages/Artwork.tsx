@@ -95,6 +95,9 @@ const Artwork = () => {
   // Artwork counts per product SKU
   const [artworkCounts, setArtworkCounts] = useState<Record<string, { total: number; approved: number; pending: number }>>({});
   
+  // Template thumbnail from first artwork (fallback if no template.thumbnail_url)
+  const [templateArtworkThumbnails, setTemplateArtworkThumbnails] = useState<Record<string, string | null>>({});
+  
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
   
@@ -192,10 +195,10 @@ const Artwork = () => {
         .in('id', templateIds.length > 0 ? templateIds : ['none'])
         .order('name');
       
-      // Fetch artwork counts per SKU
+      // Fetch artwork counts per SKU AND preview URLs for thumbnails
       let artworkQuery = supabase
         .from('artwork_files')
-        .select('sku, is_approved');
+        .select('sku, is_approved, preview_url, artwork_url, filename');
       
       if (!isVibeAdmin && userCompanyId) {
         artworkQuery = artworkQuery.eq('company_id', userCompanyId);
@@ -206,6 +209,9 @@ const Artwork = () => {
       const { data: artworkData } = await artworkQuery;
       
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
+      // Also track first available thumbnail per SKU
+      const skuThumbnails: Record<string, string | null> = {};
+      
       artworkData?.forEach(art => {
         if (!counts[art.sku]) {
           counts[art.sku] = { total: 0, approved: 0, pending: 0 };
@@ -216,24 +222,43 @@ const Artwork = () => {
         } else {
           counts[art.sku].pending++;
         }
+        
+        // Track first thumbnail for each SKU (prefer preview_url, fall back to artwork_url for images)
+        if (!skuThumbnails[art.sku]) {
+          if (art.preview_url) {
+            skuThumbnails[art.sku] = art.preview_url;
+          } else if (art.filename && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(art.filename)) {
+            skuThumbnails[art.sku] = art.artwork_url;
+          }
+        }
       });
       setArtworkCounts(counts);
       
-      // Calculate template status based on product artwork
+      // Calculate template status and first artwork thumbnail based on product artwork
       const templateStatusMap: Record<string, ArtworkStatus> = {};
+      const templateThumbnailMap: Record<string, string | null> = {};
+      
       templatesData?.forEach(template => {
         const templateProducts = productsData?.filter(p => p.template_id === template.id) || [];
         const templateSkus = templateProducts.map(p => p.item_id).filter(Boolean) as string[];
         
         let hasApproved = false;
         let hasPending = false;
+        let firstThumbnail: string | null = null;
         
         templateSkus.forEach(sku => {
           if (counts[sku]) {
             if (counts[sku].approved > 0) hasApproved = true;
             if (counts[sku].pending > 0) hasPending = true;
           }
+          // Get first available thumbnail for template
+          if (!firstThumbnail && skuThumbnails[sku]) {
+            firstThumbnail = skuThumbnails[sku];
+          }
         });
+        
+        // Store the thumbnail (or null)
+        templateThumbnailMap[template.id] = firstThumbnail;
         
         if (hasApproved && !hasPending) {
           templateStatusMap[template.id] = 'approved';
@@ -244,6 +269,7 @@ const Artwork = () => {
         }
       });
       setTemplateStatus(templateStatusMap);
+      setTemplateArtworkThumbnails(templateThumbnailMap);
       
       setTemplates(templatesData || []);
     } catch (error) {
@@ -1285,8 +1311,19 @@ const Artwork = () => {
               onClick={() => setSelectedTemplate(template)}
             >
               <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+                {/* Priority: template.thumbnail_url > artwork thumbnail > package icon */}
                 {template.thumbnail_url ? (
                   <img src={template.thumbnail_url} alt={template.name} className="w-full h-full object-cover" />
+                ) : templateArtworkThumbnails[template.id] ? (
+                  <img 
+                    src={templateArtworkThumbnails[template.id]!} 
+                    alt={template.name} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // If artwork thumbnail fails, hide it and let the Package icon show
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
