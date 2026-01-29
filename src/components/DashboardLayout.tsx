@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { ThemeToggle } from "./ThemeToggle";
 import { useCompany } from "@/contexts/CompanyContext";
+import { CompanyHeaderSwitcher } from "./CompanyHeaderSwitcher";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -101,9 +102,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <SidebarTrigger className="h-9 w-9 shrink-0" />
             
             <div className="flex-1 min-w-0">
-              <h1 className="text-sm font-medium text-foreground truncate">
-                {companyName}
-              </h1>
+              {/* Header company indicator + switcher (for multi-company users) */}
+              <CompanyHeaderSwitcher />
+              {/* Fallback text while company is still resolving */}
+              {!activeCompany && (
+                <h1 className="text-sm font-medium text-foreground truncate">
+                  {companyName}
+                </h1>
+              )}
             </div>
             
             <div className="flex items-center gap-2">
