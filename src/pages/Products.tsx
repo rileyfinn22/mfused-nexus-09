@@ -50,6 +50,7 @@ import { TemplateProductsView } from "@/components/TemplateProductsView";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 interface Product {
   id: string;
@@ -88,6 +89,7 @@ interface ProductTemplate {
 const Products = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [expandedProducts, setExpandedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
@@ -101,7 +103,6 @@ const Products = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [companies, setCompanies] = useState<any[]>([]);
-  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedTemplate, setSelectedTemplate] = useState<ProductTemplate | null>(null);
 
@@ -125,33 +126,14 @@ const Products = () => {
   const [creatingTemplate, setCreatingTemplate] = useState(false);
 
   useEffect(() => {
-    checkRole();
-  }, []);
-
-  useEffect(() => {
-    if (isVibeAdmin !== null) {
-      fetchProducts();
-      fetchTemplates();
-      fetchArtworkStatus();
-      fetchArtworkThumbnails();
-      if (isVibeAdmin) {
-        fetchCompanies();
-      }
+    fetchProducts();
+    fetchTemplates();
+    fetchArtworkStatus();
+    fetchArtworkThumbnails();
+    if (isVibeAdmin) {
+      fetchCompanies();
     }
-  }, [isVibeAdmin, companyFilter]);
-
-  const checkRole = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
-
-    setIsVibeAdmin(userRole?.role === 'vibe_admin');
-  };
+  }, [isVibeAdmin, companyFilter, activeCompanyId]);
 
   const fetchCompanies = async () => {
     const { data, error } = await supabase
@@ -171,8 +153,14 @@ const Products = () => {
         .select('*, product_states(*)')
         .order('created_at', { ascending: false });
 
-      if (isVibeAdmin && companyFilter !== 'all') {
-        query = query.eq('company_id', companyFilter);
+      // For vibe admins: use URL company filter if set
+      // For regular users: always filter by their active company
+      if (isVibeAdmin) {
+        if (companyFilter !== 'all') {
+          query = query.eq('company_id', companyFilter);
+        }
+      } else if (activeCompanyId) {
+        query = query.eq('company_id', activeCompanyId);
       }
 
       const { data: productsData, error: productsError } = await query;

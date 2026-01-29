@@ -31,6 +31,7 @@ import { UploadInventoryDialog } from "@/components/UploadInventoryDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { exportToCSV } from "@/lib/exportUtils";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 interface InventoryItem {
   id: string;
@@ -52,6 +53,7 @@ interface InventoryItem {
 const Inventory = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [stateFilter, setStateFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -63,7 +65,6 @@ const Inventory = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -84,28 +85,20 @@ const Inventory = () => {
   }, []);
 
   useEffect(() => {
-    if (isVibeAdmin !== null) {
-      fetchInventory();
-      fetchArtworkStatus();
-      fetchArtworkThumbnails();
-      if (isVibeAdmin) {
-        fetchCompanies();
-      }
-    }
-  }, [isVibeAdmin, companyFilter]);
-
-  useEffect(() => {
-    if (isVibeAdmin !== null && isVibeAdmin) {
+    fetchInventory();
+    fetchArtworkStatus();
+    fetchArtworkThumbnails();
+    if (isVibeAdmin) {
+      fetchCompanies();
       fetchProducts();
     }
-  }, [isVibeAdmin, companyFilter]);
+  }, [isVibeAdmin, companyFilter, activeCompanyId]);
 
   const checkAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
       setIsAdmin(data?.role === 'admin' || data?.role === 'vibe_admin');
-      setIsVibeAdmin(data?.role === 'vibe_admin');
     }
   };
 
@@ -149,9 +142,14 @@ const Inventory = () => {
         .select('*, products(image_url, name, item_id)')
         .order('created_at', { ascending: false });
 
-      // Filter by company if not "all" and user is vibe_admin
-      if (isVibeAdmin && companyFilter !== 'all') {
-        query = query.eq('company_id', companyFilter);
+      // For vibe admins: use URL company filter if set
+      // For regular users: always filter by their active company
+      if (isVibeAdmin) {
+        if (companyFilter !== 'all') {
+          query = query.eq('company_id', companyFilter);
+        }
+      } else if (activeCompanyId) {
+        query = query.eq('company_id', activeCompanyId);
       }
 
       const { data, error } = await query;
