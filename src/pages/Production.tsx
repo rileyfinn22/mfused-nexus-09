@@ -11,7 +11,19 @@ import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, Ca
 import { toast } from "@/hooks/use-toast";
 import { ProductionProgressBar, ProductionStatusIndicator } from "@/components/ProductionProgressBar";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+
+// Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
+const parseDateAsLocal = (dateStr: string | null): Date | undefined => {
+  if (!dateStr) return undefined;
+  // parseISO handles YYYY-MM-DD as local time when there's no time component
+  // But we add explicit handling for date-only strings to avoid timezone shifts
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length === 3) {
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  }
+  return parseISO(dateStr);
+};
 
 interface ProductionOrder {
   id: string;
@@ -455,8 +467,10 @@ export default function Production() {
 
     const formatDeliveryDate = (dateStr: string | null) => {
       if (!dateStr) return null;
-      const date = new Date(dateStr);
+      const date = parseDateAsLocal(dateStr);
+      if (!date) return null;
       const today = new Date();
+      today.setHours(0, 0, 0, 0); // Compare dates only
       const diffTime = date.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
@@ -469,7 +483,8 @@ export default function Production() {
 
     const formatCompletionDate = (dateStr: string | null) => {
       if (!dateStr) return null;
-      const date = new Date(dateStr);
+      const date = parseDateAsLocal(dateStr);
+      if (!date) return null;
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
@@ -541,7 +556,7 @@ export default function Production() {
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
-                  selected={order.estimated_delivery_date ? new Date(order.estimated_delivery_date) : undefined}
+                  selected={parseDateAsLocal(order.estimated_delivery_date)}
                   onSelect={(date) => {
                     handleUpdateDeliveryDate(order.id, date);
                     setDatePickerOpen(false);
@@ -601,7 +616,7 @@ export default function Production() {
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
-                  selected={order.order_finalized_at ? new Date(order.order_finalized_at) : undefined}
+                  selected={parseDateAsLocal(order.order_finalized_at)}
                   onSelect={(date) => {
                     handleUpdateCompletionDate(order.id, date);
                     setCompletionPickerOpen(false);
