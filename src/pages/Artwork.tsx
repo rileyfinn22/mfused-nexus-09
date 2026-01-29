@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { generatePdfThumbnailFromUrl } from "@/lib/pdfThumbnail";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
 import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
@@ -78,6 +79,7 @@ const Artwork = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [companies, setCompanies] = useState<any[]>([]);
+  const { activeCompanyId, isVibeAdmin: isVibeAdminFromCtx, loading: companyCtxLoading } = useActiveCompany();
   const [isVibeAdmin, setIsVibeAdmin] = useState<boolean | null>(null);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -127,10 +129,6 @@ const Artwork = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    checkRole();
-  }, []);
-
-  useEffect(() => {
     // Wait for role check to complete (isVibeAdmin will be non-null)
     // For non-admin users, also wait for userCompanyId to be set
     if (isVibeAdmin === null) return; // Still loading role
@@ -164,13 +162,20 @@ const Artwork = () => {
     }
   }, [selectedProduct, statusFilter]);
 
-  const checkRole = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: userRole } = await supabase.from('user_roles').select('role, company_id').eq('user_id', user.id).single();
-    setIsVibeAdmin(userRole?.role === 'vibe_admin');
-    setUserCompanyId(userRole?.company_id || null);
-  };
+  useEffect(() => {
+    if (companyCtxLoading) return;
+
+    // If a non-admin user hasn't selected an active company yet, don't keep the page stuck on "Loading..."
+    if (!isVibeAdminFromCtx && !activeCompanyId) {
+      setIsVibeAdmin(false);
+      setUserCompanyId(null);
+      setLoading(false);
+      return;
+    }
+
+    setIsVibeAdmin(isVibeAdminFromCtx);
+    setUserCompanyId(activeCompanyId);
+  }, [companyCtxLoading, isVibeAdminFromCtx, activeCompanyId]);
 
   const fetchCompanies = async () => {
     const { data } = await supabase.from('companies').select('*').order('name');
@@ -673,8 +678,22 @@ const Artwork = () => {
   const approvedArtwork = Object.values(artworkCounts).reduce((sum, c) => sum + c.approved, 0);
   const pendingArtwork = totalArtwork - approvedArtwork;
 
-  if (loading || isVibeAdmin === null) {
+  if (loading || companyCtxLoading || isVibeAdmin === null) {
     return <div className="p-6">Loading...</div>;
+  }
+
+  // Customer-side safety: if no active company is selected, prompt the user.
+  if (!isVibeAdmin && !userCompanyId) {
+    return (
+      <div className="p-6">
+        <Card className="p-6">
+          <p className="font-medium">Select a company to view artwork</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Use the company switcher in the sidebar, then come back to the Artwork page.
+          </p>
+        </Card>
+      </div>
+    );
   }
 
   // PRODUCT ARTWORK VIEW
