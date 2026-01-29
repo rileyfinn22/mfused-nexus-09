@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { ThemeToggle } from "./ThemeToggle";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -16,74 +17,22 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [companyName, setCompanyName] = useState("Packaging Portal");
+  const { activeCompany, loading: companyLoading } = useCompany();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     checkAuth();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (event) => {
         if (event === 'SIGNED_OUT') {
-          setCompanyName("Packaging Portal");
           navigate('/login');
-        } else if (event === 'SIGNED_IN' && session?.user) {
-          setTimeout(() => {
-            fetchCompanyName(session.user.id);
-          }, 0);
         }
       }
     );
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const fetchCompanyName = async (userId: string) => {
-    try {
-      const { data: userRole, error: roleError } = await supabase
-        .from('user_roles')
-        .select('company_id, role')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (roleError) {
-        console.error('Error fetching user role:', roleError);
-        return;
-      }
-
-      if (userRole?.role === 'vendor') {
-        const { data: vendor } = await supabase
-          .from('vendors')
-          .select('name, company_id')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        if (vendor) {
-          setCompanyName(vendor.name);
-          return;
-        }
-      }
-
-      if (userRole?.company_id) {
-        const { data: company, error: companyError } = await supabase
-          .from('companies')
-          .select('name')
-          .eq('id', userRole.company_id)
-          .maybeSingle();
-
-        if (companyError) {
-          console.error('Error fetching company:', companyError);
-          return;
-        }
-
-        if (company) {
-          setCompanyName(company.name);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching company name:', error);
-    }
-  };
 
   const checkAuth = async () => {
     try {
@@ -98,8 +47,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         navigate('/login');
         return;
       }
-
-      await fetchCompanyName(user.id);
     } catch (error) {
       console.error('Auth check error:', error);
       if (error instanceof Error && error.message === 'Auth check timeout') {
@@ -131,7 +78,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   };
 
-  if (loading) {
+  const companyName = activeCompany?.name || "Packaging Portal";
+
+  if (loading || companyLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
@@ -145,7 +94,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar companyName={companyName} />
+        <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           {/* Modern header */}
           <header className="h-14 border-b border-border bg-card/50 backdrop-blur-md sticky top-0 z-40 flex items-center px-4 gap-4">
