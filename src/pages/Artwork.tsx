@@ -78,7 +78,7 @@ const Artwork = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [companies, setCompanies] = useState<any[]>([]);
-  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [isVibeAdmin, setIsVibeAdmin] = useState<boolean | null>(null);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -131,7 +131,10 @@ const Artwork = () => {
   }, []);
 
   useEffect(() => {
-    // Wait for both isVibeAdmin to be determined AND userCompanyId to be set for non-admin users
+    // Wait for role check to complete (isVibeAdmin will be non-null)
+    // For non-admin users, also wait for userCompanyId to be set
+    if (isVibeAdmin === null) return; // Still loading role
+    
     const shouldFetch = isVibeAdmin === true || (isVibeAdmin === false && userCompanyId !== null);
     
     if (shouldFetch) {
@@ -670,7 +673,7 @@ const Artwork = () => {
   const approvedArtwork = Object.values(artworkCounts).reduce((sum, c) => sum + c.approved, 0);
   const pendingArtwork = totalArtwork - approvedArtwork;
 
-  if (loading) {
+  if (loading || isVibeAdmin === null) {
     return <div className="p-6">Loading...</div>;
   }
 
