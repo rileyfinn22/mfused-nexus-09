@@ -128,7 +128,10 @@ const Artwork = () => {
   }, []);
 
   useEffect(() => {
-    if (isVibeAdmin !== null) {
+    // Wait for both isVibeAdmin to be determined AND userCompanyId to be set for non-admin users
+    const shouldFetch = isVibeAdmin === true || (isVibeAdmin === false && userCompanyId !== null);
+    
+    if (shouldFetch) {
       fetchTemplates();
       fetchAllArtwork();
       fetchRejectedArtwork();
@@ -141,7 +144,7 @@ const Artwork = () => {
     if (searchParam) {
       setSearchQuery(searchParam);
     }
-  }, [searchParams, isVibeAdmin, companyFilter]);
+  }, [searchParams, isVibeAdmin, userCompanyId, companyFilter]);
 
   useEffect(() => {
     if (selectedTemplate) {
