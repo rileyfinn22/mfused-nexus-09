@@ -13,6 +13,7 @@ import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
 import { CompanyEmailsManager } from "@/components/CompanyEmailsManager";
 import { CompanyContactsManager } from "@/components/CompanyContactsManager";
+import { CompanyUsersManager } from "@/components/CompanyUsersManager";
 import { CompanyProductTemplates } from "@/components/CompanyProductTemplates";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -1191,6 +1192,22 @@ const CustomerDetail = () => {
             </CardHeader>
             <CardContent>
               {customerId && <CompanyContactsManager companyId={customerId} />}
+            </CardContent>
+          </Card>
+
+          {/* Company Portal Users Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Portal Users
+              </CardTitle>
+              <CardDescription>
+                Users who can log into the portal and access this company's data.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {customerId && <CompanyUsersManager companyId={customerId} companyName={customer?.name} />}
             </CardContent>
           </Card>
         </TabsContent>
