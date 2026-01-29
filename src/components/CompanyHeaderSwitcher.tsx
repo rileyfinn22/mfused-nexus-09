@@ -28,7 +28,6 @@ export function CompanyHeaderSwitcher({ className }: { className?: string }) {
           <div className="text-sm font-medium text-foreground truncate">
             {activeCompany.name}
           </div>
-          <div className="text-[11px] text-muted-foreground truncate">Current company</div>
         </div>
       </div>
     );
