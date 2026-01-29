@@ -2410,6 +2410,23 @@ export type Database = {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
       }
+      get_all_portal_users: {
+        Args: never
+        Returns: {
+          companies: string[]
+          email: string
+          user_id: string
+        }[]
+      }
+      get_company_users: {
+        Args: { p_company_id: string }
+        Returns: {
+          email: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }[]
+      }
       get_invitation_details: {
         Args: { token_param: string }
         Returns: {
