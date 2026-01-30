@@ -132,7 +132,7 @@ const VendorPODetail = () => {
     if (!isAdmin) return;
 
     try {
-      // Update existing items with edited quantities
+      // Update existing items with edited quantities and costs
       for (const item of poItems) {
         if (!item.isNew) {
           // Update existing items - use quantity for PO total calculations (not shipped_quantity)
@@ -143,6 +143,7 @@ const VendorPODetail = () => {
             .update({
               quantity: item.quantity,
               shipped_quantity: item.shipped_quantity,
+              unit_cost: item.unit_cost,
               total: newTotal
             })
             .eq('id', item.id);
@@ -1358,7 +1359,7 @@ Thank you for your business.`;
                       </TableCell>
                     )}
                     <TableCell className="text-right">
-                      {isEditMode && item.isNew ? (
+                      {isEditMode ? (
                         <Input
                           type="number"
                           step="0.001"
@@ -1367,7 +1368,7 @@ Thank you for your business.`;
                           onChange={(e) => {
                             const updated = [...poItems];
                             updated[index].unit_cost = parseFloat(e.target.value) || 0;
-                            updated[index].total = updated[index].shipped_quantity * updated[index].unit_cost;
+                            updated[index].total = updated[index].quantity * updated[index].unit_cost;
                             setPOItems(updated);
                           }}
                           className="w-28 text-right"
