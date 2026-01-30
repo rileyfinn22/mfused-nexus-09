@@ -52,6 +52,7 @@ interface MatchResult {
   suggestedSku: string | null;
   confidence: 'high' | 'medium' | 'low' | 'none';
   reason: string;
+  tempStoragePath?: string | null;
   // User selections
   selectedProductId: string | null;
   selectedSku: string | null;
@@ -76,7 +77,7 @@ const BulkArtworkUploadDialog = ({
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
   const [matches, setMatches] = useState<MatchResult[]>([]);
-  const [fileData, setFileData] = useState<{ [key: string]: string }>({});
+  const [batchId, setBatchId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedCount, setUploadedCount] = useState(0);
 
@@ -87,7 +88,7 @@ const BulkArtworkUploadDialog = ({
       setStep('upload');
       setZipFile(null);
       setMatches([]);
-      setFileData({});
+      setBatchId(null);
       setUploadProgress(0);
       setUploadedCount(0);
     }
@@ -175,14 +176,14 @@ const BulkArtworkUploadDialog = ({
         ...m,
         selectedProductId: m.suggestedProductId,
         selectedSku: m.suggestedSku,
-        include: m.confidence !== 'none', // Auto-include if any match
+        include: m.confidence !== 'none' && m.tempStoragePath, // Auto-include if matched AND uploaded
       }));
 
       setMatches(matchResults);
-      setFileData(data.fileData);
+      setBatchId(data.batchId);
       setStep('review');
 
-      toast.success(`Found ${data.totalFiles} artwork files`);
+      toast.success(`Found ${data.totalFiles} artwork files, ${data.uploadedFiles} uploaded to temp storage`);
 
     } catch (error: any) {
       console.error('Error processing zip:', error);
@@ -213,7 +214,7 @@ const BulkArtworkUploadDialog = ({
   };
 
   const handleUploadAll = async () => {
-    const toUpload = matches.filter(m => m.include && m.selectedProductId && m.selectedSku);
+    const toUpload = matches.filter(m => m.include && m.selectedProductId && m.selectedSku && m.tempStoragePath);
     
     if (toUpload.length === 0) {
       toast.error('No files selected for upload');
@@ -237,26 +238,28 @@ const BulkArtworkUploadDialog = ({
       const match = toUpload[i];
       
       try {
-        // Convert base64 back to Uint8Array
-        const binary = atob(fileData[match.filename]);
-        const bytes = new Uint8Array(binary.length);
-        for (let j = 0; j < binary.length; j++) {
-          bytes[j] = binary.charCodeAt(j);
+        if (!match.tempStoragePath) {
+          throw new Error('No temp storage path available');
+        }
+
+        // Download file from temp storage
+        const { data: fileBlob, error: downloadError } = await supabase.storage
+          .from('artwork')
+          .download(match.tempStoragePath);
+
+        if (downloadError || !fileBlob) {
+          throw new Error(`Failed to download from temp: ${downloadError?.message}`);
         }
 
         const fileExt = (match.filename.split('.').pop() || '').toLowerCase();
         const isPdf = fileExt === 'pdf';
 
-        const blob = new Blob([bytes], {
-          type: isPdf ? 'application/pdf' : 'application/octet-stream'
-        });
-
-        // Upload to storage
+        // Upload to final storage location
         const storagePath = `${match.selectedSku}/${Date.now()}-${match.filename}`;
 
         const { error: uploadError } = await supabase.storage
           .from('artwork')
-          .upload(storagePath, blob);
+          .upload(storagePath, fileBlob);
 
         if (uploadError) throw uploadError;
 
@@ -268,8 +271,8 @@ const BulkArtworkUploadDialog = ({
         let previewUrl: string | null = null;
         if (isPdf) {
           try {
-            const pdfBuf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-            const thumbBlob = await generatePdfThumbnailFromArrayBuffer(pdfBuf, { maxWidth: 700 });
+            const arrayBuffer = await fileBlob.arrayBuffer();
+            const thumbBlob = await generatePdfThumbnailFromArrayBuffer(arrayBuffer, { maxWidth: 700 });
             const previewPath = `${match.selectedSku}/preview-${Date.now()}.png`;
 
             const { error: previewError } = await supabase.storage
@@ -301,6 +304,11 @@ const BulkArtworkUploadDialog = ({
           });
 
         if (insertError) throw insertError;
+
+        // Clean up temp file after successful upload
+        await supabase.storage
+          .from('artwork')
+          .remove([match.tempStoragePath]);
 
         successCount++;
       } catch (error) {
