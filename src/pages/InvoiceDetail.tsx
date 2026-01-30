@@ -215,6 +215,9 @@ const InvoiceDetail = () => {
     if (allocationsData) {
       setInventoryAllocations(allocationsData);
 
+      // Check if this is a deposit invoice (no allocations, but has deposit note)
+      const isDepositInvoice = invoiceData.notes && invoiceData.notes.includes('deposit payment');
+
       // ALWAYS use allocated items for display, regardless of invoice type
       // This shows only what was actually included on THIS specific invoice
       if (allocationsData.length > 0) {
@@ -226,6 +229,10 @@ const InvoiceDetail = () => {
           total: alloc.quantity_allocated * (alloc.order_items?.unit_price || 0)
         }));
         setEditedItems(invoiceItems);
+      } else if (isDepositInvoice) {
+        // Deposit invoices show all order items with original quantities
+        // The deposit percentage is already reflected in the invoice total
+        setEditedItems(invoiceData.orders?.order_items || []);
       } else {
         // No allocations yet - show empty or all items based on invoice type
         setEditedItems(invoiceData.invoice_type === 'full' ? invoiceData.orders?.order_items || [] : []);
