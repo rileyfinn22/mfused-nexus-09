@@ -33,6 +33,7 @@ interface MatchResult {
   suggestedSku: string | null;
   confidence: 'high' | 'medium' | 'low' | 'none';
   reason: string;
+  tempStoragePath?: string;
 }
 
 serve(async (req) => {
@@ -62,7 +63,7 @@ serve(async (req) => {
 
     console.log(`Processing zip file: ${zipFile.name}, size: ${zipFile.size} bytes`);
 
-    // Create Supabase client
+    // Create Supabase client with service role for storage access
     const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
     // Fetch all products for this company
@@ -85,7 +86,7 @@ serve(async (req) => {
 
     // Get all files from zip (excluding directories and hidden files)
     const files: FileInfo[] = [];
-    const fileContents: { [key: string]: Uint8Array } = {};
+    const fileEntries: { filename: string; zipEntry: JSZip.JSZipObject }[] = [];
 
     for (const [path, file] of Object.entries(zip.files)) {
       const zipEntry = file as JSZip.JSZipObject;
@@ -111,19 +112,16 @@ serve(async (req) => {
         continue;
       }
 
-      // Get file contents
-      const content = await zipEntry.async('uint8array');
-      
       files.push({
         filename,
-        size: content.length,
+        size: 0, // Will be set after extraction
         extension,
       });
       
-      fileContents[filename] = content;
+      fileEntries.push({ filename, zipEntry });
     }
 
-    console.log(`Extracted ${files.length} valid artwork files from zip`);
+    console.log(`Found ${files.length} valid artwork files in zip`);
 
     if (files.length === 0) {
       return new Response(
@@ -200,7 +198,7 @@ Return ONLY valid JSON, no other text.`;
     const aiData = await aiResponse.json();
     const aiContent = aiData.choices?.[0]?.message?.content || '';
     
-    console.log('AI response:', aiContent);
+    console.log('AI response received, parsing...');
 
     // Parse AI response
     let aiMatches: { matches: Array<{ filename: string; productId: string | null; confidence: string; reason: string }> };
@@ -218,32 +216,70 @@ Return ONLY valid JSON, no other text.`;
       aiMatches = { matches: files.map(f => ({ filename: f.filename, productId: null, confidence: 'none', reason: 'AI parsing failed' })) };
     }
 
-    // Build final match results with product details
-    const matchResults: MatchResult[] = files.map(file => {
+    // Generate a unique batch ID for temp storage
+    const batchId = crypto.randomUUID();
+    const tempFolder = `temp-bulk-upload/${companyId}/${batchId}`;
+
+    console.log(`Uploading ${fileEntries.length} files to temp storage: ${tempFolder}`);
+
+    // Upload files to temp storage and build match results
+    const matchResults: MatchResult[] = [];
+    const uploadedPaths: { [filename: string]: string } = {};
+
+    // Process files one at a time to avoid CPU overload
+    for (const { filename, zipEntry } of fileEntries) {
+      try {
+        const content = await zipEntry.async('uint8array');
+        const tempPath = `${tempFolder}/${filename}`;
+        
+        // Get content type based on extension
+        const ext = filename.split('.').pop()?.toLowerCase() || '';
+        const contentTypes: { [key: string]: string } = {
+          'pdf': 'application/pdf',
+          'ai': 'application/illustrator',
+          'eps': 'application/postscript',
+          'psd': 'image/vnd.adobe.photoshop',
+          'jpg': 'image/jpeg',
+          'jpeg': 'image/jpeg',
+          'png': 'image/png',
+          'gif': 'image/gif',
+          'tif': 'image/tiff',
+          'tiff': 'image/tiff',
+          'svg': 'image/svg+xml',
+        };
+
+        const { error: uploadError } = await supabase.storage
+          .from('artwork')
+          .upload(tempPath, content, {
+            contentType: contentTypes[ext] || 'application/octet-stream',
+            upsert: true,
+          });
+
+        if (uploadError) {
+          console.error(`Failed to upload ${filename}:`, uploadError);
+        } else {
+          uploadedPaths[filename] = tempPath;
+          console.log(`Uploaded: ${filename}`);
+        }
+      } catch (err) {
+        console.error(`Error processing ${filename}:`, err);
+      }
+    }
+
+    // Build final match results with product details and temp paths
+    for (const file of files) {
       const aiMatch = aiMatches.matches.find(m => m.filename === file.filename);
       const matchedProduct = aiMatch?.productId ? products?.find(p => p.id === aiMatch.productId) : null;
 
-      return {
+      matchResults.push({
         filename: file.filename,
         suggestedProductId: matchedProduct?.id || null,
         suggestedProductName: matchedProduct?.name || null,
         suggestedSku: matchedProduct?.item_id || null,
         confidence: (aiMatch?.confidence as 'high' | 'medium' | 'low' | 'none') || 'none',
         reason: aiMatch?.reason || 'No match found',
-      };
-    });
-
-    // Encode file contents as base64 for transfer (using chunked approach for efficiency)
-    const fileData: { [key: string]: string } = {};
-    for (const [filename, content] of Object.entries(fileContents)) {
-      // Convert Uint8Array to base64 in chunks to avoid CPU timeout
-      const CHUNK_SIZE = 32768; // 32KB chunks
-      let binary = '';
-      for (let i = 0; i < content.length; i += CHUNK_SIZE) {
-        const chunk = content.subarray(i, Math.min(i + CHUNK_SIZE, content.length));
-        binary += String.fromCharCode.apply(null, Array.from(chunk));
-      }
-      fileData[filename] = btoa(binary);
+        tempStoragePath: uploadedPaths[file.filename] || null,
+      });
     }
 
     console.log(`Returning ${matchResults.length} match results`);
@@ -252,8 +288,10 @@ Return ONLY valid JSON, no other text.`;
       JSON.stringify({
         success: true,
         matches: matchResults,
-        fileData,
+        batchId,
+        tempFolder,
         totalFiles: files.length,
+        uploadedFiles: Object.keys(uploadedPaths).length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
