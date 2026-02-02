@@ -190,7 +190,9 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
   const initializeQuantities = () => {
     const quantities: {[itemId: string]: number} = {};
     order.order_items?.forEach((item: any) => {
-      quantities[item.id] = 0; // Always start at 0, user must specify qty to ship
+      // Auto-fill with remaining quantity (ordered - already shipped)
+      const remainingQty = Math.max(0, item.quantity - (item.shipped_quantity || 0));
+      quantities[item.id] = remainingQty;
     });
     setShipmentQuantities(quantities);
   };
