@@ -136,7 +136,8 @@ const VendorPODetail = () => {
       for (const item of poItems) {
         if (!item.isNew) {
           // Update existing items - use quantity for PO total calculations (not shipped_quantity)
-          const newTotal = Number(item.quantity) * Number(item.unit_cost);
+          // Round to 2 decimal places to avoid floating point precision issues
+          const newTotal = Math.round(Number(item.quantity) * Number(item.unit_cost) * 100) / 100;
           
           const { error: updateError } = await supabase
             .from('vendor_po_items')
@@ -179,8 +180,8 @@ const VendorPODetail = () => {
         }
       }
 
-      // Calculate new total from all items
-      const newTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+      // Calculate new total from all items - round to 2 decimal places
+      const newTotal = Math.round(poItems.reduce((sum, item) => sum + Number(item.total), 0) * 100) / 100;
 
       // Update the PO
       const { error: poError } = await supabase
@@ -1343,7 +1344,8 @@ Thank you for your business.`;
                               if (updated[index].isNew) {
                                 updated[index].quantity = newQuantity;
                               }
-                              updated[index].total = updated[index].quantity * Number(updated[index].unit_cost);
+                              // Round total to 2 decimal places to avoid floating point precision issues
+                              updated[index].total = Math.round(updated[index].quantity * Number(updated[index].unit_cost) * 100) / 100;
                               setPOItems(updated);
                             }}
                             className="w-24 text-center"
@@ -1367,8 +1369,11 @@ Thank you for your business.`;
                           value={item.unit_cost}
                           onChange={(e) => {
                             const updated = [...poItems];
-                            updated[index].unit_cost = parseFloat(e.target.value) || 0;
-                            updated[index].total = updated[index].quantity * updated[index].unit_cost;
+                            // Round to 4 decimal places to avoid floating point precision issues
+                            const newCost = Math.round((parseFloat(e.target.value) || 0) * 10000) / 10000;
+                            updated[index].unit_cost = newCost;
+                            // Round total to 2 decimal places
+                            updated[index].total = Math.round(updated[index].quantity * newCost * 100) / 100;
                             setPOItems(updated);
                           }}
                           className="w-28 text-right"
