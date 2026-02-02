@@ -868,9 +868,9 @@ const Inventory = () => {
                           {filteredProducts.slice(0, 50).map((product) => (
                             <CommandItem
                               key={product.id}
-                              value={product.id}
-                              onSelect={(value) => {
-                                setNewInventory({...newInventory, product_id: value});
+                              value={product.name}
+                              onSelect={() => {
+                                setNewInventory({...newInventory, product_id: product.id});
                                 setProductSearchOpen(false);
                                 setProductSearchQuery("");
                               }}
@@ -893,8 +893,8 @@ const Inventory = () => {
                 </Popover>
               </div>
 
-              {/* Blanket Order Selection */}
-              {isVibeAdmin && newInventory.product_id && (
+              {/* Blanket Order Selection - shown after company is selected for vibe admin */}
+              {isVibeAdmin && selectedCompanyForAdd && (
                 <div className="space-y-2">
                   <Label>Link to Blanket Order *</Label>
                   <Select
@@ -905,11 +905,15 @@ const Inventory = () => {
                       <SelectValue placeholder="Select blanket order..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {blanketOrders.map((order) => (
-                        <SelectItem key={order.id} value={order.id}>
-                          #{order.order_number} - {order.description || order.customer_name || 'No description'}
-                        </SelectItem>
-                      ))}
+                      {blanketOrders.length === 0 ? (
+                        <SelectItem value="none" disabled>No blanket orders found</SelectItem>
+                      ) : (
+                        blanketOrders.map((order) => (
+                          <SelectItem key={order.id} value={order.id}>
+                            #{order.order_number} - {order.description || order.customer_name || 'No description'}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
