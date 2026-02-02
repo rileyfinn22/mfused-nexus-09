@@ -18,13 +18,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { 
   Search, 
-  Filter, 
   ArrowUpDown,
   AlertTriangle,
   Trash2,
   Edit,
   Download,
-  Plus
+  Plus,
+  Check,
+  X
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadInventoryDialog } from "@/components/UploadInventoryDialog";
@@ -32,6 +33,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { exportToCSV } from "@/lib/exportUtils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface InventoryItem {
   id: string;
@@ -72,6 +75,11 @@ const Inventory = () => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [blanketOrders, setBlanketOrders] = useState<any[]>([]);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingValues, setEditingValues] = useState<{available: number; in_production: number; redline: number}>({available: 0, in_production: 0, redline: 0});
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [selectedCompanyForAdd, setSelectedCompanyForAdd] = useState("");
   const [newInventory, setNewInventory] = useState({
     product_id: '',
     order_id: '',
@@ -285,10 +293,10 @@ const Inventory = () => {
     }
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (companyId?: string) => {
     try {
       // Get the appropriate company_id based on role
-      let targetCompanyId = companyFilter !== 'all' ? companyFilter : null;
+      let targetCompanyId = companyId || (companyFilter !== 'all' ? companyFilter : null);
       
       if (!isVibeAdmin) {
         // For non-vibe admins, get their company
@@ -323,7 +331,68 @@ const Inventory = () => {
     }
   };
 
+  const handleStartEdit = (item: InventoryItem) => {
+    setEditingItemId(item.id);
+    setEditingValues({
+      available: item.available,
+      in_production: item.in_production,
+      redline: item.redline
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+    setEditingValues({available: 0, in_production: 0, redline: 0});
+  };
+
+  const handleSaveEdit = async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from('inventory')
+        .update({
+          available: editingValues.available,
+          in_production: editingValues.in_production,
+          redline: editingValues.redline
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Inventory updated",
+        description: "Successfully updated inventory quantities.",
+      });
+
+      setEditingItemId(null);
+      fetchInventory();
+    } catch (error) {
+      console.error('Error updating inventory:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update inventory. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const filteredProducts = products.filter(product => {
+    const searchLower = productSearchQuery.toLowerCase();
+    return (
+      product.name.toLowerCase().includes(searchLower) ||
+      (product.item_id && product.item_id.toLowerCase().includes(searchLower))
+    );
+  });
+
   const handleAddInventory = async () => {
+    if (isVibeAdmin && !selectedCompanyForAdd) {
+      toast({
+        title: "Missing fields",
+        description: "Please select a company first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!newInventory.product_id) {
       toast({
         title: "Missing fields",
@@ -628,19 +697,69 @@ const Inventory = () => {
                     {item.sku}
                   </span>
                   {!hasApprovedArtwork(item.sku) && (
-                    <AlertTriangle className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                    <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
                   )}
                 </div>
                 <div className="col-span-1">
                   <Badge variant="outline" className="text-xs">{item.state}</Badge>
                 </div>
                 <div className="col-span-2 font-semibold text-sm flex items-center gap-1">
-                  {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
-                  {item.available}
+                  {editingItemId === item.id ? (
+                    <Input
+                      type="number"
+                      min="0"
+                      value={editingValues.available}
+                      onChange={(e) => setEditingValues({...editingValues, available: parseInt(e.target.value) || 0})}
+                      className="h-7 w-20"
+                    />
+                  ) : (
+                    <>
+                      {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
+                      {item.available}
+                    </>
+                  )}
                 </div>
-                <div className="col-span-2 text-sm">{item.in_production}</div>
-                <div className={`col-span-2 text-xs font-medium uppercase ${stockColor}`}>
-                  {status}
+                <div className="col-span-2 text-sm">
+                  {editingItemId === item.id ? (
+                    <Input
+                      type="number"
+                      min="0"
+                      value={editingValues.in_production}
+                      onChange={(e) => setEditingValues({...editingValues, in_production: parseInt(e.target.value) || 0})}
+                      className="h-7 w-20"
+                    />
+                  ) : (
+                    item.in_production
+                  )}
+                </div>
+                <div className={`col-span-2 text-xs font-medium uppercase ${stockColor} flex items-center gap-2`}>
+                  {editingItemId === item.id ? (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        value={editingValues.redline}
+                        onChange={(e) => setEditingValues({...editingValues, redline: parseInt(e.target.value) || 0})}
+                        className="h-7 w-16"
+                        placeholder="Redline"
+                      />
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleSaveEdit(item.id)}>
+                        <Check className="h-4 w-4 text-success" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleCancelEdit}>
+                        <X className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      {status}
+                      {isVibeAdmin && (
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleStartEdit(item)}>
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             );
@@ -673,8 +792,16 @@ const Inventory = () => {
         </AlertDialog>
 
         {/* Add Inventory Dialog */}
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogContent>
+        <Dialog open={showAddDialog} onOpenChange={(open) => {
+          setShowAddDialog(open);
+          if (!open) {
+            setSelectedCompanyForAdd("");
+            setNewInventory({product_id: '', order_id: '', available: 0, in_production: 0, redline: 0});
+            setProductSearchQuery("");
+            setBlanketOrders([]);
+          }
+        }}>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Add Inventory</DialogTitle>
               <DialogDescription>
@@ -682,32 +809,91 @@ const Inventory = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Company Selection for Vibe Admin */}
+              {isVibeAdmin && (
+                <div className="space-y-2">
+                  <Label>Company *</Label>
+                  <Select
+                    value={selectedCompanyForAdd}
+                    onValueChange={(value) => {
+                      setSelectedCompanyForAdd(value);
+                      setNewInventory({...newInventory, product_id: '', order_id: ''});
+                      setProductSearchQuery("");
+                      fetchProducts(value);
+                      fetchBlanketOrders(value);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select company first" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.filter(c => c.name !== 'VibePKG').map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Product Selection with Search */}
               <div className="space-y-2">
-                <Label>Product</Label>
-                <Select
-                  value={newInventory.product_id}
-                  onValueChange={(value) => {
-                    const product = products.find(p => p.id === value);
-                    setNewInventory({...newInventory, product_id: value});
-                    // Fetch blanket orders for the product's company
-                    if (product?.company_id) {
-                      fetchBlanketOrders(product.company_id);
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name} {product.item_id && `(${product.item_id})`} {product.state && `- ${product.state}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Product *</Label>
+                <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={productSearchOpen}
+                      className="w-full justify-between"
+                      disabled={isVibeAdmin && !selectedCompanyForAdd}
+                    >
+                      {newInventory.product_id
+                        ? products.find(p => p.id === newInventory.product_id)?.name || "Select product..."
+                        : "Search for product..."}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Search by name or SKU..." 
+                        value={productSearchQuery}
+                        onValueChange={setProductSearchQuery}
+                      />
+                      <CommandList>
+                        <CommandEmpty>No products found.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredProducts.slice(0, 50).map((product) => (
+                            <CommandItem
+                              key={product.id}
+                              value={product.id}
+                              onSelect={(value) => {
+                                setNewInventory({...newInventory, product_id: value});
+                                setProductSearchOpen(false);
+                                setProductSearchQuery("");
+                              }}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${newInventory.product_id === product.id ? "opacity-100" : "opacity-0"}`}
+                              />
+                              <div className="flex flex-col">
+                                <span>{product.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {product.item_id && `SKU: ${product.item_id}`} {product.state && `| ${product.state}`}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
+              {/* Blanket Order Selection */}
               {isVibeAdmin && newInventory.product_id && (
                 <div className="space-y-2">
                   <Label>Link to Blanket Order *</Label>
