@@ -265,8 +265,9 @@ const CreateOrder = () => {
         }
 
         // Load existing order if editing
+        // Pass isAdmin directly to avoid stale closure issue with isVibeAdmin state
         if (orderId && isMounted) {
-          await loadExistingOrder(orderId);
+          await loadExistingOrder(orderId, isAdmin);
         }
 
       } catch (error) {
@@ -1094,7 +1095,7 @@ const CreateOrder = () => {
     }
   };
 
-  const loadExistingOrder = async (id: string) => {
+  const loadExistingOrder = async (id: string, isAdminOverride?: boolean) => {
     const { data: order, error } = await supabase
       .from('orders')
       .select('*, order_items(*)')
@@ -1103,10 +1104,12 @@ const CreateOrder = () => {
 
     if (!error && order) {
       // Check if order can be edited
+      // Use the passed isAdminOverride if provided (to avoid stale closure issue), otherwise use state
+      const effectiveIsAdmin = isAdminOverride !== undefined ? isAdminOverride : isVibeAdmin;
       const restrictedStatuses = ['in production', 'shipped', 'delivered'];
       const isRestricted = restrictedStatuses.includes(order.status) || order.vibe_processed;
       
-      if (!isVibeAdmin && isRestricted) {
+      if (!effectiveIsAdmin && isRestricted) {
         toast({
           title: "Cannot Edit",
           description: "This order has been approved for production and cannot be edited",
