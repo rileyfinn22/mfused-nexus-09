@@ -840,7 +840,7 @@ const Inventory = () => {
               {/* Product Selection with Search */}
               <div className="space-y-2">
                 <Label>Product *</Label>
-                <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen} modal={true}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -855,7 +855,7 @@ const Inventory = () => {
                       <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[400px] p-0" align="start">
+                  <PopoverContent className="w-[400px] p-0 pointer-events-auto z-[100]" align="start">
                     <Command shouldFilter={false}>
                       <CommandInput 
                         placeholder="Search by name or SKU..." 
@@ -870,7 +870,7 @@ const Inventory = () => {
                               key={product.id}
                               value={product.name}
                               onSelect={() => {
-                                setNewInventory({...newInventory, product_id: product.id});
+                                setNewInventory(prev => ({...prev, product_id: product.id}));
                                 setProductSearchOpen(false);
                                 setProductSearchQuery("");
                               }}
