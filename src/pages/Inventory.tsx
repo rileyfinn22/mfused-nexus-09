@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,10 @@ import {
   Download,
   Plus,
   Check,
-  X
+  X,
+  ChevronDown,
+  ChevronRight,
+  Package
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadInventoryDialog } from "@/components/UploadInventoryDialog";
@@ -35,6 +38,7 @@ import { exportToCSV } from "@/lib/exportUtils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface InventoryItem {
   id: string;
@@ -44,6 +48,7 @@ interface InventoryItem {
   in_production: number;
   redline: number;
   product_id: string;
+  order_id: string | null;
   upload_batch_id?: string;
   upload_timestamp?: string;
   products?: {
@@ -51,6 +56,21 @@ interface InventoryItem {
     name: string;
     item_id: string | null;
   };
+  orders?: {
+    order_number: string;
+    description: string | null;
+  } | null;
+}
+
+interface GroupedInventory {
+  sku: string;
+  state: string;
+  productName: string;
+  productImage: string | null;
+  totalAvailable: number;
+  totalInProduction: number;
+  maxRedline: number;
+  items: InventoryItem[];
 }
 
 const Inventory = () => {
@@ -147,7 +167,7 @@ const Inventory = () => {
     try {
       let query = supabase
         .from('inventory')
-        .select('*, products(image_url, name, item_id)')
+        .select('*, products(image_url, name, item_id), orders(order_number, description)')
         .order('created_at', { ascending: false });
 
       // For vibe admins: use URL company filter if set
@@ -501,6 +521,49 @@ const Inventory = () => {
       return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
     });
 
+  // Group inventory by SKU + State
+  const groupedInventory = useMemo(() => {
+    const groups: Record<string, GroupedInventory> = {};
+    
+    filteredAndSortedData.forEach(item => {
+      const key = `${item.sku}-${item.state}`;
+      
+      if (!groups[key]) {
+        groups[key] = {
+          sku: item.sku,
+          state: item.state,
+          productName: item.products?.name || '-',
+          productImage: artworkThumbnails[item.sku] || item.products?.image_url || null,
+          totalAvailable: 0,
+          totalInProduction: 0,
+          maxRedline: 0,
+          items: []
+        };
+      }
+      
+      groups[key].totalAvailable += item.available;
+      groups[key].totalInProduction += item.in_production;
+      groups[key].maxRedline = Math.max(groups[key].maxRedline, item.redline);
+      groups[key].items.push(item);
+    });
+    
+    return Object.values(groups);
+  }, [filteredAndSortedData, artworkThumbnails]);
+
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   const getSortIcon = (field: string) => {
     if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-muted-foreground" />;
     return sortDirection === "asc" ? "↑" : "↓";
@@ -653,121 +716,221 @@ const Inventory = () => {
           </div>
         </div>
 
-        {/* Table Body */}
+        {/* Table Body - Grouped by SKU */}
         <div className="divide-y divide-table-border">
-          {filteredAndSortedData.map((item, index) => {
-            const status = getStockStatus(item.available, item.redline);
+          {groupedInventory.map((group) => {
+            const status = getStockStatus(group.totalAvailable, group.maxRedline);
             const stockColor = getStockColor(status);
+            const groupKey = `${group.sku}-${group.state}`;
+            const isExpanded = expandedGroups.has(groupKey);
+            const hasMultipleOrders = group.items.length > 1;
             
             return (
-              <div 
-                key={`${item.sku}-${item.state}`}
-                className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors"
-              >
-                {isVibeAdmin && isEditMode && (
-                  <div className="col-span-1 flex items-center">
-                    <Checkbox
-                      checked={selectedItems.has(item.id)}
-                      onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
-                    />
+              <div key={groupKey}>
+                {/* Main Row */}
+                <div 
+                  className={`grid grid-cols-12 gap-4 px-4 py-3 hover:bg-table-row-hover transition-colors ${hasMultipleOrders ? 'cursor-pointer' : ''}`}
+                  onClick={() => hasMultipleOrders && toggleGroup(groupKey)}
+                >
+                  {isVibeAdmin && isEditMode && (
+                    <div className="col-span-1 flex items-center" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={group.items.every(item => selectedItems.has(item.id))}
+                        onCheckedChange={(checked) => {
+                          group.items.forEach(item => handleSelectItem(item.id, checked as boolean));
+                        }}
+                      />
+                    </div>
+                  )}
+                  <div className={isVibeAdmin && isEditMode ? "col-span-1" : "col-span-1"}>
+                    {group.productImage ? (
+                      <img 
+                        src={group.productImage} 
+                        alt={group.sku}
+                        className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/artwork?search=${encodeURIComponent(group.sku)}`);
+                        }}
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center text-xs text-muted-foreground">
+                        No preview
+                      </div>
+                    )}
+                  </div>
+                  <div className={`${isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"} text-sm font-medium flex items-center gap-2`}>
+                    {hasMultipleOrders && (
+                      isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span>{group.productName}</span>
+                  </div>
+                  <div className={`${isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"} font-mono text-sm flex items-center gap-2`}>
+                    <span className="break-words" title={group.sku}>
+                      {group.sku}
+                    </span>
+                    {!hasApprovedArtwork(group.sku) && (
+                      <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
+                    )}
+                  </div>
+                  <div className="col-span-1">
+                    <Badge variant="outline" className="text-xs">{group.state}</Badge>
+                  </div>
+                  <div className="col-span-2 font-semibold text-sm flex items-center gap-1">
+                    {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
+                    {group.totalAvailable}
+                    {hasMultipleOrders && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        ({group.items.length} orders)
+                      </span>
+                    )}
+                  </div>
+                  <div className="col-span-2 text-sm">
+                    {group.totalInProduction}
+                  </div>
+                  <div className={`col-span-2 text-xs font-medium uppercase ${stockColor} flex items-center gap-2`}>
+                    {status}
+                    {!hasMultipleOrders && isVibeAdmin && (
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-6 w-6" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartEdit(group.items[0]);
+                        }}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Expanded Order Details */}
+                {isExpanded && hasMultipleOrders && (
+                  <div className="bg-muted/30 border-t border-table-border">
+                    {group.items.map((item, idx) => (
+                      <div 
+                        key={item.id}
+                        className="grid grid-cols-12 gap-4 px-4 py-2 text-sm border-b border-table-border/50 last:border-b-0"
+                      >
+                        {isVibeAdmin && isEditMode && (
+                          <div className="col-span-1 flex items-center pl-4">
+                            <Checkbox
+                              checked={selectedItems.has(item.id)}
+                              onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                            />
+                          </div>
+                        )}
+                        <div className={isVibeAdmin && isEditMode ? "col-span-1" : "col-span-1"}></div>
+                        <div className={`${isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"} flex items-center gap-2 pl-6`}>
+                          <Package className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">
+                            {item.orders ? (
+                              <span 
+                                className="cursor-pointer hover:text-primary hover:underline"
+                                onClick={() => navigate(`/orders/${item.order_id}`)}
+                              >
+                                #{item.orders.order_number}
+                              </span>
+                            ) : (
+                              <span className="italic">No order linked</span>
+                            )}
+                          </span>
+                        </div>
+                        <div className={`${isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"} text-xs text-muted-foreground truncate`}>
+                          {item.orders?.description || '-'}
+                        </div>
+                        <div className="col-span-1"></div>
+                        <div className="col-span-2 font-medium flex items-center gap-1">
+                          {editingItemId === item.id ? (
+                            <Input
+                              type="number"
+                              min="0"
+                              value={editingValues.available}
+                              onChange={(e) => setEditingValues({...editingValues, available: parseInt(e.target.value) || 0})}
+                              className="h-7 w-20"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            item.available
+                          )}
+                        </div>
+                        <div className="col-span-2">
+                          {editingItemId === item.id ? (
+                            <Input
+                              type="number"
+                              min="0"
+                              value={editingValues.in_production}
+                              onChange={(e) => setEditingValues({...editingValues, in_production: parseInt(e.target.value) || 0})}
+                              className="h-7 w-20"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            item.in_production
+                          )}
+                        </div>
+                        <div className="col-span-2 flex items-center gap-1">
+                          {editingItemId === item.id ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                value={editingValues.redline}
+                                onChange={(e) => setEditingValues({...editingValues, redline: parseInt(e.target.value) || 0})}
+                                className="h-7 w-16"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-7 w-7" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSaveEdit(item.id);
+                                }}
+                              >
+                                <Check className="h-4 w-4 text-success" />
+                              </Button>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-7 w-7" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCancelEdit();
+                                }}
+                              >
+                                <X className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          ) : (
+                            isVibeAdmin && (
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-6 w-6" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartEdit(item);
+                                }}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
-                <div className={isVibeAdmin && isEditMode ? "col-span-1" : "col-span-1"}>
-                  {artworkThumbnails[item.sku] || item.products?.image_url ? (
-                    <img 
-                      src={artworkThumbnails[item.sku] || item.products?.image_url} 
-                      alt={item.sku}
-                      className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => navigate(`/artwork?search=${encodeURIComponent(item.sku)}`)}
-                    />
-                  ) : (
-                    <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center text-xs text-muted-foreground">
-                      No preview
-                    </div>
-                  )}
-                </div>
-                <div className={`${isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"} text-sm font-medium`}>
-                  {item.products?.name || '-'}
-                </div>
-                <div className={`${isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"} font-mono text-sm flex items-center gap-2`}>
-                  <span 
-                    className="break-words"
-                    title={item.sku}
-                  >
-                    {item.sku}
-                  </span>
-                  {!hasApprovedArtwork(item.sku) && (
-                    <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
-                  )}
-                </div>
-                <div className="col-span-1">
-                  <Badge variant="outline" className="text-xs">{item.state}</Badge>
-                </div>
-                <div className="col-span-2 font-semibold text-sm flex items-center gap-1">
-                  {editingItemId === item.id ? (
-                    <Input
-                      type="number"
-                      min="0"
-                      value={editingValues.available}
-                      onChange={(e) => setEditingValues({...editingValues, available: parseInt(e.target.value) || 0})}
-                      className="h-7 w-20"
-                    />
-                  ) : (
-                    <>
-                      {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
-                      {item.available}
-                    </>
-                  )}
-                </div>
-                <div className="col-span-2 text-sm">
-                  {editingItemId === item.id ? (
-                    <Input
-                      type="number"
-                      min="0"
-                      value={editingValues.in_production}
-                      onChange={(e) => setEditingValues({...editingValues, in_production: parseInt(e.target.value) || 0})}
-                      className="h-7 w-20"
-                    />
-                  ) : (
-                    item.in_production
-                  )}
-                </div>
-                <div className={`col-span-2 text-xs font-medium uppercase ${stockColor} flex items-center gap-2`}>
-                  {editingItemId === item.id ? (
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        min="0"
-                        value={editingValues.redline}
-                        onChange={(e) => setEditingValues({...editingValues, redline: parseInt(e.target.value) || 0})}
-                        className="h-7 w-16"
-                        placeholder="Redline"
-                      />
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleSaveEdit(item.id)}>
-                        <Check className="h-4 w-4 text-success" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleCancelEdit}>
-                        <X className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      {status}
-                      {isVibeAdmin && (
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleStartEdit(item)}>
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </div>
               </div>
             );
           })}
         </div>
       </div>
       
-      {filteredAndSortedData.length === 0 && (
+      {groupedInventory.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           No inventory items found matching your criteria.
         </div>
