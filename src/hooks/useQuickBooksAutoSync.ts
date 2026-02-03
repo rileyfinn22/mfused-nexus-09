@@ -61,6 +61,48 @@ export const useQuickBooksAutoSync = () => {
     }
   };
 
+  const syncPayment = async (paymentId: string) => {
+    try {
+      console.log('Auto-syncing payment to QuickBooks:', paymentId);
+      
+      const { error } = await supabase.functions.invoke('quickbooks-sync-payment', {
+        body: { paymentId }
+      });
+
+      if (error) {
+        console.error('QuickBooks payment sync error:', error);
+        return false;
+      }
+
+      console.log('Payment synced to QuickBooks');
+      return true;
+    } catch (error) {
+      console.error('Failed to auto-sync payment:', error);
+      return false;
+    }
+  };
+
+  const deleteInvoice = async (invoiceId: string) => {
+    try {
+      console.log('Deleting invoice from QuickBooks:', invoiceId);
+      
+      const { error } = await supabase.functions.invoke('quickbooks-delete-invoice', {
+        body: { invoiceId }
+      });
+
+      if (error) {
+        console.error('QuickBooks invoice delete error:', error);
+        return false;
+      }
+
+      console.log('Invoice deleted from QuickBooks');
+      return true;
+    } catch (error) {
+      console.error('Failed to delete invoice from QuickBooks:', error);
+      return false;
+    }
+  };
+
   // Check if QuickBooks is connected
   const checkConnection = async (): Promise<boolean> => {
     try {
@@ -91,6 +133,8 @@ export const useQuickBooksAutoSync = () => {
     syncProduct,
     syncInvoice,
     syncVendorPO,
+    syncPayment,
+    deleteInvoice,
     checkConnection,
   };
 };
