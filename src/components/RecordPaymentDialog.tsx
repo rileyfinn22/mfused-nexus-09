@@ -50,7 +50,7 @@ export function RecordPaymentDialog({ open, onOpenChange, invoice, onSuccess }: 
         return;
       }
 
-      const { error } = await supabase
+      const { data: paymentData, error } = await supabase
         .from('payments')
         .insert({
           company_id: invoice.company_id,
@@ -61,14 +61,45 @@ export function RecordPaymentDialog({ open, onOpenChange, invoice, onSuccess }: 
           payment_date: paymentDate,
           notes: notes || null,
           created_by: user.id
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      toast({
-        title: "Payment Recorded",
-        description: `Payment of $${paymentAmount.toFixed(2)} recorded successfully`
-      });
+      // Auto-sync payment to QuickBooks if invoice is synced
+      if (invoice.quickbooks_id && paymentData) {
+        try {
+          const { error: syncError } = await supabase.functions.invoke('quickbooks-sync-payment', {
+            body: { paymentId: paymentData.id }
+          });
+          
+          if (syncError) {
+            console.error('QuickBooks payment sync error:', syncError);
+            toast({
+              title: "Payment Recorded",
+              description: `Payment of $${paymentAmount.toFixed(2)} recorded. Note: Failed to sync to QuickBooks - you may need to sync manually.`,
+              variant: "default"
+            });
+          } else {
+            toast({
+              title: "Payment Recorded & Synced",
+              description: `Payment of $${paymentAmount.toFixed(2)} recorded and synced to QuickBooks`
+            });
+          }
+        } catch (syncErr) {
+          console.error('QuickBooks sync exception:', syncErr);
+          toast({
+            title: "Payment Recorded",
+            description: `Payment of $${paymentAmount.toFixed(2)} recorded. QuickBooks sync will be attempted later.`
+          });
+        }
+      } else {
+        toast({
+          title: "Payment Recorded",
+          description: `Payment of $${paymentAmount.toFixed(2)} recorded successfully`
+        });
+      }
 
       onSuccess();
       onOpenChange(false);

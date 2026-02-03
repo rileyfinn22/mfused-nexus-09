@@ -898,6 +898,21 @@ const Invoices = () => {
                                 // Don't delete payments or allocations - just soft delete the invoice
                                 // This preserves the full history for the audit log
                                 
+                                // Delete from QuickBooks first if synced
+                                if (invoice.quickbooks_id) {
+                                  try {
+                                    const { error: qbError } = await supabase.functions.invoke('quickbooks-delete-invoice', {
+                                      body: { invoiceId: invoice.id }
+                                    });
+                                    if (qbError) {
+                                      console.error('QuickBooks delete error:', qbError);
+                                      // Continue with local delete even if QB fails
+                                    }
+                                  } catch (qbErr) {
+                                    console.error('QuickBooks delete exception:', qbErr);
+                                  }
+                                }
+                                
                                 // Soft delete invoice instead of hard delete
                                 const { error } = await supabase
                                   .from('invoices')
@@ -914,7 +929,9 @@ const Invoices = () => {
                                 } else {
                                   toast({
                                     title: "Success",
-                                    description: "Invoice moved to deleted archive. Quantities have been restored and you can restore the invoice from the archive."
+                                    description: invoice.quickbooks_id 
+                                      ? "Invoice deleted from QuickBooks and moved to archive." 
+                                      : "Invoice moved to deleted archive. Quantities have been restored."
                                   });
                                   fetchInvoices();
                                 }
