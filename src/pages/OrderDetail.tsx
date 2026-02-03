@@ -51,6 +51,7 @@ const OrderDetail = () => {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [artApproved, setArtApproved] = useState(false);
+  const [artApprovedManually, setArtApprovedManually] = useState(false);
   const [orderFinalized, setOrderFinalized] = useState(false);
   const [vibeProcessed, setVibeProcessed] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -181,6 +182,7 @@ const OrderDetail = () => {
       setEditedItems(data.order_items || []);
       setVibeProcessed(data.vibe_processed || false);
       setOrderFinalized(data.order_finalized || false);
+      setArtApprovedManually(data.art_approved_manually || false);
       
       // Check artwork approval status for all products in order
       if (data.order_items && data.order_items.length > 0) {
@@ -190,11 +192,14 @@ const OrderDetail = () => {
           .select('is_approved, sku')
           .in('sku', data.order_items.map((item: any) => item.sku));
         
-        // All products must have approved artwork
+        // All products must have approved artwork (or manual override)
         const allApproved = data.order_items.every((item: any) => 
           artworkData?.some((art: any) => art.sku === item.sku && art.is_approved)
         );
-        setArtApproved(allApproved);
+        setArtApproved(allApproved || data.art_approved_manually);
+      } else {
+        // If no items, check manual override
+        setArtApproved(data.art_approved_manually || false);
       }
     }
     setLoading(false);
@@ -866,6 +871,36 @@ const OrderDetail = () => {
         description: "Order has been approved and finalized."
       });
       fetchOrder();
+    }
+  };
+
+  const handleArtApprovedManually = async (approved: boolean) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        art_approved_manually: approved,
+        art_approved_manually_at: approved ? new Date().toISOString() : null,
+        art_approved_manually_by: approved ? user.id : null
+      })
+      .eq('id', orderId);
+
+    if (!error) {
+      setArtApprovedManually(approved);
+      setArtApproved(approved);
+      toast({
+        title: approved ? "Art Approved" : "Art Approval Removed",
+        description: approved ? "Artwork has been manually approved." : "Manual art approval has been removed."
+      });
+      fetchOrder();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to update art approval status.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -1823,12 +1858,24 @@ const OrderDetail = () => {
               ) : (
                 <Circle className="h-6 w-6 text-muted-foreground" />
               )}
-              <div>
+              <div className="flex-1">
                 <p className="font-medium">Art Approved</p>
                 <p className="text-sm text-muted-foreground">
-                  {artApproved ? "All artwork approved" : "Pending artwork approval"}
+                  {artApproved 
+                    ? (artApprovedManually ? "Manually approved" : "All artwork approved") 
+                    : "Pending artwork approval"}
                 </p>
               </div>
+              {isVibeAdmin && !artApproved && (
+                <Button size="sm" onClick={() => handleArtApprovedManually(true)}>
+                  Approve Art
+                </Button>
+              )}
+              {isVibeAdmin && artApprovedManually && (
+                <Button size="sm" variant="outline" onClick={() => handleArtApprovedManually(false)}>
+                  Remove Approval
+                </Button>
+              )}
             </div>
             
             <div className="flex items-center gap-3">

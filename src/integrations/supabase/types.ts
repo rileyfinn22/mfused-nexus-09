@@ -940,6 +940,9 @@ export type Database = {
       }
       orders: {
         Row: {
+          art_approved_manually: boolean
+          art_approved_manually_at: string | null
+          art_approved_manually_by: string | null
           billing_city: string | null
           billing_name: string | null
           billing_state: string | null
@@ -992,6 +995,9 @@ export type Database = {
           vibenotes: Json | null
         }
         Insert: {
+          art_approved_manually?: boolean
+          art_approved_manually_at?: string | null
+          art_approved_manually_by?: string | null
           billing_city?: string | null
           billing_name?: string | null
           billing_state?: string | null
@@ -1044,6 +1050,9 @@ export type Database = {
           vibenotes?: Json | null
         }
         Update: {
+          art_approved_manually?: boolean
+          art_approved_manually_at?: string | null
+          art_approved_manually_by?: string | null
           billing_city?: string | null
           billing_name?: string | null
           billing_state?: string | null
