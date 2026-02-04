@@ -62,3 +62,6 @@ verify_jwt = true
 
 [functions.parse-artwork-zip]
 verify_jwt = false
+
+[functions.parse-vendor-packing-list]
+verify_jwt = true
