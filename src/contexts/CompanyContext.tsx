@@ -24,6 +24,16 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [activeCompany, setActiveCompanyState] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Highest privilege first. If a user has multiple role rows for the same company,
+  // we pick the most privileged one to keep UI + permissions stable.
+  const ROLE_PRECEDENCE = [
+    "vibe_admin",
+    "admin",
+    "company",
+    "vendor",
+    "customer",
+  ];
+
   useEffect(() => {
     loadCompanies();
 
@@ -67,13 +77,35 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const companyList: Company[] = (userRoles || [])
+      // De-dupe by company_id and choose the highest-privilege role per company.
+      const byCompanyId = new Map<string, Company>();
+
+      (userRoles || [])
         .filter((ur: any) => ur.companies)
-        .map((ur: any) => ({
-          id: ur.companies.id,
-          name: ur.companies.name,
-          role: ur.role,
-        }));
+        .forEach((ur: any) => {
+          const id = String(ur.companies.id);
+          const name = String(ur.companies.name);
+          const role = String(ur.role);
+
+          const existing = byCompanyId.get(id);
+          if (!existing) {
+            byCompanyId.set(id, { id, name, role });
+            return;
+          }
+
+          const existingRank = ROLE_PRECEDENCE.indexOf(existing.role);
+          const candidateRank = ROLE_PRECEDENCE.indexOf(role);
+
+          // Unknown roles fall to the bottom.
+          const safeExistingRank = existingRank === -1 ? ROLE_PRECEDENCE.length : existingRank;
+          const safeCandidateRank = candidateRank === -1 ? ROLE_PRECEDENCE.length : candidateRank;
+
+          if (safeCandidateRank < safeExistingRank) {
+            byCompanyId.set(id, { id, name, role });
+          }
+        });
+
+      const companyList: Company[] = Array.from(byCompanyId.values());
 
       setCompanies(companyList);
 
