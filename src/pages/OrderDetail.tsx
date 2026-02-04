@@ -756,6 +756,57 @@ const OrderDetail = () => {
     }
   };
 
+  // Handle custom substage addition
+  const handleCustomSubstageAdd = async (stageId: string, label: string) => {
+    if (!isVibeAdmin && !isVendor) return;
+
+    try {
+      setUpdatingStages(prev => ({ ...prev, [stageId]: true }));
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Ensure stage is at least in_progress
+      const stage = productionStages.find(s => s.id === stageId);
+      if (stage?.status === 'pending') {
+        await supabase
+          .from('production_stages')
+          .update({ status: 'in_progress' })
+          .eq('id', stageId);
+      }
+
+      // Create custom note with marker for detection
+      const key = label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      const noteText = `<!--CUSTOM_${key.toUpperCase()}-->${label}`;
+      
+      const { error } = await supabase
+        .from('production_stage_updates')
+        .insert({
+          stage_id: stageId,
+          updated_by: user.id,
+          update_type: 'note',
+          note_text: noteText,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Custom Note Added",
+        description: `"${label}" added to stage`,
+      });
+      
+      fetchProductionStages();
+    } catch (error: any) {
+      console.error('Error adding custom substage:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add custom note",
+        variant: "destructive"
+      });
+    } finally {
+      setUpdatingStages(prev => ({ ...prev, [stageId]: false }));
+    }
+  };
+
   const handleAssignVendor = async (stageId: string, vendorId: string) => {
     if (!isVibeAdmin) return;
 
@@ -2910,6 +2961,7 @@ const OrderDetail = () => {
                     await handleStageStatusChange(stageId, newStatus);
                   }}
                   onSubstageComplete={handleSubstageComplete}
+                  onCustomSubstageAdd={handleCustomSubstageAdd}
                   onDeleteUpdate={async (updateId) => {
                     // Find the stage this update belongs to
                     for (const stageId of Object.keys(stageUpdates)) {
