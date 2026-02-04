@@ -509,6 +509,53 @@ export default function ProductionDetail() {
     }
   };
 
+  const handleCustomSubstageAdd = async (stageId: string, label: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const stage = stages.find(s => s.id === stageId);
+      if (!stage) throw new Error("Stage not found");
+
+      // Ensure stage is at least in_progress
+      if (stage.status === 'pending') {
+        await (supabase as any)
+          .from('production_stages')
+          .update({ status: 'in_progress' })
+          .eq('id', stageId);
+      }
+
+      // Create custom note with marker for detection
+      const key = label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      const noteText = `<!--CUSTOM_${key.toUpperCase()}-->${label}`;
+      
+      const { error } = await (supabase as any)
+        .from('production_stage_updates')
+        .insert({
+          stage_id: stageId,
+          updated_by: user.id,
+          update_type: 'note',
+          note_text: noteText,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Custom Note Added",
+        description: `"${label}" added to stage`,
+      });
+      
+      await fetchOrderAndStages();
+    } catch (error: any) {
+      console.error('Error adding custom substage:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add custom note",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDeleteUpdate = async (updateId: string) => {
     try {
       const { error } = await (supabase as any)
@@ -649,6 +696,7 @@ export default function ProductionDetail() {
           onUpdateClick={handleOpenUpdateDialog}
           onQuickStatusChange={handleQuickStatusChange}
           onSubstageComplete={handleSubstageComplete}
+          onCustomSubstageAdd={handleCustomSubstageAdd}
           onDeleteUpdate={handleDeleteUpdate}
           onInternalNotesChange={handleInternalNotesChange}
           onVendorAssign={handleAssignVendor}

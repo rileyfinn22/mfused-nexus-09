@@ -1,8 +1,9 @@
-import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package, Trash2, StickyNote, Save } from "lucide-react";
+import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package, Trash2, StickyNote, Save, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -52,6 +53,7 @@ interface ProductionStageTimelineProps {
   onUpdateClick: (stage: ProductionStage, stageDef: StageDefinition) => void;
   onQuickStatusChange?: (stageId: string, newStatus: string) => Promise<void>;
   onSubstageComplete?: (stageId: string, substage: SubstageDefinition) => Promise<void>;
+  onCustomSubstageAdd?: (stageId: string, label: string) => Promise<void>;
   onDeleteUpdate?: (updateId: string) => Promise<void>;
   onInternalNotesChange?: (stageId: string, notes: string) => Promise<void>;
   onVendorAssign?: (stageId: string, vendorId: string) => void;
@@ -62,19 +64,19 @@ interface ProductionStageTimelineProps {
 }
 
 const MATERIAL_SUBSTAGES: SubstageDefinition[] = [
-  { key: 'material_ordered', label: 'Material Ordered', percent: 10 },
-  { key: 'material_secured', label: 'Material Secured', percent: 10 },
+  { key: 'material_ordered', label: 'Material Ordered', percent: 0 },
+  { key: 'material_secured', label: 'Material Secured', percent: 0 },
 ];
 
 const PRINT_SUBSTAGES: SubstageDefinition[] = [
-  { key: 'print_film', label: 'Print Film', percent: 25 },
-  { key: 'lamination_curing', label: 'Lamination + Curing', percent: 10 },
-  { key: 'converting', label: 'Converting', percent: 15 },
+  { key: 'print_film', label: 'Print Film', percent: 0 },
+  { key: 'lamination_curing', label: 'Lamination + Curing', percent: 0 },
+  { key: 'converting', label: 'Converting', percent: 0 },
 ];
 
 const QC_SUBSTAGES: SubstageDefinition[] = [
-  { key: 'packing_sorting', label: 'Packing/Sorting', percent: 8 },
-  { key: 'qc_completed', label: 'QC Completed', percent: 7 },
+  { key: 'packing_sorting', label: 'Packing/Sorting', percent: 0 },
+  { key: 'qc_completed', label: 'QC Completed', percent: 0 },
 ];
 
 export function ProductionStageTimeline({
@@ -83,6 +85,7 @@ export function ProductionStageTimeline({
   onUpdateClick,
   onQuickStatusChange,
   onSubstageComplete,
+  onCustomSubstageAdd,
   onDeleteUpdate,
   onInternalNotesChange,
   onVendorAssign,
@@ -97,6 +100,28 @@ export function ProductionStageTimeline({
   const [deletingUpdates, setDeletingUpdates] = useState<Set<string>>(new Set());
   const [internalNotesEdits, setInternalNotesEdits] = useState<Record<string, string>>({});
   const [savingNotes, setSavingNotes] = useState<Set<string>>(new Set());
+  const [customSubstageInputs, setCustomSubstageInputs] = useState<Record<string, string>>({});
+  const [showCustomInput, setShowCustomInput] = useState<Record<string, boolean>>({});
+  const [addingCustomSubstage, setAddingCustomSubstage] = useState<Set<string>>(new Set());
+
+  const handleAddCustomSubstage = async (stageId: string) => {
+    if (!onCustomSubstageAdd) return;
+    const label = customSubstageInputs[stageId]?.trim();
+    if (!label) return;
+
+    setAddingCustomSubstage(prev => new Set(prev).add(stageId));
+    try {
+      await onCustomSubstageAdd(stageId, label);
+      setCustomSubstageInputs(prev => ({ ...prev, [stageId]: '' }));
+      setShowCustomInput(prev => ({ ...prev, [stageId]: false }));
+    } finally {
+      setAddingCustomSubstage(prev => {
+        const next = new Set(prev);
+        next.delete(stageId);
+        return next;
+      });
+    }
+  };
 
   const handleSaveInternalNotes = async (stageId: string) => {
     if (!onInternalNotesChange) return;
@@ -433,7 +458,7 @@ export function ProductionStageTimeline({
                       {(isVibeAdmin || isVendor) && stageDef.value === 'production_proceeding_part_1' && onSubstageComplete && (
                         <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
                           <Label className="text-xs text-muted-foreground mb-2 block">Material Sub-stages</Label>
-                          <div className="flex gap-2 flex-wrap">
+                          <div className="flex gap-2 flex-wrap items-center">
                             {MATERIAL_SUBSTAGES.map((substage) => {
                               const isComplete = isSubstageComplete(stage, substage.key);
                               const substageKey = `${stage.id}-${substage.key}`;
@@ -445,7 +470,7 @@ export function ProductionStageTimeline({
                                   variant={isComplete ? 'default' : 'outline'}
                                   className={cn(
                                     "h-9",
-                                    isComplete && "bg-green-500 hover:bg-green-500/90 cursor-default"
+                                    isComplete && "bg-success hover:bg-success/90 cursor-default"
                                   )}
                                   disabled={isSubstageUpdating || isComplete}
                                   onClick={() => handleSubstageClick(stage.id, substage)}
@@ -458,12 +483,49 @@ export function ProductionStageTimeline({
                                     <Circle className="h-3 w-3 mr-1.5" />
                                   )}
                                   {substage.label}
-                                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">
-                                    {substage.percent}%
-                                  </Badge>
                                 </Button>
                               );
                             })}
+                            {/* Custom substage input */}
+                            {showCustomInput[`material_${stage.id}`] ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  placeholder="Custom note..."
+                                  value={customSubstageInputs[`material_${stage.id}`] || ''}
+                                  onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`material_${stage.id}`]: e.target.value }))}
+                                  className="h-9 w-32 text-sm"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      const label = customSubstageInputs[`material_${stage.id}`]?.trim();
+                                      if (label && onCustomSubstageAdd) {
+                                        onCustomSubstageAdd(stage.id, label);
+                                        setCustomSubstageInputs(prev => ({ ...prev, [`material_${stage.id}`]: '' }));
+                                        setShowCustomInput(prev => ({ ...prev, [`material_${stage.id}`]: false }));
+                                      }
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-9 w-9 p-0"
+                                  onClick={() => setShowCustomInput(prev => ({ ...prev, [`material_${stage.id}`]: false }))}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-9"
+                                onClick={() => setShowCustomInput(prev => ({ ...prev, [`material_${stage.id}`]: true }))}
+                              >
+                                <Plus className="h-3 w-3 mr-1.5" />
+                                Custom
+                              </Button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -472,7 +534,7 @@ export function ProductionStageTimeline({
                       {(isVibeAdmin || isVendor) && stageDef.value === 'production_proceeding_part_2' && onSubstageComplete && (
                         <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
                           <Label className="text-xs text-muted-foreground mb-2 block">Production Sub-stages</Label>
-                          <div className="flex gap-2 flex-wrap">
+                          <div className="flex gap-2 flex-wrap items-center">
                             {PRINT_SUBSTAGES.map((substage) => {
                               const isComplete = isSubstageComplete(stage, substage.key);
                               const substageKey = `${stage.id}-${substage.key}`;
@@ -484,7 +546,7 @@ export function ProductionStageTimeline({
                                   variant={isComplete ? 'default' : 'outline'}
                                   className={cn(
                                     "h-9",
-                                    isComplete && "bg-green-500 hover:bg-green-500/90 cursor-default"
+                                    isComplete && "bg-success hover:bg-success/90 cursor-default"
                                   )}
                                   disabled={isSubstageUpdating || isComplete}
                                   onClick={() => handleSubstageClick(stage.id, substage)}
@@ -497,12 +559,49 @@ export function ProductionStageTimeline({
                                     <Circle className="h-3 w-3 mr-1.5" />
                                   )}
                                   {substage.label}
-                                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">
-                                    {substage.percent}%
-                                  </Badge>
                                 </Button>
                               );
                             })}
+                            {/* Custom substage input */}
+                            {showCustomInput[`print_${stage.id}`] ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  placeholder="Custom note..."
+                                  value={customSubstageInputs[`print_${stage.id}`] || ''}
+                                  onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`print_${stage.id}`]: e.target.value }))}
+                                  className="h-9 w-32 text-sm"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      const label = customSubstageInputs[`print_${stage.id}`]?.trim();
+                                      if (label && onCustomSubstageAdd) {
+                                        onCustomSubstageAdd(stage.id, label);
+                                        setCustomSubstageInputs(prev => ({ ...prev, [`print_${stage.id}`]: '' }));
+                                        setShowCustomInput(prev => ({ ...prev, [`print_${stage.id}`]: false }));
+                                      }
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-9 w-9 p-0"
+                                  onClick={() => setShowCustomInput(prev => ({ ...prev, [`print_${stage.id}`]: false }))}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-9"
+                                onClick={() => setShowCustomInput(prev => ({ ...prev, [`print_${stage.id}`]: true }))}
+                              >
+                                <Plus className="h-3 w-3 mr-1.5" />
+                                Custom
+                              </Button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -511,7 +610,7 @@ export function ProductionStageTimeline({
                       {(isVibeAdmin || isVendor) && stageDef.value === 'complete_qc' && onSubstageComplete && (
                         <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
                           <Label className="text-xs text-muted-foreground mb-2 block">QC Sub-stages</Label>
-                          <div className="flex gap-2 flex-wrap">
+                          <div className="flex gap-2 flex-wrap items-center">
                             {QC_SUBSTAGES.map((substage) => {
                               const isComplete = isSubstageComplete(stage, substage.key);
                               const substageKey = `${stage.id}-${substage.key}`;
@@ -523,7 +622,7 @@ export function ProductionStageTimeline({
                                   variant={isComplete ? 'default' : 'outline'}
                                   className={cn(
                                     "h-9",
-                                    isComplete && "bg-green-500 hover:bg-green-500/90 cursor-default"
+                                    isComplete && "bg-success hover:bg-success/90 cursor-default"
                                   )}
                                   disabled={isSubstageUpdating || isComplete}
                                   onClick={() => handleSubstageClick(stage.id, substage)}
@@ -536,12 +635,49 @@ export function ProductionStageTimeline({
                                     <Circle className="h-3 w-3 mr-1.5" />
                                   )}
                                   {substage.label}
-                                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">
-                                    {substage.percent}%
-                                  </Badge>
                                 </Button>
                               );
                             })}
+                            {/* Custom substage input */}
+                            {showCustomInput[`qc_${stage.id}`] ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  placeholder="Custom note..."
+                                  value={customSubstageInputs[`qc_${stage.id}`] || ''}
+                                  onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`qc_${stage.id}`]: e.target.value }))}
+                                  className="h-9 w-32 text-sm"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      const label = customSubstageInputs[`qc_${stage.id}`]?.trim();
+                                      if (label && onCustomSubstageAdd) {
+                                        onCustomSubstageAdd(stage.id, label);
+                                        setCustomSubstageInputs(prev => ({ ...prev, [`qc_${stage.id}`]: '' }));
+                                        setShowCustomInput(prev => ({ ...prev, [`qc_${stage.id}`]: false }));
+                                      }
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-9 w-9 p-0"
+                                  onClick={() => setShowCustomInput(prev => ({ ...prev, [`qc_${stage.id}`]: false }))}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-9"
+                                onClick={() => setShowCustomInput(prev => ({ ...prev, [`qc_${stage.id}`]: true }))}
+                              >
+                                <Plus className="h-3 w-3 mr-1.5" />
+                                Custom
+                              </Button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -659,15 +795,72 @@ export function ProductionStageTimeline({
                         </div>
                       )}
                       
-                      {/* Quick Stats */}
+                      {/* Visible Notes Section - Always shown when notes exist */}
+                      {(() => {
+                        const visibleNotes = stage.production_stage_updates
+                          .filter(u => {
+                            const cleanText = u.note_text?.replace(/<!--[A-Z0-9_]+-->/g, '').trim();
+                            return cleanText && cleanText.length > 0;
+                          })
+                          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                          .slice(0, 3); // Show up to 3 most recent notes
+                        
+                        if (visibleNotes.length === 0) return null;
+                        
+                        return (
+                          <div className="mt-3 space-y-2">
+                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                              <MessageSquare className="h-3 w-3" />
+                              Recent Notes
+                            </Label>
+                            <div className="space-y-2">
+                              {visibleNotes.map((note) => {
+                                const cleanText = note.note_text?.replace(/<!--[A-Z0-9_]+-->/g, '').trim() || '';
+                                const isCompletion = !!note.note_text?.match(/<!--[A-Z0-9_]+-->/);
+                                return (
+                                  <div
+                                    key={note.id}
+                                    className={cn(
+                                      "p-3 rounded-lg border text-sm",
+                                      isCompletion
+                                        ? "bg-success/10 border-success/30"
+                                        : "bg-muted/50 border-border"
+                                    )}
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <p className={cn(
+                                        "flex-1",
+                                        isCompletion ? "text-success font-medium" : "text-foreground"
+                                      )}>
+                                        {cleanText}
+                                      </p>
+                                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                        {new Date(note.created_at).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {stage.production_stage_updates.filter(u => {
+                              const cleanText = u.note_text?.replace(/<!--[A-Z0-9_]+-->/g, '').trim();
+                              return cleanText && cleanText.length > 0;
+                            }).length > 3 && !isExpanded && (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpand(stage.id)}
+                                className="text-xs text-primary hover:underline"
+                              >
+                                View all {stage.production_stage_updates.filter(u => u.note_text).length} notes...
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      
+                      {/* Quick Stats - Only show for images/files when not expanded */}
                       {hasUpdates && !isExpanded && (
                         <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-                          {stage.production_stage_updates.some(u => u.note_text) && (
-                            <span className="flex items-center gap-1">
-                              <MessageSquare className="h-3 w-3" />
-                              {stage.production_stage_updates.filter(u => u.note_text).length} notes
-                            </span>
-                          )}
                           {stage.production_stage_updates.some(u => u.image_url) && (
                             <span className="flex items-center gap-1">
                               <ImageIcon className="h-3 w-3" />
