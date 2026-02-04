@@ -33,7 +33,7 @@ import { useActiveCompany } from "@/hooks/useActiveCompany";
 const Invoices = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
+  const { activeCompanyId, isVibeAdmin, loading: activeCompanyLoading } = useActiveCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   // Read company filter from URL, default to "all" (only for vibe admins)
@@ -60,11 +60,24 @@ const Invoices = () => {
   };
 
   useEffect(() => {
+    // For customer/company users, wait until the active company is resolved before fetching.
+    // This prevents brief "wrong company" fetches that can lead to deny/redirect flicker.
+    if (activeCompanyLoading) return;
+
     if (isVibeAdmin) {
       fetchCompanies();
+      fetchInvoices();
+      return;
     }
+
+    if (!activeCompanyId) {
+      setInvoices([]);
+      setLoading(false);
+      return;
+    }
+
     fetchInvoices();
-  }, [isVibeAdmin, activeCompanyId, companyFilter]);
+  }, [isVibeAdmin, activeCompanyId, companyFilter, activeCompanyLoading]);
 
   // Clear collapsed state when filter changes
   useEffect(() => {
@@ -78,6 +91,14 @@ const Invoices = () => {
 
   const fetchInvoices = async () => {
     setLoading(true);
+
+    // For non-admin users we must have an active company before querying.
+    if (!isVibeAdmin && !activeCompanyId) {
+      setInvoices([]);
+      setLoading(false);
+      return;
+    }
+
     let query = supabase
       .from('invoices')
       .select(`
@@ -99,6 +120,9 @@ const Invoices = () => {
     }
 
     const { data, error } = await query;
+    if (error) {
+      console.error('Invoice fetch error:', error);
+    }
     
     if (data) {
       setInvoices(data);

@@ -123,37 +123,9 @@ const InvoiceDetail = () => {
       return;
     }
 
-    // Get user's companies + roles (can be multiple rows)
-    const { data: userRolesData, error: userRolesError } = await supabase
-      .from('user_roles')
-      .select('company_id, role')
-      .eq('user_id', user.id);
-
-    if (userRolesError) {
-      console.error('User roles fetch error:', userRolesError);
-    }
-
-    let userRoles: any[] = userRolesData || [];
-    let userRole = userRoles[0] || null;
-
-    // If user has no role, try to associate them with this invoice's company
-    if ((!userRole || userRoles.length === 0) && invoiceId) {
-      const { data: associateResult } = await supabase.rpc("associate_customer_with_invoice", {
-        p_invoice_id: invoiceId,
-        p_user_email: user.email,
-      });
-      
-      const result = associateResult as { success: boolean; company_id?: string; error?: string } | null;
-      if (result?.success && result?.company_id) {
-        // Refetch roles after association
-        const { data: newRoles } = await supabase
-          .from('user_roles')
-          .select('company_id, role')
-          .eq('user_id', user.id)
-        userRoles = newRoles || [];
-        userRole = userRoles[0] || null;
-      }
-    }
+    // NOTE: Do not rely on reading user_roles rows here for permissions.
+    // Some customer accounts may not be allowed to read role rows directly.
+    // Instead we use security-definer permission helpers (RPCs) below.
 
     // Fetch invoice with order details and company info
     const {
@@ -184,34 +156,48 @@ const InvoiceDetail = () => {
       return;
     }
 
-    // Check if user has access to this invoice
-    // vibe_admin can access all invoices, other users can only access their company's invoices
+    // Check if user has access to this invoice.
+    // Use security-definer helpers so customers don't depend on direct user_roles reads.
     const invoiceCompanyId = invoiceData.company_id;
 
-    const roles = userRoles.map(r => String(r.role));
-    const companyIds = new Set(userRoles.map(r => r.company_id));
-    const isVibeAdminUser = roles.includes('vibe_admin');
-    let hasCompanyAccess = companyIds.has(invoiceCompanyId);
+    let isVibeAdminUser = false;
+    let hasCompanyAccess = false;
+
+    try {
+      const { data: isAdmin, error: isAdminError } = await supabase.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'vibe_admin',
+      });
+      if (isAdminError) console.error('has_role error:', isAdminError);
+      isVibeAdminUser = !!isAdmin;
+
+      const { data: access, error: accessError } = await supabase.rpc('user_has_company_access', {
+        _user_id: user.id,
+        _company_id: invoiceCompanyId,
+      });
+      if (accessError) console.error('user_has_company_access error:', accessError);
+      hasCompanyAccess = !!access;
+    } catch (err) {
+      console.error('Error checking invoice access:', err);
+    }
 
     // If the user is authenticated but not yet linked to this invoice's company,
-    // try to auto-associate by email before denying access.
+    // try to auto-associate by email before denying access, then re-check access.
     if (!isVibeAdminUser && !hasCompanyAccess && invoiceId && user.email) {
       try {
-        const { data: associateResult } = await supabase.rpc("associate_customer_with_invoice", {
+        const { data: associateResult } = await supabase.rpc('associate_customer_with_invoice', {
           p_invoice_id: invoiceId,
           p_user_email: user.email,
         });
 
         const result = associateResult as { success: boolean; company_id?: string; error?: string } | null;
         if (result?.success) {
-          const { data: refreshedRoles } = await supabase
-            .from('user_roles')
-            .select('company_id, role')
-            .eq('user_id', user.id);
-
-          userRoles = refreshedRoles || userRoles;
-          const refreshedCompanyIds = new Set((userRoles || []).map(r => r.company_id));
-          hasCompanyAccess = refreshedCompanyIds.has(invoiceCompanyId);
+          const { data: accessAfter, error: accessAfterError } = await supabase.rpc('user_has_company_access', {
+            _user_id: user.id,
+            _company_id: invoiceCompanyId,
+          });
+          if (accessAfterError) console.error('user_has_company_access (after) error:', accessAfterError);
+          hasCompanyAccess = !!accessAfter;
         }
       } catch (err) {
         console.error('Error auto-associating invoice access:', err);
