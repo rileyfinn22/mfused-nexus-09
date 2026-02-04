@@ -197,6 +197,23 @@ export const VendorPOPackingListSection = ({
     }
   };
 
+  // Sanitize filename for storage - remove special characters
+  const sanitizeFileName = (name: string): string => {
+    // Get extension
+    const lastDot = name.lastIndexOf('.');
+    const ext = lastDot > 0 ? name.slice(lastDot) : '';
+    const baseName = lastDot > 0 ? name.slice(0, lastDot) : name;
+    
+    // Replace special characters with underscores, keep only alphanumeric, hyphens, and underscores
+    const sanitized = baseName
+      .replace(/[^\w\s-]/g, '') // Remove non-word chars except spaces and hyphens
+      .replace(/\s+/g, '_')     // Replace spaces with underscores
+      .replace(/_+/g, '_')      // Collapse multiple underscores
+      .slice(0, 100);           // Limit length
+    
+    return sanitized + ext.toLowerCase();
+  };
+
   const handleUpload = async () => {
     if (!selectedFile) return;
 
@@ -204,8 +221,9 @@ export const VendorPOPackingListSection = ({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Upload original file to storage
-      const fileName = `${vendorPOId}/original-${Date.now()}-${selectedFile.name}`;
+      // Upload original file to storage with sanitized filename
+      const sanitizedName = sanitizeFileName(selectedFile.name);
+      const fileName = `${vendorPOId}/original-${Date.now()}-${sanitizedName}`;
       const { error: uploadError } = await supabase.storage
         .from('packing-lists')
         .upload(fileName, selectedFile);
