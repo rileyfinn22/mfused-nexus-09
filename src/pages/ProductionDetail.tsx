@@ -930,72 +930,45 @@ export default function ProductionDetail() {
           setNewStatus("");
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {isCustomer && !isVibeAdmin && !isVendor ? 'Add Note to' : 'Update'} {selectedStageDef?.label} Stage
+              Add Note to {selectedStageDef?.label} Stage
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {(isVibeAdmin || isVendor) && (
-              <div>
-                <Label>Status</Label>
-                <Select value={newStatus} onValueChange={setNewStatus}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
             <div>
-              <Label>{isCustomer && !isVibeAdmin && !isVendor ? 'Note' : 'Add Note'}</Label>
+              <Label>Note</Label>
               <Textarea
                 value={updateNote}
                 onChange={(e) => setUpdateNote(e.target.value)}
-                placeholder={isCustomer && !isVibeAdmin && !isVendor ? "Type your note here..." : "Add update notes..."}
+                placeholder="Type your note here..."
                 rows={4}
               />
             </div>
-            {(isVibeAdmin || isVendor) && (
-              <div>
-                <Label>Upload Image</Label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setUpdateImage(e.target.files?.[0] || null)}
-                />
-              </div>
-            )}
-            {(isVibeAdmin || isCustomer) && (
-              <div>
-                <Label>{isVibeAdmin ? 'Upload Document (PDF/Excel)' : 'Attach File (optional)'}</Label>
-                <Input
-                  type="file"
-                  accept={isVibeAdmin ? ".pdf,.xlsx,.xls,.csv" : ".pdf,.xlsx,.xls,.csv,.doc,.docx,.png,.jpg,.jpeg"}
-                  onChange={(e) => setUpdateFile(e.target.files?.[0] || null)}
-                />
-                {updateFile && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Selected: {updateFile.name}
-                  </p>
-                )}
-              </div>
-            )}
+            <div>
+              <Label>Attach File (optional)</Label>
+              <Input
+                type="file"
+                accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.png,.jpg,.jpeg"
+                onChange={(e) => setUpdateFile(e.target.files?.[0] || null)}
+              />
+              {updateFile && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Selected: {updateFile.name}
+                </p>
+              )}
+            </div>
             <Button onClick={handleUpdateStage} disabled={uploading || (!updateNote.trim() && !updateFile)} className="w-full">
               {uploading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {isCustomer && !isVibeAdmin && !isVendor ? 'Adding...' : 'Uploading...'}
+                  Adding...
                 </>
               ) : (
                 <>
                   <Upload className="h-4 w-4 mr-2" />
-                  {isCustomer && !isVibeAdmin && !isVendor ? 'Add Note' : 'Save Update'}
+                  Add Note
                 </>
               )}
             </Button>
