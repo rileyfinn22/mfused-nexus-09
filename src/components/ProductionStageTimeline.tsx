@@ -1,9 +1,10 @@
-import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package, Trash2, StickyNote, Save, Plus, X } from "lucide-react";
+import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package, Trash2, StickyNote, Save, Plus, X, GripVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -57,6 +58,7 @@ interface ProductionStageTimelineProps {
   onDeleteUpdate?: (updateId: string) => Promise<void>;
   onInternalNotesChange?: (stageId: string, notes: string) => Promise<void>;
   onVendorAssign?: (stageId: string, vendorId: string) => void;
+  onProgressSliderChange?: (newProgress: number) => Promise<void>;
   vendors?: { id: string; name: string }[];
   isVibeAdmin: boolean;
   isVendor: boolean;
@@ -89,6 +91,7 @@ export function ProductionStageTimeline({
   onDeleteUpdate,
   onInternalNotesChange,
   onVendorAssign,
+  onProgressSliderChange,
   vendors = [],
   isVibeAdmin,
   isVendor,
@@ -103,6 +106,9 @@ export function ProductionStageTimeline({
   const [customSubstageInputs, setCustomSubstageInputs] = useState<Record<string, string>>({});
   const [showCustomInput, setShowCustomInput] = useState<Record<string, boolean>>({});
   const [addingCustomSubstage, setAddingCustomSubstage] = useState<Set<string>>(new Set());
+  const [sliderValue, setSliderValue] = useState<number | null>(null);
+  const [isSliding, setIsSliding] = useState(false);
+  const [updatingProgress, setUpdatingProgress] = useState(false);
 
   const handleAddCustomSubstage = async (stageId: string) => {
     if (!onCustomSubstageAdd) return;
@@ -300,19 +306,110 @@ export function ProductionStageTimeline({
     return "from-gray-300 to-gray-500";
   };
 
+  // Handle slider change - updates stages based on target percentage
+  const handleSliderCommit = async (value: number[]) => {
+    if (!onProgressSliderChange) return;
+    
+    const targetPercent = value[0];
+    setUpdatingProgress(true);
+    try {
+      await onProgressSliderChange(targetPercent);
+    } finally {
+      setUpdatingProgress(false);
+      setIsSliding(false);
+      setSliderValue(null);
+    }
+  };
+
+  const displayPercent = isSliding && sliderValue !== null ? sliderValue : progressPercent;
+
   return (
     <div className="space-y-6">
       {/* Progress Overview */}
       <div className="bg-card border border-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-foreground">Production Progress</h3>
-          <span className="text-2xl font-bold text-primary">{progressPercent}%</span>
+          <div className="flex items-center gap-2">
+            {updatingProgress && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <span className="text-2xl font-bold text-primary">{displayPercent}%</span>
+          </div>
         </div>
         
-        {/* Progress Bar - Segmented for vibe_admin/vendor, Smooth continuous for everyone else */}
-        {(isVibeAdmin || isVendor) ? (
+        {/* Progress Bar - Draggable slider for vibe_admin, Segmented for vendor, Smooth for customers */}
+        {isVibeAdmin && onProgressSliderChange ? (
           <>
-            {/* Segmented progress bar for admin/vendor */}
+            {/* Draggable slider for Vibe Admin */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <Slider
+                  value={[isSliding && sliderValue !== null ? sliderValue : progressPercent]}
+                  onValueChange={(value) => {
+                    setIsSliding(true);
+                    setSliderValue(value[0]);
+                  }}
+                  onValueCommit={handleSliderCommit}
+                  max={100}
+                  step={5}
+                  disabled={updatingProgress}
+                  className="flex-1"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Drag to adjust progress. Stages will auto-update based on target percentage.
+              </p>
+              
+              {/* Segmented view below slider */}
+              <div className="flex items-center gap-0.5">
+                {visibleStageDefinitions.map((def) => {
+                  const status = getStageStatus(def.value);
+                  const weight = def.weight ?? (100 / visibleStageDefinitions.length);
+                  return (
+                    <div 
+                      key={def.value} 
+                      className={cn(
+                        "h-2 rounded-sm transition-colors",
+                        status === 'completed' ? 'bg-green-500' :
+                        status === 'in_progress' ? 'bg-blue-500' :
+                        'bg-muted'
+                      )}
+                      style={{ width: `${weight}%` }}
+                      title={`${def.label}: ${status}`}
+                    />
+                  );
+                })}
+              </div>
+              
+              {/* Stage weight labels */}
+              <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                {visibleStageDefinitions.map((def) => {
+                  const status = getStageStatus(def.value);
+                  const weight = def.weight ?? (100 / visibleStageDefinitions.length);
+                  return (
+                    <div 
+                      key={def.value} 
+                      className={cn(
+                        "truncate text-center",
+                        status === 'completed' && 'text-green-600 font-medium',
+                        status === 'in_progress' && 'text-blue-600 font-medium'
+                      )}
+                      style={{ width: `${weight}%` }}
+                    >
+                      {weight}%
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            
+            <div className="flex justify-between text-xs text-muted-foreground mt-2">
+              <span>0%</span>
+              <span>100%</span>
+            </div>
+          </>
+        ) : isVendor ? (
+          <>
+            {/* Segmented progress bar for vendor */}
             <div className="flex items-center gap-0.5 mb-2">
               {visibleStageDefinitions.map((def) => {
                 const status = getStageStatus(def.value);
@@ -333,7 +430,7 @@ export function ProductionStageTimeline({
               })}
             </div>
             
-            {/* Stage weight labels for admin/vendor */}
+            {/* Stage weight labels for vendor */}
             <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
               {visibleStageDefinitions.map((def) => {
                 const status = getStageStatus(def.value);
