@@ -2616,8 +2616,8 @@ const OrderDetail = () => {
             </div>
           </div>
 
-          {/* Order Attachments Section */}
-          <div className="border-t border-table-border bg-muted/30 p-8">
+          {/* Order Attachments Section - Admin only */}
+          {isAdmin && <div className="border-t border-table-border bg-muted/30 p-8">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Paperclip className="h-5 w-5 text-primary" />
@@ -2800,7 +2800,7 @@ const OrderDetail = () => {
                 </div>
               )}
             </div>
-          </div>
+          </div>}
 
           {/* Product Artwork Section */}
           <div className="border-t border-table-border bg-muted/30 p-8">

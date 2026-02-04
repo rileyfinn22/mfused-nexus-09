@@ -2778,8 +2778,8 @@ const InvoiceDetail = () => {
           </CardContent>
         </Card>}
 
-      {/* Order Attachments - Including Customer PO */}
-      {(orderAttachments.length > 0 || order?.po_pdf_path) && (
+      {/* Order Attachments - Including Customer PO - Admin only */}
+      {isVibeAdmin && (orderAttachments.length > 0 || order?.po_pdf_path) && (
         <Card className="shadow-lg">
           <CardContent className="p-8">
             <div className="flex items-center gap-2 mb-4">
