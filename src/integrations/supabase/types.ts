@@ -2100,6 +2100,66 @@ export type Database = {
           },
         ]
       }
+      vendor_po_packing_lists: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          notes: string | null
+          original_packing_list_id: string | null
+          parsed_data: Json | null
+          source: string | null
+          vendor_po_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          notes?: string | null
+          original_packing_list_id?: string | null
+          parsed_data?: Json | null
+          source?: string | null
+          vendor_po_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          notes?: string | null
+          original_packing_list_id?: string | null
+          parsed_data?: Json | null
+          source?: string | null
+          vendor_po_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_po_packing_lists_original_packing_list_id_fkey"
+            columns: ["original_packing_list_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_po_packing_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_po_packing_lists_vendor_po_id_fkey"
+            columns: ["vendor_po_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_pos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_po_payments: {
         Row: {
           amount: number

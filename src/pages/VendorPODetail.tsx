@@ -16,6 +16,7 @@ import { VIBE_COMPANY } from "@/lib/pdfBranding";
 import { EmailPreviewDialog, AdditionalAttachment, ArtworkFile } from "@/components/EmailPreviewDialog";
 import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
 import { UpdateBillDialog } from "@/components/UpdateBillDialog";
+import { VendorPOPackingListSection } from "@/components/VendorPOPackingListSection";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
@@ -1501,6 +1502,18 @@ Thank you for your business.`;
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Packing Lists Section */}
+      {po && (
+        <VendorPOPackingListSection
+          vendorPOId={po.id}
+          vendorPO={po}
+          order={po.orders}
+          poItems={poItems}
+          isAdmin={isAdmin === true}
+          onRefresh={fetchPODetails}
+        />
       )}
 
       {/* Email Preview Dialog */}
