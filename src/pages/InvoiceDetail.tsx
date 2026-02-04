@@ -191,7 +191,32 @@ const InvoiceDetail = () => {
     const roles = userRoles.map(r => String(r.role));
     const companyIds = new Set(userRoles.map(r => r.company_id));
     const isVibeAdminUser = roles.includes('vibe_admin');
-    const hasCompanyAccess = companyIds.has(invoiceCompanyId);
+    let hasCompanyAccess = companyIds.has(invoiceCompanyId);
+
+    // If the user is authenticated but not yet linked to this invoice's company,
+    // try to auto-associate by email before denying access.
+    if (!isVibeAdminUser && !hasCompanyAccess && invoiceId && user.email) {
+      try {
+        const { data: associateResult } = await supabase.rpc("associate_customer_with_invoice", {
+          p_invoice_id: invoiceId,
+          p_user_email: user.email,
+        });
+
+        const result = associateResult as { success: boolean; company_id?: string; error?: string } | null;
+        if (result?.success) {
+          const { data: refreshedRoles } = await supabase
+            .from('user_roles')
+            .select('company_id, role')
+            .eq('user_id', user.id);
+
+          userRoles = refreshedRoles || userRoles;
+          const refreshedCompanyIds = new Set((userRoles || []).map(r => r.company_id));
+          hasCompanyAccess = refreshedCompanyIds.has(invoiceCompanyId);
+        }
+      } catch (err) {
+        console.error('Error auto-associating invoice access:', err);
+      }
+    }
 
     if (!isVibeAdminUser && !hasCompanyAccess) {
       // User doesn't have access to this invoice
