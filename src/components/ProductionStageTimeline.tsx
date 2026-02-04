@@ -914,26 +914,53 @@ export function ProductionStageTimeline({
                               {visibleNotes.map((note) => {
                                 const cleanText = note.note_text?.replace(/<!--[A-Z0-9_]+-->/g, '').trim() || '';
                                 const isCompletion = !!note.note_text?.match(/<!--[A-Z0-9_]+-->/);
+                                const isDeleting = deletingUpdates.has(note.id);
                                 return (
                                   <div
                                     key={note.id}
                                     className={cn(
-                                      "p-3 rounded-lg border text-sm",
+                                      "p-3 rounded-lg border-2 text-sm transition-all",
                                       isCompletion
-                                        ? "bg-success/10 border-success/30"
-                                        : "bg-muted/50 border-border"
+                                        ? "bg-success/10 border-success/40 shadow-sm shadow-success/10"
+                                        : "bg-primary/5 border-primary/30 shadow-sm shadow-primary/5"
                                     )}
                                   >
                                     <div className="flex items-start justify-between gap-2">
-                                      <p className={cn(
-                                        "flex-1",
-                                        isCompletion ? "text-success font-medium" : "text-foreground"
-                                      )}>
-                                        {cleanText}
-                                      </p>
-                                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                        {new Date(note.created_at).toLocaleDateString()}
-                                      </span>
+                                      <div className="flex items-start gap-2 flex-1 min-w-0">
+                                        <MessageSquare className={cn(
+                                          "h-4 w-4 flex-shrink-0 mt-0.5",
+                                          isCompletion ? "text-success" : "text-primary"
+                                        )} />
+                                        <p className={cn(
+                                          "flex-1",
+                                          isCompletion ? "text-success font-medium" : "text-foreground"
+                                        )}>
+                                          {cleanText}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-2 flex-shrink-0">
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                          {new Date(note.created_at).toLocaleDateString()}
+                                        </span>
+                                        {isVibeAdmin && onDeleteUpdate && (
+                                          <button
+                                            type="button"
+                                            disabled={isDeleting}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteUpdate(note.id);
+                                            }}
+                                            className="w-6 h-6 rounded-full flex items-center justify-center transition-colors hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
+                                            title="Delete this note"
+                                          >
+                                            {isDeleting ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <Trash2 className="h-3 w-3" />
+                                            )}
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 );
