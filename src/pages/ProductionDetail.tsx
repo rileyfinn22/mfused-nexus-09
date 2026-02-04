@@ -609,6 +609,84 @@ export default function ProductionDetail() {
     }
   };
 
+  // Handle slider-based progress change - updates stages to match target percentage
+  const handleProgressSliderChange = async (targetPercent: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Calculate cumulative weights and determine which stages should be completed/in-progress/pending
+      let cumulativeWeight = 0;
+      const stageUpdates: { id: string; newStatus: string }[] = [];
+
+      // Filter to visible stages for admins (include po_sent)
+      const visibleDefs = STAGE_DEFINITIONS.filter(def => !def.adminOnly || isVibeAdmin);
+      
+      for (const def of visibleDefs) {
+        const stage = stages.find(s => s.stage_name === def.value);
+        if (!stage) continue;
+        
+        const weight = def.weight ?? (100 / visibleDefs.length);
+        const stageEndPercent = cumulativeWeight + weight;
+        
+        let newStatus: string;
+        if (targetPercent >= stageEndPercent) {
+          // Target is past this stage - mark completed
+          newStatus = 'completed';
+        } else if (targetPercent > cumulativeWeight) {
+          // Target is within this stage - mark in_progress
+          newStatus = 'in_progress';
+        } else {
+          // Target is before this stage - mark pending
+          newStatus = 'pending';
+        }
+        
+        // Only update if status changed
+        if (stage.status !== newStatus) {
+          stageUpdates.push({ id: stage.id, newStatus });
+        }
+        
+        cumulativeWeight = stageEndPercent;
+      }
+
+      // Apply all status changes
+      for (const update of stageUpdates) {
+        const stage = stages.find(s => s.id === update.id);
+        
+        await (supabase as any)
+          .from('production_stages')
+          .update({ status: update.newStatus })
+          .eq('id', update.id);
+
+        // Create status change record
+        await (supabase as any)
+          .from('production_stage_updates')
+          .insert({
+            stage_id: update.id,
+            updated_by: user.id,
+            update_type: 'status_change',
+            previous_status: stage?.status || 'pending',
+            new_status: update.newStatus,
+          });
+      }
+
+      if (stageUpdates.length > 0) {
+        await fetchOrderAndStages();
+        toast({
+          title: "Progress Updated",
+          description: `Production set to ${targetPercent}%`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error updating progress:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update progress",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -700,6 +778,7 @@ export default function ProductionDetail() {
           onDeleteUpdate={handleDeleteUpdate}
           onInternalNotesChange={handleInternalNotesChange}
           onVendorAssign={handleAssignVendor}
+          onProgressSliderChange={handleProgressSliderChange}
           vendors={vendors}
           isVibeAdmin={isVibeAdmin}
           isVendor={isVendor}
