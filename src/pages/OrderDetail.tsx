@@ -3028,13 +3028,12 @@ const OrderDetail = () => {
                   }))}
                   stageDefinitions={STAGE_DEFINITIONS}
                   onUpdateClick={handleOpenUpdateDialog}
-                  onQuickStatusChange={async (stageId, newStatus) => {
+                  onQuickStatusChange={isVibeAdmin || isVendor ? async (stageId, newStatus) => {
                     await handleStageStatusChange(stageId, newStatus);
-                  }}
-                  onSubstageComplete={handleSubstageComplete}
-                  onCustomSubstageAdd={handleCustomSubstageAdd}
-                  onDeleteUpdate={async (updateId) => {
-                    // Find the stage this update belongs to
+                  } : undefined}
+                  onSubstageComplete={isVibeAdmin || isVendor ? handleSubstageComplete : undefined}
+                  onCustomSubstageAdd={isVibeAdmin || isVendor ? handleCustomSubstageAdd : undefined}
+                  onDeleteUpdate={isVibeAdmin ? async (updateId) => {
                     for (const stageId of Object.keys(stageUpdates)) {
                       const updates = stageUpdates[stageId];
                       if (updates?.find(u => u.id === updateId)) {
@@ -3042,10 +3041,10 @@ const OrderDetail = () => {
                         break;
                       }
                     }
-                  }}
-                  onInternalNotesChange={handleInternalNotesChange}
-                  onVendorAssign={handleAssignVendor}
-                  onProgressSliderChange={handleProgressSliderChange}
+                  } : undefined}
+                  onInternalNotesChange={isVibeAdmin ? handleInternalNotesChange : undefined}
+                  onVendorAssign={isVibeAdmin ? handleAssignVendor : undefined}
+                  onProgressSliderChange={isVibeAdmin ? handleProgressSliderChange : undefined}
                   vendors={vendors}
                   isVibeAdmin={isVibeAdmin}
                   isVendor={isVendor}
