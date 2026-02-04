@@ -304,7 +304,7 @@ export default function ProductionDetail() {
 
       let fileUrl = null;
       let uploadedFileName = null;
-      if (isVibeAdmin && updateFile) {
+      if ((isVibeAdmin || isCustomer) && updateFile) {
         uploadedFileName = updateFile.name;
         const fileExt = updateFile.name.split('.').pop();
         const fileName = `${selectedStage.id}-${Date.now()}.${fileExt}`;
@@ -341,7 +341,7 @@ export default function ProductionDetail() {
         });
       }
 
-      if (fileUrl && isVibeAdmin) {
+      if (fileUrl && (isVibeAdmin || isCustomer)) {
         updates.push({
           stage_id: selectedStage.id,
           updated_by: user.id,
@@ -933,7 +933,7 @@ export default function ProductionDetail() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {isCustomer ? 'Add Note to' : 'Update'} {selectedStageDef?.label} Stage
+              {isCustomer && !isVibeAdmin && !isVendor ? 'Add Note to' : 'Update'} {selectedStageDef?.label} Stage
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -953,12 +953,12 @@ export default function ProductionDetail() {
               </div>
             )}
             <div>
-              <Label>Add Note</Label>
+              <Label>{isCustomer && !isVibeAdmin && !isVendor ? 'Note' : 'Add Note'}</Label>
               <Textarea
                 value={updateNote}
                 onChange={(e) => setUpdateNote(e.target.value)}
-                placeholder="Add update notes..."
-                rows={3}
+                placeholder={isCustomer && !isVibeAdmin && !isVendor ? "Type your note here..." : "Add update notes..."}
+                rows={4}
               />
             </div>
             {(isVibeAdmin || isVendor) && (
@@ -971,26 +971,31 @@ export default function ProductionDetail() {
                 />
               </div>
             )}
-            {isVibeAdmin && (
+            {(isVibeAdmin || isCustomer) && (
               <div>
-                <Label>Upload Document (PDF/Excel)</Label>
+                <Label>{isVibeAdmin ? 'Upload Document (PDF/Excel)' : 'Attach File (optional)'}</Label>
                 <Input
                   type="file"
-                  accept=".pdf,.xlsx,.xls,.csv"
+                  accept={isVibeAdmin ? ".pdf,.xlsx,.xls,.csv" : ".pdf,.xlsx,.xls,.csv,.doc,.docx,.png,.jpg,.jpeg"}
                   onChange={(e) => setUpdateFile(e.target.files?.[0] || null)}
                 />
+                {updateFile && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Selected: {updateFile.name}
+                  </p>
+                )}
               </div>
             )}
-            <Button onClick={handleUpdateStage} disabled={uploading} className="w-full">
+            <Button onClick={handleUpdateStage} disabled={uploading || (!updateNote.trim() && !updateFile)} className="w-full">
               {uploading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Uploading...
+                  {isCustomer && !isVibeAdmin && !isVendor ? 'Adding...' : 'Uploading...'}
                 </>
               ) : (
                 <>
                   <Upload className="h-4 w-4 mr-2" />
-                  {isCustomer ? 'Add Note' : 'Save Update'}
+                  {isCustomer && !isVibeAdmin && !isVendor ? 'Add Note' : 'Save Update'}
                 </>
               )}
             </Button>
