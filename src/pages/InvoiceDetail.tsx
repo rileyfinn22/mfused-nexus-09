@@ -93,10 +93,18 @@ const InvoiceDetail = () => {
       }
     } = await supabase.auth.getUser();
     if (user) {
-      const {
-        data
-      } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
-      setIsVibeAdmin(data?.role === 'vibe_admin');
+      // Users can have multiple role rows; never use .single() here.
+      const { data: roleRows, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Role fetch error:', error);
+      }
+
+      const roles = (roleRows || []).map((r: any) => String(r.role));
+      setIsVibeAdmin(roles.includes('vibe_admin'));
       setCurrentUserEmail(user.email || "");
       // Extract name from email or use full email
       const emailName = user.email?.split("@")[0] || "";
@@ -115,15 +123,21 @@ const InvoiceDetail = () => {
       return;
     }
 
-    // Get user's company and role
-    let { data: userRole } = await supabase
+    // Get user's companies + roles (can be multiple rows)
+    const { data: userRolesData, error: userRolesError } = await supabase
       .from('user_roles')
       .select('company_id, role')
-      .eq('user_id', user.id)
-      .single();
+      .eq('user_id', user.id);
+
+    if (userRolesError) {
+      console.error('User roles fetch error:', userRolesError);
+    }
+
+    let userRoles: any[] = userRolesData || [];
+    let userRole = userRoles[0] || null;
 
     // If user has no role, try to associate them with this invoice's company
-    if (!userRole && invoiceId) {
+    if ((!userRole || userRoles.length === 0) && invoiceId) {
       const { data: associateResult } = await supabase.rpc("associate_customer_with_invoice", {
         p_invoice_id: invoiceId,
         p_user_email: user.email,
@@ -131,13 +145,13 @@ const InvoiceDetail = () => {
       
       const result = associateResult as { success: boolean; company_id?: string; error?: string } | null;
       if (result?.success && result?.company_id) {
-        // Refetch the user role after association
-        const { data: newRole } = await supabase
+        // Refetch roles after association
+        const { data: newRoles } = await supabase
           .from('user_roles')
           .select('company_id, role')
           .eq('user_id', user.id)
-          .single();
-        userRole = newRole;
+        userRoles = newRoles || [];
+        userRole = userRoles[0] || null;
       }
     }
 
@@ -172,18 +186,22 @@ const InvoiceDetail = () => {
 
     // Check if user has access to this invoice
     // vibe_admin can access all invoices, other users can only access their company's invoices
-    const isVibeAdminUser = userRole?.role === 'vibe_admin';
-    const userCompanyId = userRole?.company_id;
     const invoiceCompanyId = invoiceData.company_id;
 
-    if (!isVibeAdminUser && userCompanyId !== invoiceCompanyId) {
+    const roles = userRoles.map(r => String(r.role));
+    const companyIds = new Set(userRoles.map(r => r.company_id));
+    const isVibeAdminUser = roles.includes('vibe_admin');
+    const hasCompanyAccess = companyIds.has(invoiceCompanyId);
+
+    if (!isVibeAdminUser && !hasCompanyAccess) {
       // User doesn't have access to this invoice
       toast({
         title: "Access Denied",
         description: "You don't have permission to view this invoice",
         variant: "destructive"
       });
-      navigate(`/login?invoice=${invoiceId}&redirect=/invoices/${invoiceId}`);
+      // Avoid redirect loops through login for already-authenticated users.
+      navigate('/invoices', { replace: true });
       return;
     }
 
