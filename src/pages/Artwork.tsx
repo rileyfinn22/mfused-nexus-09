@@ -27,7 +27,8 @@ import {
   List,
   ImageIcon,
   FolderOpen,
-  Upload
+  Upload,
+  Loader2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +40,7 @@ import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkVi
 import { CustomerArtworkTab } from "@/components/CustomerArtworkTab";
 import { cn } from "@/lib/utils";
 import { FileArchive, FileCode } from "lucide-react";
+import JSZip from "jszip";
 
 interface ProductTemplate {
   id: string;
@@ -108,6 +110,9 @@ const Artwork = () => {
   
   // View mode
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  
+  // Download zip loading state
+  const [downloadingZip, setDownloadingZip] = useState(false);
   
   // Dialogs
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -459,6 +464,99 @@ const Artwork = () => {
     }
   };
 
+  const handleDownloadAllAsZip = async (templateId?: string) => {
+    setDownloadingZip(true);
+    try {
+      // Fetch all artwork files for the template or current product view
+      let filesToDownload: ArtworkFile[] = [];
+      let zipName = "artwork";
+
+      if (templateId && selectedTemplate) {
+        // Get all products in this template
+        const templateProducts = products.filter(p => p.template_id === templateId);
+        const skus = templateProducts.map(p => p.item_id).filter(Boolean) as string[];
+        
+        if (skus.length === 0) {
+          toast({
+            title: "No files to download",
+            description: "No products with SKUs found in this template",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Fetch all artwork for these SKUs
+        let query = supabase
+          .from('artwork_files')
+          .select('*')
+          .in('sku', skus);
+        
+        if (!isVibeAdmin && userCompanyId) {
+          query = query.eq('company_id', userCompanyId);
+        } else if (isVibeAdmin && companyFilter !== 'all') {
+          query = query.eq('company_id', companyFilter);
+        }
+
+        const { data } = await query;
+        filesToDownload = data || [];
+        zipName = selectedTemplate.name.replace(/[^a-zA-Z0-9]/g, '_');
+      } else if (selectedProduct) {
+        // Download all files for current product
+        filesToDownload = artworkFiles;
+        zipName = (selectedProduct.item_id || selectedProduct.name).replace(/[^a-zA-Z0-9]/g, '_');
+      }
+
+      if (filesToDownload.length === 0) {
+        toast({
+          title: "No files to download",
+          description: "No artwork files found to download",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const zip = new JSZip();
+      
+      // Download each file and add to zip
+      for (const file of filesToDownload) {
+        try {
+          const response = await fetch(file.artwork_url);
+          const blob = await response.blob();
+          // Organize by SKU in folders
+          const folderPath = file.sku ? `${file.sku}/${file.filename}` : file.filename;
+          zip.file(folderPath, blob);
+        } catch (err) {
+          console.error(`Failed to download ${file.filename}:`, err);
+        }
+      }
+
+      // Generate and download zip
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const downloadUrl = window.URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${zipName}_artwork.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      toast({
+        title: "Download complete",
+        description: `Downloaded ${filesToDownload.length} artwork file${filesToDownload.length !== 1 ? 's' : ''}`,
+      });
+    } catch (error) {
+      console.error('Error creating zip:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create download archive",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingZip(false);
+    }
+  };
+
   const handleReject = async () => {
     if (!rejectionReason.trim()) {
       toast({
@@ -713,12 +811,29 @@ const Artwork = () => {
               </p>
             </div>
           </div>
-          {isVibeAdmin && (
-            <Button onClick={() => setUploadDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Art
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {/* Download All as ZIP for this product */}
+            {artworkFiles.length > 0 && (
+              <Button 
+                variant="outline" 
+                onClick={() => handleDownloadAllAsZip()}
+                disabled={downloadingZip}
+              >
+                {downloadingZip ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileArchive className="h-4 w-4 mr-2" />
+                )}
+                Download All
+              </Button>
+            )}
+            {isVibeAdmin && (
+              <Button onClick={() => setUploadDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Art
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Status Filter */}
@@ -805,6 +920,19 @@ const Artwork = () => {
                       );
                     }
                   })()}
+                  {/* Quick download button overlay */}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="absolute bottom-2 right-2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownload(file.artwork_url, file.filename);
+                    }}
+                    title="Download"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="secondary"
                     size="sm"
@@ -1067,14 +1195,29 @@ const Artwork = () => {
               </p>
             </div>
           </div>
-          {isVibeAdmin && (
-            <div className="flex gap-2">
+          <div className="flex gap-2">
+            {/* Download All as ZIP button - show for templates with artwork */}
+            {selectedTemplate && templateArtworkCounts[selectedTemplate.id] > 0 && (
+              <Button 
+                variant="outline" 
+                onClick={() => handleDownloadAllAsZip(selectedTemplate.id)}
+                disabled={downloadingZip}
+              >
+                {downloadingZip ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileArchive className="h-4 w-4 mr-2" />
+                )}
+                Download All
+              </Button>
+            )}
+            {isVibeAdmin && (
               <Button onClick={() => setUploadDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Art
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Search */}
