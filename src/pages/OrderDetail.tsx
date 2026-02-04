@@ -142,19 +142,29 @@ const OrderDetail = () => {
   const checkAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase
+      // Users can have multiple role rows; never use .single() here.
+      const { data: roleRows, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
-        .single();
-      const role = data?.role as string;
-      setIsAdmin(role === 'admin' || role === 'vibe_admin');
-      setIsVibeAdmin(role === 'vibe_admin');
-      setIsVendor(role === 'vendor');
-      // Company-side users (admin/customer/company) should see the simplified customer view
-      setIsCustomer(role === 'admin' || role === 'customer' || role === 'company');
+        .eq('user_id', user.id);
 
-      if (role === 'vendor') {
+      if (error) {
+        console.error('Error fetching roles:', error);
+      }
+
+      const roles = (roleRows || []).map((r: any) => String(r.role));
+      const vibeAdmin = roles.includes('vibe_admin');
+      const admin = roles.includes('admin') || vibeAdmin;
+      const vendor = roles.includes('vendor');
+      const customer = roles.some(r => r === 'admin' || r === 'customer' || r === 'company');
+
+      setIsAdmin(admin);
+      setIsVibeAdmin(vibeAdmin);
+      setIsVendor(vendor);
+      // Company-side users (admin/customer/company) should see the simplified customer view
+      setIsCustomer(customer);
+
+      if (vendor) {
         const { data: vendorData } = await supabase
           .from('vendors')
           .select('id')
@@ -162,6 +172,8 @@ const OrderDetail = () => {
           .maybeSingle();
         
         setVendorId(vendorData?.id || null);
+      } else {
+        setVendorId(null);
       }
     }
   };

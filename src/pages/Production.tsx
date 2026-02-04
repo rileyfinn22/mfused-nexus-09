@@ -106,34 +106,46 @@ export default function Production() {
   };
 
   const checkRole = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setRoleChecked(true);
+        return;
+      }
+
+      // IMPORTANT: users can have multiple role rows (multi-company, admin + company, etc.)
+      // so never use .single() / .maybeSingle() here.
+      const { data: roleRows, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      const roles = (roleRows || []).map((r: any) => String(r.role));
+      const vibeAdmin = roles.includes('vibe_admin');
+      const vendor = roles.includes('vendor');
+
+      setIsVibeAdmin(vibeAdmin);
+      setIsVendor(vendor);
+
+      if (vendor) {
+        // Get vendor ID for this user
+        const { data: vendorData } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        setVendorId(vendorData?.id || null);
+      } else {
+        setVendorId(null);
+      }
+    } catch (err) {
+      console.error('Error checking role:', err);
+    } finally {
       setRoleChecked(true);
-      return;
     }
-
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    const role = data?.role as string;
-    setIsVibeAdmin(role === 'vibe_admin');
-    setIsVendor(role === 'vendor');
-
-    if (role === 'vendor') {
-      // Get vendor ID for this user
-      const { data: vendorData } = await supabase
-        .from('vendors')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      setVendorId(vendorData?.id || null);
-    }
-    
-    setRoleChecked(true);
   };
 
   const fetchProductionOrders = async () => {
