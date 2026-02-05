@@ -112,23 +112,36 @@ serve(async (req) => {
       JSON.stringify(orderItemsList.map((i: any) => ({ id: i.id.substring(0, 8), name: i.name, sku: i.sku })), null, 2),
     );
 
-    // Step 1: Use AI ONLY to extract packing list line items (name/sku/qty) from the document.
+    // Step 1: Use AI to extract packing list line items AND shipping summary from the document.
     // Step 2: Match extracted lines to order items deterministically (SKU first, then strict fuzzy name match).
 
-    const systemPrompt = `You extract shipped line items from a packing list.
+    const systemPrompt = `You extract shipped line items and shipping summary from a packing list.
 
 Return ONLY items that appear in the packing list content. Do NOT guess, do NOT invent items, and do NOT try to match against an order.
 
-Rules:
+Rules for items:
 - Identify each shipped product row and extract:
-  - name (string)
-  - quantity (number)
+  - name (string) - product name/description
+  - quantity (number) - total quantity shipped
   - sku (string, optional) if present in the row (columns like SKU/Item Code/Part #)
+  - carton_numbers (string, optional) - carton range like "1-5" or "CTN 1-10"
+  - pieces_per_carton (number, optional) - quantity per carton if available
+  - num_cartons (number, optional) - number of cartons for this item
+  - gross_weight_kg (number, optional) - gross weight in kg
+  - net_weight_kg (number, optional) - net weight in kg
+  - dimensions (string, optional) - dimensions like "40x30x20 cm"
+  - cbm (number, optional) - cubic meters
 - If you can't find a quantity for a row, skip the row.
 - Ignore headers, totals, empty rows, and notes.
-- Quantity must be a number (e.g. 12, 1, 0.5).`;
 
-    const userPrompt = `Extract the shipped line items from this packing list:
+Rules for shipping summary (extract from totals/summary section):
+- total_cartons (number) - total number of cartons
+- total_gross_weight_kg (number) - total gross weight
+- total_net_weight_kg (number) - total net weight
+- total_cbm (number) - total cubic meters/volume
+- total_quantity (number) - total pieces/units`;
+
+    const userPrompt = `Extract the shipped line items and shipping summary from this packing list:
 
 ${parsedContent}`;
 
@@ -149,8 +162,8 @@ ${parsedContent}`;
           {
             type: "function",
             function: {
-              name: "extract_packing_list_items",
-              description: "Extract shipped items (name/sku/quantity) from a packing list",
+              name: "extract_packing_list_data",
+              description: "Extract shipped items and shipping summary from a packing list",
               parameters: {
                 type: "object",
                 properties: {
@@ -162,8 +175,25 @@ ${parsedContent}`;
                         name: { type: "string" },
                         sku: { type: "string" },
                         quantity: { type: "number" },
+                        carton_numbers: { type: "string" },
+                        pieces_per_carton: { type: "number" },
+                        num_cartons: { type: "number" },
+                        gross_weight_kg: { type: "number" },
+                        net_weight_kg: { type: "number" },
+                        dimensions: { type: "string" },
+                        cbm: { type: "number" },
                       },
                       required: ["name", "quantity"],
+                    },
+                  },
+                  shipping_summary: {
+                    type: "object",
+                    properties: {
+                      total_cartons: { type: "number" },
+                      total_gross_weight_kg: { type: "number" },
+                      total_net_weight_kg: { type: "number" },
+                      total_cbm: { type: "number" },
+                      total_quantity: { type: "number" },
                     },
                   },
                   parsing_notes: { type: "string" },
@@ -173,7 +203,7 @@ ${parsedContent}`;
             },
           },
         ],
-        tool_choice: { type: "function", function: { name: "extract_packing_list_items" } },
+        tool_choice: { type: "function", function: { name: "extract_packing_list_data" } },
       }),
     });
 
@@ -208,7 +238,25 @@ ${parsedContent}`;
     }
 
     const extracted = JSON.parse(toolCall.function.arguments) as {
-      packing_list_items: Array<{ name: string; sku?: string; quantity: number }>;
+      packing_list_items: Array<{ 
+        name: string; 
+        sku?: string; 
+        quantity: number;
+        carton_numbers?: string;
+        pieces_per_carton?: number;
+        num_cartons?: number;
+        gross_weight_kg?: number;
+        net_weight_kg?: number;
+        dimensions?: string;
+        cbm?: number;
+      }>;
+      shipping_summary?: {
+        total_cartons?: number;
+        total_gross_weight_kg?: number;
+        total_net_weight_kg?: number;
+        total_cbm?: number;
+        total_quantity?: number;
+      };
       parsing_notes: string;
     };
 
@@ -217,6 +265,13 @@ ${parsedContent}`;
         name: (x.name || "").trim(),
         sku: (x.sku || "").trim(),
         quantity: Number(x.quantity),
+        carton_numbers: x.carton_numbers || "",
+        pieces_per_carton: x.pieces_per_carton,
+        num_cartons: x.num_cartons,
+        gross_weight_kg: x.gross_weight_kg,
+        net_weight_kg: x.net_weight_kg,
+        dimensions: x.dimensions || "",
+        cbm: x.cbm,
       }))
       .filter((x) => x.name && Number.isFinite(x.quantity) && x.quantity > 0);
 
@@ -250,7 +305,17 @@ ${parsedContent}`;
       // 2) Name fuzzy match with threshold
       const lineTokens = tokenize(line.name);
       if (!nameNorm || lineTokens.length === 0) {
-        unmatched.push({ name: line.name || "(unknown)", quantity: line.quantity });
+        unmatched.push({ 
+          name: line.name || "(unknown)", 
+          quantity: line.quantity,
+          carton_numbers: line.carton_numbers,
+          pieces_per_carton: line.pieces_per_carton,
+          num_cartons: line.num_cartons,
+          gross_weight_kg: line.gross_weight_kg,
+          net_weight_kg: line.net_weight_kg,
+          dimensions: line.dimensions,
+          cbm: line.cbm,
+        });
         continue;
       }
 
@@ -265,7 +330,17 @@ ${parsedContent}`;
       const bestScore = best?.score ?? 0;
       if (!best || bestScore < 0.55) {
         // Below threshold = don't match
-        unmatched.push({ name: line.name, quantity: line.quantity });
+        unmatched.push({ 
+          name: line.name, 
+          quantity: line.quantity,
+          carton_numbers: line.carton_numbers,
+          pieces_per_carton: line.pieces_per_carton,
+          num_cartons: line.num_cartons,
+          gross_weight_kg: line.gross_weight_kg,
+          net_weight_kg: line.net_weight_kg,
+          dimensions: line.dimensions,
+          cbm: line.cbm,
+        });
         continue;
       }
 
@@ -287,6 +362,7 @@ ${parsedContent}`;
     const result = {
       matched_items,
       unmatched_items: unmatched,
+      shipping_summary: extracted.shipping_summary || null,
       parsing_notes: `Extracted ${lines.length} packing list rows. Matched ${matched_items.length} order items (SKU-first + strict name matching). ${unmatched.length} rows unmatched. ${extracted.parsing_notes || ""}`.trim(),
     };
 

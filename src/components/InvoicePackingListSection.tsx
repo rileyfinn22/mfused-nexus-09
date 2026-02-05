@@ -385,31 +385,61 @@ export const InvoicePackingListSection = ({
       // Build items table - use matched items if available, otherwise use extracted unmatched items
       const matchedItems = parseResult?.matched_items || [];
       const unmatchedItems = parseResult?.unmatched_items || [];
+      const shippingSummary = parseResult?.shipping_summary || {};
       const orderItemsMap = new Map<string, any>((order?.order_items || editedItems).map((item: any) => [item.id, item]));
       
-      let tableData: string[][] = [];
+      let tableData: (string | number)[][] = [];
       let usedUnmatched = false;
+      let hasCartonInfo = false;
+      let hasWeightInfo = false;
+      
+      // Check if we have carton/weight data in unmatched items
+      if (unmatchedItems.length > 0) {
+        hasCartonInfo = unmatchedItems.some((item: any) => item.carton_numbers || item.num_cartons);
+        hasWeightInfo = unmatchedItems.some((item: any) => item.gross_weight_kg || item.net_weight_kg);
+      }
       
       if (matchedItems.length > 0) {
-        // Use matched items
-        tableData = matchedItems.map((match: any) => {
+        // Use matched items (simpler format)
+        tableData = matchedItems.map((match: any, index: number) => {
           const orderItem = orderItemsMap.get(match.order_item_id) as any;
           return [
-            orderItem?.item_id || 'N/A',
+            String(index + 1),
             orderItem?.sku || '',
             orderItem?.name || match.packing_list_name || '',
             (match.shipped_quantity || 0).toLocaleString()
           ];
         });
       } else if (unmatchedItems.length > 0) {
-        // Fallback: use unmatched/extracted items directly from the packing list
+        // Fallback: use unmatched/extracted items directly from the packing list with full details
         usedUnmatched = true;
-        tableData = unmatchedItems.map((item: any, index: number) => [
-          String(index + 1),
-          '', // No SKU available
-          item.name || 'Unknown Item',
-          (item.quantity || 0).toLocaleString()
-        ]);
+        
+        if (hasCartonInfo || hasWeightInfo) {
+          // Rich packing list format with cartons, weights, etc.
+          tableData = unmatchedItems.map((item: any, index: number) => {
+            const row: (string | number)[] = [
+              String(index + 1),
+              item.carton_numbers || '-',
+              item.name || 'Unknown Item',
+              item.num_cartons || '-',
+              (item.quantity || 0).toLocaleString(),
+            ];
+            if (hasWeightInfo) {
+              row.push(item.gross_weight_kg ? `${item.gross_weight_kg} kg` : '-');
+            }
+            return row;
+          });
+        } else {
+          // Simple format
+          tableData = unmatchedItems.map((item: any, index: number) => [
+            String(index + 1),
+            '-',
+            item.name || 'Unknown Item',
+            '-',
+            (item.quantity || 0).toLocaleString(),
+            '-'
+          ]);
+        }
       }
       
       if (tableData.length === 0) {
@@ -421,58 +451,126 @@ export const InvoicePackingListSection = ({
         return;
       }
       
+      // Dynamic headers based on data available
+      const headers = usedUnmatched && (hasCartonInfo || hasWeightInfo)
+        ? hasWeightInfo 
+          ? [['#', 'CTN NO.', 'DESCRIPTION', 'CTNS', 'QTY', 'G.W.']]
+          : [['#', 'CTN NO.', 'DESCRIPTION', 'CTNS', 'QTY', 'G.W.']]
+        : [['#', 'CTN NO.', 'DESCRIPTION', 'CTNS', 'QTY', 'G.W.']];
+      
+      // Reformat matched items to include placeholder columns for consistency
+      if (matchedItems.length > 0) {
+        tableData = matchedItems.map((match: any, index: number) => {
+          const orderItem = orderItemsMap.get(match.order_item_id) as any;
+          return [
+            String(index + 1),
+            '-',
+            orderItem?.name || match.packing_list_name || '',
+            '-',
+            (match.shipped_quantity || 0).toLocaleString(),
+            '-'
+          ];
+        });
+      }
+      
       autoTable(doc, {
         startY: yPos,
-        head: [['ITEM ID', 'SKU', 'DESCRIPTION', 'QTY']],
+        head: headers,
         body: tableData,
-        theme: 'plain',
+        theme: 'grid',
         headStyles: { 
           fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]], 
           textColor: 255,
           fontStyle: 'bold',
-          fontSize: 9,
-          cellPadding: 4
+          fontSize: 8,
+          cellPadding: 3,
+          halign: 'center',
+          lineWidth: 0.5,
+          lineColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]]
         },
         bodyStyles: {
-          fontSize: 9,
-          cellPadding: 4,
+          fontSize: 8,
+          cellPadding: 3,
           textColor: [darkGray[0], darkGray[1], darkGray[2]],
-          lineWidth: 0
+          lineWidth: 0.25,
+          lineColor: [200, 200, 200]
         },
         alternateRowStyles: {
           fillColor: [lightGray[0], lightGray[1], lightGray[2]]
         },
         columnStyles: {
-          0: { cellWidth: 30 },
-          1: { cellWidth: 40 },
-          2: { cellWidth: 85 },
-          3: { cellWidth: 25, halign: 'center' }
+          0: { cellWidth: 12, halign: 'center' },  // #
+          1: { cellWidth: 25, halign: 'center' },  // CTN NO.
+          2: { cellWidth: 80 },                     // DESCRIPTION
+          3: { cellWidth: 18, halign: 'center' },  // CTNS
+          4: { cellWidth: 25, halign: 'center' },  // QTY
+          5: { cellWidth: 22, halign: 'center' }   // G.W.
         },
         margin: { left: 14, right: 14 },
         showHead: 'firstPage',
-        tableLineWidth: 0
+        tableLineWidth: 0.25,
+        tableLineColor: [200, 200, 200]
       });
       
-      // Summary
-      const totalItems = matchedItems.reduce((sum: number, item: any) => sum + (item.shipped_quantity || 0), 0);
-      const tableEndY = (doc as any).lastAutoTable.finalY + 15;
+      // Summary section with shipping totals
+      const tableEndY = (doc as any).lastAutoTable.finalY + 10;
       
-      doc.setFontSize(11);
+      // Calculate totals from data
+      const totalQty = usedUnmatched 
+        ? unmatchedItems.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+        : matchedItems.reduce((sum: number, item: any) => sum + (item.shipped_quantity || 0), 0);
+      const totalCartons = shippingSummary.total_cartons || 
+        unmatchedItems.reduce((sum: number, item: any) => sum + (item.num_cartons || 0), 0);
+      const totalGrossWeight = shippingSummary.total_gross_weight_kg ||
+        unmatchedItems.reduce((sum: number, item: any) => sum + (item.gross_weight_kg || 0), 0);
+      const totalNetWeight = shippingSummary.total_net_weight_kg ||
+        unmatchedItems.reduce((sum: number, item: any) => sum + (item.net_weight_kg || 0), 0);
+      const totalCbm = shippingSummary.total_cbm ||
+        unmatchedItems.reduce((sum: number, item: any) => sum + (item.cbm || 0), 0);
+      
+      // Draw summary box
+      doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(14, tableEndY, pageWidth - 28, 28, 2, 2, 'S');
+      
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.text('SHIPPING SUMMARY', 20, tableEndY + 7);
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
       doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(`Total Quantity: ${totalItems.toLocaleString()}`, 14, tableEndY);
+      
+      const summaryY = tableEndY + 15;
+      const colWidth = (pageWidth - 28) / 5;
+      
+      // Summary items
+      const summaryItems = [
+        { label: 'Total Qty:', value: totalQty.toLocaleString() },
+        { label: 'Total Cartons:', value: totalCartons > 0 ? totalCartons.toLocaleString() : '-' },
+        { label: 'Gross Weight:', value: totalGrossWeight > 0 ? `${totalGrossWeight.toFixed(1)} kg` : '-' },
+        { label: 'Net Weight:', value: totalNetWeight > 0 ? `${totalNetWeight.toFixed(1)} kg` : '-' },
+        { label: 'Volume (CBM):', value: totalCbm > 0 ? totalCbm.toFixed(3) : '-' },
+      ];
+      
+      summaryItems.forEach((item, idx) => {
+        const xPos = 20 + (idx * colWidth);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+        doc.text(item.label, xPos, summaryY);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+        doc.text(item.value, xPos, summaryY + 6);
+      });
       
       // Note about source
+      const noteY = tableEndY + 35;
       if (usedUnmatched) {
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         doc.setFont('helvetica', 'italic');
         doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-        doc.text('Note: Items extracted directly from vendor packing list', 14, tableEndY + 7);
-      } else if (parseResult?.unmatched_items?.length > 0 && matchedItems.length > 0) {
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'italic');
-        doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-        doc.text(`Note: ${parseResult.unmatched_items.length} item(s) from file could not be matched`, 14, tableEndY + 7);
+        doc.text('Items extracted from vendor packing list', 14, noteY);
       }
       
       // Footer
