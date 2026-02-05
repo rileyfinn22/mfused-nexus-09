@@ -6,6 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+
+// Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
+const parseDateAsLocal = (dateStr: string | null): Date | undefined => {
+  if (!dateStr) return undefined;
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
 import {
   AlertDialog,
   AlertDialogAction,
@@ -391,7 +398,7 @@ const Orders = () => {
               </div>
               <div className="divide-y divide-border">
                 {draftOrders.map((order) => {
-                  const estDelivery = order.estimated_delivery_date ? new Date(order.estimated_delivery_date).toLocaleDateString() : 'Not set';
+const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estimated_delivery_date)?.toLocaleDateString() ?? 'Not set' : 'Not set';
                   const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                   const OrderIcon = orderTypeInfo.icon;
                   
@@ -501,7 +508,7 @@ const Orders = () => {
                   No pending orders
                 </div>
               ) : pendingOrdersList.map((order) => {
-                const estDelivery = order.estimated_delivery_date ? new Date(order.estimated_delivery_date).toLocaleDateString() : 'Not set';
+                const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estimated_delivery_date)?.toLocaleDateString() ?? 'Not set' : 'Not set';
                 const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                 const OrderIcon = orderTypeInfo.icon;
                 
@@ -630,7 +637,7 @@ const Orders = () => {
                 const progress = order.status === 'in production' && order.productionProgress !== undefined 
                   ? order.productionProgress 
                   : getProgressForStatus(order.status);
-                const estDelivery = order.estimated_delivery_date ? new Date(order.estimated_delivery_date) : null;
+                const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estimated_delivery_date) ?? null : null;
                 const today = new Date();
                 const diffDays = estDelivery ? Math.ceil((estDelivery.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
                 const deliveryStatus = diffDays !== null 
