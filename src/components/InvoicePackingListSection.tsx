@@ -382,24 +382,40 @@ export const InvoicePackingListSection = ({
       
       yPos += 40;
       
-      // Build items table from matched items
+      // Build items table - use matched items if available, otherwise use extracted unmatched items
       const matchedItems = parseResult?.matched_items || [];
+      const unmatchedItems = parseResult?.unmatched_items || [];
       const orderItemsMap = new Map<string, any>((order?.order_items || editedItems).map((item: any) => [item.id, item]));
       
-      const tableData = matchedItems.map((match: any) => {
-        const orderItem = orderItemsMap.get(match.order_item_id) as any;
-        return [
-          orderItem?.item_id || 'N/A',
-          orderItem?.sku || '',
-          orderItem?.name || match.packing_list_name || '',
-          (match.shipped_quantity || 0).toLocaleString()
-        ];
-      });
+      let tableData: string[][] = [];
+      let usedUnmatched = false;
+      
+      if (matchedItems.length > 0) {
+        // Use matched items
+        tableData = matchedItems.map((match: any) => {
+          const orderItem = orderItemsMap.get(match.order_item_id) as any;
+          return [
+            orderItem?.item_id || 'N/A',
+            orderItem?.sku || '',
+            orderItem?.name || match.packing_list_name || '',
+            (match.shipped_quantity || 0).toLocaleString()
+          ];
+        });
+      } else if (unmatchedItems.length > 0) {
+        // Fallback: use unmatched/extracted items directly from the packing list
+        usedUnmatched = true;
+        tableData = unmatchedItems.map((item: any, index: number) => [
+          String(index + 1),
+          '', // No SKU available
+          item.name || 'Unknown Item',
+          (item.quantity || 0).toLocaleString()
+        ]);
+      }
       
       if (tableData.length === 0) {
         toast({
-          title: "No Items Matched",
-          description: "Could not match any items from the Excel file to order items. Please check the file format.",
+          title: "No Items Found",
+          description: "Could not extract any items from the Excel file. Please check the file format.",
           variant: "destructive"
         });
         return;
@@ -446,8 +462,13 @@ export const InvoicePackingListSection = ({
       doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
       doc.text(`Total Quantity: ${totalItems.toLocaleString()}`, 14, tableEndY);
       
-      // Unmatched items note
-      if (parseResult?.unmatched_items?.length > 0) {
+      // Note about source
+      if (usedUnmatched) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+        doc.text('Note: Items extracted directly from vendor packing list', 14, tableEndY + 7);
+      } else if (parseResult?.unmatched_items?.length > 0 && matchedItems.length > 0) {
         doc.setFontSize(9);
         doc.setFont('helvetica', 'italic');
         doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
@@ -496,9 +517,13 @@ export const InvoicePackingListSection = ({
 
       if (dbError) throw dbError;
 
+      const successMsg = usedUnmatched 
+        ? `Created packing list with ${tableData.length} items extracted from vendor file.`
+        : `Successfully created packing list. ${matchedItems.length} items matched.`;
+      
       toast({
         title: "Packing List Created",
-        description: `Successfully created packing list from Excel file. ${matchedItems.length} items matched.`
+        description: successMsg
       });
 
       setShowExcelUploadDialog(false);
