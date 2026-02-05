@@ -20,7 +20,8 @@ import {
   Plus, 
   Eye,
   FileCheck,
-  Loader2
+  Loader2,
+  FileSpreadsheet
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,10 +63,14 @@ export const InvoicePackingListSection = ({
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [processingExcel, setProcessingExcel] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showExcelUploadDialog, setShowExcelUploadDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedExcelFile, setSelectedExcelFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const excelFileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch packing lists on mount
   useEffect(() => {
@@ -94,6 +99,12 @@ export const InvoicePackingListSection = ({
     setShowUploadDialog(true);
   };
 
+  const handleExcelUploadClick = () => {
+    setSelectedExcelFile(null);
+    setNotes("");
+    setShowExcelUploadDialog(true);
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -114,6 +125,39 @@ export const InvoicePackingListSection = ({
         return;
       }
       setSelectedFile(file);
+    }
+  };
+
+  const handleExcelFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'text/csv'
+      ];
+      const validExtensions = ['.xlsx', '.xls', '.csv'];
+      const hasValidExtension = validExtensions.some(ext => 
+        file.name.toLowerCase().endsWith(ext)
+      );
+      
+      if (!validTypes.includes(file.type) && !hasValidExtension) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload an Excel (.xlsx, .xls) or CSV file",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Maximum file size is 10MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      setSelectedExcelFile(file);
     }
   };
 
@@ -175,6 +219,299 @@ export const InvoicePackingListSection = ({
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleExcelUpload = async () => {
+    if (!selectedExcelFile) return;
+
+    setProcessingExcel(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Read file as base64
+      const fileContent = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(selectedExcelFile);
+      });
+
+      // Get order items for matching
+      const orderItems = (order?.order_items || editedItems).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        sku: item.sku,
+        quantity: item.quantity,
+        shipped_quantity: item.shipped_quantity || 0
+      }));
+
+      // Call parse-packing-list edge function
+      const { data: parseResult, error: parseError } = await supabase.functions.invoke('parse-packing-list', {
+        body: {
+          fileContent,
+          orderItems,
+          fileName: selectedExcelFile.name,
+          isBase64: true
+        }
+      });
+
+      if (parseError) throw parseError;
+      if (parseResult?.error) throw new Error(parseResult.error);
+
+      console.log('Parse result:', parseResult);
+
+      // Generate PDF from parsed data
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      
+      // Colors
+      const primaryGreen = [76, 175, 80];
+      const darkGray = [51, 51, 51];
+      const lightGray = [248, 248, 248];
+      const mediumGray = [100, 100, 100];
+      
+      let yPos = 15;
+      
+      // Company header
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text('1415 S 700 W', 14, yPos + 7);
+      doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
+      doc.text('www.vibepkg.com', 14, yPos + 17);
+      
+      // Logo on right
+      try {
+        const logoResponse = await fetch('/images/vibe-logo.png');
+        const logoBlob = await logoResponse.blob();
+        const logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(logoBlob);
+        });
+        doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
+      } catch (error) {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+        doc.text('VIBE', pageWidth - 14, yPos + 8, { align: 'right' });
+      }
+      
+      yPos += 28;
+      
+      // Divider
+      doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.setLineWidth(0.5);
+      doc.line(14, yPos, pageWidth - 14, yPos);
+      
+      yPos += 12;
+      
+      // Title
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text('Packing List', 14, yPos);
+      
+      // Source file note
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text(`Generated from: ${selectedExcelFile.name}`, pageWidth - 14, yPos, { align: 'right' });
+      
+      yPos += 15;
+      
+      // Ship To and Details
+      const leftColX = 14;
+      const rightColX = pageWidth / 2 + 10;
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text('Ship to', leftColX, yPos);
+      
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text(order?.shipping_name || '', leftColX, yPos + 8);
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      
+      let shipY = yPos + 14;
+      if (order?.shipping_street) {
+        doc.text(order.shipping_street, leftColX, shipY);
+        shipY += 5;
+      }
+      doc.text(`${order?.shipping_city || ''}, ${order?.shipping_state || ''} ${order?.shipping_zip || ''}`, leftColX, shipY);
+      
+      // Details on right
+      const detailsStartY = yPos;
+      doc.text('Invoice #:', rightColX, detailsStartY);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text(invoice.invoice_number, rightColX + 45, detailsStartY);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text('Order #:', rightColX, detailsStartY + 7);
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text(order?.order_number || '', rightColX + 45, detailsStartY + 7);
+      
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text('Date:', rightColX, detailsStartY + 14);
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text(format(new Date(), 'MMM d, yyyy'), rightColX + 45, detailsStartY + 14);
+      
+      if (order?.po_number) {
+        doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+        doc.text('PO #:', rightColX, detailsStartY + 21);
+        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+        doc.text(order.po_number, rightColX + 45, detailsStartY + 21);
+      }
+      
+      yPos += 40;
+      
+      // Build items table from matched items
+      const matchedItems = parseResult?.matched_items || [];
+      const orderItemsMap = new Map<string, any>((order?.order_items || editedItems).map((item: any) => [item.id, item]));
+      
+      const tableData = matchedItems.map((match: any) => {
+        const orderItem = orderItemsMap.get(match.order_item_id) as any;
+        return [
+          orderItem?.item_id || 'N/A',
+          orderItem?.sku || '',
+          orderItem?.name || match.packing_list_name || '',
+          (match.shipped_quantity || 0).toLocaleString()
+        ];
+      });
+      
+      if (tableData.length === 0) {
+        toast({
+          title: "No Items Matched",
+          description: "Could not match any items from the Excel file to order items. Please check the file format.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['ITEM ID', 'SKU', 'DESCRIPTION', 'QTY']],
+        body: tableData,
+        theme: 'plain',
+        headStyles: { 
+          fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]], 
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 4
+        },
+        bodyStyles: {
+          fontSize: 9,
+          cellPadding: 4,
+          textColor: [darkGray[0], darkGray[1], darkGray[2]],
+          lineWidth: 0
+        },
+        alternateRowStyles: {
+          fillColor: [lightGray[0], lightGray[1], lightGray[2]]
+        },
+        columnStyles: {
+          0: { cellWidth: 30 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 85 },
+          3: { cellWidth: 25, halign: 'center' }
+        },
+        margin: { left: 14, right: 14 },
+        showHead: 'firstPage',
+        tableLineWidth: 0
+      });
+      
+      // Summary
+      const totalItems = matchedItems.reduce((sum: number, item: any) => sum + (item.shipped_quantity || 0), 0);
+      const tableEndY = (doc as any).lastAutoTable.finalY + 15;
+      
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text(`Total Quantity: ${totalItems.toLocaleString()}`, 14, tableEndY);
+      
+      // Unmatched items note
+      if (parseResult?.unmatched_items?.length > 0) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+        doc.text(`Note: ${parseResult.unmatched_items.length} item(s) from file could not be matched`, 14, tableEndY + 7);
+      }
+      
+      // Footer
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+      
+      // Convert to blob and upload
+      const pdfBlob = doc.output('blob');
+      const fileName = `${invoiceId}/${Date.now()}-packing-list-${invoice.invoice_number}.pdf`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('packing-lists')
+        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+
+      if (uploadError) {
+        if (uploadError.message.includes('Bucket not found')) {
+          toast({
+            title: "Storage Not Configured",
+            description: "Packing list storage bucket needs to be created",
+            variant: "destructive"
+          });
+          return;
+        }
+        throw uploadError;
+      }
+
+      // Create database record
+      const { error: dbError } = await supabase
+        .from('invoice_packing_lists')
+        .insert({
+          invoice_id: invoiceId,
+          file_name: `packing-list-${invoice.invoice_number}.pdf`,
+          file_path: fileName,
+          file_size: pdfBlob.size,
+          file_type: 'application/pdf',
+          source: 'excel-import',
+          created_by: user?.id,
+          notes: notes || `Generated from: ${selectedExcelFile.name}`
+        });
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: "Packing List Created",
+        description: `Successfully created packing list from Excel file. ${matchedItems.length} items matched.`
+      });
+
+      setShowExcelUploadDialog(false);
+      fetchPackingLists();
+    } catch (error: any) {
+      console.error('Excel processing error:', error);
+      toast({
+        title: "Processing Failed",
+        description: error.message || "Failed to process Excel file",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessingExcel(false);
     }
   };
 
@@ -495,7 +832,15 @@ export const InvoicePackingListSection = ({
                 onClick={handleUploadClick}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Upload
+                Upload PDF
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleExcelUploadClick}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                From Excel
               </Button>
               <Button 
                 size="sm"
@@ -646,6 +991,79 @@ export const InvoicePackingListSection = ({
                 <>
                   <Upload className="h-4 w-4 mr-2" />
                   Upload
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Excel Upload Dialog */}
+      <Dialog open={showExcelUploadDialog} onOpenChange={setShowExcelUploadDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Packing List from Excel</DialogTitle>
+            <DialogDescription>
+              Upload an Excel or CSV file to create a branded packing list. Items will be matched to order items automatically.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="excelFile">Excel/CSV File</Label>
+              <Input
+                id="excelFile"
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                ref={excelFileInputRef}
+                onChange={handleExcelFileSelect}
+                className="mt-1"
+              />
+              {selectedExcelFile && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Selected: {selectedExcelFile.name} ({formatFileSize(selectedExcelFile.size)})
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <Label htmlFor="excelNotes">Notes (optional)</Label>
+              <Input
+                id="excelNotes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add any notes about this packing list"
+                className="mt-1"
+              />
+            </div>
+
+            <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+              <p className="font-medium mb-1">How it works:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Upload your vendor's packing list (Excel or CSV)</li>
+                <li>Items are automatically matched to order items by SKU and name</li>
+                <li>A branded VibePKG PDF is generated for your customer</li>
+              </ul>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExcelUploadDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleExcelUpload} 
+              disabled={!selectedExcelFile || processingExcel}
+            >
+              {processingExcel ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Create Packing List
                 </>
               )}
             </Button>
