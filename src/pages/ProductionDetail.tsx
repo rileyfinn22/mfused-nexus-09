@@ -733,7 +733,10 @@ export default function ProductionDetail() {
                 <CalendarClock className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Est. Delivery:</span>
                 <span className="font-medium">
-                  {new Date(order.estimated_delivery_date).toLocaleDateString('en-US', { 
+                  {(() => {
+                    const [y, m, d] = order.estimated_delivery_date!.split('-').map(Number);
+                    return new Date(y, m - 1, d);
+                  })().toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric',
                     year: 'numeric'
