@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 import { 
   ArrowLeft, 
   FileText, 
@@ -17,7 +18,11 @@ import {
   ExternalLink,
   LayoutList,
   Paperclip,
-  Download
+  Download,
+  Upload,
+  Trash2,
+  Image as ImageIcon,
+  File
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -30,6 +35,9 @@ const ProjectDetail = () => {
   const [vendorPOs, setVendorPOs] = useState<any[]>([]);
   const [vendorPayments, setVendorPayments] = useState<any[]>([]);
   const [customerPOs, setCustomerPOs] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [plView, setPlView] = useState<"accrual" | "cash">("accrual");
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
@@ -135,12 +143,82 @@ const ProjectDetail = () => {
         setVendorPayments([]);
       }
 
+      // Fetch project documents
+      const { data: docData } = await supabase
+        .from('project_documents')
+        .select('*')
+        .eq('order_id', projectId)
+        .order('created_at', { ascending: false });
+      setDocuments(docData || []);
+
     } catch (error) {
       console.error('Error fetching project data:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleDocumentUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !projectId) return;
+    setUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      for (const file of Array.from(files)) {
+        const filePath = `${projectId}/${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('project-documents')
+          .upload(filePath, file);
+        if (uploadError) throw uploadError;
+
+        const { error: insertError } = await supabase
+          .from('project_documents')
+          .insert({
+            order_id: projectId,
+            file_path: filePath,
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            uploaded_by: user.id,
+          });
+        if (insertError) throw insertError;
+      }
+      toast.success(`${files.length} file(s) uploaded`);
+      fetchProjectData();
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(error.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDocumentDelete = async (doc: any) => {
+    try {
+      await supabase.storage.from('project-documents').remove([doc.file_path]);
+      await supabase.from('project_documents').delete().eq('id', doc.id);
+      toast.success('Document deleted');
+      setDocuments(prev => prev.filter(d => d.id !== doc.id));
+    } catch (error: any) {
+      toast.error(error.message || 'Delete failed');
+    }
+  };
+
+  const getDocumentUrl = (filePath: string) => {
+    const { data } = supabase.storage.from('project-documents').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const isImageFile = (type: string) => type?.startsWith('image/');
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -342,6 +420,10 @@ const ProjectDetail = () => {
               Vendor Bills ({vendorPOs.length})
             </TabsTrigger>
           )}
+          <TabsTrigger value="documents" className="gap-2">
+            <ImageIcon className="h-4 w-4" />
+            Documents ({documents.length})
+          </TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -769,6 +851,78 @@ const ProjectDetail = () => {
                       <p className="text-lg font-bold text-orange-600">{formatCurrency(totalCosts - totalCostsPaid)}</p>
                     </div>
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Documents Tab */}
+        <TabsContent value="documents">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">Project Documents</CardTitle>
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleDocumentUpload(e.target.files)}
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  size="sm"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {uploading ? 'Uploading...' : 'Upload Files'}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {documents.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No documents uploaded yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {documents.map((doc) => {
+                    const url = getDocumentUrl(doc.file_path);
+                    return (
+                      <div key={doc.id} className="border border-border rounded-lg overflow-hidden">
+                        {isImageFile(doc.file_type) ? (
+                          <div className="h-40 bg-muted flex items-center justify-center overflow-hidden">
+                            <img src={url} alt={doc.file_name} className="object-cover w-full h-full" />
+                          </div>
+                        ) : (
+                          <div className="h-40 bg-muted flex items-center justify-center">
+                            <File className="h-12 w-12 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="p-3 space-y-2">
+                          <p className="text-sm font-medium truncate" title={doc.file_name}>{doc.file_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(doc.file_size)} • {new Date(doc.created_at).toLocaleDateString()}
+                          </p>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" className="flex-1" asChild>
+                              <a href={url} download={doc.file_name} target="_blank" rel="noopener noreferrer">
+                                <Download className="h-3 w-3 mr-1" /> Download
+                              </a>
+                            </Button>
+                            {isVibeAdmin && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDocumentDelete(doc)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
