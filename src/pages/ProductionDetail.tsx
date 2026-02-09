@@ -617,7 +617,7 @@ export default function ProductionDetail() {
 
       // Calculate cumulative weights and determine which stages should be completed/in-progress/pending
       let cumulativeWeight = 0;
-      const stageUpdates: { id: string; newStatus: string }[] = [];
+      const stageUpdates: { id: string; newStatus: string; previousStatus: string }[] = [];
 
       // Filter to visible stages for admins (include po_sent)
       const visibleDefs = STAGE_DEFINITIONS.filter(def => !def.adminOnly || isVibeAdmin);
@@ -631,52 +631,53 @@ export default function ProductionDetail() {
         
         let newStatus: string;
         if (targetPercent >= stageEndPercent) {
-          // Target is past this stage - mark completed
           newStatus = 'completed';
         } else if (targetPercent > cumulativeWeight) {
-          // Target is within this stage - mark in_progress
           newStatus = 'in_progress';
         } else {
-          // Target is before this stage - mark pending
           newStatus = 'pending';
         }
         
         // Only update if status changed
         if (stage.status !== newStatus) {
-          stageUpdates.push({ id: stage.id, newStatus });
+          stageUpdates.push({ id: stage.id, newStatus, previousStatus: stage.status });
         }
         
         cumulativeWeight = stageEndPercent;
       }
 
+      if (stageUpdates.length === 0) {
+        toast({
+          title: "No Change",
+          description: "Move the slider past a stage boundary to update progress.",
+        });
+        return;
+      }
+
       // Apply all status changes
       for (const update of stageUpdates) {
-        const stage = stages.find(s => s.id === update.id);
-        
-        await (supabase as any)
+        await supabase
           .from('production_stages')
           .update({ status: update.newStatus })
           .eq('id', update.id);
 
         // Create status change record
-        await (supabase as any)
+        await supabase
           .from('production_stage_updates')
           .insert({
             stage_id: update.id,
             updated_by: user.id,
             update_type: 'status_change',
-            previous_status: stage?.status || 'pending',
+            previous_status: update.previousStatus,
             new_status: update.newStatus,
           });
       }
 
-      if (stageUpdates.length > 0) {
-        await fetchOrderAndStages();
-        toast({
-          title: "Progress Updated",
-          description: `Production set to ${targetPercent}%`,
-        });
-      }
+      await fetchOrderAndStages();
+      toast({
+        title: "Progress Updated",
+        description: `Production set to ${targetPercent}%`,
+      });
     } catch (error: any) {
       console.error('Error updating progress:', error);
       toast({
