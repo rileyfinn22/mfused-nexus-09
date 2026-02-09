@@ -982,23 +982,68 @@ export function ProductionStageTimeline({
                         );
                       })()}
                       
-                      {/* Quick Stats - Only show for images/files when not expanded */}
-                      {hasUpdates && !isExpanded && (
-                        <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-                          {stage.production_stage_updates.some(u => u.image_url) && (
-                            <span className="flex items-center gap-1">
-                              <ImageIcon className="h-3 w-3" />
-                              {stage.production_stage_updates.filter(u => u.image_url).length} images
-                            </span>
-                          )}
-                          {stage.production_stage_updates.some(u => u.file_url) && (
-                            <span className="flex items-center gap-1">
+                      {/* Recent Files/Images - Always visible */}
+                      {(() => {
+                        const fileUpdates = stage.production_stage_updates
+                          .filter(u => u.image_url || u.file_url)
+                          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                          .slice(0, 5);
+                        
+                        if (fileUpdates.length === 0) return null;
+                        
+                        return (
+                          <div className="mt-3 space-y-2">
+                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
                               <FileText className="h-3 w-3" />
-                              {stage.production_stage_updates.filter(u => u.file_url).length} files
-                            </span>
-                          )}
-                        </div>
-                      )}
+                              Recent Attachments
+                            </Label>
+                            <div className="flex flex-wrap gap-2">
+                              {fileUpdates.map((update) => {
+                                const hasImage = !!update.image_url;
+                                return (
+                                  <a
+                                    key={update.id}
+                                    href={hasImage ? update.image_url! : update.file_url!}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={cn(
+                                      "inline-flex items-center gap-2 px-3 py-2 rounded-full border transition-all hover:shadow-sm",
+                                      hasImage
+                                        ? "bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:border-purple-800"
+                                        : "bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800"
+                                    )}
+                                  >
+                                    {hasImage ? (
+                                      <ImageIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                                    ) : (
+                                      <FileText className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                    )}
+                                    <span className={cn(
+                                      "text-xs font-medium max-w-[120px] truncate",
+                                      hasImage ? "text-purple-700 dark:text-purple-300" : "text-amber-700 dark:text-amber-300"
+                                    )}>
+                                      {hasImage ? 'Image' : (update.file_name || 'Document')}
+                                    </span>
+                                    <Download className={cn(
+                                      "h-3 w-3",
+                                      hasImage ? "text-purple-600 dark:text-purple-400" : "text-amber-600 dark:text-amber-400"
+                                    )} />
+                                  </a>
+                                );
+                              })}
+                              {stage.production_stage_updates.filter(u => u.image_url || u.file_url).length > 5 && !isExpanded && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpand(stage.id)}
+                                  className="text-xs text-primary hover:underline self-center"
+                                >
+                                  +{stage.production_stage_updates.filter(u => u.image_url || u.file_url).length - 5} more...
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                     
                     {/* Expandable Updates Section */}
