@@ -178,15 +178,32 @@ Deno.serve(async (req) => {
 
       const existingMap = new Map((existingStages || []).map(s => [s.stage_name, s]));
 
+      // First pass: determine raw statuses and find the highest stage with content
+      const rawStatuses: string[] = [];
+      let highestFilledIndex = -1;
       for (let i = 0; i < ALL_STAGES.length; i++) {
         const stageName = ALL_STAGES[i];
         const sheetColIdx = stageColMap[stageName];
         const sheetValue = sheetColIdx !== undefined ? row[sheetColIdx] : undefined;
-        const newStatus = parseStageStatus(sheetValue);
+        const status = parseStageStatus(sheetValue);
+        rawStatuses.push(status);
+        if (status !== "pending") {
+          highestFilledIndex = i;
+        }
+      }
+
+      // Second pass: mark all stages before the highest filled one as completed
+      for (let i = 0; i < ALL_STAGES.length; i++) {
+        const stageName = ALL_STAGES[i];
+        let newStatus: string;
+        if (i < highestFilledIndex) {
+          newStatus = "completed";
+        } else {
+          newStatus = rawStatuses[i];
+        }
 
         const existing = existingMap.get(stageName);
         if (existing) {
-          // Only update if status differs
           if (existing.status !== newStatus) {
             await supabase
               .from("production_stages")
@@ -194,7 +211,6 @@ Deno.serve(async (req) => {
               .eq("id", existing.id);
           }
         } else {
-          // Create missing stage
           await supabase.from("production_stages").insert({
             order_id: order.id,
             stage_name: stageName,
