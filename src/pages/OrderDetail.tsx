@@ -28,12 +28,18 @@ import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 
 
 const STAGE_DEFINITIONS = [
-  { value: 'po_sent', label: 'PO Sent', order: 0, weight: 5, adminOnly: true },
-  { value: 'production_proceeding_part_1', label: 'Material Order and Securing', order: 1, weight: 15 },
-  { value: 'production_proceeding_part_2', label: 'Print and Converting', order: 2, weight: 50 },
-  { value: 'complete_qc', label: 'Packing and QC', order: 3, weight: 15 },
-  { value: 'shipped', label: 'Shipped', order: 4, weight: 10 },
-  { value: 'delivered', label: 'Delivered', order: 5, weight: 5 },
+  { value: 'estimate_sent', label: 'Estimate Sent', order: 0, weight: 5, adminOnly: true },
+  { value: 'art_approved', label: 'Art Approved', order: 1, weight: 5, adminOnly: true },
+  { value: 'deposit_paid', label: 'Deposit Paid', order: 2, weight: 5, adminOnly: true },
+  { value: 'order_confirmed', label: 'Order Confirmed', order: 3, weight: 5, adminOnly: true },
+  { value: 'po_sent', label: 'PO Sent', order: 4, weight: 5, adminOnly: true },
+  { value: 'materials_ordered', label: 'Materials Ordered', order: 5, weight: 10 },
+  { value: 'pre_press', label: 'Pre-Press', order: 6, weight: 15 },
+  { value: 'proof_approved', label: 'Proof Approved', order: 7, weight: 10 },
+  { value: 'vendor_deposit', label: 'Vendor Deposit', order: 8, weight: 5, adminOnly: true },
+  { value: 'production_complete', label: 'Production Complete', order: 9, weight: 15 },
+  { value: 'in_transit', label: 'In Transit', order: 10, weight: 15 },
+  { value: 'delivered', label: 'Delivered', order: 11, weight: 5 },
 ];
 
 // Keep STAGE_NAMES for backward compatibility

@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.parse-vendor-packing-list]
 verify_jwt = true
+
+[functions.sync-google-sheet]
+verify_jwt = true
