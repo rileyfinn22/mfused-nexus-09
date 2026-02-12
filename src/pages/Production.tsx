@@ -7,11 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays, Building2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays, Building2, RefreshCw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductionProgressBar, ProductionStatusIndicator } from "@/components/ProductionProgressBar";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 // Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
 const parseDateAsLocal = (dateStr: string | null): Date | undefined => {
@@ -63,6 +66,11 @@ export default function Production() {
   const [roleChecked, setRoleChecked] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>(searchParams.get('company') || 'all');
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [syncSpreadsheetId, setSyncSpreadsheetId] = useState("");
+  const [syncSheetName, setSyncSheetName] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const { activeCompanyId } = useActiveCompany();
 
   useEffect(() => {
     checkRole();
@@ -336,11 +344,17 @@ export default function Production() {
 
   // Weighted progress calculation: PO Sent 5% (admin only), Material 15%, Print 50%, QC 15%, Shipped 10%, Delivered 5%
   const STAGE_WEIGHTS: Record<string, number> = {
+    'estimate_sent': 5,
+    'art_approved': 5,
+    'deposit_paid': 5,
+    'order_confirmed': 5,
     'po_sent': 5,
-    'production_proceeding_part_1': 15,
-    'production_proceeding_part_2': 50,
-    'complete_qc': 15,
-    'shipped': 10,
+    'materials_ordered': 10,
+    'pre_press': 15,
+    'proof_approved': 10,
+    'vendor_deposit': 5,
+    'production_complete': 15,
+    'in_transit': 15,
     'delivered': 5,
   };
 
@@ -466,6 +480,36 @@ export default function Production() {
         description: "Failed to update completion date",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleGoogleSheetSync = async () => {
+    if (!syncSpreadsheetId.trim()) {
+      toast({ title: "Error", description: "Please enter a Spreadsheet ID", variant: "destructive" });
+      return;
+    }
+    const companyId = selectedCompanyId !== 'all' ? selectedCompanyId : activeCompanyId;
+    if (!companyId) {
+      toast({ title: "Error", description: "Please select a company first", variant: "destructive" });
+      return;
+    }
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-google-sheet', {
+        body: { spreadsheetId: syncSpreadsheetId.trim(), sheetName: syncSheetName.trim() || undefined, companyId },
+      });
+      if (error) throw error;
+      toast({
+        title: "Sync Complete",
+        description: `Synced ${data.synced} orders, ${data.skipped} skipped`,
+      });
+      setSyncDialogOpen(false);
+      fetchProductionOrders();
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast({ title: "Sync Failed", description: error.message || "Failed to sync from Google Sheet", variant: "destructive" });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -716,6 +760,55 @@ export default function Production() {
               : "Monitor orders in production and track stage progress"}
           </p>
         </div>
+        {isVibeAdmin && (
+          <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Sync Google Sheet
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Sync from Google Sheets</DialogTitle>
+                <DialogDescription>
+                  Enter the Spreadsheet ID from the URL and optionally a sheet tab name.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Spreadsheet ID</Label>
+                  <Input
+                    placeholder="e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+                    value={syncSpreadsheetId}
+                    onChange={(e) => setSyncSpreadsheetId(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Found in the Google Sheets URL between /d/ and /edit
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Sheet Tab Name (optional)</Label>
+                  <Input
+                    placeholder="e.g. Sheet1"
+                    value={syncSheetName}
+                    onChange={(e) => setSyncSheetName(e.target.value)}
+                  />
+                </div>
+                {selectedCompanyId === 'all' && !activeCompanyId && (
+                  <p className="text-sm text-destructive">Please select a company before syncing.</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSyncDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleGoogleSheetSync} disabled={syncing}>
+                  {syncing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {syncing ? "Syncing..." : "Sync Now"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">

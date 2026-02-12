@@ -552,7 +552,7 @@ export function ProductionStageTimeline({
                       </div>
                       
                       {/* Sub-stages for Material Order and Securing */}
-                      {(isVibeAdmin || isVendor) && stageDef.value === 'production_proceeding_part_1' && onSubstageComplete && (
+                      {(isVibeAdmin || isVendor) && stageDef.value === 'materials_ordered' && onSubstageComplete && (
                         <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
                           <Label className="text-xs text-muted-foreground mb-2 block">Material Sub-stages</Label>
                           <div className="flex gap-2 flex-wrap items-center">
@@ -628,7 +628,7 @@ export function ProductionStageTimeline({
                       )}
 
                       {/* Sub-stages for Print and Converting */}
-                      {(isVibeAdmin || isVendor) && stageDef.value === 'production_proceeding_part_2' && onSubstageComplete && (
+                      {(isVibeAdmin || isVendor) && stageDef.value === 'pre_press' && onSubstageComplete && (
                         <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
                           <Label className="text-xs text-muted-foreground mb-2 block">Production Sub-stages</Label>
                           <div className="flex gap-2 flex-wrap items-center">
@@ -704,7 +704,7 @@ export function ProductionStageTimeline({
                       )}
 
                       {/* Sub-stages for Packing and QC */}
-                      {(isVibeAdmin || isVendor) && stageDef.value === 'complete_qc' && onSubstageComplete && (
+                      {(isVibeAdmin || isVendor) && stageDef.value === 'production_complete' && onSubstageComplete && (
                         <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
                           <Label className="text-xs text-muted-foreground mb-2 block">QC Sub-stages</Label>
                           <div className="flex gap-2 flex-wrap items-center">
