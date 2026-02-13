@@ -59,6 +59,7 @@ interface ProductionStageTimelineProps {
   onInternalNotesChange?: (stageId: string, notes: string) => Promise<void>;
   onVendorAssign?: (stageId: string, vendorId: string) => void;
   onProgressSliderChange?: (newProgress: number) => Promise<void>;
+  savedProgress?: number;
   vendors?: { id: string; name: string }[];
   isVibeAdmin: boolean;
   isVendor: boolean;
@@ -92,6 +93,7 @@ export function ProductionStageTimeline({
   onInternalNotesChange,
   onVendorAssign,
   onProgressSliderChange,
+  savedProgress,
   vendors = [],
   isVibeAdmin,
   isVendor,
@@ -298,6 +300,8 @@ export function ProductionStageTimeline({
   };
 
   const progressPercent = calculateWeightedProgress();
+  // For admin slider: use savedProgress from DB if available, otherwise fall back to calculated
+  const adminSliderPercent = savedProgress ?? progressPercent;
 
   const getProgressGradient = (percent: number) => {
     if (percent >= 100) return "from-green-400 to-green-600";
@@ -321,7 +325,7 @@ export function ProductionStageTimeline({
     }
   };
 
-  const displayPercent = isSliding && sliderValue !== null ? sliderValue : progressPercent;
+  const displayPercent = isSliding && sliderValue !== null ? sliderValue : adminSliderPercent;
 
   return (
     <div className="space-y-6">
@@ -343,7 +347,7 @@ export function ProductionStageTimeline({
               <div className="flex items-center gap-3">
                 <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <Slider
-                  value={[isSliding && sliderValue !== null ? sliderValue : progressPercent]}
+                  value={[isSliding && sliderValue !== null ? sliderValue : adminSliderPercent]}
                   onValueChange={(value) => {
                     setIsSliding(true);
                     setSliderValue(value[0]);
