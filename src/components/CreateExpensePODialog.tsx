@@ -202,7 +202,7 @@ export function CreateExpensePODialog({ open, onOpenChange, onCreated }: CreateE
           po_number: poNumber,
           vendor_id: selectedVendorId,
           company_id: roleData?.company_id,
-          customer_company_id: selectedCompanyId || null,
+          customer_company_id: selectedCompanyId && selectedCompanyId !== 'none' ? selectedCompanyId : null,
           po_type: "expense",
           expense_category: expenseCategory,
           description: description || null,
@@ -327,7 +327,7 @@ export function CreateExpensePODialog({ open, onOpenChange, onCreated }: CreateE
                     <SelectValue placeholder="Select customer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No customer link</SelectItem>
+                    <SelectItem value="none">No customer link</SelectItem>
                     {companies.map((company) => (
                       <SelectItem key={company.id} value={company.id}>
                         {company.name}
