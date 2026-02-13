@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 interface Quote {
   id: string;
@@ -50,38 +51,20 @@ interface Company {
 const Quotes = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
 
   useEffect(() => {
-    checkRole();
-  }, []);
-
-  useEffect(() => {
-    if (isVibeAdmin !== undefined) {
-      fetchQuotes();
-      if (isVibeAdmin) {
-        fetchCompanies();
-      }
+    fetchQuotes();
+    if (isVibeAdmin) {
+      fetchCompanies();
     }
-  }, [isVibeAdmin]);
-
-  const checkRole = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-      setIsVibeAdmin(data?.role === 'vibe_admin');
-    }
-  };
+  }, [isVibeAdmin, activeCompanyId]);
 
   const fetchCompanies = async () => {
     const { data } = await supabase
@@ -97,6 +80,11 @@ const Quotes = () => {
         .from('quotes')
         .select('*, company:companies(name)')
         .order('created_at', { ascending: false });
+
+      // Non-admin users: filter by active company
+      if (!isVibeAdmin && activeCompanyId) {
+        query = query.eq('company_id', activeCompanyId);
+      }
 
       const { data, error } = await query;
 

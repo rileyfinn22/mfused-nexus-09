@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { z } from "zod";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 const customerSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name too long"),
@@ -47,6 +48,7 @@ const customerSchema = z.object({
 
 const Customers = () => {
   const navigate = useNavigate();
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,7 +56,6 @@ const Customers = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [selectedCompanyForInvite, setSelectedCompanyForInvite] = useState<string | undefined>();
-  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<any>(null);
   const [formData, setFormData] = useState({
@@ -75,27 +76,22 @@ const Customers = () => {
 
   useEffect(() => {
     fetchCustomers();
-    checkVibeAdmin();
-  }, []);
-
-  const checkVibeAdmin = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase.rpc('has_role', { 
-        _user_id: user.id, 
-        _role: 'vibe_admin' 
-      });
-      setIsVibeAdmin(data === true);
-    }
-  };
+  }, [activeCompanyId, isVibeAdmin]);
 
   const fetchCustomers = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('companies')
       .select('*')
       .neq('name', 'VibePKG')
       .order('name');
+
+    // Non-admin users: only show their active company
+    if (!isVibeAdmin && activeCompanyId) {
+      query = query.eq('id', activeCompanyId);
+    }
+
+    const { data, error } = await query;
     
     if (error) {
       toast({
