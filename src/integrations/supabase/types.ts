@@ -970,6 +970,7 @@ export type Database = {
           parent_order_id: string | null
           po_number: string | null
           po_pdf_path: string | null
+          production_progress: number | null
           qb_estimate_id: string | null
           qb_project_id: string | null
           quote_id: string | null
@@ -1025,6 +1026,7 @@ export type Database = {
           parent_order_id?: string | null
           po_number?: string | null
           po_pdf_path?: string | null
+          production_progress?: number | null
           qb_estimate_id?: string | null
           qb_project_id?: string | null
           quote_id?: string | null
@@ -1080,6 +1082,7 @@ export type Database = {
           parent_order_id?: string | null
           po_number?: string | null
           po_pdf_path?: string | null
+          production_progress?: number | null
           qb_estimate_id?: string | null
           qb_project_id?: string | null
           quote_id?: string | null

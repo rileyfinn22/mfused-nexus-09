@@ -615,71 +615,18 @@ export default function ProductionDetail() {
     }
   };
 
-  // Handle slider-based progress change - updates stages to match target percentage
+  // Handle slider-based progress change - just stores the percentage, no stage auto-updates
   const handleProgressSliderChange = async (targetPercent: number) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      if (!orderId) return;
 
-      // Calculate cumulative weights and determine which stages should be completed/in-progress/pending
-      let cumulativeWeight = 0;
-      const stageUpdates: { id: string; newStatus: string; previousStatus: string }[] = [];
+      const { error } = await supabase
+        .from('orders')
+        .update({ production_progress: targetPercent })
+        .eq('id', orderId);
 
-      // Filter to visible stages for admins (include po_sent)
-      const visibleDefs = STAGE_DEFINITIONS.filter(def => !def.adminOnly || isVibeAdmin);
-      
-      for (const def of visibleDefs) {
-        const stage = stages.find(s => s.stage_name === def.value);
-        if (!stage) continue;
-        
-        const weight = def.weight ?? (100 / visibleDefs.length);
-        const stageEndPercent = cumulativeWeight + weight;
-        
-        let newStatus: string;
-        if (targetPercent >= stageEndPercent) {
-          newStatus = 'completed';
-        } else if (targetPercent > cumulativeWeight) {
-          newStatus = 'in_progress';
-        } else {
-          newStatus = 'pending';
-        }
-        
-        // Only update if status changed
-        if (stage.status !== newStatus) {
-          stageUpdates.push({ id: stage.id, newStatus, previousStatus: stage.status });
-        }
-        
-        cumulativeWeight = stageEndPercent;
-      }
+      if (error) throw error;
 
-      if (stageUpdates.length === 0) {
-        toast({
-          title: "No Change",
-          description: "Move the slider past a stage boundary to update progress.",
-        });
-        return;
-      }
-
-      // Apply all status changes
-      for (const update of stageUpdates) {
-        await supabase
-          .from('production_stages')
-          .update({ status: update.newStatus })
-          .eq('id', update.id);
-
-        // Create status change record
-        await supabase
-          .from('production_stage_updates')
-          .insert({
-            stage_id: update.id,
-            updated_by: user.id,
-            update_type: 'status_change',
-            previous_status: update.previousStatus,
-            new_status: update.newStatus,
-          });
-      }
-
-      await fetchOrderAndStages();
       toast({
         title: "Progress Updated",
         description: `Production set to ${targetPercent}%`,
@@ -789,6 +736,7 @@ export default function ProductionDetail() {
           onInternalNotesChange={isVibeAdmin ? handleInternalNotesChange : undefined}
           onVendorAssign={isVibeAdmin ? handleAssignVendor : undefined}
           onProgressSliderChange={isVibeAdmin ? handleProgressSliderChange : undefined}
+          savedProgress={(order as any)?.production_progress ?? undefined}
           vendors={vendors}
           isVibeAdmin={isVibeAdmin}
           isVendor={isVendor}
