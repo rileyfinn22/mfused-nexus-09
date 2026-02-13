@@ -86,7 +86,7 @@ export default function Production() {
     if (roleChecked) {
       fetchProductionOrders();
     }
-  }, [roleChecked, isVibeAdmin, isVendor, vendorId, selectedCompanyId]);
+  }, [roleChecked, isVibeAdmin, isVendor, vendorId, selectedCompanyId, activeCompanyId]);
 
   const handleCompanyChange = (value: string) => {
     setSelectedCompanyId(value);
@@ -257,9 +257,13 @@ export default function Production() {
           .neq('order_type', 'pull_ship')
           .is('parent_order_id', null);
 
-        // Apply company filter if selected
-        if (selectedCompanyId && selectedCompanyId !== 'all') {
-          query = query.eq('company_id', selectedCompanyId);
+        // Apply company filter
+        if (isVibeAdmin) {
+          if (selectedCompanyId && selectedCompanyId !== 'all') {
+            query = query.eq('company_id', selectedCompanyId);
+          }
+        } else if (activeCompanyId) {
+          query = query.eq('company_id', activeCompanyId);
         }
 
         const { data, error } = await query.order('order_date', { ascending: false });
@@ -292,9 +296,13 @@ export default function Production() {
           .neq('order_type', 'pull_ship')
           .is('parent_order_id', null);
 
-        // Apply company filter if selected
-        if (selectedCompanyId && selectedCompanyId !== 'all') {
-          completedQuery = completedQuery.eq('company_id', selectedCompanyId);
+        // Apply company filter
+        if (isVibeAdmin) {
+          if (selectedCompanyId && selectedCompanyId !== 'all') {
+            completedQuery = completedQuery.eq('company_id', selectedCompanyId);
+          }
+        } else if (activeCompanyId) {
+          completedQuery = completedQuery.eq('company_id', activeCompanyId);
         }
 
         const { data: completedData, error: completedError } = await completedQuery.order('order_date', { ascending: false });
