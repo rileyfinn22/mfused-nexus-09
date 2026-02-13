@@ -1166,7 +1166,25 @@ Thank you for your business.`;
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => window.open(po.attachment_url, '_blank')}
+                      onClick={async () => {
+                        // Extract file path from the stored public URL
+                        const url = po.attachment_url;
+                        const bucketPath = url.includes('/object/public/po-documents/')
+                          ? url.split('/object/public/po-documents/')[1]
+                          : null;
+                        
+                        if (bucketPath) {
+                          const { data } = await supabase.storage
+                            .from('po-documents')
+                            .createSignedUrl(decodeURIComponent(bucketPath), 3600);
+                          if (data?.signedUrl) {
+                            window.open(data.signedUrl, '_blank');
+                            return;
+                          }
+                        }
+                        // Fallback to direct URL
+                        window.open(url, '_blank');
+                      }}
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
                       View
