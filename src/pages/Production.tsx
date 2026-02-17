@@ -187,6 +187,7 @@ export default function Production() {
               shipping_state,
               total,
               estimated_delivery_date,
+              production_progress,
               updated_at,
               status,
               companies (
@@ -206,24 +207,25 @@ export default function Production() {
           const { data: completedData, error: completedError } = await supabase
             .from('orders')
             .select(`
-              id,
-              order_number,
-              customer_name,
-              order_date,
-              company_id,
-              po_number,
-              description,
-              shipping_state,
-              total,
-              estimated_delivery_date,
-              updated_at,
-              status,
-              companies (
-                name
-              )
-            `)
-            .in('id', orderIds)
-            .in('status', ['shipped', 'delivered', 'completed'])
+            id,
+            order_number,
+            customer_name,
+            order_date,
+            company_id,
+            po_number,
+            description,
+            shipping_state,
+            total,
+            estimated_delivery_date,
+            production_progress,
+            updated_at,
+            status,
+            companies (
+              name
+            )
+          `)
+          .in('id', orderIds)
+          .in('status', ['shipped', 'delivered', 'completed'])
             .neq('order_type', 'pull_ship')
             .is('parent_order_id', null)
             .order('order_date', { ascending: false });
@@ -246,6 +248,7 @@ export default function Production() {
             shipping_state,
             total,
             estimated_delivery_date,
+            production_progress,
             order_finalized_at,
             updated_at,
             status,
@@ -285,6 +288,7 @@ export default function Production() {
             shipping_state,
             total,
             estimated_delivery_date,
+            production_progress,
             order_finalized_at,
             updated_at,
             status,
@@ -311,29 +315,16 @@ export default function Production() {
         completedOrdersData = completedData || [];
       }
       
-      // Fetch production stages for each order to calculate progress
-      const ordersWithProgress = await Promise.all(
-        ordersData.map(async (order) => {
-          let stagesQuery = supabase
-            .from('production_stages')
-            .select('status, stage_name')
-            .eq('order_id', order.id);
+      // Use production_progress from the database directly
+      const ordersWithProgress = ordersData.map(order => ({
+        ...order,
+        production_progress: order.production_progress ?? 0,
+      }));
 
-          // Vendors only see their assigned stages
-          if (isVendor && vendorId) {
-            stagesQuery = stagesQuery.eq('vendor_id', vendorId);
-          }
-
-          const { data: stages } = await stagesQuery;
-          const progress = calculateProgress(stages || []);
-          return { ...order, production_progress: progress };
-        })
-      );
-
-      // Mark completed orders with 100% progress
+      // Completed orders use DB value, default to 100
       const completedWithProgress = completedOrdersData.map(order => ({
         ...order,
-        production_progress: 100
+        production_progress: order.production_progress ?? 100,
       }));
       
       setOrders(ordersWithProgress);
