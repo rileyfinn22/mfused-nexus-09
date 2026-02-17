@@ -354,7 +354,8 @@ export function ProductionStageTimeline({
                   }}
                   onValueCommit={handleSliderCommit}
                   max={100}
-                  step={5}
+                  min={0}
+                  step={1}
                   disabled={updatingProgress}
                   className="flex-1"
                 />
