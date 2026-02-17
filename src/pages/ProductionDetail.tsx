@@ -19,6 +19,7 @@ interface Order {
   status: string;
   description: string | null;
   estimated_delivery_date: string | null;
+  production_progress: number | null;
   companies: {
     name: string;
   };
@@ -180,6 +181,7 @@ export default function ProductionDetail() {
           status,
           description,
           estimated_delivery_date,
+          production_progress,
           companies (
             name
           )
@@ -630,7 +632,7 @@ export default function ProductionDetail() {
       if (error) throw error;
 
       // Update local state so the slider reflects the new value
-      setOrder(prev => prev ? { ...prev, production_progress: targetPercent } as any : prev);
+      setOrder(prev => prev ? { ...prev, production_progress: targetPercent } : prev);
 
       toast({
         title: "Progress Updated",
@@ -741,7 +743,7 @@ export default function ProductionDetail() {
           onInternalNotesChange={isVibeAdmin ? handleInternalNotesChange : undefined}
           onVendorAssign={isVibeAdmin ? handleAssignVendor : undefined}
           onProgressSliderChange={isVibeAdmin ? handleProgressSliderChange : undefined}
-          savedProgress={(order as any)?.production_progress ?? undefined}
+          savedProgress={order?.production_progress ?? undefined}
           vendors={vendors}
           isVibeAdmin={isVibeAdmin}
           isVendor={isVendor}
