@@ -247,23 +247,23 @@ const InvoiceDetail = () => {
       // Check if this is a deposit invoice (no allocations, but has deposit note)
       const isDepositInvoice = invoiceData.notes && invoiceData.notes.includes('deposit payment');
 
-      // ALWAYS use allocated items for display, regardless of invoice type
-      // This shows only what was actually included on THIS specific invoice
-      if (allocationsData.length > 0) {
+      // Blanket/full invoices always show ALL order items with ordered quantities
+      const isBlanketInvoice = invoiceData.invoice_type === 'full' && invoiceData.shipment_number === 1;
+      
+      if (isBlanketInvoice || isDepositInvoice) {
+        // Blanket and deposit invoices show all order items with original quantities
+        setEditedItems(invoiceData.orders?.order_items || []);
+      } else if (allocationsData.length > 0) {
+        // Shipment/partial invoices show only allocated items
         const invoiceItems = allocationsData.map((alloc: any) => ({
           ...alloc.order_items,
           quantity: alloc.quantity_allocated,
-          // Use allocated quantity as the quantity for this invoice
           shipped_quantity: alloc.quantity_allocated,
           total: alloc.quantity_allocated * (alloc.order_items?.unit_price || 0)
         }));
         setEditedItems(invoiceItems);
-      } else if (isDepositInvoice) {
-        // Deposit invoices show all order items with original quantities
-        // The deposit percentage is already reflected in the invoice total
-        setEditedItems(invoiceData.orders?.order_items || []);
       } else {
-        // No allocations yet - show empty or all items based on invoice type
+        // No allocations yet - show all items for full invoices, empty for partials
         setEditedItems(invoiceData.invoice_type === 'full' ? invoiceData.orders?.order_items || [] : []);
       }
     } else {
@@ -963,18 +963,21 @@ const InvoiceDetail = () => {
       // Update each order item
       for (const item of editedItems) {
         const newShippedQty = Number(item.shipped_quantity) || 0;
-        const newTotal = newShippedQty * Number(item.unit_price);
+        // For blanket invoices, total should be based on ORDERED quantity, not shipped
+        const orderedTotal = Number(item.quantity) * Number(item.unit_price);
+        const shippedTotal = newShippedQty * Number(item.unit_price);
+        
         const {
           error
         } = await supabase.from('order_items').update({
           shipped_quantity: newShippedQty,
           unit_price: item.unit_price,
-          total: newTotal
+          total: orderedTotal // Always use ordered quantity for item total
         }).eq('id', item.id);
         if (error) throw error;
         
-        // For blanket invoices being shipped directly, create/update inventory allocations
-        if (isBlanketInvoice && newShippedQty > 0) {
+        // Only create allocations for shipment/partial invoices, NOT blanket invoices
+        if (!isBlanketInvoice && newShippedQty > 0) {
           // Check if allocation already exists
           const { data: existingAlloc } = await supabase
             .from('inventory_allocations')
@@ -1004,16 +1007,20 @@ const InvoiceDetail = () => {
         }
       }
 
-      // Recalculate order totals based on shipped quantities
-      const newSubtotal = editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
+      // Recalculate totals - blanket uses ordered quantities, shipments use shipped
+      const newSubtotal = isBlanketInvoice
+        ? editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0)
+        : editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
       const newTotal = newSubtotal + Number(invoice.tax || 0);
 
-      // Update order totals
+      // Update order totals (always based on ordered quantities)
+      const orderSubtotal = editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0);
+      const orderTotal = orderSubtotal + Number(invoice.tax || 0);
       const {
         error: orderError
       } = await supabase.from('orders').update({
-        subtotal: newSubtotal,
-        total: newTotal
+        subtotal: orderSubtotal,
+        total: orderTotal
       }).eq('id', invoice.order_id);
       if (orderError) throw orderError;
 
