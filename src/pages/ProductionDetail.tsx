@@ -629,6 +629,9 @@ export default function ProductionDetail() {
 
       if (error) throw error;
 
+      // Update local state so the slider reflects the new value
+      setOrder(prev => prev ? { ...prev, production_progress: targetPercent } as any : prev);
+
       toast({
         title: "Progress Updated",
         description: `Production set to ${targetPercent}%`,
