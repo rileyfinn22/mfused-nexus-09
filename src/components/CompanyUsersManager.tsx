@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, UserPlus, Users, Shield, User, Search, Link } from "lucide-react";
+import { Plus, Trash2, UserPlus, Users, Shield, User, Search, Link, Copy, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { InviteCompanyUserDialog } from "@/components/InviteCompanyUserDialog";
@@ -49,6 +49,7 @@ interface PendingInvite {
   status: string;
   created_at: string;
   expires_at: string;
+  invitation_token: string;
 }
 
 interface PortalUser {
@@ -60,6 +61,23 @@ interface PortalUser {
 interface CompanyUsersManagerProps {
   companyId: string;
   companyName?: string;
+}
+
+function CopyInviteLinkButton({ token }: { token: string }) {
+  const [copied, setCopied] = useState(false);
+  const link = `https://vibepkgportal.com/accept-invite?token=${token}`;
+  const handleCopy = () => {
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast({ title: "Copied!", description: "Invite link copied to clipboard" });
+  };
+  return (
+    <Button variant="ghost" size="sm" onClick={handleCopy} className="gap-1">
+      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      {copied ? "Copied" : "Copy Link"}
+    </Button>
+  );
 }
 
 export function CompanyUsersManager({ companyId, companyName }: CompanyUsersManagerProps) {
@@ -136,7 +154,7 @@ export function CompanyUsersManager({ companyId, companyName }: CompanyUsersMana
     try {
       const { data, error } = await supabase
         .from("company_invitations")
-        .select("id, email, role, status, created_at, expires_at")
+        .select("id, email, role, status, created_at, expires_at, invitation_token")
         .eq("company_id", companyId)
         .eq("status", "pending")
         .gt("expires_at", new Date().toISOString())
@@ -421,16 +439,19 @@ export function CompanyUsersManager({ companyId, companyName }: CompanyUsersMana
                       </div>
                     </div>
                   </div>
-                  {isVibeAdmin && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCancelInvite(invite.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      Cancel
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1">
+                    <CopyInviteLinkButton token={invite.invitation_token} />
+                    {isVibeAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCancelInvite(invite.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </>
