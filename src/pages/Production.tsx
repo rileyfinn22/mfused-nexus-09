@@ -846,14 +846,12 @@ export default function Production() {
           emptyMessage="No orders in production"
         />
 
-        {/* Completed Orders */}
-        {filteredCompletedOrders.length > 0 && (
-          <OrderTable 
-            orderList={filteredCompletedOrders} 
-            title="Completed Orders" 
-            emptyMessage="No completed orders"
-          />
-        )}
+        {/* Completed Orders - Always show section */}
+        <OrderTable 
+          orderList={filteredCompletedOrders} 
+          title="Completed Orders" 
+          emptyMessage="No completed orders yet — orders auto-complete when all invoices are paid"
+        />
       </div>
     </div>
   );
