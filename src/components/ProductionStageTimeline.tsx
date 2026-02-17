@@ -517,31 +517,31 @@ export function ProductionStageTimeline({
 
               {/* Action Buttons */}
               {(isVibeAdmin || isVendor) && (
-                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/50 flex-wrap">
                   {onQuickStatusChange && (
                     <>
                       {stage.status === 'pending' && (
-                        <Button size="sm" variant="outline" className="h-8 text-xs border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'in_progress')}>
-                          {isUpdating ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Clock className="h-3 w-3 mr-1" />} Start
+                        <Button size="sm" variant="outline" className="h-9 text-xs font-medium border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'in_progress')}>
+                          {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Clock className="h-3.5 w-3.5 mr-1.5" />} Mark In Progress
                         </Button>
                       )}
                       {stage.status === 'in_progress' && (
-                        <Button size="sm" variant="outline" className="h-8 text-xs border-green-500/50 text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'completed')}>
-                          {isUpdating ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />} Complete
+                        <Button size="sm" variant="outline" className="h-9 text-xs font-medium border-green-500/50 text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'completed')}>
+                          {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />} Mark Complete
                         </Button>
                       )}
                       {stage.status === 'completed' && isVibeAdmin && (
-                        <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'pending')}>
-                          {isUpdating ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null} Reset
+                        <Button size="sm" variant="ghost" className="h-9 text-xs text-muted-foreground" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'pending')}>
+                          {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null} Reset
                         </Button>
                       )}
                     </>
                   )}
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => onUpdateClick(stage, stageDef)}>
-                    <Upload className="h-3 w-3 mr-1" /> Add Update
+                  <Button size="sm" variant="default" className="h-9 text-xs font-medium" onClick={() => onUpdateClick(stage, stageDef)}>
+                    <MessageSquare className="h-3.5 w-3.5 mr-1.5" /> Add Note
                   </Button>
                   {isVibeAdmin && onVendorAssign && vendors.length > 0 && (
-                    <select className="h-8 text-xs border rounded px-2 bg-background text-foreground" value={stage.vendor_id || ''} onChange={(e) => { if (e.target.value) onVendorAssign(stage.id, e.target.value); }}>
+                    <select className="h-9 text-xs border rounded-lg px-2 bg-background text-foreground" value={stage.vendor_id || ''} onChange={(e) => { if (e.target.value) onVendorAssign(stage.id, e.target.value); }}>
                       <option value="">Assign vendor...</option>
                       {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
                     </select>

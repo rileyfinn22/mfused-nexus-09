@@ -898,16 +898,32 @@ export default function ProductionDetail() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              Add Note to {selectedStageDef?.label} Stage
+              Update {selectedStageDef?.label} Stage
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Status Change */}
+            {(isVibeAdmin || isVendor) && selectedStage && (
+              <div>
+                <Label>Stage Status</Label>
+                <Select value={newStatus} onValueChange={setNewStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
-              <Label>Note</Label>
+              <Label>Note <span className="text-muted-foreground font-normal">(visible to customers)</span></Label>
               <Textarea
                 value={updateNote}
                 onChange={(e) => setUpdateNote(e.target.value)}
-                placeholder="Type your note here..."
+                placeholder="Type your note here... This will be visible to customers."
                 rows={4}
               />
             </div>
@@ -924,16 +940,16 @@ export default function ProductionDetail() {
                 </p>
               )}
             </div>
-            <Button onClick={handleUpdateStage} disabled={uploading || (!updateNote.trim() && !updateFile)} className="w-full">
+            <Button onClick={handleUpdateStage} disabled={uploading || (!updateNote.trim() && !updateFile && newStatus === selectedStage?.status)} className="w-full">
               {uploading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Adding...
+                  Saving...
                 </>
               ) : (
                 <>
                   <Upload className="h-4 w-4 mr-2" />
-                  Add Note
+                  Save Update
                 </>
               )}
             </Button>
