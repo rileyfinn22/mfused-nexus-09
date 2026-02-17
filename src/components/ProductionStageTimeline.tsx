@@ -327,6 +327,301 @@ export function ProductionStageTimeline({
 
   const displayPercent = isSliding && sliderValue !== null ? sliderValue : adminSliderPercent;
 
+  const renderStageCard = (stageDef: StageDefinition) => {
+    const stage = getStageData(stageDef.value);
+    if (!stage) return null;
+    
+    const isExpanded = expandedStages.has(stage.id);
+    const hasUpdates = stage.production_stage_updates.length > 0;
+    const isActive = stage.status === 'in_progress';
+    const isComplete = stage.status === 'completed';
+    const isUpdating = updatingStages.has(stage.id);
+    
+    const customSubstages = stage.production_stage_updates.filter(u => u.note_text?.includes('<!--CUSTOM_SUBSTAGE:'));
+    const recentAttachments = stage.production_stage_updates
+      .filter(u => u.update_type === 'image' || u.update_type === 'file')
+      .slice(-5);
+
+    return (
+      <div key={stage.id} className="relative pl-12">
+        <div
+          className={cn(
+            "absolute left-4 top-5 w-5 h-5 rounded-full border-2 flex items-center justify-center z-10 transition-all",
+            isComplete ? "bg-green-500 border-green-500" :
+            isActive ? "bg-blue-500 border-blue-500 ring-4 ring-blue-500/20" :
+            "bg-background border-muted-foreground/30"
+          )}
+        >
+          {isComplete && <CheckCircle2 className="h-3 w-3 text-white" />}
+          {isActive && <div className="h-2 w-2 bg-white rounded-full animate-pulse" />}
+        </div>
+        
+        <Collapsible open={isExpanded} onOpenChange={() => toggleExpand(stage.id)}>
+          <div
+            className={cn(
+              "border rounded-xl transition-all",
+              isActive ? "border-blue-500/50 bg-blue-50/5 shadow-sm shadow-blue-500/10" :
+              isComplete ? "border-green-500/30 bg-green-50/5" :
+              "border-border bg-card"
+            )}
+          >
+            <div className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-medium text-foreground">{stageDef.label}</h4>
+                      {getStatusBadge(stage.status)}
+                      {isVibeAdmin && stageDef.adminOnly && (
+                        <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 bg-amber-50/30 dark:bg-amber-500/5">
+                          Internal
+                        </Badge>
+                      )}
+                    </div>
+                    {stage.vendors?.name && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Assigned to: <span className="font-medium text-foreground">{stage.vendors.name}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {hasUpdates && (
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="px-2">
+                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        <span className="ml-1 text-xs text-muted-foreground">{stage.production_stage_updates.length}</span>
+                      </Button>
+                    </CollapsibleTrigger>
+                  )}
+                </div>
+              </div>
+              
+              {/* Sub-stages for Material Order */}
+              {(isVibeAdmin || isVendor) && stageDef.value === 'materials_ordered' && onSubstageComplete && (
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
+                  <Label className="text-xs text-muted-foreground mb-2 block">Material Sub-stages</Label>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    {MATERIAL_SUBSTAGES.map((substage) => {
+                      const completed = isSubstageComplete(stage, substage.key);
+                      const substageKey = `${stage.id}-${substage.key}`;
+                      const updating = updatingSubstages.has(substageKey);
+                      return (
+                        <Button key={substage.key} size="sm" variant={completed ? 'default' : 'outline'} className={cn("h-9", completed && "bg-success hover:bg-success/90 cursor-default")} disabled={updating || completed} onClick={() => handleSubstageClick(stage.id, substage)}>
+                          {completed ? <CheckCircle2 className="h-3 w-3 mr-1.5" /> : updating ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <Circle className="h-3 w-3 mr-1.5" />}
+                          {substage.label}
+                        </Button>
+                      );
+                    })}
+                    {showCustomInput[`material_${stage.id}`] ? (
+                      <div className="flex items-center gap-1">
+                        <Input placeholder="Custom note..." value={customSubstageInputs[`material_${stage.id}`] || ''} onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`material_${stage.id}`]: e.target.value }))} className="h-9 w-32 text-sm" onKeyDown={(e) => { if (e.key === 'Enter') handleAddCustomSubstage(stage.id); }} />
+                        <Button size="sm" className="h-9" disabled={addingCustomSubstage.has(stage.id)} onClick={() => handleAddCustomSubstage(stage.id)}>{addingCustomSubstage.has(stage.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}</Button>
+                        <Button size="sm" variant="ghost" className="h-9 px-2" onClick={() => setShowCustomInput(prev => ({ ...prev, [`material_${stage.id}`]: false }))}><X className="h-3 w-3" /></Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={() => setShowCustomInput(prev => ({ ...prev, [`material_${stage.id}`]: true }))}><Plus className="h-3 w-3 mr-1" /> Custom</Button>
+                    )}
+                    {customSubstages.map((update) => {
+                      const label = update.note_text?.match(/<!--CUSTOM_SUBSTAGE:(.*?)-->/)?.[1] || 'Custom';
+                      return <Badge key={update.id} variant="default" className="bg-success hover:bg-success/90 gap-1"><CheckCircle2 className="h-3 w-3" />{label}</Badge>;
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-stages for Pre-Press */}
+              {(isVibeAdmin || isVendor) && stageDef.value === 'pre_press' && onSubstageComplete && (
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
+                  <Label className="text-xs text-muted-foreground mb-2 block">Print Sub-stages</Label>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    {PRINT_SUBSTAGES.map((substage) => {
+                      const completed = isSubstageComplete(stage, substage.key);
+                      const substageKey = `${stage.id}-${substage.key}`;
+                      const updating = updatingSubstages.has(substageKey);
+                      return (
+                        <Button key={substage.key} size="sm" variant={completed ? 'default' : 'outline'} className={cn("h-9", completed && "bg-success hover:bg-success/90 cursor-default")} disabled={updating || completed} onClick={() => handleSubstageClick(stage.id, substage)}>
+                          {completed ? <CheckCircle2 className="h-3 w-3 mr-1.5" /> : updating ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <Circle className="h-3 w-3 mr-1.5" />}
+                          {substage.label}
+                        </Button>
+                      );
+                    })}
+                    {showCustomInput[`print_${stage.id}`] ? (
+                      <div className="flex items-center gap-1">
+                        <Input placeholder="Custom note..." value={customSubstageInputs[`print_${stage.id}`] || ''} onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`print_${stage.id}`]: e.target.value }))} className="h-9 w-32 text-sm" onKeyDown={(e) => { if (e.key === 'Enter') handleAddCustomSubstage(stage.id); }} />
+                        <Button size="sm" className="h-9" disabled={addingCustomSubstage.has(stage.id)} onClick={() => handleAddCustomSubstage(stage.id)}>{addingCustomSubstage.has(stage.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}</Button>
+                        <Button size="sm" variant="ghost" className="h-9 px-2" onClick={() => setShowCustomInput(prev => ({ ...prev, [`print_${stage.id}`]: false }))}><X className="h-3 w-3" /></Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={() => setShowCustomInput(prev => ({ ...prev, [`print_${stage.id}`]: true }))}><Plus className="h-3 w-3 mr-1" /> Custom</Button>
+                    )}
+                    {customSubstages.map((update) => {
+                      const label = update.note_text?.match(/<!--CUSTOM_SUBSTAGE:(.*?)-->/)?.[1] || 'Custom';
+                      return <Badge key={update.id} variant="default" className="bg-success hover:bg-success/90 gap-1"><CheckCircle2 className="h-3 w-3" />{label}</Badge>;
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-stages for Production Complete (QC) */}
+              {(isVibeAdmin || isVendor) && stageDef.value === 'production_complete' && onSubstageComplete && (
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
+                  <Label className="text-xs text-muted-foreground mb-2 block">QC Sub-stages</Label>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    {QC_SUBSTAGES.map((substage) => {
+                      const completed = isSubstageComplete(stage, substage.key);
+                      const substageKey = `${stage.id}-${substage.key}`;
+                      const updating = updatingSubstages.has(substageKey);
+                      return (
+                        <Button key={substage.key} size="sm" variant={completed ? 'default' : 'outline'} className={cn("h-9", completed && "bg-success hover:bg-success/90 cursor-default")} disabled={updating || completed} onClick={() => handleSubstageClick(stage.id, substage)}>
+                          {completed ? <CheckCircle2 className="h-3 w-3 mr-1.5" /> : updating ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <Circle className="h-3 w-3 mr-1.5" />}
+                          {substage.label}
+                        </Button>
+                      );
+                    })}
+                    {showCustomInput[`qc_${stage.id}`] ? (
+                      <div className="flex items-center gap-1">
+                        <Input placeholder="Custom note..." value={customSubstageInputs[`qc_${stage.id}`] || ''} onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`qc_${stage.id}`]: e.target.value }))} className="h-9 w-32 text-sm" onKeyDown={(e) => { if (e.key === 'Enter') handleAddCustomSubstage(stage.id); }} />
+                        <Button size="sm" className="h-9" disabled={addingCustomSubstage.has(stage.id)} onClick={() => handleAddCustomSubstage(stage.id)}>{addingCustomSubstage.has(stage.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}</Button>
+                        <Button size="sm" variant="ghost" className="h-9 px-2" onClick={() => setShowCustomInput(prev => ({ ...prev, [`qc_${stage.id}`]: false }))}><X className="h-3 w-3" /></Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={() => setShowCustomInput(prev => ({ ...prev, [`qc_${stage.id}`]: true }))}><Plus className="h-3 w-3 mr-1" /> Custom</Button>
+                    )}
+                    {customSubstages.map((update) => {
+                      const label = update.note_text?.match(/<!--CUSTOM_SUBSTAGE:(.*?)-->/)?.[1] || 'Custom';
+                      return <Badge key={update.id} variant="default" className="bg-success hover:bg-success/90 gap-1"><CheckCircle2 className="h-3 w-3" />{label}</Badge>;
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Attachments */}
+              {recentAttachments.length > 0 && (
+                <div className="mt-3">
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Recent Attachments</Label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {recentAttachments.map((attachment) => (
+                      <a key={attachment.id} href={attachment.image_url || attachment.file_url || '#'} target="_blank" rel="noopener noreferrer"
+                        className={cn("inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors",
+                          attachment.update_type === 'image' ? "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-500/10 dark:text-purple-400" : "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/10 dark:text-amber-400"
+                        )}>
+                        {attachment.update_type === 'image' ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                        {attachment.file_name || 'Image'}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              {(isVibeAdmin || isVendor) && (
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  {onQuickStatusChange && (
+                    <>
+                      {stage.status === 'pending' && (
+                        <Button size="sm" variant="outline" className="h-8 text-xs border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'in_progress')}>
+                          {isUpdating ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Clock className="h-3 w-3 mr-1" />} Start
+                        </Button>
+                      )}
+                      {stage.status === 'in_progress' && (
+                        <Button size="sm" variant="outline" className="h-8 text-xs border-green-500/50 text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'completed')}>
+                          {isUpdating ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />} Complete
+                        </Button>
+                      )}
+                      {stage.status === 'completed' && isVibeAdmin && (
+                        <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'pending')}>
+                          {isUpdating ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null} Reset
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => onUpdateClick(stage, stageDef)}>
+                    <Upload className="h-3 w-3 mr-1" /> Add Update
+                  </Button>
+                  {isVibeAdmin && onVendorAssign && vendors.length > 0 && (
+                    <select className="h-8 text-xs border rounded px-2 bg-background text-foreground" value={stage.vendor_id || ''} onChange={(e) => { if (e.target.value) onVendorAssign(stage.id, e.target.value); }}>
+                      <option value="">Assign vendor...</option>
+                      {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* Internal Notes */}
+              {isVibeAdmin && onInternalNotesChange && (
+                <div className="mt-3 p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="text-xs text-muted-foreground flex items-center gap-1"><StickyNote className="h-3 w-3" /> Internal Notes</Label>
+                    {hasUnsavedNotes(stage.id, stage.internal_notes) && (
+                      <Button size="sm" variant="ghost" className="h-6 text-xs text-primary" disabled={savingNotes.has(stage.id)} onClick={() => handleSaveInternalNotes(stage.id)}>
+                        {savingNotes.has(stage.id) ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />} Save
+                      </Button>
+                    )}
+                  </div>
+                  <Textarea value={getInternalNotesValue(stage)} onChange={(e) => setInternalNotesEdits(prev => ({ ...prev, [stage.id]: e.target.value }))} placeholder="Add internal notes..." className="text-xs min-h-[60px] resize-none bg-background" />
+                </div>
+              )}
+            </div>
+
+            {/* Activity History */}
+            <CollapsibleContent>
+              <div className="px-4 pb-4 border-t border-border pt-3">
+                <Label className="text-xs text-muted-foreground mb-2 block">Activity History</Label>
+                <div className="space-y-2">
+                  {stage.production_stage_updates
+                    .filter(u => u.update_type !== 'status_change' || u.note_text || u.image_url || u.file_url)
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .map((update) => {
+                      const isCustomSub = update.note_text?.includes('<!--CUSTOM_SUBSTAGE:');
+                      const customLabel = update.note_text?.match(/<!--CUSTOM_SUBSTAGE:(.*?)-->/)?.[1];
+                      return (
+                        <div key={update.id} className={cn("flex items-start gap-2 p-2 rounded-lg transition-colors",
+                          update.update_type === 'note' ? 'bg-slate-100/80 dark:bg-slate-800/30 border-2 border-primary/20' :
+                          update.update_type === 'image' ? 'bg-purple-50 dark:bg-purple-900/10' :
+                          update.update_type === 'file' ? 'bg-amber-50 dark:bg-amber-900/10' :
+                          update.new_status === 'completed' ? 'bg-green-50 dark:bg-green-900/10 border-2 border-success/20' : 'bg-muted/30'
+                        )}>
+                          <div className="flex-shrink-0 mt-0.5">
+                            {update.update_type === 'note' ? <MessageSquare className="h-4 w-4 text-slate-500" /> :
+                             update.update_type === 'image' ? <ImageIcon className="h-4 w-4 text-purple-500" /> :
+                             update.update_type === 'file' ? <FileText className="h-4 w-4 text-amber-500" /> :
+                             update.new_status === 'completed' ? <CheckCircle2 className="h-4 w-4 text-green-500" /> :
+                             <Clock className="h-4 w-4 text-muted-foreground" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            {update.update_type === 'status_change' && <p className="text-sm">Status changed to <span className="font-medium capitalize">{update.new_status?.replace('_', ' ')}</span></p>}
+                            {update.note_text && !isCustomSub && <p className="text-sm whitespace-pre-wrap">{update.note_text}</p>}
+                            {isCustomSub && <p className="text-sm font-medium text-success">✓ {customLabel}</p>}
+                            {update.image_url && <a href={update.image_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1"><ImageIcon className="h-3 w-3" /> View Image</a>}
+                            {update.file_url && <a href={update.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1"><Download className="h-3 w-3" /> {update.file_name || 'Download File'}</a>}
+                            <p className="text-xs text-muted-foreground mt-1">{new Date(update.created_at).toLocaleDateString()} {new Date(update.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                          </div>
+                          {isVibeAdmin && onDeleteUpdate && (
+                            <button type="button" disabled={deletingUpdates.has(update.id)} onClick={(e) => { e.stopPropagation(); handleDeleteUpdate(update.id); }}
+                              className={cn("flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors", "hover:bg-destructive/20 text-muted-foreground hover:text-destructive")} title="Delete this update">
+                              {deletingUpdates.has(update.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  {stage.production_stage_updates.filter(u => u.update_type !== 'status_change' || u.note_text || u.image_url || u.file_url).length === 0 && (
+                    <div className="flex items-center gap-2 text-muted-foreground py-2">
+                      <Circle className="h-4 w-4 opacity-40" />
+                      <span className="text-sm">No activity yet</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Progress Overview */}
@@ -482,709 +777,60 @@ export function ProductionStageTimeline({
       </div>
 
       {/* Stage Cards */}
-      <div className="relative">
-        {/* Vertical Timeline Line */}
-        <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border" />
-        
-        <div className="space-y-3">
-          {visibleStageDefinitions.map((stageDef, index) => {
-            const stage = getStageData(stageDef.value);
-            if (!stage) return null;
-            
-            const isExpanded = expandedStages.has(stage.id);
-            const hasUpdates = stage.production_stage_updates.length > 0;
-            const isActive = stage.status === 'in_progress';
-            const isComplete = stage.status === 'completed';
-            const isUpdating = updatingStages.has(stage.id);
-            
+      {isVibeAdmin ? (
+        <>
+          {/* Internal Stages Section */}
+          {(() => {
+            const internalDefs = visibleStageDefinitions.filter(d => d.adminOnly);
+            if (internalDefs.length === 0) return null;
             return (
-              <div key={stage.id} className="relative pl-12">
-                {/* Timeline Node */}
-                <div
-                  className={cn(
-                    "absolute left-4 top-5 w-5 h-5 rounded-full border-2 flex items-center justify-center z-10 transition-all",
-                    isComplete ? "bg-green-500 border-green-500" :
-                    isActive ? "bg-blue-500 border-blue-500 ring-4 ring-blue-500/20" :
-                    "bg-background border-muted-foreground/30"
-                  )}
-                >
-                  {isComplete && <CheckCircle2 className="h-3 w-3 text-white" />}
-                  {isActive && <div className="h-2 w-2 bg-white rounded-full animate-pulse" />}
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-50/50 dark:bg-amber-500/10">
+                    Internal Only
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">Not visible to customers</span>
                 </div>
-                
-                <Collapsible open={isExpanded} onOpenChange={() => toggleExpand(stage.id)}>
-                  <div
-                    className={cn(
-                      "border rounded-xl transition-all",
-                      isActive ? "border-blue-500/50 bg-blue-50/5 shadow-sm shadow-blue-500/10" :
-                      isComplete ? "border-green-500/30 bg-green-50/5" :
-                      "border-border bg-card"
-                    )}
-                  >
-                    {/* Stage Header */}
-                    <div className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-medium text-foreground">{stageDef.label}</h4>
-                              {getStatusBadge(stage.status)}
-                            </div>
-                            {stage.vendors?.name && (
-                              <p className="text-sm text-muted-foreground mt-1">
-                                Assigned to: <span className="font-medium text-foreground">{stage.vendors.name}</span>
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {hasUpdates && (
-                            <CollapsibleTrigger asChild>
-                              <Button variant="ghost" size="sm" className="px-2">
-                                {isExpanded ? (
-                                  <ChevronUp className="h-4 w-4" />
-                                ) : (
-                                  <ChevronDown className="h-4 w-4" />
-                                )}
-                                <span className="ml-1 text-xs text-muted-foreground">
-                                  {stage.production_stage_updates.length}
-                                </span>
-                              </Button>
-                            </CollapsibleTrigger>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Sub-stages for Material Order and Securing */}
-                      {(isVibeAdmin || isVendor) && stageDef.value === 'materials_ordered' && onSubstageComplete && (
-                        <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
-                          <Label className="text-xs text-muted-foreground mb-2 block">Material Sub-stages</Label>
-                          <div className="flex gap-2 flex-wrap items-center">
-                            {MATERIAL_SUBSTAGES.map((substage) => {
-                              const isComplete = isSubstageComplete(stage, substage.key);
-                              const substageKey = `${stage.id}-${substage.key}`;
-                              const isSubstageUpdating = updatingSubstages.has(substageKey);
-                              return (
-                                <Button
-                                  key={substage.key}
-                                  size="sm"
-                                  variant={isComplete ? 'default' : 'outline'}
-                                  className={cn(
-                                    "h-9",
-                                    isComplete && "bg-success hover:bg-success/90 cursor-default"
-                                  )}
-                                  disabled={isSubstageUpdating || isComplete}
-                                  onClick={() => handleSubstageClick(stage.id, substage)}
-                                >
-                                  {isComplete ? (
-                                    <CheckCircle2 className="h-3 w-3 mr-1.5" />
-                                  ) : isSubstageUpdating ? (
-                                    <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                                  ) : (
-                                    <Circle className="h-3 w-3 mr-1.5" />
-                                  )}
-                                  {substage.label}
-                                </Button>
-                              );
-                            })}
-                            {/* Custom substage input */}
-                            {showCustomInput[`material_${stage.id}`] ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  placeholder="Custom note..."
-                                  value={customSubstageInputs[`material_${stage.id}`] || ''}
-                                  onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`material_${stage.id}`]: e.target.value }))}
-                                  className="h-9 w-32 text-sm"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      const label = customSubstageInputs[`material_${stage.id}`]?.trim();
-                                      if (label && onCustomSubstageAdd) {
-                                        onCustomSubstageAdd(stage.id, label);
-                                        setCustomSubstageInputs(prev => ({ ...prev, [`material_${stage.id}`]: '' }));
-                                        setShowCustomInput(prev => ({ ...prev, [`material_${stage.id}`]: false }));
-                                      }
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-9 w-9 p-0"
-                                  onClick={() => setShowCustomInput(prev => ({ ...prev, [`material_${stage.id}`]: false }))}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-9"
-                                onClick={() => setShowCustomInput(prev => ({ ...prev, [`material_${stage.id}`]: true }))}
-                              >
-                                <Plus className="h-3 w-3 mr-1.5" />
-                                Custom
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Sub-stages for Print and Converting */}
-                      {(isVibeAdmin || isVendor) && stageDef.value === 'pre_press' && onSubstageComplete && (
-                        <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
-                          <Label className="text-xs text-muted-foreground mb-2 block">Production Sub-stages</Label>
-                          <div className="flex gap-2 flex-wrap items-center">
-                            {PRINT_SUBSTAGES.map((substage) => {
-                              const isComplete = isSubstageComplete(stage, substage.key);
-                              const substageKey = `${stage.id}-${substage.key}`;
-                              const isSubstageUpdating = updatingSubstages.has(substageKey);
-                              return (
-                                <Button
-                                  key={substage.key}
-                                  size="sm"
-                                  variant={isComplete ? 'default' : 'outline'}
-                                  className={cn(
-                                    "h-9",
-                                    isComplete && "bg-success hover:bg-success/90 cursor-default"
-                                  )}
-                                  disabled={isSubstageUpdating || isComplete}
-                                  onClick={() => handleSubstageClick(stage.id, substage)}
-                                >
-                                  {isComplete ? (
-                                    <CheckCircle2 className="h-3 w-3 mr-1.5" />
-                                  ) : isSubstageUpdating ? (
-                                    <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                                  ) : (
-                                    <Circle className="h-3 w-3 mr-1.5" />
-                                  )}
-                                  {substage.label}
-                                </Button>
-                              );
-                            })}
-                            {/* Custom substage input */}
-                            {showCustomInput[`print_${stage.id}`] ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  placeholder="Custom note..."
-                                  value={customSubstageInputs[`print_${stage.id}`] || ''}
-                                  onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`print_${stage.id}`]: e.target.value }))}
-                                  className="h-9 w-32 text-sm"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      const label = customSubstageInputs[`print_${stage.id}`]?.trim();
-                                      if (label && onCustomSubstageAdd) {
-                                        onCustomSubstageAdd(stage.id, label);
-                                        setCustomSubstageInputs(prev => ({ ...prev, [`print_${stage.id}`]: '' }));
-                                        setShowCustomInput(prev => ({ ...prev, [`print_${stage.id}`]: false }));
-                                      }
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-9 w-9 p-0"
-                                  onClick={() => setShowCustomInput(prev => ({ ...prev, [`print_${stage.id}`]: false }))}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-9"
-                                onClick={() => setShowCustomInput(prev => ({ ...prev, [`print_${stage.id}`]: true }))}
-                              >
-                                <Plus className="h-3 w-3 mr-1.5" />
-                                Custom
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Sub-stages for Packing and QC */}
-                      {(isVibeAdmin || isVendor) && stageDef.value === 'production_complete' && onSubstageComplete && (
-                        <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
-                          <Label className="text-xs text-muted-foreground mb-2 block">QC Sub-stages</Label>
-                          <div className="flex gap-2 flex-wrap items-center">
-                            {QC_SUBSTAGES.map((substage) => {
-                              const isComplete = isSubstageComplete(stage, substage.key);
-                              const substageKey = `${stage.id}-${substage.key}`;
-                              const isSubstageUpdating = updatingSubstages.has(substageKey);
-                              return (
-                                <Button
-                                  key={substage.key}
-                                  size="sm"
-                                  variant={isComplete ? 'default' : 'outline'}
-                                  className={cn(
-                                    "h-9",
-                                    isComplete && "bg-success hover:bg-success/90 cursor-default"
-                                  )}
-                                  disabled={isSubstageUpdating || isComplete}
-                                  onClick={() => handleSubstageClick(stage.id, substage)}
-                                >
-                                  {isComplete ? (
-                                    <CheckCircle2 className="h-3 w-3 mr-1.5" />
-                                  ) : isSubstageUpdating ? (
-                                    <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                                  ) : (
-                                    <Circle className="h-3 w-3 mr-1.5" />
-                                  )}
-                                  {substage.label}
-                                </Button>
-                              );
-                            })}
-                            {/* Custom substage input */}
-                            {showCustomInput[`qc_${stage.id}`] ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  placeholder="Custom note..."
-                                  value={customSubstageInputs[`qc_${stage.id}`] || ''}
-                                  onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`qc_${stage.id}`]: e.target.value }))}
-                                  className="h-9 w-32 text-sm"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      const label = customSubstageInputs[`qc_${stage.id}`]?.trim();
-                                      if (label && onCustomSubstageAdd) {
-                                        onCustomSubstageAdd(stage.id, label);
-                                        setCustomSubstageInputs(prev => ({ ...prev, [`qc_${stage.id}`]: '' }));
-                                        setShowCustomInput(prev => ({ ...prev, [`qc_${stage.id}`]: false }));
-                                      }
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-9 w-9 p-0"
-                                  onClick={() => setShowCustomInput(prev => ({ ...prev, [`qc_${stage.id}`]: false }))}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-9"
-                                onClick={() => setShowCustomInput(prev => ({ ...prev, [`qc_${stage.id}`]: true }))}
-                              >
-                                <Plus className="h-3 w-3 mr-1.5" />
-                                Custom
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Quick Status Buttons - For Admin/Vendor */}
-                      {(isVibeAdmin || isVendor) && onQuickStatusChange && (
-                        <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-border/50">
-                          {isUpdating ? (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span className="text-sm">Updating...</span>
-                            </div>
-                          ) : (
-                            <>
-                              <Button
-                                size="sm"
-                                variant={stage.status === 'pending' ? 'default' : 'outline'}
-                                className={cn(
-                                  "h-8",
-                                  stage.status === 'pending' && "bg-muted-foreground hover:bg-muted-foreground/90"
-                                )}
-                                onClick={() => handleQuickStatus(stage.id, 'pending')}
-                                disabled={stage.status === 'pending'}
-                              >
-                                <Circle className="h-3 w-3 mr-1.5" />
-                                Pending
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={stage.status === 'in_progress' ? 'default' : 'outline'}
-                                className={cn(
-                                  "h-8",
-                                  stage.status === 'in_progress' && "bg-blue-500 hover:bg-blue-600"
-                                )}
-                                onClick={() => handleQuickStatus(stage.id, 'in_progress')}
-                                disabled={stage.status === 'in_progress'}
-                              >
-                                <Truck className="h-3 w-3 mr-1.5" />
-                                In Progress
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={stage.status === 'completed' ? 'default' : 'outline'}
-                                className={cn(
-                                  "h-8",
-                                  stage.status === 'completed' && "bg-green-500 hover:bg-green-600"
-                                )}
-                                onClick={() => handleQuickStatus(stage.id, 'completed')}
-                                disabled={stage.status === 'completed'}
-                              >
-                                <CheckCircle2 className="h-3 w-3 mr-1.5" />
-                                Complete
-                              </Button>
-                              <div className="flex-1" />
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onUpdateClick(stage, stageDef)}
-                              >
-                                <MessageSquare className="h-3 w-3 mr-1.5" />
-                                Add Note
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Internal Notes Section - Vibe Admin Only */}
-                      {isVibeAdmin && onInternalNotesChange && (
-                        <div className="mt-4 p-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg border border-amber-200/50 dark:border-amber-800/30">
-                          <div className="flex items-center gap-2 mb-2">
-                            <StickyNote className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                            <Label className="text-xs font-medium text-amber-700 dark:text-amber-300">Internal Notes</Label>
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
-                              Admin Only
-                            </Badge>
-                          </div>
-                          <Textarea
-                            placeholder="Add internal notes about this stage's progress..."
-                            value={getInternalNotesValue(stage)}
-                            onChange={(e) => setInternalNotesEdits(prev => ({ ...prev, [stage.id]: e.target.value }))}
-                            className="min-h-[60px] text-sm bg-background/80 border-amber-200/50 dark:border-amber-800/30 focus:border-amber-400 dark:focus:border-amber-600"
-                          />
-                          {hasUnsavedNotes(stage.id, stage.internal_notes) && (
-                            <div className="flex justify-end mt-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleSaveInternalNotes(stage.id)}
-                                disabled={savingNotes.has(stage.id)}
-                                className="h-7 bg-amber-500 hover:bg-amber-600 text-white"
-                              >
-                                {savingNotes.has(stage.id) ? (
-                                  <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                                ) : (
-                                  <Save className="h-3 w-3 mr-1.5" />
-                                )}
-                                Save Notes
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Customer view - just add note button */}
-                      {isCustomer && !isVibeAdmin && !isVendor && (
-                        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/50">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onUpdateClick(stage, stageDef)}
-                          >
-                            <MessageSquare className="h-3 w-3 mr-1.5" />
-                            Add Note
-                          </Button>
-                        </div>
-                      )}
-                      
-                      {/* Visible Notes Section - Always shown when notes exist */}
-                      {(() => {
-                        const visibleNotes = stage.production_stage_updates
-                          .filter(u => {
-                            const cleanText = u.note_text?.replace(/<!--[A-Z0-9_]+-->/g, '').trim();
-                            return cleanText && cleanText.length > 0;
-                          })
-                          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                          .slice(0, 3); // Show up to 3 most recent notes
-                        
-                        if (visibleNotes.length === 0) return null;
-                        
-                        return (
-                          <div className="mt-3 space-y-2">
-                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                              <MessageSquare className="h-3 w-3" />
-                              Recent Notes
-                            </Label>
-                            <div className="space-y-2">
-                              {visibleNotes.map((note) => {
-                                const cleanText = note.note_text?.replace(/<!--[A-Z0-9_]+-->/g, '').trim() || '';
-                                const isCompletion = !!note.note_text?.match(/<!--[A-Z0-9_]+-->/);
-                                const isDeleting = deletingUpdates.has(note.id);
-                                return (
-                                  <div
-                                    key={note.id}
-                                    className={cn(
-                                      "p-3 rounded-lg border-2 text-sm transition-all",
-                                      isCompletion
-                                        ? "bg-success/10 border-success/40 shadow-sm shadow-success/10"
-                                        : "bg-primary/5 border-primary/30 shadow-sm shadow-primary/5"
-                                    )}
-                                  >
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="flex items-start gap-2 flex-1 min-w-0">
-                                        <MessageSquare className={cn(
-                                          "h-4 w-4 flex-shrink-0 mt-0.5",
-                                          isCompletion ? "text-success" : "text-primary"
-                                        )} />
-                                        <p className={cn(
-                                          "flex-1",
-                                          isCompletion ? "text-success font-medium" : "text-foreground"
-                                        )}>
-                                          {cleanText}
-                                        </p>
-                                      </div>
-                                      <div className="flex items-center gap-2 flex-shrink-0">
-                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                          {new Date(note.created_at).toLocaleDateString()}
-                                        </span>
-                                        {isVibeAdmin && onDeleteUpdate && (
-                                          <button
-                                            type="button"
-                                            disabled={isDeleting}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDeleteUpdate(note.id);
-                                            }}
-                                            className="w-6 h-6 rounded-full flex items-center justify-center transition-colors hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
-                                            title="Delete this note"
-                                          >
-                                            {isDeleting ? (
-                                              <Loader2 className="h-3 w-3 animate-spin" />
-                                            ) : (
-                                              <Trash2 className="h-3 w-3" />
-                                            )}
-                                          </button>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            {stage.production_stage_updates.filter(u => {
-                              const cleanText = u.note_text?.replace(/<!--[A-Z0-9_]+-->/g, '').trim();
-                              return cleanText && cleanText.length > 0;
-                            }).length > 3 && !isExpanded && (
-                              <button
-                                type="button"
-                                onClick={() => toggleExpand(stage.id)}
-                                className="text-xs text-primary hover:underline"
-                              >
-                                View all {stage.production_stage_updates.filter(u => u.note_text).length} notes...
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })()}
-                      
-                      {/* Recent Files/Images - Always visible */}
-                      {(() => {
-                        const fileUpdates = stage.production_stage_updates
-                          .filter(u => u.image_url || u.file_url)
-                          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                          .slice(0, 5);
-                        
-                        if (fileUpdates.length === 0) return null;
-                        
-                        return (
-                          <div className="mt-3 space-y-2">
-                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                              <FileText className="h-3 w-3" />
-                              Recent Attachments
-                            </Label>
-                            <div className="flex flex-wrap gap-2">
-                              {fileUpdates.map((update) => {
-                                const hasImage = !!update.image_url;
-                                return (
-                                  <a
-                                    key={update.id}
-                                    href={hasImage ? update.image_url! : update.file_url!}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={cn(
-                                      "inline-flex items-center gap-2 px-3 py-2 rounded-full border transition-all hover:shadow-sm",
-                                      hasImage
-                                        ? "bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:border-purple-800"
-                                        : "bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800"
-                                    )}
-                                  >
-                                    {hasImage ? (
-                                      <ImageIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-                                    ) : (
-                                      <FileText className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-                                    )}
-                                    <span className={cn(
-                                      "text-xs font-medium max-w-[120px] truncate",
-                                      hasImage ? "text-purple-700 dark:text-purple-300" : "text-amber-700 dark:text-amber-300"
-                                    )}>
-                                      {hasImage ? 'Image' : (update.file_name || 'Document')}
-                                    </span>
-                                    <Download className={cn(
-                                      "h-3 w-3",
-                                      hasImage ? "text-purple-600 dark:text-purple-400" : "text-amber-600 dark:text-amber-400"
-                                    )} />
-                                  </a>
-                                );
-                              })}
-                              {stage.production_stage_updates.filter(u => u.image_url || u.file_url).length > 5 && !isExpanded && (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleExpand(stage.id)}
-                                  className="text-xs text-primary hover:underline self-center"
-                                >
-                                  +{stage.production_stage_updates.filter(u => u.image_url || u.file_url).length - 5} more...
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                    
-                    {/* Expandable Updates Section */}
-                    <CollapsibleContent>
-                      <div className="border-t border-border px-4 py-4 bg-muted/20">
-                        <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                          Activity History
-                        </h5>
-                        <div className="flex flex-wrap gap-2">
-                          {stage.production_stage_updates
-                            .filter((update) => {
-                              // Show all non-status-change updates
-                              if (update.update_type !== 'status_change') return true;
-                              // For status_change, only show if it has actual content (note/image/file)
-                              return update.note_text || update.image_url || update.file_url;
-                            })
-                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                            .map((update) => {
-                              const cleanNoteText = update.note_text?.replace(/<!--[A-Z_]+-->/g, '');
-                              const hasNote = cleanNoteText && cleanNoteText.trim().length > 0;
-                              const hasImage = !!update.image_url;
-                              const hasFile = !!update.file_url;
-                              const updateTypeLabel = update.update_type === 'status_change' && hasNote ? 'note' : update.update_type.replace('_', ' ');
-                              
-                              // Determine primary type for styling
-                              const primaryType = hasImage ? 'image' : hasFile ? 'document' : 'note';
-                              const isStageComplete = stage.status === 'completed';
-
-                              // Note bubbles should turn green when the stage is complete OR when the note represents a
-                              // sub-stage completion auto-note (e.g., <!--PRINT_FILM-->Print Film Complete).
-                              const hasAutoMarker = !!update.note_text?.match(/<!--[A-Z0-9_]+-->/);
-                              const isCompletionNote = !!cleanNoteText?.match(/\bcomplete\b/i);
-                              const isNoteComplete = isStageComplete || (hasAutoMarker && isCompletionNote);
-                              
-                              return (
-                                <div
-                                  key={update.id}
-                                  className={cn(
-                                    "inline-flex items-center gap-2 px-3 py-2 rounded-full border transition-all",
-                                    "hover:shadow-sm cursor-default",
-                                    primaryType === 'note' && isNoteComplete && "bg-success/15 border-success/30",
-                                    primaryType === 'note' && !isNoteComplete && "bg-muted/60 border-border",
-                                    primaryType === 'image' && "bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:border-purple-800",
-                                    primaryType === 'document' && "bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800"
-                                  )}
-                                  title={`${new Date(update.created_at).toLocaleString()}${hasNote ? `: ${cleanNoteText}` : ''}`}
-                                >
-                                  {/* Icon */}
-                                  <div className={cn(
-                                    "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center",
-                                    primaryType === 'note' && isNoteComplete && "bg-success/20",
-                                    primaryType === 'note' && !isNoteComplete && "bg-background/60",
-                                    primaryType === 'image' && "bg-purple-100 dark:bg-purple-900/50",
-                                    primaryType === 'document' && "bg-amber-100 dark:bg-amber-900/50"
-                                  )}>
-                                    {primaryType === 'note' && (
-                                      <MessageSquare
-                                        className={cn(
-                                          "h-3 w-3",
-                                          isNoteComplete ? "text-success" : "text-muted-foreground"
-                                        )}
-                                      />
-                                    )}
-                                    {primaryType === 'image' && <ImageIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />}
-                                    {primaryType === 'document' && <FileText className="h-3 w-3 text-amber-600 dark:text-amber-400" />}
-                                  </div>
-                                  
-                                  {/* Label */}
-                                  <span className={cn(
-                                    "text-xs font-medium max-w-[120px] truncate",
-                                    primaryType === 'note' && isNoteComplete && "text-success",
-                                    primaryType === 'note' && !isNoteComplete && "text-foreground",
-                                    primaryType === 'image' && "text-purple-700 dark:text-purple-300",
-                                    primaryType === 'document' && "text-amber-700 dark:text-amber-300"
-                                  )}>
-                                    {hasNote ? cleanNoteText : hasFile ? (update.file_name || 'Document') : 'Image'}
-                                  </span>
-                                  {/* Action buttons for image/file */}
-                                  {(hasImage || hasFile) && (
-                                    <a
-                                      href={hasImage ? update.image_url! : update.file_url!}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className={cn(
-                                        "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors",
-                                        "hover:bg-background/80",
-                                        primaryType === 'image' && "text-purple-600 dark:text-purple-400",
-                                        primaryType === 'document' && "text-amber-600 dark:text-amber-400"
-                                      )}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <Download className="h-3 w-3" />
-                                    </a>
-                                  )}
-                                  
-                                  {/* Delete button for Vibe Admins */}
-                                  {isVibeAdmin && onDeleteUpdate && (
-                                    <button
-                                      type="button"
-                                      disabled={deletingUpdates.has(update.id)}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteUpdate(update.id);
-                                      }}
-                                      className={cn(
-                                        "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors",
-                                        "hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
-                                      )}
-                                      title="Delete this update"
-                                    >
-                                      {deletingUpdates.has(update.id) ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                      ) : (
-                                        <Trash2 className="h-3 w-3" />
-                                      )}
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          {stage.production_stage_updates.filter(u => u.update_type !== 'status_change' || u.note_text || u.image_url || u.file_url).length === 0 && (
-                            <div className="flex items-center gap-2 text-muted-foreground py-2">
-                              <Circle className="h-4 w-4 opacity-40" />
-                              <span className="text-sm">No activity yet</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </CollapsibleContent>
+                <div className="relative">
+                  <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-amber-300/40 dark:bg-amber-500/20" />
+                  <div className="space-y-3">
+                    {internalDefs.map((stageDef) => renderStageCard(stageDef))}
                   </div>
-                </Collapsible>
+                </div>
               </div>
             );
-          })}
+          })()}
+
+          {/* Customer-Facing Stages Section */}
+          {(() => {
+            const customerDefs = visibleStageDefinitions.filter(d => !d.adminOnly);
+            if (customerDefs.length === 0) return null;
+            return (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant="outline" className="text-xs border-blue-500/50 text-blue-600 bg-blue-50/50 dark:bg-blue-500/10">
+                    Customer Visible
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">Visible to customers &amp; vendors</span>
+                </div>
+                <div className="relative">
+                  <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border" />
+                  <div className="space-y-3">
+                    {customerDefs.map((stageDef) => renderStageCard(stageDef))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </>
+      ) : (
+        <div className="relative">
+          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border" />
+          <div className="space-y-3">
+            {visibleStageDefinitions.map((stageDef) => renderStageCard(stageDef))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
