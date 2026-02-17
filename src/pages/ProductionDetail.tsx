@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,6 +93,8 @@ const STAGE_NAMES = STAGE_DEFINITIONS;
 export default function ProductionDetail() {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const companyFilter = searchParams.get('company');
   const [order, setOrder] = useState<Order | null>(null);
   const [stages, setStages] = useState<ProductionStage[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -660,7 +662,7 @@ export default function ProductionDetail() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/production')}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/production${companyFilter ? `?company=${companyFilter}` : ''}`)}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Production
         </Button>

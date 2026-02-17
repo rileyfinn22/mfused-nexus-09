@@ -569,7 +569,7 @@ export default function Production() {
           progress > 0 ? "border-info/30 bg-info/5" :
           "border-border bg-card"
         )}
-        onClick={() => navigate(`/production/${order.id}`)}
+        onClick={() => navigate(`/production/${order.id}${selectedCompanyId && selectedCompanyId !== 'all' ? `?company=${selectedCompanyId}` : ''}`)}
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
