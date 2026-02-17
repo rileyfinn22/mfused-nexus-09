@@ -321,10 +321,10 @@ export default function Production() {
         production_progress: order.production_progress ?? 0,
       }));
 
-      // Completed orders use DB value, default to 100
+      // Completed/shipped/delivered orders are always 100% complete
       const completedWithProgress = completedOrdersData.map(order => ({
         ...order,
-        production_progress: order.production_progress ?? 100,
+        production_progress: 100,
       }));
       
       setOrders(ordersWithProgress);
