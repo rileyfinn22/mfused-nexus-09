@@ -362,7 +362,7 @@ export const VendorPOPackingListSection = ({
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('SHIP TO', leftBoxX + 4, yPos + 5.5);
+      doc.text('DELIVERY ADDRESS', leftBoxX + 4, yPos + 5.5);
       
       // Ship To content
       doc.setFontSize(10);
@@ -409,7 +409,7 @@ export const VendorPOPackingListSection = ({
         doc.text(value, rightBoxX + 4 + labelWidth, rowY);
       };
       
-      drawDetailRow('PO Number', vendorPO?.po_number || '', detailY);
+      drawDetailRow('Invoice #', order?.order_number || '', detailY);
       drawDetailRow('Order', order?.order_number || vendorPO?.orders?.order_number || '', detailY + 7);
       drawDetailRow('Date', format(new Date(), 'MMM d, yyyy'), detailY + 14);
       drawDetailRow('Customer', order?.customer_name || vendorPO?.orders?.customer_name || '', detailY + 21);
@@ -468,7 +468,14 @@ export const VendorPOPackingListSection = ({
       });
       
       // ===== SUMMARY SECTION =====
-      const tableEndY = (doc as any).lastAutoTable.finalY + 8;
+      let tableEndY = (doc as any).lastAutoTable.finalY + 8;
+      
+      // Check if summary + footer will overflow the page
+      const summaryNeededSpace = 24 + 30; // summaryBoxHeight + footer
+      if (tableEndY + summaryNeededSpace > pageHeight - 10) {
+        doc.addPage();
+        tableEndY = 20;
+      }
       
       // Calculate totals
       const totalCartons = items.reduce((sum, item) => {

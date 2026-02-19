@@ -840,7 +840,7 @@ const InvoiceDetail = () => {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Ship to', leftColX, yPos);
+    doc.text('Delivery Address', leftColX, yPos);
     
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
@@ -932,7 +932,13 @@ const InvoiceDetail = () => {
     
     // Summary
     const totalItems = itemsForPacking.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
-    const tableEndY = (doc as any).lastAutoTable.finalY + 15;
+    let tableEndY = (doc as any).lastAutoTable.finalY + 15;
+    
+    // Check if summary + footer will overflow the page
+    if (tableEndY + 30 > pageHeight - 10) {
+      doc.addPage();
+      tableEndY = 20;
+    }
     
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
