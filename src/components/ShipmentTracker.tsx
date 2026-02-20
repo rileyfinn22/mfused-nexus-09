@@ -1,4 +1,4 @@
-import { Ship, ShieldCheck, Truck, ExternalLink, MapPin, Calendar, Clock, Package } from "lucide-react";
+import { Ship, ShieldCheck, Truck, ExternalLink, MapPin, Calendar, Clock, Package, Paperclip, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { getTrackingUrl, getLegStatusColor, LEG_TYPE_LABELS, LEG_STATUS_OPTIONS } from "@/lib/trackingUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 export interface ShipmentLeg {
   id: string;
@@ -25,6 +25,8 @@ export interface ShipmentLeg {
   actual_arrival: string | null;
   status: string;
   notes: string | null;
+  attachment_url: string | null;
+  attachment_name: string | null;
   created_by: string | null;
   created_at: string;
 }
@@ -35,6 +37,7 @@ interface ShipmentTrackerProps {
   onStatusChange?: (legId: string, newStatus: string) => Promise<void>;
   onActualArrivalChange?: (legId: string, date: string) => Promise<void>;
   onAddLeg?: () => void;
+  onAttachmentUpload?: (legId: string, file: File) => Promise<void>;
 }
 
 const getLegIcon = (legType: string) => {
@@ -55,8 +58,9 @@ const formatDate = (dateStr: string | null) => {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArrivalChange, onAddLeg }: ShipmentTrackerProps) {
+export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArrivalChange, onAddLeg, onAttachmentUpload }: ShipmentTrackerProps) {
   const [updatingLeg, setUpdatingLeg] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   if (legs.length === 0 && !isVibeAdmin) return null;
 
@@ -240,6 +244,21 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                         {leg.notes && (
                           <p className="mt-2 text-xs text-muted-foreground italic">{leg.notes}</p>
                         )}
+
+                        {/* Attachment */}
+                        {leg.attachment_url && leg.attachment_name && (
+                          <div className="mt-2">
+                            <a
+                              href={leg.attachment_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline bg-primary/10 rounded-md px-2 py-1"
+                            >
+                              <Paperclip className="h-3 w-3" />
+                              {leg.attachment_name}
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -270,6 +289,38 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                               if (e.target.value) handleArrivalChange(leg.id, e.target.value);
                             }}
                           />
+                        )}
+
+                        {onAttachmentUpload && (
+                          <>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.png,.jpg,.jpeg"
+                              ref={(el) => { fileInputRefs.current[leg.id] = el; }}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setUpdatingLeg(leg.id);
+                                try {
+                                  await onAttachmentUpload(leg.id, file);
+                                } finally {
+                                  setUpdatingLeg(null);
+                                  e.target.value = '';
+                                }
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs"
+                              disabled={updatingLeg === leg.id}
+                              onClick={() => fileInputRefs.current[leg.id]?.click()}
+                            >
+                              <Upload className="h-3 w-3 mr-1" />
+                              {leg.attachment_url ? 'Replace' : 'Attach'}
+                            </Button>
+                          </>
                         )}
                       </div>
                     )}

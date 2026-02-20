@@ -189,7 +189,22 @@ export default function ProductionDetail() {
     }
   };
 
-  const handleAddShipmentLeg = async (formData: LegFormData) => {
+  const uploadShipmentFile = async (file: File, legId: string): Promise<{ url: string; name: string } | null> => {
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `shipment-legs/${orderId}/${legId}-${Date.now()}-${sanitizedName}`;
+    const { error: uploadError } = await supabase.storage
+      .from('packing-lists')
+      .upload(filePath, file);
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('packing-lists')
+      .getPublicUrl(filePath);
+
+    return { url: publicUrl, name: file.name };
+  };
+
+  const handleAddShipmentLeg = async (formData: LegFormData, file?: File) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !order) throw new Error("Not authenticated");
@@ -200,9 +215,22 @@ export default function ProductionDetail() {
       const trackingUrl = formData.carrier && formData.tracking_number
         ? getTrackingUrl(formData.carrier, formData.tracking_number) : null;
 
+      const legId = crypto.randomUUID();
+
+      let attachmentUrl: string | null = null;
+      let attachmentName: string | null = null;
+      if (file) {
+        const result = await uploadShipmentFile(file, legId);
+        if (result) {
+          attachmentUrl = result.url;
+          attachmentName = result.name;
+        }
+      }
+
       const { error } = await (supabase as any)
         .from('shipment_legs')
         .insert({
+          id: legId,
           order_id: orderId,
           company_id: companyId,
           leg_number: shipmentLegs.length + 1,
@@ -218,6 +246,8 @@ export default function ProductionDetail() {
           status: 'pending',
           notes: formData.notes || null,
           created_by: user.id,
+          attachment_url: attachmentUrl,
+          attachment_name: attachmentName,
         });
 
       if (error) throw error;
@@ -226,6 +256,24 @@ export default function ProductionDetail() {
     } catch (error: any) {
       console.error('Error adding shipment leg:', error);
       toast({ title: "Error", description: "Failed to add shipping leg", variant: "destructive" });
+    }
+  };
+
+  const handleLegAttachmentUpload = async (legId: string, file: File) => {
+    try {
+      const result = await uploadShipmentFile(file, legId);
+      if (!result) throw new Error("Upload failed");
+
+      const { error } = await (supabase as any)
+        .from('shipment_legs')
+        .update({ attachment_url: result.url, attachment_name: result.name })
+        .eq('id', legId);
+      if (error) throw error;
+      await fetchShipmentLegs();
+      toast({ title: "Success", description: "Attachment uploaded" });
+    } catch (error: any) {
+      console.error('Error uploading attachment:', error);
+      toast({ title: "Error", description: "Failed to upload attachment", variant: "destructive" });
     }
   };
 
@@ -821,6 +869,7 @@ export default function ProductionDetail() {
         onStatusChange={isVibeAdmin ? handleLegStatusChange : undefined}
         onActualArrivalChange={isVibeAdmin ? handleLegArrivalChange : undefined}
         onAddLeg={isVibeAdmin ? () => setAddLegDialogOpen(true) : undefined}
+        onAttachmentUpload={isVibeAdmin ? handleLegAttachmentUpload : undefined}
       />
 
       <AddShipmentLegDialog

@@ -1998,6 +1998,8 @@ export type Database = {
       shipment_legs: {
         Row: {
           actual_arrival: string | null
+          attachment_name: string | null
+          attachment_url: string | null
           carrier: string | null
           company_id: string
           created_at: string
@@ -2018,6 +2020,8 @@ export type Database = {
         }
         Insert: {
           actual_arrival?: string | null
+          attachment_name?: string | null
+          attachment_url?: string | null
           carrier?: string | null
           company_id: string
           created_at?: string
@@ -2038,6 +2042,8 @@ export type Database = {
         }
         Update: {
           actual_arrival?: string | null
+          attachment_name?: string | null
+          attachment_url?: string | null
           carrier?: string | null
           company_id?: string
           created_at?: string
