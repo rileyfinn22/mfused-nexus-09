@@ -814,6 +814,22 @@ export default function ProductionDetail() {
         )}
       </div>
 
+      {/* Shipment Tracking Section */}
+      <ShipmentTracker
+        legs={shipmentLegs}
+        isVibeAdmin={isVibeAdmin}
+        onStatusChange={isVibeAdmin ? handleLegStatusChange : undefined}
+        onActualArrivalChange={isVibeAdmin ? handleLegArrivalChange : undefined}
+        onAddLeg={isVibeAdmin ? () => setAddLegDialogOpen(true) : undefined}
+      />
+
+      <AddShipmentLegDialog
+        open={addLegDialogOpen}
+        onOpenChange={setAddLegDialogOpen}
+        onSubmit={handleAddShipmentLeg}
+        nextLegNumber={shipmentLegs.length + 1}
+      />
+
       {/* Production Stages Section */}
       {stages.length === 0 ? (
         <div className="border border-dashed border-border rounded-xl p-12 text-center">
@@ -844,22 +860,6 @@ export default function ProductionDetail() {
           isCustomer={isCustomer}
         />
       )}
-
-      {/* Shipment Tracking Section */}
-      <ShipmentTracker
-        legs={shipmentLegs}
-        isVibeAdmin={isVibeAdmin}
-        onStatusChange={isVibeAdmin ? handleLegStatusChange : undefined}
-        onActualArrivalChange={isVibeAdmin ? handleLegArrivalChange : undefined}
-        onAddLeg={isVibeAdmin ? () => setAddLegDialogOpen(true) : undefined}
-      />
-
-      <AddShipmentLegDialog
-        open={addLegDialogOpen}
-        onOpenChange={setAddLegDialogOpen}
-        onSubmit={handleAddShipmentLeg}
-        nextLegNumber={shipmentLegs.length + 1}
-      />
 
       {/* Fulfillment Section */}
       <div className="border border-border rounded-xl bg-card overflow-hidden">
