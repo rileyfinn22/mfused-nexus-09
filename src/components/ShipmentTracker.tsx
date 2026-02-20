@@ -55,7 +55,10 @@ const getLegIcon = (legType: string) => {
 
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return null;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  // Parse YYYY-MM-DD as local time to avoid UTC timezone shift
+  const parts = dateStr.split('T')[0].split('-').map(Number);
+  const localDate = new Date(parts[0], parts[1] - 1, parts[2]);
+  return localDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArrivalChange, onAddLeg, onAttachmentUpload }: ShipmentTrackerProps) {
