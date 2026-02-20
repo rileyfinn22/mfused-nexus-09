@@ -5,13 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Paperclip } from "lucide-react";
 import { CARRIERS, LEG_TYPE_LABELS, getTrackingUrl } from "@/lib/trackingUtils";
 
 interface AddShipmentLegDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (leg: LegFormData) => Promise<void>;
+  onSubmit: (leg: LegFormData, file?: File) => Promise<void>;
   nextLegNumber: number;
 }
 
@@ -35,6 +35,7 @@ const DEFAULT_LABELS: Record<string, string> = {
 
 export function AddShipmentLegDialog({ open, onOpenChange, onSubmit, nextLegNumber }: AddShipmentLegDialogProps) {
   const [saving, setSaving] = useState(false);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [form, setForm] = useState<LegFormData>({
     leg_type: 'international',
     label: DEFAULT_LABELS['international'],
@@ -58,7 +59,7 @@ export function AddShipmentLegDialog({ open, onOpenChange, onSubmit, nextLegNumb
   const handleSubmit = async () => {
     setSaving(true);
     try {
-      await onSubmit(form);
+      await onSubmit(form, attachmentFile || undefined);
       // Reset
       setForm({
         leg_type: 'international',
@@ -71,6 +72,7 @@ export function AddShipmentLegDialog({ open, onOpenChange, onSubmit, nextLegNumb
         estimated_arrival: '',
         notes: '',
       });
+      setAttachmentFile(null);
       onOpenChange(false);
     } finally {
       setSaving(false);
@@ -153,6 +155,21 @@ export function AddShipmentLegDialog({ open, onOpenChange, onSubmit, nextLegNumb
               <Label>Estimated Arrival</Label>
               <Input type="date" value={form.estimated_arrival} onChange={e => setForm(p => ({ ...p, estimated_arrival: e.target.value }))} />
             </div>
+          </div>
+
+          <div>
+            <Label>Packing List / Attachment</Label>
+            <Input
+              type="file"
+              accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.png,.jpg,.jpeg"
+              onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)}
+            />
+            {attachmentFile && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <Paperclip className="h-3 w-3" />
+                {attachmentFile.name}
+              </p>
+            )}
           </div>
 
           <div>
