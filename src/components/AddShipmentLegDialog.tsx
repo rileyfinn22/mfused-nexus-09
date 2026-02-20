@@ -117,14 +117,17 @@ export function AddShipmentLegDialog({ open, onOpenChange, onSubmit, nextLegNumb
             <>
               <div>
                 <Label>Carrier</Label>
-                <Select value={form.carrier} onValueChange={val => setForm(p => ({ ...p, carrier: val }))}>
-                  <SelectTrigger><SelectValue placeholder="Select carrier" /></SelectTrigger>
-                  <SelectContent>
-                    {CARRIERS.map(c => (
-                      <SelectItem key={c.value} value={c.label}>{c.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input 
+                  value={form.carrier} 
+                  onChange={e => setForm(p => ({ ...p, carrier: e.target.value }))} 
+                  placeholder="Type carrier name (e.g. FedEx, UPS, MSC)"
+                  list="carrier-suggestions"
+                />
+                <datalist id="carrier-suggestions">
+                  {CARRIERS.map(c => (
+                    <option key={c.value} value={c.label} />
+                  ))}
+                </datalist>
               </div>
 
               <div>
