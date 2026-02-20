@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Loader2, ArrowLeft, Upload, Plus, CalendarClock, FileText, Package, Truck, CheckCircle2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
+import { ShipmentTracker, type ShipmentLeg } from "@/components/ShipmentTracker";
+import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipmentLegDialog";
+import { getTrackingUrl } from "@/lib/trackingUtils";
 import { cn } from "@/lib/utils";
 interface Order {
   id: string;
@@ -113,12 +116,15 @@ export default function ProductionDetail() {
   const [uploading, setUploading] = useState(false);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [shipmentLegs, setShipmentLegs] = useState<ShipmentLeg[]>([]);
+  const [addLegDialogOpen, setAddLegDialogOpen] = useState(false);
 
   useEffect(() => {
     checkRole();
     fetchOrderAndStages();
     fetchVendors();
     fetchFulfillmentData();
+    fetchShipmentLegs();
   }, [orderId]);
 
   const checkRole = async () => {
@@ -167,6 +173,94 @@ export default function ProductionDetail() {
       setOrderItems(itemsData || []);
     } catch (error: any) {
       console.error('Error fetching fulfillment data:', error);
+    }
+  };
+
+  const fetchShipmentLegs = async () => {
+    try {
+      const { data } = await (supabase as any)
+        .from('shipment_legs')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('leg_number', { ascending: true });
+      setShipmentLegs(data || []);
+    } catch (error: any) {
+      console.error('Error fetching shipment legs:', error);
+    }
+  };
+
+  const handleAddShipmentLeg = async (formData: LegFormData) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !order) throw new Error("Not authenticated");
+
+      const companyId = await getOrderCompanyId();
+      if (!companyId) throw new Error("Company not found");
+
+      const trackingUrl = formData.carrier && formData.tracking_number
+        ? getTrackingUrl(formData.carrier, formData.tracking_number) : null;
+
+      const { error } = await (supabase as any)
+        .from('shipment_legs')
+        .insert({
+          order_id: orderId,
+          company_id: companyId,
+          leg_number: shipmentLegs.length + 1,
+          leg_type: formData.leg_type,
+          label: formData.label || null,
+          carrier: formData.carrier || null,
+          tracking_number: formData.tracking_number || null,
+          tracking_url: trackingUrl,
+          origin: formData.origin || null,
+          destination: formData.destination || null,
+          shipped_date: formData.shipped_date || null,
+          estimated_arrival: formData.estimated_arrival || null,
+          status: 'pending',
+          notes: formData.notes || null,
+          created_by: user.id,
+        });
+
+      if (error) throw error;
+      await fetchShipmentLegs();
+      toast({ title: "Success", description: "Shipping leg added" });
+    } catch (error: any) {
+      console.error('Error adding shipment leg:', error);
+      toast({ title: "Error", description: "Failed to add shipping leg", variant: "destructive" });
+    }
+  };
+
+  const getOrderCompanyId = async () => {
+    const { data } = await supabase
+      .from('orders')
+      .select('company_id')
+      .eq('id', orderId)
+      .single();
+    return data?.company_id;
+  };
+
+  const handleLegStatusChange = async (legId: string, newStatus: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('shipment_legs')
+        .update({ status: newStatus })
+        .eq('id', legId);
+      if (error) throw error;
+      await fetchShipmentLegs();
+    } catch (error: any) {
+      toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+    }
+  };
+
+  const handleLegArrivalChange = async (legId: string, date: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('shipment_legs')
+        .update({ actual_arrival: date, status: 'delivered' })
+        .eq('id', legId);
+      if (error) throw error;
+      await fetchShipmentLegs();
+    } catch (error: any) {
+      toast({ title: "Error", description: "Failed to update arrival", variant: "destructive" });
     }
   };
 
@@ -750,6 +844,22 @@ export default function ProductionDetail() {
           isCustomer={isCustomer}
         />
       )}
+
+      {/* Shipment Tracking Section */}
+      <ShipmentTracker
+        legs={shipmentLegs}
+        isVibeAdmin={isVibeAdmin}
+        onStatusChange={isVibeAdmin ? handleLegStatusChange : undefined}
+        onActualArrivalChange={isVibeAdmin ? handleLegArrivalChange : undefined}
+        onAddLeg={isVibeAdmin ? () => setAddLegDialogOpen(true) : undefined}
+      />
+
+      <AddShipmentLegDialog
+        open={addLegDialogOpen}
+        onOpenChange={setAddLegDialogOpen}
+        onSubmit={handleAddShipmentLeg}
+        nextLegNumber={shipmentLegs.length + 1}
+      />
 
       {/* Fulfillment Section */}
       <div className="border border-border rounded-xl bg-card overflow-hidden">
