@@ -125,30 +125,11 @@ const Orders = () => {
       
       // Fetch artwork approval status and production stages for all orders
       const ordersWithChecklist = await Promise.all(filteredData.map(async (order) => {
-        // Fetch production stages for progress calculation
-        let productionProgress = 0;
-        if (order.status === 'in production') {
-          const { data: stages } = await supabase
-            .from('production_stages')
-            .select('status')
-            .eq('order_id', order.id);
-          
-          if (stages && stages.length > 0) {
-            // Each stage contributes proportionally: 10% for in_progress, 20% for completed
-            const maxPerStage = 100 / stages.length;
-            const progressPerStage = maxPerStage / 2;
-            
-            let totalProgress = 0;
-            stages.forEach(s => {
-              if (s.status === 'completed') {
-                totalProgress += maxPerStage;
-              } else if (s.status === 'in_progress') {
-                totalProgress += progressPerStage;
-              }
-            });
-            productionProgress = Math.round(totalProgress);
-          }
-        }
+        // Use the manually-set production_progress from the database
+        const completedStatuses = ['completed', 'shipped', 'delivered'];
+        const productionProgress = completedStatuses.includes(order.status?.toLowerCase())
+          ? 100
+          : (order.production_progress ?? 0);
         
         if (order.order_items && order.order_items.length > 0) {
           const { data: artworkData } = await supabase
