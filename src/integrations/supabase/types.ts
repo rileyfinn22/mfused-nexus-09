@@ -1995,6 +1995,84 @@ export type Database = {
           },
         ]
       }
+      shipment_legs: {
+        Row: {
+          actual_arrival: string | null
+          carrier: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          destination: string | null
+          estimated_arrival: string | null
+          id: string
+          label: string | null
+          leg_number: number
+          leg_type: string
+          notes: string | null
+          order_id: string
+          origin: string | null
+          shipped_date: string | null
+          status: string
+          tracking_number: string | null
+          tracking_url: string | null
+        }
+        Insert: {
+          actual_arrival?: string | null
+          carrier?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          destination?: string | null
+          estimated_arrival?: string | null
+          id?: string
+          label?: string | null
+          leg_number?: number
+          leg_type?: string
+          notes?: string | null
+          order_id: string
+          origin?: string | null
+          shipped_date?: string | null
+          status?: string
+          tracking_number?: string | null
+          tracking_url?: string | null
+        }
+        Update: {
+          actual_arrival?: string | null
+          carrier?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          destination?: string | null
+          estimated_arrival?: string | null
+          id?: string
+          label?: string | null
+          leg_number?: number
+          leg_type?: string
+          notes?: string | null
+          order_id?: string
+          origin?: string | null
+          shipped_date?: string | null
+          status?: string
+          tracking_number?: string | null
+          tracking_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_legs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_legs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           company_id: string
