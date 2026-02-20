@@ -9,12 +9,15 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays, Building2, RefreshCw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays, Building2, RefreshCw, Truck, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductionProgressBar, ProductionStatusIndicator } from "@/components/ProductionProgressBar";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipmentLegDialog";
+import { getTrackingUrl } from "@/lib/trackingUtils";
 
 // Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
 const parseDateAsLocal = (dateStr: string | null): Date | undefined => {
@@ -71,6 +74,103 @@ export default function Production() {
   const [syncSheetName, setSyncSheetName] = useState("");
   const [syncing, setSyncing] = useState(false);
   const { activeCompanyId } = useActiveCompany();
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [bulkLegDialogOpen, setBulkLegDialogOpen] = useState(false);
+
+  const toggleOrderSelection = (orderId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedOrderIds(prev => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedOrderIds(new Set());
+
+  const handleBulkAddShipmentLeg = async (formData: LegFormData, file?: File) => {
+    if (selectedOrderIds.size === 0) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const trackingUrl = formData.carrier && formData.tracking_number
+        ? getTrackingUrl(formData.carrier, formData.tracking_number) : null;
+
+      let fileUrl: string | null = null;
+      let fileName: string | null = null;
+
+      if (file) {
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const filePath = `shipment-legs/bulk/${Date.now()}-${sanitizedName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('packing-lists')
+          .upload(filePath, file);
+        if (uploadError) throw uploadError;
+        const { data: { publicUrl } } = supabase.storage
+          .from('packing-lists')
+          .getPublicUrl(filePath);
+        fileUrl = publicUrl;
+        fileName = file.name;
+      }
+
+      const orderIds = Array.from(selectedOrderIds);
+      const { data: existingLegs } = await (supabase as any)
+        .from('shipment_legs')
+        .select('order_id, leg_number')
+        .in('order_id', orderIds);
+
+      const maxLegByOrder: Record<string, number> = {};
+      (existingLegs || []).forEach((leg: any) => {
+        maxLegByOrder[leg.order_id] = Math.max(maxLegByOrder[leg.order_id] || 0, leg.leg_number);
+      });
+
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('id, company_id')
+        .in('id', orderIds);
+
+      const companyMap: Record<string, string> = {};
+      (orderData || []).forEach((o: any) => { companyMap[o.id] = o.company_id; });
+
+      const inserts = orderIds.map(oid => ({
+        order_id: oid,
+        company_id: companyMap[oid],
+        leg_number: (maxLegByOrder[oid] || 0) + 1,
+        leg_type: formData.leg_type,
+        label: formData.label || null,
+        carrier: formData.carrier || null,
+        tracking_number: formData.tracking_number || null,
+        tracking_url: trackingUrl,
+        origin: formData.origin || null,
+        destination: formData.destination || null,
+        shipped_date: formData.shipped_date || null,
+        estimated_arrival: formData.estimated_arrival || null,
+        status: 'pending',
+        notes: formData.notes || null,
+        created_by: user.id,
+        attachment_url: fileUrl,
+        attachment_name: fileName,
+      }));
+
+      const { error } = await (supabase as any)
+        .from('shipment_legs')
+        .insert(inserts);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Shipping leg added to ${orderIds.length} order${orderIds.length > 1 ? 's' : ''}`,
+      });
+      clearSelection();
+      setBulkLegDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error bulk adding shipment leg:', error);
+      toast({ title: "Error", description: "Failed to add shipping legs", variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
     checkRole();
@@ -551,20 +651,30 @@ export default function Production() {
     const deliveryText = deliveryInfo?.text ?? 'TBD';
     const completionText = completionDate ?? '—';
     const dateBadgeVariant = isCompleted ? 'success' : 'outline';
+    const isSelected = selectedOrderIds.has(order.id);
 
     return (
       <div
         className={cn(
-          "group border rounded-xl p-4 hover:shadow-md transition-all cursor-pointer",
+          "group border rounded-xl p-4 hover:shadow-md transition-all cursor-pointer relative",
           progress >= 100 ? "border-success/30 bg-success/5" :
           progress > 0 ? "border-info/30 bg-info/5" :
-          "border-border bg-card"
+          "border-border bg-card",
+          isSelected && "ring-2 ring-primary border-primary/50"
         )}
         onClick={() => navigate(`/production/${order.id}${selectedCompanyId && selectedCompanyId !== 'all' ? `?company=${selectedCompanyId}` : ''}`)}
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
+              {isVibeAdmin && (
+                <div onClick={(e) => toggleOrderSelection(order.id, e)} className="flex-shrink-0">
+                  <Checkbox
+                    checked={isSelected}
+                    className="mt-0.5"
+                  />
+                </div>
+              )}
               <span className="font-mono font-bold text-lg text-foreground">{order.order_number}</span>
               {isVibeAdmin && (
                 <span className="text-xs text-muted-foreground">({order.companies?.name || '-'})</span>
@@ -853,6 +963,39 @@ export default function Production() {
           emptyMessage="No completed orders yet — orders auto-complete when all invoices are paid"
         />
       </div>
+
+      {/* Bulk Action Bar */}
+      {isVibeAdmin && selectedOrderIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-primary text-primary-foreground rounded-xl shadow-lg px-5 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4">
+          <span className="text-sm font-medium">
+            {selectedOrderIds.size} order{selectedOrderIds.size > 1 ? 's' : ''} selected
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setBulkLegDialogOpen(true)}
+          >
+            <Truck className="h-4 w-4 mr-1.5" />
+            Add Shipping Leg
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-primary-foreground hover:text-primary-foreground/80 hover:bg-primary-foreground/10"
+            onClick={clearSelection}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      {/* Bulk Add Shipment Leg Dialog */}
+      <AddShipmentLegDialog
+        open={bulkLegDialogOpen}
+        onOpenChange={setBulkLegDialogOpen}
+        onSubmit={handleBulkAddShipmentLeg}
+        nextLegNumber={0}
+      />
     </div>
   );
 }
