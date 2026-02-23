@@ -2079,6 +2079,42 @@ export type Database = {
           },
         ]
       }
+      shipment_share_links: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          is_active: boolean
+          label: string | null
+          order_ids: string[]
+          token: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          order_ids: string[]
+          token?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          order_ids?: string[]
+          token?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           company_id: string
@@ -2640,6 +2676,27 @@ export type Database = {
         Args: { p_company_id: string; p_token_type: string }
         Returns: string
       }
+      get_shipment_legs_by_token: {
+        Args: { p_token: string }
+        Returns: {
+          actual_arrival: string
+          carrier: string
+          destination: string
+          estimated_arrival: string
+          label: string
+          leg_id: string
+          leg_number: number
+          leg_type: string
+          notes: string
+          order_id: string
+          order_number: string
+          origin: string
+          shipped_date: string
+          status: string
+          tracking_number: string
+          tracking_url: string
+        }[]
+      }
       get_user_companies: { Args: { _user_id: string }; Returns: string[] }
       get_user_company: { Args: { _user_id: string }; Returns: string }
       get_vibe_admins: {
@@ -2664,6 +2721,17 @@ export type Database = {
           p_token_value: string
         }
         Returns: string
+      }
+      update_shipment_leg_public: {
+        Args: {
+          p_carrier?: string
+          p_estimated_arrival?: string
+          p_leg_id: string
+          p_notes?: string
+          p_token: string
+          p_tracking_number?: string
+        }
+        Returns: Json
       }
       user_has_company_access: {
         Args: { _company_id: string; _user_id: string }

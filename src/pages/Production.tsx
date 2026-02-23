@@ -10,13 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays, Building2, RefreshCw, Truck, X } from "lucide-react";
+import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays, Building2, RefreshCw, Truck, X, Link2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductionProgressBar, ProductionStatusIndicator } from "@/components/ProductionProgressBar";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipmentLegDialog";
+import { GenerateShipmentLinkDialog } from "@/components/GenerateShipmentLinkDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
 
 // Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
@@ -76,6 +77,7 @@ export default function Production() {
   const { activeCompanyId } = useActiveCompany();
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [bulkLegDialogOpen, setBulkLegDialogOpen] = useState(false);
+  const [shareLinkDialogOpen, setShareLinkDialogOpen] = useState(false);
 
   const toggleOrderSelection = (orderId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -980,6 +982,14 @@ export default function Production() {
           </Button>
           <Button
             size="sm"
+            variant="secondary"
+            onClick={() => setShareLinkDialogOpen(true)}
+          >
+            <Link2 className="h-4 w-4 mr-1.5" />
+            Share Link
+          </Button>
+          <Button
+            size="sm"
             variant="ghost"
             className="text-primary-foreground hover:text-primary-foreground/80 hover:bg-primary-foreground/10"
             onClick={clearSelection}
@@ -995,6 +1005,14 @@ export default function Production() {
         onOpenChange={setBulkLegDialogOpen}
         onSubmit={handleBulkAddShipmentLeg}
         nextLegNumber={0}
+      />
+
+      {/* Generate Shipment Share Link Dialog */}
+      <GenerateShipmentLinkDialog
+        open={shareLinkDialogOpen}
+        onOpenChange={setShareLinkDialogOpen}
+        orderIds={Array.from(selectedOrderIds)}
+        companyId={selectedCompanyId !== 'all' ? selectedCompanyId : (activeCompanyId || '')}
       />
     </div>
   );
