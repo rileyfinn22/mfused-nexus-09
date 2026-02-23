@@ -44,6 +44,7 @@ import Quotes from "./pages/Quotes";
 import QuoteDetail from "./pages/QuoteDetail";
 import CreateQuote from "./pages/CreateQuote";
 import NotFound from "./pages/NotFound";
+import ShipmentUpdate from "./pages/ShipmentUpdate";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+          <Route path="/shipment-update" element={<ShipmentUpdate />} />
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
