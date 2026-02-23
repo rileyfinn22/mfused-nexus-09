@@ -41,7 +41,7 @@ interface EditedFields {
 }
 
 interface NewLeg {
-  id: string; // temp client ID
+  id: string;
   order_id: string;
   order_number: string;
   leg_type: string;
@@ -51,6 +51,7 @@ interface NewLeg {
   tracking_number: string;
   estimated_arrival: string;
   notes: string;
+  status: string;
 }
 
 const statusColors: Record<string, string> = {
@@ -77,7 +78,6 @@ export default function ShipmentUpdate() {
   const [dragLegId, setDragLegId] = useState<string | null>(null);
   const [dragOrderId, setDragOrderId] = useState<string | null>(null);
 
-  // Get unique orders for the "Add Leg" dropdown
   const uniqueOrders = legs.reduce<{ order_id: string; order_number: string }[]>((acc, leg) => {
     if (!acc.find((o) => o.order_id === leg.order_id)) {
       acc.push({ order_id: leg.order_id, order_number: leg.order_number });
@@ -139,6 +139,7 @@ export default function ShipmentUpdate() {
         tracking_number: "",
         estimated_arrival: "",
         notes: "",
+        status: "pending",
       },
     ]);
   };
@@ -149,6 +150,32 @@ export default function ShipmentUpdate() {
 
   const removeNewLeg = (id: string) => {
     setNewLegs((prev) => prev.filter((l) => l.id !== id));
+  };
+
+  const deleteLeg = async (legId: string) => {
+    if (!token) return;
+    try {
+      const { data, error: rpcError } = await supabase.rpc(
+        "delete_shipment_leg_public" as any,
+        { p_token: token, p_leg_id: legId }
+      );
+      if (rpcError) throw rpcError;
+      const result = data as any;
+      if (result?.success) {
+        toast({ title: "Deleted", description: "Leg removed successfully." });
+        // Remove any pending edits for this leg
+        setEdits((prev) => {
+          const next = { ...prev };
+          delete next[legId];
+          return next;
+        });
+        fetchLegs();
+      } else {
+        toast({ title: "Error", description: result?.error || "Failed to delete leg.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to delete leg.", variant: "destructive" });
+    }
   };
 
   const handleDragStart = (legId: string, orderId: string) => {
@@ -163,13 +190,11 @@ export default function ShipmentUpdate() {
       return;
     }
     try {
-      // Find the positions to determine direction
       const orderLegs = legs.filter(l => l.order_id === targetOrderId).sort((a, b) => a.leg_number - b.leg_number);
       const fromIdx = orderLegs.findIndex(l => l.leg_id === dragLegId);
       const toIdx = orderLegs.findIndex(l => l.leg_id === targetLegId);
       if (fromIdx === -1 || toIdx === -1) return;
 
-      // Use multiple reorder calls to move the leg step by step
       const steps = Math.abs(toIdx - fromIdx);
       const direction = toIdx > fromIdx ? "down" : "up";
       for (let i = 0; i < steps; i++) {
@@ -198,7 +223,6 @@ export default function ShipmentUpdate() {
     let successCount = 0;
     let errorCount = 0;
 
-    // Save edits to existing legs
     for (const [legId, fields] of Object.entries(edits)) {
       try {
         const params: any = { p_token: token, p_leg_id: legId };
@@ -208,7 +232,6 @@ export default function ShipmentUpdate() {
           params.p_estimated_arrival = fields.estimated_arrival || null;
         if (fields.notes !== undefined) params.p_notes = fields.notes;
         if (fields.origin !== undefined) params.p_origin = fields.origin;
-        // For customs legs, auto-set destination = origin
         const effectiveType = fields.leg_type ?? legs.find(l => l.leg_id === legId)?.leg_type;
         if (effectiveType === "customs") {
           params.p_destination = fields.origin ?? legs.find(l => l.leg_id === legId)?.origin ?? "";
@@ -224,17 +247,13 @@ export default function ShipmentUpdate() {
         );
         if (rpcError) throw rpcError;
         const result = data as any;
-        if (result?.success) {
-          successCount++;
-        } else {
-          errorCount++;
-        }
+        if (result?.success) successCount++;
+        else errorCount++;
       } catch {
         errorCount++;
       }
     }
 
-    // Save new legs
     for (const leg of newLegs) {
       try {
         const params: any = {
@@ -244,7 +263,7 @@ export default function ShipmentUpdate() {
         };
         if (leg.origin) params.p_origin = leg.origin;
         if (leg.leg_type === "customs") {
-          params.p_destination = leg.origin; // customs: destination = origin
+          params.p_destination = leg.origin;
         } else if (leg.destination) {
           params.p_destination = leg.destination;
         }
@@ -259,11 +278,8 @@ export default function ShipmentUpdate() {
         );
         if (rpcError) throw rpcError;
         const result = data as any;
-        if (result?.success) {
-          successCount++;
-        } else {
-          errorCount++;
-        }
+        if (result?.success) successCount++;
+        else errorCount++;
       } catch {
         errorCount++;
       }
@@ -320,7 +336,7 @@ export default function ShipmentUpdate() {
       <Toaster />
       {/* Header */}
       <header className="border-b border-border bg-card px-4 py-4 sm:px-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <img src="/images/vibe-logo.png" alt="VibePKG" className="h-8 w-auto" />
             <div>
@@ -362,54 +378,51 @@ export default function ShipmentUpdate() {
       </header>
 
       {/* Table */}
-      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+      <div className="p-4 sm:p-6">
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-auto">
             <thead>
               <tr className="border-b-2 border-border bg-muted">
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Leg</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Type</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Origin</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Destination</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Carrier</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Tracking #</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">ETA</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Notes</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Status</th>
-                <th className="px-3 py-2.5 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap w-10"></th>
+                <th className="px-2 py-2.5 w-8"></th>
+                <th className="px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap w-12">Leg</th>
+                <th className="px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Type</th>
+                <th className="px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Origin</th>
+                <th className="px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Destination</th>
+                <th className="px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Carrier</th>
+                <th className="px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Tracking #</th>
+                <th className="px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">ETA</th>
+                <th className="px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Notes</th>
+                <th className="px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Status</th>
+                <th className="px-2 py-2.5 w-10"></th>
               </tr>
             </thead>
             <tbody>
-              {/* Group legs by order */}
               {(() => {
-                // Build grouped structure
                 const grouped: { order_id: string; order_number: string; existingLegs: ShipmentLeg[]; newLegsForOrder: NewLeg[] }[] = [];
                 const orderMap = new Map<string, typeof grouped[0]>();
 
                 for (const leg of legs) {
                   if (!orderMap.has(leg.order_id)) {
-                    const group = { order_id: leg.order_id, order_number: leg.order_number, existingLegs: [], newLegsForOrder: [] as NewLeg[] };
+                    const group = { order_id: leg.order_id, order_number: leg.order_number, existingLegs: [] as ShipmentLeg[], newLegsForOrder: [] as NewLeg[] };
                     orderMap.set(leg.order_id, group);
                     grouped.push(group);
                   }
                   orderMap.get(leg.order_id)!.existingLegs.push(leg);
                 }
 
-                // Add new legs to their groups, or create new groups
                 for (const nl of newLegs) {
                   if (!orderMap.has(nl.order_id)) {
-                    const group = { order_id: nl.order_id, order_number: nl.order_number, existingLegs: [] as ShipmentLeg[], newLegsForOrder: [] };
+                    const group = { order_id: nl.order_id, order_number: nl.order_number, existingLegs: [] as ShipmentLeg[], newLegsForOrder: [] as NewLeg[] };
                     orderMap.set(nl.order_id, group);
                     grouped.push(group);
                   }
                   orderMap.get(nl.order_id)!.newLegsForOrder.push(nl);
                 }
 
-                const totalColumns = 10;
+                const totalColumns = 11;
 
                 return grouped.map((group) => (
                   <React.Fragment key={group.order_id}>
-                    {/* Order header row */}
                     <tr className="bg-muted/70 border-b border-border">
                       <td colSpan={totalColumns} className="px-3 py-2">
                         <div className="flex items-center gap-2">
@@ -422,9 +435,11 @@ export default function ShipmentUpdate() {
                       </td>
                     </tr>
 
-                    {/* Existing legs */}
                     {group.existingLegs.map((leg) => {
                       const isEdited = !!edits[leg.leg_id];
+                      const legType = getValue(leg, "leg_type") || leg.leg_type;
+                      const isCustoms = legType === "customs";
+                      const availableStatuses = isCustoms ? CUSTOMS_STATUSES : STATUSES;
                       return (
                         <tr
                           key={leg.leg_id}
@@ -443,13 +458,13 @@ export default function ShipmentUpdate() {
                           }}
                           className={`border-b border-border transition-colors ${isEdited ? "bg-primary/5" : "hover:bg-muted/50"} ${dragLegId === leg.leg_id ? "opacity-50" : ""}`}
                         >
-                          <td className="px-3 py-2 text-center">{leg.leg_number}</td>
-                          <td className="px-3 py-2">
-                            <Select
-                              value={getValue(leg, "leg_type") || leg.leg_type}
-                              onValueChange={(val) => updateField(leg.leg_id, "leg_type", val)}
-                            >
-                              <SelectTrigger className="h-8 text-xs min-w-[120px]">
+                          <td className="px-2 py-2 cursor-grab active:cursor-grabbing">
+                            <GripVertical className="h-4 w-4 text-muted-foreground" />
+                          </td>
+                          <td className="px-2 py-2 text-center text-xs">{leg.leg_number}</td>
+                          <td className="px-2 py-2">
+                            <Select value={legType} onValueChange={(val) => updateField(leg.leg_id, "leg_type", val)}>
+                              <SelectTrigger className="h-8 text-xs w-[110px]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -459,151 +474,161 @@ export default function ShipmentUpdate() {
                               </SelectContent>
                             </Select>
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-2 py-2">
                             <Input
                               value={getValue(leg, "origin")}
                               onChange={(e) => updateField(leg.leg_id, "origin", e.target.value)}
-                              placeholder={(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? "Location (e.g. Los Angeles)" : "Origin"}
-                              className="h-8 text-xs min-w-[120px]"
+                              placeholder={isCustoms ? "Location" : "Origin"}
+                              className="h-8 text-xs w-full min-w-[100px]"
                             />
                           </td>
-                          <td className="px-3 py-2">
-                            {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
+                          <td className="px-2 py-2">
+                            {isCustoms ? (
                               <span className="text-xs text-muted-foreground italic px-1">—</span>
                             ) : (
                               <Input
                                 value={getValue(leg, "destination")}
                                 onChange={(e) => updateField(leg.leg_id, "destination", e.target.value)}
                                 placeholder="Destination"
-                                className="h-8 text-xs min-w-[120px]"
+                                className="h-8 text-xs w-full min-w-[100px]"
                               />
                             )}
                           </td>
-                          <td className="px-3 py-2">
-                            {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
+                          <td className="px-2 py-2">
+                            {isCustoms ? (
                               <span className="text-xs text-muted-foreground italic px-1">—</span>
                             ) : (
                               <Input
                                 value={getValue(leg, "carrier")}
                                 onChange={(e) => updateField(leg.leg_id, "carrier", e.target.value)}
                                 placeholder="e.g. UPS, FedEx"
-                                className="h-8 text-xs min-w-[120px]"
+                                className="h-8 text-xs w-full min-w-[100px]"
                               />
                             )}
                           </td>
-                          <td className="px-3 py-2">
-                            {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
+                          <td className="px-2 py-2">
+                            {isCustoms ? (
                               <span className="text-xs text-muted-foreground italic px-1">—</span>
                             ) : (
                               <Input
                                 value={getValue(leg, "tracking_number")}
                                 onChange={(e) => updateField(leg.leg_id, "tracking_number", e.target.value)}
                                 placeholder="Tracking/PRO #"
-                                className="h-8 text-xs min-w-[140px]"
+                                className="h-8 text-xs w-full min-w-[110px]"
                               />
                             )}
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-2 py-2">
                             <Input
                               type="date"
                               value={formatEta(leg)}
                               onChange={(e) => updateField(leg.leg_id, "estimated_arrival", e.target.value)}
-                              className="h-8 text-xs min-w-[130px]"
+                              className="h-8 text-xs w-full min-w-[120px]"
                             />
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-2 py-2">
                             <Textarea
                               value={getValue(leg, "notes")}
                               onChange={(e) => updateField(leg.leg_id, "notes", e.target.value)}
                               placeholder="Notes..."
-                              className="min-h-[32px] h-8 text-xs min-w-[150px] resize-none"
+                              className="min-h-[32px] h-8 text-xs w-full min-w-[120px] resize-none"
                               rows={1}
                             />
                           </td>
-                          <td className="px-3 py-2">
-                            {(() => {
-                              const legType = getValue(leg, "leg_type") || leg.leg_type;
-                              const availableStatuses = legType === "customs" ? CUSTOMS_STATUSES : STATUSES;
-                              return (
-                                <Select
-                                  value={getValue(leg, "status") || leg.status}
-                                  onValueChange={(val) => updateField(leg.leg_id, "status", val)}
-                                >
-                                  <SelectTrigger className={`h-8 text-xs min-w-[120px] ${statusColors[getValue(leg, "status") || leg.status] || ""}`}>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {availableStatuses.map((s) => (
-                                      <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              );
-                            })()}
+                          <td className="px-2 py-2">
+                            <Select
+                              value={getValue(leg, "status") || leg.status}
+                              onValueChange={(val) => updateField(leg.leg_id, "status", val)}
+                            >
+                              <SelectTrigger className={`h-8 text-xs w-[110px] ${statusColors[getValue(leg, "status") || leg.status] || ""}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableStatuses.map((s) => (
+                                  <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </td>
-                          <td className="px-3 py-2 cursor-grab active:cursor-grabbing">
-                            <GripVertical className="h-4 w-4 text-muted-foreground" />
+                          <td className="px-2 py-2">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteLeg(leg.leg_id)} title="Delete leg">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           </td>
                         </tr>
                       );
                     })}
 
-                    {/* New legs for this order */}
-                    {group.newLegsForOrder.map((leg) => (
-                      <tr key={leg.id} className="border-b border-border hover:bg-muted/50">
-                        <td className="px-3 py-2 text-center text-muted-foreground text-xs">—</td>
-                        <td className="px-3 py-2">
-                          <Select value={leg.leg_type} onValueChange={(val) => updateNewLeg(leg.id, "leg_type", val)}>
-                            <SelectTrigger className="h-8 text-xs min-w-[120px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {LEG_TYPES.map((t) => (
-                                <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="px-3 py-2">
-                          <Input value={leg.origin} onChange={(e) => updateNewLeg(leg.id, "origin", e.target.value)} placeholder={leg.leg_type === "customs" ? "Location (e.g. Los Angeles)" : "Origin"} className="h-8 text-xs min-w-[120px]" />
-                        </td>
-                        <td className="px-3 py-2">
-                          {leg.leg_type === "customs" ? (
-                            <span className="text-xs text-muted-foreground italic px-1">—</span>
-                          ) : (
-                            <Input value={leg.destination} onChange={(e) => updateNewLeg(leg.id, "destination", e.target.value)} placeholder="Destination" className="h-8 text-xs min-w-[120px]" />
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          {leg.leg_type === "customs" ? (
-                            <span className="text-xs text-muted-foreground italic px-1">—</span>
-                          ) : (
-                            <Input value={leg.carrier} onChange={(e) => updateNewLeg(leg.id, "carrier", e.target.value)} placeholder="e.g. UPS, FedEx" className="h-8 text-xs min-w-[120px]" />
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          {leg.leg_type === "customs" ? (
-                            <span className="text-xs text-muted-foreground italic px-1">—</span>
-                          ) : (
-                            <Input value={leg.tracking_number} onChange={(e) => updateNewLeg(leg.id, "tracking_number", e.target.value)} placeholder="Tracking/PRO #" className="h-8 text-xs min-w-[140px]" />
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          <Input type="date" value={leg.estimated_arrival} onChange={(e) => updateNewLeg(leg.id, "estimated_arrival", e.target.value)} className="h-8 text-xs min-w-[130px]" />
-                        </td>
-                        <td className="px-3 py-2">
-                          <Textarea value={leg.notes} onChange={(e) => updateNewLeg(leg.id, "notes", e.target.value)} placeholder="Notes..." className="min-h-[32px] h-8 text-xs min-w-[150px] resize-none" rows={1} />
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className="text-xs text-muted-foreground">pending</span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => removeNewLeg(leg.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                    {/* New legs */}
+                    {group.newLegsForOrder.map((leg) => {
+                      const isCustoms = leg.leg_type === "customs";
+                      const availableStatuses = isCustoms ? CUSTOMS_STATUSES : STATUSES;
+                      return (
+                        <tr key={leg.id} className="border-b border-border hover:bg-muted/50">
+                          <td className="px-2 py-2"></td>
+                          <td className="px-2 py-2 text-center text-muted-foreground text-xs">—</td>
+                          <td className="px-2 py-2">
+                            <Select value={leg.leg_type} onValueChange={(val) => updateNewLeg(leg.id, "leg_type", val)}>
+                              <SelectTrigger className="h-8 text-xs w-[110px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {LEG_TYPES.map((t) => (
+                                  <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-2 py-2">
+                            <Input value={leg.origin} onChange={(e) => updateNewLeg(leg.id, "origin", e.target.value)} placeholder={isCustoms ? "Location" : "Origin"} className="h-8 text-xs w-full min-w-[100px]" />
+                          </td>
+                          <td className="px-2 py-2">
+                            {isCustoms ? (
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
+                            ) : (
+                              <Input value={leg.destination} onChange={(e) => updateNewLeg(leg.id, "destination", e.target.value)} placeholder="Destination" className="h-8 text-xs w-full min-w-[100px]" />
+                            )}
+                          </td>
+                          <td className="px-2 py-2">
+                            {isCustoms ? (
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
+                            ) : (
+                              <Input value={leg.carrier} onChange={(e) => updateNewLeg(leg.id, "carrier", e.target.value)} placeholder="e.g. UPS, FedEx" className="h-8 text-xs w-full min-w-[100px]" />
+                            )}
+                          </td>
+                          <td className="px-2 py-2">
+                            {isCustoms ? (
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
+                            ) : (
+                              <Input value={leg.tracking_number} onChange={(e) => updateNewLeg(leg.id, "tracking_number", e.target.value)} placeholder="Tracking/PRO #" className="h-8 text-xs w-full min-w-[110px]" />
+                            )}
+                          </td>
+                          <td className="px-2 py-2">
+                            <Input type="date" value={leg.estimated_arrival} onChange={(e) => updateNewLeg(leg.id, "estimated_arrival", e.target.value)} className="h-8 text-xs w-full min-w-[120px]" />
+                          </td>
+                          <td className="px-2 py-2">
+                            <Textarea value={leg.notes} onChange={(e) => updateNewLeg(leg.id, "notes", e.target.value)} placeholder="Notes..." className="min-h-[32px] h-8 text-xs w-full min-w-[120px] resize-none" rows={1} />
+                          </td>
+                          <td className="px-2 py-2">
+                            <Select value={leg.status} onValueChange={(val) => updateNewLeg(leg.id, "status", val)}>
+                              <SelectTrigger className={`h-8 text-xs w-[110px] ${statusColors[leg.status] || ""}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableStatuses.map((s) => (
+                                  <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-2 py-2">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removeNewLeg(leg.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </React.Fragment>
                 ));
               })()}
