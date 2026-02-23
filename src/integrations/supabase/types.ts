@@ -2660,6 +2660,10 @@ export type Database = {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
       }
+      delete_shipment_leg_public: {
+        Args: { p_leg_id: string; p_token: string }
+        Returns: Json
+      }
       get_all_portal_users: {
         Args: never
         Returns: {
