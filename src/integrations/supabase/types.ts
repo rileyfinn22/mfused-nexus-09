@@ -2728,6 +2728,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      reorder_shipment_leg_public: {
+        Args: { p_direction: string; p_leg_id: string; p_token: string }
+        Returns: Json
+      }
       store_qb_token_encrypted: {
         Args: {
           p_company_id: string

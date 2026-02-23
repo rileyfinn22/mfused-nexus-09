@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, AlertCircle, CheckCircle2, Ship, Plus, Trash2 } from "lucide-react";
+import { Loader2, Save, AlertCircle, CheckCircle2, Ship, Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -147,6 +147,25 @@ export default function ShipmentUpdate() {
 
   const removeNewLeg = (id: string) => {
     setNewLegs((prev) => prev.filter((l) => l.id !== id));
+  };
+
+  const reorderLeg = async (legId: string, direction: "up" | "down") => {
+    if (!token) return;
+    try {
+      const { data, error: rpcError } = await supabase.rpc(
+        "reorder_shipment_leg_public" as any,
+        { p_token: token, p_leg_id: legId, p_direction: direction }
+      );
+      if (rpcError) throw rpcError;
+      const result = data as any;
+      if (result?.success) {
+        fetchLegs();
+      } else {
+        toast({ title: "Cannot move", description: result?.error || "Failed to reorder.", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: "Failed to reorder leg.", variant: "destructive" });
+    }
   };
 
   const modifiedCount = Object.keys(edits).length + newLegs.length;
@@ -336,6 +355,7 @@ export default function ShipmentUpdate() {
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">ETA</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Notes</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Status</th>
+                <th className="px-3 py-2.5 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Order</th>
               </tr>
             </thead>
             <tbody>
@@ -445,6 +465,28 @@ export default function ShipmentUpdate() {
                           </Select>
                         );
                       })()}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => reorderLeg(leg.leg_id, "up")}
+                          title="Move up"
+                        >
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => reorderLeg(leg.leg_id, "down")}
+                          title="Move down"
+                        >
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
