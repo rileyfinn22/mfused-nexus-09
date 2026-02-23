@@ -195,7 +195,11 @@ export default function ShipmentUpdate() {
           p_leg_type: leg.leg_type,
         };
         if (leg.origin) params.p_origin = leg.origin;
-        if (leg.destination) params.p_destination = leg.destination;
+        if (leg.leg_type === "customs") {
+          params.p_destination = leg.origin; // customs: destination = origin
+        } else if (leg.destination) {
+          params.p_destination = leg.destination;
+        }
         if (leg.carrier) params.p_carrier = leg.carrier;
         if (leg.tracking_number) params.p_tracking_number = leg.tracking_number;
         if (leg.estimated_arrival) params.p_estimated_arrival = leg.estimated_arrival;
@@ -444,10 +448,14 @@ export default function ShipmentUpdate() {
                     </Select>
                   </td>
                   <td className="px-3 py-2">
-                    <Input value={leg.origin} onChange={(e) => updateNewLeg(leg.id, "origin", e.target.value)} placeholder="Origin" className="h-8 text-xs min-w-[120px]" />
+                    <Input value={leg.origin} onChange={(e) => updateNewLeg(leg.id, "origin", e.target.value)} placeholder={leg.leg_type === "customs" ? "Location (e.g. Los Angeles)" : "Origin"} className="h-8 text-xs min-w-[120px]" />
                   </td>
                   <td className="px-3 py-2">
-                    <Input value={leg.destination} onChange={(e) => updateNewLeg(leg.id, "destination", e.target.value)} placeholder="Destination" className="h-8 text-xs min-w-[120px]" />
+                    {leg.leg_type === "customs" ? (
+                      <span className="text-xs text-muted-foreground italic px-1">Same as origin</span>
+                    ) : (
+                      <Input value={leg.destination} onChange={(e) => updateNewLeg(leg.id, "destination", e.target.value)} placeholder="Destination" className="h-8 text-xs min-w-[120px]" />
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <Input value={leg.carrier} onChange={(e) => updateNewLeg(leg.id, "carrier", e.target.value)} placeholder="e.g. UPS, FedEx" className="h-8 text-xs min-w-[120px]" />
