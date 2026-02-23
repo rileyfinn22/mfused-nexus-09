@@ -63,6 +63,7 @@ const statusColors: Record<string, string> = {
 
 const LEG_TYPES = ["international", "customs", "domestic"];
 const STATUSES = ["pending", "in_transit", "delivered", "customs_hold", "cleared"];
+const CUSTOMS_STATUSES = ["pending", "cleared"];
 
 export default function ShipmentUpdate() {
   const [searchParams] = useSearchParams();
@@ -384,20 +385,28 @@ export default function ShipmentUpdate() {
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      <Input
-                        value={getValue(leg, "carrier")}
-                        onChange={(e) => updateField(leg.leg_id, "carrier", e.target.value)}
-                        placeholder="e.g. UPS, FedEx"
-                        className="h-8 text-xs min-w-[120px]"
-                      />
+                      {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
+                        <span className="text-xs text-muted-foreground italic px-1">—</span>
+                      ) : (
+                        <Input
+                          value={getValue(leg, "carrier")}
+                          onChange={(e) => updateField(leg.leg_id, "carrier", e.target.value)}
+                          placeholder="e.g. UPS, FedEx"
+                          className="h-8 text-xs min-w-[120px]"
+                        />
+                      )}
                     </td>
                     <td className="px-3 py-2">
-                      <Input
-                        value={getValue(leg, "tracking_number")}
-                        onChange={(e) => updateField(leg.leg_id, "tracking_number", e.target.value)}
-                        placeholder="Tracking/PRO #"
-                        className="h-8 text-xs min-w-[140px]"
-                      />
+                      {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
+                        <span className="text-xs text-muted-foreground italic px-1">—</span>
+                      ) : (
+                        <Input
+                          value={getValue(leg, "tracking_number")}
+                          onChange={(e) => updateField(leg.leg_id, "tracking_number", e.target.value)}
+                          placeholder="Tracking/PRO #"
+                          className="h-8 text-xs min-w-[140px]"
+                        />
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <Input
@@ -417,19 +426,25 @@ export default function ShipmentUpdate() {
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <Select
-                        value={getValue(leg, "status") || leg.status}
-                        onValueChange={(val) => updateField(leg.leg_id, "status", val)}
-                      >
-                        <SelectTrigger className={`h-8 text-xs min-w-[120px] ${statusColors[getValue(leg, "status") || leg.status] || ""}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUSES.map((s) => (
-                            <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {(() => {
+                        const legType = getValue(leg, "leg_type") || leg.leg_type;
+                        const availableStatuses = legType === "customs" ? CUSTOMS_STATUSES : STATUSES;
+                        return (
+                          <Select
+                            value={getValue(leg, "status") || leg.status}
+                            onValueChange={(val) => updateField(leg.leg_id, "status", val)}
+                          >
+                            <SelectTrigger className={`h-8 text-xs min-w-[120px] ${statusColors[getValue(leg, "status") || leg.status] || ""}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableStatuses.map((s) => (
+                                <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );
@@ -468,10 +483,18 @@ export default function ShipmentUpdate() {
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <Input value={leg.carrier} onChange={(e) => updateNewLeg(leg.id, "carrier", e.target.value)} placeholder="e.g. UPS, FedEx" className="h-8 text-xs min-w-[120px]" />
+                    {leg.leg_type === "customs" ? (
+                      <span className="text-xs text-muted-foreground italic px-1">—</span>
+                    ) : (
+                      <Input value={leg.carrier} onChange={(e) => updateNewLeg(leg.id, "carrier", e.target.value)} placeholder="e.g. UPS, FedEx" className="h-8 text-xs min-w-[120px]" />
+                    )}
                   </td>
                   <td className="px-3 py-2">
-                    <Input value={leg.tracking_number} onChange={(e) => updateNewLeg(leg.id, "tracking_number", e.target.value)} placeholder="Tracking/PRO #" className="h-8 text-xs min-w-[140px]" />
+                    {leg.leg_type === "customs" ? (
+                      <span className="text-xs text-muted-foreground italic px-1">—</span>
+                    ) : (
+                      <Input value={leg.tracking_number} onChange={(e) => updateNewLeg(leg.id, "tracking_number", e.target.value)} placeholder="Tracking/PRO #" className="h-8 text-xs min-w-[140px]" />
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <Input type="date" value={leg.estimated_arrival} onChange={(e) => updateNewLeg(leg.id, "estimated_arrival", e.target.value)} className="h-8 text-xs min-w-[130px]" />
