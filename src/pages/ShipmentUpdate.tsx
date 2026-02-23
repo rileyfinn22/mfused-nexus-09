@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -345,7 +345,6 @@ export default function ShipmentUpdate() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b-2 border-border bg-muted">
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Order #</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Leg</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Type</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Origin</th>
@@ -359,198 +358,226 @@ export default function ShipmentUpdate() {
               </tr>
             </thead>
             <tbody>
-              {/* Existing legs */}
-              {legs.map((leg) => {
-                const isEdited = !!edits[leg.leg_id];
-                return (
-                  <tr
-                    key={leg.leg_id}
-                    className={`border-b border-border transition-colors ${isEdited ? "bg-primary/5" : "hover:bg-muted/50"}`}
-                  >
-                    <td className="px-3 py-2 font-mono font-medium whitespace-nowrap">{leg.order_number}</td>
-                    <td className="px-3 py-2 text-center">{leg.leg_number}</td>
-                    <td className="px-3 py-2">
-                      <Select
-                        value={getValue(leg, "leg_type") || leg.leg_type}
-                        onValueChange={(val) => updateField(leg.leg_id, "leg_type", val)}
-                      >
-                        <SelectTrigger className="h-8 text-xs min-w-[120px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {LEG_TYPES.map((t) => (
-                            <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        value={getValue(leg, "origin")}
-                        onChange={(e) => updateField(leg.leg_id, "origin", e.target.value)}
-                        placeholder={(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? "Location (e.g. Los Angeles)" : "Origin"}
-                        className="h-8 text-xs min-w-[120px]"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
-                        <span className="text-xs text-muted-foreground italic px-1">—</span>
-                      ) : (
-                        <Input
-                          value={getValue(leg, "destination")}
-                          onChange={(e) => updateField(leg.leg_id, "destination", e.target.value)}
-                          placeholder="Destination"
-                          className="h-8 text-xs min-w-[120px]"
-                        />
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
-                        <span className="text-xs text-muted-foreground italic px-1">—</span>
-                      ) : (
-                        <Input
-                          value={getValue(leg, "carrier")}
-                          onChange={(e) => updateField(leg.leg_id, "carrier", e.target.value)}
-                          placeholder="e.g. UPS, FedEx"
-                          className="h-8 text-xs min-w-[120px]"
-                        />
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
-                        <span className="text-xs text-muted-foreground italic px-1">—</span>
-                      ) : (
-                        <Input
-                          value={getValue(leg, "tracking_number")}
-                          onChange={(e) => updateField(leg.leg_id, "tracking_number", e.target.value)}
-                          placeholder="Tracking/PRO #"
-                          className="h-8 text-xs min-w-[140px]"
-                        />
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        type="date"
-                        value={formatEta(leg)}
-                        onChange={(e) => updateField(leg.leg_id, "estimated_arrival", e.target.value)}
-                        className="h-8 text-xs min-w-[130px]"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Textarea
-                        value={getValue(leg, "notes")}
-                        onChange={(e) => updateField(leg.leg_id, "notes", e.target.value)}
-                        placeholder="Notes..."
-                        className="min-h-[32px] h-8 text-xs min-w-[150px] resize-none"
-                        rows={1}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      {(() => {
-                        const legType = getValue(leg, "leg_type") || leg.leg_type;
-                        const availableStatuses = legType === "customs" ? CUSTOMS_STATUSES : STATUSES;
-                        return (
-                          <Select
-                            value={getValue(leg, "status") || leg.status}
-                            onValueChange={(val) => updateField(leg.leg_id, "status", val)}
-                          >
-                            <SelectTrigger className={`h-8 text-xs min-w-[120px] ${statusColors[getValue(leg, "status") || leg.status] || ""}`}>
+              {/* Group legs by order */}
+              {(() => {
+                // Build grouped structure
+                const grouped: { order_id: string; order_number: string; existingLegs: ShipmentLeg[]; newLegsForOrder: NewLeg[] }[] = [];
+                const orderMap = new Map<string, typeof grouped[0]>();
+
+                for (const leg of legs) {
+                  if (!orderMap.has(leg.order_id)) {
+                    const group = { order_id: leg.order_id, order_number: leg.order_number, existingLegs: [], newLegsForOrder: [] as NewLeg[] };
+                    orderMap.set(leg.order_id, group);
+                    grouped.push(group);
+                  }
+                  orderMap.get(leg.order_id)!.existingLegs.push(leg);
+                }
+
+                // Add new legs to their groups, or create new groups
+                for (const nl of newLegs) {
+                  if (!orderMap.has(nl.order_id)) {
+                    const group = { order_id: nl.order_id, order_number: nl.order_number, existingLegs: [] as ShipmentLeg[], newLegsForOrder: [] };
+                    orderMap.set(nl.order_id, group);
+                    grouped.push(group);
+                  }
+                  orderMap.get(nl.order_id)!.newLegsForOrder.push(nl);
+                }
+
+                const totalColumns = 10;
+
+                return grouped.map((group) => (
+                  <React.Fragment key={group.order_id}>
+                    {/* Order header row */}
+                    <tr className="bg-muted/70 border-b border-border">
+                      <td colSpan={totalColumns} className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <Ship className="h-4 w-4 text-primary" />
+                          <span className="font-semibold text-sm text-foreground">Order {group.order_number}</span>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {group.existingLegs.length + group.newLegsForOrder.length} leg{group.existingLegs.length + group.newLegsForOrder.length !== 1 ? "s" : ""}
+                          </Badge>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Existing legs */}
+                    {group.existingLegs.map((leg) => {
+                      const isEdited = !!edits[leg.leg_id];
+                      return (
+                        <tr
+                          key={leg.leg_id}
+                          className={`border-b border-border transition-colors ${isEdited ? "bg-primary/5" : "hover:bg-muted/50"}`}
+                        >
+                          <td className="px-3 py-2 text-center">{leg.leg_number}</td>
+                          <td className="px-3 py-2">
+                            <Select
+                              value={getValue(leg, "leg_type") || leg.leg_type}
+                              onValueChange={(val) => updateField(leg.leg_id, "leg_type", val)}
+                            >
+                              <SelectTrigger className="h-8 text-xs min-w-[120px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {LEG_TYPES.map((t) => (
+                                  <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={getValue(leg, "origin")}
+                              onChange={(e) => updateField(leg.leg_id, "origin", e.target.value)}
+                              placeholder={(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? "Location (e.g. Los Angeles)" : "Origin"}
+                              className="h-8 text-xs min-w-[120px]"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
+                            ) : (
+                              <Input
+                                value={getValue(leg, "destination")}
+                                onChange={(e) => updateField(leg.leg_id, "destination", e.target.value)}
+                                placeholder="Destination"
+                                className="h-8 text-xs min-w-[120px]"
+                              />
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
+                            ) : (
+                              <Input
+                                value={getValue(leg, "carrier")}
+                                onChange={(e) => updateField(leg.leg_id, "carrier", e.target.value)}
+                                placeholder="e.g. UPS, FedEx"
+                                className="h-8 text-xs min-w-[120px]"
+                              />
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
+                            ) : (
+                              <Input
+                                value={getValue(leg, "tracking_number")}
+                                onChange={(e) => updateField(leg.leg_id, "tracking_number", e.target.value)}
+                                placeholder="Tracking/PRO #"
+                                className="h-8 text-xs min-w-[140px]"
+                              />
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="date"
+                              value={formatEta(leg)}
+                              onChange={(e) => updateField(leg.leg_id, "estimated_arrival", e.target.value)}
+                              className="h-8 text-xs min-w-[130px]"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Textarea
+                              value={getValue(leg, "notes")}
+                              onChange={(e) => updateField(leg.leg_id, "notes", e.target.value)}
+                              placeholder="Notes..."
+                              className="min-h-[32px] h-8 text-xs min-w-[150px] resize-none"
+                              rows={1}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            {(() => {
+                              const legType = getValue(leg, "leg_type") || leg.leg_type;
+                              const availableStatuses = legType === "customs" ? CUSTOMS_STATUSES : STATUSES;
+                              return (
+                                <Select
+                                  value={getValue(leg, "status") || leg.status}
+                                  onValueChange={(val) => updateField(leg.leg_id, "status", val)}
+                                >
+                                  <SelectTrigger className={`h-8 text-xs min-w-[120px] ${statusColors[getValue(leg, "status") || leg.status] || ""}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableStatuses.map((s) => (
+                                      <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              );
+                            })()}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-0.5">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderLeg(leg.leg_id, "up")} title="Move up">
+                                <ArrowUp className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderLeg(leg.leg_id, "down")} title="Move down">
+                                <ArrowDown className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {/* New legs for this order */}
+                    {group.newLegsForOrder.map((leg) => (
+                      <tr key={leg.id} className="border-b border-border bg-green-500/5">
+                        <td className="px-3 py-2 text-center">
+                          <Badge variant="outline" className="text-[10px] bg-green-500/10 text-green-500 border-green-500/30">NEW</Badge>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Select value={leg.leg_type} onValueChange={(val) => updateNewLeg(leg.id, "leg_type", val)}>
+                            <SelectTrigger className="h-8 text-xs min-w-[120px]">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableStatuses.map((s) => (
-                                <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
+                              {LEG_TYPES.map((t) => (
+                                <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-0.5">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => reorderLeg(leg.leg_id, "up")}
-                          title="Move up"
-                        >
-                          <ArrowUp className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => reorderLeg(leg.leg_id, "down")}
-                          title="Move down"
-                        >
-                          <ArrowDown className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {/* New legs */}
-              {newLegs.map((leg) => (
-                <tr key={leg.id} className="border-b border-border bg-green-500/5">
-                  <td className="px-3 py-2 font-mono font-medium whitespace-nowrap">
-                    <div className="flex items-center gap-1">
-                      <Badge variant="outline" className="text-[10px] bg-green-500/10 text-green-500 border-green-500/30">NEW</Badge>
-                      {leg.order_number}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 text-center text-muted-foreground">—</td>
-                  <td className="px-3 py-2">
-                    <Select value={leg.leg_type} onValueChange={(val) => updateNewLeg(leg.id, "leg_type", val)}>
-                      <SelectTrigger className="h-8 text-xs min-w-[120px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {LEG_TYPES.map((t) => (
-                          <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input value={leg.origin} onChange={(e) => updateNewLeg(leg.id, "origin", e.target.value)} placeholder={leg.leg_type === "customs" ? "Location (e.g. Los Angeles)" : "Origin"} className="h-8 text-xs min-w-[120px]" />
-                  </td>
-                  <td className="px-3 py-2">
-                    {leg.leg_type === "customs" ? (
-                      <span className="text-xs text-muted-foreground italic px-1">—</span>
-                    ) : (
-                      <Input value={leg.destination} onChange={(e) => updateNewLeg(leg.id, "destination", e.target.value)} placeholder="Destination" className="h-8 text-xs min-w-[120px]" />
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {leg.leg_type === "customs" ? (
-                      <span className="text-xs text-muted-foreground italic px-1">—</span>
-                    ) : (
-                      <Input value={leg.carrier} onChange={(e) => updateNewLeg(leg.id, "carrier", e.target.value)} placeholder="e.g. UPS, FedEx" className="h-8 text-xs min-w-[120px]" />
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {leg.leg_type === "customs" ? (
-                      <span className="text-xs text-muted-foreground italic px-1">—</span>
-                    ) : (
-                      <Input value={leg.tracking_number} onChange={(e) => updateNewLeg(leg.id, "tracking_number", e.target.value)} placeholder="Tracking/PRO #" className="h-8 text-xs min-w-[140px]" />
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input type="date" value={leg.estimated_arrival} onChange={(e) => updateNewLeg(leg.id, "estimated_arrival", e.target.value)} className="h-8 text-xs min-w-[130px]" />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Textarea value={leg.notes} onChange={(e) => updateNewLeg(leg.id, "notes", e.target.value)} placeholder="Notes..." className="min-h-[32px] h-8 text-xs min-w-[150px] resize-none" rows={1} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => removeNewLeg(leg.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input value={leg.origin} onChange={(e) => updateNewLeg(leg.id, "origin", e.target.value)} placeholder={leg.leg_type === "customs" ? "Location (e.g. Los Angeles)" : "Origin"} className="h-8 text-xs min-w-[120px]" />
+                        </td>
+                        <td className="px-3 py-2">
+                          {leg.leg_type === "customs" ? (
+                            <span className="text-xs text-muted-foreground italic px-1">—</span>
+                          ) : (
+                            <Input value={leg.destination} onChange={(e) => updateNewLeg(leg.id, "destination", e.target.value)} placeholder="Destination" className="h-8 text-xs min-w-[120px]" />
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {leg.leg_type === "customs" ? (
+                            <span className="text-xs text-muted-foreground italic px-1">—</span>
+                          ) : (
+                            <Input value={leg.carrier} onChange={(e) => updateNewLeg(leg.id, "carrier", e.target.value)} placeholder="e.g. UPS, FedEx" className="h-8 text-xs min-w-[120px]" />
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {leg.leg_type === "customs" ? (
+                            <span className="text-xs text-muted-foreground italic px-1">—</span>
+                          ) : (
+                            <Input value={leg.tracking_number} onChange={(e) => updateNewLeg(leg.id, "tracking_number", e.target.value)} placeholder="Tracking/PRO #" className="h-8 text-xs min-w-[140px]" />
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input type="date" value={leg.estimated_arrival} onChange={(e) => updateNewLeg(leg.id, "estimated_arrival", e.target.value)} className="h-8 text-xs min-w-[130px]" />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Textarea value={leg.notes} onChange={(e) => updateNewLeg(leg.id, "notes", e.target.value)} placeholder="Notes..." className="min-h-[32px] h-8 text-xs min-w-[150px] resize-none" rows={1} />
+                        </td>
+                        <td className="px-3 py-2" colSpan={2}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => removeNewLeg(leg.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ));
+              })()}
             </tbody>
           </table>
         </div>
