@@ -166,7 +166,13 @@ export default function ShipmentUpdate() {
           params.p_estimated_arrival = fields.estimated_arrival || null;
         if (fields.notes !== undefined) params.p_notes = fields.notes;
         if (fields.origin !== undefined) params.p_origin = fields.origin;
-        if (fields.destination !== undefined) params.p_destination = fields.destination;
+        // For customs legs, auto-set destination = origin
+        const effectiveType = fields.leg_type ?? legs.find(l => l.leg_id === legId)?.leg_type;
+        if (effectiveType === "customs") {
+          params.p_destination = fields.origin ?? legs.find(l => l.leg_id === legId)?.origin ?? "";
+        } else if (fields.destination !== undefined) {
+          params.p_destination = fields.destination;
+        }
         if (fields.leg_type !== undefined) params.p_leg_type = fields.leg_type;
         if (fields.status !== undefined) params.p_status = fields.status;
 
@@ -361,17 +367,21 @@ export default function ShipmentUpdate() {
                       <Input
                         value={getValue(leg, "origin")}
                         onChange={(e) => updateField(leg.leg_id, "origin", e.target.value)}
-                        placeholder="Origin"
+                        placeholder={(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? "Location (e.g. Los Angeles)" : "Origin"}
                         className="h-8 text-xs min-w-[120px]"
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <Input
-                        value={getValue(leg, "destination")}
-                        onChange={(e) => updateField(leg.leg_id, "destination", e.target.value)}
-                        placeholder="Destination"
-                        className="h-8 text-xs min-w-[120px]"
-                      />
+                      {(getValue(leg, "leg_type") || leg.leg_type) === "customs" ? (
+                        <span className="text-xs text-muted-foreground italic px-1">—</span>
+                      ) : (
+                        <Input
+                          value={getValue(leg, "destination")}
+                          onChange={(e) => updateField(leg.leg_id, "destination", e.target.value)}
+                          placeholder="Destination"
+                          className="h-8 text-xs min-w-[120px]"
+                        />
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <Input
@@ -452,7 +462,7 @@ export default function ShipmentUpdate() {
                   </td>
                   <td className="px-3 py-2">
                     {leg.leg_type === "customs" ? (
-                      <span className="text-xs text-muted-foreground italic px-1">Same as origin</span>
+                      <span className="text-xs text-muted-foreground italic px-1">—</span>
                     ) : (
                       <Input value={leg.destination} onChange={(e) => updateNewLeg(leg.id, "destination", e.target.value)} placeholder="Destination" className="h-8 text-xs min-w-[120px]" />
                     )}
