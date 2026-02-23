@@ -2638,6 +2638,20 @@ export type Database = {
         Args: { invitation_token_param: string; user_email: string }
         Returns: Json
       }
+      add_shipment_leg_public: {
+        Args: {
+          p_carrier?: string
+          p_destination?: string
+          p_estimated_arrival?: string
+          p_leg_type?: string
+          p_notes?: string
+          p_order_id: string
+          p_origin?: string
+          p_token: string
+          p_tracking_number?: string
+        }
+        Returns: Json
+      }
       associate_customer_with_invoice: {
         Args: { p_invoice_id: string; p_user_email: string }
         Returns: Json
@@ -2722,17 +2736,33 @@ export type Database = {
         }
         Returns: string
       }
-      update_shipment_leg_public: {
-        Args: {
-          p_carrier?: string
-          p_estimated_arrival?: string
-          p_leg_id: string
-          p_notes?: string
-          p_token: string
-          p_tracking_number?: string
-        }
-        Returns: Json
-      }
+      update_shipment_leg_public:
+        | {
+            Args: {
+              p_carrier?: string
+              p_estimated_arrival?: string
+              p_leg_id: string
+              p_notes?: string
+              p_token: string
+              p_tracking_number?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_carrier?: string
+              p_destination?: string
+              p_estimated_arrival?: string
+              p_leg_id: string
+              p_leg_type?: string
+              p_notes?: string
+              p_origin?: string
+              p_status?: string
+              p_token: string
+              p_tracking_number?: string
+            }
+            Returns: Json
+          }
       user_has_company_access: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean

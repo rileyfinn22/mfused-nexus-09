@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Save, AlertCircle, CheckCircle2, Ship } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Save, AlertCircle, CheckCircle2, Ship, Plus, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -33,6 +34,23 @@ interface EditedFields {
   tracking_number?: string;
   estimated_arrival?: string;
   notes?: string;
+  origin?: string;
+  destination?: string;
+  leg_type?: string;
+  status?: string;
+}
+
+interface NewLeg {
+  id: string; // temp client ID
+  order_id: string;
+  order_number: string;
+  leg_type: string;
+  origin: string;
+  destination: string;
+  carrier: string;
+  tracking_number: string;
+  estimated_arrival: string;
+  notes: string;
 }
 
 const statusColors: Record<string, string> = {
@@ -43,6 +61,9 @@ const statusColors: Record<string, string> = {
   cleared: "bg-green-500/15 text-green-400 border-green-500/30",
 };
 
+const LEG_TYPES = ["international", "customs", "domestic"];
+const STATUSES = ["pending", "in_transit", "delivered", "customs_hold", "cleared"];
+
 export default function ShipmentUpdate() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
@@ -51,6 +72,15 @@ export default function ShipmentUpdate() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, EditedFields>>({});
+  const [newLegs, setNewLegs] = useState<NewLeg[]>([]);
+
+  // Get unique orders for the "Add Leg" dropdown
+  const uniqueOrders = legs.reduce<{ order_id: string; order_number: string }[]>((acc, leg) => {
+    if (!acc.find((o) => o.order_id === leg.order_id)) {
+      acc.push({ order_id: leg.order_id, order_number: leg.order_number });
+    }
+    return acc;
+  }, []);
 
   const fetchLegs = useCallback(async () => {
     if (!token) {
@@ -90,7 +120,35 @@ export default function ShipmentUpdate() {
     }));
   };
 
-  const modifiedCount = Object.keys(edits).length;
+  const addNewLeg = (orderId: string) => {
+    const order = uniqueOrders.find((o) => o.order_id === orderId);
+    if (!order) return;
+    setNewLegs((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        order_id: orderId,
+        order_number: order.order_number,
+        leg_type: "domestic",
+        origin: "",
+        destination: "",
+        carrier: "",
+        tracking_number: "",
+        estimated_arrival: "",
+        notes: "",
+      },
+    ]);
+  };
+
+  const updateNewLeg = (id: string, field: keyof Omit<NewLeg, "id" | "order_id" | "order_number">, value: string) => {
+    setNewLegs((prev) => prev.map((l) => (l.id === id ? { ...l, [field]: value } : l)));
+  };
+
+  const removeNewLeg = (id: string) => {
+    setNewLegs((prev) => prev.filter((l) => l.id !== id));
+  };
+
+  const modifiedCount = Object.keys(edits).length + newLegs.length;
 
   const handleSave = async () => {
     if (!token || modifiedCount === 0) return;
@@ -98,6 +156,7 @@ export default function ShipmentUpdate() {
     let successCount = 0;
     let errorCount = 0;
 
+    // Save edits to existing legs
     for (const [legId, fields] of Object.entries(edits)) {
       try {
         const params: any = { p_token: token, p_leg_id: legId };
@@ -106,6 +165,10 @@ export default function ShipmentUpdate() {
         if (fields.estimated_arrival !== undefined)
           params.p_estimated_arrival = fields.estimated_arrival || null;
         if (fields.notes !== undefined) params.p_notes = fields.notes;
+        if (fields.origin !== undefined) params.p_origin = fields.origin;
+        if (fields.destination !== undefined) params.p_destination = fields.destination;
+        if (fields.leg_type !== undefined) params.p_leg_type = fields.leg_type;
+        if (fields.status !== undefined) params.p_status = fields.status;
 
         const { data, error: rpcError } = await supabase.rpc(
           "update_shipment_leg_public" as any,
@@ -123,13 +186,45 @@ export default function ShipmentUpdate() {
       }
     }
 
+    // Save new legs
+    for (const leg of newLegs) {
+      try {
+        const params: any = {
+          p_token: token,
+          p_order_id: leg.order_id,
+          p_leg_type: leg.leg_type,
+        };
+        if (leg.origin) params.p_origin = leg.origin;
+        if (leg.destination) params.p_destination = leg.destination;
+        if (leg.carrier) params.p_carrier = leg.carrier;
+        if (leg.tracking_number) params.p_tracking_number = leg.tracking_number;
+        if (leg.estimated_arrival) params.p_estimated_arrival = leg.estimated_arrival;
+        if (leg.notes) params.p_notes = leg.notes;
+
+        const { data, error: rpcError } = await supabase.rpc(
+          "add_shipment_leg_public" as any,
+          params
+        );
+        if (rpcError) throw rpcError;
+        const result = data as any;
+        if (result?.success) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      } catch {
+        errorCount++;
+      }
+    }
+
     if (successCount > 0) {
-      toast({ title: "Saved", description: `${successCount} leg(s) updated successfully.` });
+      toast({ title: "Saved", description: `${successCount} update(s) saved successfully.` });
       setEdits({});
+      setNewLegs([]);
       fetchLegs();
     }
     if (errorCount > 0) {
-      toast({ title: "Error", description: `${errorCount} leg(s) failed to update.`, variant: "destructive" });
+      toast({ title: "Error", description: `${errorCount} update(s) failed.`, variant: "destructive" });
     }
     setSaving(false);
   };
@@ -173,7 +268,7 @@ export default function ShipmentUpdate() {
       <Toaster />
       {/* Header */}
       <header className="border-b border-border bg-card px-4 py-4 sm:px-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <img src="/images/vibe-logo.png" alt="VibePKG" className="h-8 w-auto" />
             <div>
@@ -182,16 +277,35 @@ export default function ShipmentUpdate() {
                 Shipment Update
               </h1>
               <p className="text-xs text-muted-foreground">
-                Update carrier, tracking, and ETA information below
+                Add legs, update carrier, tracking, and ETA information below
               </p>
             </div>
           </div>
-          {modifiedCount > 0 && (
-            <Button onClick={handleSave} disabled={saving} size="sm">
-              {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
-              Save {modifiedCount} Change{modifiedCount > 1 ? "s" : ""}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {uniqueOrders.length > 0 && (
+              <Select onValueChange={(val) => addNewLeg(val)}>
+                <SelectTrigger className="h-9 w-auto min-w-[160px] text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <Plus className="h-3.5 w-3.5" />
+                    <SelectValue placeholder="Add Leg to Order..." />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueOrders.map((o) => (
+                    <SelectItem key={o.order_id} value={o.order_id}>
+                      {o.order_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {modifiedCount > 0 && (
+              <Button onClick={handleSave} disabled={saving} size="sm">
+                {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
+                Save {modifiedCount} Change{modifiedCount > 1 ? "s" : ""}
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -214,6 +328,7 @@ export default function ShipmentUpdate() {
               </tr>
             </thead>
             <tbody>
+              {/* Existing legs */}
               {legs.map((leg) => {
                 const isEdited = !!edits[leg.leg_id];
                 return (
@@ -223,9 +338,37 @@ export default function ShipmentUpdate() {
                   >
                     <td className="px-3 py-2 font-mono font-medium whitespace-nowrap">{leg.order_number}</td>
                     <td className="px-3 py-2 text-center">{leg.leg_number}</td>
-                    <td className="px-3 py-2 whitespace-nowrap capitalize">{leg.leg_type}</td>
-                    <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{leg.origin || "—"}</td>
-                    <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{leg.destination || "—"}</td>
+                    <td className="px-3 py-2">
+                      <Select
+                        value={getValue(leg, "leg_type") || leg.leg_type}
+                        onValueChange={(val) => updateField(leg.leg_id, "leg_type", val)}
+                      >
+                        <SelectTrigger className="h-8 text-xs min-w-[120px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LEG_TYPES.map((t) => (
+                            <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input
+                        value={getValue(leg, "origin")}
+                        onChange={(e) => updateField(leg.leg_id, "origin", e.target.value)}
+                        placeholder="Origin"
+                        className="h-8 text-xs min-w-[120px]"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input
+                        value={getValue(leg, "destination")}
+                        onChange={(e) => updateField(leg.leg_id, "destination", e.target.value)}
+                        placeholder="Destination"
+                        className="h-8 text-xs min-w-[120px]"
+                      />
+                    </td>
                     <td className="px-3 py-2">
                       <Input
                         value={getValue(leg, "carrier")}
@@ -260,13 +403,71 @@ export default function ShipmentUpdate() {
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <Badge variant="outline" className={`text-xs whitespace-nowrap ${statusColors[leg.status] || ""}`}>
-                        {leg.status.replace("_", " ")}
-                      </Badge>
+                      <Select
+                        value={getValue(leg, "status") || leg.status}
+                        onValueChange={(val) => updateField(leg.leg_id, "status", val)}
+                      >
+                        <SelectTrigger className={`h-8 text-xs min-w-[120px] ${statusColors[getValue(leg, "status") || leg.status] || ""}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUSES.map((s) => (
+                            <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </td>
                   </tr>
                 );
               })}
+
+              {/* New legs */}
+              {newLegs.map((leg) => (
+                <tr key={leg.id} className="border-b border-border bg-green-500/5">
+                  <td className="px-3 py-2 font-mono font-medium whitespace-nowrap">
+                    <div className="flex items-center gap-1">
+                      <Badge variant="outline" className="text-[10px] bg-green-500/10 text-green-500 border-green-500/30">NEW</Badge>
+                      {leg.order_number}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-center text-muted-foreground">—</td>
+                  <td className="px-3 py-2">
+                    <Select value={leg.leg_type} onValueChange={(val) => updateNewLeg(leg.id, "leg_type", val)}>
+                      <SelectTrigger className="h-8 text-xs min-w-[120px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LEG_TYPES.map((t) => (
+                          <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td className="px-3 py-2">
+                    <Input value={leg.origin} onChange={(e) => updateNewLeg(leg.id, "origin", e.target.value)} placeholder="Origin" className="h-8 text-xs min-w-[120px]" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Input value={leg.destination} onChange={(e) => updateNewLeg(leg.id, "destination", e.target.value)} placeholder="Destination" className="h-8 text-xs min-w-[120px]" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Input value={leg.carrier} onChange={(e) => updateNewLeg(leg.id, "carrier", e.target.value)} placeholder="e.g. UPS, FedEx" className="h-8 text-xs min-w-[120px]" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Input value={leg.tracking_number} onChange={(e) => updateNewLeg(leg.id, "tracking_number", e.target.value)} placeholder="Tracking/PRO #" className="h-8 text-xs min-w-[140px]" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Input type="date" value={leg.estimated_arrival} onChange={(e) => updateNewLeg(leg.id, "estimated_arrival", e.target.value)} className="h-8 text-xs min-w-[130px]" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Textarea value={leg.notes} onChange={(e) => updateNewLeg(leg.id, "notes", e.target.value)} placeholder="Notes..." className="min-h-[32px] h-8 text-xs min-w-[150px] resize-none" rows={1} />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => removeNewLeg(leg.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
