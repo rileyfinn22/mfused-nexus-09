@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, AlertCircle, CheckCircle2, Ship, Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, Save, AlertCircle, CheckCircle2, Ship, Plus, Trash2, GripVertical } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -74,6 +74,8 @@ export default function ShipmentUpdate() {
   const [error, setError] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, EditedFields>>({});
   const [newLegs, setNewLegs] = useState<NewLeg[]>([]);
+  const [dragLegId, setDragLegId] = useState<string | null>(null);
+  const [dragOrderId, setDragOrderId] = useState<string | null>(null);
 
   // Get unique orders for the "Add Leg" dropdown
   const uniqueOrders = legs.reduce<{ order_id: string; order_number: string }[]>((acc, leg) => {
@@ -149,22 +151,42 @@ export default function ShipmentUpdate() {
     setNewLegs((prev) => prev.filter((l) => l.id !== id));
   };
 
-  const reorderLeg = async (legId: string, direction: "up" | "down") => {
-    if (!token) return;
+  const handleDragStart = (legId: string, orderId: string) => {
+    setDragLegId(legId);
+    setDragOrderId(orderId);
+  };
+
+  const handleDrop = async (targetLegId: string, targetOrderId: string) => {
+    if (!token || !dragLegId || dragLegId === targetLegId || dragOrderId !== targetOrderId) {
+      setDragLegId(null);
+      setDragOrderId(null);
+      return;
+    }
     try {
-      const { data, error: rpcError } = await supabase.rpc(
-        "reorder_shipment_leg_public" as any,
-        { p_token: token, p_leg_id: legId, p_direction: direction }
-      );
-      if (rpcError) throw rpcError;
-      const result = data as any;
-      if (result?.success) {
-        fetchLegs();
-      } else {
-        toast({ title: "Cannot move", description: result?.error || "Failed to reorder.", variant: "destructive" });
+      // Find the positions to determine direction
+      const orderLegs = legs.filter(l => l.order_id === targetOrderId).sort((a, b) => a.leg_number - b.leg_number);
+      const fromIdx = orderLegs.findIndex(l => l.leg_id === dragLegId);
+      const toIdx = orderLegs.findIndex(l => l.leg_id === targetLegId);
+      if (fromIdx === -1 || toIdx === -1) return;
+
+      // Use multiple reorder calls to move the leg step by step
+      const steps = Math.abs(toIdx - fromIdx);
+      const direction = toIdx > fromIdx ? "down" : "up";
+      for (let i = 0; i < steps; i++) {
+        const { data, error: rpcError } = await supabase.rpc(
+          "reorder_shipment_leg_public" as any,
+          { p_token: token, p_leg_id: dragLegId, p_direction: direction }
+        );
+        if (rpcError) throw rpcError;
+        const result = data as any;
+        if (!result?.success) break;
       }
+      fetchLegs();
     } catch (err: any) {
       toast({ title: "Error", description: "Failed to reorder leg.", variant: "destructive" });
+    } finally {
+      setDragLegId(null);
+      setDragOrderId(null);
     }
   };
 
@@ -354,7 +376,7 @@ export default function ShipmentUpdate() {
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">ETA</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Notes</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Status</th>
-                <th className="px-3 py-2.5 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Order</th>
+                <th className="px-3 py-2.5 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -406,7 +428,20 @@ export default function ShipmentUpdate() {
                       return (
                         <tr
                           key={leg.leg_id}
-                          className={`border-b border-border transition-colors ${isEdited ? "bg-primary/5" : "hover:bg-muted/50"}`}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = "move";
+                            handleDragStart(leg.leg_id, leg.order_id);
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            handleDrop(leg.leg_id, leg.order_id);
+                          }}
+                          className={`border-b border-border transition-colors ${isEdited ? "bg-primary/5" : "hover:bg-muted/50"} ${dragLegId === leg.leg_id ? "opacity-50" : ""}`}
                         >
                           <td className="px-3 py-2 text-center">{leg.leg_number}</td>
                           <td className="px-3 py-2">
@@ -506,15 +541,8 @@ export default function ShipmentUpdate() {
                               );
                             })()}
                           </td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-0.5">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderLeg(leg.leg_id, "up")} title="Move up">
-                                <ArrowUp className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => reorderLeg(leg.leg_id, "down")} title="Move down">
-                                <ArrowDown className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
+                          <td className="px-3 py-2 cursor-grab active:cursor-grabbing">
+                            <GripVertical className="h-4 w-4 text-muted-foreground" />
                           </td>
                         </tr>
                       );
@@ -522,10 +550,8 @@ export default function ShipmentUpdate() {
 
                     {/* New legs for this order */}
                     {group.newLegsForOrder.map((leg) => (
-                      <tr key={leg.id} className="border-b border-border bg-green-500/5">
-                        <td className="px-3 py-2 text-center">
-                          <Badge variant="outline" className="text-[10px] bg-green-500/10 text-green-500 border-green-500/30">NEW</Badge>
-                        </td>
+                      <tr key={leg.id} className="border-b border-border hover:bg-muted/50">
+                        <td className="px-3 py-2 text-center text-muted-foreground text-xs">—</td>
                         <td className="px-3 py-2">
                           <Select value={leg.leg_type} onValueChange={(val) => updateNewLeg(leg.id, "leg_type", val)}>
                             <SelectTrigger className="h-8 text-xs min-w-[120px]">
@@ -568,7 +594,10 @@ export default function ShipmentUpdate() {
                         <td className="px-3 py-2">
                           <Textarea value={leg.notes} onChange={(e) => updateNewLeg(leg.id, "notes", e.target.value)} placeholder="Notes..." className="min-h-[32px] h-8 text-xs min-w-[150px] resize-none" rows={1} />
                         </td>
-                        <td className="px-3 py-2" colSpan={2}>
+                        <td className="px-3 py-2">
+                          <span className="text-xs text-muted-foreground">pending</span>
+                        </td>
+                        <td className="px-3 py-2">
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => removeNewLeg(leg.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
