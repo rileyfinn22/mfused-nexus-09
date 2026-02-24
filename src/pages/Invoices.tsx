@@ -620,9 +620,7 @@ const Invoices = () => {
                   key={invoice.id} 
                   className={`grid grid-cols-12 gap-4 px-4 py-3 transition-colors cursor-pointer ${
                     isChild ? 'bg-muted/60 border-l-4 border-l-primary/50' : 'hover:bg-muted/50'
-                  } ${isChild ? '' : 'even:bg-muted/40'} ${
-                    getComputedStatus(invoice) === 'paid' && !isChild ? 'opacity-60' : ''
-                  }`}
+                   } ${isChild ? '' : 'even:bg-muted/40'}`}
                   onClick={() => navigate(`/invoices/${invoice.id}`)}
                 >
                   <div className="col-span-2">
