@@ -47,6 +47,7 @@ serve(async (req) => {
     const formData = await req.formData();
     const zipFile = formData.get('zipFile') as File;
     const companyId = formData.get('companyId') as string;
+    const templateId = formData.get('templateId') as string | null;
 
     if (!zipFile) {
       return new Response(
@@ -62,16 +63,22 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Processing zip file: ${zipFile.name}, size: ${zipFile.size} bytes`);
+    console.log(`Processing zip file: ${zipFile.name}, size: ${zipFile.size} bytes, templateId: ${templateId}`);
 
     // Create Supabase client with service role for storage access
     const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
-    // Fetch all products for this company
-    const { data: products, error: productsError } = await supabase
+    // Fetch products filtered by template if provided
+    let productQuery = supabase
       .from('products')
       .select('id, name, item_id, state, product_type, company_id')
       .eq('company_id', companyId);
+    
+    if (templateId) {
+      productQuery = productQuery.eq('template_id', templateId);
+    }
+
+    const { data: products, error: productsError } = await productQuery;
 
     if (productsError) {
       console.error('Error fetching products:', productsError);
