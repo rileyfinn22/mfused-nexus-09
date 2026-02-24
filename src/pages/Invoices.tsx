@@ -46,8 +46,7 @@ const Invoices = () => {
   const [loading, setLoading] = useState(true);
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
   const [collapsedWhileFiltering, setCollapsedWhileFiltering] = useState<Set<string>>(new Set());
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [expandedCompletedInvoices, setExpandedCompletedInvoices] = useState<Set<string>>(new Set());
+  
 
   // Update URL when company filter changes
   const setCompanyFilter = (value: string) => {
@@ -433,98 +432,7 @@ const Invoices = () => {
       return sum + remaining;
     }, 0);
 
-  // Get completed invoices - blanket invoices where all children are paid and cover full amount
-  const completedInvoices = invoices.filter(invoice => {
-    // Only blanket/parent invoices (not child invoices)
-    if (invoice.parent_invoice_id) return false;
-    const isBlanket = invoice.invoice_type === 'full' || !invoice.invoice_type;
-    if (!isBlanket) return false;
-    
-    // Check if computed status is 'paid' (meaning children cover and are all paid)
-    return getComputedStatus(invoice) === 'paid';
-  });
-
-  // Group completed invoices with their children
-  const completedInvoiceGroups = completedInvoices.map(parent => ({
-    parent,
-    children: invoices
-      .filter(inv => inv.parent_invoice_id === parent.id)
-      .sort((a, b) => (a.shipment_number || 0) - (b.shipment_number || 0))
-  }));
-
-  // Create display list for completed invoices
-  const displayCompletedInvoices = completedInvoiceGroups.flatMap(group => {
-    const isExpanded = expandedCompletedInvoices.has(group.parent.id);
-    
-    const items = [{ 
-      invoice: group.parent, 
-      isParent: true, 
-      isChild: false, 
-      hasChildren: group.children.length > 0,
-      isExpanded,
-      childrenMatchFilter: false
-    }];
-    
-    if (isExpanded) {
-      items.push(...group.children.map(child => ({ 
-        invoice: child, 
-        isParent: false, 
-        isChild: true, 
-        hasChildren: false,
-        isExpanded: false,
-        childrenMatchFilter: false
-      })));
-    }
-    
-    return items;
-  });
-
-  const toggleCompletedExpanded = (invoiceId: string) => {
-    setExpandedCompletedInvoices(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(invoiceId)) {
-        newSet.delete(invoiceId);
-      } else {
-        newSet.add(invoiceId);
-      }
-      return newSet;
-    });
-  };
-
-  // Filter out completed invoices from the main display (only when not filtering by 'paid')
-  const activeInvoiceGroups = invoiceGroups.filter(group => 
-    getComputedStatus(group.parent) !== 'paid' || statusFilter === 'paid'
-  );
-
-  // Create display list for active invoices (excluding completed unless filtering by paid)
-  const displayActiveInvoices = activeInvoiceGroups.flatMap(group => {
-    const childrenMatchFilter = statusFilter !== "all" && group.children.some(child => getComputedStatus(child) === statusFilter);
-    
-    const isExpanded = expandedInvoices.has(group.parent.id) || 
-      (childrenMatchFilter && !collapsedWhileFiltering.has(group.parent.id));
-    
-    const items = [{ 
-      invoice: group.parent, 
-      isParent: true, 
-      isChild: false, 
-      hasChildren: group.children.length > 0,
-      isExpanded,
-      childrenMatchFilter
-    }];
-    
-    if (isExpanded) {
-      items.push(...group.children.map(child => ({ 
-        invoice: child, 
-        isParent: false, 
-        isChild: true, 
-        hasChildren: false,
-        isExpanded: false,
-        childrenMatchFilter: false
-      })));
-    }
-    
-    return items;
-  });
+  
 
   return (
     <div className="space-y-6">
@@ -685,7 +593,7 @@ const Invoices = () => {
               No invoices found matching your criteria.
             </div>
           ) : (
-            displayActiveInvoices.map(({ invoice, isParent, isChild, hasChildren, isExpanded, childrenMatchFilter }) => {
+            displayInvoices.map(({ invoice, isParent, isChild, hasChildren, isExpanded, childrenMatchFilter }) => {
               const StatusIcon = getStatusIcon(invoice);
               const daysUntilDue = invoice.due_date ? getDaysUntilDue(invoice.due_date) : null;
               const showOverdueAlert = isParent && hasChildren && hasOverdueChildren(invoice.id);
@@ -712,7 +620,9 @@ const Invoices = () => {
                   key={invoice.id} 
                   className={`grid grid-cols-12 gap-4 px-4 py-3 transition-colors cursor-pointer ${
                     isChild ? 'bg-muted/60 border-l-4 border-l-primary/50' : 'hover:bg-muted/50'
-                  } ${isChild ? '' : 'even:bg-muted/40'}`}
+                  } ${isChild ? '' : 'even:bg-muted/40'} ${
+                    getComputedStatus(invoice) === 'paid' && !isChild ? 'opacity-60' : ''
+                  }`}
                   onClick={() => navigate(`/invoices/${invoice.id}`)}
                 >
                   <div className="col-span-2">
@@ -1049,188 +959,7 @@ const Invoices = () => {
           )}
         </div>
       </div>
-
-      {/* Completed Invoices Section */}
-      {statusFilter !== 'paid' && completedInvoices.length > 0 && (
-        <div className="mt-8">
-          <Button
-            variant="ghost"
-            className="w-full flex items-center justify-between p-4 bg-success/10 hover:bg-success/20 rounded-xl border border-success/30"
-            onClick={() => setShowCompleted(!showCompleted)}
-          >
-            <div className="flex items-center gap-3">
-              <CheckCircle className="h-5 w-5 text-success" />
-              <span className="font-semibold text-success">Completed Orders</span>
-              <Badge variant="outline" className="border-success/50 text-success">
-                {completedInvoices.length}
-              </Badge>
-            </div>
-            {showCompleted ? (
-              <ChevronDown className="h-5 w-5 text-success" />
-            ) : (
-              <ChevronRight className="h-5 w-5 text-success" />
-            )}
-          </Button>
-
-          {showCompleted && (
-            <div className="border border-success/30 rounded-xl bg-card shadow-sm overflow-hidden mt-2">
-              {/* Table Header */}
-              <div className="bg-success/10 border-b border-success/30">
-                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  <div className="col-span-2">Invoice ID</div>
-                  <div className="col-span-1">Due Date</div>
-                  <div className="col-span-2">Company</div>
-                  <div className="col-span-2">Description</div>
-                  <div className="col-span-1">Amount</div>
-                  <div className="col-span-1">Status</div>
-                  <div className="col-span-1">Type</div>
-                  <div className="col-span-2">Actions</div>
-                </div>
-              </div>
-
-              {/* Table Body */}
-              <div className="divide-y divide-border">
-                {displayCompletedInvoices.map(({ invoice, isParent, isChild, hasChildren, isExpanded }) => {
-                  const StatusIcon = CheckCircle;
-                  
-                  return (
-                    <div 
-                      key={invoice.id} 
-                      className={`grid grid-cols-12 gap-4 px-4 py-3 transition-colors cursor-pointer ${
-                        isChild ? 'bg-muted/60 border-l-4 border-l-success/50' : 'hover:bg-muted/50'
-                      } ${isChild ? '' : 'even:bg-muted/40'}`}
-                      onClick={() => navigate(`/invoices/${invoice.id}`)}
-                    >
-                      <div className="col-span-2">
-                        <div className="flex items-center gap-2">
-                          {isParent && hasChildren && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-2 gap-1 border-success/40 bg-success/5 hover:bg-success/10 text-success/80"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleCompletedExpanded(invoice.id);
-                              }}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-success" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-success" />
-                              )}
-                            </Button>
-                          )}
-                          {isChild && <div className="w-4 h-4 flex items-center justify-center ml-1"><Package className="h-3 w-3 text-success/60" /></div>}
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`font-medium ${isChild ? 'text-sm text-muted-foreground' : ''}`}>
-                              {invoice.invoice_number}
-                            </span>
-                            {!isChild && invoice.quickbooks_sync_status === 'synced' && (
-                              <Badge variant="outline" className="text-xs border-success/50 text-success">
-                                <Link2 className="h-3 w-3 mr-1" />
-                                QB
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-span-1 flex items-center">
-                        <span className="text-sm text-muted-foreground">
-                          {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
-                        </span>
-                      </div>
-                      <div className="col-span-2 flex items-center">
-                        <span className="text-sm truncate">{(invoice as any).companies?.name}</span>
-                      </div>
-                      <div className="col-span-2 flex items-center">
-                        <span className="text-sm text-muted-foreground truncate">
-                          {invoice.description || invoice.orders?.description || '-'}
-                        </span>
-                      </div>
-                      <div className="col-span-1 flex items-center">
-                        <span className="font-medium">{formatCurrency(invoice.total || 0)}</span>
-                      </div>
-                      <div className="col-span-1 flex items-center">
-                        <div className="flex items-center gap-1.5">
-                          <StatusIcon className="h-4 w-4 text-success" />
-                          <span className="font-semibold text-sm text-success">PAID</span>
-                        </div>
-                      </div>
-                      <div className="col-span-1 flex items-center">
-                        {invoice.invoice_type === 'partial' ? (
-                          <Badge className="bg-info text-white">Shipped</Badge>
-                        ) : (
-                          <Badge className="bg-primary text-primary-foreground">Blanket</Badge>
-                        )}
-                      </div>
-                      <div className="col-span-2 flex items-center gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 w-6 p-0" 
-                          title="View Invoice"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/invoices/${invoice.id}`);
-                          }}
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 w-6 p-0" 
-                          title="Download Invoice"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              const { data: orderData } = await supabase
-                                .from('orders')
-                                .select(`*, order_items (*)`)
-                                .eq('id', invoice.order_id)
-                                .single();
-                              
-                              if (!orderData) return;
-
-                              const { data: allocationsData } = await supabase
-                                .from('inventory_allocations')
-                                .select(`quantity_allocated, order_items (id, sku, name, unit_price, line_number)`)
-                                .eq('invoice_id', invoice.id);
-
-                              let itemsForPdf = orderData.order_items || [];
-                              
-                              if (allocationsData && allocationsData.length > 0) {
-                                itemsForPdf = allocationsData
-                                  .sort((a, b) => (a.order_items?.line_number ?? 999) - (b.order_items?.line_number ?? 999))
-                                  .map((alloc: any) => ({
-                                    ...alloc.order_items,
-                                    quantity: alloc.quantity_allocated,
-                                    unit_price: alloc.order_items?.unit_price || 0
-                                  }));
-                              }
-
-                              const orderForPdf = { ...orderData, order_items: itemsForPdf };
-                              await generateInvoicePDF(invoice, orderForPdf);
-                              toast({ title: "Success", description: "Invoice PDF downloaded" });
-                            } catch (error) {
-                              console.error('Download error:', error);
-                              toast({ title: "Error", description: "Failed to download invoice", variant: "destructive" });
-                            }
-                          }}
-                        >
-                          <Download className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
         </TabsContent>
-
         {isCompanyUser && userCompanyId && (
           <TabsContent value="statement">
             <CustomerStatementTab 
