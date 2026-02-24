@@ -39,6 +39,11 @@ interface Company {
   name: string;
 }
 
+interface Template {
+  id: string;
+  name: string;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -67,10 +72,12 @@ const BulkArtworkUploadDialog = ({
   defaultArtworkType = 'vibe_proof',
 }: BulkArtworkUploadDialogProps) => {
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [companyId, setCompanyId] = useState(restrictToCompany || '');
+  const [templateId, setTemplateId] = useState('');
   
   // Processing states
   const [step, setStep] = useState<'upload' | 'review' | 'uploading' | 'done'>('upload');
@@ -91,14 +98,23 @@ const BulkArtworkUploadDialog = ({
       setBatchId(null);
       setUploadProgress(0);
       setUploadedCount(0);
+      setTemplateId('');
     }
   }, [open]);
 
   useEffect(() => {
     if (companyId) {
+      fetchTemplates();
       fetchProducts();
+      setTemplateId('');
     }
   }, [companyId]);
+
+  useEffect(() => {
+    if (companyId) {
+      fetchProducts();
+    }
+  }, [templateId]);
 
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -127,12 +143,26 @@ const BulkArtworkUploadDialog = ({
     if (data) setCompanies(data);
   };
 
-  const fetchProducts = async () => {
+  const fetchTemplates = async () => {
     const { data } = await supabase
-      .from('products')
-      .select('id, name, item_id')
+      .from('product_templates')
+      .select('id, name')
       .eq('company_id', companyId)
       .order('name');
+    if (data) setTemplates(data);
+  };
+
+  const fetchProducts = async () => {
+    let query = supabase
+      .from('products')
+      .select('id, name, item_id')
+      .eq('company_id', companyId);
+    
+    if (templateId) {
+      query = query.eq('template_id', templateId);
+    }
+    
+    const { data } = await query.order('name');
     if (data) setProducts(data);
   };
 
@@ -146,7 +176,7 @@ const BulkArtworkUploadDialog = ({
   };
 
   const handleProcessZip = async () => {
-    if (!zipFile || !companyId) return;
+    if (!zipFile || !companyId || !templateId) return;
 
     setProcessing(true);
 
@@ -154,6 +184,7 @@ const BulkArtworkUploadDialog = ({
       const formData = new FormData();
       formData.append('zipFile', zipFile);
       formData.append('companyId', companyId);
+      formData.append('templateId', templateId);
 
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -381,6 +412,27 @@ const BulkArtworkUploadDialog = ({
               </div>
             )}
 
+            {companyId && (
+              <div className="space-y-2">
+                <Label>Template *</Label>
+                <Select value={templateId} onValueChange={setTemplateId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select template (e.g. Vape Bags)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  AI will only match files to products within this template
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>ZIP File *</Label>
               <div className="border-2 border-dashed rounded-lg p-8 text-center">
@@ -422,7 +474,7 @@ const BulkArtworkUploadDialog = ({
               </Button>
               <Button 
                 onClick={handleProcessZip} 
-                disabled={!zipFile || !companyId || processing}
+                disabled={!zipFile || !companyId || !templateId || processing}
               >
                 {processing ? (
                   <>
