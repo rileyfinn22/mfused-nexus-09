@@ -23,6 +23,7 @@ interface Product {
   name: string;
   item_id: string | null;
   state: string | null;
+  product_type: string | null;
   company_id: string;
 }
 
@@ -69,7 +70,7 @@ serve(async (req) => {
     // Fetch all products for this company
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id, name, item_id, state, company_id')
+      .select('id, name, item_id, state, product_type, company_id')
       .eq('company_id', companyId);
 
     if (productsError) {
@@ -136,10 +137,11 @@ serve(async (req) => {
       name: p.name,
       sku: p.item_id,
       state: p.state,
+      type: p.product_type,
     })) || [];
 
     // Use AI to match files to products
-    const matchPrompt = `You are helping match artwork files to products. 
+    const matchPrompt = `You are an expert at matching artwork filenames to the correct product in a packaging/merchandise catalog.
 
 Here are the products available (each has id, name, sku, and state):
 ${JSON.stringify(productList, null, 2)}
@@ -147,10 +149,14 @@ ${JSON.stringify(productList, null, 2)}
 Here are the artwork filenames to match:
 ${files.map(f => f.filename).join('\n')}
 
-For each filename, determine which product it most likely belongs to based on:
-1. Product name appearing in the filename
-2. State/version appearing in the filename (like "OH", "CA", "TX" for US states)
-3. SKU appearing in the filename
+For each filename, determine which product it most likely belongs to.
+
+CRITICAL MATCHING RULES (in priority order):
+1. **Product Type MUST match.** The filename's product type (bag, pouch, sleeve, box, jar, tube, label, pen, etc.) MUST match the product name's type. NEVER match a "bag" file to a "sleeve" product or vice versa. "bag" and "pouch" are synonyms, but "bag" ≠ "sleeve" ≠ "box" ≠ "jar" ≠ "tube". If the product types don't match, return "none" confidence.
+2. **Brand/product name** appearing in the filename should match the product name. Look for brand keywords (e.g. "Anthos", "FRX", "Vape") in both the filename and product name.
+3. **State** appearing in the filename (like "AZ", "OH", "CA", "TX", "NY" for US states) should match the product's state field.
+4. **SKU** appearing in the filename is a strong signal.
+5. **Flavor/variant** names (e.g. "Blue Razz", "Mango", "Watermelon") should match if present.
 
 Return a JSON array with one object per file:
 {
@@ -164,11 +170,11 @@ Return a JSON array with one object per file:
   ]
 }
 
-Rules:
-- "high" confidence: Clear match on product name + state, or exact SKU match
-- "medium" confidence: Partial name match or state match
-- "low" confidence: Very weak match, user should verify
-- "none": No reasonable match found
+Confidence levels:
+- "high": Product type matches + clear name/brand match + state or SKU match
+- "medium": Product type matches + partial name match
+- "low": Product type matches but weak overall match, user should verify
+- "none": Product type mismatch, no reasonable match, or not enough info to match confidently
 
 Return ONLY valid JSON, no other text.`;
 
