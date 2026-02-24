@@ -68,3 +68,6 @@ verify_jwt = true
 
 [functions.sync-google-sheet]
 verify_jwt = true
+
+[functions.quickbooks-push-pending-payments]
+verify_jwt = false
