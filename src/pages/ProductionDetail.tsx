@@ -948,13 +948,28 @@ export default function ProductionDetail() {
           }}
         />
       )}
-      {!isVibeAdmin && order.production_notes && (
-        <div className="border border-border rounded-xl p-4 bg-card space-y-2">
-          <div className="flex items-center gap-2">
-            <StickyNote className="h-4 w-4 text-primary" />
-            <h3 className="font-medium text-sm">Production Notes</h3>
-          </div>
-          <p className="text-sm text-foreground whitespace-pre-wrap">{order.production_notes}</p>
+      {!isVibeAdmin && (order.production_notes || order.is_delayed) && (
+        <div className="border border-border rounded-xl p-4 bg-card space-y-3">
+          {order.is_delayed && (
+            <div className="flex items-center gap-2 text-destructive">
+              <span className="relative flex h-2 w-2">
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
+              </span>
+              <span className="text-sm font-medium">Delayed</span>
+              {order.delay_reason && (
+                <span className="text-sm text-foreground font-normal">— {order.delay_reason}</span>
+              )}
+            </div>
+          )}
+          {order.production_notes && (
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <StickyNote className="h-4 w-4 text-primary" />
+                <h3 className="font-medium text-sm">Production Notes</h3>
+              </div>
+              <p className="text-sm text-foreground whitespace-pre-wrap">{order.production_notes}</p>
+            </div>
+          )}
         </div>
       )}
       <ShipmentTracker
