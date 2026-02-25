@@ -713,13 +713,13 @@ export default function Production() {
                   type="button"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
-                  className="mt-2 flex items-center gap-1.5 text-xs text-destructive hover:opacity-80 transition-opacity"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs bg-destructive/10 text-destructive border border-destructive/20 rounded-full px-2.5 py-1 hover:bg-destructive/20 transition-colors cursor-pointer"
                 >
-                  <span className="relative flex h-2.5 w-2.5">
+                  <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-destructive"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
                   </span>
-                  <span className="font-medium">Delayed</span>
+                  <span className="font-medium">Delayed — View Reason</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-64 p-3" align="start">
