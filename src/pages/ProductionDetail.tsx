@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Upload, Plus, CalendarClock, FileText, Package, Truck, CheckCircle2 } from "lucide-react";
+import { Loader2, ArrowLeft, Upload, Plus, CalendarClock, FileText, Package, Truck, CheckCircle2, AlertCircle, StickyNote } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
 import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
 import { ShipmentTracker, type ShipmentLeg } from "@/components/ShipmentTracker";
@@ -23,6 +24,9 @@ interface Order {
   description: string | null;
   estimated_delivery_date: string | null;
   production_progress: number | null;
+  production_notes: string | null;
+  is_delayed: boolean;
+  delay_reason: string | null;
   companies: {
     name: string;
   };
@@ -93,6 +97,65 @@ const STAGE_DEFINITIONS = [
 
 // Keep STAGE_NAMES for backward compatibility
 const STAGE_NAMES = STAGE_DEFINITIONS;
+
+function ProductionNotesSection({ order, onUpdate }: { 
+  order: Order; 
+  onUpdate: (updates: Partial<Pick<Order, 'production_notes' | 'is_delayed' | 'delay_reason'>>) => void;
+}) {
+  const [notes, setNotes] = useState(order.production_notes || "");
+  const [isDelayed, setIsDelayed] = useState(order.is_delayed || false);
+  const [delayReason, setDelayReason] = useState(order.delay_reason || "");
+  const [dirty, setDirty] = useState(false);
+
+  const handleSave = () => {
+    onUpdate({ 
+      production_notes: notes || null, 
+      is_delayed: isDelayed, 
+      delay_reason: isDelayed ? (delayReason || null) : null 
+    });
+    setDirty(false);
+  };
+
+  return (
+    <div className="border border-border rounded-xl p-4 bg-card space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <StickyNote className="h-4 w-4 text-primary" />
+          <h3 className="font-medium text-sm">Production Notes</h3>
+        </div>
+        {dirty && (
+          <Button size="sm" onClick={handleSave}>Save</Button>
+        )}
+      </div>
+      <Textarea
+        placeholder="Add production notes visible on the detail page…"
+        value={notes}
+        onChange={(e) => { setNotes(e.target.value); setDirty(true); }}
+        className="min-h-[60px] text-sm"
+      />
+      <div className="flex items-center gap-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isDelayed}
+            onChange={(e) => { setIsDelayed(e.target.checked); setDirty(true); }}
+            className="rounded border-border"
+          />
+          <AlertCircle className={cn("h-4 w-4", isDelayed ? "text-destructive" : "text-muted-foreground")} />
+          <span className="text-sm font-medium">Mark as Delayed</span>
+        </label>
+      </div>
+      {isDelayed && (
+        <Input
+          placeholder="Reason for delay…"
+          value={delayReason}
+          onChange={(e) => { setDelayReason(e.target.value); setDirty(true); }}
+          className="text-sm"
+        />
+      )}
+    </div>
+  );
+}
 
 export default function ProductionDetail() {
   const { orderId } = useParams();
@@ -324,6 +387,9 @@ export default function ProductionDetail() {
           description,
           estimated_delivery_date,
           production_progress,
+          production_notes,
+          is_delayed,
+          delay_reason,
           companies (
             name
           )
@@ -862,7 +928,35 @@ export default function ProductionDetail() {
         )}
       </div>
 
-      {/* Shipment Tracking Section */}
+      {/* Production Notes & Delay Section */}
+      {isVibeAdmin && (
+        <ProductionNotesSection
+          order={order}
+          onUpdate={(updates) => {
+            supabase
+              .from('orders')
+              .update(updates as any)
+              .eq('id', order.id)
+              .then(({ error }) => {
+                if (error) {
+                  toast({ title: "Error", description: "Failed to save", variant: "destructive" });
+                } else {
+                  setOrder(prev => prev ? { ...prev, ...updates } : prev);
+                  toast({ title: "Saved", description: "Production notes updated" });
+                }
+              });
+          }}
+        />
+      )}
+      {!isVibeAdmin && order.production_notes && (
+        <div className="border border-border rounded-xl p-4 bg-card space-y-2">
+          <div className="flex items-center gap-2">
+            <StickyNote className="h-4 w-4 text-primary" />
+            <h3 className="font-medium text-sm">Production Notes</h3>
+          </div>
+          <p className="text-sm text-foreground whitespace-pre-wrap">{order.production_notes}</p>
+        </div>
+      )}
       <ShipmentTracker
         legs={shipmentLegs}
         isVibeAdmin={isVibeAdmin}

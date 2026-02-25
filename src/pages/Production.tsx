@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays, Building2, RefreshCw, Truck, X, Link2 } from "lucide-react";
+import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays, Building2, RefreshCw, Truck, X, Link2, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductionProgressBar, ProductionStatusIndicator } from "@/components/ProductionProgressBar";
 import { cn } from "@/lib/utils";
@@ -46,6 +46,8 @@ interface ProductionOrder {
   order_finalized_at: string | null;
   updated_at: string;
   status: string;
+  is_delayed: boolean;
+  delay_reason: string | null;
   companies: {
     name: string;
   };
@@ -290,6 +292,8 @@ export default function Production() {
               total,
               estimated_delivery_date,
               production_progress,
+              is_delayed,
+              delay_reason,
               updated_at,
               status,
               companies (
@@ -320,6 +324,8 @@ export default function Production() {
             total,
             estimated_delivery_date,
             production_progress,
+            is_delayed,
+            delay_reason,
             updated_at,
             status,
             companies (
@@ -351,6 +357,8 @@ export default function Production() {
             total,
             estimated_delivery_date,
             production_progress,
+            is_delayed,
+            delay_reason,
             order_finalized_at,
             updated_at,
             status,
@@ -391,6 +399,8 @@ export default function Production() {
             total,
             estimated_delivery_date,
             production_progress,
+            is_delayed,
+            delay_reason,
             order_finalized_at,
             updated_at,
             status,
@@ -693,9 +703,40 @@ export default function Production() {
             <ProductionStatusIndicator progress={progress} size="md" />
             <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
           </div>
-        </div>
+          </div>
 
-        {/* Date Badges Row - Side by Side */}
+          {/* Delay Indicator */}
+          {order.is_delayed && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-2 flex items-center gap-1.5 text-xs text-destructive hover:opacity-80 transition-opacity"
+                >
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-destructive"></span>
+                  </span>
+                  <span className="font-medium">Delayed</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-3" align="start">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  <span className="font-medium text-sm text-destructive">Order Delayed</span>
+                </div>
+                {order.delay_reason ? (
+                  <p className="text-sm text-foreground">{order.delay_reason}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No reason provided</p>
+                )}
+              </PopoverContent>
+            </Popover>
+          )}
+
+          {/* Date Badges Row - Side by Side */}
         <div
           className="mt-3 grid grid-cols-2 gap-2"
           onPointerDown={(e) => e.stopPropagation()}

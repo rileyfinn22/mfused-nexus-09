@@ -954,12 +954,14 @@ export type Database = {
           customer_email: string | null
           customer_name: string
           customer_phone: string | null
+          delay_reason: string | null
           deleted_at: string | null
           description: string | null
           due_date: string | null
           estimated_delivery_date: string | null
           fulfillment_vendor_id: string | null
           id: string
+          is_delayed: boolean | null
           memo: string | null
           order_date: string
           order_finalized: boolean
@@ -970,6 +972,7 @@ export type Database = {
           parent_order_id: string | null
           po_number: string | null
           po_pdf_path: string | null
+          production_notes: string | null
           production_progress: number | null
           qb_estimate_id: string | null
           qb_project_id: string | null
@@ -1010,12 +1013,14 @@ export type Database = {
           customer_email?: string | null
           customer_name: string
           customer_phone?: string | null
+          delay_reason?: string | null
           deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           estimated_delivery_date?: string | null
           fulfillment_vendor_id?: string | null
           id?: string
+          is_delayed?: boolean | null
           memo?: string | null
           order_date?: string
           order_finalized?: boolean
@@ -1026,6 +1031,7 @@ export type Database = {
           parent_order_id?: string | null
           po_number?: string | null
           po_pdf_path?: string | null
+          production_notes?: string | null
           production_progress?: number | null
           qb_estimate_id?: string | null
           qb_project_id?: string | null
@@ -1066,12 +1072,14 @@ export type Database = {
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string | null
+          delay_reason?: string | null
           deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           estimated_delivery_date?: string | null
           fulfillment_vendor_id?: string | null
           id?: string
+          is_delayed?: boolean | null
           memo?: string | null
           order_date?: string
           order_finalized?: boolean
@@ -1082,6 +1090,7 @@ export type Database = {
           parent_order_id?: string | null
           po_number?: string | null
           po_pdf_path?: string | null
+          production_notes?: string | null
           production_progress?: number | null
           qb_estimate_id?: string | null
           qb_project_id?: string | null
