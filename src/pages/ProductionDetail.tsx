@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Upload, Plus, CalendarClock, FileText, Package, Truck, CheckCircle2, AlertCircle, StickyNote } from "lucide-react";
+import { Loader2, ArrowLeft, Upload, Plus, CalendarClock, FileText, Package, Truck, CheckCircle2, AlertCircle, StickyNote, MessageSquare, Send } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
 import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
@@ -153,6 +153,131 @@ function ProductionNotesSection({ order, onUpdate }: {
           className="text-sm"
         />
       )}
+    </div>
+  );
+}
+
+interface ProductionComment {
+  id: string;
+  author_name: string;
+  author_role: string;
+  message: string;
+  created_at: string;
+}
+
+function ProductionCommentsThread({ orderId, isVibeAdmin }: { orderId: string; isVibeAdmin: boolean }) {
+  const [comments, setComments] = useState<ProductionComment[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const fetchComments = useCallback(async () => {
+    const { data } = await (supabase as any)
+      .from('production_comments')
+      .select('id, author_name, author_role, message, created_at')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: true });
+    setComments(data || []);
+    setLoading(false);
+  }, [orderId]);
+
+  useEffect(() => { fetchComments(); }, [fetchComments]);
+
+  const handleSend = async () => {
+    if (!newMessage.trim()) return;
+    setSending(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: profile } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      const roles = (profile || []).map((r: any) => String(r.role));
+      const role = roles.includes('vibe_admin') ? 'admin' : 'customer';
+      const name = user.email?.split('@')[0] || 'User';
+
+      const { error } = await (supabase as any)
+        .from('production_comments')
+        .insert({
+          order_id: orderId,
+          user_id: user.id,
+          author_name: name,
+          author_role: role,
+          message: newMessage.trim(),
+        });
+
+      if (error) throw error;
+      setNewMessage("");
+      await fetchComments();
+    } catch (error: any) {
+      console.error('Error posting comment:', error);
+      toast({ title: "Error", description: "Failed to post message", variant: "destructive" });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="border border-border rounded-xl bg-card overflow-hidden">
+      <div className="p-4 border-b border-border bg-muted/30 flex items-center gap-2">
+        <MessageSquare className="h-4 w-4 text-primary" />
+        <h3 className="font-medium text-sm">Updates & Messages</h3>
+        <Badge variant="secondary" className="ml-auto text-[10px]">{comments.length}</Badge>
+      </div>
+
+      <div className="max-h-[300px] overflow-y-auto p-4 space-y-3">
+        {loading ? (
+          <div className="flex justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : comments.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">No messages yet. Start a conversation.</p>
+        ) : (
+          comments.map((c) => (
+            <div
+              key={c.id}
+              className={cn(
+                "rounded-lg p-3 text-sm max-w-[85%]",
+                c.author_role === 'admin'
+                  ? "bg-primary/10 border border-primary/20 ml-auto"
+                  : "bg-muted border border-border"
+              )}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-medium text-xs">
+                  {c.author_name}
+                </span>
+                <Badge variant={c.author_role === 'admin' ? 'default' : 'outline'} className="text-[9px] px-1.5 py-0">
+                  {c.author_role === 'admin' ? 'Team' : 'Customer'}
+                </Badge>
+                <span className="text-[10px] text-muted-foreground ml-auto">
+                  {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {' '}
+                  {new Date(c.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </div>
+              <p className="text-foreground whitespace-pre-wrap">{c.message}</p>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="p-3 border-t border-border flex gap-2">
+        <Input
+          placeholder="Type a message or request an update…"
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          className="text-sm"
+          disabled={sending}
+        />
+        <Button size="icon" onClick={handleSend} disabled={sending || !newMessage.trim()}>
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -972,6 +1097,9 @@ export default function ProductionDetail() {
           )}
         </div>
       )}
+
+      {/* Shared Comments Thread */}
+      <ProductionCommentsThread orderId={order.id} isVibeAdmin={isVibeAdmin} />
       <ShipmentTracker
         legs={shipmentLegs}
         isVibeAdmin={isVibeAdmin}
