@@ -487,16 +487,47 @@ export default function ProductionDetail() {
     }
   };
 
-  const handleLegArrivalChange = async (legId: string, date: string) => {
+  const handleLegArrivalChange = async (legId: string, date: string | null) => {
     try {
+      const updateData: any = { actual_arrival: date || null };
+      if (date) {
+        updateData.status = 'delivered';
+      }
       const { error } = await (supabase as any)
         .from('shipment_legs')
-        .update({ actual_arrival: date, status: 'delivered' })
+        .update(updateData)
         .eq('id', legId);
       if (error) throw error;
       await fetchShipmentLegs();
     } catch (error: any) {
       toast({ title: "Error", description: "Failed to update arrival", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteLeg = async (legId: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('shipment_legs')
+        .delete()
+        .eq('id', legId);
+      if (error) throw error;
+      await fetchShipmentLegs();
+      toast({ title: "Leg deleted" });
+    } catch (error: any) {
+      toast({ title: "Error", description: "Failed to delete leg", variant: "destructive" });
+    }
+  };
+
+  const handleLegNotesChange = async (legId: string, notes: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('shipment_legs')
+        .update({ notes })
+        .eq('id', legId);
+      if (error) throw error;
+      await fetchShipmentLegs();
+    } catch (error: any) {
+      toast({ title: "Error", description: "Failed to update notes", variant: "destructive" });
     }
   };
 
@@ -1107,6 +1138,8 @@ export default function ProductionDetail() {
         onActualArrivalChange={isVibeAdmin ? handleLegArrivalChange : undefined}
         onAddLeg={isVibeAdmin ? () => setAddLegDialogOpen(true) : undefined}
         onAttachmentUpload={isVibeAdmin ? handleLegAttachmentUpload : undefined}
+        onDeleteLeg={isVibeAdmin ? handleDeleteLeg : undefined}
+        onNotesChange={isVibeAdmin ? handleLegNotesChange : undefined}
       />
 
       <AddShipmentLegDialog
