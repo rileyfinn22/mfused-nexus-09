@@ -262,7 +262,7 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                               ETA: {formatDate(leg.estimated_arrival)}
                             </span>
                           )}
-                          {leg.actual_arrival && (
+                          {leg.actual_arrival && (leg.status === 'delivered' || leg.status === 'cleared') && (
                             <span className="flex items-center gap-1 text-green-600">
                               <Calendar className="h-3 w-3" />
                               Arrived: {formatDate(leg.actual_arrival)}

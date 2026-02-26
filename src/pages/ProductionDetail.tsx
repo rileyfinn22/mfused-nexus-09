@@ -476,9 +476,13 @@ export default function ProductionDetail() {
 
   const handleLegStatusChange = async (legId: string, newStatus: string) => {
     try {
+      const updateData: any = { status: newStatus };
+      if (!['delivered', 'cleared'].includes(newStatus)) {
+        updateData.actual_arrival = null;
+      }
       const { error } = await (supabase as any)
         .from('shipment_legs')
-        .update({ status: newStatus })
+        .update(updateData)
         .eq('id', legId);
       if (error) throw error;
       await fetchShipmentLegs();
