@@ -20,6 +20,8 @@ interface SendNoticeRequest {
   portalUrl: string;
   pdfBase64?: string;
   pdfFilename?: string;
+  customSubject?: string;
+  customBody?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -41,6 +43,8 @@ const handler = async (req: Request): Promise<Response> => {
       portalUrl,
       pdfBase64,
       pdfFilename,
+      customSubject,
+      customBody,
     }: SendNoticeRequest = await req.json();
 
     if (!recipientEmails || recipientEmails.length === 0) {
@@ -68,9 +72,11 @@ const handler = async (req: Request): Promise<Response> => {
     let ctaColor: string;
 
     if (noticeType === "billed") {
-      subject = `Invoice ${invoiceNumber} — ${formattedAmount} Due ${formattedDueDate}`;
+      subject = customSubject || `Invoice ${invoiceNumber} — ${formattedAmount} Due ${formattedDueDate}`;
       headline = "Invoice Ready for Payment";
-      bodyMessage = `
+      bodyMessage = customBody
+        ? customBody.split('\n').map(line => `<p style="margin: 0 0 16px 0; color: #374151; font-size: 16px; line-height: 1.6;">${line}</p>`).join('')
+        : `
         <p style="margin: 0 0 16px 0; color: #374151; font-size: 16px; line-height: 1.6;">
           Dear ${customerName},
         </p>
@@ -86,9 +92,11 @@ const handler = async (req: Request): Promise<Response> => {
       headerColor = "#2563eb";
       ctaColor = "background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);";
     } else {
-      subject = `⚠️ Payment Due — Invoice ${invoiceNumber} (${formattedAmount})`;
+      subject = customSubject || `⚠️ Payment Due — Invoice ${invoiceNumber} (${formattedAmount})`;
       headline = "Payment Due Reminder";
-      bodyMessage = `
+      bodyMessage = customBody
+        ? customBody.split('\n').map(line => `<p style="margin: 0 0 16px 0; color: #374151; font-size: 16px; line-height: 1.6;">${line}</p>`).join('')
+        : `
         <p style="margin: 0 0 16px 0; color: #374151; font-size: 16px; line-height: 1.6;">
           Dear ${customerName},
         </p>
