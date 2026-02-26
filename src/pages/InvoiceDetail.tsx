@@ -21,6 +21,7 @@ import { SyncToQuickBooksDialog } from "@/components/SyncToQuickBooksDialog";
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
 import { InvoiceAuditLog } from "@/components/InvoiceAuditLog";
 import { SendInvoiceEmailDialog } from "@/components/SendInvoiceEmailDialog";
+import { SendInvoiceNoticeDialog } from "@/components/SendInvoiceNoticeDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
@@ -65,6 +66,7 @@ const InvoiceDetail = () => {
   const [pullingPayments, setPullingPayments] = useState(false);
   const [orderAttachments, setOrderAttachments] = useState<any[]>([]);
   const [sendingNotice, setSendingNotice] = useState<string | null>(null);
+  const [showNoticeDialog, setShowNoticeDialog] = useState<"billed" | "payment_due" | null>(null);
   const {
     syncInvoice,
     checkConnection
@@ -1330,60 +1332,7 @@ const InvoiceDetail = () => {
     }
   };
 
-  const handleSendNotice = async (noticeType: "billed" | "payment_due") => {
-    if (!invoice || !order) return;
-    
-    const customerEmail = order.customer_email;
-    if (!customerEmail) {
-      toast({
-        title: "No Customer Email",
-        description: "This order doesn't have a customer email address set.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const label = noticeType === "billed" ? "Billed Notice" : "Payment Due Reminder";
-    if (!confirm(`Send ${label} email to ${customerEmail}?`)) return;
-
-    setSendingNotice(noticeType);
-    try {
-      // Determine portal URL
-      const origin = window.location.origin;
-      const isPreview = origin.includes('lovable.app') || origin.includes('lovableproject.com');
-      const portalBase = isPreview ? 'https://vibepkgportal.lovable.app' : origin;
-      const portalUrl = `${portalBase}/invoices/${invoice.id}`;
-
-      const { data, error } = await supabase.functions.invoke('send-invoice-notice', {
-        body: {
-          noticeType,
-          recipientEmails: [customerEmail],
-          senderEmail: currentUserEmail || 'info@vibepkg.com',
-          invoiceNumber: invoice.invoice_number,
-          dueDate: invoice.due_date,
-          totalAmount: invoice.total || 0,
-          customerName: order.shipping_name || order.customer_name || 'Customer',
-          portalUrl,
-        },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      toast({
-        title: `${label} Sent`,
-        description: `${label} sent to ${customerEmail}`,
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || `Failed to send ${label}`,
-        variant: "destructive",
-      });
-    } finally {
-      setSendingNotice(null);
-    }
-  };
+  // Notice dialogs are now handled by SendInvoiceNoticeDialog
 
   const handleUnsyncFromQB = async () => {
     setUnsyncingFromQB(true);
@@ -1583,18 +1532,12 @@ const InvoiceDetail = () => {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="text-xs text-muted-foreground">Notices</DropdownMenuLabel>
-                <DropdownMenuItem 
-                  onClick={() => handleSendNotice("billed")}
-                  disabled={sendingNotice !== null}
-                >
-                  {sendingNotice === "billed" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Bell className="h-4 w-4 mr-2" />}
+                <DropdownMenuItem onClick={() => setShowNoticeDialog("billed")}>
+                  <Bell className="h-4 w-4 mr-2" />
                   Send Billed Notice (Net 30)
                 </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => handleSendNotice("payment_due")}
-                  disabled={sendingNotice !== null}
-                >
-                  {sendingNotice === "payment_due" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <AlertCircle className="h-4 w-4 mr-2" />}
+                <DropdownMenuItem onClick={() => setShowNoticeDialog("payment_due")}>
+                  <AlertCircle className="h-4 w-4 mr-2" />
                   Send Payment Due Reminder
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -3053,6 +2996,19 @@ const InvoiceDetail = () => {
         senderName={currentUserName}
         senderEmail={currentUserEmail}
       />
+
+      {/* Send Invoice Notice Dialog */}
+      {showNoticeDialog && (
+        <SendInvoiceNoticeDialog
+          open={!!showNoticeDialog}
+          onOpenChange={(open) => { if (!open) setShowNoticeDialog(null); }}
+          noticeType={showNoticeDialog}
+          invoice={invoice}
+          order={order}
+          items={editedItems}
+          senderEmail={currentUserEmail}
+        />
+      )}
     </div>;
 };
 export default InvoiceDetail;
