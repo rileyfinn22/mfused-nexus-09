@@ -257,7 +257,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Send the email - use verified domain for sending
     // Subject: "PO # From VibePKG" only
     const emailResponse = await resend.emails.send({
-      from: `VibePKG <no-reply@vibepkgportal.com>`,
+      from: `VibePKG <orders@vibepkgportal.com>`,
       replyTo: senderEmail,
       to: recipientEmails,
       bcc: internalBccRecipients,
