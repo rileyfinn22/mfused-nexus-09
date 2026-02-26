@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,11 +47,16 @@ export function SendInvoiceNoticeDialog({
   const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [attachPdf, setAttachPdf] = useState(true);
+  const [editableSubject, setEditableSubject] = useState("");
+  const [editableBody, setEditableBody] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isBilled = noticeType === "billed";
   const title = isBilled ? "Send Billed Notice" : "Send Payment Due Reminder";
   const icon = isBilled ? <Bell className="h-5 w-5 text-primary" /> : <AlertCircle className="h-5 w-5 text-destructive" />;
+
+  // Derive the proper company/customer name (not shipping_name which may include state prefix)
+  const customerDisplayName = invoice?.companies?.name || order?.customer_name || "Customer";
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
@@ -81,8 +87,21 @@ export function SendInvoiceNoticeDialog({
       setActiveTab("compose");
       setShowEmailSuggestions(false);
       setAttachPdf(true);
+
+      const dueDate = invoice?.due_date
+        ? new Date(invoice.due_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+        : "Upon Receipt";
+      const amount = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(invoice?.total || 0);
+
+      if (isBilled) {
+        setEditableSubject(`Invoice ${invoice?.invoice_number} — ${amount} Due ${dueDate}`);
+        setEditableBody(`Dear ${customerDisplayName},\n\nYour order has shipped and invoice ${invoice?.invoice_number} is now ready for payment. Per our Net 30 terms, payment is due by ${dueDate}.\n\nYou can view the full invoice and make a payment through our portal.`);
+      } else {
+        setEditableSubject(`⚠️ Payment Due — Invoice ${invoice?.invoice_number} (${amount})`);
+        setEditableBody(`Dear ${customerDisplayName},\n\nThis is a friendly reminder that invoice ${invoice?.invoice_number} for ${amount} was due on ${dueDate}.\n\nIf payment has already been sent, please disregard this notice. Otherwise, we kindly ask that you arrange payment at your earliest convenience.\n\nYou can view the invoice and make a payment through our secure portal below.`);
+      }
     }
-  }, [open, invoice, order]);
+  }, [open, invoice, order, noticeType]);
 
   const saveEmailsToHistory = async (emailsToSave: string[]) => {
     if (!companyId) return;
@@ -288,9 +307,6 @@ export function SendInvoiceNoticeDialog({
 
   const formattedAmount = formatCurrency(invoice?.total || 0);
 
-  const previewSubject = isBilled
-    ? `Invoice ${invoice?.invoice_number} — ${formattedAmount} Due ${formattedDueDate}`
-    : `⚠️ Payment Due — Invoice ${invoice?.invoice_number} (${formattedAmount})`;
 
   const handleSend = async () => {
     if (emails.length === 0) {
@@ -320,10 +336,12 @@ export function SendInvoiceNoticeDialog({
           invoiceNumber: invoice.invoice_number,
           dueDate: invoice.due_date,
           totalAmount: invoice.total || 0,
-          customerName: order?.shipping_name || order?.customer_name || 'Customer',
+          customerName: customerDisplayName,
           portalUrl,
           pdfBase64,
           pdfFilename,
+          customSubject: editableSubject,
+          customBody: editableBody,
         },
       });
 
@@ -449,6 +467,28 @@ export function SendInvoiceNoticeDialog({
               )}
             </div>
 
+            {/* Editable Subject */}
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Input
+                value={editableSubject}
+                onChange={(e) => setEditableSubject(e.target.value)}
+                placeholder="Email subject line"
+              />
+            </div>
+
+            {/* Editable Body */}
+            <div className="space-y-2">
+              <Label>Email Body</Label>
+              <Textarea
+                value={editableBody}
+                onChange={(e) => setEditableBody(e.target.value)}
+                placeholder="Email body text"
+                className="min-h-[140px]"
+              />
+              <p className="text-xs text-muted-foreground">The invoice details card, &quot;View in Portal&quot; button, and footer will be included automatically below your message.</p>
+            </div>
+
             {/* Attachment toggle */}
             <div className="space-y-2">
               <Label>Attachment</Label>
@@ -497,7 +537,7 @@ export function SendInvoiceNoticeDialog({
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="text-sm text-muted-foreground w-16">Subject:</span>
-                    <span className="text-sm font-medium">{previewSubject}</span>
+                    <span className="text-sm font-medium">{editableSubject}</span>
                   </div>
                   {attachPdf && (
                     <div className="flex items-start gap-3">
@@ -521,29 +561,9 @@ export function SendInvoiceNoticeDialog({
 
                   {/* Body */}
                   <div className="p-6 space-y-4 border-x">
-                    {isBilled ? (
-                      <>
-                        <p className="text-sm">Dear {order?.shipping_name || order?.customer_name || 'Customer'},</p>
-                        <p className="text-sm">
-                          Your order has shipped and invoice <strong>{invoice?.invoice_number}</strong> is now ready for payment.
-                          Per our Net 30 terms, payment is due by <strong>{formattedDueDate}</strong>.
-                        </p>
-                        <p className="text-sm">You can view the full invoice and make a payment through our portal.</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm">Dear {order?.shipping_name || order?.customer_name || 'Customer'},</p>
-                        <p className="text-sm">
-                          This is a friendly reminder that invoice <strong>{invoice?.invoice_number}</strong> for <strong>{formattedAmount}</strong> was
-                          due on <strong>{formattedDueDate}</strong>.
-                        </p>
-                        <p className="text-sm">
-                          If payment has already been sent, please disregard this notice. Otherwise, we kindly ask that you
-                          arrange payment at your earliest convenience.
-                        </p>
-                        <p className="text-sm">You can view the invoice and make a payment through our secure portal below.</p>
-                      </>
-                    )}
+                    {editableBody.split('\n').map((line, i) => (
+                      <p key={i} className="text-sm">{line || '\u00A0'}</p>
+                    ))}
 
                     {/* Invoice Card Preview */}
                     <div className="bg-muted/50 rounded-lg p-4 space-y-3">
