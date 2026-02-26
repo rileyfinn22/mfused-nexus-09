@@ -613,7 +613,12 @@ export type Database = {
           quickbooks_synced_at: string | null
           quote_id: string | null
           shipment_number: number | null
+          shipping_city: string | null
           shipping_cost: number | null
+          shipping_name: string | null
+          shipping_state: string | null
+          shipping_street: string | null
+          shipping_zip: string | null
           status: string
           subtotal: number
           tax: number
@@ -643,7 +648,12 @@ export type Database = {
           quickbooks_synced_at?: string | null
           quote_id?: string | null
           shipment_number?: number | null
+          shipping_city?: string | null
           shipping_cost?: number | null
+          shipping_name?: string | null
+          shipping_state?: string | null
+          shipping_street?: string | null
+          shipping_zip?: string | null
           status?: string
           subtotal?: number
           tax?: number
@@ -673,7 +683,12 @@ export type Database = {
           quickbooks_synced_at?: string | null
           quote_id?: string | null
           shipment_number?: number | null
+          shipping_city?: string | null
           shipping_cost?: number | null
+          shipping_name?: string | null
+          shipping_state?: string | null
+          shipping_street?: string | null
+          shipping_zip?: string | null
           status?: string
           subtotal?: number
           tax?: number
