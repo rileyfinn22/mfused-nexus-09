@@ -198,6 +198,13 @@ const handler = async (req: Request): Promise<Response> => {
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                       <tr>
                         <td>
+                          <p style="margin: 0; color: #ef4444; font-size: 12px; font-weight: 600;">
+                            ⚠️ Please do not reply to this email — this mailbox is not monitored.
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding-top: 8px;">
                           <p style="margin: 0; color: #6b7280; font-size: 14px;">
                             Questions? Contact us at 
                             <a href="mailto:${senderEmail}" style="color: #2563eb; text-decoration: none;">${senderEmail}</a>
@@ -251,7 +258,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send the email - use verified domain for sending
     const emailResponse = await resend.emails.send({
-      from: `VibePKG <invoices@vibepkgportal.com>`,
+      from: `VibePKG <no-reply@vibepkgportal.com>`,
       replyTo: senderEmail,
       to: recipientEmails,
       bcc: internalBccRecipients,
