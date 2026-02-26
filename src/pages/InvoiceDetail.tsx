@@ -359,6 +359,38 @@ const InvoiceDetail = () => {
         });
         paymentsData = paymentsWithInvoices;
       }
+    } else if (invoiceData.parent_invoice_id) {
+      // Partial invoice with a parent - show payments for this invoice AND the parent blanket
+      const parentAndSelfIds = [invoiceId!, invoiceData.parent_invoice_id];
+      // Also include sibling partial invoices
+      if (relatedData && relatedData.length > 0) {
+        parentAndSelfIds.push(...relatedData.map(inv => inv.id));
+      }
+      
+      const { data: allRelatedPayments, error: relatedPaymentsError } = await supabase
+        .from('payments')
+        .select('*')
+        .in('invoice_id', parentAndSelfIds)
+        .order('payment_date', { ascending: false });
+      
+      if (relatedPaymentsError) {
+        console.error('Error fetching related payments:', relatedPaymentsError);
+      }
+      
+      if (allRelatedPayments) {
+        // Add invoice info to each payment
+        const paymentsWithInvoices = allRelatedPayments.map(payment => {
+          if (payment.invoice_id === invoiceId) {
+            return { ...payment, invoices: { invoice_number: invoiceData.invoice_number, invoice_type: invoiceData.invoice_type, shipment_number: invoiceData.shipment_number } };
+          }
+          if (payment.invoice_id === invoiceData.parent_invoice_id) {
+            return { ...payment, invoices: { invoice_number: 'Parent Blanket', invoice_type: 'full', shipment_number: 1 } };
+          }
+          const sibling = relatedData?.find(inv => inv.id === payment.invoice_id);
+          return { ...payment, invoices: sibling ? { invoice_number: sibling.invoice_number, invoice_type: sibling.invoice_type, shipment_number: sibling.shipment_number } : null };
+        });
+        paymentsData = paymentsWithInvoices;
+      }
     } else {
       // Regular invoice - only show payments for this invoice
       const { data: singleInvoicePayments } = await supabase
@@ -2393,7 +2425,7 @@ const InvoiceDetail = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <TableHead>Invoice</TableHead>}
+                  {((invoice.invoice_type === 'full' && invoice.shipment_number === 1) || invoice.parent_invoice_id) && <TableHead>Invoice</TableHead>}
                   <TableHead>Method</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
@@ -2406,7 +2438,7 @@ const InvoiceDetail = () => {
                     <TableCell className="font-medium">
                       {new Date(payment.payment_date).toLocaleDateString()}
                     </TableCell>
-                    {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && (
+                    {((invoice.invoice_type === 'full' && invoice.shipment_number === 1) || invoice.parent_invoice_id) && (
                       <TableCell className="font-mono text-xs">
                         {payment.invoices?.invoice_number || '-'}
                       </TableCell>
