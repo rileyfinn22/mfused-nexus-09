@@ -845,18 +845,23 @@ const InvoiceDetail = () => {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(order.shipping_name || '', leftColX, yPos + 8);
+    const shipName = invoice.shipping_name || order.shipping_name || '';
+    const shipStreet = invoice.shipping_street || order.shipping_street || '';
+    const shipCity = invoice.shipping_city || order.shipping_city || '';
+    const shipState = invoice.shipping_state || order.shipping_state || '';
+    const shipZip = invoice.shipping_zip || order.shipping_zip || '';
+    doc.text(shipName, leftColX, yPos + 8);
     
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
     
     let shipY = yPos + 14;
-    if (order.shipping_street) {
-      doc.text(order.shipping_street, leftColX, shipY);
+    if (shipStreet) {
+      doc.text(shipStreet, leftColX, shipY);
       shipY += 5;
     }
-    doc.text(`${order.shipping_city || ''}, ${order.shipping_state || ''} ${order.shipping_zip || ''}`, leftColX, shipY);
+    doc.text(`${shipCity}, ${shipState} ${shipZip}`, leftColX, shipY);
     
     // Details on right
     doc.setFontSize(9);
@@ -1756,10 +1761,10 @@ const InvoiceDetail = () => {
               <div>
                 <h3 className="text-sm font-semibold mb-3">Ship To</h3>
                 <div className="text-sm space-y-1">
-                  <p className="font-medium">{order?.shipping_name}</p>
-                  <p className="text-muted-foreground">{order?.shipping_street}</p>
+                  <p className="font-medium">{invoice?.shipping_name || order?.shipping_name}</p>
+                  <p className="text-muted-foreground">{invoice?.shipping_street || order?.shipping_street}</p>
                   <p className="text-muted-foreground">
-                    {order?.shipping_city}, {order?.shipping_state} {order?.shipping_zip}
+                    {invoice?.shipping_city || order?.shipping_city}, {invoice?.shipping_state || order?.shipping_state} {invoice?.shipping_zip || order?.shipping_zip}
                   </p>
                 </div>
               </div>

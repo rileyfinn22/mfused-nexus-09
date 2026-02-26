@@ -18,7 +18,11 @@ export async function approvePullShipOrder({
     order_number: string;
     parent_order_id: string | null;
     company_id: string;
+    shipping_name?: string;
+    shipping_street?: string;
+    shipping_city?: string;
     shipping_state: string;
+    shipping_zip?: string;
     shipping_cost?: number;
     total: number;
   };
@@ -158,6 +162,11 @@ export async function approvePullShipOrder({
       tax: 0,
       total: recalculatedTotal,
       shipping_cost: pullOrder.shipping_cost || 0,
+      shipping_name: pullOrder.shipping_name || null,
+      shipping_street: pullOrder.shipping_street || null,
+      shipping_city: pullOrder.shipping_city || null,
+      shipping_state: pullOrder.shipping_state || null,
+      shipping_zip: pullOrder.shipping_zip || null,
       shipment_number: nextShipmentNumber,
       billed_percentage: Number(percentageOfOrder.toFixed(2)),
       parent_invoice_id: blanketInvoice.id,
