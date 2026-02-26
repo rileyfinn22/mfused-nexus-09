@@ -216,24 +216,32 @@ const PullShip = () => {
     }
   };
 
-  const handleSkuSelection = (sku: string, checked: boolean) => {
+  const handleSkuSelection = (inventoryId: string, checked: boolean) => {
     const newSelected = new Set(selectedSkus);
     if (checked) {
-      newSelected.add(sku);
-      setSkuQuantities(prev => ({ ...prev, [sku]: 1 }));
+      newSelected.add(inventoryId);
+      setSkuQuantities(prev => ({ ...prev, [inventoryId]: 1 }));
     } else {
-      newSelected.delete(sku);
+      newSelected.delete(inventoryId);
       setSkuQuantities(prev => {
         const newQuantities = { ...prev };
-        delete newQuantities[sku];
+        delete newQuantities[inventoryId];
         return newQuantities;
       });
     }
     setSelectedSkus(newSelected);
+    
+    // Auto-fetch prices from linked orders for newly selected items
+    if (checked) {
+      const item = inventory.find(i => i.id === inventoryId);
+      if (item?.order_id && !invoiceItemPrices[`_fetched_${item.order_id}`]) {
+        fetchInvoiceItemPrices(item.order_id);
+      }
+    }
   };
 
-  const handleQuantityChange = (sku: string, quantity: number) => {
-    setSkuQuantities(prev => ({ ...prev, [sku]: Math.max(1, quantity) }));
+  const handleQuantityChange = (inventoryId: string, quantity: number) => {
+    setSkuQuantities(prev => ({ ...prev, [inventoryId]: Math.max(1, quantity) }));
   };
 
   const generatePackingListPDF = (items: Array<{sku: string, itemId?: string, quantity: number}>, orderData: any, invoiceId: string) => {
@@ -345,12 +353,12 @@ const PullShip = () => {
   const viewPackingList = () => {
     if (selectedSkus.size === 0) return;
     
-    const items = Array.from(selectedSkus).map(sku => {
-      const inventoryItem = inventory.find(item => item.sku === sku);
+    const items = Array.from(selectedSkus).map(inventoryId => {
+      const inventoryItem = inventory.find(item => item.id === inventoryId);
       return {
-        sku,
+        sku: inventoryItem?.sku || inventoryId,
         itemId: inventoryItem?.products?.item_id,
-        quantity: skuQuantities[sku] || 1
+        quantity: skuQuantities[inventoryId] || 1
       };
     });
     
@@ -361,27 +369,16 @@ const PullShip = () => {
   const viewInvoice = async () => {
     if (selectedSkus.size === 0) return;
     
-    // Get parent order item prices if available
-    let parentOrderItems: any[] = [];
-    if (orderData.parentOrderId) {
-      const { data: parentData } = await supabase
-        .from('order_items')
-        .select('sku, unit_price')
-        .eq('order_id', orderData.parentOrderId);
-      
-      if (parentData) {
-        parentOrderItems = parentData;
-      }
-    }
-    
-    const items = Array.from(selectedSkus).map(sku => {
-      const inventoryItem = inventory.find(item => item.sku === sku);
-      const parentItem = parentOrderItems.find(pi => pi.sku === sku);
-      const unitPrice = parentItem?.unit_price || 1;
+    const items = Array.from(selectedSkus).map(inventoryId => {
+      const inventoryItem = inventory.find(item => item.id === inventoryId);
+      const sku = inventoryItem?.sku || inventoryId;
+      const itemId = inventoryItem?.products?.item_id || sku;
+      // Look up price by item_id or sku from auto-fetched prices
+      const unitPrice = invoiceItemPrices[itemId] || invoiceItemPrices[sku] || 0;
       return {
         sku,
-        itemId: inventoryItem?.products?.item_id,
-        quantity: skuQuantities[sku] || 1,
+        itemId,
+        quantity: skuQuantities[inventoryId] || 1,
         unitPrice
       };
     });
@@ -420,18 +417,18 @@ const PullShip = () => {
   const getLinkedOrdersFromSelection = () => {
     const orderMap = new Map<string, { orderId: string; orderNumber: string; description: string; skus: string[] }>();
     
-    Array.from(selectedSkus).forEach(sku => {
-      const inventoryItem = inventory.find(item => item.sku === sku);
+    Array.from(selectedSkus).forEach(inventoryId => {
+      const inventoryItem = inventory.find(item => item.id === inventoryId);
       if (inventoryItem?.order_id && inventoryItem?.orders) {
         const existingEntry = orderMap.get(inventoryItem.order_id);
         if (existingEntry) {
-          existingEntry.skus.push(sku);
+          existingEntry.skus.push(inventoryItem.sku);
         } else {
           orderMap.set(inventoryItem.order_id, {
             orderId: inventoryItem.order_id,
             orderNumber: inventoryItem.orders.order_number,
             description: inventoryItem.orders.description || 'No description',
-            skus: [sku]
+            skus: [inventoryItem.sku]
           });
         }
       }
@@ -441,8 +438,8 @@ const PullShip = () => {
   };
 
   const linkedOrders = getLinkedOrdersFromSelection();
-  const unlinkedSkus = Array.from(selectedSkus).filter(sku => {
-    const inventoryItem = inventory.find(item => item.sku === sku);
+  const unlinkedSkus = Array.from(selectedSkus).filter(inventoryId => {
+    const inventoryItem = inventory.find(item => item.id === inventoryId);
     return !inventoryItem?.order_id;
   });
 
@@ -453,7 +450,6 @@ const PullShip = () => {
     }
 
     try {
-      // Fetch order items with their SKUs and unit prices - need to join with products to get item_id
       const { data, error } = await supabase
         .from('order_items')
         .select(`
@@ -466,22 +462,25 @@ const PullShip = () => {
 
       if (error) throw error;
 
-      // Create a map of product item_id (inventory SKU) to unit price
-      const priceMap: Record<string, number> = {};
+      // Merge prices into existing map (don't replace)
+      const newPrices: Record<string, number> = {};
       if (data) {
         data.forEach((item: any) => {
           const inventorySku = item.products?.item_id;
           if (inventorySku) {
-            priceMap[inventorySku] = item.unit_price;
+            newPrices[inventorySku] = item.unit_price;
+          }
+          // Also map by order_items SKU
+          if (item.sku) {
+            newPrices[item.sku] = item.unit_price;
           }
         });
       }
 
-      console.log('Invoice item prices loaded:', priceMap);
-      setInvoiceItemPrices(priceMap);
+      console.log('Invoice item prices loaded for order:', parentOrderId, newPrices);
+      setInvoiceItemPrices(prev => ({ ...prev, ...newPrices, [`_fetched_${parentOrderId}`]: 1 }));
     } catch (error) {
       console.error('Error fetching invoice item prices:', error);
-      setInvoiceItemPrices({});
     }
   };
 
@@ -655,13 +654,13 @@ const PullShip = () => {
       if (!user) throw new Error('Not authenticated');
 
       // Build items with their linked order_ids from inventory
-      const items = Array.from(selectedSkus).map(sku => {
-        const inventoryItem = inventory.find(item => item.sku === sku);
+      const items = Array.from(selectedSkus).map(inventoryId => {
+        const inventoryItem = inventory.find(item => item.id === inventoryId);
         return {
-          sku,
+          sku: inventoryItem?.sku || inventoryId,
           itemId: inventoryItem?.products?.item_id,
-          name: inventoryItem?.products?.name || sku,
-          quantity: skuQuantities[sku] || 1,
+          name: inventoryItem?.products?.name || inventoryItem?.sku || inventoryId,
+          quantity: skuQuantities[inventoryId] || 1,
           linkedOrderId: inventoryItem?.order_id || null
         };
       });
@@ -998,7 +997,7 @@ const PullShip = () => {
                         .map((item) => {
                           const status = getStockStatus(item.available, item.redline);
                           const stockColor = getStockColor(status);
-                          const isSelected = selectedSkus.has(item.sku);
+                          const isSelected = selectedSkus.has(item.id);
                           
                           return (
                             <div 
@@ -1008,13 +1007,18 @@ const PullShip = () => {
                               <div className="col-span-1 flex items-center">
                                 <Checkbox
                                   checked={isSelected}
-                                  onCheckedChange={(checked) => handleSkuSelection(item.sku, checked as boolean)}
+                                  onCheckedChange={(checked) => handleSkuSelection(item.id, checked as boolean)}
                                   className="h-4 w-4"
                                 />
                               </div>
                               <div className="col-span-4 text-sm">
                                 <div className="font-medium">{item.products?.item_id || item.sku}</div>
-                                <div className="text-xs text-muted-foreground">{item.products?.name || 'No name'}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {item.products?.name || 'No name'}
+                                  {item.orders?.order_number && (
+                                    <span className="ml-1 text-primary font-medium">• Linked to #{item.orders.order_number}</span>
+                                  )}
+                                </div>
                               </div>
                               <div className="col-span-2 font-semibold text-sm flex items-center gap-1">
                                 {status === "critical" && <AlertTriangle className="h-3 w-3 text-danger" />}
@@ -1085,19 +1089,27 @@ const PullShip = () => {
                 
                 <div className="border-t pt-4 space-y-3">
                   <div className="text-sm font-medium">Set Quantities:</div>
-                  {Array.from(selectedSkus).map(sku => (
-                    <div key={sku} className="space-y-2">
-                      <div className="text-xs font-medium text-muted-foreground">{sku}</div>
+                  {Array.from(selectedSkus).map(inventoryId => {
+                    const inventoryItem = inventory.find(i => i.id === inventoryId);
+                    const displaySku = inventoryItem?.products?.item_id || inventoryItem?.sku || inventoryId;
+                    const linkedOrder = inventoryItem?.orders?.order_number;
+                    return (
+                    <div key={inventoryId} className="space-y-2">
+                      <div className="text-xs font-medium text-muted-foreground">
+                        {displaySku}
+                        {linkedOrder && <span className="ml-1 text-primary">(#{linkedOrder})</span>}
+                      </div>
                       <Input
                         type="number"
                         min="1"
-                        value={skuQuantities[sku] || 1}
-                        onChange={(e) => handleQuantityChange(sku, parseInt(e.target.value) || 1)}
+                        value={skuQuantities[inventoryId] || 1}
+                        onChange={(e) => handleQuantityChange(inventoryId, parseInt(e.target.value) || 1)}
                         className="h-8 text-sm"
                         placeholder="Quantity"
                       />
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="border-t pt-4">
@@ -1125,17 +1137,22 @@ const PullShip = () => {
                 <div className="bg-primary/10 border border-primary/20 p-3 rounded text-center">
                   <div className="text-sm font-semibold text-primary">
                     Est. Value: ${(() => {
-                      return Array.from(selectedSkus).reduce((sum, sku) => {
-                        const quantity = skuQuantities[sku] || 1;
-                        // Use invoice price from parent order if available, otherwise fall back to product cost
-                        const unitPrice = invoiceItemPrices[sku] || 0;
+                      return Array.from(selectedSkus).reduce((sum, inventoryId) => {
+                        const quantity = skuQuantities[inventoryId] || 1;
+                        const inventoryItem = inventory.find(i => i.id === inventoryId);
+                        const itemId = inventoryItem?.products?.item_id || inventoryItem?.sku || '';
+                        const unitPrice = invoiceItemPrices[itemId] || invoiceItemPrices[inventoryItem?.sku || ''] || 0;
                         return sum + (quantity * unitPrice);
                       }, 0).toFixed(2);
                     })()}
                   </div>
-                  {orderData.parentOrderId && Object.keys(invoiceItemPrices).length === 0 && (
+                  {selectedSkus.size > 0 && Array.from(selectedSkus).some(id => {
+                    const item = inventory.find(i => i.id === id);
+                    const itemId = item?.products?.item_id || item?.sku || '';
+                    return !(invoiceItemPrices[itemId] || invoiceItemPrices[item?.sku || '']);
+                  }) && (
                     <div className="text-xs text-muted-foreground mt-1">
-                      No pricing data from linked invoice
+                      Some items have no pricing from linked orders
                     </div>
                   )}
                 </div>
