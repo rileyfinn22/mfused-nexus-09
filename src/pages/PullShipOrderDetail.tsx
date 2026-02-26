@@ -699,42 +699,10 @@ const PullShipOrderDetail = () => {
         });
       }
 
-      // Generate and send packing list to fulfillment vendor
-      const items = editedOrder.order_items.map((item: any) => ({
-        sku: item.sku,
-        itemId: item.item_id,
-        quantity: item.quantity
-      }));
-
-      const packingListDoc = generatePackingListPDF();
-      const packingListPdf = packingListDoc.output('dataurlstring');
-
-      const invoiceDoc = generateInvoicePDF();
-      const invoicePdf = invoiceDoc.output('dataurlstring');
-
-      // Send to fulfillment vendor
-      const { error: emailError } = await supabase.functions.invoke('send-packing-list', {
-        body: {
-          packingListPdf,
-          invoicePdf,
-          orderData: editedOrder,
-          recipientEmail: editedOrder.vendors?.contact_email
-        }
+      toast({
+        title: "Order Approved",
+        description: "Order approved and shipment invoice created successfully",
       });
-
-      if (emailError) {
-        console.error('Error sending email:', emailError);
-        toast({
-          title: "Order Approved",
-          description: "Order approved and invoice created. Email notification failed.",
-          variant: "default",
-        });
-      } else {
-        toast({
-          title: "Order Approved & Sent",
-          description: "Order approved, invoice created, and sent to fulfillment vendor",
-        });
-      }
 
       setIsEditing(false);
       fetchOrder();
