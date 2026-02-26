@@ -272,7 +272,13 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
 
                         {/* Notes display */}
                         {leg.notes && editingNotesLeg !== leg.id && (
-                          <p className="mt-2 text-xs text-muted-foreground italic">{leg.notes}</p>
+                          <div className="mt-3 rounded-md border border-border bg-muted/50 px-3 py-2.5">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Notes</span>
+                            </div>
+                            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{leg.notes}</p>
+                          </div>
                         )}
 
                         {/* Notes editing */}
