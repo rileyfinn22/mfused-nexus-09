@@ -1,4 +1,16 @@
 
+## ⚠️ Security-First Development Rules
+
+**Every change MUST be evaluated against `.lovable/SECURITY_RULES.md` before implementation.**
+
+- **Customer data visibility**: Never expose vendor costs, vendor POs, internal notes, or margins to non-admin roles
+- **Database changes**: Always confirm with the user before modifying schema or RLS policies; flag any risk of data exposure
+- **Role-based UI**: Maintain `isVibeAdmin` guards on all financial/vendor data; never add vendor routes to customer navigation
+- **RLS integrity**: Never weaken or remove existing RLS policies; always scope queries with `company_id`
+- **Destructive changes**: Flag and confirm before dropping columns, tables, or policies
+
+---
+
 
 # Public Vendor Shipment Update Link -- Implementation Plan
 
