@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 import { CompanySwitcher } from "./CompanySwitcher";
 import { useCompany } from "@/contexts/CompanyContext";
 
-const customerNavigationItems = [
+const companyNavigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Products", url: "/products", icon: Package },
   { title: "Inventory", url: "/inventory", icon: Archive },
@@ -105,7 +105,7 @@ export function AppSidebar() {
 
   const navigationItems = isVendor 
     ? vendorNavigationItems 
-    : (isVibeAdmin ? vibeAdminNavigationItems : customerNavigationItems);
+    : (isVibeAdmin ? vibeAdminNavigationItems : companyNavigationItems);
 
   const isActive = (path: string) => currentPath === path;
   const isCollapsed = state === "collapsed";
