@@ -28,10 +28,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   // we pick the most privileged one to keep UI + permissions stable.
   const ROLE_PRECEDENCE = [
     "vibe_admin",
-    "admin",
     "company",
     "vendor",
-    "customer",
   ];
 
   useEffect(() => {

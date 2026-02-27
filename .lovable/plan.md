@@ -28,4 +28,3 @@
 
 **5. Update `useActiveCompany.ts`**
 - No changes needed (already just checks for `vibe_admin`)
-

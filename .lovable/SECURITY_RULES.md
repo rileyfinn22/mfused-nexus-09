@@ -8,19 +8,19 @@ This document outlines critical security boundaries that **must not be broken** 
 
 Roles in order of privilege (highest → lowest):
 1. **vibe_admin** — Full system access across all companies (internal VibePKG staff)
-2. **admin** — Company-level admin (rarely used)
-3. **company** — Standard company user (customer portal)
-4. **vendor** — External vendor with limited production access
-5. **customer** — End customer with read-only invoice/order access
+2. **company** — Company users (contacts with portal access, scoped to their company)
+3. **vendor** — External vendor with limited production access
 
-## 2. What Customers Can See (company/customer roles)
+> **Note:** The `admin` and `customer` roles are deprecated and no longer in use. All former `customer` users have been migrated to the `company` role.
+
+## 2. What Company Users Can See (company role)
 
 ✅ **ALLOWED:**
 - Their own company's orders, invoices, payments, products, inventory, artwork, quotes
 - Shipment tracking for their orders
 - Pull & Ship orders they created
 
-❌ **NEVER VISIBLE TO CUSTOMERS:**
+❌ **NEVER VISIBLE TO COMPANY USERS:**
 - Vendor POs, Bills, or Vendor Payments (internal cost data)
 - Vendor names, costs, or margins on order items (`vendor_cost`, `vendor_id`, `vendor_po_number` fields)
 - Other companies' data (enforced by RLS + `company_id` filtering)
@@ -44,7 +44,7 @@ Roles in order of privilege (highest → lowest):
 
 ### Navigation Filtering
 - `AppSidebar.tsx` shows different nav items based on role
-- **DO NOT** add vendor/cost-related pages to `customerNavigationItems` or `vendorNavigationItems`
+- **DO NOT** add vendor/cost-related pages to `companyNavigationItems` or `vendorNavigationItems`
 
 ### Route Protection
 - Pages like `VendorPOs`, `Vendors`, `VendorPODetail` redirect non-admins to `/dashboard`
@@ -83,24 +83,24 @@ Roles in order of privilege (highest → lowest):
 - [ ] Enable RLS on the table
 - [ ] Add SELECT policy scoped to `user_has_company_access` or `has_role`
 - [ ] Add INSERT/UPDATE/DELETE policies appropriate to the role
-- [ ] Never allow customers to see vendor cost data
+- [ ] Never allow company users to see vendor cost data
 
 ### Before modifying an existing query:
 - [ ] Ensure `company_id` filtering is maintained
-- [ ] Don't join vendor tables in customer-facing queries
+- [ ] Don't join vendor tables in company-facing queries
 - [ ] Don't expose `vendor_cost`, `vendor_id`, or `vendor_po_number` to non-admins
 
 ### Before changing RLS policies:
 - [ ] Understand the current policy before modifying
 - [ ] Never make vendor/cost tables publicly readable
-- [ ] Test that customers still can't see other companies' data
+- [ ] Test that company users still can't see other companies' data
 
 ## 7. Common Mistakes to Avoid
 
 | ❌ Don't | ✅ Do Instead |
 |----------|--------------|
 | Remove `isVibeAdmin` checks from UI | Keep role-based conditional rendering |
-| Add vendor routes to customer nav | Only add to `vibeAdminNavigationItems` |
+| Add vendor routes to company nav | Only add to `vibeAdminNavigationItems` |
 | Use `.select('*')` on orders and show all columns | Filter out `vendor_cost`, `vendor_id` for non-admins |
 | Create tables without RLS | Always enable RLS and add policies |
 | Store roles in localStorage for auth checks | Use `useCompany()` context which reads from DB |
@@ -109,7 +109,7 @@ Roles in order of privilege (highest → lowest):
 ## 8. Testing Checklist
 
 After any permission-related change:
-1. Log in as a **customer** user and verify they cannot see vendor/cost data
+1. Log in as a **company** user and verify they cannot see vendor/cost data
 2. Log in as a **vibe_admin** and verify full access works
 3. Check that switching companies in the header properly scopes data
-4. Verify new routes are not accessible by typing the URL directly as a customer
+4. Verify new routes are not accessible by typing the URL directly as a company user
