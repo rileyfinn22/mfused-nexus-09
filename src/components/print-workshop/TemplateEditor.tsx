@@ -3,7 +3,7 @@ import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2 } from "lucide-react";
+import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette } from "lucide-react";
 import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
 import { IconPickerDialog } from "./IconPickerDialog";
@@ -130,6 +130,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const [zoneSelectMode, setZoneSelectMode] = useState(false);
   const [zoneExtractLocked, setZoneExtractLocked] = useState(false);
   const [extractingText, setExtractingText] = useState(false);
+  const [fontColor, setFontColor] = useState("#000000");
+
+  // Undo/redo history
+  const undoStack = useRef<string[]>([]);
+  const redoStack = useRef<string[]>([]);
+  const isUndoRedo = useRef(false);
   
   const zoneRectRef = useRef<Rect | null>(null);
   const zoneStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -160,16 +166,63 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
   const syncCanvas = useCallback(() => {
     if (fabricRef.current && onCanvasChange) {
-      // Exclude backgroundImage + trim guide from serialization.
-      // Background is re-rendered from sourcePdfPath and trim guide is re-created on load.
       const data = fabricRef.current.toObject(['locked', 'editable', 'name']) as any;
       delete data.backgroundImage;
       if (Array.isArray(data.objects)) {
         data.objects = data.objects.filter((obj: any) => obj?.name !== "_trimGuide");
       }
       onCanvasChange(data);
+
+      // Push to undo stack (skip if triggered by undo/redo itself)
+      if (!isUndoRedo.current) {
+        undoStack.current.push(JSON.stringify(data));
+        // Cap stack size
+        if (undoStack.current.length > 50) undoStack.current.shift();
+        redoStack.current = [];
+      }
     }
   }, [onCanvasChange]);
+
+  const undo = useCallback(async () => {
+    const canvas = fabricRef.current;
+    if (!canvas || undoStack.current.length < 2) return;
+    const current = undoStack.current.pop()!;
+    redoStack.current.push(current);
+    const prev = undoStack.current[undoStack.current.length - 1];
+    isUndoRedo.current = true;
+    await canvas.loadFromJSON(JSON.parse(prev));
+    canvas.renderAll();
+    onCanvasChange?.(JSON.parse(prev));
+    isUndoRedo.current = false;
+  }, [onCanvasChange]);
+
+  const redo = useCallback(async () => {
+    const canvas = fabricRef.current;
+    if (!canvas || redoStack.current.length === 0) return;
+    const next = redoStack.current.pop()!;
+    undoStack.current.push(next);
+    isUndoRedo.current = true;
+    await canvas.loadFromJSON(JSON.parse(next));
+    canvas.renderAll();
+    onCanvasChange?.(JSON.parse(next));
+    isUndoRedo.current = false;
+  }, [onCanvasChange]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [undo, redo]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -272,6 +325,15 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       }
 
       canvas.renderAll();
+
+      // Seed undo stack with initial state
+      const initialData = canvas.toObject(['locked', 'editable', 'name']) as any;
+      delete initialData.backgroundImage;
+      if (Array.isArray(initialData.objects)) {
+        initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide");
+      }
+      undoStack.current = [JSON.stringify(initialData)];
+      redoStack.current = [];
     };
 
     loadCanvasAndBackground();
@@ -282,6 +344,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         setSelectedObject(obj);
         if ((obj as any).fontSize) setFontSizePt(pxToPt((obj as any).fontSize));
         if ((obj as any).fontFamily) setFontFamily((obj as any).fontFamily);
+        if ((obj as any).fill) setFontColor((obj as any).fill);
       }
     });
     canvas.on("selection:updated", (e) => {
@@ -290,6 +353,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         setSelectedObject(obj);
         if ((obj as any).fontSize) setFontSizePt(pxToPt((obj as any).fontSize));
         if ((obj as any).fontFamily) setFontFamily((obj as any).fontFamily);
+        if ((obj as any).fill) setFontColor((obj as any).fill);
       }
     });
     canvas.on("selection:cleared", () => setSelectedObject(null));
@@ -637,12 +701,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           // Remove the selection rect, add a white cover rect to hide the underlying text, then add editable IText
           canvas.remove(rect);
 
-          // White cover to mask just the baked-in text (tight fit, no padding)
+          // White cover to mask the baked-in text (2px padding to cover anti-aliased edges)
+          const coverPad = 2;
           const cover = new Rect({
-            left: cropLeft,
-            top: cropTop,
-            width: cropW,
-            height: cropH,
+            left: cropLeft - coverPad,
+            top: cropTop - coverPad,
+            width: cropW + coverPad * 2,
+            height: cropH + coverPad * 2,
             fill: "#ffffff",
             opacity: 1,
             selectable: false,
@@ -770,12 +835,28 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     syncCanvas();
   };
 
+  const applyFontColor = (color: string) => {
+    if (!selectedObject || !fabricRef.current) return;
+    setFontColor(color);
+    (selectedObject as any).set("fill", color);
+    fabricRef.current.renderAll();
+    syncCanvas();
+  };
+
   const isTextObject = selectedObject && ((selectedObject as any).type === "i-text" || (selectedObject as any).type === "textbox" || (selectedObject as any).type === "text");
 
   return (
     <div className="flex flex-col gap-4">
       {/* Toolbar */}
       <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border flex-wrap">
+        {/* Undo / Redo */}
+        <Button size="sm" variant="ghost" onClick={undo} className="h-8 w-8 p-0" title="Undo (Ctrl+Z)">
+          <Undo2 className="h-3.5 w-3.5" />
+        </Button>
+        <Button size="sm" variant="ghost" onClick={redo} className="h-8 w-8 p-0" title="Redo (Ctrl+Y)">
+          <Redo2 className="h-3.5 w-3.5" />
+        </Button>
+        <div className="w-px h-6 bg-border mx-1" />
         {mode === "edit" && (
           <>
             <Button size="sm" variant="outline" onClick={() => addText(false)} className="gap-1.5">
@@ -949,6 +1030,16 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             <Button size="sm" variant="ghost" onClick={toggleItalic} className="h-8 w-8 p-0">
               <Italic className="h-3.5 w-3.5" />
             </Button>
+            <div className="flex items-center gap-1">
+              <Palette className="h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="color"
+                value={fontColor}
+                onChange={(e) => applyFontColor(e.target.value)}
+                className="w-7 h-7 rounded border border-border cursor-pointer p-0"
+                title="Font color"
+              />
+            </div>
           </>
         )}
 
