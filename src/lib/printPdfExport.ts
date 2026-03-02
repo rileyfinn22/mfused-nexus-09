@@ -16,7 +16,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
-const EXPORT_DPI = 300;
+const EXPORT_DPI = 600;
 
 /** Map Fabric.js font families to jsPDF built-in fonts */
 const JSPDF_FONT_MAP: Record<string, string> = {
@@ -91,7 +91,7 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
   // 1. Render the source PDF as the base layer at 300 DPI
   const pdfData = await fetchSourcePdf(sourcePdfPath);
   const bgDataUrl = await renderPdfPage(pdfData, totalW, totalH, EXPORT_DPI);
-  doc.addImage(bgDataUrl, "PNG", 0, 0, totalW, totalH);
+  doc.addImage(bgDataUrl, "PNG", 0, 0, totalW, totalH, undefined, "NONE");
 
   // 2. Internal DPI used by the Fabric.js canvas (must match TemplateEditor)
   const CANVAS_DPI = 150;
@@ -100,21 +100,25 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
   // 3. Overlay Fabric.js objects
   const objects: any[] = canvasData?.objects || [];
   for (const obj of objects) {
+    if (obj?.visible === false) continue;
+
+    const objectType = String(obj?.type || "").toLowerCase();
+
     // Skip trim guide and background image
-    if (obj.name === "_trimGuide") continue;
-    if (obj.type === "image" && obj.left === 0 && obj.top === 0) continue; // background
+    if (obj?.name === "_trimGuide") continue;
+    if (objectType === "image" && obj.left === 0 && obj.top === 0) continue;
 
     // Convert canvas px position to inches
     const xIn = (obj.left ?? 0) / CANVAS_DPI;
     const yIn = (obj.top ?? 0) / CANVAS_DPI;
 
-    if (obj.type === "i-text" || obj.type === "textbox" || obj.type === "text") {
+    if (objectType === "itext" || objectType === "textbox" || objectType === "text") {
       const fontSizePx = obj.fontSize || 24;
-      const fontSizePt = (fontSizePx * 72) / CANVAS_DPI;
+      const scaleY = obj.scaleY || 1;
+      const fontSizePt = ((fontSizePx * scaleY) * 72) / CANVAS_DPI;
 
       const jspdfFont = JSPDF_FONT_MAP[obj.fontFamily];
       if (jspdfFont) {
-        // Native vector text
         const style =
           obj.fontWeight === "bold" && obj.fontStyle === "italic"
             ? "bolditalic"
@@ -123,38 +127,33 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
               : obj.fontStyle === "italic"
                 ? "italic"
                 : "normal";
+
         doc.setFont(jspdfFont, style);
         doc.setFontSize(fontSizePt);
 
-        // Parse fill color
-        const fill = obj.fill || "#000000";
-        const r = parseInt(fill.slice(1, 3), 16);
-        const g = parseInt(fill.slice(3, 5), 16);
-        const b = parseInt(fill.slice(5, 7), 16);
+        const { r, g, b } = parseColor(obj.fill);
         doc.setTextColor(r, g, b);
 
-        // jsPDF y is baseline; approximate by adding ascent (~80% of font size)
-        const baselineY = yIn + (fontSizePt / 72) * 0.8;
-        doc.text(obj.text || "", xIn, baselineY);
+        const textLines = String(obj.text || "").split("\n");
+        const baselineY = yIn + (fontSizePt / 72) * 0.82;
+        doc.text(textLines, xIn, baselineY);
       } else {
-        // Non-standard font: rasterize at 300 DPI
+        // Non-standard font: rasterize at high DPI to preserve appearance
         const textCanvas = renderTextToCanvas(obj, CANVAS_DPI, EXPORT_DPI);
         const textDataUrl = textCanvas.toDataURL("image/png");
         const wIn = textCanvas.width / EXPORT_DPI;
         const hIn = textCanvas.height / EXPORT_DPI;
-        doc.addImage(textDataUrl, "PNG", xIn, yIn, wIn, hIn);
+        doc.addImage(textDataUrl, "PNG", xIn, yIn, wIn, hIn, undefined, "NONE");
       }
-    } else if (obj.type === "image") {
-      // Embedded image object
+    } else if (objectType === "image") {
       if (obj.src) {
         const scaleX = obj.scaleX || 1;
         const scaleY = obj.scaleY || 1;
         const wIn = ((obj.width || 100) * scaleX) / CANVAS_DPI;
         const hIn = ((obj.height || 100) * scaleY) / CANVAS_DPI;
         try {
-          doc.addImage(obj.src, "PNG", xIn, yIn, wIn, hIn);
+          doc.addImage(obj.src, "PNG", xIn, yIn, wIn, hIn, undefined, "NONE");
         } catch {
-          // Skip if image can't be embedded (CORS, etc.)
           console.warn("Could not embed image in PDF export", obj.name);
         }
       }
@@ -165,6 +164,36 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
   addCropMarks(doc, totalW, totalH, bleedInches);
 
   return doc.output("blob");
+}
+
+/**
+ * Parse Fabric fill color values (#hex or rgb()) into RGB tuple.
+ */
+function parseColor(fill: string | undefined): { r: number; g: number; b: number } {
+  if (!fill) return { r: 0, g: 0, b: 0 };
+
+  if (fill.startsWith("#")) {
+    const hex = fill.length === 4
+      ? `#${fill[1]}${fill[1]}${fill[2]}${fill[2]}${fill[3]}${fill[3]}`
+      : fill;
+    const r = Number.parseInt(hex.slice(1, 3), 16);
+    const g = Number.parseInt(hex.slice(3, 5), 16);
+    const b = Number.parseInt(hex.slice(5, 7), 16);
+    if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
+      return { r, g, b };
+    }
+  }
+
+  const rgbMatch = fill.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+  if (rgbMatch) {
+    return {
+      r: Number.parseInt(rgbMatch[1], 10),
+      g: Number.parseInt(rgbMatch[2], 10),
+      b: Number.parseInt(rgbMatch[3], 10),
+    };
+  }
+
+  return { r: 0, g: 0, b: 0 };
 }
 
 /**
