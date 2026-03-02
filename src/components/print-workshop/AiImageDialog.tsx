@@ -2,18 +2,34 @@ import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, Loader2, ImagePlus, X } from "lucide-react";
+import { Sparkles, Loader2, ImagePlus, X, SplitSquareHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-interface AiImageDialogProps {
-  onImageGenerated: (dataUrl: string) => void;
+export interface TextRegion {
+  text: string;
+  x_percent: number;
+  y_percent: number;
+  font_size_percent: number;
+  color: string;
+  font_weight?: "bold" | "normal";
+  font_style?: "italic" | "normal";
+  text_align?: "left" | "center" | "right";
+  suggested_font?: string;
 }
 
-export function AiImageDialog({ onImageGenerated }: AiImageDialogProps) {
+interface AiImageDialogProps {
+  onImageGenerated: (dataUrl: string) => void;
+  onDecomposedDesign?: (backgroundUrl: string, textRegions: TextRegion[]) => void;
+  canvasWidth?: number;
+  canvasHeight?: number;
+}
+
+export function AiImageDialog({ onImageGenerated, onDecomposedDesign, canvasWidth, canvasHeight }: AiImageDialogProps) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
+  const [decomposing, setDecomposing] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,11 +77,40 @@ export function AiImageDialog({ onImageGenerated }: AiImageDialogProps) {
   const useImage = () => {
     if (preview) {
       onImageGenerated(preview);
-      setOpen(false);
-      setPrompt("");
-      setPreview(null);
-      setReferenceImage(null);
+      closeAndReset();
     }
+  };
+
+  const decompose = async () => {
+    if (!preview || !onDecomposedDesign) return;
+    setDecomposing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("decompose-design-image", {
+        body: {
+          image_url: preview,
+          canvas_width: canvasWidth || 900,
+          canvas_height: canvasHeight || 600,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      
+      const regions: TextRegion[] = data?.text_regions || [];
+      onDecomposedDesign(preview, regions);
+      toast.success(`Extracted ${regions.length} text region(s) as editable elements`);
+      closeAndReset();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to decompose design");
+    } finally {
+      setDecomposing(false);
+    }
+  };
+
+  const closeAndReset = () => {
+    setOpen(false);
+    setPrompt("");
+    setPreview(null);
+    setReferenceImage(null);
   };
 
   const clearRef = () => {
@@ -149,13 +194,28 @@ export function AiImageDialog({ onImageGenerated }: AiImageDialogProps) {
                 <img src={preview} alt="AI Generated" className="max-h-64 object-contain rounded" />
               </div>
               <div className="flex gap-2">
-                <Button onClick={generate} variant="outline" disabled={loading} className="flex-1">
+                <Button onClick={generate} variant="outline" disabled={loading || decomposing} className="flex-1">
                   Regenerate
                 </Button>
-                <Button onClick={useImage} className="flex-1">
-                  Add to Canvas
+                <Button onClick={useImage} variant="outline" disabled={decomposing} className="flex-1">
+                  Add as Image
                 </Button>
               </div>
+              {onDecomposedDesign && (
+                <Button
+                  onClick={decompose}
+                  disabled={decomposing || loading}
+                  className="w-full gap-2"
+                  variant="default"
+                >
+                  {decomposing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <SplitSquareHorizontal className="h-4 w-4" />
+                  )}
+                  {decomposing ? "Extracting text regions..." : "Decompose & Add (Editable Text)"}
+                </Button>
+              )}
             </div>
           )}
         </div>

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText } from "lucide-react";
-import { AiImageDialog } from "./AiImageDialog";
+import { AiImageDialog, TextRegion } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
 import { IconPickerDialog } from "./IconPickerDialog";
 import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
@@ -501,6 +501,79 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     }
   }, []);
 
+  const handleDecomposedDesign = useCallback(async (backgroundUrl: string, textRegions: TextRegion[]) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+
+    // 1. Place AI image as a canvas object (locked background layer)
+    const imgEl = new window.Image();
+    imgEl.crossOrigin = "anonymous";
+    imgEl.onload = async () => {
+      const fabricImg = new FabricImage(imgEl, {
+        left: 0,
+        top: 0,
+        selectable: false,
+        evented: false,
+      });
+      // Scale to fill canvas
+      const scaleX = canvasWidth / imgEl.width;
+      const scaleY = canvasHeight / imgEl.height;
+      fabricImg.set({ scaleX, scaleY });
+      (fabricImg as any).locked = true;
+      (fabricImg as any).editable = false;
+      (fabricImg as any).name = "ai_background";
+
+      // Insert at bottom (above background image, below other objects)
+      canvas.insertAt(0, fabricImg);
+
+      // 2. Create editable IText objects from extracted text regions
+      for (const region of textRegions) {
+        const fontDef = FONT_OPTIONS.find((f) => f.value === region.suggested_font);
+        const fontFamily = region.suggested_font || "Arial";
+        if (fontDef?.google || (region.suggested_font && !["Arial", "Helvetica", "Times New Roman", "Georgia", "Courier New", "Verdana", "Impact"].includes(fontFamily))) {
+          await loadGoogleFont(fontFamily);
+        }
+
+        const fontSize = Math.round((region.font_size_percent / 100) * canvasHeight);
+        const x = Math.round((region.x_percent / 100) * canvasWidth);
+        const y = Math.round((region.y_percent / 100) * canvasHeight);
+
+        const text = new IText(region.text, {
+          left: x,
+          top: y,
+          fontSize: Math.max(fontSize, ptToPx(8)),
+          fontFamily,
+          fill: region.color || "#000000",
+          fontWeight: region.font_weight || "normal",
+          fontStyle: region.font_style || "normal",
+          textAlign: region.text_align || "center",
+          originX: "center",
+          originY: "center",
+          editable: true,
+        });
+        (text as any).locked = false;
+        (text as any).editable = true;
+        (text as any).name = "editable_text";
+        text.set({
+          borderColor: "#3b82f6",
+          cornerColor: "#3b82f6",
+          cornerStyle: "circle",
+          transparentCorners: false,
+        } as any);
+
+        canvas.add(text);
+      }
+
+      // Keep trim guide on top
+      const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
+      if (trim) canvas.bringObjectToFront(trim);
+
+      canvas.renderAll();
+      syncCanvas();
+    };
+    imgEl.src = backgroundUrl;
+  }, [canvasWidth, canvasHeight, ptToPx, syncCanvas]);
+
   const applyFontSize = (sizePt: number) => {
     if (!selectedObject || !fabricRef.current) return;
     setFontSizePt(sizePt);
@@ -571,7 +644,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               <span className="text-xs">Editable Image</span>
             </Button>
             <div className="w-px h-6 bg-border mx-1" />
-            <AiImageDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
+            <AiImageDialog
+              onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)}
+              onDecomposedDesign={handleDecomposedDesign}
+              canvasWidth={canvasWidth}
+              canvasHeight={canvasHeight}
+            />
             <AiEditDialog getCanvasImage={getCanvasImage} onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <IconPickerDialog onIconSelected={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <div className="w-px h-6 bg-border mx-1" />
