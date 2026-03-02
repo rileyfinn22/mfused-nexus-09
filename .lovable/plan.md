@@ -1,107 +1,62 @@
 
 
-## Print Workshop - On-Demand Label Printing
+## Layerable Print-Ready Pipeline
 
-### Overview
-A new "Print Workshop" section accessible to Vibe Admins where they can create label templates with locked/editable zones, customize them on demand, and generate print-ready files that flow into the existing order system.
+### Problem
+The current approach rasterizes the PDF background into a PNG, losing vector quality. No matter how much we oversample, it will never match the sharpness of a native PDF, and the final "print-ready" export is just a Fabric.js canvas rasterization -- not a true press-ready file.
 
 ### Architecture
 
 ```text
-┌─────────────────────────────────────────────────┐
-│                 Print Workshop                   │
-├──────────────┬──────────────────────────────────┤
-│  Template    │                                   │
-│  Browser     │   Label Canvas Editor             │
-│              │   ┌─────────────────────────┐     │
-│  ☐ Compliance│   │  [LOCKED] Brand Logo    │     │
-│  ☐ Nutrition │   │  [LOCKED] Layout Frame  │     │
-│  ☐ Custom    │   │                         │     │
-│              │   │  [EDITABLE] Lot #: ___  │     │
-│              │   │  [EDITABLE] Date: ___   │     │
-│              │   │  [EDITABLE] THC %: ___  │     │
-│              │   └─────────────────────────┘     │
-│              │                                   │
-│              │   Material: [Matte ▼]             │
-│              │   Quantity: [____]                 │
-│              │   Price: $0.12/ea = $120.00        │
-│              │   [Generate Print File & Order]    │
-└──────────────┴──────────────────────────────────┘
+Upload Flow:
+  PDF file → Upload original to `print-files` bucket → Store path in template
+                ↓
+  Rasterize at 2x for on-screen preview only (existing pdfThumbnail logic)
+
+Export Flow:
+  Original PDF (from storage)
+    + Fabric.js overlay objects (text, images) rendered at 300 DPI
+    = Merged PDF via jsPDF (original as base page, overlays drawn on top)
 ```
 
-### Database Schema
+### Implementation Steps
 
-**`print_templates`** - Master label templates created by admins
-- `id`, `company_id`, `name`, `description`, `product_type` (label, box, bag)
-- `width_inches`, `height_inches`, `bleed_inches`
-- `canvas_data` (JSONB - stores Fabric.js canvas state with locked/editable flags)
-- `thumbnail_url`, `preset_price_per_unit`, `material_options` (JSONB array)
-- `created_by`, `created_at`, `updated_at`
-- RLS: vibe_admin only
+**1. Database: Add `source_pdf_path` column to `print_templates`**
+- Migration: `ALTER TABLE print_templates ADD COLUMN source_pdf_path text;`
+- Stores the storage path of the original uploaded PDF (e.g., `templates/{id}/source.pdf`)
 
-**`print_orders`** - Orders generated from the workshop
-- `id`, `company_id`, `print_template_id`, `template_name`
-- `canvas_data` (JSONB - snapshot of the customized design)
-- `print_file_url` - generated print-ready PDF
-- `material`, `quantity`, `price_per_unit`, `total`
-- `status` (draft, pending_quote, quoted, approved, in_production, completed)
-- `quoted_price`, `quoted_by`, `quoted_at`
-- `order_id` (FK to orders table, created when finalized)
-- `created_by`, `created_at`
-- RLS: vibe_admin only
+**2. TemplateEditor: Store original PDF on upload**
+- When user clicks "PDF BG", upload the original file to `print-files` bucket at `templates/{templateId}/source.pdf`
+- Store the path in component state and pass it up via a new `onSourcePdfChange` callback
+- Continue using the rasterized preview for the canvas display (existing logic, kept as-is for the editor preview)
 
-**Storage**: New `print-files` bucket for generated print PDFs and template assets.
+**3. TemplateBuilder: Persist `source_pdf_path`**
+- Accept `onSourcePdfChange` from TemplateEditor
+- Include `source_pdf_path` in the save payload to the database
 
-### Frontend Implementation
+**4. New utility: `src/lib/printPdfExport.ts` — Hybrid PDF merge**
+- Fetch original PDF from storage as ArrayBuffer
+- Use `pdfjs-dist` to render the first page at 300 DPI onto a jsPDF page
+- Iterate Fabric.js canvas objects (excluding background and trim guide), and for each:
+  - **Text objects**: Use `jsPDF.text()` with correct font, size (in pt), position, color — this keeps text as native vector in the output PDF
+  - **Image objects**: Render to a temp canvas, embed via `jsPDF.addImage()`
+- Add crop marks and bleed indicators
+- Return the final PDF Blob
 
-**New dependency**: `fabric` (Fabric.js) - canvas library for the label editor with object locking, layering, and JSON serialization.
+**5. OrderPanel: "Generate Print File" button**
+- Add a "Generate Print-Ready PDF" button
+- Calls the new export utility with the template's `source_pdf_path` and current Fabric.js canvas data
+- Uploads the generated PDF to `print-files` bucket
+- Stores the URL in the `print_orders.print_file_url` column
 
-**New pages/components**:
+**6. PrintWorkshop "use" mode: Pass source PDF path through**
+- When selecting a template, pass `source_pdf_path` to both TemplateEditor (for preview re-rendering) and OrderPanel (for export)
 
-1. **`src/pages/PrintWorkshop.tsx`** - Main page with two modes:
-   - **Browse mode**: Grid of available templates filtered by company, with thumbnails and descriptions
-   - **Editor mode**: Full canvas editor loaded when a template is selected
+### Key Technical Details
 
-2. **`src/components/print-workshop/TemplateEditor.tsx`** - Fabric.js canvas wrapper
-   - Loads template `canvas_data` and renders objects
-   - Objects with `locked: true` are non-editable (brand elements, layout frames)
-   - Objects with `locked: false` are editable (text fields for dates, lot numbers, percentages)
-   - Editable text fields highlighted with a subtle border/glow
-   - Toolbar for font size, bold/italic on editable text only
-
-3. **`src/components/print-workshop/TemplateBuilder.tsx`** - Admin tool to create templates
-   - Upload background artwork/dieline
-   - Add text fields and mark them as locked or editable
-   - Set label dimensions and bleed
-   - Configure material options and preset pricing
-
-4. **`src/components/print-workshop/OrderPanel.tsx`** - Right sidebar
-   - Material dropdown (from template's `material_options`)
-   - Quantity input
-   - Auto-calculated price if preset, or "Request Quote" button if not
-   - "Generate Print File" button that exports canvas to PDF with proper dimensions/bleed
-
-5. **Print file generation**: Client-side PDF generation using existing `jspdf` dependency
-   - Export Fabric.js canvas at print resolution (300 DPI)
-   - Add crop marks and bleed area
-   - Upload to `print-files` storage bucket
-
-**Navigation**: Add "Print Workshop" to `vibeAdminNavigationItems` in AppSidebar with a `Printer` icon.
-
-**Route**: `/print-workshop` wrapped in `DashboardLayout`.
-
-### Workflow
-
-1. Admin creates a label template in the Template Builder (uploads base artwork, adds editable text zones, sets dimensions/pricing)
-2. User opens Print Workshop, selects a template
-3. Canvas loads with locked branding + editable fields
-4. User modifies editable text (lot #, date, THC %, etc.)
-5. User selects material and quantity
-6. If price is preset: total auto-calculates, user clicks "Create Order"
-7. If no preset price: user clicks "Request Quote", status = `pending_quote`, admin quotes it
-8. System generates print-ready PDF, creates a `print_orders` record, and optionally links to a standard `orders` record
-
-### Phased Approach
-- **Phase 1** (this implementation): Template browsing, canvas editor with locked/editable zones, material/quantity selection, print file generation, order creation
-- **Phase 2** (future): Image upload into editable zones, multi-page labels, template versioning, company user access
+- **Preview remains rasterized** — the on-screen canvas still uses the 2x oversampled PNG for interactive editing. This is fast and good enough for proofing.
+- **Export is hybrid** — the final PDF uses the original vector PDF as the base layer, with Fabric.js edits rendered on top at 300 DPI. Text objects are written as native PDF text (vector), not rasterized.
+- **Font mapping** — jsPDF ships with Helvetica/Courier/Times. For Google Fonts, we fall back to rendering the text object to a high-res canvas and embedding as an image in the PDF. This preserves visual fidelity while keeping common fonts as vectors.
+- **No new dependencies** — uses existing `jspdf` and `pdfjs-dist`.
+- **Storage** — reuses existing `print-files` bucket (already public).
 
