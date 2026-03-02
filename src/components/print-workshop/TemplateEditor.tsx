@@ -383,80 +383,111 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.on("text:changed", syncCanvas);
 
     // Smart snapping guidelines
-    const SNAP_THRESHOLD = 8; // pixels in canvas coords
+    const SNAP_THRESHOLD = 12; // pixels in canvas coords
     canvas.on("object:moving", (e) => {
       const obj = e.target;
       if (!obj) return;
       clearGuidelines(canvas);
 
-      const objBounds = obj.getBoundingRect();
-      const objCenterX = objBounds.left / (displayScale * dpr) + objBounds.width / (displayScale * dpr) / 2;
-      const objCenterY = objBounds.top / (displayScale * dpr) + objBounds.height / (displayScale * dpr) / 2;
-      const objLeft = objBounds.left / (displayScale * dpr);
-      const objTop = objBounds.top / (displayScale * dpr);
-      const objRight = objLeft + objBounds.width / (displayScale * dpr);
-      const objBottom = objTop + objBounds.height / (displayScale * dpr);
+      // obj.left/top are the origin point; use getBoundingRect for visual edges
+      const br = obj.getBoundingRect();
+      const zoom = canvas.getZoom();
+      // Convert screen-space bounding rect back to canvas coords
+      const objLeft = br.left / zoom;
+      const objTop = br.top / zoom;
+      const objW = br.width / zoom;
+      const objH = br.height / zoom;
+      const objCenterX = objLeft + objW / 2;
+      const objCenterY = objTop + objH / 2;
+      const objRight = objLeft + objW;
+      const objBottom = objTop + objH;
 
-      // Trim area boundaries
-      const trimLeft = bleedPx;
-      const trimTop = bleedPx;
-      const trimRight = canvasWidth - bleedPx;
-      const trimBottom = canvasHeight - bleedPx;
-      const trimCenterX = canvasWidth / 2;
-      const trimCenterY = canvasHeight / 2;
+      // Offset between obj.left/top and bounding rect origin
+      const offX = (obj.left || 0) - objLeft;
+      const offY = (obj.top || 0) - objTop;
 
-      const guidelines: { x1: number; y1: number; x2: number; y2: number }[] = [];
+      const trimL = bleedPx;
+      const trimT = bleedPx;
+      const trimR = canvasWidth - bleedPx;
+      const trimB = canvasHeight - bleedPx;
+      const trimCX = canvasWidth / 2;
+      const trimCY = canvasHeight / 2;
 
-      // Snap to horizontal center
-      if (Math.abs(objCenterX - trimCenterX) < SNAP_THRESHOLD) {
-        obj.set({ left: trimCenterX - (objBounds.width / (displayScale * dpr)) / 2 + ((obj.left || 0) - objLeft) });
-        guidelines.push({ x1: trimCenterX, y1: 0, x2: trimCenterX, y2: canvasHeight });
+      const guides: { x1: number; y1: number; x2: number; y2: number }[] = [];
+      let snappedX = false, snappedY = false;
+
+      // Helper to snap X
+      const trySnapX = (current: number, target: number, guide: { x1: number; y1: number; x2: number; y2: number }) => {
+        if (!snappedX && Math.abs(current - target) < SNAP_THRESHOLD) {
+          obj.set({ left: target + offX + (current === objCenterX ? -objW / 2 + (current - objLeft) : current === objRight ? -objW + (current - objLeft) : 0) });
+          guides.push(guide);
+          snappedX = true;
+        }
+      };
+      const trySnapY = (current: number, target: number, guide: { x1: number; y1: number; x2: number; y2: number }) => {
+        if (!snappedY && Math.abs(current - target) < SNAP_THRESHOLD) {
+          obj.set({ top: target + offY + (current === objCenterY ? -objH / 2 + (current - objTop) : current === objBottom ? -objH + (current - objTop) : 0) });
+          guides.push(guide);
+          snappedY = true;
+        }
+      };
+
+      // Snap to canvas/trim center
+      if (Math.abs(objCenterX - trimCX) < SNAP_THRESHOLD) {
+        obj.set({ left: trimCX - objW / 2 + offX });
+        guides.push({ x1: trimCX, y1: 0, x2: trimCX, y2: canvasHeight });
+        snappedX = true;
       }
-      // Snap to vertical center
-      if (Math.abs(objCenterY - trimCenterY) < SNAP_THRESHOLD) {
-        obj.set({ top: trimCenterY - (objBounds.height / (displayScale * dpr)) / 2 + ((obj.top || 0) - objTop) });
-        guidelines.push({ x1: 0, y1: trimCenterY, x2: canvasWidth, y2: trimCenterY });
+      if (Math.abs(objCenterY - trimCY) < SNAP_THRESHOLD) {
+        obj.set({ top: trimCY - objH / 2 + offY });
+        guides.push({ x1: 0, y1: trimCY, x2: canvasWidth, y2: trimCY });
+        snappedY = true;
       }
+
       // Snap to trim edges
-      if (Math.abs(objLeft - trimLeft) < SNAP_THRESHOLD) {
-        obj.set({ left: trimLeft + ((obj.left || 0) - objLeft) });
-        guidelines.push({ x1: trimLeft, y1: 0, x2: trimLeft, y2: canvasHeight });
+      if (!snappedX && Math.abs(objLeft - trimL) < SNAP_THRESHOLD) {
+        obj.set({ left: trimL + offX });
+        guides.push({ x1: trimL, y1: 0, x2: trimL, y2: canvasHeight });
+        snappedX = true;
       }
-      if (Math.abs(objRight - trimRight) < SNAP_THRESHOLD) {
-        obj.set({ left: trimRight - (objBounds.width / (displayScale * dpr)) + ((obj.left || 0) - objLeft) });
-        guidelines.push({ x1: trimRight, y1: 0, x2: trimRight, y2: canvasHeight });
+      if (!snappedX && Math.abs(objRight - trimR) < SNAP_THRESHOLD) {
+        obj.set({ left: trimR - objW + offX });
+        guides.push({ x1: trimR, y1: 0, x2: trimR, y2: canvasHeight });
+        snappedX = true;
       }
-      if (Math.abs(objTop - trimTop) < SNAP_THRESHOLD) {
-        obj.set({ top: trimTop + ((obj.top || 0) - objTop) });
-        guidelines.push({ x1: 0, y1: trimTop, x2: canvasWidth, y2: trimTop });
+      if (!snappedY && Math.abs(objTop - trimT) < SNAP_THRESHOLD) {
+        obj.set({ top: trimT + offY });
+        guides.push({ x1: 0, y1: trimT, x2: canvasWidth, y2: trimT });
+        snappedY = true;
       }
-      if (Math.abs(objBottom - trimBottom) < SNAP_THRESHOLD) {
-        obj.set({ top: trimBottom - (objBounds.height / (displayScale * dpr)) + ((obj.top || 0) - objTop) });
-        guidelines.push({ x1: 0, y1: trimBottom, x2: canvasWidth, y2: trimBottom });
+      if (!snappedY && Math.abs(objBottom - trimB) < SNAP_THRESHOLD) {
+        obj.set({ top: trimB - objH + offY });
+        guides.push({ x1: 0, y1: trimB, x2: canvasWidth, y2: trimB });
+        snappedY = true;
       }
 
-      // Snap to other objects' centers/edges
-      canvas.getObjects().forEach((other: any) => {
-        if (other === obj || other.name === "_textCover" || other.name === "_snapGuide") return;
-        const oBounds = other.getBoundingRect();
-        const oCenterX = oBounds.left / (displayScale * dpr) + oBounds.width / (displayScale * dpr) / 2;
-        const oCenterY = oBounds.top / (displayScale * dpr) + oBounds.height / (displayScale * dpr) / 2;
+      // Snap to other objects' centers
+      if (!snappedX || !snappedY) {
+        canvas.getObjects().forEach((other: any) => {
+          if (other === obj || other.name === "_textCover" || other.name === GUIDE_NAME) return;
+          const obr = other.getBoundingRect();
+          const oCX = obr.left / zoom + obr.width / zoom / 2;
+          const oCY = obr.top / zoom + obr.height / zoom / 2;
 
-        // Align centers horizontally
-        if (Math.abs(objCenterY - oCenterY) < SNAP_THRESHOLD) {
-          obj.set({ top: oCenterY - (objBounds.height / (displayScale * dpr)) / 2 + ((obj.top || 0) - objTop) });
-          guidelines.push({ x1: 0, y1: oCenterY, x2: canvasWidth, y2: oCenterY });
-        }
-        // Align centers vertically
-        if (Math.abs(objCenterX - oCenterX) < SNAP_THRESHOLD) {
-          obj.set({ left: oCenterX - (objBounds.width / (displayScale * dpr)) / 2 + ((obj.left || 0) - objLeft) });
-          guidelines.push({ x1: oCenterX, y1: 0, x2: oCenterX, y2: canvasHeight });
-        }
-      });
+          if (!snappedX && Math.abs(objCenterX - oCX) < SNAP_THRESHOLD) {
+            obj.set({ left: oCX - objW / 2 + offX });
+            guides.push({ x1: oCX, y1: 0, x2: oCX, y2: canvasHeight });
+            snappedX = true;
+          }
+          if (!snappedY && Math.abs(objCenterY - oCY) < SNAP_THRESHOLD) {
+            obj.set({ top: oCY - objH / 2 + offY });
+            guides.push({ x1: 0, y1: oCY, x2: canvasWidth, y2: oCY });
+            snappedY = true;
+          }
+        });
+      }
 
-      // Draw guidelines
-      guidelines.forEach((g) => addGuideline(canvas, g));
-
+      guides.forEach((g) => addGuideline(canvas, g));
       obj.setCoords();
       canvas.renderAll();
     });
@@ -962,7 +993,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     if (!canvas || !obj) return;
 
     const bounds = obj.getBoundingRect();
-    const zoom = displayScale * dpr;
+    const zoom = canvas.getZoom();
     const objW = bounds.width / zoom;
     const objH = bounds.height / zoom;
     const objLeftOffset = (obj.left || 0) - bounds.left / zoom;
