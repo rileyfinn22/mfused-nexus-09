@@ -762,11 +762,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           cornerColor: "#94a3b8",
         } as any);
 
-        // Add text first to measure its actual bounds
+        // Measure text bounds, then add cover below text
         canvas.add(textObj);
         canvas.renderAll();
         const zoom = canvas.getZoom();
         const textBounds = textObj.getBoundingRect();
+        canvas.remove(textObj);
         const coverPad = 2;
         const cover = new Rect({
           left: textBounds.left / zoom - coverPad,
@@ -780,13 +781,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           objectCaching: false,
           name: "_textCover",
         });
-        canvas.add(cover);
-        // Move cover just below the text object
-        const coverIdx = canvas.getObjects().indexOf(cover);
-        const textIdx = canvas.getObjects().indexOf(textObj);
-        if (coverIdx > textIdx) {
-          canvas.moveObjectTo(cover, textIdx);
-        }
+        canvas.add(cover);    // cover first
+        canvas.add(textObj);  // text on top
         addedCount++;
       }
 
@@ -1111,11 +1107,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             transparentCorners: isLocked ? undefined : false,
           } as any);
 
-          // Add text temporarily to measure its actual bounding box
+          // Measure text bounds off-screen to size the cover accurately
           canvas.add(text);
           canvas.renderAll();
           const zoom = canvas.getZoom();
           const textBounds = text.getBoundingRect();
+          // Remove text, add cover, then re-add text on top
+          canvas.remove(text);
           const coverPad = 2;
           const cover = new Rect({
             left: textBounds.left / zoom - coverPad,
@@ -1129,17 +1127,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             objectCaching: false,
             name: "_textCover",
           });
-          // Insert cover just below the text
-          canvas.add(cover);
-          // Fix z-order: bg → cover → text → trim
+          canvas.add(cover);   // cover goes on first
+          canvas.add(text);    // text goes on top of cover
+          // Fix z-order: bg at back, trim on top
           const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
           if (bg) canvas.sendObjectToBack(bg);
-          // Move cover just above bg, below text
-          const coverIdx = canvas.getObjects().indexOf(cover);
-          const textIdx = canvas.getObjects().indexOf(text);
-          if (coverIdx > textIdx) {
-            canvas.moveObjectTo(cover, textIdx);
-          }
           const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
           if (trim) canvas.bringObjectToFront(trim);
           canvas.setActiveObject(text);
