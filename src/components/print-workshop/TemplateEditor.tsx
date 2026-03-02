@@ -1081,12 +1081,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       borderColor: newLocked ? "#94a3b8" : "#3b82f6",
       cornerColor: newLocked ? "#94a3b8" : "#3b82f6",
     });
-    // Deselect after toggling so the action feels committed
-    // and doesn't auto-carry to the next clicked object
-    canvas.discardActiveObject();
     canvas.renderAll();
     syncCanvas();
+    // Force React to re-render with updated properties by cycling the state
     setSelectedObject(null);
+    setTimeout(() => {
+      setSelectedObject(canvas.getActiveObject() || null);
+    }, 0);
     toast.success(newLocked ? "Element locked" : "Element set to editable", { duration: 1500 });
   };
 
