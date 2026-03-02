@@ -368,7 +368,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const obj = e.selected?.[0];
       if (obj) {
         setSelectedObject(obj);
-        if ((obj as any).fontSize) setFontSizePt(pxToPt((obj as any).fontSize));
+        if ((obj as any).fontSize) setFontSizePt((obj as any)._fontSizePt ?? pxToPt((obj as any).fontSize));
         if ((obj as any).fontFamily) setFontFamily((obj as any).fontFamily);
         if ((obj as any).fill) setFontColor((obj as any).fill);
       }
@@ -377,7 +377,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const obj = e.selected?.[0];
       if (obj) {
         setSelectedObject(obj);
-        if ((obj as any).fontSize) setFontSizePt(pxToPt((obj as any).fontSize));
+        if ((obj as any).fontSize) setFontSizePt((obj as any)._fontSizePt ?? pxToPt((obj as any).fontSize));
         if ((obj as any).fontFamily) setFontFamily((obj as any).fontFamily);
         if ((obj as any).fill) setFontColor((obj as any).fill);
       }
@@ -1179,6 +1179,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     if (!selectedObject || !fabricRef.current) return;
     setFontSizePt(sizePt);
     (selectedObject as any).set("fontSize", ptToPx(sizePt));
+    (selectedObject as any)._fontSizePt = sizePt; // store exact pt to avoid round-trip error
     fabricRef.current.renderAll();
     syncCanvas();
   };
