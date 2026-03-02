@@ -461,7 +461,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           const objTop = obj.top ?? 0;
           const objW = (obj.width ?? 0) * (obj.scaleX ?? 1);
           const objH = (obj.height ?? 0) * (obj.scaleY ?? 1);
-          const pad = 6;
+          const pad = 2;
           const highlight = new Rect({
             left: objLeft - pad,
             top: objTop - pad,
