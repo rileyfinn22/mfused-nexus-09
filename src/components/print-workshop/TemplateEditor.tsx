@@ -75,10 +75,15 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const [fontSize, setFontSize] = useState(16);
   const [fontFamily, setFontFamily] = useState("Arial");
 
+  // Internal resolution for print quality
   const DPI = 150;
   const canvasWidth = Math.round((width + bleed * 2) * DPI);
   const canvasHeight = Math.round((height + bleed * 2) * DPI);
   const bleedPx = Math.round(bleed * DPI);
+
+  // Display zoom: fit the high-res canvas into a reasonable screen size
+  // Target ~800px wide for comfortable editing
+  const displayZoom = Math.min(800 / canvasWidth, 700 / canvasHeight, 1);
 
   const syncCanvas = useCallback(() => {
     if (fabricRef.current && onCanvasChange) {
@@ -90,7 +95,15 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     if (!canvasRef.current) return;
 
     const canvas = new FabricCanvas(canvasRef.current);
+    // Set the canvas internal dimensions at full DPI resolution
     canvas.setDimensions({ width: canvasWidth, height: canvasHeight });
+    // Use Fabric's native zoom for display scaling (preserves mouse coordinates for text editing)
+    canvas.setZoom(displayZoom);
+    // Set the HTML element size to the zoomed dimensions
+    canvas.setDimensions(
+      { width: canvasWidth * displayZoom, height: canvasHeight * displayZoom },
+      { cssOnly: true }
+    );
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
 
@@ -154,7 +167,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       canvas.dispose();
       fabricRef.current = null;
     };
-  }, [canvasWidth, canvasHeight, bleedPx, mode]);
+  }, [canvasWidth, canvasHeight, bleedPx, mode, displayZoom]);
 
   const addText = (editable: boolean) => {
     const canvas = fabricRef.current;
@@ -460,7 +473,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
       {/* Canvas */}
       <div className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center">
-        <div className="shadow-lg" style={{ transform: "scale(0.5)", transformOrigin: "top center" }}>
+        <div className="shadow-lg">
           <canvas ref={canvasRef} />
         </div>
       </div>
