@@ -94,7 +94,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const TARGET_DISPLAY_WIDTH = 900;
   const TARGET_DISPLAY_HEIGHT = 750;
   // Oversample imported PDF backgrounds so rasterized text stays sharp in preview
-  const PDF_BACKGROUND_OVERSAMPLE = 2;
+  const PDF_BACKGROUND_OVERSAMPLE = 4;
   const displayScale = Math.min(TARGET_DISPLAY_WIDTH / canvasWidth, TARGET_DISPLAY_HEIGHT / canvasHeight, 1.5);
   const cssWidth = Math.round(canvasWidth * displayScale);
   const cssHeight = Math.round(canvasHeight * displayScale);
