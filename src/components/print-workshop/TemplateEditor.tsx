@@ -338,13 +338,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       objectCaching: false,
     } as any);
 
-    // Scale uniformly to fit inside the canvas (contain mode), then center
-    const uniformScale = Math.min(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
+    // Scale to cover the full canvas so PDF fills the workspace without gaps
+    const coverScale = Math.max(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
     fabricImg.set({
-      scaleX: uniformScale,
-      scaleY: uniformScale,
-      left: (canvasWidth - imgEl.width * uniformScale) / 2,
-      top: (canvasHeight - imgEl.height * uniformScale) / 2,
+      scaleX: coverScale,
+      scaleY: coverScale,
+      left: (canvasWidth - imgEl.width * coverScale) / 2,
+      top: (canvasHeight - imgEl.height * coverScale) / 2,
     });
     canvas.backgroundImage = fabricImg;
     canvas.renderAll();
@@ -386,6 +386,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         imgEl.onload = () => {
           setCanvasBackground(imgEl);
           URL.revokeObjectURL(url);
+          // Auto-extract text from the uploaded PDF after a short delay for canvas to settle
+          setTimeout(() => {
+            autoExtractAllText();
+          }, 500);
         };
         imgEl.src = url;
       } catch (err: any) {
