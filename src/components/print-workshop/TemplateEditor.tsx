@@ -301,18 +301,22 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.on("selection:cleared", () => setSelectedObject(null));
     canvas.on("object:modified", syncCanvas);
     canvas.on("text:changed", syncCanvas);
-    // Ensure bleed overlay always stays on top when any object is added or modified
-    let reordering = false;
-    const bringBleedToFront = () => {
-      if (reordering) return;
-      reordering = true;
+    // Ensure bleed overlay always stays on top after every render
+    const ensureBleedOnTop = () => {
       const objs = canvas.getObjects();
       const trims = objs.filter((o: any) => o.name === "_trimGuide");
-      trims.forEach((t) => canvas.bringObjectToFront(t));
-      reordering = false;
+      const nonTrims = objs.filter((o: any) => o.name !== "_trimGuide");
+      if (trims.length === 0) return;
+      // Check if trims are already at the end
+      const lastNonTrimIdx = objs.length - trims.length - 1;
+      const alreadySorted = trims.every((t, i) => objs.indexOf(t) === nonTrims.length + i);
+      if (alreadySorted) return;
+      // Reorder: put all non-trim objects first, then trims
+      // Use internal _objects array to avoid triggering events
+      (canvas as any)._objects = [...nonTrims, ...trims];
+      canvas.renderAll();
     };
-    canvas.on("object:added", bringBleedToFront);
-    canvas.on("object:modified", bringBleedToFront);
+    canvas.on("after:render", ensureBleedOnTop);
 
     return () => {
       canvas.dispose();
