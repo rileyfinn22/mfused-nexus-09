@@ -211,6 +211,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     }
   }, [onCanvasChange]);
 
+  // After any canvas load, fix z-ordering: pdf_background to back, _trimGuide to front
+  const fixZOrder = useCallback((canvas: any) => {
+    const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
+    if (bg) canvas.sendObjectToBack(bg);
+    const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
+    if (trim) canvas.bringObjectToFront(trim);
+  }, []);
+
   const undo = useCallback(async () => {
     const canvas = fabricRef.current;
     if (!canvas || undoStack.current.length < 2) return;
@@ -219,10 +227,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const prev = undoStack.current[undoStack.current.length - 1];
     isUndoRedo.current = true;
     await canvas.loadFromJSON(JSON.parse(prev));
+    fixZOrder(canvas);
     canvas.renderAll();
     onCanvasChange?.(JSON.parse(prev));
     isUndoRedo.current = false;
-  }, [onCanvasChange]);
+  }, [onCanvasChange, fixZOrder]);
 
   const redo = useCallback(async () => {
     const canvas = fabricRef.current;
@@ -231,10 +240,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     undoStack.current.push(next);
     isUndoRedo.current = true;
     await canvas.loadFromJSON(JSON.parse(next));
+    fixZOrder(canvas);
     canvas.renderAll();
     onCanvasChange?.(JSON.parse(next));
     isUndoRedo.current = false;
-  }, [onCanvasChange]);
+  }, [onCanvasChange, fixZOrder]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -1108,6 +1118,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           } as any);
 
           canvas.add(text);
+          // Ensure correct z-order: bg behind, trim on top
+          const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
+          if (bg) canvas.sendObjectToBack(bg);
           const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
           if (trim) canvas.bringObjectToFront(trim);
           canvas.setActiveObject(text);
