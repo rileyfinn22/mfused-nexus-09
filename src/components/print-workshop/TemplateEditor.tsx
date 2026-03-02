@@ -205,7 +205,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       if (!isUndoRedo.current) {
         undoStack.current.push(JSON.stringify(data));
         // Cap stack size
-        if (undoStack.current.length > 50) undoStack.current.shift();
+        if (undoStack.current.length > 200) undoStack.current.shift();
         redoStack.current = [];
       }
     }
