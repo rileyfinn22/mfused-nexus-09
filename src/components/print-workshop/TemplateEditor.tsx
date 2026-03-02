@@ -456,14 +456,17 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
         // Add translucent highlight boxes behind each editable object
         editableObjects.forEach((obj: any) => {
-          const br = obj.getBoundingRect();
-          const zoom = canvas.getZoom();
+          // Use object's own coordinates (canvas space) not getBoundingRect (screen space)
+          const objLeft = obj.left ?? 0;
+          const objTop = obj.top ?? 0;
+          const objW = (obj.width ?? 0) * (obj.scaleX ?? 1);
+          const objH = (obj.height ?? 0) * (obj.scaleY ?? 1);
           const pad = 6;
           const highlight = new Rect({
-            left: (br.left / zoom) - pad,
-            top: (br.top / zoom) - pad,
-            width: (br.width / zoom) + pad * 2,
-            height: (br.height / zoom) + pad * 2,
+            left: objLeft - pad,
+            top: objTop - pad,
+            width: objW + pad * 2,
+            height: objH + pad * 2,
             fill: "rgba(59, 130, 246, 0.08)",
             stroke: "rgba(59, 130, 246, 0.35)",
             strokeWidth: 1.5,
@@ -477,18 +480,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             objectCaching: false,
           } as any);
           (highlight as any).name = "_editHighlight";
-          (highlight as any)._linkedObjId = obj.__uid || obj.name || Math.random();
           canvas.add(highlight);
           // Place highlight just behind the editable object
           const objIndex = canvas.getObjects().indexOf(obj);
           if (objIndex > 0) {
-            // Move highlight just below the editable object
-            const objects = canvas.getObjects();
-            const highlightIdx = objects.indexOf(highlight);
-            if (highlightIdx >= 0 && highlightIdx !== objIndex) {
-              canvas.remove(highlight);
-              canvas.insertAt(objIndex, highlight);
-            }
+            canvas.remove(highlight);
+            canvas.insertAt(objIndex, highlight);
           }
         });
 
