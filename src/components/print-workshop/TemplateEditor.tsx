@@ -211,10 +211,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     }
   }, [onCanvasChange]);
 
-  // After any canvas load, fix z-ordering: pdf_background to back, _trimGuide to front
+  // After any canvas load, fix z-ordering and lock pdf_background
   const fixZOrder = useCallback((canvas: any) => {
     const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
-    if (bg) canvas.sendObjectToBack(bg);
+    if (bg) {
+      bg.set({ selectable: false, evented: false, hasControls: false, hasBorders: false });
+      canvas.sendObjectToBack(bg);
+    }
     const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
     if (trim) canvas.bringObjectToFront(trim);
   }, []);
@@ -341,6 +344,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             imgEl.onload = () => {
               const fabricImg = new FabricImage(imgEl, {
                 left: 0, top: 0, objectCaching: false,
+                selectable: false, evented: false, hasControls: false, hasBorders: false,
               } as any);
               const fitScale = Math.min(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
               fabricImg.set({
@@ -572,11 +576,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         scaleX: fillScale,
         scaleY: fillScale,
         objectCaching: false,
+        selectable: false, evented: false, hasControls: false, hasBorders: false,
       } as any);
       (fabricImg as any).name = "pdf_background";
       canvas.add(fabricImg);
       canvas.sendObjectToBack(fabricImg);
-      canvas.setActiveObject(fabricImg);
       canvas.renderAll();
       syncCanvas();
       return;
@@ -587,6 +591,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       left: 0,
       top: 0,
       objectCaching: false,
+      selectable: false, evented: false, hasControls: false, hasBorders: false,
     } as any);
 
     const fitScale = Math.min(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
@@ -599,7 +604,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     (fabricImg as any).name = "pdf_background";
     canvas.add(fabricImg);
     canvas.sendObjectToBack(fabricImg);
-    canvas.setActiveObject(fabricImg);
     canvas.renderAll();
     syncCanvas();
   };
