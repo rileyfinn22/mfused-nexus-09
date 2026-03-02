@@ -176,7 +176,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const br = obj.getBoundingRect();
     return { left: br.left, top: br.top, width: br.width, height: br.height };
   };
-  const getWhiteoutStrokeWidth = (fontSizePx: number) => Math.max(2, fontSizePx * 0.35);
   const [fontFamily, setFontFamily] = useState("Arial");
 
   // Internal resolution for print quality
@@ -797,12 +796,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           fontWeight: region.font_weight || "normal",
           fontStyle: region.font_style || "normal",
           fill: region.color || "#000000",
-          stroke: "#ffffff",
-          strokeWidth: getWhiteoutStrokeWidth(fontSizePx),
-          strokeLineJoin: "round",
-          paintFirst: "stroke",
+          textBackgroundColor: "#ffffff",
           editable: true,
-          padding: 4,
+          padding: 0,
         });
         (textObj as any)._fontSizePt = fontSizePtVal;
         (textObj as any).locked = true;
@@ -1054,6 +1050,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         const detectedStyle = data?.font_style || "normal";
         const detectedColor = data?.color || "#000000";
         const detectedFontSizePt = data?.font_size_pt || null;
+        const detectedXPercent = typeof data?.x_percent === "number" ? data.x_percent : null;
+        const detectedYPercent = typeof data?.y_percent === "number" ? data.y_percent : null;
+        const detectedHPercent = typeof data?.h_percent === "number" ? data.h_percent : null;
 
         if (!extractedText.trim()) {
           toast.warning("No text detected in the selected area");
@@ -1081,9 +1080,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             }
           }
 
-          // Determine font size: use AI-detected pt size if available, otherwise auto-fit to crop region
+          // Determine font size + position from OCR region when available
           let finalFontSizePx: number;
           let finalFontSizePt: number;
+          const textLeft = cropLeft + ((detectedXPercent ?? 0) / 100) * cropW;
+          const textTop = cropTop + ((detectedYPercent ?? 0) / 100) * cropH;
+          const targetTextHeightPx = detectedHPercent && detectedHPercent > 0
+            ? (detectedHPercent / 100) * cropH
+            : cropH;
 
           if (detectedFontSizePt && detectedFontSizePt > 0) {
             // Use the AI-detected point size directly
@@ -1093,8 +1097,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             // Auto-fit: trial render, measure in canvas coords, then scale
             const trialSize = 40;
             const trialText = new IText(extractedText, {
-              left: cropLeft,
-              top: cropTop,
+              left: textLeft,
+              top: textTop,
               fontSize: trialSize,
               fontFamily: useFontFamily,
               fontWeight: detectedWeight,
@@ -1105,30 +1109,26 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             });
             canvas.add(trialText);
             canvas.renderAll();
-            // Fabric v6 getBoundingRect is already in scene/canvas coords
             const trialBounds = getObjectBoundsInCanvas(trialText);
             const measuredH = trialBounds.height;
             finalFontSizePx = measuredH > 0
-              ? Math.round(trialSize * (cropH / measuredH))
-              : Math.max(Math.round(cropH * 0.6), ptToPx(4));
+              ? Math.round(trialSize * (targetTextHeightPx / measuredH))
+              : Math.max(Math.round(targetTextHeightPx * 0.6), ptToPx(4));
             finalFontSizePt = pxToPt(finalFontSizePx);
             canvas.remove(trialText);
           }
 
           const text = new IText(extractedText, {
-            left: cropLeft,
-            top: cropTop,
+            left: textLeft,
+            top: textTop,
             fontSize: finalFontSizePx,
             fontFamily: useFontFamily,
             fontWeight: detectedWeight,
             fontStyle: detectedStyle,
             fill: detectedColor,
-            stroke: "#ffffff",
-            strokeWidth: getWhiteoutStrokeWidth(finalFontSizePx),
-            strokeLineJoin: "round",
-            paintFirst: "stroke",
+            textBackgroundColor: "#ffffff",
             editable: true,
-            padding: 4,
+            padding: 0,
           });
           (text as any)._fontSizePt = finalFontSizePt;
           // Re-add below after configuring lock state

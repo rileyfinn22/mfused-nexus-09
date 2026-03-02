@@ -99,36 +99,52 @@ serve(async (req) => {
             type: "function",
             function: {
               name: "extract_text_with_style",
-              description:
-                "Extract text from the cropped image region along with detected font styling.",
-              parameters: {
-                type: "object",
-                properties: {
-                  text: { type: "string", description: "The extracted text content" },
-                  font_family: {
-                    type: "string",
-                    description:
-                      "Best guess for the font family. Use common names like Arial, Helvetica, Times New Roman, Georgia, Roboto, Montserrat, Bebas Neue, Open Sans, Lato, Poppins, etc.",
-                  },
-                  font_size_pt: {
-                    type: "number",
-                    description: "Estimated font size in points based on the text height relative to the cropped region",
-                  },
-                  font_weight: {
-                    type: "string",
-                    enum: ["normal", "bold"],
-                    description: "Whether the text appears bold",
-                  },
-                  font_style: {
-                    type: "string",
-                    enum: ["normal", "italic"],
-                    description: "Whether the text appears italic",
-                  },
-                  color: {
-                    type: "string",
-                    description: "Text color as hex (e.g. #000000, #ffffff, #ff0000)",
-                  },
-                },
+               description:
+                 "Extract text from the cropped image region along with detected font styling and text bounds within the crop.",
+               parameters: {
+                 type: "object",
+                 properties: {
+                   text: { type: "string", description: "The extracted text content" },
+                   x_percent: {
+                     type: "number",
+                     description: "Left position of text in the crop as percentage (0-100) of crop width",
+                   },
+                   y_percent: {
+                     type: "number",
+                     description: "Top position of text in the crop as percentage (0-100) of crop height",
+                   },
+                   w_percent: {
+                     type: "number",
+                     description: "Text bounds width in the crop as percentage (0-100) of crop width",
+                   },
+                   h_percent: {
+                     type: "number",
+                     description: "Text bounds height in the crop as percentage (0-100) of crop height",
+                   },
+                   font_family: {
+                     type: "string",
+                     description:
+                       "Best guess for the font family. Use common names like Arial, Helvetica, Times New Roman, Georgia, Roboto, Montserrat, Bebas Neue, Open Sans, Lato, Poppins, etc.",
+                   },
+                   font_size_pt: {
+                     type: "number",
+                     description: "Estimated font size in points based on the text height relative to the cropped region",
+                   },
+                   font_weight: {
+                     type: "string",
+                     enum: ["normal", "bold"],
+                     description: "Whether the text appears bold",
+                   },
+                   font_style: {
+                     type: "string",
+                     enum: ["normal", "italic"],
+                     description: "Whether the text appears italic",
+                   },
+                   color: {
+                     type: "string",
+                     description: "Text color as hex (e.g. #000000, #ffffff, #ff0000)",
+                   },
+                 },
                 required: ["text"],
                 additionalProperties: false,
               },
@@ -138,11 +154,11 @@ serve(async (req) => {
 
     const systemPrompt = isFullPage
       ? `You are a precise OCR and layout analysis assistant for print design files. Analyze the full page image and identify ALL distinct text blocks/regions. For each text block, determine its position (as percentage of page dimensions), the text content, and font styling. Be very accurate with positions. Group nearby text that belongs together (e.g. a multi-line paragraph is one region). The canvas dimensions are ${canvas_width || "unknown"}x${canvas_height || "unknown"} pixels.`
-      : "You are an OCR assistant specialized in print design. Extract the text from the cropped image and detect its font styling (family, weight, style, color). Be precise about the font family - match it to the closest common font name.";
+      : "You are an OCR assistant specialized in print design. Extract the text from the cropped image and detect its font styling (family, weight, style, color). Also return the text bounds position and size within the crop as percentages (x_percent, y_percent, w_percent, h_percent). Be precise about font family and positions.";
 
     const userPrompt = isFullPage
       ? "Analyze this full page design and extract ALL text regions with their positions and font properties."
-      : "Extract the text and detect its font styling from this cropped region.";
+      : "Extract the text, styling, and precise bounds from this cropped region.";
 
     const toolChoice = isFullPage
       ? { type: "function", function: { name: "extract_text_regions" } }
@@ -219,6 +235,10 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           text: parsed.text || "",
+          x_percent: parsed.x_percent ?? null,
+          y_percent: parsed.y_percent ?? null,
+          w_percent: parsed.w_percent ?? null,
+          h_percent: parsed.h_percent ?? null,
           font_family: parsed.font_family || null,
           font_size_pt: parsed.font_size_pt || null,
           font_weight: parsed.font_weight || "normal",
