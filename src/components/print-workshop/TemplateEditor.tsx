@@ -3,7 +3,7 @@ import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2 } from "lucide-react";
+import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Wand2 } from "lucide-react";
 import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
 import { IconPickerDialog } from "./IconPickerDialog";
@@ -130,6 +130,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const [zoneSelectMode, setZoneSelectMode] = useState(false);
   const [zoneExtractLocked, setZoneExtractLocked] = useState(false);
   const [extractingText, setExtractingText] = useState(false);
+  const [autoExtracting, setAutoExtracting] = useState(false);
   const zoneRectRef = useRef<Rect | null>(null);
   const zoneStartRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -616,6 +617,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         if (data?.error) throw new Error(data.error);
 
         const extractedText = data?.text || "";
+        const detectedFont = data?.font_family || null;
+        const detectedWeight = data?.font_weight || "normal";
+        const detectedStyle = data?.font_style || "normal";
+        const detectedColor = data?.color || "#000000";
+
         if (!extractedText.trim()) {
           toast.warning("No text detected in the selected area");
           canvas.remove(rect);
@@ -640,13 +646,33 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           canvas.add(cover);
 
           const isLocked = zoneExtractLocked;
+
+          // Try to load detected Google font if available
+          let useFontFamily = "Arial";
+          if (detectedFont) {
+            const fontDef = FONT_OPTIONS.find(
+              (f) => f.value.toLowerCase() === detectedFont.toLowerCase()
+            );
+            if (fontDef) {
+              useFontFamily = fontDef.value;
+              if (fontDef.google) {
+                await loadGoogleFont(fontDef.value);
+              }
+            } else {
+              // Try as-is (might be web-safe)
+              useFontFamily = detectedFont;
+            }
+          }
+
           const fontSize = Math.max(Math.round(cropH * 0.5), ptToPx(10));
           const text = new IText(extractedText, {
             left: cropLeft,
             top: cropTop,
             fontSize,
-            fontFamily: "Arial",
-            fill: "#000000",
+            fontFamily: useFontFamily,
+            fontWeight: detectedWeight,
+            fontStyle: detectedStyle,
+            fill: detectedColor,
             editable: true,
             padding: 4,
           });
@@ -666,7 +692,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           canvas.setActiveObject(text);
           canvas.renderAll();
           syncCanvas();
-          toast.success(`Extracted as ${isLocked ? "locked" : "editable"}: "${extractedText.substring(0, 50)}${extractedText.length > 50 ? "..." : ""}"`);
+          toast.success(`Extracted as ${isLocked ? "locked" : "editable"} (${useFontFamily}): "${extractedText.substring(0, 50)}${extractedText.length > 50 ? "..." : ""}"`);
         }
       } catch (err: any) {
         toast.error(err.message || "Failed to extract text");
@@ -694,6 +720,98 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       o.set({ evented: true });
     });
     canvas.renderAll();
+  };
+
+  // Auto-extract all text from the full canvas (especially useful after PDF upload)
+  const autoExtractAllText = async () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    setAutoExtracting(true);
+    try {
+      const fullDataUrl = canvas.toDataURL({ format: "png", multiplier: 2 });
+      const { data, error } = await supabase.functions.invoke("decompose-design-image", {
+        body: {
+          image_url: fullDataUrl,
+          extract_all: true,
+          canvas_width: canvasWidth,
+          canvas_height: canvasHeight,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const regions = data?.regions || [];
+      if (regions.length === 0) {
+        toast.warning("No text regions detected");
+        return;
+      }
+
+      let added = 0;
+      for (const region of regions) {
+        if (!region.text?.trim()) continue;
+        const x = (region.x_percent / 100) * canvasWidth;
+        const y = (region.y_percent / 100) * canvasHeight;
+        const w = (region.w_percent / 100) * canvasWidth;
+        const h = (region.h_percent / 100) * canvasHeight;
+
+        const coverPad = 4;
+        const cover = new Rect({
+          left: x - coverPad, top: y - coverPad,
+          width: w + coverPad * 2, height: h + coverPad * 2,
+          fill: "#ffffff", opacity: 1, selectable: false, evented: false,
+          objectCaching: false, name: "_textCover",
+        });
+        canvas.add(cover);
+
+        let useFontFamily = "Arial";
+        if (region.font_family) {
+          const fontDef = FONT_OPTIONS.find(
+            (f) => f.value.toLowerCase() === region.font_family.toLowerCase()
+          );
+          if (fontDef) {
+            useFontFamily = fontDef.value;
+            if (fontDef.google) await loadGoogleFont(fontDef.value);
+          } else {
+            useFontFamily = region.font_family;
+          }
+        }
+
+        const fontSize = region.font_size_pt
+          ? ptToPx(region.font_size_pt)
+          : Math.max(Math.round(h * 0.6), ptToPx(10));
+
+        const isLocked = zoneExtractLocked;
+        const text = new IText(region.text, {
+          left: x, top: y, fontSize,
+          fontFamily: useFontFamily,
+          fontWeight: region.font_weight || "normal",
+          fontStyle: region.font_style || "normal",
+          fill: region.color || "#000000",
+          editable: true, padding: 4,
+        });
+        (text as any).locked = isLocked;
+        (text as any).editable = !isLocked;
+        (text as any).name = isLocked ? "locked_text" : "editable_text";
+        text.set({
+          borderColor: isLocked ? "#94a3b8" : "#3b82f6",
+          cornerColor: isLocked ? "#94a3b8" : "#3b82f6",
+          cornerStyle: isLocked ? undefined : "circle",
+          transparentCorners: isLocked ? undefined : false,
+        } as any);
+        canvas.add(text);
+        added++;
+      }
+
+      const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
+      if (trim) canvas.bringObjectToFront(trim);
+      canvas.renderAll();
+      syncCanvas();
+      toast.success(`Extracted ${added} text region${added !== 1 ? "s" : ""} from PDF`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to auto-extract text");
+    } finally {
+      setAutoExtracting(false);
+    }
   };
 
   const applyFontSize = (sizePt: number) => {
@@ -805,6 +923,22 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               )}
               <span className="text-xs">
                 {extractingText ? "Extracting..." : zoneSelectMode ? "Cancel" : "Extract Text"}
+              </span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={autoExtractAllText}
+              disabled={autoExtracting || extractingText}
+              className="gap-1.5"
+            >
+              {autoExtracting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Wand2 className="h-3.5 w-3.5" />
+              )}
+              <span className="text-xs">
+                {autoExtracting ? "Analyzing..." : "Auto-Extract All"}
               </span>
             </Button>
             <div className="w-px h-6 bg-border mx-1" />

@@ -15,13 +15,134 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { image_url } = await req.json();
+    const { image_url, extract_all, canvas_width, canvas_height } = await req.json();
     if (!image_url) {
       return new Response(JSON.stringify({ error: "image_url is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Two modes: single zone extraction (with font detection) or full-page extraction
+    const isFullPage = extract_all === true;
+
+    const tools = isFullPage
+      ? [
+          {
+            type: "function",
+            function: {
+              name: "extract_text_regions",
+              description:
+                "Extract all text regions from the full page image. Return each distinct text block with its position as a percentage of image dimensions, estimated font properties, and content.",
+              parameters: {
+                type: "object",
+                properties: {
+                  regions: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        text: { type: "string", description: "The text content" },
+                        x_percent: {
+                          type: "number",
+                          description: "Left position as percentage (0-100) of image width",
+                        },
+                        y_percent: {
+                          type: "number",
+                          description: "Top position as percentage (0-100) of image height",
+                        },
+                        w_percent: {
+                          type: "number",
+                          description: "Width as percentage (0-100) of image width",
+                        },
+                        h_percent: {
+                          type: "number",
+                          description: "Height as percentage (0-100) of image height",
+                        },
+                        font_family: {
+                          type: "string",
+                          description:
+                            "Best guess for the font family. Use common names like Arial, Helvetica, Times New Roman, Georgia, Roboto, Montserrat, Bebas Neue, etc.",
+                        },
+                        font_size_pt: {
+                          type: "number",
+                          description: "Estimated font size in points based on the text height relative to the page",
+                        },
+                        font_weight: {
+                          type: "string",
+                          enum: ["normal", "bold"],
+                          description: "Whether the text appears bold",
+                        },
+                        font_style: {
+                          type: "string",
+                          enum: ["normal", "italic"],
+                          description: "Whether the text appears italic",
+                        },
+                        color: {
+                          type: "string",
+                          description: "Text color as hex (e.g. #000000, #ffffff, #ff0000)",
+                        },
+                      },
+                      required: ["text", "x_percent", "y_percent", "w_percent", "h_percent"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["regions"],
+                additionalProperties: false,
+              },
+            },
+          },
+        ]
+      : [
+          {
+            type: "function",
+            function: {
+              name: "extract_text_with_style",
+              description:
+                "Extract text from the cropped image region along with detected font styling.",
+              parameters: {
+                type: "object",
+                properties: {
+                  text: { type: "string", description: "The extracted text content" },
+                  font_family: {
+                    type: "string",
+                    description:
+                      "Best guess for the font family. Use common names like Arial, Helvetica, Times New Roman, Georgia, Roboto, Montserrat, Bebas Neue, Open Sans, Lato, Poppins, etc.",
+                  },
+                  font_weight: {
+                    type: "string",
+                    enum: ["normal", "bold"],
+                    description: "Whether the text appears bold",
+                  },
+                  font_style: {
+                    type: "string",
+                    enum: ["normal", "italic"],
+                    description: "Whether the text appears italic",
+                  },
+                  color: {
+                    type: "string",
+                    description: "Text color as hex (e.g. #000000, #ffffff, #ff0000)",
+                  },
+                },
+                required: ["text"],
+                additionalProperties: false,
+              },
+            },
+          },
+        ];
+
+    const systemPrompt = isFullPage
+      ? `You are a precise OCR and layout analysis assistant for print design files. Analyze the full page image and identify ALL distinct text blocks/regions. For each text block, determine its position (as percentage of page dimensions), the text content, and font styling. Be very accurate with positions. Group nearby text that belongs together (e.g. a multi-line paragraph is one region). The canvas dimensions are ${canvas_width || "unknown"}x${canvas_height || "unknown"} pixels.`
+      : "You are an OCR assistant specialized in print design. Extract the text from the cropped image and detect its font styling (family, weight, style, color). Be precise about the font family - match it to the closest common font name.";
+
+    const userPrompt = isFullPage
+      ? "Analyze this full page design and extract ALL text regions with their positions and font properties."
+      : "Extract the text and detect its font styling from this cropped region.";
+
+    const toolChoice = isFullPage
+      ? { type: "function", function: { name: "extract_text_regions" } }
+      : { type: "function", function: { name: "extract_text_with_style" } };
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -34,24 +155,17 @@ serve(async (req) => {
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
           messages: [
-            {
-              role: "system",
-              content: "You are an OCR assistant. Extract ALL text visible in the provided image crop. Return the exact text content, preserving line breaks where they appear. Return ONLY the extracted text, nothing else — no explanation, no formatting, no quotes.",
-            },
+            { role: "system", content: systemPrompt },
             {
               role: "user",
               content: [
-                {
-                  type: "text",
-                  text: "Extract all text from this cropped image region. Return only the raw text content.",
-                },
-                {
-                  type: "image_url",
-                  image_url: { url: image_url },
-                },
+                { type: "text", text: userPrompt },
+                { type: "image_url", image_url: { url: image_url } },
               ],
             },
           ],
+          tools,
+          tool_choice: toolChoice,
         }),
       }
     );
@@ -78,12 +192,37 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const extractedText = (data.choices?.[0]?.message?.content || "").trim();
+    
+    // Parse tool call response
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall) {
+      // Fallback to content-based extraction
+      const fallbackText = (data.choices?.[0]?.message?.content || "").trim();
+      return new Response(
+        JSON.stringify({ text: fallbackText }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    return new Response(
-      JSON.stringify({ text: extractedText }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    const parsed = JSON.parse(toolCall.function.arguments);
+
+    if (isFullPage) {
+      return new Response(
+        JSON.stringify({ regions: parsed.regions || [] }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({
+          text: parsed.text || "",
+          font_family: parsed.font_family || null,
+          font_weight: parsed.font_weight || "normal",
+          font_style: parsed.font_style || "normal",
+          color: parsed.color || "#000000",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
   } catch (e) {
     console.error("decompose-design-image error:", e);
     const msg = e instanceof Error ? e.message : "Unknown error";
