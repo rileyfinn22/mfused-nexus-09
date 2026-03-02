@@ -385,21 +385,23 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     loadCanvasAndBackground();
 
     canvas.on("selection:created", (e) => {
-      const obj = e.selected?.[0];
-      if (obj) {
-        setSelectedObject(obj);
-        if ((obj as any).fontSize) setFontSizePt((obj as any)._fontSizePt ?? pxToPt((obj as any).fontSize));
-        if ((obj as any).fontFamily) setFontFamily((obj as any).fontFamily);
-        if ((obj as any).fill) setFontColor((obj as any).fill);
+      const sel = canvas.getActiveObject();
+      setSelectedObject(sel || null);
+      const first = e.selected?.[0];
+      if (first) {
+        if ((first as any).fontSize) setFontSizePt((first as any)._fontSizePt ?? pxToPt((first as any).fontSize));
+        if ((first as any).fontFamily) setFontFamily((first as any).fontFamily);
+        if ((first as any).fill) setFontColor((first as any).fill);
       }
     });
     canvas.on("selection:updated", (e) => {
-      const obj = e.selected?.[0];
-      if (obj) {
-        setSelectedObject(obj);
-        if ((obj as any).fontSize) setFontSizePt((obj as any)._fontSizePt ?? pxToPt((obj as any).fontSize));
-        if ((obj as any).fontFamily) setFontFamily((obj as any).fontFamily);
-        if ((obj as any).fill) setFontColor((obj as any).fill);
+      const sel = canvas.getActiveObject();
+      setSelectedObject(sel || null);
+      const first = e.selected?.[0];
+      if (first) {
+        if ((first as any).fontSize) setFontSizePt((first as any)._fontSizePt ?? pxToPt((first as any).fontSize));
+        if ((first as any).fontFamily) setFontFamily((first as any).fontFamily);
+        if ((first as any).fill) setFontColor((first as any).fill);
       }
     });
     canvas.on("selection:cleared", () => setSelectedObject(null));
@@ -1427,48 +1429,80 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
   // Auto-extract removed - user positions PDF manually
 
+  // Helper: get all selected text objects (handles both single & multi-select)
+  const getSelectedTextObjects = (): any[] => {
+    const canvas = fabricRef.current;
+    if (!canvas) return [];
+    const active = canvas.getActiveObject();
+    if (!active) return [];
+    // ActiveSelection (multi-select)
+    if ((active as any).type === "activeselection" || (active as any).type === "activeSelection") {
+      return ((active as any).getObjects?.() || []).filter((o: any) =>
+        o.type === "i-text" || o.type === "textbox" || o.type === "text"
+      );
+    }
+    // Single text object
+    if (active.type === "i-text" || (active as any).type === "textbox" || (active as any).type === "text") {
+      return [active];
+    }
+    return [];
+  };
+
   const applyFontSize = (sizePt: number) => {
-    if (!selectedObject || !fabricRef.current) return;
+    const canvas = fabricRef.current;
+    const textObjs = getSelectedTextObjects();
+    if (!canvas || textObjs.length === 0) return;
     setFontSizePt(sizePt);
-    (selectedObject as any).set("fontSize", ptToPx(sizePt));
-    (selectedObject as any)._fontSizePt = sizePt; // store exact pt to avoid round-trip error
-    fabricRef.current.renderAll();
+    textObjs.forEach((obj: any) => {
+      obj.set("fontSize", ptToPx(sizePt));
+      obj._fontSizePt = sizePt;
+    });
+    canvas.renderAll();
     syncCanvas();
   };
 
   const applyFontFamily = async (family: string) => {
-    if (!selectedObject || !fabricRef.current) return;
+    const canvas = fabricRef.current;
+    const textObjs = getSelectedTextObjects();
+    if (!canvas || textObjs.length === 0) return;
     const fontDef = FONT_OPTIONS.find((f) => f.value === family);
     if (fontDef?.google) {
       await loadGoogleFont(family);
     }
     setFontFamily(family);
-    (selectedObject as any).set("fontFamily", family);
-    fabricRef.current.renderAll();
+    textObjs.forEach((obj: any) => obj.set("fontFamily", family));
+    canvas.renderAll();
     syncCanvas();
   };
 
   const toggleBold = () => {
-    if (!selectedObject || !fabricRef.current) return;
-    const current = (selectedObject as any).fontWeight;
-    (selectedObject as any).set("fontWeight", current === "bold" ? "normal" : "bold");
-    fabricRef.current.renderAll();
+    const canvas = fabricRef.current;
+    const textObjs = getSelectedTextObjects();
+    if (!canvas || textObjs.length === 0) return;
+    // Toggle based on first object's state
+    const newWeight = (textObjs[0] as any).fontWeight === "bold" ? "normal" : "bold";
+    textObjs.forEach((obj: any) => obj.set("fontWeight", newWeight));
+    canvas.renderAll();
     syncCanvas();
   };
 
   const toggleItalic = () => {
-    if (!selectedObject || !fabricRef.current) return;
-    const current = (selectedObject as any).fontStyle;
-    (selectedObject as any).set("fontStyle", current === "italic" ? "normal" : "italic");
-    fabricRef.current.renderAll();
+    const canvas = fabricRef.current;
+    const textObjs = getSelectedTextObjects();
+    if (!canvas || textObjs.length === 0) return;
+    const newStyle = (textObjs[0] as any).fontStyle === "italic" ? "normal" : "italic";
+    textObjs.forEach((obj: any) => obj.set("fontStyle", newStyle));
+    canvas.renderAll();
     syncCanvas();
   };
 
   const applyFontColor = (color: string) => {
-    if (!selectedObject || !fabricRef.current) return;
+    const canvas = fabricRef.current;
+    const textObjs = getSelectedTextObjects();
+    if (!canvas || textObjs.length === 0) return;
     setFontColor(color);
-    (selectedObject as any).set("fill", color);
-    fabricRef.current.renderAll();
+    textObjs.forEach((obj: any) => obj.set("fill", color));
+    canvas.renderAll();
     syncCanvas();
   };
   // Split selected text within an IText into a separate editable object
@@ -1595,7 +1629,18 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     syncCanvas();
   };
 
-  const isTextObject = selectedObject && ((selectedObject as any).type === "i-text" || (selectedObject as any).type === "textbox" || (selectedObject as any).type === "text");
+  const isTextObject = (() => {
+    if (!selectedObject) return false;
+    const t = (selectedObject as any).type;
+    if (t === "i-text" || t === "textbox" || t === "text") return true;
+    // Multi-selection: show text toolbar if any selected object is text
+    if (t === "activeselection" || t === "activeSelection") {
+      return ((selectedObject as any).getObjects?.() || []).some((o: any) =>
+        o.type === "i-text" || o.type === "textbox" || o.type === "text"
+      );
+    }
+    return false;
+  })();
 
   return (
     <div className="flex flex-col gap-4">
