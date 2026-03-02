@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, ImagePlus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -15,6 +15,26 @@ export function AiImageDialog({ onImageGenerated }: AiImageDialogProps) {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be under 10MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setReferenceImage(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const generate = async () => {
     if (!prompt.trim()) return;
@@ -22,7 +42,10 @@ export function AiImageDialog({ onImageGenerated }: AiImageDialogProps) {
     setPreview(null);
     try {
       const { data, error } = await supabase.functions.invoke("generate-design-image", {
-        body: { prompt: prompt.trim() },
+        body: {
+          prompt: prompt.trim(),
+          reference_image: referenceImage || undefined,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -41,7 +64,13 @@ export function AiImageDialog({ onImageGenerated }: AiImageDialogProps) {
       setOpen(false);
       setPrompt("");
       setPreview(null);
+      setReferenceImage(null);
     }
+  };
+
+  const clearRef = () => {
+    setReferenceImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -60,16 +89,59 @@ export function AiImageDialog({ onImageGenerated }: AiImageDialogProps) {
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {/* Reference image upload */}
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Optional: Upload a screenshot or reference image for the AI to recreate
+            </p>
+            {referenceImage ? (
+              <div className="relative inline-block">
+                <img
+                  src={referenceImage}
+                  alt="Reference"
+                  className="max-h-32 rounded-lg border border-border object-contain"
+                />
+                <button
+                  onClick={clearRef}
+                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5 hover:bg-destructive/80 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-1.5 w-full border-dashed"
+              >
+                <ImagePlus className="h-4 w-4" />
+                Upload Reference Image
+              </Button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </div>
+
           <Textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe the graphic you want... e.g. 'A minimalist gold leaf pattern for a luxury candle label'"
+            placeholder={
+              referenceImage
+                ? "Describe how you want the AI to recreate this... e.g. 'Recreate this label design as a clean, print-ready vector-style graphic with the same layout'"
+                : "Describe the graphic you want... e.g. 'A minimalist gold leaf pattern for a luxury candle label'"
+            }
             rows={3}
             className="resize-none"
           />
           <Button onClick={generate} disabled={loading || !prompt.trim()} className="w-full gap-2">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {loading ? "Generating..." : "Generate Image"}
+            {loading ? "Generating..." : referenceImage ? "Recreate from Reference" : "Generate Image"}
           </Button>
           {preview && (
             <div className="space-y-3">
