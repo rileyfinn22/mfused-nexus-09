@@ -12,7 +12,8 @@ import {
   Settings,
   BarChart3,
   ChevronRight,
-  Calculator
+  Calculator,
+  MessageSquare
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -61,6 +62,7 @@ const vibeAdminNavigationItems = [
   { title: "Inventory", url: "/inventory", icon: Archive },
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "Chat", url: "/chat", icon: MessageSquare },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
