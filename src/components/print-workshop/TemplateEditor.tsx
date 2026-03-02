@@ -628,6 +628,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         const detectedWeight = data?.font_weight || "normal";
         const detectedStyle = data?.font_style || "normal";
         const detectedColor = data?.color || "#000000";
+        const detectedFontSizePt = data?.font_size_pt || null;
 
         if (!extractedText.trim()) {
           toast.warning("No text detected in the selected area");
@@ -636,13 +637,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           // Remove the selection rect, add a white cover rect to hide the underlying text, then add editable IText
           canvas.remove(rect);
 
-          // White cover to fully mask the baked-in text underneath
-          const coverPad = 8;
+          // White cover to mask just the baked-in text (tight fit, no padding)
           const cover = new Rect({
-            left: cropLeft - coverPad,
-            top: cropTop - coverPad,
-            width: cropW + coverPad * 2,
-            height: cropH + coverPad * 2,
+            left: cropLeft,
+            top: cropTop,
+            width: cropW,
+            height: cropH,
             fill: "#ffffff",
             opacity: 1,
             selectable: false,
@@ -671,7 +671,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             }
           }
 
-          const fontSize = Math.max(Math.round(cropH * 0.5), ptToPx(10));
+          // Use AI-detected font size (pt→px) if available, else estimate from crop height
+          const fontSize = detectedFontSizePt
+            ? Math.round(ptToPx(detectedFontSizePt))
+            : Math.max(Math.round(cropH * 0.5), ptToPx(10));
           const text = new IText(extractedText, {
             left: cropLeft,
             top: cropTop,
