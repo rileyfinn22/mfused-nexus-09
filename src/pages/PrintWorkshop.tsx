@@ -6,18 +6,22 @@ import { Badge } from "@/components/ui/badge";
 import { TemplateBuilder } from "@/components/print-workshop/TemplateBuilder";
 import { TemplateEditor } from "@/components/print-workshop/TemplateEditor";
 import { OrderPanel } from "@/components/print-workshop/OrderPanel";
-import { Plus, Printer, ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { PrintCart, type CartItem } from "@/components/print-workshop/PrintCart";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { Plus, Printer, ArrowLeft, Pencil, Trash2, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 type View = "browse" | "build" | "use";
 
 export default function PrintWorkshop() {
+  const { isVibeAdmin, loading: roleLoading } = useActiveCompany();
   const [view, setView] = useState<View>("browse");
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [canvasData, setCanvasData] = useState<any>(null);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
   const fetchTemplates = async () => {
     setLoading(true);
@@ -34,8 +38,24 @@ export default function PrintWorkshop() {
   };
 
   useEffect(() => {
-    fetchTemplates();
-  }, []);
+    if (!roleLoading && isVibeAdmin) fetchTemplates();
+  }, [roleLoading, isVibeAdmin]);
+
+  // Gate: vibe_admin only
+  if (roleLoading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-muted-foreground">
+        Loading...
+      </div>
+    );
+  }
+  if (!isVibeAdmin) {
+    return (
+      <div className="flex items-center justify-center py-20 text-muted-foreground">
+        Access restricted to internal admins.
+      </div>
+    );
+  }
 
   const handleDeleteTemplate = async (id: string) => {
     if (!confirm("Delete this template?")) return;
@@ -43,6 +63,20 @@ export default function PrintWorkshop() {
     if (error) toast.error("Failed to delete");
     else {
       toast.success("Template deleted");
+      fetchTemplates();
+    }
+  };
+
+  const handleDuplicateTemplate = async (tmpl: any) => {
+    const { id, created_at, updated_at, ...rest } = tmpl;
+    const { error } = await supabase.from("print_templates").insert({
+      ...rest,
+      name: `(Copy) ${tmpl.name}`,
+    } as any);
+    if (error) {
+      toast.error("Failed to duplicate template");
+    } else {
+      toast.success("Template duplicated");
       fetchTemplates();
     }
   };
@@ -70,6 +104,26 @@ export default function PrintWorkshop() {
     fetchTemplates();
   };
 
+  const handleAddToCart = (item: Omit<CartItem, "id">) => {
+    const newItem: CartItem = { ...item, id: crypto.randomUUID() };
+    setCartItems((prev) => [...prev, newItem]);
+    toast.success(`"${item.templateName}" added to cart`);
+    setView("browse");
+    setSelectedTemplate(null);
+  };
+
+  const handleUpdateCartQty = (id: string, quantity: number) => {
+    setCartItems((prev) => prev.map((i) => (i.id === id ? { ...i, quantity } : i)));
+  };
+
+  const handleRemoveCartItem = (id: string) => {
+    setCartItems((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const handleClearCart = () => {
+    setCartItems([]);
+  };
+
   // Browse mode
   if (view === "browse") {
     return (
@@ -84,9 +138,17 @@ export default function PrintWorkshop() {
               Create and customize label templates for on-demand printing
             </p>
           </div>
-          <Button onClick={handleNewTemplate} className="gap-2">
-            <Plus className="h-4 w-4" /> New Template
-          </Button>
+          <div className="flex items-center gap-2">
+            <PrintCart
+              items={cartItems}
+              onUpdateQuantity={handleUpdateCartQty}
+              onRemoveItem={handleRemoveCartItem}
+              onClearCart={handleClearCart}
+            />
+            <Button onClick={handleNewTemplate} className="gap-2">
+              <Plus className="h-4 w-4" /> New Template
+            </Button>
+          </div>
         </div>
 
         {loading ? (
@@ -151,6 +213,9 @@ export default function PrintWorkshop() {
                       </div>
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDuplicateTemplate(tmpl)} title="Duplicate">
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditTemplate(tmpl)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -179,20 +244,28 @@ export default function PrintWorkshop() {
     );
   }
 
-  // Use mode - customize template & order
+  // Use mode - customize template & add to cart
   if (view === "use" && selectedTemplate) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={handleBack} className="gap-1.5">
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Button>
-          <div>
-            <h2 className="text-xl font-semibold">{selectedTemplate.name}</h2>
-            {selectedTemplate.description && (
-              <p className="text-sm text-muted-foreground">{selectedTemplate.description}</p>
-            )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={handleBack} className="gap-1.5">
+              <ArrowLeft className="h-4 w-4" /> Back
+            </Button>
+            <div>
+              <h2 className="text-xl font-semibold">{selectedTemplate.name}</h2>
+              {selectedTemplate.description && (
+                <p className="text-sm text-muted-foreground">{selectedTemplate.description}</p>
+              )}
+            </div>
           </div>
+          <PrintCart
+            items={cartItems}
+            onUpdateQuantity={handleUpdateCartQty}
+            onRemoveItem={handleRemoveCartItem}
+            onClearCart={handleClearCart}
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -211,7 +284,7 @@ export default function PrintWorkshop() {
             <OrderPanel
               template={selectedTemplate}
               canvasData={canvasData}
-              onOrderCreated={handleBack}
+              onAddToCart={handleAddToCart}
             />
           </div>
         </div>
