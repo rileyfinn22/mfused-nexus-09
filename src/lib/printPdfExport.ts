@@ -45,30 +45,116 @@ async function fetchSourcePdf(path: string): Promise<ArrayBuffer> {
   return resp.arrayBuffer();
 }
 
+interface RenderedPdfBaseLayer {
+  dataUrl: string;
+  xInches: number;
+  yInches: number;
+  widthInches: number;
+  heightInches: number;
+}
+
 /**
- * Render the first page of a PDF at a target DPI onto a canvas, returning the image data.
+ * Render the first PDF page and return a positioned base layer that matches
+ * TemplateEditor preview behavior (crop/fill/trim alignment).
  */
 async function renderPdfPage(
   pdfData: ArrayBuffer,
-  pageWidthInches: number,
-  pageHeightInches: number,
+  templateTotalWidthInches: number,
+  templateTotalHeightInches: number,
+  trimWidthInches: number,
+  trimHeightInches: number,
+  bleedInches: number,
   dpi: number
-): Promise<string> {
+): Promise<RenderedPdfBaseLayer> {
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(pdfData) }).promise;
   const page = await pdf.getPage(1);
 
-  const targetWidthPx = Math.round(pageWidthInches * dpi);
   const baseViewport = page.getViewport({ scale: 1 });
-  const scale = targetWidthPx / baseViewport.width;
-  const viewport = page.getViewport({ scale });
+  const pdfPageWidthInches = baseViewport.width / 72;
+  const pdfPageHeightInches = baseViewport.height / 72;
 
-  const canvas = document.createElement("canvas");
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  const ctx = canvas.getContext("2d")!;
+  // Render at physical print density so 1" in PDF = `dpi` pixels
+  const renderScale = dpi / 72;
+  const viewport = page.getViewport({ scale: renderScale });
 
-  await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
-  return canvas.toDataURL("image/png");
+  const renderedCanvas = document.createElement("canvas");
+  renderedCanvas.width = Math.max(1, Math.round(viewport.width));
+  renderedCanvas.height = Math.max(1, Math.round(viewport.height));
+  const renderedCtx = renderedCanvas.getContext("2d")!;
+
+  await page.render({ canvasContext: renderedCtx, viewport, canvas: renderedCanvas } as any).promise;
+
+  const toleranceInches = 0.05;
+  const isLargerThanTemplate =
+    pdfPageWidthInches > templateTotalWidthInches + toleranceInches ||
+    pdfPageHeightInches > templateTotalHeightInches + toleranceInches;
+
+  const matchesTrimArea =
+    Math.abs(pdfPageWidthInches - trimWidthInches) <= toleranceInches &&
+    Math.abs(pdfPageHeightInches - trimHeightInches) <= toleranceInches;
+
+  // Case 1: source page is larger than template -> crop centered template area (matches preview)
+  if (isLargerThanTemplate) {
+    const targetWidthPx = Math.max(1, Math.round(templateTotalWidthInches * dpi));
+    const targetHeightPx = Math.max(1, Math.round(templateTotalHeightInches * dpi));
+
+    const cropWidthPx = Math.min(targetWidthPx, renderedCanvas.width);
+    const cropHeightPx = Math.min(targetHeightPx, renderedCanvas.height);
+    const cropLeftPx = Math.max(0, Math.round((renderedCanvas.width - cropWidthPx) / 2));
+    const cropTopPx = Math.max(0, Math.round((renderedCanvas.height - cropHeightPx) / 2));
+
+    const croppedCanvas = document.createElement("canvas");
+    croppedCanvas.width = targetWidthPx;
+    croppedCanvas.height = targetHeightPx;
+    const croppedCtx = croppedCanvas.getContext("2d")!;
+
+    croppedCtx.drawImage(
+      renderedCanvas,
+      cropLeftPx,
+      cropTopPx,
+      cropWidthPx,
+      cropHeightPx,
+      0,
+      0,
+      targetWidthPx,
+      targetHeightPx
+    );
+
+    return {
+      dataUrl: croppedCanvas.toDataURL("image/png"),
+      xInches: 0,
+      yInches: 0,
+      widthInches: templateTotalWidthInches,
+      heightInches: templateTotalHeightInches,
+    };
+  }
+
+  // Case 2: source page matches trim size -> place inside trim area with bleed margins (matches preview)
+  if (matchesTrimArea) {
+    return {
+      dataUrl: renderedCanvas.toDataURL("image/png"),
+      xInches: bleedInches,
+      yInches: bleedInches,
+      widthInches: trimWidthInches,
+      heightInches: trimHeightInches,
+    };
+  }
+
+  // Case 3: standard fit/center into full template area (matches preview default)
+  const fitScale = Math.min(
+    templateTotalWidthInches / pdfPageWidthInches,
+    templateTotalHeightInches / pdfPageHeightInches
+  );
+  const drawWidthInches = pdfPageWidthInches * fitScale;
+  const drawHeightInches = pdfPageHeightInches * fitScale;
+
+  return {
+    dataUrl: renderedCanvas.toDataURL("image/png"),
+    xInches: (templateTotalWidthInches - drawWidthInches) / 2,
+    yInches: (templateTotalHeightInches - drawHeightInches) / 2,
+    widthInches: drawWidthInches,
+    heightInches: drawHeightInches,
+  };
 }
 
 /**
@@ -88,14 +174,30 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
     format: [totalW, totalH],
   });
 
-  // 1. Render the source PDF as the base layer at 300 DPI
+  // 1. Render the source PDF base layer using the same placement rules as preview
   const pdfData = await fetchSourcePdf(sourcePdfPath);
-  const bgDataUrl = await renderPdfPage(pdfData, totalW, totalH, EXPORT_DPI);
-  doc.addImage(bgDataUrl, "PNG", 0, 0, totalW, totalH, undefined, "NONE");
+  const bgLayer = await renderPdfPage(
+    pdfData,
+    totalW,
+    totalH,
+    widthInches,
+    heightInches,
+    bleedInches,
+    EXPORT_DPI
+  );
+  doc.addImage(
+    bgLayer.dataUrl,
+    "PNG",
+    bgLayer.xInches,
+    bgLayer.yInches,
+    bgLayer.widthInches,
+    bgLayer.heightInches,
+    undefined,
+    "NONE"
+  );
 
   // 2. Internal DPI used by the Fabric.js canvas (must match TemplateEditor)
   const CANVAS_DPI = 150;
-  const canvasBleedPx = Math.round(bleedInches * CANVAS_DPI);
 
   // 3. Overlay Fabric.js objects
   const objects: any[] = canvasData?.objects || [];
