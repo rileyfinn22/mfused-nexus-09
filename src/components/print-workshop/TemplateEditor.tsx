@@ -1087,7 +1087,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     input.click();
   }
 
-  const toggleLock = () => {
+  const setSelectionLockedState = (newLocked: boolean) => {
     if (!selectedObject || !fabricRef.current) return;
     const canvas = fabricRef.current;
 
@@ -1096,8 +1096,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       : [selectedObject];
 
     if (targets.length === 0) return;
-
-    const newLocked = !getSelectionLockedState(selectedObject as any);
 
     targets.forEach((obj: any) => {
       obj.locked = newLocked;
@@ -1118,6 +1116,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     syncCanvas();
     toast.success(newLocked ? "Element locked" : "Element set to editable", { duration: 1500 });
   };
+
   const deleteSelected = () => {
     if (!selectedObject || !fabricRef.current) return;
     fabricRef.current.remove(selectedObject);
@@ -1951,7 +1950,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             <AiEditDialog getCanvasImage={getCanvasImage} onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <IconPickerDialog onIconSelected={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <div className="w-px h-6 bg-border mx-1" />
-            {/* Extract Text zone controls */}
+            {/* Extract Text zone controls (OCR mode, not object lock state) */}
             <Button
               size="sm"
               variant={zoneExtractLocked ? "outline" : "default"}
@@ -1960,7 +1959,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               className="gap-1 px-2"
             >
               <Unlock className="h-3 w-3" />
-              <span className="text-[10px]">Editable</span>
+              <span className="text-[10px]">OCR Editable</span>
             </Button>
             <Button
               size="sm"
@@ -1970,7 +1969,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               className="gap-1 px-2"
             >
               <Lock className="h-3 w-3" />
-              <span className="text-[10px]">Locked</span>
+              <span className="text-[10px]">OCR Locked</span>
             </Button>
             <Button
               size="sm"
@@ -2204,12 +2203,21 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         {selectedObject && mode === "edit" && (
           <>
             <div className="w-px h-6 bg-border mx-1" />
-            <Button size="sm" variant="ghost" onClick={toggleLock} className="h-8 gap-1.5">
-              {selectedLockedState ? (
-                <><Lock className="h-3.5 w-3.5" /><span className="text-xs">Locked</span></>
-              ) : (
-                <><Unlock className="h-3.5 w-3.5" /><span className="text-xs">Editable</span></>
-              )}
+            <Button
+              size="sm"
+              variant={selectedLockedState ? "outline" : "default"}
+              onClick={() => setSelectionLockedState(false)}
+              className="h-8 gap-1.5"
+            >
+              <Unlock className="h-3.5 w-3.5" /><span className="text-xs">Editable</span>
+            </Button>
+            <Button
+              size="sm"
+              variant={selectedLockedState ? "default" : "outline"}
+              onClick={() => setSelectionLockedState(true)}
+              className="h-8 gap-1.5"
+            >
+              <Lock className="h-3.5 w-3.5" /><span className="text-xs">Locked</span>
             </Button>
             <Button size="sm" variant="ghost" onClick={deleteSelected} className="h-8 w-8 p-0 text-destructive">
               <Trash2 className="h-3.5 w-3.5" />
