@@ -75,14 +75,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const [fontSize, setFontSize] = useState(16);
   const [fontFamily, setFontFamily] = useState("Arial");
 
-  const DPI = 72;
+  const DPI = 150;
   const canvasWidth = Math.round((width + bleed * 2) * DPI);
   const canvasHeight = Math.round((height + bleed * 2) * DPI);
   const bleedPx = Math.round(bleed * DPI);
 
   const syncCanvas = useCallback(() => {
     if (fabricRef.current && onCanvasChange) {
-      onCanvasChange(fabricRef.current.toObject(['locked', 'editable', 'name']));
+      onCanvasChange(fabricRef.current.toObject(['locked', 'editable', 'name', 'backgroundImage']));
     }
   }, [onCanvasChange]);
 
@@ -184,22 +184,21 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     syncCanvas();
   };
 
+  const setCanvasBackground = (imgEl: HTMLImageElement) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const fabricImg = new FabricImage(imgEl, { left: 0, top: 0 });
+    // Scale to fill the entire canvas (cover mode)
+    const scaleX = canvasWidth / imgEl.width;
+    const scaleY = canvasHeight / imgEl.height;
+    fabricImg.set({ scaleX, scaleY });
+    canvas.backgroundImage = fabricImg;
+    canvas.renderAll();
+    syncCanvas();
+  };
+
   const addBackgroundImage = () => {
-    pickImageFile((imgEl) => {
-      const canvas = fabricRef.current;
-      if (!canvas) return;
-      const fabricImg = new FabricImage(imgEl, { left: 0, top: 0 });
-      fabricImg.scaleToWidth(canvasWidth);
-      (fabricImg as any).locked = true;
-      (fabricImg as any).editable = false;
-      (fabricImg as any).name = "background_image";
-      canvas.add(fabricImg);
-      canvas.sendObjectToBack(fabricImg);
-      const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
-      if (trim) canvas.bringObjectToFront(trim);
-      canvas.renderAll();
-      syncCanvas();
-    });
+    pickImageFile((imgEl) => setCanvasBackground(imgEl));
   };
 
   const addPdfBackground = () => {
@@ -210,24 +209,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const file = e.target.files?.[0];
       if (!file) return;
       try {
-        // Render PDF page 1 at high resolution for print quality
-        const blob = await generatePdfThumbnailFromFile(file, { scale: 2, maxWidth: 2400 });
+        // Render PDF at high resolution matching canvas width for crisp output
+        const blob = await generatePdfThumbnailFromFile(file, { scale: 4, maxWidth: canvasWidth * 2 });
         const url = URL.createObjectURL(blob);
         const imgEl = new window.Image();
         imgEl.onload = () => {
-          const canvas = fabricRef.current;
-          if (!canvas) return;
-          const fabricImg = new FabricImage(imgEl, { left: 0, top: 0 });
-          fabricImg.scaleToWidth(canvasWidth);
-          (fabricImg as any).locked = true;
-          (fabricImg as any).editable = false;
-          (fabricImg as any).name = "background_pdf";
-          canvas.add(fabricImg);
-          canvas.sendObjectToBack(fabricImg);
-          const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
-          if (trim) canvas.bringObjectToFront(trim);
-          canvas.renderAll();
-          syncCanvas();
+          setCanvasBackground(imgEl);
           URL.revokeObjectURL(url);
         };
         imgEl.src = url;
@@ -473,7 +460,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
       {/* Canvas */}
       <div className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center">
-        <div className="shadow-lg">
+        <div className="shadow-lg" style={{ transform: "scale(0.5)", transformOrigin: "top center" }}>
           <canvas ref={canvasRef} />
         </div>
       </div>
