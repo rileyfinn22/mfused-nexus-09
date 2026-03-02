@@ -63,7 +63,7 @@ const vibeAdminNavigationItems = [
   { title: "Inventory", url: "/inventory", icon: Archive },
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Reports", url: "/reports", icon: BarChart3 },
-  { title: "Chat", url: "/chat", icon: MessageSquare },
+  { title: "Message Hub", url: "/chat", icon: MessageSquare },
   { title: "Print Workshop", url: "/print-workshop", icon: Printer },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
@@ -79,10 +79,59 @@ export function AppSidebar() {
   const { activeCompany } = useCompany();
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   useEffect(() => {
     checkRole();
   }, [activeCompany]);
+
+  // Track unread chat messages
+  useEffect(() => {
+    let cancelled = false;
+    const fetchUnread = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
+      // Get channels user is a member of
+      const { data: memberships } = await supabase
+        .from('chat_channel_members')
+        .select('channel_id, joined_at')
+        .eq('user_id', user.id);
+
+      if (!memberships || memberships.length === 0) { setUnreadChatCount(0); return; }
+
+      // Count messages in those channels newer than the last time user visited
+      // Simple approach: count messages not by the current user in last 24h
+      let total = 0;
+      for (const m of memberships) {
+        const { count } = await supabase
+          .from('chat_messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('channel_id', m.channel_id)
+          .neq('user_id', user.id)
+          .gt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        total += count || 0;
+      }
+      if (!cancelled) setUnreadChatCount(total);
+    };
+
+    fetchUnread();
+
+    // Re-check on new messages via realtime
+    const channel = supabase
+      .channel('sidebar-chat-unread')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, () => {
+        fetchUnread();
+      })
+      .subscribe();
+
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, []);
+
+  // Reset count when on chat page
+  useEffect(() => {
+    if (currentPath === '/chat') setUnreadChatCount(0);
+  }, [currentPath]);
 
   const checkRole = async () => {
     // Use the active company's role if available
@@ -143,7 +192,7 @@ export function AppSidebar() {
                       <NavLink 
                         to={item.url} 
                         className={cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 group",
+                          "relative flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 group",
                           active 
                             ? "bg-primary/10 text-primary" 
                             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -157,10 +206,20 @@ export function AppSidebar() {
                         {!isCollapsed && (
                           <>
                             <span className="flex-1 text-sm font-medium">{item.title}</span>
-                            {active && (
+                            {item.url === '/chat' && unreadChatCount > 0 && (
+                              <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
+                                {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                              </span>
+                            )}
+                            {active && item.url !== '/chat' && (
                               <ChevronRight className="h-4 w-4 text-primary" />
                             )}
                           </>
+                        )}
+                        {isCollapsed && item.url === '/chat' && unreadChatCount > 0 && (
+                          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                            {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                          </span>
                         )}
                       </NavLink>
                     </SidebarMenuButton>
