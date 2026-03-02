@@ -71,3 +71,6 @@ verify_jwt = true
 
 [functions.quickbooks-push-pending-payments]
 verify_jwt = false
+
+[functions.generate-design-image]
+verify_jwt = true

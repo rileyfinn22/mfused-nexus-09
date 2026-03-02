@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText } from "lucide-react";
+import { AiImageDialog } from "./AiImageDialog";
+import { IconPickerDialog } from "./IconPickerDialog";
 import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -18,7 +20,7 @@ const FONT_OPTIONS = [
   { label: "Courier New", value: "Courier New", google: false },
   { label: "Verdana", value: "Verdana", google: false },
   { label: "Impact", value: "Impact", google: false },
-  // Google Fonts (loaded on demand)
+  // Google Fonts — expanded selection
   { label: "Roboto", value: "Roboto", google: true },
   { label: "Open Sans", value: "Open Sans", google: true },
   { label: "Lato", value: "Lato", google: true },
@@ -40,6 +42,54 @@ const FONT_OPTIONS = [
   { label: "Source Sans 3", value: "Source Sans 3", google: true },
   { label: "Archivo", value: "Archivo", google: true },
   { label: "Archivo Black", value: "Archivo Black", google: true },
+  // Additional popular & display fonts
+  { label: "Anton", value: "Anton", google: true },
+  { label: "Abril Fatface", value: "Abril Fatface", google: true },
+  { label: "Bitter", value: "Bitter", google: true },
+  { label: "Cabin", value: "Cabin", google: true },
+  { label: "Caveat", value: "Caveat", google: true },
+  { label: "Cinzel", value: "Cinzel", google: true },
+  { label: "Comfortaa", value: "Comfortaa", google: true },
+  { label: "Cormorant Garamond", value: "Cormorant Garamond", google: true },
+  { label: "Dancing Script", value: "Dancing Script", google: true },
+  { label: "DM Serif Display", value: "DM Serif Display", google: true },
+  { label: "Exo 2", value: "Exo 2", google: true },
+  { label: "Fjalla One", value: "Fjalla One", google: true },
+  { label: "Fira Sans", value: "Fira Sans", google: true },
+  { label: "Great Vibes", value: "Great Vibes", google: true },
+  { label: "Josefin Sans", value: "Josefin Sans", google: true },
+  { label: "Josefin Slab", value: "Josefin Slab", google: true },
+  { label: "Kanit", value: "Kanit", google: true },
+  { label: "Kalam", value: "Kalam", google: true },
+  { label: "Lexend", value: "Lexend", google: true },
+  { label: "Lobster", value: "Lobster", google: true },
+  { label: "Lora", value: "Lora", google: true },
+  { label: "Manrope", value: "Manrope", google: true },
+  { label: "Mulish", value: "Mulish", google: true },
+  { label: "Noto Sans", value: "Noto Sans", google: true },
+  { label: "Noto Serif", value: "Noto Serif", google: true },
+  { label: "Nunito Sans", value: "Nunito Sans", google: true },
+  { label: "Outfit", value: "Outfit", google: true },
+  { label: "Pacifico", value: "Pacifico", google: true },
+  { label: "Permanent Marker", value: "Permanent Marker", google: true },
+  { label: "PT Sans", value: "PT Sans", google: true },
+  { label: "Quicksand", value: "Quicksand", google: true },
+  { label: "Righteous", value: "Righteous", google: true },
+  { label: "Roboto Condensed", value: "Roboto Condensed", google: true },
+  { label: "Roboto Slab", value: "Roboto Slab", google: true },
+  { label: "Rubik", value: "Rubik", google: true },
+  { label: "Sacramento", value: "Sacramento", google: true },
+  { label: "Satisfy", value: "Satisfy", google: true },
+  { label: "Silkscreen", value: "Silkscreen", google: true },
+  { label: "Space Grotesk", value: "Space Grotesk", google: true },
+  { label: "Space Mono", value: "Space Mono", google: true },
+  { label: "Spectral", value: "Spectral", google: true },
+  { label: "Syne", value: "Syne", google: true },
+  { label: "Teko", value: "Teko", google: true },
+  { label: "Titillium Web", value: "Titillium Web", google: true },
+  { label: "Ubuntu", value: "Ubuntu", google: true },
+  { label: "Yanone Kaffeesatz", value: "Yanone Kaffeesatz", google: true },
+  { label: "Zilla Slab", value: "Zilla Slab", google: true },
 ];
 
 const loadedFonts = new Set<string>();
@@ -76,6 +126,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
   const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
+  const [fontSearch, setFontSearch] = useState("");
   const [fontSizePt, setFontSizePt] = useState(12);
 
   // Convert between typographic points and canvas pixels at current DPI
@@ -407,6 +458,38 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     syncCanvas();
   };
 
+  const addImageFromDataUrl = (dataUrl: string, editable: boolean = true) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const imgEl = new window.Image();
+    imgEl.onload = () => {
+      const fabricImg = new FabricImage(imgEl, {
+        left: bleedPx + 30,
+        top: bleedPx + 30,
+      });
+      const maxW = canvasWidth * 0.5;
+      const maxH = canvasHeight * 0.5;
+      const scale = Math.min(maxW / imgEl.width, maxH / imgEl.height, 1);
+      fabricImg.scale(scale);
+      (fabricImg as any).locked = !editable;
+      (fabricImg as any).editable = editable;
+      (fabricImg as any).name = editable ? "editable_image" : "locked_image";
+      fabricImg.set({
+        borderColor: "#3b82f6",
+        cornerColor: "#3b82f6",
+        cornerStyle: "circle",
+        transparentCorners: false,
+      } as any);
+      canvas.add(fabricImg);
+      const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
+      if (trim) canvas.bringObjectToFront(trim);
+      canvas.setActiveObject(fabricImg);
+      canvas.renderAll();
+      syncCanvas();
+    };
+    imgEl.src = dataUrl;
+  };
+
   const applyFontSize = (sizePt: number) => {
     if (!selectedObject || !fabricRef.current) return;
     setFontSizePt(sizePt);
@@ -477,6 +560,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               <span className="text-xs">Editable Image</span>
             </Button>
             <div className="w-px h-6 bg-border mx-1" />
+            <AiImageDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
+            <IconPickerDialog onIconSelected={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
+            <div className="w-px h-6 bg-border mx-1" />
           </>
         )}
 
@@ -511,23 +597,52 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         {selectedObject && isTextObject && (
           <>
             <div className="flex items-center gap-1.5">
-              <Select value={fontFamily} onValueChange={applyFontFamily}>
-                <SelectTrigger className="w-[160px] h-8 text-xs">
+              <Select value={fontFamily} onValueChange={(v) => { applyFontFamily(v); setFontSearch(""); }}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">System Fonts</div>
-                  {FONT_OPTIONS.filter(f => !f.google).map((f) => (
-                    <SelectItem key={f.value} value={f.value} className="text-xs" style={{ fontFamily: f.value }}>
-                      {f.label}
-                    </SelectItem>
-                  ))}
-                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Google Fonts</div>
-                  {FONT_OPTIONS.filter(f => f.google).map((f) => (
-                    <SelectItem key={f.value} value={f.value} className="text-xs">
-                      {f.label}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-[350px]">
+                  <div className="px-2 py-1.5 sticky top-0 bg-popover z-10">
+                    <Input
+                      value={fontSearch}
+                      onChange={(e) => setFontSearch(e.target.value)}
+                      placeholder="Search fonts..."
+                      className="h-7 text-xs"
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  {(() => {
+                    const q = fontSearch.toLowerCase();
+                    const systemFonts = FONT_OPTIONS.filter(f => !f.google && f.label.toLowerCase().includes(q));
+                    const googleFonts = FONT_OPTIONS.filter(f => f.google && f.label.toLowerCase().includes(q));
+                    return (
+                      <>
+                        {systemFonts.length > 0 && (
+                          <>
+                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">System Fonts</div>
+                            {systemFonts.map((f) => (
+                              <SelectItem key={f.value} value={f.value} className="text-xs" style={{ fontFamily: f.value }}>
+                                {f.label}
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                        {googleFonts.length > 0 && (
+                          <>
+                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Google Fonts</div>
+                            {googleFonts.map((f) => (
+                              <SelectItem key={f.value} value={f.value} className="text-xs">
+                                {f.label}
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                        {systemFonts.length === 0 && googleFonts.length === 0 && (
+                          <div className="px-2 py-3 text-xs text-muted-foreground text-center">No fonts match "{fontSearch}"</div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </SelectContent>
               </Select>
             </div>
