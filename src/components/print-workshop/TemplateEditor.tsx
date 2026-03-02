@@ -301,11 +301,18 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.on("selection:cleared", () => setSelectedObject(null));
     canvas.on("object:modified", syncCanvas);
     canvas.on("text:changed", syncCanvas);
-    // Ensure bleed overlay always stays on top when any object is added
-    canvas.on("object:added", () => {
-      const trims = canvas.getObjects().filter((o: any) => o.name === "_trimGuide");
+    // Ensure bleed overlay always stays on top when any object is added or modified
+    let reordering = false;
+    const bringBleedToFront = () => {
+      if (reordering) return;
+      reordering = true;
+      const objs = canvas.getObjects();
+      const trims = objs.filter((o: any) => o.name === "_trimGuide");
       trims.forEach((t) => canvas.bringObjectToFront(t));
-    });
+      reordering = false;
+    };
+    canvas.on("object:added", bringBleedToFront);
+    canvas.on("object:modified", bringBleedToFront);
 
     return () => {
       canvas.dispose();
