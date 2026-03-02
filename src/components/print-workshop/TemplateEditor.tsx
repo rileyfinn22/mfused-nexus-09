@@ -168,7 +168,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
   // Convert between typographic points and canvas pixels at current DPI
   // 1 pt = 1/72 inch, so at N DPI: 1pt = DPI/72 pixels
-  const ptToPx = (pt: number) => Math.round(pt * (DPI / 72));
+  const ptToPx = (pt: number) => pt * (DPI / 72);
   const pxToPt = (px: number) => Math.round((px * 72) / DPI * 10) / 10;
   const [fontFamily, setFontFamily] = useState("Arial");
 
@@ -519,6 +519,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     (text as any).locked = !editable;
     (text as any).editable = editable;
     (text as any).name = editable ? "editable_text" : "locked_text";
+    (text as any)._fontSizePt = defaultPt;
 
     text.set({
       borderColor: editable ? "#3b82f6" : "#94a3b8",
@@ -874,29 +875,52 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             }
           }
 
-          // Auto-fit font size to match the crop region height exactly
-          // Start with a trial size, measure, then scale to fit cropH
-          const trialSize = 40;
+          // Determine font size: use AI-detected pt size if available, otherwise auto-fit to crop region
+          let finalFontSizePx: number;
+          let finalFontSizePt: number;
+
+          if (detectedFontSizePt && detectedFontSizePt > 0) {
+            // Use the AI-detected point size directly
+            finalFontSizePt = detectedFontSizePt;
+            finalFontSizePx = ptToPx(detectedFontSizePt);
+          } else {
+            // Auto-fit: trial render, measure in canvas coords, then scale
+            const trialSize = 40;
+            const trialText = new IText(extractedText, {
+              left: cropLeft,
+              top: cropTop,
+              fontSize: trialSize,
+              fontFamily: useFontFamily,
+              fontWeight: detectedWeight,
+              fontStyle: detectedStyle,
+              fill: detectedColor,
+              editable: true,
+              padding: 0,
+            });
+            canvas.add(trialText);
+            canvas.renderAll();
+            // getBoundingRect returns screen-space; divide by zoom to get canvas coords
+            const zoom = canvas.getZoom();
+            const measuredH = trialText.getBoundingRect().height / zoom;
+            finalFontSizePx = measuredH > 0
+              ? Math.round(trialSize * (cropH / measuredH))
+              : Math.max(Math.round(cropH * 0.6), 20);
+            finalFontSizePt = pxToPt(finalFontSizePx);
+            canvas.remove(trialText);
+          }
+
           const text = new IText(extractedText, {
             left: cropLeft,
             top: cropTop,
-            fontSize: trialSize,
+            fontSize: finalFontSizePx,
             fontFamily: useFontFamily,
             fontWeight: detectedWeight,
             fontStyle: detectedStyle,
             fill: detectedColor,
             editable: true,
-            padding: 0,
+            padding: 4,
           });
-          // Temporarily add to canvas to measure bounding box
-          canvas.add(text);
-          canvas.renderAll();
-          const measuredH = text.getBoundingRect().height;
-          const fittedSize = measuredH > 0
-            ? Math.round(trialSize * (cropH / measuredH))
-            : Math.max(Math.round(cropH * 0.6), 20);
-          text.set({ fontSize: fittedSize, padding: 4 });
-          canvas.remove(text);
+          (text as any)._fontSizePt = finalFontSizePt;
           // Re-add below after configuring lock state
           (text as any).locked = isLocked;
           (text as any).editable = !isLocked;
@@ -1009,6 +1033,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           const defaultPt = fontSizePt || 12;
           // Auto-fit font size: aim for text height ≈ box height
           const fontSize = Math.max(ptToPx(6), Math.round(h * 0.7));
+          const computedPt = pxToPt(fontSize);
 
           const textObj = new IText(isEditable ? "Type here" : "Locked text", {
             left: rect.left || 0,
@@ -1023,6 +1048,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           (textObj as any).locked = !isEditable;
           (textObj as any).editable = isEditable;
           (textObj as any).name = isEditable ? "editable_text" : "locked_text";
+          (textObj as any)._fontSizePt = computedPt;
           textObj.set({
             borderColor: isEditable ? "#3b82f6" : "#94a3b8",
             cornerColor: isEditable ? "#3b82f6" : "#94a3b8",
