@@ -154,6 +154,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const displayScale = Math.min(TARGET_DISPLAY_WIDTH / canvasWidth, TARGET_DISPLAY_HEIGHT / canvasHeight, 1.5);
   const cssWidth = Math.round(canvasWidth * displayScale);
   const cssHeight = Math.round(canvasHeight * displayScale);
+  const displayBleedPx = Math.max(1, Math.round(bleedPx * displayScale));
   // Use device pixel ratio so retina screens get a sharp backing buffer
   const dpr = typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1;
 
@@ -187,37 +188,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     fabricRef.current = canvas;
 
-    // Bleed overlay is drawn in after:render (not as Fabric objects)
-    // so it is always the top visual layer over PDFs, images, and text.
-    const drawBleedOverlay = () => {
-      const ctx = canvas.getContext();
-      const vpt = canvas.viewportTransform;
-      if (!ctx || !vpt) return;
-
-      const innerWidth = canvasWidth - bleedPx * 2;
-      const innerHeight = canvasHeight - bleedPx * 2;
-
-      ctx.save();
-      // Align overlay drawing with Fabric viewport (zoom/pan/retina)
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.transform(vpt[0], vpt[1], vpt[2], vpt[3], vpt[4], vpt[5]);
-      ctx.globalCompositeOperation = "source-over";
-
-      // Grey bleed mask
-      ctx.fillStyle = "rgba(31, 41, 55, 0.35)";
-      ctx.fillRect(0, 0, canvasWidth, bleedPx); // top
-      ctx.fillRect(0, canvasHeight - bleedPx, canvasWidth, bleedPx); // bottom
-      ctx.fillRect(0, bleedPx, bleedPx, innerHeight); // left
-      ctx.fillRect(canvasWidth - bleedPx, bleedPx, bleedPx, innerHeight); // right
-
-      // Red trim line
-      ctx.strokeStyle = "#ef4444";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([6, 4]);
-      ctx.strokeRect(bleedPx + 0.5, bleedPx + 0.5, innerWidth - 1, innerHeight - 1);
-
-      ctx.restore();
-    };
+    // Bleed/trim visual guide is rendered as HTML overlay above the canvas
+    // (more reliable than Fabric after:render across zoom/retina).
 
     const loadCanvasAndBackground = async () => {
       if (canvasData && canvasData.objects?.length > 0) {
@@ -323,8 +295,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.on("selection:cleared", () => setSelectedObject(null));
     canvas.on("object:modified", syncCanvas);
     canvas.on("text:changed", syncCanvas);
-    // Draw bleed mask + trim line after each canvas render so they are always visually on top.
-    canvas.on("after:render", drawBleedOverlay);
 
     return () => {
       canvas.dispose();
@@ -998,8 +968,37 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
       {/* Canvas */}
       <div className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center">
-        <div className="shadow-lg">
+        <div className="relative shadow-lg" style={{ width: cssWidth, height: cssHeight }}>
           <canvas ref={canvasRef} />
+
+          {/* Always-on-top bleed/trim guide (visual only) */}
+          <div className="pointer-events-none absolute inset-0 z-20">
+            <div
+              className="absolute left-0 top-0 right-0"
+              style={{ height: displayBleedPx, background: "rgba(31, 41, 55, 0.35)" }}
+            />
+            <div
+              className="absolute left-0 bottom-0 right-0"
+              style={{ height: displayBleedPx, background: "rgba(31, 41, 55, 0.35)" }}
+            />
+            <div
+              className="absolute left-0"
+              style={{ top: displayBleedPx, bottom: displayBleedPx, width: displayBleedPx, background: "rgba(31, 41, 55, 0.35)" }}
+            />
+            <div
+              className="absolute right-0"
+              style={{ top: displayBleedPx, bottom: displayBleedPx, width: displayBleedPx, background: "rgba(31, 41, 55, 0.35)" }}
+            />
+            <div
+              className="absolute border border-dashed border-destructive"
+              style={{
+                left: displayBleedPx,
+                top: displayBleedPx,
+                right: displayBleedPx,
+                bottom: displayBleedPx,
+              }}
+            />
+          </div>
         </div>
       </div>
 
