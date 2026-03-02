@@ -617,8 +617,21 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           toast.warning("No text detected in the selected area");
           canvas.remove(rect);
         } else {
-          // Remove the selection rect and create an editable IText in its place
+          // Remove the selection rect, add a white cover rect to hide the underlying text, then add editable IText
           canvas.remove(rect);
+
+          // White cover to mask the baked-in text underneath
+          const cover = new Rect({
+            left: cropLeft,
+            top: cropTop,
+            width: cropW,
+            height: cropH,
+            fill: "#ffffff",
+            selectable: false,
+            evented: false,
+            name: "_textCover",
+          });
+          canvas.add(cover);
 
           const fontSize = Math.max(Math.round(cropH * 0.5), ptToPx(10));
           const text = new IText(extractedText, {
@@ -628,7 +641,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             fontFamily: "Arial",
             fill: "#000000",
             editable: true,
-            backgroundColor: "rgba(255,255,255,0.6)",
             padding: 4,
           });
           (text as any).locked = false;
