@@ -337,10 +337,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       objectCaching: false,
     } as any);
 
-    // Scale to fill the entire canvas (cover mode)
-    const scaleX = canvasWidth / imgEl.width;
-    const scaleY = canvasHeight / imgEl.height;
-    fabricImg.set({ scaleX, scaleY });
+    // Scale uniformly to fit inside the canvas (contain mode), then center
+    const uniformScale = Math.min(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
+    fabricImg.set({
+      scaleX: uniformScale,
+      scaleY: uniformScale,
+      left: (canvasWidth - imgEl.width * uniformScale) / 2,
+      top: (canvasHeight - imgEl.height * uniformScale) / 2,
+    });
     canvas.backgroundImage = fabricImg;
     canvas.renderAll();
     syncCanvas();
