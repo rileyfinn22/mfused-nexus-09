@@ -232,8 +232,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const file = e.target.files?.[0];
       if (!file) return;
       try {
-        // Render PDF at very high resolution - no width cap, scale 8x for print clarity
-        const blob = await generatePdfThumbnailFromFile(file, { scale: 8, maxWidth: canvasWidth * 4 });
+        // Render PDF at exactly the canvas pixel dimensions for 1:1 pixel mapping (no rescaling blur)
+        const blob = await generatePdfThumbnailFromFile(file, { scale: 8, maxWidth: canvasWidth });
         const url = URL.createObjectURL(blob);
         const imgEl = new window.Image();
         imgEl.onload = () => {
