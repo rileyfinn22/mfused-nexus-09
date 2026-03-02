@@ -46,6 +46,7 @@ import CreateQuote from "./pages/CreateQuote";
 import NotFound from "./pages/NotFound";
 import ShipmentUpdate from "./pages/ShipmentUpdate";
 import Chat from "./pages/Chat";
+import PrintWorkshop from "./pages/PrintWorkshop";
 
 const queryClient = new QueryClient();
 
@@ -89,7 +90,8 @@ const App = () => (
           <Route path="/production/:orderId" element={<DashboardLayout><ProductionDetail /></DashboardLayout>} />
           <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
           <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
-          <Route path="/chat" element={<DashboardLayout><Chat /></DashboardLayout>} />
+           <Route path="/chat" element={<DashboardLayout><Chat /></DashboardLayout>} />
+           <Route path="/print-workshop" element={<DashboardLayout><PrintWorkshop /></DashboardLayout>} />
           <Route path="/projects" element={<DashboardLayout><Projects /></DashboardLayout>} />
           <Route path="/projects/:projectId" element={<DashboardLayout><ProjectDetail /></DashboardLayout>} />
           
