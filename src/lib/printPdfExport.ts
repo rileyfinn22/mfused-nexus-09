@@ -103,10 +103,13 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
     if (obj?.visible === false) continue;
 
     const objectType = String(obj?.type || "").toLowerCase();
+    const objName = String(obj?.name || "");
 
-    // Skip trim guide and background image
-    if (obj?.name === "_trimGuide") continue;
-    if (objectType === "image" && obj.left === 0 && obj.top === 0) continue;
+    // Skip internal helper objects — only export user-visible content
+    if (objName === "_trimGuide") continue;
+    if (objName === "_ocrKnockout") continue;
+    if (objName === "pdf_background") continue;
+    if (objName.startsWith("_")) continue;
 
     // Convert canvas px position to inches
     const xIn = (obj.left ?? 0) / CANVAS_DPI;
@@ -277,7 +280,11 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
   for (const obj of objects) {
     if (obj?.visible === false) continue;
     const objectType = String(obj?.type || "").toLowerCase();
-    if (obj?.name === "_trimGuide") continue;
+    const objName = String(obj?.name || "");
+    if (objName === "_trimGuide") continue;
+    if (objName === "_ocrKnockout") continue;
+    if (objName === "pdf_background") continue;
+    if (objName.startsWith("_")) continue;
 
     const xIn = (obj.left ?? 0) / CANVAS_DPI;
     const yIn = (obj.top ?? 0) / CANVAS_DPI;
