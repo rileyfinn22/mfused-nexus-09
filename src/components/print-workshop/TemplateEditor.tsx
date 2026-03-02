@@ -176,8 +176,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const pxToPt = (px: number) => Math.round((px * 72) / DPI * 10) / 10;
   const getObjectBoundsInCanvas = (obj: FabricObject) => {
     const br = obj.getBoundingRect();
-    // Fabric v6: getBoundingRect() returns scene/canvas coords — no zoom division needed
-    return { left: br.left, top: br.top, width: br.width, height: br.height };
+    const canvas = fabricRef.current;
+    // Fabric v6: getBoundingRect() returns viewport/screen coords; divide by zoom to get scene coords
+    const zoom = canvas ? canvas.getZoom() : 1;
+    return { left: br.left / zoom, top: br.top / zoom, width: br.width / zoom, height: br.height / zoom };
   };
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
   const setPreviewPdfUrl = (url: string) => {
@@ -448,11 +450,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           const resp = await fetch(urlData.publicUrl);
           if (resp.ok) {
             const buf = await resp.arrayBuffer();
+            // Clone buffer so pdfjs doesn't detach it before thumbnail generation
+            const bufCopy = buf.slice(0);
 
             let pdfWidthIn: number | undefined;
             let pdfHeightIn: number | undefined;
             try {
-              const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+              const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(bufCopy) }).promise;
               const page = await pdf.getPage(1);
               const vp = page.getViewport({ scale: 1 });
               pdfWidthIn = Math.round((vp.width / 72) * 100) / 100;
