@@ -43,7 +43,6 @@ const FONT_OPTIONS = [
   { label: "Source Sans 3", value: "Source Sans 3", google: true },
   { label: "Archivo", value: "Archivo", google: true },
   { label: "Archivo Black", value: "Archivo Black", google: true },
-  // Additional popular & display fonts
   { label: "Anton", value: "Anton", google: true },
   { label: "Abril Fatface", value: "Abril Fatface", google: true },
   { label: "Bitter", value: "Bitter", google: true },
@@ -104,7 +103,6 @@ function loadGoogleFont(fontFamily: string): Promise<void> {
     link.rel = "stylesheet";
     link.onload = () => {
       loadedFonts.add(fontFamily);
-      // Give browser a moment to register the font
       document.fonts.ready.then(() => resolve());
     };
     link.onerror = () => resolve();
@@ -130,6 +128,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const [fontSearch, setFontSearch] = useState("");
   const [fontSizePt, setFontSizePt] = useState(12);
   const [zoneSelectMode, setZoneSelectMode] = useState(false);
+  const [zoneExtractLocked, setZoneExtractLocked] = useState(false);
   const [extractingText, setExtractingText] = useState(false);
   const zoneRectRef = useRef<Rect | null>(null);
   const zoneStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -515,7 +514,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.selection = false;
     canvas.getObjects().forEach((o) => o.set({ evented: false } as any));
 
-    toast.info("Draw a rectangle over the text you want to extract", { duration: 3000 });
+    toast.info(`Draw a rectangle over text to extract as ${zoneExtractLocked ? "locked" : "editable"}`, { duration: 3000 });
 
     const onMouseDown = (opt: any) => {
       const pointer = canvas.getScenePoint(opt.e);
@@ -620,19 +619,23 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           // Remove the selection rect, add a white cover rect to hide the underlying text, then add editable IText
           canvas.remove(rect);
 
-          // White cover to mask the baked-in text underneath
+          // White cover to fully mask the baked-in text underneath
+          const coverPad = 8;
           const cover = new Rect({
-            left: cropLeft,
-            top: cropTop,
-            width: cropW,
-            height: cropH,
+            left: cropLeft - coverPad,
+            top: cropTop - coverPad,
+            width: cropW + coverPad * 2,
+            height: cropH + coverPad * 2,
             fill: "#ffffff",
+            opacity: 1,
             selectable: false,
             evented: false,
+            objectCaching: false,
             name: "_textCover",
           });
           canvas.add(cover);
 
+          const isLocked = zoneExtractLocked;
           const fontSize = Math.max(Math.round(cropH * 0.5), ptToPx(10));
           const text = new IText(extractedText, {
             left: cropLeft,
@@ -643,14 +646,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             editable: true,
             padding: 4,
           });
-          (text as any).locked = false;
-          (text as any).editable = true;
-          (text as any).name = "editable_text";
+          (text as any).locked = isLocked;
+          (text as any).editable = !isLocked;
+          (text as any).name = isLocked ? "locked_text" : "editable_text";
           text.set({
-            borderColor: "#3b82f6",
-            cornerColor: "#3b82f6",
-            cornerStyle: "circle",
-            transparentCorners: false,
+            borderColor: isLocked ? "#94a3b8" : "#3b82f6",
+            cornerColor: isLocked ? "#94a3b8" : "#3b82f6",
+            cornerStyle: isLocked ? undefined : "circle",
+            transparentCorners: isLocked ? undefined : false,
           } as any);
 
           canvas.add(text);
@@ -659,7 +662,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           canvas.setActiveObject(text);
           canvas.renderAll();
           syncCanvas();
-          toast.success(`Extracted: "${extractedText.substring(0, 50)}${extractedText.length > 50 ? "..." : ""}"`);
+          toast.success(`Extracted as ${isLocked ? "locked" : "editable"}: "${extractedText.substring(0, 50)}${extractedText.length > 50 ? "..." : ""}"`);
         }
       } catch (err: any) {
         toast.error(err.message || "Failed to extract text");
@@ -763,9 +766,30 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             <AiEditDialog getCanvasImage={getCanvasImage} onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <IconPickerDialog onIconSelected={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <div className="w-px h-6 bg-border mx-1" />
+            {/* Extract Text zone controls */}
             <Button
               size="sm"
-              variant={zoneSelectMode ? "default" : "outline"}
+              variant={zoneExtractLocked ? "outline" : "default"}
+              onClick={() => setZoneExtractLocked(false)}
+              disabled={extractingText}
+              className="gap-1 px-2"
+            >
+              <Unlock className="h-3 w-3" />
+              <span className="text-[10px]">Editable</span>
+            </Button>
+            <Button
+              size="sm"
+              variant={zoneExtractLocked ? "default" : "outline"}
+              onClick={() => setZoneExtractLocked(true)}
+              disabled={extractingText}
+              className="gap-1 px-2"
+            >
+              <Lock className="h-3 w-3" />
+              <span className="text-[10px]">Locked</span>
+            </Button>
+            <Button
+              size="sm"
+              variant={zoneSelectMode ? "destructive" : "secondary"}
               onClick={zoneSelectMode ? endZoneSelect : startZoneSelect}
               disabled={extractingText}
               className="gap-1.5"
@@ -776,7 +800,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
                 <Scan className="h-3.5 w-3.5" />
               )}
               <span className="text-xs">
-                {extractingText ? "Extracting..." : zoneSelectMode ? "Cancel Zone" : "Extract Text"}
+                {extractingText ? "Extracting..." : zoneSelectMode ? "Cancel" : "Extract Text"}
               </span>
             </Button>
             <div className="w-px h-6 bg-border mx-1" />
