@@ -51,6 +51,23 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      const sanitizedCanvasData = canvasData
+        ? (() => {
+            const data = JSON.parse(JSON.stringify(canvasData));
+            if (Array.isArray(data.objects)) {
+              data.objects = data.objects.filter((obj: any) => {
+                if (obj?.name !== "pdf_background") return true;
+                const src = typeof obj?.src === "string" ? obj.src : "";
+                return !sourcePdfPath && !src.startsWith("blob:");
+              });
+            }
+            if (data?.backgroundImage?.src?.startsWith("blob:")) {
+              delete data.backgroundImage;
+            }
+            return data;
+          })()
+        : null;
+
       const payload = {
         name: name.trim(),
         description: description.trim() || null,
@@ -60,7 +77,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         bleed_inches: bleedInches,
         preset_price_per_unit: presetPrice ? Number(presetPrice) : null,
         material_options: materialOptions,
-        canvas_data: canvasData,
+        canvas_data: sanitizedCanvasData,
         source_pdf_path: sourcePdfPath || null,
         company_id: template?.company_id || null,
         created_by: user?.id || null,
