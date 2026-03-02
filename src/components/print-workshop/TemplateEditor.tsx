@@ -3,7 +3,7 @@ import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical } from "lucide-react";
+import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Scissors } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
@@ -1233,6 +1233,84 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     fabricRef.current.renderAll();
     syncCanvas();
   };
+  // Split selected text within an IText into a separate editable object
+  const splitSelectedText = () => {
+    const canvas = fabricRef.current;
+    const obj = selectedObject as any;
+    if (!canvas || !obj || !obj.isEditing) return;
+
+    const selStart = obj.selectionStart ?? 0;
+    const selEnd = obj.selectionEnd ?? 0;
+    if (selStart === selEnd) {
+      toast.info("Select some text first, then click Split");
+      return;
+    }
+
+    const fullText: string = obj.text || "";
+    const selectedText = fullText.substring(selStart, selEnd);
+    const beforeText = fullText.substring(0, selStart);
+    const afterText = fullText.substring(selEnd);
+
+    // Get properties from the source object
+    const fontSize = obj.fontSize || 24;
+    const fontFamilyVal = obj.fontFamily || "Arial";
+    const fontWeight = obj.fontWeight || "normal";
+    const fontStyle = obj.fontStyle || "normal";
+    const fill = obj.fill || "#000000";
+    const objLeft = obj.left || 0;
+    const objTop = obj.top || 0;
+
+    // Measure the X offset of the selected text by measuring the "before" portion
+    // Create a temporary canvas to measure text width
+    const measureCanvas = document.createElement("canvas");
+    const mCtx = measureCanvas.getContext("2d");
+    let beforeWidth = 0;
+    if (mCtx) {
+      const style = `${fontWeight === "bold" ? "bold " : ""}${fontStyle === "italic" ? "italic " : ""}${fontSize}px ${fontFamilyVal}`;
+      mCtx.font = style;
+      beforeWidth = mCtx.measureText(beforeText).width;
+    }
+
+    // Exit editing mode on the original
+    obj.exitEditing();
+
+    // Update the original object: remove the selected portion
+    const remaining = beforeText + afterText;
+    if (remaining.trim()) {
+      obj.set({ text: remaining });
+    } else {
+      canvas.remove(obj);
+    }
+
+    // Create the new editable text at the correct position
+    const newText = new IText(selectedText, {
+      left: objLeft + beforeWidth,
+      top: objTop,
+      fontSize,
+      fontFamily: fontFamilyVal,
+      fontWeight,
+      fontStyle,
+      fill,
+      editable: true,
+      padding: 4,
+    });
+    (newText as any).locked = false;
+    (newText as any).editable = true;
+    (newText as any).name = "editable_text";
+    (newText as any)._fontSizePt = obj._fontSizePt;
+    newText.set({
+      borderColor: "#3b82f6",
+      cornerColor: "#3b82f6",
+      cornerStyle: "circle",
+      transparentCorners: false,
+    } as any);
+
+    canvas.add(newText);
+    canvas.setActiveObject(newText);
+    canvas.renderAll();
+    syncCanvas();
+    toast.success(`Split "${selectedText}" into a separate editable text`);
+  };
 
   // Alignment helpers — align selected object relative to trim area
   const alignObject = (alignment: "left" | "centerH" | "right" | "top" | "centerV" | "bottom") => {
@@ -1517,6 +1595,18 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
                 title="Font color"
               />
             </div>
+            <div className="w-px h-6 bg-border mx-1" />
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" variant="outline" onClick={splitSelectedText} className="h-8 gap-1.5">
+                    <Scissors className="h-3.5 w-3.5" />
+                    <span className="text-xs">Split</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Select text inside the box, then click Split to make it a separate editable element</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </>
         )}
 
