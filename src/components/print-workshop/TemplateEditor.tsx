@@ -187,28 +187,33 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     fabricRef.current = canvas;
 
-    // Bleed overlay: 4 semi-transparent rects covering the bleed zone + dashed trim line
-    // Always stays on top so content behind it appears "cut off"
-    const bleedColor = "rgba(0, 0, 0, 0.35)";
-    const bleedTop = new Rect({ left: 0, top: 0, width: canvasWidth, height: bleedPx, fill: bleedColor, selectable: false, evented: false });
-    const bleedBottom = new Rect({ left: 0, top: canvasHeight - bleedPx, width: canvasWidth, height: bleedPx, fill: bleedColor, selectable: false, evented: false });
-    const bleedLeft = new Rect({ left: 0, top: bleedPx, width: bleedPx, height: canvasHeight - bleedPx * 2, fill: bleedColor, selectable: false, evented: false });
-    const bleedRight = new Rect({ left: canvasWidth - bleedPx, top: bleedPx, width: bleedPx, height: canvasHeight - bleedPx * 2, fill: bleedColor, selectable: false, evented: false });
-    const trimLine = new Rect({
-      left: bleedPx, top: bleedPx,
-      width: canvasWidth - bleedPx * 2, height: canvasHeight - bleedPx * 2,
-      fill: "transparent", stroke: "#ef4444", strokeWidth: 1, strokeDashArray: [5, 5],
-      selectable: false, evented: false,
-    });
-    const bleedOverlayParts = [bleedTop, bleedBottom, bleedLeft, bleedRight, trimLine];
-    bleedOverlayParts.forEach((p: any) => {
-      p.name = "_trimGuide";
-      p.hasControls = false;
-      p.hasBorders = false;
-      p.lockMovementX = true;
-      p.lockMovementY = true;
-    });
-    // Trim guide is injected after JSON load to avoid persisted/selectable stale guides.
+    // Bleed overlay is drawn in after:render (not as Fabric objects)
+    // so it is always the top visual layer over PDFs, images, and text.
+    const drawBleedOverlay = () => {
+      const ctx = canvas.getContext();
+      if (!ctx) return;
+
+      const innerWidth = canvasWidth - bleedPx * 2;
+      const innerHeight = canvasHeight - bleedPx * 2;
+
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+
+      // Grey bleed mask
+      ctx.fillStyle = "rgba(31, 41, 55, 0.35)";
+      ctx.fillRect(0, 0, canvasWidth, bleedPx); // top
+      ctx.fillRect(0, canvasHeight - bleedPx, canvasWidth, bleedPx); // bottom
+      ctx.fillRect(0, bleedPx, bleedPx, innerHeight); // left
+      ctx.fillRect(canvasWidth - bleedPx, bleedPx, bleedPx, innerHeight); // right
+
+      // Red trim line
+      ctx.strokeStyle = "#ef4444";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(bleedPx + 0.5, bleedPx + 0.5, innerWidth - 1, innerHeight - 1);
+
+      ctx.restore();
+    };
 
     const loadCanvasAndBackground = async () => {
       if (canvasData && canvasData.objects?.length > 0) {
@@ -219,14 +224,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         await canvas.loadFromJSON(safeCanvasData);
       }
 
-      // Remove any persisted trim guides (from older saves) and inject a fresh locked one
+      // Remove any persisted trim guides from older saves.
       canvas.getObjects()
         .filter((o: any) => o.name === "_trimGuide")
         .forEach((o) => canvas.remove(o));
-      bleedOverlayParts.forEach((p) => {
-        canvas.add(p);
-        canvas.bringObjectToFront(p);
-      });
 
       if (mode === "use") {
         canvas.getObjects().forEach((obj: any) => {
@@ -301,22 +302,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.on("selection:cleared", () => setSelectedObject(null));
     canvas.on("object:modified", syncCanvas);
     canvas.on("text:changed", syncCanvas);
-    // Ensure bleed overlay always stays on top after every render
-    const ensureBleedOnTop = () => {
-      const objs = canvas.getObjects();
-      const trims = objs.filter((o: any) => o.name === "_trimGuide");
-      const nonTrims = objs.filter((o: any) => o.name !== "_trimGuide");
-      if (trims.length === 0) return;
-      // Check if trims are already at the end
-      const lastNonTrimIdx = objs.length - trims.length - 1;
-      const alreadySorted = trims.every((t, i) => objs.indexOf(t) === nonTrims.length + i);
-      if (alreadySorted) return;
-      // Reorder: put all non-trim objects first, then trims
-      // Use internal _objects array to avoid triggering events
-      (canvas as any)._objects = [...nonTrims, ...trims];
-      canvas.renderAll();
-    };
-    canvas.on("after:render", ensureBleedOnTop);
+    // Draw bleed mask + trim line after each canvas render so they are always visually on top.
+    canvas.on("after:render", drawBleedOverlay);
 
     return () => {
       canvas.dispose();
