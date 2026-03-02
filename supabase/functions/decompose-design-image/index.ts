@@ -110,6 +110,10 @@ serve(async (req) => {
                     description:
                       "Best guess for the font family. Use common names like Arial, Helvetica, Times New Roman, Georgia, Roboto, Montserrat, Bebas Neue, Open Sans, Lato, Poppins, etc.",
                   },
+                  font_size_pt: {
+                    type: "number",
+                    description: "Estimated font size in points based on the text height relative to the cropped region",
+                  },
                   font_weight: {
                     type: "string",
                     enum: ["normal", "bold"],
@@ -216,6 +220,7 @@ serve(async (req) => {
         JSON.stringify({
           text: parsed.text || "",
           font_family: parsed.font_family || null,
+          font_size_pt: parsed.font_size_pt || null,
           font_weight: parsed.font_weight || "normal",
           font_style: parsed.font_style || "normal",
           color: parsed.color || "#000000",
