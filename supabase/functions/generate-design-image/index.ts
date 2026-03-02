@@ -15,7 +15,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { prompt, reference_image } = await req.json();
+    const { prompt, reference_image, edit_mode } = await req.json();
     if (!prompt || typeof prompt !== "string") {
       return new Response(JSON.stringify({ error: "prompt is required" }), {
         status: 400,
@@ -23,9 +23,14 @@ serve(async (req) => {
       });
     }
 
-    const systemPrompt = reference_image
-      ? "You are a professional packaging and label designer. The user has provided a reference image (screenshot, photo, or mockup). Your job is to recreate the design as a clean, high-quality, print-ready graphic. Match the layout, color scheme, and overall style as closely as possible. Make the output crisp, professional, and suitable for product packaging printing. Improve clarity and sharpness where the original is blurry or low-quality."
-      : "You are a professional packaging and label designer. Generate high-quality design elements, graphics, patterns, or label artwork based on the user's description. Output should be clean, print-ready, and suitable for product packaging. Use vibrant colors and sharp details. The image should have a transparent or white background unless otherwise specified.";
+    let systemPrompt: string;
+    if (edit_mode && reference_image) {
+      systemPrompt = "You are a professional packaging and label designer and image editor. The user has provided their current design. Apply the requested edits precisely while preserving the rest of the design. Keep the same dimensions, layout, and elements that weren't mentioned. Output a clean, high-quality, print-ready result.";
+    } else if (reference_image) {
+      systemPrompt = "You are a professional packaging and label designer. The user has provided a reference image (screenshot, photo, or mockup). Your job is to recreate the design as a clean, high-quality, print-ready graphic. Match the layout, color scheme, and overall style as closely as possible. Make the output crisp, professional, and suitable for product packaging printing. Improve clarity and sharpness where the original is blurry or low-quality.";
+    } else {
+      systemPrompt = "You are a professional packaging and label designer. Generate high-quality design elements, graphics, patterns, or label artwork based on the user's description. Output should be clean, print-ready, and suitable for product packaging. Use vibrant colors and sharp details. The image should have a transparent or white background unless otherwise specified.";
+    }
 
     // Build the user message content
     const userContent: any[] = [{ type: "text", text: prompt }];

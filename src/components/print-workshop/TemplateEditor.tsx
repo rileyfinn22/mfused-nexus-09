@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText } from "lucide-react";
 import { AiImageDialog } from "./AiImageDialog";
+import { AiEditDialog } from "./AiEditDialog";
 import { IconPickerDialog } from "./IconPickerDialog";
 import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
 import { supabase } from "@/integrations/supabase/client";
@@ -490,6 +491,16 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     imgEl.src = dataUrl;
   };
 
+  const getCanvasImage = useCallback((): string | null => {
+    const canvas = fabricRef.current;
+    if (!canvas) return null;
+    try {
+      return canvas.toDataURL({ format: "png", multiplier: 2 });
+    } catch {
+      return null;
+    }
+  }, []);
+
   const applyFontSize = (sizePt: number) => {
     if (!selectedObject || !fabricRef.current) return;
     setFontSizePt(sizePt);
@@ -561,6 +572,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             </Button>
             <div className="w-px h-6 bg-border mx-1" />
             <AiImageDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
+            <AiEditDialog getCanvasImage={getCanvasImage} onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <IconPickerDialog onIconSelected={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <div className="w-px h-6 bg-border mx-1" />
           </>
