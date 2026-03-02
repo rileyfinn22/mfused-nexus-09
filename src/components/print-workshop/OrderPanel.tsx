@@ -4,23 +4,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShoppingCart, FileText, DollarSign, Download } from "lucide-react";
+import { ShoppingCart, DollarSign, Download } from "lucide-react";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
+import type { CartItem } from "./PrintCart";
 
 interface OrderPanelProps {
   template: any;
   canvasData: any;
-  onOrderCreated: () => void;
+  onAddToCart: (item: Omit<CartItem, "id">) => void;
 }
 
-export function OrderPanel({ template, canvasData, onOrderCreated }: OrderPanelProps) {
+export function OrderPanel({ template, canvasData, onAddToCart }: OrderPanelProps) {
   const [material, setMaterial] = useState<string>(
     (template.material_options as string[])?.[0] || ""
   );
   const [quantity, setQuantity] = useState(100);
-  const [creating, setCreating] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const hasPresetPrice = template.preset_price_per_unit != null;
@@ -49,7 +48,6 @@ export function OrderPanel({ template, canvasData, onOrderCreated }: OrderPanelP
         });
       }
 
-      // Download locally
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -65,8 +63,8 @@ export function OrderPanel({ template, canvasData, onOrderCreated }: OrderPanelP
     }
   };
 
-  const handleCreateOrder = async () => {
-    if (!material) {
+  const handleAddToCart = () => {
+    if (!material && materials.length > 0) {
       toast.error("Please select a material");
       return;
     }
@@ -75,65 +73,20 @@ export function OrderPanel({ template, canvasData, onOrderCreated }: OrderPanelP
       return;
     }
 
-    setCreating(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      // Generate & upload print file if source PDF exists
-      let printFileUrl: string | null = null;
-      if (hasSourcePdf) {
-        try {
-          const blob = await generatePrintReadyPdf({
-            sourcePdfPath: template.source_pdf_path,
-            canvasData,
-            widthInches: template.width_inches,
-            heightInches: template.height_inches,
-            bleedInches: template.bleed_inches,
-          });
-          const filePath = `orders/${crypto.randomUUID()}/print_ready.pdf`;
-          const { error: uploadErr } = await supabase.storage
-            .from("print-files")
-            .upload(filePath, blob, { contentType: "application/pdf" });
-          if (!uploadErr) {
-            const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(filePath);
-            printFileUrl = urlData.publicUrl;
-          }
-        } catch (e) {
-          console.warn("Could not auto-generate print file:", e);
-        }
-      }
-
-      const orderData = {
-        company_id: template.company_id,
-        print_template_id: template.id,
-        template_name: template.name,
-        canvas_data: canvasData,
-        material,
-        quantity,
-        price_per_unit: pricePerUnit,
-        total: total || 0,
-        status: hasPresetPrice ? "approved" : "pending_quote",
-        created_by: user?.id || null,
-        print_file_url: printFileUrl,
-      };
-
-      const { error } = await supabase
-        .from("print_orders")
-        .insert(orderData as any);
-
-      if (error) throw error;
-
-      toast.success(
-        hasPresetPrice
-          ? "Print order created successfully!"
-          : "Quote request submitted. An admin will review and quote the order."
-      );
-      onOrderCreated();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create order");
-    } finally {
-      setCreating(false);
-    }
+    onAddToCart({
+      templateId: template.id,
+      templateName: template.name,
+      canvasData,
+      material,
+      quantity,
+      pricePerUnit,
+      thumbnailUrl: template.thumbnail_url,
+      sourcePdfPath: template.source_pdf_path,
+      widthInches: template.width_inches,
+      heightInches: template.height_inches,
+      bleedInches: template.bleed_inches,
+      companyId: template.company_id,
+    });
   };
 
   const materials = (template.material_options as string[]) || [];
@@ -213,22 +166,12 @@ export function OrderPanel({ template, canvasData, onOrderCreated }: OrderPanelP
         </Button>
 
         <Button
-          onClick={handleCreateOrder}
-          disabled={creating}
+          onClick={handleAddToCart}
           className="w-full gap-2"
           size="lg"
         >
-          {hasPresetPrice ? (
-            <>
-              <ShoppingCart className="h-4 w-4" />
-              {creating ? "Creating..." : "Create Print Order"}
-            </>
-          ) : (
-            <>
-              <FileText className="h-4 w-4" />
-              {creating ? "Submitting..." : "Request Quote"}
-            </>
-          )}
+          <ShoppingCart className="h-4 w-4" />
+          Add to Cart
         </Button>
       </CardContent>
     </Card>
