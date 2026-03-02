@@ -1551,6 +1551,7 @@ export type Database = {
           name: string
           preset_price_per_unit: number | null
           product_type: string
+          source_pdf_path: string | null
           thumbnail_url: string | null
           updated_at: string
           width_inches: number
@@ -1568,6 +1569,7 @@ export type Database = {
           name: string
           preset_price_per_unit?: number | null
           product_type?: string
+          source_pdf_path?: string | null
           thumbnail_url?: string | null
           updated_at?: string
           width_inches?: number
@@ -1585,6 +1587,7 @@ export type Database = {
           name?: string
           preset_price_per_unit?: number | null
           product_type?: string
+          source_pdf_path?: string | null
           thumbnail_url?: string | null
           updated_at?: string
           width_inches?: number

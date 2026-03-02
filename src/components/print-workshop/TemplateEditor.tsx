@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText } from "lucide-react";
 import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // Popular print-ready fonts (web-safe + Google Fonts)
 const FONT_OPTIONS = [
@@ -65,10 +67,12 @@ interface TemplateEditorProps {
   height: number;
   bleed: number;
   onCanvasChange?: (data: any) => void;
+  onSourcePdfChange?: (path: string) => void;
+  sourcePdfPath?: string;
   mode: "edit" | "use";
 }
 
-export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChange, mode }: TemplateEditorProps) {
+export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChange, onSourcePdfChange, sourcePdfPath, mode }: TemplateEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
   const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
@@ -243,7 +247,20 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const file = e.target.files?.[0];
       if (!file) return;
       try {
-        // Render PDF at 2x canvas width then scale down for sharper on-screen proofing.
+        // 1. Upload original PDF to storage for print-ready export
+        const storagePath = `templates/${crypto.randomUUID()}/source.pdf`;
+        const { error: uploadError } = await supabase.storage
+          .from("print-files")
+          .upload(storagePath, file, { contentType: "application/pdf", upsert: true });
+        if (uploadError) {
+          console.error("PDF upload error:", uploadError);
+          toast.error("Failed to upload PDF to storage");
+        } else {
+          onSourcePdfChange?.(storagePath);
+          toast.success("Original PDF stored for print-ready export");
+        }
+
+        // 2. Render preview at 2x canvas width for sharp on-screen proofing
         const blob = await generatePdfThumbnailFromFile(file, {
           maxWidth: canvasWidth * PDF_BACKGROUND_OVERSAMPLE,
           scale: 1,

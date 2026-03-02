@@ -203,6 +203,7 @@ export default function PrintWorkshop() {
               height={selectedTemplate.height_inches}
               bleed={selectedTemplate.bleed_inches}
               onCanvasChange={setCanvasData}
+              sourcePdfPath={selectedTemplate.source_pdf_path}
               mode="use"
             />
           </div>

@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShoppingCart, FileText, DollarSign } from "lucide-react";
+import { ShoppingCart, FileText, DollarSign, Download } from "lucide-react";
+import { generatePrintReadyPdf } from "@/lib/printPdfExport";
 
 interface OrderPanelProps {
   template: any;
@@ -20,10 +21,43 @@ export function OrderPanel({ template, canvasData, onOrderCreated }: OrderPanelP
   );
   const [quantity, setQuantity] = useState(100);
   const [creating, setCreating] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const hasPresetPrice = template.preset_price_per_unit != null;
   const pricePerUnit = hasPresetPrice ? Number(template.preset_price_per_unit) : null;
   const total = pricePerUnit ? pricePerUnit * quantity : null;
+  const hasSourcePdf = !!template.source_pdf_path;
+
+  const handleGeneratePrintFile = async () => {
+    if (!hasSourcePdf) {
+      toast.error("No source PDF attached to this template");
+      return;
+    }
+    setGeneratingPdf(true);
+    try {
+      const blob = await generatePrintReadyPdf({
+        sourcePdfPath: template.source_pdf_path,
+        canvasData,
+        widthInches: template.width_inches,
+        heightInches: template.height_inches,
+        bleedInches: template.bleed_inches,
+      });
+
+      // Download locally
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${template.name.replace(/\s+/g, "_")}_print_ready.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Print-ready PDF generated!");
+    } catch (err: any) {
+      console.error("Print PDF export error:", err);
+      toast.error(err.message || "Failed to generate print-ready PDF");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
 
   const handleCreateOrder = async () => {
     if (!material) {
@@ -38,7 +72,31 @@ export function OrderPanel({ template, canvasData, onOrderCreated }: OrderPanelP
     setCreating(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
+      // Generate & upload print file if source PDF exists
+      let printFileUrl: string | null = null;
+      if (hasSourcePdf) {
+        try {
+          const blob = await generatePrintReadyPdf({
+            sourcePdfPath: template.source_pdf_path,
+            canvasData,
+            widthInches: template.width_inches,
+            heightInches: template.height_inches,
+            bleedInches: template.bleed_inches,
+          });
+          const filePath = `orders/${crypto.randomUUID()}/print_ready.pdf`;
+          const { error: uploadErr } = await supabase.storage
+            .from("print-files")
+            .upload(filePath, blob, { contentType: "application/pdf" });
+          if (!uploadErr) {
+            const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(filePath);
+            printFileUrl = urlData.publicUrl;
+          }
+        } catch (e) {
+          console.warn("Could not auto-generate print file:", e);
+        }
+      }
+
       const orderData = {
         company_id: template.company_id,
         print_template_id: template.id,
@@ -50,14 +108,15 @@ export function OrderPanel({ template, canvasData, onOrderCreated }: OrderPanelP
         total: total || 0,
         status: hasPresetPrice ? "approved" : "pending_quote",
         created_by: user?.id || null,
+        print_file_url: printFileUrl,
       };
 
       const { error } = await supabase
         .from("print_orders")
         .insert(orderData as any);
-      
+
       if (error) throw error;
-      
+
       toast.success(
         hasPresetPrice
           ? "Print order created successfully!"
@@ -136,6 +195,18 @@ export function OrderPanel({ template, canvasData, onOrderCreated }: OrderPanelP
             {template.width_inches}" × {template.height_inches}" {template.product_type}
           </Label>
         </div>
+
+        {hasSourcePdf && (
+          <Button
+            onClick={handleGeneratePrintFile}
+            disabled={generatingPdf}
+            variant="outline"
+            className="w-full gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {generatingPdf ? "Generating..." : "Download Print-Ready PDF"}
+          </Button>
+        )}
 
         <Button
           onClick={handleCreateOrder}
