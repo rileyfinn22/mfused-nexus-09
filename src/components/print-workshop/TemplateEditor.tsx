@@ -1075,16 +1075,22 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
   const toggleLock = () => {
     if (!selectedObject || !fabricRef.current) return;
+    const canvas = fabricRef.current;
     const isLocked = (selectedObject as any).locked;
-    (selectedObject as any).locked = !isLocked;
-    (selectedObject as any).editable = isLocked;
+    const newLocked = !isLocked;
+    (selectedObject as any).locked = newLocked;
+    (selectedObject as any).editable = !newLocked;
     selectedObject.set({
-      borderColor: isLocked ? "#3b82f6" : "#94a3b8",
-      cornerColor: isLocked ? "#3b82f6" : "#94a3b8",
+      borderColor: newLocked ? "#94a3b8" : "#3b82f6",
+      cornerColor: newLocked ? "#94a3b8" : "#3b82f6",
     });
-    fabricRef.current.renderAll();
+    // Deselect after toggling so the action feels committed
+    // and doesn't auto-carry to the next clicked object
+    canvas.discardActiveObject();
+    canvas.renderAll();
     syncCanvas();
-    setSelectedObject({ ...selectedObject } as any);
+    setSelectedObject(null);
+    toast.success(newLocked ? "Element locked" : "Element set to editable", { duration: 1500 });
   };
 
   const deleteSelected = () => {
