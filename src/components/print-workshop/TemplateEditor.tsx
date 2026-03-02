@@ -1620,15 +1620,21 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     setUnlockZoneMode(false);
     const canvas = fabricRef.current;
     if (!canvas) return;
-    canvas.selection = false;
+    canvas.selection = mode === "edit";
     canvas.defaultCursor = "default";
-    // Re-enable evented on editable objects only
     canvas.getObjects().forEach((obj: any) => {
-      if (obj.name === "_trimGuide" || obj.name === GUIDE_NAME) return;
-      if (obj.locked || !obj.editable) {
-        obj.set({ selectable: false, evented: false });
+      if (obj.name === "_trimGuide" || obj.name === GUIDE_NAME || obj.name === "_editHighlight" || obj.name === OCR_KNOCKOUT_NAME || obj.name === "pdf_background") {
+        obj.set({ selectable: false, evented: false, hasControls: false });
+        return;
+      }
+
+      if (mode === "edit") {
+        // In template edit mode, everything should be selectable so lock/edit state can be adjusted.
+        obj.set({ selectable: true, evented: true, hasControls: true });
+      } else if (obj.locked || !obj.editable) {
+        obj.set({ selectable: false, evented: false, hasControls: false });
       } else {
-        obj.set({ selectable: true, evented: true });
+        obj.set({ selectable: true, evented: true, hasControls: true });
       }
     });
     canvas.renderAll();
