@@ -584,6 +584,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       setSelectedObject(null);
       setSelectedLockedState(false);
     });
+    canvas.on("mouse:down", (e) => {
+      const target = (e as any)?.target as any;
+      if (!target) return;
+      setSelectedObject(target);
+      setSelectedLockedState(getSelectionLockedState(target));
+    });
     canvas.on("object:modified", () => { clearGuidelines(canvas); syncCanvas(); });
     canvas.on("text:changed", syncCanvas);
 
@@ -1111,7 +1117,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       if (typeof obj.setCoords === "function") obj.setCoords();
     });
 
-    setSelectedLockedState(newLocked);
+    const active = canvas.getActiveObject();
+    setSelectedObject(active || selectedObject);
+    setSelectedLockedState(getSelectionLockedState(active || selectedObject));
     canvas.requestRenderAll();
     syncCanvas();
     toast.success(newLocked ? "Element locked" : "Element set to editable", { duration: 1500 });
@@ -2209,7 +2217,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               onClick={() => setSelectionLockedState(false)}
               className="h-8 gap-1.5"
             >
-              <Unlock className="h-3.5 w-3.5" /><span className="text-xs">Editable</span>
+              <Unlock className="h-3.5 w-3.5" /><span className="text-xs">Object Editable</span>
             </Button>
             <Button
               size="sm"
@@ -2217,7 +2225,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               onClick={() => setSelectionLockedState(true)}
               className="h-8 gap-1.5"
             >
-              <Lock className="h-3.5 w-3.5" /><span className="text-xs">Locked</span>
+              <Lock className="h-3.5 w-3.5" /><span className="text-xs">Object Locked</span>
             </Button>
             <Button size="sm" variant="ghost" onClick={deleteSelected} className="h-8 w-8 p-0 text-destructive">
               <Trash2 className="h-3.5 w-3.5" />
