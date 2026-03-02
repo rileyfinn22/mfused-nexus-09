@@ -150,6 +150,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const fabricRef = useRef<FabricCanvas | null>(null);
   const previewPdfUrlRef = useRef<string | null>(null);
   const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
+  const [selectedLockedState, setSelectedLockedState] = useState(false);
   const [fontSearch, setFontSearch] = useState("");
   const [fontSizePt, setFontSizePt] = useState(12);
   const [zoneSelectMode, setZoneSelectMode] = useState(false);
@@ -169,6 +170,17 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   
   const zoneRectRef = useRef<Rect | null>(null);
   const zoneStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const getSelectionLockedState = useCallback((obj: any): boolean => {
+    if (!obj) return false;
+    const type = typeof obj.type === "string" ? obj.type.toLowerCase() : "";
+    if (type === "activeselection") {
+      const objects: any[] = obj.getObjects?.() || [];
+      if (objects.length === 0) return false;
+      return objects.every((o: any) => !!o.locked);
+    }
+    return !!obj.locked;
+  }, []);
 
   // Convert between typographic points and canvas pixels at current DPI
   // 1 pt = 1/72 inch, so at N DPI: 1pt = DPI/72 pixels
@@ -549,6 +561,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.on("selection:created", (e) => {
       const sel = canvas.getActiveObject();
       setSelectedObject(sel || null);
+      setSelectedLockedState(getSelectionLockedState(sel));
       const first = e.selected?.[0];
       if (first) {
         if ((first as any).fontSize) setFontSizePt((first as any)._fontSizePt ?? pxToPt((first as any).fontSize));
@@ -559,6 +572,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.on("selection:updated", (e) => {
       const sel = canvas.getActiveObject();
       setSelectedObject(sel || null);
+      setSelectedLockedState(getSelectionLockedState(sel));
       const first = e.selected?.[0];
       if (first) {
         if ((first as any).fontSize) setFontSizePt((first as any)._fontSizePt ?? pxToPt((first as any).fontSize));
@@ -566,7 +580,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         if ((first as any).fill) setFontColor((first as any).fill);
       }
     });
-    canvas.on("selection:cleared", () => setSelectedObject(null));
+    canvas.on("selection:cleared", () => {
+      setSelectedObject(null);
+      setSelectedLockedState(false);
+    });
     canvas.on("object:modified", () => { clearGuidelines(canvas); syncCanvas(); });
     canvas.on("text:changed", syncCanvas);
 
@@ -712,7 +729,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       canvas.dispose();
       fabricRef.current = null;
     };
-  }, [canvasWidth, canvasHeight, bleedPx, mode, displayScale, dpr, cssWidth, cssHeight]);
+  }, [canvasWidth, canvasHeight, bleedPx, mode, displayScale, dpr, cssWidth, cssHeight, getSelectionLockedState]);
 
   const addText = (editable: boolean) => {
     const canvas = fabricRef.current;
@@ -1080,36 +1097,32 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     if (targets.length === 0) return;
 
-    // If any target is editable, lock all; otherwise unlock all.
-    const shouldLock = targets.some((obj) => !(obj as any).locked);
+    const newLocked = !getSelectionLockedState(selectedObject as any);
 
     targets.forEach((obj: any) => {
-      obj.locked = shouldLock;
-      obj.editable = !shouldLock;
-      obj.name = shouldLock
+      obj.locked = newLocked;
+      obj.editable = !newLocked;
+      obj.name = newLocked
         ? (obj.type?.includes("text") ? "locked_text" : "locked_image")
         : (obj.type?.includes("text") ? "editable_text" : "editable_image");
       obj.set({
-        borderColor: shouldLock ? "#94a3b8" : "#3b82f6",
-        cornerColor: shouldLock ? "#94a3b8" : "#3b82f6",
-        hasControls: mode === "edit" ? true : !shouldLock,
+        borderColor: newLocked ? "#94a3b8" : "#3b82f6",
+        cornerColor: newLocked ? "#94a3b8" : "#3b82f6",
+        hasControls: mode === "edit" ? true : !newLocked,
       });
       if (typeof obj.setCoords === "function") obj.setCoords();
     });
 
+    setSelectedLockedState(newLocked);
     canvas.requestRenderAll();
     syncCanvas();
-
-    // Trigger toolbar refresh without changing active selection.
-    setSelectedObject(null);
-    setTimeout(() => setSelectedObject(canvas.getActiveObject() || null), 0);
-
-    toast.success(shouldLock ? "Element locked" : "Element set to editable", { duration: 1500 });
+    toast.success(newLocked ? "Element locked" : "Element set to editable", { duration: 1500 });
   };
   const deleteSelected = () => {
     if (!selectedObject || !fabricRef.current) return;
     fabricRef.current.remove(selectedObject);
     setSelectedObject(null);
+    setSelectedLockedState(false);
     syncCanvas();
   };
 
@@ -2192,7 +2205,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           <>
             <div className="w-px h-6 bg-border mx-1" />
             <Button size="sm" variant="ghost" onClick={toggleLock} className="h-8 gap-1.5">
-              {(selectedObject as any).locked ? (
+              {selectedLockedState ? (
                 <><Lock className="h-3.5 w-3.5" /><span className="text-xs">Locked</span></>
               ) : (
                 <><Unlock className="h-3.5 w-3.5" /><span className="text-xs">Editable</span></>
