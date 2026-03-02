@@ -1,32 +1,64 @@
 
 
-## Knowledge Base Security & Permissions Document
+## Add Team Members, DMs, and @Mentions to Chat
 
-### What I'll Create
-A comprehensive `.lovable/SECURITY_RULES.md` rewrite that serves as the definitive knowledge base entry, covering three areas:
+### Current State
+- Chat exists with channels, threads, file sharing -- all restricted to `vibe_admin` users
+- Users display as email prefixes (e.g. "riley" from riley@company.com)
+- `chat_channel_members` table exists but isn't used for DMs
+- No concept of display names or @mentions
 
-### 1. Role Permissions Matrix (vibe_admin, company, vendor)
-- Detailed per-role visibility for every data entity (orders, invoices, vendor POs, products, artwork, etc.)
-- Explicit field-level restrictions (e.g., `vendor_cost`, `vendor_id`, `vendor_po_number` hidden from company users)
-- Route access table showing which URLs each role can access
+### What We'll Build
 
-### 2. Frontend Enforcement Rules
-- Navigation arrays in `AppSidebar.tsx` — which items belong to which role
-- `isVibeAdmin` conditional rendering pattern (used in 37+ files) — must never be removed
-- Route redirect guards on admin-only pages
-- Field filtering: never expose vendor cost fields in company-facing queries
+**1. Team member profiles with display names**
+- Add a `display_name` column to `chat_channel_members` or use a lightweight approach: store display names directly on a new `chat_profiles` table (`user_id`, `display_name`, `avatar_color`) with RLS for vibe_admin only
+- Seed Carrie, Jack, Justin as known team members so they show up with proper names instead of email prefixes
 
-### 3. Data Safety & Integrity Rules
-- **Soft-delete pattern**: Orders and invoices use `deleted_at` column — never hard-delete financial records
-- **RLS enforcement**: Every new table must have RLS enabled with appropriate policies
-- **Key RLS functions**: `has_role()`, `user_has_company_access()`, `get_user_company()`
-- **Additive migrations only**: No dropping columns/tables without explicit approval
-- **Deprecated roles**: `admin` and `customer` still exist in the enum and some RLS policies — treat as legacy, do not use for new code
-- **Sensitive fields**: Bank details on vendors table, QuickBooks tokens — never exposed via public queries
+**2. Direct Messages section in sidebar**
+- Add a "Direct Messages" section below Channels in the sidebar
+- "New DM" button that shows a list of all vibe_admin team members to pick from
+- Creates a DM channel (`is_dm = true`) between the two users
+- DM channels show the other person's display name instead of a channel name
 
-### 4. Legacy RLS Policy Cleanup Note
-Document that many existing RLS policies still reference `has_role(auth.uid(), 'admin'::app_role)` — these are from when `admin` was an active role. They still function but are effectively dead code since no users have the `admin` role. Flag for future cleanup.
+**3. @Mention support in messages**
+- In the message composer, typing `@` triggers a popup showing team members
+- Selecting a person inserts `@Name` into the message
+- Mentioned names render as highlighted/bold text in messages
+- Optional: notify mentioned users (future enhancement)
 
-### Implementation
-Single file update: `.lovable/SECURITY_RULES.md` — complete rewrite with all sections above, formatted for easy scanning and copy-paste into the Knowledge settings.
+### Database Changes
+- New table `chat_profiles` with columns: `id`, `user_id` (unique), `display_name`, `avatar_color`, `created_at`
+- RLS: vibe_admin only for all operations
+- Seed profiles for existing team members
+
+### Frontend Changes (all in `src/pages/Chat.tsx`)
+- Load chat profiles on mount to build a `userId -> displayName` map
+- Replace email-based display with profile display names throughout
+- Add "Direct Messages" section in sidebar with "New DM" dialog
+- Add `@mention` autocomplete dropdown in message composer (triggered by `@` key)
+- Render `@Name` mentions as styled spans in message text
+- When creating a DM, check if one already exists between the two users before creating
+
+### Technical Details
+
+```text
+Sidebar Layout:
+┌──────────────────┐
+│ Chat          [+] │
+├──────────────────┤
+│ CHANNELS         │
+│ # general        │
+│ # shipping       │
+├──────────────────┤
+│ DIRECT MESSAGES  │
+│ 👤 Carrie        │
+│ 👤 Jack          │
+│ 👤 Justin        │
+│ + New Message    │
+└──────────────────┘
+```
+
+- @mention popup: positioned above cursor, filters as user types, Enter/click to select
+- DM channel naming convention: store both user IDs, display the "other" user's name
+- All changes stay within vibe_admin security boundary
 
