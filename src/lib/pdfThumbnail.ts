@@ -32,7 +32,8 @@ export async function generatePdfThumbnailFromArrayBuffer(
   const scale = options?.scale ?? 1;
   const maxWidth = options?.maxWidth ?? 600;
 
-  const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+  // Slice to avoid detaching the caller's ArrayBuffer
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfData.slice(0)) });
   const pdf = await loadingTask.promise;
   const page = await pdf.getPage(1);
 
