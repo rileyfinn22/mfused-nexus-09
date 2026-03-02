@@ -287,24 +287,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     if (Array.isArray(data.objects)) {
       data.objects = data.objects.filter((obj: any) => {
-        if (obj?.name === "_trimGuide" || obj?.name === "_snapGuide") return false;
+        if (obj?.name === "_trimGuide" || obj?.name === "_snapGuide" || obj?.name === "_editHighlight") return false;
         if (!includePdfBackground && obj?.name === "pdf_background") {
           const src = typeof obj?.src === "string" ? obj.src : "";
           if (sourcePdfPath || src.startsWith("blob:")) return false;
         }
         return true;
-      });
-      // Strip editable highlight stroke artifacts from serialized data
-      data.objects.forEach((obj: any) => {
-        if (obj?._editableHighlight) {
-          obj.stroke = obj._origStroke || null;
-          obj.strokeWidth = obj._origStrokeWidth || 0;
-          obj.strokeDashArray = obj._origStrokeDash || null;
-          delete obj._editableHighlight;
-          delete obj._origStroke;
-          delete obj._origStrokeWidth;
-          delete obj._origStrokeDash;
-        }
       });
     }
 
@@ -445,6 +433,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       });
 
       if (mode === "use") {
+        const editableObjects: any[] = [];
         canvas.getObjects().forEach((obj: any) => {
           if (obj.name === "_trimGuide") return;
           if (obj.name === "_ocrKnockout") return;
@@ -452,7 +441,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           if (obj.locked || !obj.editable) {
             obj.set({ selectable: false, evented: false, hasControls: false, lockMovementX: true, lockMovementY: true });
           } else {
-            // Highlight editable objects with a visible dashed border
             obj.set({
               selectable: true,
               evented: true,
@@ -461,19 +449,49 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               cornerColor: "#3b82f6",
               cornerStyle: "circle",
               transparentCorners: false,
-              // Persistent highlight stroke to show editability
-              stroke: "#3b82f6",
-              strokeWidth: 2,
-              strokeDashArray: [6, 4],
-              paintFirst: "stroke",
-              // Store original stroke so we can restore on deselect
-              _origStroke: obj.stroke || null,
-              _origStrokeWidth: obj.strokeWidth || 0,
-              _origStrokeDash: obj.strokeDashArray || null,
-              _editableHighlight: true,
             });
+            editableObjects.push(obj);
           }
         });
+
+        // Add translucent highlight boxes behind each editable object
+        editableObjects.forEach((obj: any) => {
+          const br = obj.getBoundingRect();
+          const zoom = canvas.getZoom();
+          const pad = 6;
+          const highlight = new Rect({
+            left: (br.left / zoom) - pad,
+            top: (br.top / zoom) - pad,
+            width: (br.width / zoom) + pad * 2,
+            height: (br.height / zoom) + pad * 2,
+            fill: "rgba(59, 130, 246, 0.08)",
+            stroke: "rgba(59, 130, 246, 0.35)",
+            strokeWidth: 1.5,
+            strokeDashArray: [6, 3],
+            rx: 4,
+            ry: 4,
+            selectable: false,
+            evented: false,
+            hasControls: false,
+            hasBorders: false,
+            objectCaching: false,
+          } as any);
+          (highlight as any).name = "_editHighlight";
+          (highlight as any)._linkedObjId = obj.__uid || obj.name || Math.random();
+          canvas.add(highlight);
+          // Place highlight just behind the editable object
+          const objIndex = canvas.getObjects().indexOf(obj);
+          if (objIndex > 0) {
+            // Move highlight just below the editable object
+            const objects = canvas.getObjects();
+            const highlightIdx = objects.indexOf(highlight);
+            if (highlightIdx >= 0 && highlightIdx !== objIndex) {
+              canvas.remove(highlight);
+              canvas.insertAt(objIndex, highlight);
+            }
+          }
+        });
+
         canvas.renderAll();
       }
 
@@ -523,7 +541,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const initialData = canvas.toObject(['locked', 'editable', 'name']) as any;
       delete initialData.backgroundImage;
       if (Array.isArray(initialData.objects)) {
-        initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide");
+        initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide" && obj?.name !== "_editHighlight");
       }
       undoStack.current = [JSON.stringify(initialData)];
       redoStack.current = [];
@@ -551,31 +569,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         if ((first as any).fill) setFontColor((first as any).fill);
       }
     });
-    canvas.on("selection:cleared", () => {
-      setSelectedObject(null);
-      // Restore editable highlights when deselected (use mode)
-      if (mode === "use") {
-        canvas.getObjects().forEach((obj: any) => {
-          if (obj._editableHighlight) {
-            obj.set({ stroke: "#3b82f6", strokeWidth: 2, strokeDashArray: [6, 4] });
-          }
-        });
-        canvas.renderAll();
-      }
-    });
+    canvas.on("selection:cleared", () => setSelectedObject(null));
     canvas.on("object:modified", () => { clearGuidelines(canvas); syncCanvas(); });
     canvas.on("text:changed", syncCanvas);
 
-    // In use mode: auto-enter text editing on click, hide highlight on active object
+    // In use mode: auto-enter text editing on click
     if (mode === "use") {
       canvas.on("selection:created", (e) => {
         const obj = e.selected?.[0] as any;
-        if (obj?._editableHighlight) {
-          // Remove highlight stroke on the active/selected object
-          obj.set({ stroke: obj._origStroke || "", strokeWidth: obj._origStrokeWidth || 0, strokeDashArray: obj._origStrokeDash || null });
-          canvas.renderAll();
-        }
-        // Auto-enter editing for text objects
         if (obj && obj.type === "i-text" && obj.editable) {
           setTimeout(() => {
             obj.enterEditing();
@@ -584,20 +585,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         }
       });
       canvas.on("selection:updated", (e) => {
-        // Restore highlight on previously selected
-        const deselected = e.deselected;
-        if (deselected) {
-          deselected.forEach((d: any) => {
-            if (d._editableHighlight) {
-              d.set({ stroke: "#3b82f6", strokeWidth: 2, strokeDashArray: [6, 4] });
-            }
-          });
-        }
         const obj = e.selected?.[0] as any;
-        if (obj?._editableHighlight) {
-          obj.set({ stroke: obj._origStroke || "", strokeWidth: obj._origStrokeWidth || 0, strokeDashArray: obj._origStrokeDash || null });
-          canvas.renderAll();
-        }
         if (obj && obj.type === "i-text" && obj.editable) {
           setTimeout(() => {
             obj.enterEditing();
