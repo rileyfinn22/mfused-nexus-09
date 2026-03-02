@@ -505,7 +505,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const canvas = fabricRef.current;
     if (!canvas) return;
 
-    // 1. Place AI image as a canvas object (locked background layer)
+    // 1. Place AI image as a locked background layer
     const imgEl = new window.Image();
     imgEl.crossOrigin = "anonymous";
     imgEl.onload = async () => {
@@ -515,41 +515,49 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         selectable: false,
         evented: false,
       });
-      // Scale to fill canvas
       const scaleX = canvasWidth / imgEl.width;
       const scaleY = canvasHeight / imgEl.height;
-      fabricImg.set({ scaleX, scaleY });
+      fabricImg.set({ scaleX, scaleY, opacity: 0.35 });
       (fabricImg as any).locked = true;
       (fabricImg as any).editable = false;
       (fabricImg as any).name = "ai_background";
 
-      // Insert at bottom (above background image, below other objects)
       canvas.insertAt(0, fabricImg);
 
-      // 2. Create editable IText objects from extracted text regions
-      for (const region of textRegions) {
-        const fontDef = FONT_OPTIONS.find((f) => f.value === region.suggested_font);
+      // 2. Stack extracted text neatly — users drag into position
+      const startX = bleedPx + 40;
+      let currentY = bleedPx + 30;
+      const lineSpacing = 12;
+
+      // Sort by font size (largest first = headings first)
+      const sorted = [...textRegions].sort(
+        (a, b) => (b.font_size_percent || 3) - (a.font_size_percent || 3)
+      );
+
+      for (const region of sorted) {
         const fontFamily = region.suggested_font || "Arial";
+        const fontDef = FONT_OPTIONS.find((f) => f.value === fontFamily);
         if (fontDef?.google || (region.suggested_font && !["Arial", "Helvetica", "Times New Roman", "Georgia", "Courier New", "Verdana", "Impact"].includes(fontFamily))) {
           await loadGoogleFont(fontFamily);
         }
 
-        const fontSize = Math.round((region.font_size_percent / 100) * canvasHeight);
-        const x = Math.round((region.x_percent / 100) * canvasWidth);
-        const y = Math.round((region.y_percent / 100) * canvasHeight);
+        const fontSize = Math.max(
+          Math.round((region.font_size_percent / 100) * canvasHeight),
+          ptToPx(8)
+        );
 
         const text = new IText(region.text, {
-          left: x,
-          top: y,
-          fontSize: Math.max(fontSize, ptToPx(8)),
+          left: startX,
+          top: currentY,
+          fontSize,
           fontFamily,
           fill: region.color || "#000000",
           fontWeight: region.font_weight || "normal",
           fontStyle: region.font_style || "normal",
-          textAlign: region.text_align || "center",
-          originX: "center",
-          originY: "center",
+          textAlign: "left",
           editable: true,
+          backgroundColor: "rgba(255,255,255,0.7)",
+          padding: 4,
         });
         (text as any).locked = false;
         (text as any).editable = true;
@@ -562,6 +570,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         } as any);
 
         canvas.add(text);
+        currentY += fontSize + lineSpacing;
       }
 
       // Keep trim guide on top
@@ -570,9 +579,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
       canvas.renderAll();
       syncCanvas();
+
+      toast.info("Text extracted! Drag each text element into position over the faded reference image, then adjust opacity of the background.", { duration: 6000 });
     };
     imgEl.src = backgroundUrl;
-  }, [canvasWidth, canvasHeight, ptToPx, syncCanvas]);
+  }, [canvasWidth, canvasHeight, bleedPx, ptToPx, syncCanvas]);
 
   const applyFontSize = (sizePt: number) => {
     if (!selectedObject || !fabricRef.current) return;
