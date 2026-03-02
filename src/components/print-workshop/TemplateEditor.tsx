@@ -89,6 +89,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   // Display: fit into ~900px wide, accounting for device pixel ratio for crisp rendering
   const TARGET_DISPLAY_WIDTH = 900;
   const TARGET_DISPLAY_HEIGHT = 750;
+  // Oversample imported PDF backgrounds so rasterized text stays sharp in preview
+  const PDF_BACKGROUND_OVERSAMPLE = 2;
   const displayScale = Math.min(TARGET_DISPLAY_WIDTH / canvasWidth, TARGET_DISPLAY_HEIGHT / canvasHeight, 1.5);
   const cssWidth = Math.round(canvasWidth * displayScale);
   const cssHeight = Math.round(canvasHeight * displayScale);
@@ -210,7 +212,16 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const setCanvasBackground = (imgEl: HTMLImageElement) => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const fabricImg = new FabricImage(imgEl, { left: 0, top: 0 });
+
+    // Keep PDF/image backgrounds crisp when they are downscaled for display.
+    const fabricImg = new FabricImage(imgEl, {
+      left: 0,
+      top: 0,
+      selectable: false,
+      evented: false,
+      objectCaching: false,
+    } as any);
+
     // Scale to fill the entire canvas (cover mode)
     const scaleX = canvasWidth / imgEl.width;
     const scaleY = canvasHeight / imgEl.height;
@@ -232,8 +243,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const file = e.target.files?.[0];
       if (!file) return;
       try {
-        // Render PDF at exactly the canvas pixel dimensions for 1:1 pixel mapping (no rescaling blur)
-        const blob = await generatePdfThumbnailFromFile(file, { scale: 8, maxWidth: canvasWidth });
+        // Render PDF at 2x canvas width then scale down for sharper on-screen proofing.
+        const blob = await generatePdfThumbnailFromFile(file, {
+          maxWidth: canvasWidth * PDF_BACKGROUND_OVERSAMPLE,
+          scale: 1,
+        });
         const url = URL.createObjectURL(blob);
         const imgEl = new window.Image();
         imgEl.onload = () => {
