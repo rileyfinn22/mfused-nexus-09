@@ -36,10 +36,10 @@ export async function generatePdfThumbnailFromArrayBuffer(
   const pdf = await loadingTask.promise;
   const page = await pdf.getPage(1);
 
-  // First render pass to compute width
+  // Always render at exactly maxWidth so the output is a 1:1 pixel match with the target canvas
   const initialViewport = page.getViewport({ scale });
-  const widthScale = initialViewport.width > maxWidth ? maxWidth / initialViewport.width : 1;
-  const viewport = page.getViewport({ scale: scale * widthScale });
+  const targetScale = maxWidth / initialViewport.width * scale;
+  const viewport = page.getViewport({ scale: targetScale });
 
   const canvas = document.createElement("canvas");
   canvas.width = Math.floor(viewport.width);
