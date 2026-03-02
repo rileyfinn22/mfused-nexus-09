@@ -1115,17 +1115,31 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         const zoneBottom = zoneTop + (rect.height || 0);
         canvas.remove(rect);
 
-        // Find all locked text objects whose center falls within the drawn zone
+        // Find locked text objects that overlap with the drawn zone
         let unlocked = 0;
+        const zoom = canvas.getZoom();
         canvas.getObjects().forEach((obj: any) => {
           if (!obj.type?.includes("text") && obj.type !== "i-text" && obj.type !== "textbox") return;
           if (!obj.locked) return;
           const br = obj.getBoundingRect();
-          const zoom = canvas.getZoom();
-          const cx = br.left / zoom + br.width / zoom / 2;
-          const cy = br.top / zoom + br.height / zoom / 2;
+          const oLeft = br.left / zoom;
+          const oTop = br.top / zoom;
+          const oRight = oLeft + br.width / zoom;
+          const oBottom = oTop + br.height / zoom;
 
-          if (cx >= zoneLeft && cx <= zoneRight && cy >= zoneTop && cy <= zoneBottom) {
+          // Check if the object's bounding box overlaps with the drawn zone
+          const overlaps =
+            oLeft < zoneRight && oRight > zoneLeft &&
+            oTop < zoneBottom && oBottom > zoneTop;
+
+          // Additionally require at least 50% of the object to be inside the zone
+          const overlapW = Math.max(0, Math.min(oRight, zoneRight) - Math.max(oLeft, zoneLeft));
+          const overlapH = Math.max(0, Math.min(oBottom, zoneBottom) - Math.max(oTop, zoneTop));
+          const overlapArea = overlapW * overlapH;
+          const objArea = (oRight - oLeft) * (oBottom - oTop);
+          const overlapRatio = objArea > 0 ? overlapArea / objArea : 0;
+
+          if (overlaps && overlapRatio > 0.5) {
             obj.locked = false;
             obj.editable = true;
             obj.name = "editable_text";
