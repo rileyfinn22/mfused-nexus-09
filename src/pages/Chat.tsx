@@ -8,7 +8,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import {
   Hash,
@@ -19,8 +18,8 @@ import {
   X,
   Reply,
   Download,
-  Users,
   ChevronLeft,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, isToday, isYesterday } from "date-fns";
@@ -54,6 +53,13 @@ interface Attachment {
   file_size: number | null;
 }
 
+interface ChatProfile {
+  id: string;
+  user_id: string;
+  display_name: string;
+  avatar_color: string;
+}
+
 export default function Chat() {
   const { isVibeAdmin } = useActiveCompany();
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -71,15 +77,43 @@ export default function Chat() {
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelDesc, setNewChannelDesc] = useState("");
   const [showMobileSidebar, setShowMobileSidebar] = useState(true);
+  const [chatProfiles, setChatProfiles] = useState<ChatProfile[]>([]);
+  const [profileMap, setProfileMap] = useState<Record<string, ChatProfile>>({});
+  const [showNewDm, setShowNewDm] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [cursorPos, setCursorPos] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLInputElement>(null);
+  const mentionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) setCurrentUserId(data.user.id);
     });
   }, []);
+
+  // Load chat profiles
+  useEffect(() => {
+    if (!isVibeAdmin) return;
+    loadProfiles();
+  }, [isVibeAdmin]);
+
+  const loadProfiles = async () => {
+    const { data } = await supabase
+      .from("chat_profiles")
+      .select("*");
+    if (data) {
+      setChatProfiles(data);
+      const map: Record<string, ChatProfile> = {};
+      data.forEach((p: ChatProfile) => {
+        map[p.user_id] = p;
+      });
+      setProfileMap(map);
+    }
+  };
 
   // Load channels
   useEffect(() => {
@@ -118,7 +152,6 @@ export default function Chat() {
       .order("created_at");
 
     if (data) {
-      // Get reply counts
       const messageIds = data.map((m) => m.id);
       const { data: replies } = await supabase
         .from("chat_messages")
@@ -132,7 +165,6 @@ export default function Chat() {
         }
       });
 
-      // Get attachments
       const { data: attachments } = await supabase
         .from("chat_message_attachments")
         .select("*")
@@ -144,7 +176,6 @@ export default function Chat() {
         attachmentMap[a.message_id].push(a);
       });
 
-      // Resolve emails
       const userIds = [...new Set(data.map((m) => m.user_id))];
       await resolveEmails(userIds);
 
@@ -206,12 +237,52 @@ export default function Chat() {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [threadMessages]);
 
+  // Helper: get display name for a user
+  const getDisplayName = (userId: string): string => {
+    if (profileMap[userId]) return profileMap[userId].display_name;
+    const email = userEmails[userId];
+    return email ? email.split("@")[0] : "unknown";
+  };
+
+  const getAvatarColor = (userId: string): string => {
+    return profileMap[userId]?.avatar_color || "";
+  };
+
+  const getInitials = (userId: string) => {
+    const name = getDisplayName(userId);
+    const parts = name.split(" ");
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  // DM helpers
+  const getDmDisplayName = (channel: Channel): string => {
+    if (!currentUserId) return channel.name;
+    // DM channel name format: "dm-userId1-userId2"
+    const parts = channel.name.split("-");
+    if (parts.length >= 3) {
+      const otherUserId = parts[1] === currentUserId ? parts.slice(2).join("-") : parts[1];
+      return getDisplayName(otherUserId);
+    }
+    return channel.name;
+  };
+
+  const getDmOtherUserId = (channel: Channel): string | null => {
+    if (!currentUserId) return null;
+    const parts = channel.name.split("-");
+    if (parts.length >= 3) {
+      return parts[1] === currentUserId ? parts.slice(2).join("-") : parts[1];
+    }
+    return null;
+  };
+
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if ((!newMessage.trim() && pendingFiles.length === 0) || !activeChannel || !currentUserId) return;
 
     const content = newMessage.trim() || (pendingFiles.length > 0 ? `📎 ${pendingFiles.length} file(s)` : "");
     setNewMessage("");
+    setMentionQuery(null);
 
     const { data: msg, error } = await supabase
       .from("chat_messages")
@@ -224,7 +295,6 @@ export default function Chat() {
       return;
     }
 
-    // Upload files
     if (msg && pendingFiles.length > 0) {
       for (const file of pendingFiles) {
         const path = `${activeChannel.id}/${msg.id}/${file.name}`;
@@ -298,8 +368,154 @@ export default function Chat() {
     }
   };
 
-  const getInitials = (email: string) => {
-    return email?.split("@")[0]?.slice(0, 2).toUpperCase() || "??";
+  const startDm = async (targetUserId: string) => {
+    if (!currentUserId) return;
+    // Check if DM channel already exists between these two users
+    const dmChannels = channels.filter((c) => c.is_dm);
+    const existing = dmChannels.find((c) => {
+      const parts = c.name.split("-");
+      if (parts.length >= 3) {
+        const id1 = parts[1];
+        const id2 = parts.slice(2).join("-");
+        return (
+          (id1 === currentUserId && id2 === targetUserId) ||
+          (id1 === targetUserId && id2 === currentUserId)
+        );
+      }
+      return false;
+    });
+
+    if (existing) {
+      setActiveChannel(existing);
+      setShowNewDm(false);
+      setShowMobileSidebar(false);
+      return;
+    }
+
+    // Create new DM channel
+    const { data, error } = await supabase
+      .from("chat_channels")
+      .insert({
+        name: `dm-${currentUserId}-${targetUserId}`,
+        is_dm: true,
+        created_by: currentUserId,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      // Add both members
+      await supabase.from("chat_channel_members").insert([
+        { channel_id: data.id, user_id: currentUserId },
+        { channel_id: data.id, user_id: targetUserId },
+      ]);
+      setShowNewDm(false);
+      await loadChannels();
+      setActiveChannel(data);
+      setShowMobileSidebar(false);
+    }
+  };
+
+  // @mention logic
+  const filteredMentions = chatProfiles.filter((p) => {
+    if (mentionQuery === null) return false;
+    if (mentionQuery === "") return true;
+    return p.display_name.toLowerCase().includes(mentionQuery.toLowerCase());
+  });
+
+  const handleComposerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    const pos = e.target.selectionStart || 0;
+    setNewMessage(val);
+    setCursorPos(pos);
+
+    // Check for @ trigger
+    const textBeforeCursor = val.slice(0, pos);
+    const atMatch = textBeforeCursor.match(/@(\w*)$/);
+    if (atMatch) {
+      setMentionQuery(atMatch[1]);
+      setMentionIndex(0);
+    } else {
+      setMentionQuery(null);
+    }
+  };
+
+  const insertMention = (profile: ChatProfile) => {
+    const textBeforeCursor = newMessage.slice(0, cursorPos);
+    const atMatch = textBeforeCursor.match(/@(\w*)$/);
+    if (atMatch) {
+      const beforeAt = textBeforeCursor.slice(0, atMatch.index);
+      const afterCursor = newMessage.slice(cursorPos);
+      const newVal = `${beforeAt}@${profile.display_name} ${afterCursor}`;
+      setNewMessage(newVal);
+      setMentionQuery(null);
+      composerRef.current?.focus();
+    }
+  };
+
+  const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (mentionQuery !== null && filteredMentions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionIndex((prev) => Math.min(prev + 1, filteredMentions.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionIndex((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        insertMention(filteredMentions[mentionIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        setMentionQuery(null);
+        return;
+      }
+    }
+
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  // Render message content with @mention highlighting
+  const renderContent = (content: string) => {
+    const mentionRegex = /@([\w\s]+?)(?=\s@|\s|$)/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = mentionRegex.exec(content)) !== null) {
+      const name = match[1].trim();
+      const isRealMention = chatProfiles.some(
+        (p) => p.display_name.toLowerCase() === name.toLowerCase()
+      );
+
+      if (isRealMention) {
+        if (match.index > lastIndex) {
+          parts.push(content.slice(lastIndex, match.index));
+        }
+        parts.push(
+          <span
+            key={match.index}
+            className="bg-primary/15 text-primary font-medium rounded px-0.5"
+          >
+            @{name}
+          </span>
+        );
+        lastIndex = match.index + match[0].length;
+      }
+    }
+
+    if (lastIndex < content.length) {
+      parts.push(content.slice(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : content;
   };
 
   const formatTimestamp = (ts: string) => {
@@ -323,6 +539,9 @@ export default function Chat() {
       </div>
     );
   }
+
+  const dmChannels = channels.filter((c) => c.is_dm);
+  const regularChannels = channels.filter((c) => !c.is_dm);
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-lg border border-border bg-background">
@@ -373,30 +592,107 @@ export default function Chat() {
         <Separator />
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-0.5">
+            {/* Channels Section */}
             <p className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Channels
             </p>
-            {channels
-              .filter((c) => !c.is_dm)
-              .map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setActiveChannel(c);
-                    setThreadParent(null);
-                    setShowMobileSidebar(false);
-                  }}
-                  className={cn(
-                    "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
-                    activeChannel?.id === c.id
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  )}
-                >
-                  <Hash className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{c.name}</span>
-                </button>
-              ))}
+            {regularChannels.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  setActiveChannel(c);
+                  setThreadParent(null);
+                  setShowMobileSidebar(false);
+                }}
+                className={cn(
+                  "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                  activeChannel?.id === c.id
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )}
+              >
+                <Hash className="h-4 w-4 shrink-0" />
+                <span className="truncate">{c.name}</span>
+              </button>
+            ))}
+
+            {/* Direct Messages Section */}
+            <div className="pt-4">
+              <div className="flex items-center justify-between px-3 py-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Direct Messages
+                </p>
+                <Dialog open={showNewDm} onOpenChange={setShowNewDm}>
+                  <DialogTrigger asChild>
+                    <button className="text-muted-foreground hover:text-foreground">
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>New Direct Message</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-1 pt-2">
+                      {chatProfiles
+                        .filter((p) => p.user_id !== currentUserId)
+                        .map((p) => (
+                          <button
+                            key={p.user_id}
+                            onClick={() => startDm(p.user_id)}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-accent transition-colors text-left"
+                          >
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback
+                                className="text-xs text-primary-foreground font-medium"
+                                style={{ backgroundColor: p.avatar_color }}
+                              >
+                                {p.display_name.split(" ").map((n) => n[0]).join("").toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm font-medium">{p.display_name}</span>
+                          </button>
+                        ))}
+                      {chatProfiles.filter((p) => p.user_id !== currentUserId).length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No team members found. Add profiles first.
+                        </p>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              {dmChannels.map((c) => {
+                const otherUserId = getDmOtherUserId(c);
+                const dmName = getDmDisplayName(c);
+                const color = otherUserId ? getAvatarColor(otherUserId) : "";
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      setActiveChannel(c);
+                      setThreadParent(null);
+                      setShowMobileSidebar(false);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                      activeChannel?.id === c.id
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    <Avatar className="h-5 w-5">
+                      <AvatarFallback
+                        className="text-[9px] text-primary-foreground font-medium"
+                        style={{ backgroundColor: color || undefined }}
+                      >
+                        {dmName.slice(0, 1).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{dmName}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </ScrollArea>
       </div>
@@ -414,13 +710,22 @@ export default function Chat() {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Hash className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <h3 className="font-semibold text-sm">{activeChannel.name}</h3>
-              {activeChannel.description && (
-                <p className="text-xs text-muted-foreground">{activeChannel.description}</p>
-              )}
-            </div>
+            {activeChannel.is_dm ? (
+              <>
+                <User className="h-5 w-5 text-muted-foreground" />
+                <h3 className="font-semibold text-sm">{getDmDisplayName(activeChannel)}</h3>
+              </>
+            ) : (
+              <>
+                <Hash className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <h3 className="font-semibold text-sm">{activeChannel.name}</h3>
+                  {activeChannel.description && (
+                    <p className="text-xs text-muted-foreground">{activeChannel.description}</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -438,7 +743,8 @@ export default function Chat() {
                 !showDate &&
                 new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime() < 300000;
 
-              const email = userEmails[msg.user_id] || "unknown";
+              const displayName = getDisplayName(msg.user_id);
+              const avatarColor = getAvatarColor(msg.user_id);
 
               return (
                 <div key={msg.id}>
@@ -459,8 +765,11 @@ export default function Chat() {
                   >
                     {!sameUser ? (
                       <Avatar className="h-8 w-8 mt-0.5 shrink-0">
-                        <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                          {getInitials(email)}
+                        <AvatarFallback
+                          className="text-xs font-medium"
+                          style={avatarColor ? { backgroundColor: avatarColor, color: "white" } : undefined}
+                        >
+                          {getInitials(msg.user_id)}
                         </AvatarFallback>
                       </Avatar>
                     ) : (
@@ -469,16 +778,15 @@ export default function Chat() {
                     <div className="flex-1 min-w-0">
                       {!sameUser && (
                         <div className="flex items-baseline gap-2">
-                          <span className="font-semibold text-sm">
-                            {email.split("@")[0]}
-                          </span>
+                          <span className="font-semibold text-sm">{displayName}</span>
                           <span className="text-xs text-muted-foreground">
                             {formatTimestamp(msg.created_at)}
                           </span>
                         </div>
                       )}
-                      <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                      {/* Attachments */}
+                      <p className="text-sm whitespace-pre-wrap break-words">
+                        {renderContent(msg.content)}
+                      </p>
                       {msg.attachments && msg.attachments.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-1">
                           {msg.attachments.map((a) => (
@@ -496,7 +804,6 @@ export default function Chat() {
                           ))}
                         </div>
                       )}
-                      {/* Thread indicator */}
                       {(msg.reply_count ?? 0) > 0 && (
                         <button
                           onClick={() => openThread(msg)}
@@ -507,7 +814,6 @@ export default function Chat() {
                         </button>
                       )}
                     </div>
-                    {/* Actions */}
                     <div className="opacity-0 group-hover:opacity-100 flex items-start gap-1 shrink-0 transition-opacity">
                       <Button
                         variant="ghost"
@@ -528,7 +834,35 @@ export default function Chat() {
 
         {/* Composer */}
         {activeChannel && (
-          <div className="p-4 border-t border-border">
+          <div className="p-4 border-t border-border relative">
+            {/* @mention dropdown */}
+            {mentionQuery !== null && filteredMentions.length > 0 && (
+              <div
+                ref={mentionRef}
+                className="absolute bottom-full left-4 right-4 mb-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-30"
+              >
+                {filteredMentions.map((p, idx) => (
+                  <button
+                    key={p.user_id}
+                    onClick={() => insertMention(p)}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors",
+                      idx === mentionIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted"
+                    )}
+                  >
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback
+                        className="text-[10px] text-primary-foreground font-medium"
+                        style={{ backgroundColor: p.avatar_color }}
+                      >
+                        {p.display_name.split(" ").map((n) => n[0]).join("").toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span>{p.display_name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {pendingFiles.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-2">
                 {pendingFiles.map((f, i) => (
@@ -570,16 +904,16 @@ export default function Chat() {
                 <Paperclip className="h-4 w-4" />
               </Button>
               <Input
+                ref={composerRef}
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder={`Message #${activeChannel.name}`}
+                onChange={handleComposerChange}
+                placeholder={
+                  activeChannel.is_dm
+                    ? `Message ${getDmDisplayName(activeChannel)}`
+                    : `Message #${activeChannel.name}`
+                }
                 className="flex-1"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }}
+                onKeyDown={handleComposerKeyDown}
               />
               <Button type="submit" size="icon" disabled={!newMessage.trim() && pendingFiles.length === 0}>
                 <Send className="h-4 w-4" />
@@ -609,45 +943,60 @@ export default function Chat() {
               {/* Parent message */}
               <div className="flex gap-3 pb-3 border-b border-border">
                 <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                    {getInitials(userEmails[threadParent.user_id] || "")}
+                  <AvatarFallback
+                    className="text-xs font-medium"
+                    style={
+                      getAvatarColor(threadParent.user_id)
+                        ? { backgroundColor: getAvatarColor(threadParent.user_id), color: "white" }
+                        : undefined
+                    }
+                  >
+                    {getInitials(threadParent.user_id)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <div className="flex items-baseline gap-2">
                     <span className="font-semibold text-sm">
-                      {(userEmails[threadParent.user_id] || "").split("@")[0]}
+                      {getDisplayName(threadParent.user_id)}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {formatTimestamp(threadParent.created_at)}
                     </span>
                   </div>
-                  <p className="text-sm whitespace-pre-wrap">{threadParent.content}</p>
+                  <p className="text-sm whitespace-pre-wrap">
+                    {renderContent(threadParent.content)}
+                  </p>
                 </div>
               </div>
 
               {/* Replies */}
-              {threadMessages.map((msg) => {
-                const email = userEmails[msg.user_id] || "unknown";
-                return (
-                  <div key={msg.id} className="flex gap-3">
-                    <Avatar className="h-7 w-7 shrink-0">
-                      <AvatarFallback className="text-[10px] bg-primary/20 text-primary">
-                        {getInitials(email)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="font-semibold text-sm">{email.split("@")[0]}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatTimestamp(msg.created_at)}
-                        </span>
-                      </div>
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              {threadMessages.map((msg) => (
+                <div key={msg.id} className="flex gap-3">
+                  <Avatar className="h-7 w-7 shrink-0">
+                    <AvatarFallback
+                      className="text-[10px] font-medium"
+                      style={
+                        getAvatarColor(msg.user_id)
+                          ? { backgroundColor: getAvatarColor(msg.user_id), color: "white" }
+                          : undefined
+                      }
+                    >
+                      {getInitials(msg.user_id)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-semibold text-sm">{getDisplayName(msg.user_id)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatTimestamp(msg.created_at)}
+                      </span>
                     </div>
+                    <p className="text-sm whitespace-pre-wrap">
+                      {renderContent(msg.content)}
+                    </p>
                   </div>
-                );
-              })}
+                </div>
+              ))}
               <div ref={threadEndRef} />
             </div>
           </ScrollArea>
