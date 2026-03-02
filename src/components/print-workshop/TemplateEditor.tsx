@@ -294,6 +294,18 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         }
         return true;
       });
+      // Strip editable highlight stroke artifacts from serialized data
+      data.objects.forEach((obj: any) => {
+        if (obj?._editableHighlight) {
+          obj.stroke = obj._origStroke || null;
+          obj.strokeWidth = obj._origStrokeWidth || 0;
+          obj.strokeDashArray = obj._origStrokeDash || null;
+          delete obj._editableHighlight;
+          delete obj._origStroke;
+          delete obj._origStrokeWidth;
+          delete obj._origStrokeDash;
+        }
+      });
     }
 
     return data;
@@ -435,12 +447,34 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       if (mode === "use") {
         canvas.getObjects().forEach((obj: any) => {
           if (obj.name === "_trimGuide") return;
+          if (obj.name === "_ocrKnockout") return;
+          if (obj.name === "pdf_background") return;
           if (obj.locked || !obj.editable) {
             obj.set({ selectable: false, evented: false, hasControls: false, lockMovementX: true, lockMovementY: true });
           } else {
-            obj.set({ selectable: true, evented: true, hasControls: true, borderColor: "#3b82f6", cornerColor: "#3b82f6", cornerStyle: "circle", transparentCorners: false });
+            // Highlight editable objects with a visible dashed border
+            obj.set({
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              borderColor: "#3b82f6",
+              cornerColor: "#3b82f6",
+              cornerStyle: "circle",
+              transparentCorners: false,
+              // Persistent highlight stroke to show editability
+              stroke: "#3b82f6",
+              strokeWidth: 2,
+              strokeDashArray: [6, 4],
+              paintFirst: "stroke",
+              // Store original stroke so we can restore on deselect
+              _origStroke: obj.stroke || null,
+              _origStrokeWidth: obj.strokeWidth || 0,
+              _origStrokeDash: obj.strokeDashArray || null,
+              _editableHighlight: true,
+            });
           }
         });
+        canvas.renderAll();
       }
 
       // Re-render PDF background from stored source path
@@ -517,9 +551,61 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         if ((first as any).fill) setFontColor((first as any).fill);
       }
     });
-    canvas.on("selection:cleared", () => setSelectedObject(null));
+    canvas.on("selection:cleared", () => {
+      setSelectedObject(null);
+      // Restore editable highlights when deselected (use mode)
+      if (mode === "use") {
+        canvas.getObjects().forEach((obj: any) => {
+          if (obj._editableHighlight) {
+            obj.set({ stroke: "#3b82f6", strokeWidth: 2, strokeDashArray: [6, 4] });
+          }
+        });
+        canvas.renderAll();
+      }
+    });
     canvas.on("object:modified", () => { clearGuidelines(canvas); syncCanvas(); });
     canvas.on("text:changed", syncCanvas);
+
+    // In use mode: auto-enter text editing on click, hide highlight on active object
+    if (mode === "use") {
+      canvas.on("selection:created", (e) => {
+        const obj = e.selected?.[0] as any;
+        if (obj?._editableHighlight) {
+          // Remove highlight stroke on the active/selected object
+          obj.set({ stroke: obj._origStroke || "", strokeWidth: obj._origStrokeWidth || 0, strokeDashArray: obj._origStrokeDash || null });
+          canvas.renderAll();
+        }
+        // Auto-enter editing for text objects
+        if (obj && obj.type === "i-text" && obj.editable) {
+          setTimeout(() => {
+            obj.enterEditing();
+            canvas.renderAll();
+          }, 50);
+        }
+      });
+      canvas.on("selection:updated", (e) => {
+        // Restore highlight on previously selected
+        const deselected = e.deselected;
+        if (deselected) {
+          deselected.forEach((d: any) => {
+            if (d._editableHighlight) {
+              d.set({ stroke: "#3b82f6", strokeWidth: 2, strokeDashArray: [6, 4] });
+            }
+          });
+        }
+        const obj = e.selected?.[0] as any;
+        if (obj?._editableHighlight) {
+          obj.set({ stroke: obj._origStroke || "", strokeWidth: obj._origStrokeWidth || 0, strokeDashArray: obj._origStrokeDash || null });
+          canvas.renderAll();
+        }
+        if (obj && obj.type === "i-text" && obj.editable) {
+          setTimeout(() => {
+            obj.enterEditing();
+            canvas.renderAll();
+          }, 50);
+        }
+      });
+    }
 
     // Smart snapping guidelines
     const SNAP_THRESHOLD = 12; // pixels in canvas coords
