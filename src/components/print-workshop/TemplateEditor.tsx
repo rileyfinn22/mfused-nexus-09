@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject } from "fabric";
+import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line } from "fabric";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette } from "lucide-react";
+import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
 import { IconPickerDialog } from "./IconPickerDialog";
@@ -110,6 +111,27 @@ function loadGoogleFont(fontFamily: string): Promise<void> {
   });
 }
 
+// Snap guide helpers
+const GUIDE_NAME = "_snapGuide";
+
+function clearGuidelines(canvas: FabricCanvas) {
+  const guides = canvas.getObjects().filter((o: any) => o.name === GUIDE_NAME);
+  guides.forEach((g) => canvas.remove(g));
+}
+
+function addGuideline(canvas: FabricCanvas, coords: { x1: number; y1: number; x2: number; y2: number }) {
+  const line = new Line([coords.x1, coords.y1, coords.x2, coords.y2], {
+    stroke: "#3b82f6",
+    strokeWidth: 1,
+    strokeDashArray: [4, 4],
+    selectable: false,
+    evented: false,
+    objectCaching: false,
+  } as any);
+  (line as any).name = GUIDE_NAME;
+  canvas.add(line);
+}
+
 interface TemplateEditorProps {
   canvasData?: any;
   width: number;
@@ -169,7 +191,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const data = fabricRef.current.toObject(['locked', 'editable', 'name']) as any;
       delete data.backgroundImage;
       if (Array.isArray(data.objects)) {
-        data.objects = data.objects.filter((obj: any) => obj?.name !== "_trimGuide");
+        data.objects = data.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide");
       }
       onCanvasChange(data);
 
@@ -330,7 +352,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const initialData = canvas.toObject(['locked', 'editable', 'name']) as any;
       delete initialData.backgroundImage;
       if (Array.isArray(initialData.objects)) {
-        initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide");
+        initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide");
       }
       undoStack.current = [JSON.stringify(initialData)];
       redoStack.current = [];
@@ -357,8 +379,89 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       }
     });
     canvas.on("selection:cleared", () => setSelectedObject(null));
-    canvas.on("object:modified", syncCanvas);
+    canvas.on("object:modified", () => { clearGuidelines(canvas); syncCanvas(); });
     canvas.on("text:changed", syncCanvas);
+
+    // Smart snapping guidelines
+    const SNAP_THRESHOLD = 8; // pixels in canvas coords
+    canvas.on("object:moving", (e) => {
+      const obj = e.target;
+      if (!obj) return;
+      clearGuidelines(canvas);
+
+      const objBounds = obj.getBoundingRect();
+      const objCenterX = objBounds.left / (displayScale * dpr) + objBounds.width / (displayScale * dpr) / 2;
+      const objCenterY = objBounds.top / (displayScale * dpr) + objBounds.height / (displayScale * dpr) / 2;
+      const objLeft = objBounds.left / (displayScale * dpr);
+      const objTop = objBounds.top / (displayScale * dpr);
+      const objRight = objLeft + objBounds.width / (displayScale * dpr);
+      const objBottom = objTop + objBounds.height / (displayScale * dpr);
+
+      // Trim area boundaries
+      const trimLeft = bleedPx;
+      const trimTop = bleedPx;
+      const trimRight = canvasWidth - bleedPx;
+      const trimBottom = canvasHeight - bleedPx;
+      const trimCenterX = canvasWidth / 2;
+      const trimCenterY = canvasHeight / 2;
+
+      const guidelines: { x1: number; y1: number; x2: number; y2: number }[] = [];
+
+      // Snap to horizontal center
+      if (Math.abs(objCenterX - trimCenterX) < SNAP_THRESHOLD) {
+        obj.set({ left: trimCenterX - (objBounds.width / (displayScale * dpr)) / 2 + ((obj.left || 0) - objLeft) });
+        guidelines.push({ x1: trimCenterX, y1: 0, x2: trimCenterX, y2: canvasHeight });
+      }
+      // Snap to vertical center
+      if (Math.abs(objCenterY - trimCenterY) < SNAP_THRESHOLD) {
+        obj.set({ top: trimCenterY - (objBounds.height / (displayScale * dpr)) / 2 + ((obj.top || 0) - objTop) });
+        guidelines.push({ x1: 0, y1: trimCenterY, x2: canvasWidth, y2: trimCenterY });
+      }
+      // Snap to trim edges
+      if (Math.abs(objLeft - trimLeft) < SNAP_THRESHOLD) {
+        obj.set({ left: trimLeft + ((obj.left || 0) - objLeft) });
+        guidelines.push({ x1: trimLeft, y1: 0, x2: trimLeft, y2: canvasHeight });
+      }
+      if (Math.abs(objRight - trimRight) < SNAP_THRESHOLD) {
+        obj.set({ left: trimRight - (objBounds.width / (displayScale * dpr)) + ((obj.left || 0) - objLeft) });
+        guidelines.push({ x1: trimRight, y1: 0, x2: trimRight, y2: canvasHeight });
+      }
+      if (Math.abs(objTop - trimTop) < SNAP_THRESHOLD) {
+        obj.set({ top: trimTop + ((obj.top || 0) - objTop) });
+        guidelines.push({ x1: 0, y1: trimTop, x2: canvasWidth, y2: trimTop });
+      }
+      if (Math.abs(objBottom - trimBottom) < SNAP_THRESHOLD) {
+        obj.set({ top: trimBottom - (objBounds.height / (displayScale * dpr)) + ((obj.top || 0) - objTop) });
+        guidelines.push({ x1: 0, y1: trimBottom, x2: canvasWidth, y2: trimBottom });
+      }
+
+      // Snap to other objects' centers/edges
+      canvas.getObjects().forEach((other: any) => {
+        if (other === obj || other.name === "_textCover" || other.name === "_snapGuide") return;
+        const oBounds = other.getBoundingRect();
+        const oCenterX = oBounds.left / (displayScale * dpr) + oBounds.width / (displayScale * dpr) / 2;
+        const oCenterY = oBounds.top / (displayScale * dpr) + oBounds.height / (displayScale * dpr) / 2;
+
+        // Align centers horizontally
+        if (Math.abs(objCenterY - oCenterY) < SNAP_THRESHOLD) {
+          obj.set({ top: oCenterY - (objBounds.height / (displayScale * dpr)) / 2 + ((obj.top || 0) - objTop) });
+          guidelines.push({ x1: 0, y1: oCenterY, x2: canvasWidth, y2: oCenterY });
+        }
+        // Align centers vertically
+        if (Math.abs(objCenterX - oCenterX) < SNAP_THRESHOLD) {
+          obj.set({ left: oCenterX - (objBounds.width / (displayScale * dpr)) / 2 + ((obj.left || 0) - objLeft) });
+          guidelines.push({ x1: oCenterX, y1: 0, x2: oCenterX, y2: canvasHeight });
+        }
+      });
+
+      // Draw guidelines
+      guidelines.forEach((g) => addGuideline(canvas, g));
+
+      obj.setCoords();
+      canvas.renderAll();
+    });
+
+    // Guidelines already cleared in object:modified above
 
     return () => {
       canvas.dispose();
@@ -852,6 +955,51 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     syncCanvas();
   };
 
+  // Alignment helpers — align selected object relative to trim area
+  const alignObject = (alignment: "left" | "centerH" | "right" | "top" | "centerV" | "bottom") => {
+    const canvas = fabricRef.current;
+    const obj = selectedObject;
+    if (!canvas || !obj) return;
+
+    const bounds = obj.getBoundingRect();
+    const zoom = displayScale * dpr;
+    const objW = bounds.width / zoom;
+    const objH = bounds.height / zoom;
+    const objLeftOffset = (obj.left || 0) - bounds.left / zoom;
+    const objTopOffset = (obj.top || 0) - bounds.top / zoom;
+
+    const trimLeft = bleedPx;
+    const trimTop = bleedPx;
+    const trimRight = canvasWidth - bleedPx;
+    const trimBottom = canvasHeight - bleedPx;
+    const trimW = trimRight - trimLeft;
+    const trimH = trimBottom - trimTop;
+
+    switch (alignment) {
+      case "left":
+        obj.set({ left: trimLeft + objLeftOffset });
+        break;
+      case "centerH":
+        obj.set({ left: trimLeft + trimW / 2 - objW / 2 + objLeftOffset });
+        break;
+      case "right":
+        obj.set({ left: trimRight - objW + objLeftOffset });
+        break;
+      case "top":
+        obj.set({ top: trimTop + objTopOffset });
+        break;
+      case "centerV":
+        obj.set({ top: trimTop + trimH / 2 - objH / 2 + objTopOffset });
+        break;
+      case "bottom":
+        obj.set({ top: trimBottom - objH + objTopOffset });
+        break;
+    }
+    obj.setCoords();
+    canvas.renderAll();
+    syncCanvas();
+  };
+
   const isTextObject = selectedObject && ((selectedObject as any).type === "i-text" || (selectedObject as any).type === "textbox" || (selectedObject as any).type === "text");
 
   return (
@@ -1049,6 +1197,48 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
                 title="Font color"
               />
             </div>
+          </>
+        )}
+
+        {/* Alignment buttons — shown when any object is selected */}
+        {selectedObject && (
+          <>
+            <div className="w-px h-6 bg-border mx-1" />
+            <TooltipProvider delayDuration={200}>
+              <div className="flex items-center gap-0.5">
+                <Tooltip><TooltipTrigger asChild>
+                  <Button size="sm" variant="ghost" onClick={() => alignObject("left")} className="h-8 w-8 p-0">
+                    <AlignLeft className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Align Left</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild>
+                  <Button size="sm" variant="ghost" onClick={() => alignObject("centerH")} className="h-8 w-8 p-0">
+                    <AlignCenter className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Center Horizontally</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild>
+                  <Button size="sm" variant="ghost" onClick={() => alignObject("right")} className="h-8 w-8 p-0">
+                    <AlignRight className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Align Right</TooltipContent></Tooltip>
+                <div className="w-px h-4 bg-border mx-0.5" />
+                <Tooltip><TooltipTrigger asChild>
+                  <Button size="sm" variant="ghost" onClick={() => alignObject("top")} className="h-8 w-8 p-0">
+                    <AlignStartVertical className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Align Top</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild>
+                  <Button size="sm" variant="ghost" onClick={() => alignObject("centerV")} className="h-8 w-8 p-0">
+                    <AlignCenterVertical className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Center Vertically</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild>
+                  <Button size="sm" variant="ghost" onClick={() => alignObject("bottom")} className="h-8 w-8 p-0">
+                    <AlignEndVertical className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Align Bottom</TooltipContent></Tooltip>
+              </div>
+            </TooltipProvider>
           </>
         )}
 
