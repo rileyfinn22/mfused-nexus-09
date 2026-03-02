@@ -1958,16 +1958,17 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             <AiEditDialog getCanvasImage={getCanvasImage} onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <IconPickerDialog onIconSelected={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <div className="w-px h-6 bg-border mx-1" />
-            {/* Extract Text zone controls (OCR mode, not object lock state) */}
+            {/* Controls whether extracted text will be editable or locked for end users */}
             <Button
               size="sm"
               variant={zoneExtractLocked ? "outline" : "default"}
               onClick={() => setZoneExtractLocked(false)}
               disabled={extractingText}
               className="gap-1 px-2"
+              title="Extracted text will be editable by customers"
             >
               <Unlock className="h-3 w-3" />
-              <span className="text-[10px]">OCR Editable</span>
+              <span className="text-[10px]">Extract Editable</span>
             </Button>
             <Button
               size="sm"
@@ -1975,9 +1976,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               onClick={() => setZoneExtractLocked(true)}
               disabled={extractingText}
               className="gap-1 px-2"
+              title="Extracted text will be locked (not editable by customers)"
             >
               <Lock className="h-3 w-3" />
-              <span className="text-[10px]">OCR Locked</span>
+              <span className="text-[10px]">Extract Locked</span>
             </Button>
             <Button
               size="sm"
@@ -2217,7 +2219,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               onClick={() => setSelectionLockedState(false)}
               className="h-8 gap-1.5"
             >
-              <Unlock className="h-3.5 w-3.5" /><span className="text-xs">Object Editable</span>
+              <Unlock className="h-3.5 w-3.5" /><span className="text-xs">Editable</span>
             </Button>
             <Button
               size="sm"
@@ -2225,7 +2227,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               onClick={() => setSelectionLockedState(true)}
               className="h-8 gap-1.5"
             >
-              <Lock className="h-3.5 w-3.5" /><span className="text-xs">Object Locked</span>
+              <Lock className="h-3.5 w-3.5" /><span className="text-xs">Locked</span>
             </Button>
             <Button size="sm" variant="ghost" onClick={deleteSelected} className="h-8 w-8 p-0 text-destructive">
               <Trash2 className="h-3.5 w-3.5" />
