@@ -176,7 +176,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const br = obj.getBoundingRect();
     return { left: br.left, top: br.top, width: br.width, height: br.height };
   };
-  const getWhiteoutStrokeWidth = (fontSizePx: number) => Math.max(1, Math.min(4, fontSizePx * 0.14));
+  const getWhiteoutStrokeWidth = (fontSizePx: number) => Math.max(2, fontSizePx * 0.35);
   const [fontFamily, setFontFamily] = useState("Arial");
 
   // Internal resolution for print quality
