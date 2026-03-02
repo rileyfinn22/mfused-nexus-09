@@ -114,6 +114,7 @@ function loadGoogleFont(fontFamily: string): Promise<void> {
 
 // Snap guide helpers
 const GUIDE_NAME = "_snapGuide";
+const OCR_KNOCKOUT_NAME = "_ocrKnockout";
 
 function clearGuidelines(canvas: FabricCanvas) {
   const guides = canvas.getObjects().filter((o: any) => o.name === GUIDE_NAME);
@@ -175,6 +176,97 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const getObjectBoundsInCanvas = (obj: FabricObject) => {
     const br = obj.getBoundingRect();
     return { left: br.left, top: br.top, width: br.width, height: br.height };
+  };
+  const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+  const sampleCanvasPixelColor = (canvas: FabricCanvas, x: number, y: number) => {
+    const el = (canvas as any).lowerCanvasEl as HTMLCanvasElement | undefined;
+    const ctx = el?.getContext("2d");
+    if (!el || !ctx) return null;
+
+    const zoom = canvas.getZoom() || 1;
+    const px = clamp(Math.round(x * zoom), 0, el.width - 1);
+    const py = clamp(Math.round(y * zoom), 0, el.height - 1);
+
+    const data = ctx.getImageData(px, py, 1, 1).data;
+    if (!data || data[3] === 0) return null;
+    return { r: data[0], g: data[1], b: data[2] };
+  };
+
+  const getKnockoutFillColor = (canvas: FabricCanvas, left: number, top: number, width: number, height: number) => {
+    const probe = Math.max(2, Math.round(Math.min(width, height) * 0.18));
+    const points: Array<[number, number]> = [
+      [left - probe, top - probe],
+      [left + width + probe, top - probe],
+      [left - probe, top + height + probe],
+      [left + width + probe, top + height + probe],
+      [left + width / 2, top - probe],
+      [left + width / 2, top + height + probe],
+      [left - probe, top + height / 2],
+      [left + width + probe, top + height / 2],
+    ];
+
+    const samples = points
+      .map(([x, y]) => sampleCanvasPixelColor(canvas, x, y))
+      .filter((sample): sample is { r: number; g: number; b: number } => sample !== null);
+
+    if (samples.length === 0) return "#ffffff";
+
+    const avg = samples.reduce(
+      (acc, sample) => {
+        acc.r += sample.r;
+        acc.g += sample.g;
+        acc.b += sample.b;
+        return acc;
+      },
+      { r: 0, g: 0, b: 0 }
+    );
+
+    const r = Math.round(avg.r / samples.length);
+    const g = Math.round(avg.g / samples.length);
+    const b = Math.round(avg.b / samples.length);
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
+  const addOcrKnockoutCover = (
+    canvas: FabricCanvas,
+    bounds: { left: number; top: number; width: number; height: number }
+  ) => {
+    if (bounds.width <= 0 || bounds.height <= 0) return;
+
+    const padX = Math.max(2, Math.round(bounds.width * 0.06));
+    const padY = Math.max(2, Math.round(bounds.height * 0.22));
+
+    const left = clamp(bounds.left - padX, 0, canvasWidth);
+    const top = clamp(bounds.top - padY, 0, canvasHeight);
+    const right = clamp(bounds.left + bounds.width + padX, 0, canvasWidth);
+    const bottom = clamp(bounds.top + bounds.height + padY, 0, canvasHeight);
+    const width = Math.max(1, right - left);
+    const height = Math.max(1, bottom - top);
+
+    const fill = getKnockoutFillColor(canvas, left, top, width, height);
+    const cover = new Rect({
+      left,
+      top,
+      width,
+      height,
+      fill,
+      selectable: false,
+      evented: false,
+      hasControls: false,
+      hasBorders: false,
+      objectCaching: false,
+      strokeWidth: 0,
+      name: OCR_KNOCKOUT_NAME,
+    } as any);
+
+    (cover as any).locked = true;
+    (cover as any).editable = false;
+
+    canvas.add(cover);
+    canvas.sendObjectToBack(cover);
+    const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
+    if (bg) canvas.sendObjectToBack(bg);
   };
   const [fontFamily, setFontFamily] = useState("Arial");
 
@@ -495,7 +587,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       // Snap to other objects' centers
       if (!snappedX || !snappedY) {
         canvas.getObjects().forEach((other: any) => {
-          if (other === obj || other.name === "_textCover" || other.name === GUIDE_NAME) return;
+          if (other === obj || other.name === "_textCover" || other.name === OCR_KNOCKOUT_NAME || other.name === GUIDE_NAME) return;
           const obr = other.getBoundingRect();
           const oCX = obr.left / zoom + obr.width / zoom / 2;
           const oCY = obr.top / zoom + obr.height / zoom / 2;
@@ -770,6 +862,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         // Convert percentage positions to canvas pixel coords
         const x = (region.x_percent / 100) * canvasWidth;
         const y = (region.y_percent / 100) * canvasHeight;
+        const regionWidthPx = (region.w_percent / 100) * canvasWidth;
 
         // Determine font size: use AI-detected pt or derive from region height
         const regionHeightPx = (region.h_percent / 100) * canvasHeight;
@@ -790,6 +883,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           await loadGoogleFont(fontDef.value);
         }
 
+        addOcrKnockoutCover(canvas, {
+          left: x,
+          top: y,
+          width: regionWidthPx > 0 ? regionWidthPx : Math.max(fontSizePx, text.length * (fontSizePx * 0.5)),
+          height: regionHeightPx > 0 ? regionHeightPx : Math.max(fontSizePx * 1.15, ptToPx(6)),
+        });
+
         const textObj = new IText(text, {
           left: x,
           top: y,
@@ -798,7 +898,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           fontWeight: region.font_weight || "normal",
           fontStyle: region.font_style || "normal",
           fill: region.color || "#000000",
-          textBackgroundColor: "#ffffff",
           editable: true,
           padding: 0,
         });
@@ -1054,13 +1153,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         const detectedFontSizePt = data?.font_size_pt || null;
         const detectedXPercent = typeof data?.x_percent === "number" ? data.x_percent : null;
         const detectedYPercent = typeof data?.y_percent === "number" ? data.y_percent : null;
+        const detectedWPercent = typeof data?.w_percent === "number" ? data.w_percent : null;
         const detectedHPercent = typeof data?.h_percent === "number" ? data.h_percent : null;
 
         if (!extractedText.trim()) {
           toast.warning("No text detected in the selected area");
           canvas.remove(rect);
         } else {
-          // Remove the selection rect; we'll add a tightly-fitted white cover after measuring the text
           canvas.remove(rect);
 
           const isLocked = zoneExtractLocked;
@@ -1128,12 +1227,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             fontWeight: detectedWeight,
             fontStyle: detectedStyle,
             fill: detectedColor,
-            textBackgroundColor: "#ffffff",
             editable: true,
             padding: 0,
           });
           (text as any)._fontSizePt = finalFontSizePt;
-          // Re-add below after configuring lock state
           (text as any).locked = isLocked;
           (text as any).editable = !isLocked;
           (text as any).name = isLocked ? "locked_text" : "editable_text";
@@ -1145,6 +1242,15 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           } as any);
 
           canvas.add(text);
+          const measuredBounds = getObjectBoundsInCanvas(text);
+          addOcrKnockoutCover(canvas, {
+            left: detectedXPercent !== null ? textLeft : measuredBounds.left,
+            top: detectedYPercent !== null ? textTop : measuredBounds.top,
+            width: detectedWPercent && detectedWPercent > 0 ? (detectedWPercent / 100) * cropW : measuredBounds.width,
+            height: detectedHPercent && detectedHPercent > 0 ? (detectedHPercent / 100) * cropH : measuredBounds.height,
+          });
+          canvas.bringObjectToFront(text);
+
           // Fix z-order: bg at back, trim on top
           const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
           if (bg) canvas.sendObjectToBack(bg);
@@ -1177,7 +1283,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     if (!canvas) return;
     canvas.selection = mode === "edit";
     canvas.getObjects().forEach((o: any) => {
-      if (o.name === "_trimGuide" || o.name === "_zoneSelect") return;
+      if (o.name === "_trimGuide" || o.name === "_zoneSelect" || o.name === OCR_KNOCKOUT_NAME) return;
       o.set({ evented: true });
     });
     canvas.renderAll();
@@ -1298,7 +1404,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.selection = mode === "edit";
     canvas.defaultCursor = "default";
     canvas.getObjects().forEach((o: any) => {
-      if (o.name === "_trimGuide" || o.name === GUIDE_NAME || o.name === "_drawTextRect") return;
+      if (o.name === "_trimGuide" || o.name === GUIDE_NAME || o.name === "_drawTextRect" || o.name === OCR_KNOCKOUT_NAME) return;
       o.set({ evented: true });
     });
     canvas.renderAll();
