@@ -252,3 +252,80 @@ function addCropMarks(doc: jsPDF, totalW: number, totalH: number, bleed: number)
     doc.line(c.x, c.y + vDir * offset, c.x, c.y + vDir * (offset + markLen));
   }
 }
+
+/**
+ * Generate a print-ready PDF from canvas data only (no source PDF).
+ * Rasterizes the Fabric.js canvas at high DPI.
+ */
+export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "sourcePdfPath">): Promise<Blob> {
+  const { canvasData, widthInches, heightInches, bleedInches } = options;
+
+  const totalW = widthInches + bleedInches * 2;
+  const totalH = heightInches + bleedInches * 2;
+
+  const orientation = totalW > totalH ? "landscape" : "portrait";
+  const doc = new jsPDF({
+    orientation,
+    unit: "in",
+    format: [totalW, totalH],
+  });
+
+  const CANVAS_DPI = 150;
+
+  // Overlay Fabric.js objects
+  const objects: any[] = canvasData?.objects || [];
+  for (const obj of objects) {
+    if (obj?.visible === false) continue;
+    const objectType = String(obj?.type || "").toLowerCase();
+    if (obj?.name === "_trimGuide") continue;
+
+    const xIn = (obj.left ?? 0) / CANVAS_DPI;
+    const yIn = (obj.top ?? 0) / CANVAS_DPI;
+
+    if (objectType === "itext" || objectType === "textbox" || objectType === "text") {
+      const fontSizePx = obj.fontSize || 24;
+      const scaleY = obj.scaleY || 1;
+      const fontSizePt = ((fontSizePx * scaleY) * 72) / CANVAS_DPI;
+
+      const jspdfFont = JSPDF_FONT_MAP[obj.fontFamily];
+      if (jspdfFont) {
+        const style =
+          obj.fontWeight === "bold" && obj.fontStyle === "italic"
+            ? "bolditalic"
+            : obj.fontWeight === "bold"
+              ? "bold"
+              : obj.fontStyle === "italic"
+                ? "italic"
+                : "normal";
+        doc.setFont(jspdfFont, style);
+        doc.setFontSize(fontSizePt);
+        const { r, g, b } = parseColor(obj.fill);
+        doc.setTextColor(r, g, b);
+        const textLines = String(obj.text || "").split("\n");
+        const baselineY = yIn + (fontSizePt / 72) * 0.82;
+        doc.text(textLines, xIn, baselineY);
+      } else {
+        const textCanvas = renderTextToCanvas(obj, CANVAS_DPI, EXPORT_DPI);
+        const textDataUrl = textCanvas.toDataURL("image/png");
+        const wIn = textCanvas.width / EXPORT_DPI;
+        const hIn = textCanvas.height / EXPORT_DPI;
+        doc.addImage(textDataUrl, "PNG", xIn, yIn, wIn, hIn, undefined, "NONE");
+      }
+    } else if (objectType === "image") {
+      if (obj.src) {
+        const scaleX = obj.scaleX || 1;
+        const scaleY = obj.scaleY || 1;
+        const wIn = ((obj.width || 100) * scaleX) / CANVAS_DPI;
+        const hIn = ((obj.height || 100) * scaleY) / CANVAS_DPI;
+        try {
+          doc.addImage(obj.src, "PNG", xIn, yIn, wIn, hIn, undefined, "NONE");
+        } catch {
+          console.warn("Could not embed image in PDF export", obj.name);
+        }
+      }
+    }
+  }
+
+  addCropMarks(doc, totalW, totalH, bleedInches);
+  return doc.output("blob");
+}

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ShoppingCart, FileText, DollarSign, Download } from "lucide-react";
-import { generatePrintReadyPdf } from "@/lib/printPdfExport";
+import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
 
 interface OrderPanelProps {
   template: any;
@@ -29,19 +29,25 @@ export function OrderPanel({ template, canvasData, onOrderCreated }: OrderPanelP
   const hasSourcePdf = !!template.source_pdf_path;
 
   const handleGeneratePrintFile = async () => {
-    if (!hasSourcePdf) {
-      toast.error("No source PDF attached to this template");
-      return;
-    }
     setGeneratingPdf(true);
     try {
-      const blob = await generatePrintReadyPdf({
-        sourcePdfPath: template.source_pdf_path,
-        canvasData,
-        widthInches: template.width_inches,
-        heightInches: template.height_inches,
-        bleedInches: template.bleed_inches,
-      });
+      let blob: Blob;
+      if (hasSourcePdf) {
+        blob = await generatePrintReadyPdf({
+          sourcePdfPath: template.source_pdf_path,
+          canvasData,
+          widthInches: template.width_inches,
+          heightInches: template.height_inches,
+          bleedInches: template.bleed_inches,
+        });
+      } else {
+        blob = await generateCanvasOnlyPdf({
+          canvasData,
+          widthInches: template.width_inches,
+          heightInches: template.height_inches,
+          bleedInches: template.bleed_inches,
+        });
+      }
 
       // Download locally
       const url = URL.createObjectURL(blob);
@@ -196,17 +202,15 @@ export function OrderPanel({ template, canvasData, onOrderCreated }: OrderPanelP
           </Label>
         </div>
 
-        {hasSourcePdf && (
-          <Button
-            onClick={handleGeneratePrintFile}
-            disabled={generatingPdf}
-            variant="outline"
-            className="w-full gap-2"
-          >
-            <Download className="h-4 w-4" />
-            {generatingPdf ? "Generating..." : "Download Print-Ready PDF"}
-          </Button>
-        )}
+        <Button
+          onClick={handleGeneratePrintFile}
+          disabled={generatingPdf}
+          variant="outline"
+          className="w-full gap-2"
+        >
+          <Download className="h-4 w-4" />
+          {generatingPdf ? "Generating..." : "Download Print-Ready PDF"}
+        </Button>
 
         <Button
           onClick={handleCreateOrder}
