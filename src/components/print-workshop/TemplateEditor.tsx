@@ -1375,26 +1375,23 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           </>
         )}
 
-        {mode === "use" && (
-          <>
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant={unlockZoneMode ? "default" : "outline"}
-                    onClick={unlockZoneMode ? endUnlockZone : startUnlockZone}
-                    className="gap-1.5"
-                  >
-                    <Unlock className="h-3.5 w-3.5" />
-                    <span className="text-xs">{unlockZoneMode ? "Cancel" : "Select to Edit"}</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Draw a box around text to make it editable</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </>
-        )}
+        {/* Select to Edit - available in both modes */}
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant={unlockZoneMode ? "default" : "outline"}
+                onClick={unlockZoneMode ? endUnlockZone : startUnlockZone}
+                className="gap-1.5"
+              >
+                <Unlock className="h-3.5 w-3.5" />
+                <span className="text-xs">{unlockZoneMode ? "Cancel" : "Select to Edit"}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Draw a box around locked text to make it editable</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         {mode === "use" && selectedObject && (selectedObject as any).editable && (selectedObject as any).type?.includes("image") && (
           <Button size="sm" variant="outline" onClick={() => {
