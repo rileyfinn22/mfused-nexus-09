@@ -736,21 +736,30 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             }
           }
 
-          // Use AI-detected font size (pt→px) if available, else estimate from crop height
-          const fontSize = detectedFontSizePt
-            ? Math.round(ptToPx(detectedFontSizePt))
-            : Math.max(Math.round(cropH * 0.5), ptToPx(10));
+          // Auto-fit font size to match the crop region height exactly
+          // Start with a trial size, measure, then scale to fit cropH
+          const trialSize = 40;
           const text = new IText(extractedText, {
             left: cropLeft,
             top: cropTop,
-            fontSize,
+            fontSize: trialSize,
             fontFamily: useFontFamily,
             fontWeight: detectedWeight,
             fontStyle: detectedStyle,
             fill: detectedColor,
             editable: true,
-            padding: 4,
+            padding: 0,
           });
+          // Temporarily add to canvas to measure bounding box
+          canvas.add(text);
+          canvas.renderAll();
+          const measuredH = text.getBoundingRect().height;
+          const fittedSize = measuredH > 0
+            ? Math.round(trialSize * (cropH / measuredH))
+            : Math.max(Math.round(cropH * 0.6), 20);
+          text.set({ fontSize: fittedSize, padding: 4 });
+          canvas.remove(text);
+          // Re-add below after configuring lock state
           (text as any).locked = isLocked;
           (text as any).editable = !isLocked;
           (text as any).name = isLocked ? "locked_text" : "editable_text";
