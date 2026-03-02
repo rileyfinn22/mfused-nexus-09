@@ -10,6 +10,7 @@ import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
 import { AiCleanupDialog } from "./AiCleanupDialog";
 import { IconPickerDialog } from "./IconPickerDialog";
+import { CanvasObjectsPanel } from "./CanvasObjectsPanel";
 import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -370,7 +371,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     isUndoRedo.current = false;
   }, [onCanvasChange, fixZOrder]);
 
-  // Keyboard shortcuts for undo/redo
+  // Keyboard shortcuts for undo/redo and delete
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
@@ -381,10 +382,26 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         e.preventDefault();
         redo();
       }
+      // Delete/Backspace to remove selected object (only when not editing text)
+      if ((e.key === "Delete" || e.key === "Backspace") && mode === "edit") {
+        const canvas = fabricRef.current;
+        if (!canvas) return;
+        const active = canvas.getActiveObject() as any;
+        if (!active) return;
+        // Don't delete if user is editing text inside an IText
+        if (active.isEditing) return;
+        // Don't delete background
+        if (active.name === "pdf_background") return;
+        e.preventDefault();
+        canvas.remove(active);
+        canvas.discardActiveObject();
+        canvas.renderAll();
+        syncCanvas();
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undo, redo]);
+  }, [undo, redo, mode, syncCanvas]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -2289,14 +2306,19 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         </div>
       </div>
 
-      {/* Dimensions info */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-        <span>{width}" × {height}" label</span>
-        <span>{bleed}" bleed</span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-0.5 border-t border-dashed border-destructive inline-block" />
-          Trim line
-        </span>
+      {/* Objects panel + Dimensions info */}
+      <div className="flex items-start gap-4">
+        <div className="flex-1">
+          <CanvasObjectsPanel canvas={fabricRef.current} onSync={syncCanvas} />
+        </div>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
+          <span>{width}" × {height}" label</span>
+          <span>{bleed}" bleed</span>
+          <span className="flex items-center gap-1">
+            <span className="w-3 h-0.5 border-t border-dashed border-destructive inline-block" />
+            Trim line
+          </span>
+        </div>
       </div>
     </div>
   );
