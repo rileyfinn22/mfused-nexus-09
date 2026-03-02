@@ -3,7 +3,7 @@ import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Wand2 } from "lucide-react";
+import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2 } from "lucide-react";
 import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
 import { IconPickerDialog } from "./IconPickerDialog";
@@ -130,7 +130,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const [zoneSelectMode, setZoneSelectMode] = useState(false);
   const [zoneExtractLocked, setZoneExtractLocked] = useState(false);
   const [extractingText, setExtractingText] = useState(false);
-  const [autoExtracting, setAutoExtracting] = useState(false);
+  
   const zoneRectRef = useRef<Rect | null>(null);
   const zoneStartRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -249,12 +249,18 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             const imgEl = new window.Image();
             imgEl.onload = () => {
               const fabricImg = new FabricImage(imgEl, {
-                left: 0, top: 0, selectable: false, evented: false, objectCaching: false,
+                left: 0, top: 0, objectCaching: false,
               } as any);
-              const scaleX = canvasWidth / imgEl.width;
-              const scaleY = canvasHeight / imgEl.height;
-              fabricImg.set({ scaleX, scaleY });
-              canvas.backgroundImage = fabricImg;
+              const fitScale = Math.min(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
+              fabricImg.set({
+                scaleX: fitScale,
+                scaleY: fitScale,
+                left: (canvasWidth - imgEl.width * fitScale) / 2,
+                top: (canvasHeight - imgEl.height * fitScale) / 2,
+              });
+              (fabricImg as any).name = "pdf_background";
+              canvas.add(fabricImg);
+              canvas.sendObjectToBack(fabricImg);
               canvas.renderAll();
               URL.revokeObjectURL(url);
             };
@@ -329,24 +335,25 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const canvas = fabricRef.current;
     if (!canvas) return;
 
-    // Keep PDF/image backgrounds crisp when they are downscaled for display.
+    // Add PDF as a selectable, movable, resizable object so user can position it
     const fabricImg = new FabricImage(imgEl, {
       left: 0,
       top: 0,
-      selectable: false,
-      evented: false,
       objectCaching: false,
     } as any);
 
-    // Scale to cover the full canvas so PDF fills the workspace without gaps
-    const coverScale = Math.max(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
+    // Scale to fit inside the canvas initially
+    const fitScale = Math.min(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
     fabricImg.set({
-      scaleX: coverScale,
-      scaleY: coverScale,
-      left: (canvasWidth - imgEl.width * coverScale) / 2,
-      top: (canvasHeight - imgEl.height * coverScale) / 2,
+      scaleX: fitScale,
+      scaleY: fitScale,
+      left: (canvasWidth - imgEl.width * fitScale) / 2,
+      top: (canvasHeight - imgEl.height * fitScale) / 2,
     });
-    canvas.backgroundImage = fabricImg;
+    (fabricImg as any).name = "pdf_background";
+    canvas.add(fabricImg);
+    canvas.sendObjectToBack(fabricImg);
+    canvas.setActiveObject(fabricImg);
     canvas.renderAll();
     syncCanvas();
   };
@@ -386,10 +393,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         imgEl.onload = () => {
           setCanvasBackground(imgEl);
           URL.revokeObjectURL(url);
-          // Auto-extract text from the uploaded PDF after a short delay for canvas to settle
-          setTimeout(() => {
-            autoExtractAllText();
-          }, 500);
         };
         imgEl.src = url;
       } catch (err: any) {
@@ -726,97 +729,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
   };
 
-  // Auto-extract all text from the full canvas (especially useful after PDF upload)
-  const autoExtractAllText = async () => {
-    const canvas = fabricRef.current;
-    if (!canvas) return;
-    setAutoExtracting(true);
-    try {
-      const fullDataUrl = canvas.toDataURL({ format: "png", multiplier: 2 });
-      const { data, error } = await supabase.functions.invoke("decompose-design-image", {
-        body: {
-          image_url: fullDataUrl,
-          extract_all: true,
-          canvas_width: canvasWidth,
-          canvas_height: canvasHeight,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      const regions = data?.regions || [];
-      if (regions.length === 0) {
-        toast.warning("No text regions detected");
-        return;
-      }
-
-      let added = 0;
-      for (const region of regions) {
-        if (!region.text?.trim()) continue;
-        const x = (region.x_percent / 100) * canvasWidth;
-        const y = (region.y_percent / 100) * canvasHeight;
-        const w = (region.w_percent / 100) * canvasWidth;
-        const h = (region.h_percent / 100) * canvasHeight;
-
-        const coverPad = 4;
-        const cover = new Rect({
-          left: x - coverPad, top: y - coverPad,
-          width: w + coverPad * 2, height: h + coverPad * 2,
-          fill: "#ffffff", opacity: 1, selectable: false, evented: false,
-          objectCaching: false, name: "_textCover",
-        });
-        canvas.add(cover);
-
-        let useFontFamily = "Arial";
-        if (region.font_family) {
-          const fontDef = FONT_OPTIONS.find(
-            (f) => f.value.toLowerCase() === region.font_family.toLowerCase()
-          );
-          if (fontDef) {
-            useFontFamily = fontDef.value;
-            if (fontDef.google) await loadGoogleFont(fontDef.value);
-          } else {
-            useFontFamily = region.font_family;
-          }
-        }
-
-        const fontSize = region.font_size_pt
-          ? ptToPx(region.font_size_pt)
-          : Math.max(Math.round(h * 0.6), ptToPx(10));
-
-        const isLocked = zoneExtractLocked;
-        const text = new IText(region.text, {
-          left: x, top: y, fontSize,
-          fontFamily: useFontFamily,
-          fontWeight: region.font_weight || "normal",
-          fontStyle: region.font_style || "normal",
-          fill: region.color || "#000000",
-          editable: true, padding: 4,
-        });
-        (text as any).locked = isLocked;
-        (text as any).editable = !isLocked;
-        (text as any).name = isLocked ? "locked_text" : "editable_text";
-        text.set({
-          borderColor: isLocked ? "#94a3b8" : "#3b82f6",
-          cornerColor: isLocked ? "#94a3b8" : "#3b82f6",
-          cornerStyle: isLocked ? undefined : "circle",
-          transparentCorners: isLocked ? undefined : false,
-        } as any);
-        canvas.add(text);
-        added++;
-      }
-
-      const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
-      if (trim) canvas.bringObjectToFront(trim);
-      canvas.renderAll();
-      syncCanvas();
-      toast.success(`Extracted ${added} text region${added !== 1 ? "s" : ""} from PDF`);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to auto-extract text");
-    } finally {
-      setAutoExtracting(false);
-    }
-  };
+  // Auto-extract removed - user positions PDF manually
 
   const applyFontSize = (sizePt: number) => {
     if (!selectedObject || !fabricRef.current) return;
@@ -929,22 +842,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
                 {extractingText ? "Extracting..." : zoneSelectMode ? "Cancel" : "Extract Text"}
               </span>
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={autoExtractAllText}
-              disabled={autoExtracting || extractingText}
-              className="gap-1.5"
-            >
-              {autoExtracting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Wand2 className="h-3.5 w-3.5" />
-              )}
-              <span className="text-xs">
-                {autoExtracting ? "Analyzing..." : "Auto-Extract All"}
-              </span>
-            </Button>
+            
             <div className="w-px h-6 bg-border mx-1" />
           </>
         )}
