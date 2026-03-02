@@ -51,9 +51,12 @@ export async function generatePdfThumbnailFromArrayBuffer(
   return await canvasToPngBlob(canvas);
 }
 
-export async function generatePdfThumbnailFromFile(file: File): Promise<Blob> {
+export async function generatePdfThumbnailFromFile(
+  file: File,
+  options?: { scale?: number; maxWidth?: number }
+): Promise<Blob> {
   const buf = await file.arrayBuffer();
-  return generatePdfThumbnailFromArrayBuffer(buf);
+  return generatePdfThumbnailFromArrayBuffer(buf, options);
 }
 
 export async function generatePdfThumbnailFromUrl(url: string): Promise<Blob> {

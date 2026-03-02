@@ -3,7 +3,8 @@ import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload } from "lucide-react";
+import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText } from "lucide-react";
+import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
 
 // Popular print-ready fonts (web-safe + Google Fonts)
 const FONT_OPTIONS = [
@@ -201,6 +202,43 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     });
   };
 
+  const addPdfBackground = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/pdf";
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        // Render PDF page 1 at high resolution for print quality
+        const blob = await generatePdfThumbnailFromFile(file, { scale: 2, maxWidth: 2400 });
+        const url = URL.createObjectURL(blob);
+        const imgEl = new window.Image();
+        imgEl.onload = () => {
+          const canvas = fabricRef.current;
+          if (!canvas) return;
+          const fabricImg = new FabricImage(imgEl, { left: 0, top: 0 });
+          fabricImg.scaleToWidth(canvasWidth);
+          (fabricImg as any).locked = true;
+          (fabricImg as any).editable = false;
+          (fabricImg as any).name = "background_pdf";
+          canvas.add(fabricImg);
+          canvas.sendObjectToBack(fabricImg);
+          const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
+          if (trim) canvas.bringObjectToFront(trim);
+          canvas.renderAll();
+          syncCanvas();
+          URL.revokeObjectURL(url);
+        };
+        imgEl.src = url;
+      } catch (err: any) {
+        console.error("PDF render error:", err);
+        alert("Failed to render PDF. Make sure it's a valid PDF file.");
+      }
+    };
+    input.click();
+  };
+
   const addArtworkImage = (editable: boolean) => {
     pickImageFile((imgEl) => {
       const canvas = fabricRef.current;
@@ -327,7 +365,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             <div className="w-px h-6 bg-border mx-1" />
             <Button size="sm" variant="outline" onClick={addBackgroundImage} className="gap-1.5">
               <ImageIcon className="h-3.5 w-3.5" />
-              <span className="text-xs">Background</span>
+              <span className="text-xs">Image BG</span>
+            </Button>
+            <Button size="sm" variant="outline" onClick={addPdfBackground} className="gap-1.5">
+              <FileText className="h-3.5 w-3.5" />
+              <span className="text-xs">PDF BG</span>
             </Button>
             <Button size="sm" variant="outline" onClick={() => addArtworkImage(false)} className="gap-1.5">
               <Upload className="h-3.5 w-3.5" />
