@@ -158,6 +158,34 @@ async function renderPdfPage(
 }
 
 /**
+ * Keep only user-visible layers for export.
+ * Note: _ocrKnockout must be preserved because it hides original PDF text
+ * and is visible in preview output.
+ */
+function shouldSkipExportObject(objName: string): boolean {
+  if (objName === "_trimGuide") return true;
+  if (objName === "_snapGuide") return true;
+  if (objName === "pdf_background") return true;
+  if (objName.startsWith("_") && objName !== "_ocrKnockout") return true;
+  return false;
+}
+
+function drawRectObject(doc: jsPDF, obj: any, canvasDpi: number) {
+  const scaleX = obj.scaleX || 1;
+  const scaleY = obj.scaleY || 1;
+  const xIn = (obj.left ?? 0) / canvasDpi;
+  const yIn = (obj.top ?? 0) / canvasDpi;
+  const wIn = ((obj.width || 0) * scaleX) / canvasDpi;
+  const hIn = ((obj.height || 0) * scaleY) / canvasDpi;
+
+  if (wIn <= 0 || hIn <= 0) return;
+
+  const { r, g, b } = parseColor(typeof obj.fill === "string" ? obj.fill : "#ffffff");
+  doc.setFillColor(r, g, b);
+  doc.rect(xIn, yIn, wIn, hIn, "F");
+}
+
+/**
  * Generate a print-ready PDF by compositing the source PDF with Fabric.js overlays.
  */
 export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blob> {
@@ -207,11 +235,12 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
     const objectType = String(obj?.type || "").toLowerCase();
     const objName = String(obj?.name || "");
 
-    // Skip internal helper objects — only export user-visible content
-    if (objName === "_trimGuide") continue;
-    if (objName === "_ocrKnockout") continue;
-    if (objName === "pdf_background") continue;
-    if (objName.startsWith("_")) continue;
+    if (shouldSkipExportObject(objName)) continue;
+
+    if (objName === "_ocrKnockout" && objectType === "rect") {
+      drawRectObject(doc, obj, CANVAS_DPI);
+      continue;
+    }
 
     // Convert canvas px position to inches
     const xIn = (obj.left ?? 0) / CANVAS_DPI;
@@ -383,10 +412,12 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
     if (obj?.visible === false) continue;
     const objectType = String(obj?.type || "").toLowerCase();
     const objName = String(obj?.name || "");
-    if (objName === "_trimGuide") continue;
-    if (objName === "_ocrKnockout") continue;
-    if (objName === "pdf_background") continue;
-    if (objName.startsWith("_")) continue;
+    if (shouldSkipExportObject(objName)) continue;
+
+    if (objName === "_ocrKnockout" && objectType === "rect") {
+      drawRectObject(doc, obj, CANVAS_DPI);
+      continue;
+    }
 
     const xIn = (obj.left ?? 0) / CANVAS_DPI;
     const yIn = (obj.top ?? 0) / CANVAS_DPI;
