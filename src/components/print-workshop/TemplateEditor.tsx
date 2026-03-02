@@ -103,10 +103,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
   const syncCanvas = useCallback(() => {
     if (fabricRef.current && onCanvasChange) {
-      // Exclude backgroundImage from serialization — it uses ephemeral blob URLs.
-      // The background is re-rendered from sourcePdfPath on load.
-      const data = fabricRef.current.toObject(['locked', 'editable', 'name']);
+      // Exclude backgroundImage + trim guide from serialization.
+      // Background is re-rendered from sourcePdfPath and trim guide is re-created on load.
+      const data = fabricRef.current.toObject(['locked', 'editable', 'name']) as any;
       delete data.backgroundImage;
+      if (Array.isArray(data.objects)) {
+        data.objects = data.objects.filter((obj: any) => obj?.name !== "_trimGuide");
+      }
       onCanvasChange(data);
     }
   }, [onCanvasChange]);
@@ -139,26 +142,39 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       strokeDashArray: [5, 5],
       selectable: false,
       evented: false,
+      hasControls: false,
+      hasBorders: false,
+      lockMovementX: true,
+      lockMovementY: true,
       name: "_trimGuide",
     });
-    canvas.add(trimRect);
+    // Trim guide is injected after JSON load to avoid persisted/selectable stale guides.
 
     const loadCanvasAndBackground = async () => {
       if (canvasData && canvasData.objects?.length > 0) {
-        await canvas.loadFromJSON(canvasData);
-        const hasTrim = canvas.getObjects().some((o: any) => o.name === "_trimGuide");
-        if (!hasTrim) canvas.add(trimRect);
-
-        if (mode === "use") {
-          canvas.getObjects().forEach((obj: any) => {
-            if (obj.name === "_trimGuide") return;
-            if (obj.locked || !obj.editable) {
-              obj.set({ selectable: false, evented: false, hasControls: false, lockMovementX: true, lockMovementY: true });
-            } else {
-              obj.set({ selectable: true, evented: true, hasControls: true, borderColor: "#3b82f6", cornerColor: "#3b82f6", cornerStyle: "circle", transparentCorners: false });
-            }
-          });
+        const safeCanvasData = JSON.parse(JSON.stringify(canvasData));
+        if (safeCanvasData?.backgroundImage?.src?.startsWith("blob:")) {
+          delete safeCanvasData.backgroundImage;
         }
+        await canvas.loadFromJSON(safeCanvasData);
+      }
+
+      // Remove any persisted trim guides (from older saves) and inject a fresh locked one
+      canvas.getObjects()
+        .filter((o: any) => o.name === "_trimGuide")
+        .forEach((o) => canvas.remove(o));
+      canvas.add(trimRect);
+      canvas.bringObjectToFront(trimRect);
+
+      if (mode === "use") {
+        canvas.getObjects().forEach((obj: any) => {
+          if (obj.name === "_trimGuide") return;
+          if (obj.locked || !obj.editable) {
+            obj.set({ selectable: false, evented: false, hasControls: false, lockMovementX: true, lockMovementY: true });
+          } else {
+            obj.set({ selectable: true, evented: true, hasControls: true, borderColor: "#3b82f6", cornerColor: "#3b82f6", cornerStyle: "circle", transparentCorners: false });
+          }
+        });
       }
 
       // Re-render PDF background from stored source path
