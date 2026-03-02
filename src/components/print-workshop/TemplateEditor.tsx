@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line } from "fabric";
+import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -157,6 +158,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const drawTextStartRef = useRef<{ x: number; y: number } | null>(null);
   const drawTextRectRef = useRef<Rect | null>(null);
   const [unlockZoneMode, setUnlockZoneMode] = useState(false);
+  const [extractingAll, setExtractingAll] = useState(false);
 
   // Undo/redo history
   const undoStack = useRef<string[]>([]);
@@ -573,6 +575,31 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const file = e.target.files?.[0];
       if (!file) return;
       try {
+        // Read the PDF to validate its page size against template dimensions
+        const arrayBuf = await file.arrayBuffer();
+        try {
+          const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
+          const page = await pdf.getPage(1);
+          const vp = page.getViewport({ scale: 1 });
+          // PDF units are 1/72 inch (points)
+          const pdfWidthIn = Math.round(vp.width / 72 * 100) / 100;
+          const pdfHeightIn = Math.round(vp.height / 72 * 100) / 100;
+          const templateTotalW = Math.round((width + bleed * 2) * 100) / 100;
+          const templateTotalH = Math.round((height + bleed * 2) * 100) / 100;
+          const wDiff = Math.abs(pdfWidthIn - templateTotalW);
+          const hDiff = Math.abs(pdfHeightIn - templateTotalH);
+          if (wDiff > 0.05 || hDiff > 0.05) {
+            toast.warning(
+              `PDF size (${pdfWidthIn}" × ${pdfHeightIn}") doesn't match template (${templateTotalW}" × ${templateTotalH}" with bleed). The PDF will be scaled to fit.`,
+              { duration: 8000 }
+            );
+          } else {
+            toast.success(`PDF dimensions match template: ${pdfWidthIn}" × ${pdfHeightIn}"`);
+          }
+        } catch (dimErr) {
+          console.warn("Could not validate PDF dimensions:", dimErr);
+        }
+
         // 1. Upload original PDF to storage for print-ready export
         const storagePath = `templates/${crypto.randomUUID()}/source.pdf`;
         const { error: uploadError } = await supabase.storage
@@ -586,7 +613,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           toast.success("Original PDF stored for print-ready export");
         }
 
-        // 2. Render preview at 2x canvas width for sharp on-screen proofing
+        // 2. Render preview at 4x canvas width for sharp on-screen proofing
         const blob = await generatePdfThumbnailFromFile(file, {
           maxWidth: canvasWidth * PDF_BACKGROUND_OVERSAMPLE,
           scale: 1,
@@ -604,6 +631,114 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       }
     };
     input.click();
+  };
+
+  // Extract ALL text from the canvas using AI full-page analysis
+  const extractAllText = async () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    setExtractingAll(true);
+    try {
+      // Get the canvas as a high-res image for AI analysis
+      const dataUrl = canvas.toDataURL({ format: "png", multiplier: 2 });
+
+      const { data, error } = await supabase.functions.invoke("decompose-design-image", {
+        body: {
+          image_url: dataUrl,
+          extract_all: true,
+          canvas_width: canvasWidth,
+          canvas_height: canvasHeight,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const regions = data?.regions || [];
+      if (regions.length === 0) {
+        toast.warning("No text regions detected");
+        return;
+      }
+
+      // Place each detected text region on the canvas
+      let addedCount = 0;
+      for (const region of regions) {
+        const text = region.text?.trim();
+        if (!text) continue;
+
+        // Convert percentage positions to canvas pixel coords
+        const x = (region.x_percent / 100) * canvasWidth;
+        const y = (region.y_percent / 100) * canvasHeight;
+
+        // Determine font size: use AI-detected pt or derive from region height
+        const regionHeightPx = (region.h_percent / 100) * canvasHeight;
+        let fontSizePx: number;
+        let fontSizePtVal: number;
+        if (region.font_size_pt && region.font_size_pt > 0) {
+          fontSizePtVal = region.font_size_pt;
+          fontSizePx = ptToPx(region.font_size_pt);
+        } else {
+          fontSizePx = Math.max(12, Math.round(regionHeightPx * 0.7));
+          fontSizePtVal = pxToPt(fontSizePx);
+        }
+
+        // Load font if it's a Google font
+        const fontFam = region.font_family || "Arial";
+        const fontDef = FONT_OPTIONS.find(f => f.value.toLowerCase() === fontFam.toLowerCase());
+        if (fontDef?.google) {
+          await loadGoogleFont(fontDef.value);
+        }
+
+        // White cover to mask baked-in text
+        const coverPad = 2;
+        const coverW = (region.w_percent / 100) * canvasWidth + coverPad * 2;
+        const coverH = regionHeightPx + coverPad * 2;
+        const cover = new Rect({
+          left: x - coverPad,
+          top: y - coverPad,
+          width: coverW,
+          height: coverH,
+          fill: "#ffffff",
+          opacity: 1,
+          selectable: false,
+          evented: false,
+          objectCaching: false,
+          name: "_textCover",
+        });
+        canvas.add(cover);
+
+        const textObj = new IText(text, {
+          left: x,
+          top: y,
+          fontSize: fontSizePx,
+          fontFamily: fontDef?.value || fontFam,
+          fontWeight: region.font_weight || "normal",
+          fontStyle: region.font_style || "normal",
+          fill: region.color || "#000000",
+          editable: true,
+          padding: 4,
+        });
+        (textObj as any)._fontSizePt = fontSizePtVal;
+        (textObj as any).locked = true;
+        (textObj as any).editable = false;
+        (textObj as any).name = "locked_text";
+        textObj.set({
+          borderColor: "#94a3b8",
+          cornerColor: "#94a3b8",
+        } as any);
+
+        canvas.add(textObj);
+        addedCount++;
+      }
+
+      canvas.renderAll();
+      syncCanvas();
+      toast.success(`Extracted ${addedCount} text region${addedCount !== 1 ? "s" : ""} from the design`);
+    } catch (err: any) {
+      console.error("Extract all text error:", err);
+      toast.error(err.message || "Failed to extract text from design");
+    } finally {
+      setExtractingAll(false);
+    }
   };
 
   const addArtworkImage = (editable: boolean) => {
@@ -1490,6 +1625,30 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               </span>
             </Button>
             
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={extractAllText}
+                    disabled={extractingAll}
+                    className="gap-1.5"
+                  >
+                    {extractingAll ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <FileText className="h-3.5 w-3.5" />
+                    )}
+                    <span className="text-xs">
+                      {extractingAll ? "Analyzing..." : "Extract All Text"}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Use AI to detect and extract all text from the design at once</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             <div className="w-px h-6 bg-border mx-1" />
           </>
         )}
