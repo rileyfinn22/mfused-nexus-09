@@ -1073,24 +1073,39 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const toggleLock = () => {
     if (!selectedObject || !fabricRef.current) return;
     const canvas = fabricRef.current;
-    const isLocked = (selectedObject as any).locked;
-    const newLocked = !isLocked;
-    (selectedObject as any).locked = newLocked;
-    (selectedObject as any).editable = !newLocked;
-    selectedObject.set({
-      borderColor: newLocked ? "#94a3b8" : "#3b82f6",
-      cornerColor: newLocked ? "#94a3b8" : "#3b82f6",
-    });
-    canvas.renderAll();
-    syncCanvas();
-    // Force React to re-render with updated properties by cycling the state
-    setSelectedObject(null);
-    setTimeout(() => {
-      setSelectedObject(canvas.getActiveObject() || null);
-    }, 0);
-    toast.success(newLocked ? "Element locked" : "Element set to editable", { duration: 1500 });
-  };
 
+    const targets: any[] = ((selectedObject as any).type === "activeSelection" || (selectedObject as any).type === "activeselection")
+      ? ((selectedObject as any).getObjects?.() || [])
+      : [selectedObject];
+
+    if (targets.length === 0) return;
+
+    // If any target is editable, lock all; otherwise unlock all.
+    const shouldLock = targets.some((obj) => !(obj as any).locked);
+
+    targets.forEach((obj: any) => {
+      obj.locked = shouldLock;
+      obj.editable = !shouldLock;
+      obj.name = shouldLock
+        ? (obj.type?.includes("text") ? "locked_text" : "locked_image")
+        : (obj.type?.includes("text") ? "editable_text" : "editable_image");
+      obj.set({
+        borderColor: shouldLock ? "#94a3b8" : "#3b82f6",
+        cornerColor: shouldLock ? "#94a3b8" : "#3b82f6",
+        hasControls: mode === "edit" ? true : !shouldLock,
+      });
+      if (typeof obj.setCoords === "function") obj.setCoords();
+    });
+
+    canvas.requestRenderAll();
+    syncCanvas();
+
+    // Trigger toolbar refresh without changing active selection.
+    setSelectedObject(null);
+    setTimeout(() => setSelectedObject(canvas.getActiveObject() || null), 0);
+
+    toast.success(shouldLock ? "Element locked" : "Element set to editable", { duration: 1500 });
+  };
   const deleteSelected = () => {
     if (!selectedObject || !fabricRef.current) return;
     fabricRef.current.remove(selectedObject);
