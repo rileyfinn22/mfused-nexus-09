@@ -148,6 +148,7 @@ interface TemplateEditorProps {
 export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChange, onSourcePdfChange, sourcePdfPath, mode }: TemplateEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
+  const previewPdfUrlRef = useRef<string | null>(null);
   const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
   const [fontSearch, setFontSearch] = useState("");
   const [fontSizePt, setFontSizePt] = useState(12);
@@ -179,6 +180,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     return { left: br.left, top: br.top, width: br.width, height: br.height };
   };
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+  const setPreviewPdfUrl = (url: string) => {
+    if (previewPdfUrlRef.current && previewPdfUrlRef.current !== url) {
+      URL.revokeObjectURL(previewPdfUrlRef.current);
+    }
+    previewPdfUrlRef.current = url;
+  };
 
   /**
    * Build knockout bounds from OCR percentage data relative to a reference area.
@@ -270,24 +277,45 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   // Use device pixel ratio so retina screens get a sharp backing buffer
   const dpr = typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1;
 
-  const syncCanvas = useCallback(() => {
-    if (fabricRef.current && onCanvasChange) {
-      const data = fabricRef.current.toObject(['locked', 'editable', 'name']) as any;
-      delete data.backgroundImage;
-      if (Array.isArray(data.objects)) {
-        data.objects = data.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide");
-      }
-      onCanvasChange(data);
+  const serializeCanvasState = useCallback((includePdfBackground: boolean) => {
+    if (!fabricRef.current) return null;
 
-      // Push to undo stack (skip if triggered by undo/redo itself)
-      if (!isUndoRedo.current) {
-        undoStack.current.push(JSON.stringify(data));
-        // Cap stack size
-        if (undoStack.current.length > 200) undoStack.current.shift();
-        redoStack.current = [];
-      }
+    const data = fabricRef.current.toObject(['locked', 'editable', 'name']) as any;
+    delete data.backgroundImage;
+
+    if (Array.isArray(data.objects)) {
+      data.objects = data.objects.filter((obj: any) => {
+        if (obj?.name === "_trimGuide" || obj?.name === "_snapGuide") return false;
+        if (!includePdfBackground && obj?.name === "pdf_background") {
+          const src = typeof obj?.src === "string" ? obj.src : "";
+          if (sourcePdfPath || src.startsWith("blob:")) return false;
+        }
+        return true;
+      });
     }
-  }, [onCanvasChange]);
+
+    return data;
+  }, [sourcePdfPath]);
+
+  const syncCanvas = useCallback(() => {
+    if (!onCanvasChange) return;
+
+    const persistedData = serializeCanvasState(false);
+    if (!persistedData) return;
+
+    onCanvasChange(persistedData);
+
+    // Push to undo stack (skip if triggered by undo/redo itself)
+    if (!isUndoRedo.current) {
+      const historyData = serializeCanvasState(true);
+      if (!historyData) return;
+
+      undoStack.current.push(JSON.stringify(historyData));
+      // Cap stack size
+      if (undoStack.current.length > 200) undoStack.current.shift();
+      redoStack.current = [];
+    }
+  }, [onCanvasChange, serializeCanvasState]);
 
   // After any canvas load, fix z-ordering and lock pdf_background
   const fixZOrder = useCallback((canvas: any) => {
@@ -366,6 +394,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const loadCanvasAndBackground = async () => {
       if (canvasData && canvasData.objects?.length > 0) {
         const safeCanvasData = JSON.parse(JSON.stringify(canvasData));
+        if (Array.isArray(safeCanvasData.objects)) {
+          safeCanvasData.objects = safeCanvasData.objects.filter((obj: any) => {
+            if (obj?.name !== "pdf_background") return true;
+            const src = typeof obj?.src === "string" ? obj.src : "";
+            return !sourcePdfPath && !src.startsWith("blob:");
+          });
+        }
         if (safeCanvasData?.backgroundImage?.src?.startsWith("blob:")) {
           delete safeCanvasData.backgroundImage;
         }
@@ -432,10 +467,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               scale: 1,
             });
             const url = URL.createObjectURL(blob);
+            setPreviewPdfUrl(url);
             const imgEl = new window.Image();
             imgEl.onload = () => {
               setCanvasBackground(imgEl, pdfWidthIn, pdfHeightIn);
-              URL.revokeObjectURL(url);
             };
             imgEl.src = url;
           }
@@ -595,6 +630,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     // Guidelines already cleared in object:modified above
 
     return () => {
+      if (previewPdfUrlRef.current) {
+        URL.revokeObjectURL(previewPdfUrlRef.current);
+        previewPdfUrlRef.current = null;
+      }
       canvas.dispose();
       fabricRef.current = null;
     };
@@ -793,12 +832,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           scale: 1,
         });
         const url = URL.createObjectURL(blob);
+        setPreviewPdfUrl(url);
         const imgEl = new window.Image();
         const capturedW = pdfWidthIn;
         const capturedH = pdfHeightIn;
         imgEl.onload = () => {
           setCanvasBackground(imgEl, capturedW || undefined, capturedH || undefined);
-          URL.revokeObjectURL(url);
         };
         imgEl.src = url;
       } catch (err: any) {
