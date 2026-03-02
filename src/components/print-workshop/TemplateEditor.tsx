@@ -191,12 +191,16 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     // so it is always the top visual layer over PDFs, images, and text.
     const drawBleedOverlay = () => {
       const ctx = canvas.getContext();
-      if (!ctx) return;
+      const vpt = canvas.viewportTransform;
+      if (!ctx || !vpt) return;
 
       const innerWidth = canvasWidth - bleedPx * 2;
       const innerHeight = canvasHeight - bleedPx * 2;
 
       ctx.save();
+      // Align overlay drawing with Fabric viewport (zoom/pan/retina)
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.transform(vpt[0], vpt[1], vpt[2], vpt[3], vpt[4], vpt[5]);
       ctx.globalCompositeOperation = "source-over";
 
       // Grey bleed mask
