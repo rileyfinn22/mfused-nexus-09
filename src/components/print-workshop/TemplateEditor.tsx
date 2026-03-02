@@ -103,7 +103,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
   const syncCanvas = useCallback(() => {
     if (fabricRef.current && onCanvasChange) {
-      onCanvasChange(fabricRef.current.toObject(['locked', 'editable', 'name', 'backgroundImage']));
+      // Exclude backgroundImage from serialization — it uses ephemeral blob URLs.
+      // The background is re-rendered from sourcePdfPath on load.
+      const data = fabricRef.current.toObject(['locked', 'editable', 'name']);
+      delete data.backgroundImage;
+      onCanvasChange(data);
     }
   }, [onCanvasChange]);
 
@@ -139,8 +143,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     });
     canvas.add(trimRect);
 
-    if (canvasData && canvasData.objects?.length > 0) {
-      canvas.loadFromJSON(canvasData).then(() => {
+    const loadCanvasAndBackground = async () => {
+      if (canvasData && canvasData.objects?.length > 0) {
+        await canvas.loadFromJSON(canvasData);
         const hasTrim = canvas.getObjects().some((o: any) => o.name === "_trimGuide");
         if (!hasTrim) canvas.add(trimRect);
 
@@ -154,9 +159,44 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             }
           });
         }
-        canvas.renderAll();
-      });
-    }
+      }
+
+      // Re-render PDF background from stored source path
+      if (sourcePdfPath) {
+        try {
+          const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(sourcePdfPath);
+          const resp = await fetch(urlData.publicUrl);
+          if (resp.ok) {
+            const buf = await resp.arrayBuffer();
+            const { generatePdfThumbnailFromArrayBuffer } = await import("@/lib/pdfThumbnail");
+            const blob = await generatePdfThumbnailFromArrayBuffer(buf, {
+              maxWidth: canvasWidth * PDF_BACKGROUND_OVERSAMPLE,
+              scale: 1,
+            });
+            const url = URL.createObjectURL(blob);
+            const imgEl = new window.Image();
+            imgEl.onload = () => {
+              const fabricImg = new FabricImage(imgEl, {
+                left: 0, top: 0, selectable: false, evented: false, objectCaching: false,
+              } as any);
+              const scaleX = canvasWidth / imgEl.width;
+              const scaleY = canvasHeight / imgEl.height;
+              fabricImg.set({ scaleX, scaleY });
+              canvas.backgroundImage = fabricImg;
+              canvas.renderAll();
+              URL.revokeObjectURL(url);
+            };
+            imgEl.src = url;
+          }
+        } catch (err) {
+          console.warn("Could not re-render PDF background:", err);
+        }
+      }
+
+      canvas.renderAll();
+    };
+
+    loadCanvasAndBackground();
 
     canvas.on("selection:created", (e) => {
       const obj = e.selected?.[0];
