@@ -176,6 +176,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const br = obj.getBoundingRect();
     return { left: br.left, top: br.top, width: br.width, height: br.height };
   };
+  const getWhiteoutStrokeWidth = (fontSizePx: number) => Math.max(1, Math.min(4, fontSizePx * 0.14));
   const [fontFamily, setFontFamily] = useState("Arial");
 
   // Internal resolution for print quality
@@ -298,9 +299,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         await canvas.loadFromJSON(safeCanvasData);
       }
 
-      // Remove any persisted trim guides from older saves (named + legacy unnamed artifacts).
+      // Remove any persisted trim guides / old text covers from older saves.
       canvas.getObjects().forEach((o: any) => {
         const isNamedGuide = o?.name === "_trimGuide";
+        const isLegacyTextCover = o?.name === "_textCover";
         const isLegacyTrimLine =
           o?.type === "rect" &&
           o?.selectable === false &&
@@ -315,7 +317,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           typeof o?.fill === "string" &&
           (o.fill.includes("rgba(0, 0, 0, 0.35)") || o.fill.includes("rgba(31, 41, 55, 0.35)"));
 
-        if (isNamedGuide || isLegacyTrimLine || isLegacyBleedMask) {
+        if (isNamedGuide || isLegacyTextCover || isLegacyTrimLine || isLegacyBleedMask) {
           canvas.remove(o);
         }
       });
@@ -795,6 +797,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           fontWeight: region.font_weight || "normal",
           fontStyle: region.font_style || "normal",
           fill: region.color || "#000000",
+          stroke: "#ffffff",
+          strokeWidth: getWhiteoutStrokeWidth(fontSizePx),
+          strokeLineJoin: "round",
+          paintFirst: "stroke",
           editable: true,
           padding: 4,
         });
@@ -807,33 +813,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           cornerColor: "#94a3b8",
         } as any);
 
-        // Measure text bounds, then add a tight cover below text only
         canvas.add(textObj);
-        canvas.renderAll();
-        const textBounds = getObjectBoundsInCanvas(textObj);
-        canvas.remove(textObj);
-
-        const textPadding = typeof (textObj as any).padding === "number" ? (textObj as any).padding : 0;
-        const innerLeft = textBounds.left + textPadding;
-        const innerTop = textBounds.top + textPadding;
-        const innerWidth = Math.max(1, textBounds.width - textPadding * 2);
-        const innerHeight = Math.max(1, textBounds.height - textPadding * 2);
-        const coverPad = 0.75;
-
-        const cover = new Rect({
-          left: innerLeft - coverPad,
-          top: innerTop - coverPad,
-          width: innerWidth + coverPad * 2,
-          height: innerHeight + coverPad * 2,
-          fill: "#ffffff",
-          opacity: 1,
-          selectable: false,
-          evented: false,
-          objectCaching: false,
-          name: "_textCover",
-        });
-        canvas.add(cover);    // cover first
-        canvas.add(textObj);  // text on top
         addedCount++;
       }
 
@@ -1143,6 +1123,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             fontWeight: detectedWeight,
             fontStyle: detectedStyle,
             fill: detectedColor,
+            stroke: "#ffffff",
+            strokeWidth: getWhiteoutStrokeWidth(finalFontSizePx),
+            strokeLineJoin: "round",
+            paintFirst: "stroke",
             editable: true,
             padding: 4,
           });
@@ -1158,34 +1142,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             transparentCorners: isLocked ? undefined : false,
           } as any);
 
-          // Measure text bounds in canvas coords and size cover to just the glyph area
           canvas.add(text);
-          canvas.renderAll();
-          const textBounds = getObjectBoundsInCanvas(text);
-          // Remove text, add cover, then re-add text on top
-          canvas.remove(text);
-
-          const textPadding = typeof (text as any).padding === "number" ? (text as any).padding : 0;
-          const innerLeft = textBounds.left + textPadding;
-          const innerTop = textBounds.top + textPadding;
-          const innerWidth = Math.max(1, textBounds.width - textPadding * 2);
-          const innerHeight = Math.max(1, textBounds.height - textPadding * 2);
-          const coverPad = 0.75;
-
-          const cover = new Rect({
-            left: innerLeft - coverPad,
-            top: innerTop - coverPad,
-            width: innerWidth + coverPad * 2,
-            height: innerHeight + coverPad * 2,
-            fill: "#ffffff",
-            opacity: 1,
-            selectable: false,
-            evented: false,
-            objectCaching: false,
-            name: "_textCover",
-          });
-          canvas.add(cover);   // cover goes on first
-          canvas.add(text);    // text goes on top of cover
           // Fix z-order: bg at back, trim on top
           const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
           if (bg) canvas.sendObjectToBack(bg);
