@@ -1455,6 +1455,150 @@ export type Database = {
           },
         ]
       }
+      print_orders: {
+        Row: {
+          canvas_data: Json | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          material: string | null
+          order_id: string | null
+          price_per_unit: number | null
+          print_file_url: string | null
+          print_template_id: string | null
+          quantity: number
+          quoted_at: string | null
+          quoted_by: string | null
+          quoted_price: number | null
+          status: string
+          template_name: string
+          total: number | null
+        }
+        Insert: {
+          canvas_data?: Json | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          material?: string | null
+          order_id?: string | null
+          price_per_unit?: number | null
+          print_file_url?: string | null
+          print_template_id?: string | null
+          quantity?: number
+          quoted_at?: string | null
+          quoted_by?: string | null
+          quoted_price?: number | null
+          status?: string
+          template_name: string
+          total?: number | null
+        }
+        Update: {
+          canvas_data?: Json | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          material?: string | null
+          order_id?: string | null
+          price_per_unit?: number | null
+          print_file_url?: string | null
+          print_template_id?: string | null
+          quantity?: number
+          quoted_at?: string | null
+          quoted_by?: string | null
+          quoted_price?: number | null
+          status?: string
+          template_name?: string
+          total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_orders_print_template_id_fkey"
+            columns: ["print_template_id"]
+            isOneToOne: false
+            referencedRelation: "print_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      print_templates: {
+        Row: {
+          bleed_inches: number
+          canvas_data: Json | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          height_inches: number
+          id: string
+          material_options: Json | null
+          name: string
+          preset_price_per_unit: number | null
+          product_type: string
+          thumbnail_url: string | null
+          updated_at: string
+          width_inches: number
+        }
+        Insert: {
+          bleed_inches?: number
+          canvas_data?: Json | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          height_inches?: number
+          id?: string
+          material_options?: Json | null
+          name: string
+          preset_price_per_unit?: number | null
+          product_type?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          width_inches?: number
+        }
+        Update: {
+          bleed_inches?: number
+          canvas_data?: Json | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          height_inches?: number
+          id?: string
+          material_options?: Json | null
+          name?: string
+          preset_price_per_unit?: number | null
+          product_type?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          width_inches?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_states: {
         Row: {
           artwork_status: string
