@@ -228,10 +228,27 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         await canvas.loadFromJSON(safeCanvasData);
       }
 
-      // Remove any persisted trim guides from older saves.
-      canvas.getObjects()
-        .filter((o: any) => o.name === "_trimGuide")
-        .forEach((o) => canvas.remove(o));
+      // Remove any persisted trim guides from older saves (named + legacy unnamed artifacts).
+      canvas.getObjects().forEach((o: any) => {
+        const isNamedGuide = o?.name === "_trimGuide";
+        const isLegacyTrimLine =
+          o?.type === "rect" &&
+          o?.selectable === false &&
+          o?.evented === false &&
+          typeof o?.stroke === "string" &&
+          o.stroke.toLowerCase() === "#ef4444" &&
+          Array.isArray(o?.strokeDashArray);
+        const isLegacyBleedMask =
+          o?.type === "rect" &&
+          o?.selectable === false &&
+          o?.evented === false &&
+          typeof o?.fill === "string" &&
+          (o.fill.includes("rgba(0, 0, 0, 0.35)") || o.fill.includes("rgba(31, 41, 55, 0.35)"));
+
+        if (isNamedGuide || isLegacyTrimLine || isLegacyBleedMask) {
+          canvas.remove(o);
+        }
+      });
 
       if (mode === "use") {
         canvas.getObjects().forEach((obj: any) => {
