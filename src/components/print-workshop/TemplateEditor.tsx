@@ -8,6 +8,7 @@ import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, 
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
+import { AiCleanupDialog } from "./AiCleanupDialog";
 import { IconPickerDialog } from "./IconPickerDialog";
 import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
 import { supabase } from "@/integrations/supabase/client";
@@ -1956,6 +1957,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             <div className="w-px h-6 bg-border mx-1" />
             <AiImageDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <AiEditDialog getCanvasImage={getCanvasImage} onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
+            <AiCleanupDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <IconPickerDialog onIconSelected={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <div className="w-px h-6 bg-border mx-1" />
             {/* Controls whether extracted text will be editable or locked for end users */}
