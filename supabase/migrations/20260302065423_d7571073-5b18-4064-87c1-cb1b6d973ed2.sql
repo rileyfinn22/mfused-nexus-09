@@ -1,0 +1,1 @@
+ALTER TABLE public.print_templates ADD COLUMN source_pdf_path text;

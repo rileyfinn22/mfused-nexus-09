@@ -29,8 +29,8 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
   );
   const [newMaterial, setNewMaterial] = useState("");
   const [canvasData, setCanvasData] = useState<any>(template?.canvas_data || null);
+  const [sourcePdfPath, setSourcePdfPath] = useState<string>(template?.source_pdf_path || "");
   const [saving, setSaving] = useState(false);
-  const [companyId, setCompanyId] = useState(template?.company_id || "");
 
   const addMaterial = () => {
     if (newMaterial.trim() && !materialOptions.includes(newMaterial.trim())) {
@@ -61,7 +61,8 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         preset_price_per_unit: presetPrice ? Number(presetPrice) : null,
         material_options: materialOptions,
         canvas_data: canvasData,
-        company_id: companyId || null,
+        source_pdf_path: sourcePdfPath || null,
+        company_id: template?.company_id || null,
         created_by: user?.id || null,
       };
 
@@ -177,6 +178,8 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
             height={heightInches}
             bleed={bleedInches}
             onCanvasChange={setCanvasData}
+            onSourcePdfChange={setSourcePdfPath}
+            sourcePdfPath={sourcePdfPath}
             mode="edit"
           />
         </div>
