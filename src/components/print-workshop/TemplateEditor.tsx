@@ -153,6 +153,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const [zoneExtractLocked, setZoneExtractLocked] = useState(false);
   const [extractingText, setExtractingText] = useState(false);
   const [fontColor, setFontColor] = useState("#000000");
+  const [drawTextMode, setDrawTextMode] = useState<"off" | "editable" | "locked">("off");
+  const drawTextStartRef = useRef<{ x: number; y: number } | null>(null);
+  const drawTextRectRef = useRef<Rect | null>(null);
 
   // Undo/redo history
   const undoStack = useRef<string[]>([]);
@@ -940,6 +943,125 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
   };
 
+  // --- Draw Text Box: click-and-drag to place a text zone ---
+  const startDrawText = (type: "editable" | "locked") => {
+    setDrawTextMode(type);
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.selection = false;
+    canvas.getObjects().forEach((o: any) => {
+      if (o.name === "_trimGuide" || o.name === GUIDE_NAME) return;
+      o.set({ evented: false });
+    });
+    canvas.defaultCursor = "crosshair";
+    canvas.renderAll();
+
+    const onMouseDown = (e: any) => {
+      const pointer = canvas.getViewportPoint(e.e);
+      const zoom = canvas.getZoom();
+      const x = pointer.x / zoom;
+      const y = pointer.y / zoom;
+      drawTextStartRef.current = { x, y };
+      const rect = new Rect({
+        left: x, top: y, width: 1, height: 1,
+        fill: type === "editable" ? "rgba(59,130,246,0.08)" : "rgba(148,163,184,0.08)",
+        stroke: type === "editable" ? "#3b82f6" : "#94a3b8",
+        strokeWidth: 2,
+        strokeDashArray: [6, 4],
+        selectable: false, evented: false,
+        name: "_drawTextRect",
+      } as any);
+      drawTextRectRef.current = rect;
+      canvas.add(rect);
+      canvas.renderAll();
+    };
+
+    const onMouseMove = (e: any) => {
+      if (!drawTextStartRef.current || !drawTextRectRef.current) return;
+      const pointer = canvas.getViewportPoint(e.e);
+      const zoom = canvas.getZoom();
+      const x = pointer.x / zoom;
+      const y = pointer.y / zoom;
+      const start = drawTextStartRef.current;
+      drawTextRectRef.current.set({
+        left: Math.min(start.x, x),
+        top: Math.min(start.y, y),
+        width: Math.abs(x - start.x),
+        height: Math.abs(y - start.y),
+      });
+      canvas.renderAll();
+    };
+
+    const onMouseUp = () => {
+      canvas.off("mouse:down", onMouseDown);
+      canvas.off("mouse:move", onMouseMove);
+      canvas.off("mouse:up", onMouseUp);
+
+      const rect = drawTextRectRef.current;
+      if (rect) {
+        const w = rect.width || 0;
+        const h = rect.height || 0;
+        canvas.remove(rect);
+
+        if (w > 10 && h > 10) {
+          const isEditable = type === "editable";
+          const defaultPt = fontSizePt || 12;
+          // Auto-fit font size: aim for text height ≈ box height
+          const fontSize = Math.max(ptToPx(6), Math.round(h * 0.7));
+
+          const textObj = new IText(isEditable ? "Type here" : "Locked text", {
+            left: rect.left || 0,
+            top: rect.top || 0,
+            fontSize,
+            fontFamily: fontFamily || "Arial",
+            fill: fontColor || "#000000",
+            editable: true,
+            padding: 4,
+            width: w,
+          } as any);
+          (textObj as any).locked = !isEditable;
+          (textObj as any).editable = isEditable;
+          (textObj as any).name = isEditable ? "editable_text" : "locked_text";
+          textObj.set({
+            borderColor: isEditable ? "#3b82f6" : "#94a3b8",
+            cornerColor: isEditable ? "#3b82f6" : "#94a3b8",
+            cornerStyle: isEditable ? "circle" : undefined,
+            transparentCorners: isEditable ? false : undefined,
+          } as any);
+
+          canvas.add(textObj);
+          canvas.setActiveObject(textObj);
+          // Enter editing mode immediately
+          textObj.enterEditing();
+          textObj.selectAll();
+          canvas.renderAll();
+          syncCanvas();
+        }
+      }
+
+      drawTextRectRef.current = null;
+      drawTextStartRef.current = null;
+      endDrawText();
+    };
+
+    canvas.on("mouse:down", onMouseDown);
+    canvas.on("mouse:move", onMouseMove);
+    canvas.on("mouse:up", onMouseUp);
+  };
+
+  const endDrawText = () => {
+    setDrawTextMode("off");
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.selection = mode === "edit";
+    canvas.defaultCursor = "default";
+    canvas.getObjects().forEach((o: any) => {
+      if (o.name === "_trimGuide" || o.name === GUIDE_NAME || o.name === "_drawTextRect") return;
+      o.set({ evented: true });
+    });
+    canvas.renderAll();
+  };
+
   // Auto-extract removed - user positions PDF manually
 
   const applyFontSize = (sizePt: number) => {
@@ -1047,14 +1169,37 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         <div className="w-px h-6 bg-border mx-1" />
         {mode === "edit" && (
           <>
-            <Button size="sm" variant="outline" onClick={() => addText(false)} className="gap-1.5">
-              <Lock className="h-3.5 w-3.5" />
-              <span className="text-xs">Locked Text</span>
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => addText(true)} className="gap-1.5">
-              <Unlock className="h-3.5 w-3.5" />
-              <span className="text-xs">Editable Text</span>
-            </Button>
+            {/* Draw text box mode */}
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant={drawTextMode === "editable" ? "default" : "outline"}
+                    onClick={() => drawTextMode === "editable" ? endDrawText() : startDrawText("editable")}
+                    className="gap-1.5"
+                  >
+                    <Type className="h-3.5 w-3.5" />
+                    <span className="text-xs">Draw Text</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Click &amp; drag on the canvas to place an editable text box</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant={drawTextMode === "locked" ? "default" : "outline"}
+                    onClick={() => drawTextMode === "locked" ? endDrawText() : startDrawText("locked")}
+                    className="gap-1.5"
+                  >
+                    <Lock className="h-3.5 w-3.5" />
+                    <span className="text-xs">Draw Locked</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Click &amp; drag to place a locked (non-editable by end users) text box</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <div className="w-px h-6 bg-border mx-1" />
             <Button size="sm" variant="outline" onClick={addBackgroundImage} className="gap-1.5">
               <ImageIcon className="h-3.5 w-3.5" />
@@ -1289,6 +1434,15 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           </>
         )}
       </div>
+
+      {/* Draw text mode hint */}
+      {drawTextMode !== "off" && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-primary/10 border border-primary/30 text-sm text-primary">
+          <Type className="h-4 w-4" />
+          <span>Click and drag on the canvas to draw a {drawTextMode === "editable" ? "editable" : "locked"} text box</span>
+          <Button size="sm" variant="ghost" onClick={endDrawText} className="ml-auto h-6 px-2 text-xs">Cancel</Button>
+        </div>
+      )}
 
       {/* Canvas */}
       <div className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center">
