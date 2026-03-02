@@ -172,6 +172,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   // 1 pt = 1/72 inch, so at N DPI: 1pt = DPI/72 pixels
   const ptToPx = (pt: number) => pt * (DPI / 72);
   const pxToPt = (px: number) => Math.round((px * 72) / DPI * 10) / 10;
+  const getObjectBoundsInCanvas = (obj: FabricObject) => {
+    const br = obj.getBoundingRect();
+    return { left: br.left, top: br.top, width: br.width, height: br.height };
+  };
   const [fontFamily, setFontFamily] = useState("Arial");
 
   // Internal resolution for print quality
@@ -334,6 +338,19 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           const resp = await fetch(urlData.publicUrl);
           if (resp.ok) {
             const buf = await resp.arrayBuffer();
+
+            let pdfWidthIn: number | undefined;
+            let pdfHeightIn: number | undefined;
+            try {
+              const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+              const page = await pdf.getPage(1);
+              const vp = page.getViewport({ scale: 1 });
+              pdfWidthIn = Math.round((vp.width / 72) * 100) / 100;
+              pdfHeightIn = Math.round((vp.height / 72) * 100) / 100;
+            } catch (dimErr) {
+              console.warn("Could not read stored PDF dimensions:", dimErr);
+            }
+
             const { generatePdfThumbnailFromArrayBuffer } = await import("@/lib/pdfThumbnail");
             const blob = await generatePdfThumbnailFromArrayBuffer(buf, {
               maxWidth: canvasWidth * PDF_BACKGROUND_OVERSAMPLE,
@@ -342,21 +359,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             const url = URL.createObjectURL(blob);
             const imgEl = new window.Image();
             imgEl.onload = () => {
-              const fabricImg = new FabricImage(imgEl, {
-                left: 0, top: 0, objectCaching: false,
-                selectable: false, evented: false, hasControls: false, hasBorders: false,
-              } as any);
-              const fitScale = Math.min(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
-              fabricImg.set({
-                scaleX: fitScale,
-                scaleY: fitScale,
-                left: (canvasWidth - imgEl.width * fitScale) / 2,
-                top: (canvasHeight - imgEl.height * fitScale) / 2,
-              });
-              (fabricImg as any).name = "pdf_background";
-              canvas.add(fabricImg);
-              canvas.sendObjectToBack(fabricImg);
-              canvas.renderAll();
+              setCanvasBackground(imgEl, pdfWidthIn, pdfHeightIn);
               URL.revokeObjectURL(url);
             };
             imgEl.src = url;
@@ -556,27 +559,66 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const templateTotalW = width + bleed * 2;
     const templateTotalH = height + bleed * 2;
+    const trimWidthPx = Math.round(width * DPI);
+    const trimHeightPx = Math.round(height * DPI);
+    const toleranceIn = 0.05;
+
+    // Remove any existing PDF background so we always keep a single locked background layer.
+    canvas.getObjects().forEach((obj: any) => {
+      if (obj.name === "pdf_background") canvas.remove(obj);
+    });
 
     // If the PDF page is larger than the template (extra artboard around dieline),
-    // we need to crop to the center design area instead of scaling to fit
-    if (pdfPageWidthIn && pdfPageHeightIn && 
-        (pdfPageWidthIn > templateTotalW + 0.05 || pdfPageHeightIn > templateTotalH + 0.05)) {
-      // Calculate what fraction of the image represents the template area (centered)
+    // crop to the centered template area.
+    if (
+      pdfPageWidthIn &&
+      pdfPageHeightIn &&
+      (pdfPageWidthIn > templateTotalW + toleranceIn || pdfPageHeightIn > templateTotalH + toleranceIn)
+    ) {
       const scaleToFillX = canvasWidth / (imgEl.width * (templateTotalW / pdfPageWidthIn));
       const scaleToFillY = canvasHeight / (imgEl.height * (templateTotalH / pdfPageHeightIn));
       const fillScale = Math.max(scaleToFillX, scaleToFillY);
-      
-      // The template area is centered in the PDF page
+
       const offsetXFraction = (pdfPageWidthIn - templateTotalW) / 2 / pdfPageWidthIn;
       const offsetYFraction = (pdfPageHeightIn - templateTotalH) / 2 / pdfPageHeightIn;
-      
+
       const fabricImg = new FabricImage(imgEl, {
         left: -(offsetXFraction * imgEl.width * fillScale),
         top: -(offsetYFraction * imgEl.height * fillScale),
         scaleX: fillScale,
         scaleY: fillScale,
         objectCaching: false,
-        selectable: false, evented: false, hasControls: false, hasBorders: false,
+        selectable: false,
+        evented: false,
+        hasControls: false,
+        hasBorders: false,
+      } as any);
+      (fabricImg as any).name = "pdf_background";
+      canvas.add(fabricImg);
+      canvas.sendObjectToBack(fabricImg);
+      canvas.renderAll();
+      syncCanvas();
+      return;
+    }
+
+    // If PDF exactly matches dieline size (without bleed), align it to trim area so type scale stays true.
+    if (
+      pdfPageWidthIn &&
+      pdfPageHeightIn &&
+      Math.abs(pdfPageWidthIn - width) <= toleranceIn &&
+      Math.abs(pdfPageHeightIn - height) <= toleranceIn
+    ) {
+      const fitScale = Math.min(trimWidthPx / imgEl.width, trimHeightPx / imgEl.height);
+      const fabricImg = new FabricImage(imgEl, {
+        left: bleedPx + (trimWidthPx - imgEl.width * fitScale) / 2,
+        top: bleedPx + (trimHeightPx - imgEl.height * fitScale) / 2,
+        scaleX: fitScale,
+        scaleY: fitScale,
+        objectCaching: false,
+        selectable: false,
+        evented: false,
+        hasControls: false,
+        hasBorders: false,
       } as any);
       (fabricImg as any).name = "pdf_background";
       canvas.add(fabricImg);
@@ -591,7 +633,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       left: 0,
       top: 0,
       objectCaching: false,
-      selectable: false, evented: false, hasControls: false, hasBorders: false,
+      selectable: false,
+      evented: false,
+      hasControls: false,
+      hasBorders: false,
     } as any);
 
     const fitScale = Math.min(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
@@ -762,18 +807,24 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           cornerColor: "#94a3b8",
         } as any);
 
-        // Measure text bounds, then add cover below text
+        // Measure text bounds, then add a tight cover below text only
         canvas.add(textObj);
         canvas.renderAll();
-        const zoom = canvas.getZoom();
-        const textBounds = textObj.getBoundingRect();
+        const textBounds = getObjectBoundsInCanvas(textObj);
         canvas.remove(textObj);
-        const coverPad = 2;
+
+        const textPadding = typeof (textObj as any).padding === "number" ? (textObj as any).padding : 0;
+        const innerLeft = textBounds.left + textPadding;
+        const innerTop = textBounds.top + textPadding;
+        const innerWidth = Math.max(1, textBounds.width - textPadding * 2);
+        const innerHeight = Math.max(1, textBounds.height - textPadding * 2);
+        const coverPad = 0.75;
+
         const cover = new Rect({
-          left: textBounds.left / zoom - coverPad,
-          top: textBounds.top / zoom - coverPad,
-          width: textBounds.width / zoom + coverPad * 2,
-          height: textBounds.height / zoom + coverPad * 2,
+          left: innerLeft - coverPad,
+          top: innerTop - coverPad,
+          width: innerWidth + coverPad * 2,
+          height: innerHeight + coverPad * 2,
           fill: "#ffffff",
           opacity: 1,
           selectable: false,
@@ -1074,12 +1125,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             });
             canvas.add(trialText);
             canvas.renderAll();
-            // getBoundingRect returns screen-space; divide by zoom to get canvas coords
-            const zoom = canvas.getZoom();
-            const measuredH = trialText.getBoundingRect().height / zoom;
+            // Fabric v6 getBoundingRect is already in scene/canvas coords
+            const trialBounds = getObjectBoundsInCanvas(trialText);
+            const measuredH = trialBounds.height;
             finalFontSizePx = measuredH > 0
               ? Math.round(trialSize * (cropH / measuredH))
-              : Math.max(Math.round(cropH * 0.6), 20);
+              : Math.max(Math.round(cropH * 0.6), ptToPx(4));
             finalFontSizePt = pxToPt(finalFontSizePx);
             canvas.remove(trialText);
           }
@@ -1107,19 +1158,25 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             transparentCorners: isLocked ? undefined : false,
           } as any);
 
-          // Measure text bounds off-screen to size the cover accurately
+          // Measure text bounds in canvas coords and size cover to just the glyph area
           canvas.add(text);
           canvas.renderAll();
-          const zoom = canvas.getZoom();
-          const textBounds = text.getBoundingRect();
+          const textBounds = getObjectBoundsInCanvas(text);
           // Remove text, add cover, then re-add text on top
           canvas.remove(text);
-          const coverPad = 2;
+
+          const textPadding = typeof (text as any).padding === "number" ? (text as any).padding : 0;
+          const innerLeft = textBounds.left + textPadding;
+          const innerTop = textBounds.top + textPadding;
+          const innerWidth = Math.max(1, textBounds.width - textPadding * 2);
+          const innerHeight = Math.max(1, textBounds.height - textPadding * 2);
+          const coverPad = 0.75;
+
           const cover = new Rect({
-            left: textBounds.left / zoom - coverPad,
-            top: textBounds.top / zoom - coverPad,
-            width: textBounds.width / zoom + coverPad * 2,
-            height: textBounds.height / zoom + coverPad * 2,
+            left: innerLeft - coverPad,
+            top: innerTop - coverPad,
+            width: innerWidth + coverPad * 2,
+            height: innerHeight + coverPad * 2,
             fill: "#ffffff",
             opacity: 1,
             selectable: false,
@@ -1342,15 +1399,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
         // Find locked text objects that overlap with the drawn zone
         let unlocked = 0;
-        const zoom = canvas.getZoom();
         canvas.getObjects().forEach((obj: any) => {
           if (!obj.type?.includes("text") && obj.type !== "i-text" && obj.type !== "textbox") return;
           if (!obj.locked) return;
-          const br = obj.getBoundingRect();
-          const oLeft = br.left / zoom;
-          const oTop = br.top / zoom;
-          const oRight = oLeft + br.width / zoom;
-          const oBottom = oTop + br.height / zoom;
+          const br = getObjectBoundsInCanvas(obj);
+          const oLeft = br.left;
+          const oTop = br.top;
+          const oRight = oLeft + br.width;
+          const oBottom = oTop + br.height;
 
           // Check if the object's bounding box overlaps with the drawn zone
           const overlaps =
