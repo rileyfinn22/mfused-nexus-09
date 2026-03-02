@@ -536,18 +536,49 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     syncCanvas();
   };
 
-  const setCanvasBackground = (imgEl: HTMLImageElement) => {
+  const setCanvasBackground = (imgEl: HTMLImageElement, pdfPageWidthIn?: number, pdfPageHeightIn?: number) => {
     const canvas = fabricRef.current;
     if (!canvas) return;
 
-    // Add PDF as a selectable, movable, resizable object so user can position it
+    const templateTotalW = width + bleed * 2;
+    const templateTotalH = height + bleed * 2;
+
+    // If the PDF page is larger than the template (extra artboard around dieline),
+    // we need to crop to the center design area instead of scaling to fit
+    if (pdfPageWidthIn && pdfPageHeightIn && 
+        (pdfPageWidthIn > templateTotalW + 0.05 || pdfPageHeightIn > templateTotalH + 0.05)) {
+      // Calculate what fraction of the image represents the template area (centered)
+      const scaleToFillX = canvasWidth / (imgEl.width * (templateTotalW / pdfPageWidthIn));
+      const scaleToFillY = canvasHeight / (imgEl.height * (templateTotalH / pdfPageHeightIn));
+      const fillScale = Math.max(scaleToFillX, scaleToFillY);
+      
+      // The template area is centered in the PDF page
+      const offsetXFraction = (pdfPageWidthIn - templateTotalW) / 2 / pdfPageWidthIn;
+      const offsetYFraction = (pdfPageHeightIn - templateTotalH) / 2 / pdfPageHeightIn;
+      
+      const fabricImg = new FabricImage(imgEl, {
+        left: -(offsetXFraction * imgEl.width * fillScale),
+        top: -(offsetYFraction * imgEl.height * fillScale),
+        scaleX: fillScale,
+        scaleY: fillScale,
+        objectCaching: false,
+      } as any);
+      (fabricImg as any).name = "pdf_background";
+      canvas.add(fabricImg);
+      canvas.sendObjectToBack(fabricImg);
+      canvas.setActiveObject(fabricImg);
+      canvas.renderAll();
+      syncCanvas();
+      return;
+    }
+
+    // Standard fit behavior for matching or smaller PDFs
     const fabricImg = new FabricImage(imgEl, {
       left: 0,
       top: 0,
       objectCaching: false,
     } as any);
 
-    // Scale to fit inside the canvas initially
     const fitScale = Math.min(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
     fabricImg.set({
       scaleX: fitScale,
@@ -577,24 +608,31 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       try {
         // Read the PDF to validate its page size against template dimensions
         const arrayBuf = await file.arrayBuffer();
+        let pdfWidthIn = 0;
+        let pdfHeightIn = 0;
         try {
           const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
           const page = await pdf.getPage(1);
           const vp = page.getViewport({ scale: 1 });
           // PDF units are 1/72 inch (points)
-          const pdfWidthIn = Math.round(vp.width / 72 * 100) / 100;
-          const pdfHeightIn = Math.round(vp.height / 72 * 100) / 100;
+          pdfWidthIn = Math.round(vp.width / 72 * 100) / 100;
+          pdfHeightIn = Math.round(vp.height / 72 * 100) / 100;
           const templateTotalW = Math.round((width + bleed * 2) * 100) / 100;
           const templateTotalH = Math.round((height + bleed * 2) * 100) / 100;
           const wDiff = Math.abs(pdfWidthIn - templateTotalW);
           const hDiff = Math.abs(pdfHeightIn - templateTotalH);
-          if (wDiff > 0.05 || hDiff > 0.05) {
-            toast.warning(
-              `PDF size (${pdfWidthIn}" × ${pdfHeightIn}") doesn't match template (${templateTotalW}" × ${templateTotalH}" with bleed). The PDF will be scaled to fit.`,
-              { duration: 8000 }
+          if (wDiff <= 0.05 && hDiff <= 0.05) {
+            toast.success(`PDF dimensions match template: ${pdfWidthIn}" × ${pdfHeightIn}"`);
+          } else if (pdfWidthIn >= templateTotalW - 0.05 && pdfHeightIn >= templateTotalH - 0.05) {
+            toast.info(
+              `PDF page (${pdfWidthIn}" × ${pdfHeightIn}") is larger than template (${templateTotalW}" × ${templateTotalH}"). The design area will be centered and cropped to fit.`,
+              { duration: 6000 }
             );
           } else {
-            toast.success(`PDF dimensions match template: ${pdfWidthIn}" × ${pdfHeightIn}"`);
+            toast.warning(
+              `PDF size (${pdfWidthIn}" × ${pdfHeightIn}") is smaller than template (${templateTotalW}" × ${templateTotalH}" with bleed). The PDF will be scaled to fit.`,
+              { duration: 8000 }
+            );
           }
         } catch (dimErr) {
           console.warn("Could not validate PDF dimensions:", dimErr);
@@ -620,8 +658,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         });
         const url = URL.createObjectURL(blob);
         const imgEl = new window.Image();
+        const capturedW = pdfWidthIn;
+        const capturedH = pdfHeightIn;
         imgEl.onload = () => {
-          setCanvasBackground(imgEl);
+          setCanvasBackground(imgEl, capturedW || undefined, capturedH || undefined);
           URL.revokeObjectURL(url);
         };
         imgEl.src = url;
