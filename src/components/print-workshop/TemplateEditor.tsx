@@ -175,15 +175,37 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const pxToPt = (px: number) => Math.round((px * 72) / DPI * 10) / 10;
   const getObjectBoundsInCanvas = (obj: FabricObject) => {
     const br = obj.getBoundingRect();
-    const zoom = fabricRef.current?.getZoom() || 1;
-    return {
-      left: br.left / zoom,
-      top: br.top / zoom,
-      width: br.width / zoom,
-      height: br.height / zoom,
-    };
+    // Fabric v6: getBoundingRect() returns scene/canvas coords — no zoom division needed
+    return { left: br.left, top: br.top, width: br.width, height: br.height };
   };
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+  /**
+   * Build knockout bounds from OCR percentage data relative to a reference area.
+   * refLeft/refTop/refW/refH define the reference rectangle (crop area or full canvas).
+   */
+  const ocrPercentsToBounds = (
+    xPct: number | null, yPct: number | null, wPct: number | null, hPct: number | null,
+    refLeft: number, refTop: number, refW: number, refH: number
+  ) => {
+    const x = xPct != null && xPct >= 0 ? (xPct / 100) * refW : 0;
+    const y = yPct != null && yPct >= 0 ? (yPct / 100) * refH : 0;
+    const w = wPct != null && wPct > 0 ? (wPct / 100) * refW : refW;
+    const h = hPct != null && hPct > 0 ? (hPct / 100) * refH : refH;
+    return { left: refLeft + x, top: refTop + y, width: w, height: h };
+  };
+
+  /** Remove any existing knockout rects that overlap with a given area to prevent stacking */
+  const clearOverlappingKnockouts = (canvas: FabricCanvas, area: { left: number; top: number; width: number; height: number }) => {
+    const toRemove = canvas.getObjects().filter((o: any) => {
+      if (o.name !== OCR_KNOCKOUT_NAME) return false;
+      const oL = o.left ?? 0, oT = o.top ?? 0, oW = (o.width ?? 0) * (o.scaleX ?? 1), oH = (o.height ?? 0) * (o.scaleY ?? 1);
+      const overlapX = oL < area.left + area.width && oL + oW > area.left;
+      const overlapY = oT < area.top + area.height && oT + oH > area.top;
+      return overlapX && overlapY;
+    });
+    toRemove.forEach((o) => canvas.remove(o));
+  };
 
   const addOcrKnockoutCover = (
     canvas: FabricCanvas,
@@ -191,8 +213,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   ) => {
     if (bounds.width <= 0 || bounds.height <= 0) return;
 
+    // Clear any existing knockouts in this area first
+    clearOverlappingKnockouts(canvas, bounds);
+
     const padX = Math.max(2, Math.round(bounds.width * 0.04));
-    const padY = Math.max(2, Math.round(bounds.height * 0.18));
+    const padY = Math.max(2, Math.round(bounds.height * 0.10));
 
     const left = clamp(bounds.left - padX, 0, canvasWidth);
     const top = clamp(bounds.top - padY, 0, canvasHeight);
@@ -220,6 +245,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     (cover as any).editable = false;
 
     canvas.add(cover);
+    // z-order: bg at back, knockout above bg, text above knockout
     canvas.sendObjectToBack(cover);
     const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
     if (bg) canvas.sendObjectToBack(bg);
@@ -859,8 +885,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         } as any);
 
         canvas.add(textObj);
-        const measuredBounds = getObjectBoundsInCanvas(textObj);
-        addOcrKnockoutCover(canvas, measuredBounds);
+        // Use OCR-reported bounds for knockout, not rendered text bounds
+        const knockoutBounds = ocrPercentsToBounds(
+          region.x_percent, region.y_percent, region.w_percent, region.h_percent,
+          0, 0, canvasWidth, canvasHeight
+        );
+        addOcrKnockoutCover(canvas, knockoutBounds);
         canvas.bringObjectToFront(textObj);
         addedCount++;
       }
@@ -1104,6 +1134,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         const detectedFontSizePt = data?.font_size_pt || null;
         const detectedXPercent = typeof data?.x_percent === "number" ? data.x_percent : null;
         const detectedYPercent = typeof data?.y_percent === "number" ? data.y_percent : null;
+        const detectedWPercent = typeof data?.w_percent === "number" ? data.w_percent : null;
         const detectedHPercent = typeof data?.h_percent === "number" ? data.h_percent : null;
 
         if (!extractedText.trim()) {
@@ -1192,8 +1223,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           } as any);
 
           canvas.add(text);
-          const measuredBounds = getObjectBoundsInCanvas(text);
-          addOcrKnockoutCover(canvas, measuredBounds);
+          // Use OCR bounds relative to the crop rectangle for knockout placement
+          // This ensures the knockout covers the original PDF text exactly where it was
+          const knockoutBounds = ocrPercentsToBounds(
+            detectedXPercent, detectedYPercent, detectedWPercent, detectedHPercent,
+            cropLeft, cropTop, cropW, cropH
+          );
+          addOcrKnockoutCover(canvas, knockoutBounds);
           canvas.bringObjectToFront(text);
 
           // Fix z-order: bg at back, trim on top
