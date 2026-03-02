@@ -15,28 +15,13 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { image_url, canvas_width, canvas_height } = await req.json();
+    const { image_url } = await req.json();
     if (!image_url) {
       return new Response(JSON.stringify({ error: "image_url is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const systemPrompt = `You are analyzing a product label/packaging design image. Your job is to identify every text element in the design and return structured data about each one.
-
-For each text element found, extract:
-- "text": the exact text content
-- "x_percent": horizontal position as percentage of image width (0-100), measuring from left edge to text center
-- "y_percent": vertical position as percentage of image height (0-100), measuring from top edge to text center
-- "font_size_percent": approximate font size as percentage of image height
-- "color": the text color as a hex code (e.g. "#FFFFFF")
-- "font_weight": "bold" or "normal"
-- "font_style": "italic" or "normal"
-- "text_align": "left", "center", or "right"
-- "suggested_font": suggest a Google Font that closely matches the style (e.g. "Montserrat", "Playfair Display", "Bebas Neue")
-
-Be precise about positions. Return ALL visible text, including small text like ingredients, weights, taglines, etc.`;
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -49,13 +34,16 @@ Be precise about positions. Return ALL visible text, including small text like i
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
           messages: [
-            { role: "system", content: systemPrompt },
+            {
+              role: "system",
+              content: "You are an OCR assistant. Extract ALL text visible in the provided image crop. Return the exact text content, preserving line breaks where they appear. Return ONLY the extracted text, nothing else — no explanation, no formatting, no quotes.",
+            },
             {
               role: "user",
               content: [
                 {
                   type: "text",
-                  text: `Analyze this design image (canvas size: ${canvas_width}x${canvas_height} pixels). Extract all text elements with their positions and styling. Return ONLY a JSON array of text elements, no markdown, no explanation.`,
+                  text: "Extract all text from this cropped image region. Return only the raw text content.",
                 },
                 {
                   type: "image_url",
@@ -64,40 +52,6 @@ Be precise about positions. Return ALL visible text, including small text like i
               ],
             },
           ],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "extract_text_regions",
-                description: "Extract all text regions from the design image with position and style data",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    text_regions: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          text: { type: "string", description: "The exact text content" },
-                          x_percent: { type: "number", description: "X position as % of image width (0-100)" },
-                          y_percent: { type: "number", description: "Y position as % of image height (0-100)" },
-                          font_size_percent: { type: "number", description: "Font size as % of image height" },
-                          color: { type: "string", description: "Text color as hex code" },
-                          font_weight: { type: "string", enum: ["bold", "normal"] },
-                          font_style: { type: "string", enum: ["italic", "normal"] },
-                          text_align: { type: "string", enum: ["left", "center", "right"] },
-                          suggested_font: { type: "string", description: "Suggested Google Font name" },
-                        },
-                        required: ["text", "x_percent", "y_percent", "font_size_percent", "color"],
-                      },
-                    },
-                  },
-                  required: ["text_regions"],
-                },
-              },
-            },
-          ],
-          tool_choice: { type: "function", function: { name: "extract_text_regions" } },
         }),
       }
     );
@@ -111,48 +65,23 @@ Be precise about positions. Return ALL visible text, including small text like i
       }
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add funds in workspace settings." }),
+          JSON.stringify({ error: "AI credits exhausted." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       const errText = await response.text();
       console.error("AI gateway error:", response.status, errText);
       return new Response(
-        JSON.stringify({ error: "AI analysis failed" }),
+        JSON.stringify({ error: "AI text extraction failed" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const data = await response.json();
-    
-    // Extract from tool call response
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    let textRegions: any[] = [];
-    
-    if (toolCall?.function?.arguments) {
-      try {
-        const args = JSON.parse(toolCall.function.arguments);
-        textRegions = args.text_regions || [];
-      } catch (e) {
-        console.error("Failed to parse tool call arguments:", e);
-      }
-    }
-
-    // Fallback: try parsing content as JSON if no tool calls
-    if (textRegions.length === 0) {
-      const content = data.choices?.[0]?.message?.content || "";
-      try {
-        const jsonMatch = content.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          textRegions = JSON.parse(jsonMatch[0]);
-        }
-      } catch {
-        console.warn("Could not parse fallback content as JSON");
-      }
-    }
+    const extractedText = (data.choices?.[0]?.message?.content || "").trim();
 
     return new Response(
-      JSON.stringify({ text_regions: textRegions }),
+      JSON.stringify({ text: extractedText }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

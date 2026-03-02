@@ -3,8 +3,8 @@ import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText } from "lucide-react";
-import { AiImageDialog, TextRegion } from "./AiImageDialog";
+import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2 } from "lucide-react";
+import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
 import { IconPickerDialog } from "./IconPickerDialog";
 import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
@@ -129,6 +129,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
   const [fontSearch, setFontSearch] = useState("");
   const [fontSizePt, setFontSizePt] = useState(12);
+  const [zoneSelectMode, setZoneSelectMode] = useState(false);
+  const [extractingText, setExtractingText] = useState(false);
+  const zoneRectRef = useRef<Rect | null>(null);
+  const zoneStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Convert between typographic points and canvas pixels at current DPI
   // 1 pt = 1/72 inch, so at N DPI: 1pt = DPI/72 pixels
@@ -501,89 +505,177 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     }
   }, []);
 
-  const handleDecomposedDesign = useCallback(async (backgroundUrl: string, textRegions: TextRegion[]) => {
+  // --- Zone Selection: draw rectangle, crop canvas region, send to AI for OCR ---
+  const startZoneSelect = () => {
+    setZoneSelectMode(true);
     const canvas = fabricRef.current;
     if (!canvas) return;
 
-    // 1. Place AI image as a locked background layer
-    const imgEl = new window.Image();
-    imgEl.crossOrigin = "anonymous";
-    imgEl.onload = async () => {
-      const fabricImg = new FabricImage(imgEl, {
-        left: 0,
-        top: 0,
+    // Disable object selection during zone draw
+    canvas.selection = false;
+    canvas.getObjects().forEach((o) => o.set({ evented: false } as any));
+
+    toast.info("Draw a rectangle over the text you want to extract", { duration: 3000 });
+
+    const onMouseDown = (opt: any) => {
+      const pointer = canvas.getScenePoint(opt.e);
+      zoneStartRef.current = { x: pointer.x, y: pointer.y };
+      const rect = new Rect({
+        left: pointer.x,
+        top: pointer.y,
+        width: 0,
+        height: 0,
+        fill: "rgba(59,130,246,0.15)",
+        stroke: "#3b82f6",
+        strokeWidth: 2,
+        strokeDashArray: [6, 3],
         selectable: false,
         evented: false,
+        name: "_zoneSelect",
       });
-      const scaleX = canvasWidth / imgEl.width;
-      const scaleY = canvasHeight / imgEl.height;
-      fabricImg.set({ scaleX, scaleY, opacity: 0.35 });
-      (fabricImg as any).locked = true;
-      (fabricImg as any).editable = false;
-      (fabricImg as any).name = "ai_background";
+      zoneRectRef.current = rect;
+      canvas.add(rect);
+    };
 
-      canvas.insertAt(0, fabricImg);
+    const onMouseMove = (opt: any) => {
+      if (!zoneStartRef.current || !zoneRectRef.current) return;
+      const pointer = canvas.getScenePoint(opt.e);
+      const left = Math.min(zoneStartRef.current.x, pointer.x);
+      const top = Math.min(zoneStartRef.current.y, pointer.y);
+      const w = Math.abs(pointer.x - zoneStartRef.current.x);
+      const h = Math.abs(pointer.y - zoneStartRef.current.y);
+      zoneRectRef.current.set({ left, top, width: w, height: h });
+      canvas.renderAll();
+    };
 
-      // 2. Stack extracted text neatly — users drag into position
-      const startX = bleedPx + 40;
-      let currentY = bleedPx + 30;
-      const lineSpacing = 12;
+    const onMouseUp = async () => {
+      canvas.off("mouse:down", onMouseDown);
+      canvas.off("mouse:move", onMouseMove);
+      canvas.off("mouse:up", onMouseUp);
 
-      // Sort by font size (largest first = headings first)
-      const sorted = [...textRegions].sort(
-        (a, b) => (b.font_size_percent || 3) - (a.font_size_percent || 3)
-      );
-
-      for (const region of sorted) {
-        const fontFamily = region.suggested_font || "Arial";
-        const fontDef = FONT_OPTIONS.find((f) => f.value === fontFamily);
-        if (fontDef?.google || (region.suggested_font && !["Arial", "Helvetica", "Times New Roman", "Georgia", "Courier New", "Verdana", "Impact"].includes(fontFamily))) {
-          await loadGoogleFont(fontFamily);
-        }
-
-        const fontSize = Math.max(
-          Math.round((region.font_size_percent / 100) * canvasHeight),
-          ptToPx(8)
-        );
-
-        const text = new IText(region.text, {
-          left: startX,
-          top: currentY,
-          fontSize,
-          fontFamily,
-          fill: region.color || "#000000",
-          fontWeight: region.font_weight || "normal",
-          fontStyle: region.font_style || "normal",
-          textAlign: "left",
-          editable: true,
-          backgroundColor: "rgba(255,255,255,0.7)",
-          padding: 4,
-        });
-        (text as any).locked = false;
-        (text as any).editable = true;
-        (text as any).name = "editable_text";
-        text.set({
-          borderColor: "#3b82f6",
-          cornerColor: "#3b82f6",
-          cornerStyle: "circle",
-          transparentCorners: false,
-        } as any);
-
-        canvas.add(text);
-        currentY += fontSize + lineSpacing;
+      const rect = zoneRectRef.current;
+      const start = zoneStartRef.current;
+      if (!rect || !start || (rect.width || 0) < 10 || (rect.height || 0) < 10) {
+        // Too small, cancel
+        if (rect) canvas.remove(rect);
+        zoneRectRef.current = null;
+        zoneStartRef.current = null;
+        endZoneSelect();
+        return;
       }
 
-      // Keep trim guide on top
-      const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
-      if (trim) canvas.bringObjectToFront(trim);
+      // Crop that region from the canvas as a data URL
+      setExtractingText(true);
+      try {
+        const cropLeft = rect.left || 0;
+        const cropTop = rect.top || 0;
+        const cropW = rect.width || 100;
+        const cropH = rect.height || 100;
 
-      canvas.renderAll();
-      syncCanvas();
+        // Create a temp canvas to crop
+        const tempCanvas = document.createElement("canvas");
+        const scale = 2; // 2x for better OCR
+        tempCanvas.width = cropW * scale;
+        tempCanvas.height = cropH * scale;
+        const ctx = tempCanvas.getContext("2d");
+        if (!ctx) throw new Error("Could not create canvas context");
 
-      toast.info("Text extracted! Drag each text element into position over the faded reference image, then adjust opacity of the background.", { duration: 6000 });
+        // Hide the zone rect before exporting
+        rect.set({ visible: false });
+        canvas.renderAll();
+
+        // Get the full canvas as image at current zoom
+        const fullDataUrl = canvas.toDataURL({ format: "png", multiplier: scale });
+        
+        // Draw cropped region
+        const fullImg = new window.Image();
+        await new Promise<void>((resolve, reject) => {
+          fullImg.onload = () => resolve();
+          fullImg.onerror = reject;
+          fullImg.src = fullDataUrl;
+        });
+        
+        const zoom = canvas.getZoom();
+        ctx.drawImage(
+          fullImg,
+          cropLeft * zoom * scale, cropTop * zoom * scale,
+          cropW * zoom * scale, cropH * zoom * scale,
+          0, 0,
+          cropW * scale, cropH * scale
+        );
+        const croppedDataUrl = tempCanvas.toDataURL("image/png");
+
+        // Send to AI for text extraction
+        const { data, error } = await supabase.functions.invoke("decompose-design-image", {
+          body: { image_url: croppedDataUrl },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        const extractedText = data?.text || "";
+        if (!extractedText.trim()) {
+          toast.warning("No text detected in the selected area");
+          canvas.remove(rect);
+        } else {
+          // Remove the selection rect and create an editable IText in its place
+          canvas.remove(rect);
+
+          const fontSize = Math.max(Math.round(cropH * 0.5), ptToPx(10));
+          const text = new IText(extractedText, {
+            left: cropLeft,
+            top: cropTop,
+            fontSize,
+            fontFamily: "Arial",
+            fill: "#000000",
+            editable: true,
+            backgroundColor: "rgba(255,255,255,0.6)",
+            padding: 4,
+          });
+          (text as any).locked = false;
+          (text as any).editable = true;
+          (text as any).name = "editable_text";
+          text.set({
+            borderColor: "#3b82f6",
+            cornerColor: "#3b82f6",
+            cornerStyle: "circle",
+            transparentCorners: false,
+          } as any);
+
+          canvas.add(text);
+          const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
+          if (trim) canvas.bringObjectToFront(trim);
+          canvas.setActiveObject(text);
+          canvas.renderAll();
+          syncCanvas();
+          toast.success(`Extracted: "${extractedText.substring(0, 50)}${extractedText.length > 50 ? "..." : ""}"`);
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Failed to extract text");
+        if (rect) canvas.remove(rect);
+      } finally {
+        zoneRectRef.current = null;
+        zoneStartRef.current = null;
+        setExtractingText(false);
+        endZoneSelect();
+      }
     };
-    imgEl.src = backgroundUrl;
-  }, [canvasWidth, canvasHeight, bleedPx, ptToPx, syncCanvas]);
+
+    canvas.on("mouse:down", onMouseDown);
+    canvas.on("mouse:move", onMouseMove);
+    canvas.on("mouse:up", onMouseUp);
+  };
+
+  const endZoneSelect = () => {
+    setZoneSelectMode(false);
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.selection = mode === "edit";
+    canvas.getObjects().forEach((o: any) => {
+      if (o.name === "_trimGuide" || o.name === "_zoneSelect") return;
+      o.set({ evented: true });
+    });
+    canvas.renderAll();
+  };
 
   const applyFontSize = (sizePt: number) => {
     if (!selectedObject || !fabricRef.current) return;
@@ -655,14 +747,26 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               <span className="text-xs">Editable Image</span>
             </Button>
             <div className="w-px h-6 bg-border mx-1" />
-            <AiImageDialog
-              onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)}
-              onDecomposedDesign={handleDecomposedDesign}
-              canvasWidth={canvasWidth}
-              canvasHeight={canvasHeight}
-            />
+            <AiImageDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <AiEditDialog getCanvasImage={getCanvasImage} onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <IconPickerDialog onIconSelected={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
+            <div className="w-px h-6 bg-border mx-1" />
+            <Button
+              size="sm"
+              variant={zoneSelectMode ? "default" : "outline"}
+              onClick={zoneSelectMode ? endZoneSelect : startZoneSelect}
+              disabled={extractingText}
+              className="gap-1.5"
+            >
+              {extractingText ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Scan className="h-3.5 w-3.5" />
+              )}
+              <span className="text-xs">
+                {extractingText ? "Extracting..." : zoneSelectMode ? "Cancel Zone" : "Extract Text"}
+              </span>
+            </Button>
             <div className="w-px h-6 bg-border mx-1" />
           </>
         )}
