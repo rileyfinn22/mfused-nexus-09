@@ -742,24 +742,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           await loadGoogleFont(fontDef.value);
         }
 
-        // White cover to mask baked-in text
-        const coverPad = 2;
-        const coverW = (region.w_percent / 100) * canvasWidth + coverPad * 2;
-        const coverH = regionHeightPx + coverPad * 2;
-        const cover = new Rect({
-          left: x - coverPad,
-          top: y - coverPad,
-          width: coverW,
-          height: coverH,
-          fill: "#ffffff",
-          opacity: 1,
-          selectable: false,
-          evented: false,
-          objectCaching: false,
-          name: "_textCover",
-        });
-        canvas.add(cover);
-
         const textObj = new IText(text, {
           left: x,
           top: y,
@@ -780,7 +762,31 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           cornerColor: "#94a3b8",
         } as any);
 
+        // Add text first to measure its actual bounds
         canvas.add(textObj);
+        canvas.renderAll();
+        const zoom = canvas.getZoom();
+        const textBounds = textObj.getBoundingRect();
+        const coverPad = 2;
+        const cover = new Rect({
+          left: textBounds.left / zoom - coverPad,
+          top: textBounds.top / zoom - coverPad,
+          width: textBounds.width / zoom + coverPad * 2,
+          height: textBounds.height / zoom + coverPad * 2,
+          fill: "#ffffff",
+          opacity: 1,
+          selectable: false,
+          evented: false,
+          objectCaching: false,
+          name: "_textCover",
+        });
+        canvas.add(cover);
+        // Move cover just below the text object
+        const coverIdx = canvas.getObjects().indexOf(cover);
+        const textIdx = canvas.getObjects().indexOf(textObj);
+        if (coverIdx > textIdx) {
+          canvas.moveObjectTo(cover, textIdx);
+        }
         addedCount++;
       }
 
@@ -1026,24 +1032,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           toast.warning("No text detected in the selected area");
           canvas.remove(rect);
         } else {
-          // Remove the selection rect, add a white cover rect to hide the underlying text, then add editable IText
+          // Remove the selection rect; we'll add a tightly-fitted white cover after measuring the text
           canvas.remove(rect);
-
-          // White cover to mask the baked-in text (2px padding to cover anti-aliased edges)
-          const coverPad = 2;
-          const cover = new Rect({
-            left: cropLeft - coverPad,
-            top: cropTop - coverPad,
-            width: cropW + coverPad * 2,
-            height: cropH + coverPad * 2,
-            fill: "#ffffff",
-            opacity: 1,
-            selectable: false,
-            evented: false,
-            objectCaching: false,
-            name: "_textCover",
-          });
-          canvas.add(cover);
 
           const isLocked = zoneExtractLocked;
 
@@ -1121,10 +1111,35 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             transparentCorners: isLocked ? undefined : false,
           } as any);
 
+          // Add text temporarily to measure its actual bounding box
           canvas.add(text);
-          // Ensure correct z-order: bg behind, trim on top
+          canvas.renderAll();
+          const zoom = canvas.getZoom();
+          const textBounds = text.getBoundingRect();
+          const coverPad = 2;
+          const cover = new Rect({
+            left: textBounds.left / zoom - coverPad,
+            top: textBounds.top / zoom - coverPad,
+            width: textBounds.width / zoom + coverPad * 2,
+            height: textBounds.height / zoom + coverPad * 2,
+            fill: "#ffffff",
+            opacity: 1,
+            selectable: false,
+            evented: false,
+            objectCaching: false,
+            name: "_textCover",
+          });
+          // Insert cover just below the text
+          canvas.add(cover);
+          // Fix z-order: bg → cover → text → trim
           const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
           if (bg) canvas.sendObjectToBack(bg);
+          // Move cover just above bg, below text
+          const coverIdx = canvas.getObjects().indexOf(cover);
+          const textIdx = canvas.getObjects().indexOf(text);
+          if (coverIdx > textIdx) {
+            canvas.moveObjectTo(cover, textIdx);
+          }
           const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
           if (trim) canvas.bringObjectToFront(trim);
           canvas.setActiveObject(text);
