@@ -72,7 +72,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
   const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
-  const [fontSize, setFontSize] = useState(16);
+  const [fontSizePt, setFontSizePt] = useState(12);
+
+  // Convert between typographic points and canvas pixels at current DPI
+  // 1 pt = 1/72 inch, so at N DPI: 1pt = DPI/72 pixels
+  const ptToPx = (pt: number) => Math.round(pt * (DPI / 72));
+  const pxToPt = (px: number) => Math.round((px * 72) / DPI * 10) / 10;
   const [fontFamily, setFontFamily] = useState("Arial");
 
   // Internal resolution for print quality
@@ -151,7 +156,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const obj = e.selected?.[0];
       if (obj) {
         setSelectedObject(obj);
-        if ((obj as any).fontSize) setFontSize((obj as any).fontSize);
+        if ((obj as any).fontSize) setFontSizePt(pxToPt((obj as any).fontSize));
         if ((obj as any).fontFamily) setFontFamily((obj as any).fontFamily);
       }
     });
@@ -159,7 +164,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const obj = e.selected?.[0];
       if (obj) {
         setSelectedObject(obj);
-        if ((obj as any).fontSize) setFontSize((obj as any).fontSize);
+        if ((obj as any).fontSize) setFontSizePt(pxToPt((obj as any).fontSize));
         if ((obj as any).fontFamily) setFontFamily((obj as any).fontFamily);
       }
     });
@@ -176,10 +181,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const addText = (editable: boolean) => {
     const canvas = fabricRef.current;
     if (!canvas) return;
+    const defaultPt = fontSizePt || 12;
     const text = new IText(editable ? "Edit me" : "Locked text", {
       left: bleedPx + 20,
       top: bleedPx + 20 + canvas.getObjects().length * 30,
-      fontSize: 16,
+      fontSize: ptToPx(defaultPt),
       fontFamily: "Arial",
       fill: "#000000",
       editable: true,
@@ -314,10 +320,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     syncCanvas();
   };
 
-  const applyFontSize = (size: number) => {
+  const applyFontSize = (sizePt: number) => {
     if (!selectedObject || !fabricRef.current) return;
-    setFontSize(size);
-    (selectedObject as any).set("fontSize", size);
+    setFontSizePt(sizePt);
+    (selectedObject as any).set("fontSize", ptToPx(sizePt));
     fabricRef.current.renderAll();
     syncCanvas();
   };
@@ -442,12 +448,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               <Type className="h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 type="number"
-                value={fontSize}
+                value={fontSizePt}
                 onChange={(e) => applyFontSize(Number(e.target.value))}
                 className="w-16 h-8 text-xs"
-                min={8}
-                max={120}
+                min={4}
+                max={200}
+                step={0.5}
               />
+              <span className="text-[10px] text-muted-foreground">pt</span>
             </div>
             <Button size="sm" variant="ghost" onClick={toggleBold} className="h-8 w-8 p-0">
               <Bold className="h-3.5 w-3.5" />
