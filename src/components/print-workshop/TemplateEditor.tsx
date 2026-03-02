@@ -179,63 +179,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   };
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-  const sampleCanvasPixelColor = (canvas: FabricCanvas, x: number, y: number) => {
-    const el = (canvas as any).lowerCanvasEl as HTMLCanvasElement | undefined;
-    const ctx = el?.getContext("2d");
-    if (!el || !ctx) return null;
-
-    const zoom = canvas.getZoom() || 1;
-    const px = clamp(Math.round(x * zoom), 0, el.width - 1);
-    const py = clamp(Math.round(y * zoom), 0, el.height - 1);
-
-    const data = ctx.getImageData(px, py, 1, 1).data;
-    if (!data || data[3] === 0) return null;
-    return { r: data[0], g: data[1], b: data[2] };
-  };
-
-  const getKnockoutFillColor = (canvas: FabricCanvas, left: number, top: number, width: number, height: number) => {
-    const probe = Math.max(2, Math.round(Math.min(width, height) * 0.18));
-    const points: Array<[number, number]> = [
-      [left - probe, top - probe],
-      [left + width + probe, top - probe],
-      [left - probe, top + height + probe],
-      [left + width + probe, top + height + probe],
-      [left + width / 2, top - probe],
-      [left + width / 2, top + height + probe],
-      [left - probe, top + height / 2],
-      [left + width + probe, top + height / 2],
-    ];
-
-    const samples = points
-      .map(([x, y]) => sampleCanvasPixelColor(canvas, x, y))
-      .filter((sample): sample is { r: number; g: number; b: number } => sample !== null);
-
-    if (samples.length === 0) return "#ffffff";
-
-    const avg = samples.reduce(
-      (acc, sample) => {
-        acc.r += sample.r;
-        acc.g += sample.g;
-        acc.b += sample.b;
-        return acc;
-      },
-      { r: 0, g: 0, b: 0 }
-    );
-
-    const r = Math.round(avg.r / samples.length);
-    const g = Math.round(avg.g / samples.length);
-    const b = Math.round(avg.b / samples.length);
-    return `rgb(${r}, ${g}, ${b})`;
-  };
-
   const addOcrKnockoutCover = (
     canvas: FabricCanvas,
     bounds: { left: number; top: number; width: number; height: number }
   ) => {
     if (bounds.width <= 0 || bounds.height <= 0) return;
 
-    const padX = Math.max(2, Math.round(bounds.width * 0.06));
-    const padY = Math.max(2, Math.round(bounds.height * 0.22));
+    const padX = Math.max(2, Math.round(bounds.width * 0.04));
+    const padY = Math.max(2, Math.round(bounds.height * 0.18));
 
     const left = clamp(bounds.left - padX, 0, canvasWidth);
     const top = clamp(bounds.top - padY, 0, canvasHeight);
@@ -244,13 +195,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const width = Math.max(1, right - left);
     const height = Math.max(1, bottom - top);
 
-    const fill = getKnockoutFillColor(canvas, left, top, width, height);
     const cover = new Rect({
       left,
       top,
       width,
       height,
-      fill,
+      fill: "#ffffff",
       selectable: false,
       evented: false,
       hasControls: false,
@@ -862,7 +812,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         // Convert percentage positions to canvas pixel coords
         const x = (region.x_percent / 100) * canvasWidth;
         const y = (region.y_percent / 100) * canvasHeight;
-        const regionWidthPx = (region.w_percent / 100) * canvasWidth;
 
         // Determine font size: use AI-detected pt or derive from region height
         const regionHeightPx = (region.h_percent / 100) * canvasHeight;
@@ -882,13 +831,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         if (fontDef?.google) {
           await loadGoogleFont(fontDef.value);
         }
-
-        addOcrKnockoutCover(canvas, {
-          left: x,
-          top: y,
-          width: regionWidthPx > 0 ? regionWidthPx : Math.max(fontSizePx, text.length * (fontSizePx * 0.5)),
-          height: regionHeightPx > 0 ? regionHeightPx : Math.max(fontSizePx * 1.15, ptToPx(6)),
-        });
 
         const textObj = new IText(text, {
           left: x,
@@ -911,6 +853,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         } as any);
 
         canvas.add(textObj);
+        const measuredBounds = getObjectBoundsInCanvas(textObj);
+        addOcrKnockoutCover(canvas, measuredBounds);
+        canvas.bringObjectToFront(textObj);
         addedCount++;
       }
 
@@ -1153,7 +1098,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         const detectedFontSizePt = data?.font_size_pt || null;
         const detectedXPercent = typeof data?.x_percent === "number" ? data.x_percent : null;
         const detectedYPercent = typeof data?.y_percent === "number" ? data.y_percent : null;
-        const detectedWPercent = typeof data?.w_percent === "number" ? data.w_percent : null;
         const detectedHPercent = typeof data?.h_percent === "number" ? data.h_percent : null;
 
         if (!extractedText.trim()) {
@@ -1243,12 +1187,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
           canvas.add(text);
           const measuredBounds = getObjectBoundsInCanvas(text);
-          addOcrKnockoutCover(canvas, {
-            left: detectedXPercent !== null ? textLeft : measuredBounds.left,
-            top: detectedYPercent !== null ? textTop : measuredBounds.top,
-            width: detectedWPercent && detectedWPercent > 0 ? (detectedWPercent / 100) * cropW : measuredBounds.width,
-            height: detectedHPercent && detectedHPercent > 0 ? (detectedHPercent / 100) * cropH : measuredBounds.height,
-          });
+          addOcrKnockoutCover(canvas, measuredBounds);
           canvas.bringObjectToFront(text);
 
           // Fix z-order: bg at back, trim on top
