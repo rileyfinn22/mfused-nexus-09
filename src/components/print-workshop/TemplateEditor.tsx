@@ -187,22 +187,26 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     fabricRef.current = canvas;
 
-    const trimRect = new Rect({
-      left: bleedPx,
-      top: bleedPx,
-      width: canvasWidth - bleedPx * 2,
-      height: canvasHeight - bleedPx * 2,
-      fill: "transparent",
-      stroke: "#ef4444",
-      strokeWidth: 1,
-      strokeDashArray: [5, 5],
-      selectable: false,
-      evented: false,
-      hasControls: false,
-      hasBorders: false,
-      lockMovementX: true,
-      lockMovementY: true,
-      name: "_trimGuide",
+    // Bleed overlay: 4 semi-transparent rects covering the bleed zone + dashed trim line
+    // Always stays on top so content behind it appears "cut off"
+    const bleedColor = "rgba(0, 0, 0, 0.35)";
+    const bleedTop = new Rect({ left: 0, top: 0, width: canvasWidth, height: bleedPx, fill: bleedColor, selectable: false, evented: false });
+    const bleedBottom = new Rect({ left: 0, top: canvasHeight - bleedPx, width: canvasWidth, height: bleedPx, fill: bleedColor, selectable: false, evented: false });
+    const bleedLeft = new Rect({ left: 0, top: bleedPx, width: bleedPx, height: canvasHeight - bleedPx * 2, fill: bleedColor, selectable: false, evented: false });
+    const bleedRight = new Rect({ left: canvasWidth - bleedPx, top: bleedPx, width: bleedPx, height: canvasHeight - bleedPx * 2, fill: bleedColor, selectable: false, evented: false });
+    const trimLine = new Rect({
+      left: bleedPx, top: bleedPx,
+      width: canvasWidth - bleedPx * 2, height: canvasHeight - bleedPx * 2,
+      fill: "transparent", stroke: "#ef4444", strokeWidth: 1, strokeDashArray: [5, 5],
+      selectable: false, evented: false,
+    });
+    const bleedOverlayParts = [bleedTop, bleedBottom, bleedLeft, bleedRight, trimLine];
+    bleedOverlayParts.forEach((p: any) => {
+      p.name = "_trimGuide";
+      p.hasControls = false;
+      p.hasBorders = false;
+      p.lockMovementX = true;
+      p.lockMovementY = true;
     });
     // Trim guide is injected after JSON load to avoid persisted/selectable stale guides.
 
@@ -219,8 +223,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       canvas.getObjects()
         .filter((o: any) => o.name === "_trimGuide")
         .forEach((o) => canvas.remove(o));
-      canvas.add(trimRect);
-      canvas.bringObjectToFront(trimRect);
+      bleedOverlayParts.forEach((p) => {
+        canvas.add(p);
+        canvas.bringObjectToFront(p);
+      });
 
       if (mode === "use") {
         canvas.getObjects().forEach((obj: any) => {
@@ -295,6 +301,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.on("selection:cleared", () => setSelectedObject(null));
     canvas.on("object:modified", syncCanvas);
     canvas.on("text:changed", syncCanvas);
+    // Ensure bleed overlay always stays on top when any object is added
+    canvas.on("object:added", () => {
+      const trims = canvas.getObjects().filter((o: any) => o.name === "_trimGuide");
+      trims.forEach((t) => canvas.bringObjectToFront(t));
+    });
 
     return () => {
       canvas.dispose();
