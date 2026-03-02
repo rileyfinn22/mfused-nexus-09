@@ -175,7 +175,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const pxToPt = (px: number) => Math.round((px * 72) / DPI * 10) / 10;
   const getObjectBoundsInCanvas = (obj: FabricObject) => {
     const br = obj.getBoundingRect();
-    return { left: br.left, top: br.top, width: br.width, height: br.height };
+    const zoom = fabricRef.current?.getZoom() || 1;
+    return {
+      left: br.left / zoom,
+      top: br.top / zoom,
+      width: br.width / zoom,
+      height: br.height / zoom,
+    };
   };
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
