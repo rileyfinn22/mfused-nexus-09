@@ -81,9 +81,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const canvasHeight = Math.round((height + bleed * 2) * DPI);
   const bleedPx = Math.round(bleed * DPI);
 
-  // Display zoom: fit the high-res canvas into a reasonable screen size
-  // Target ~800px wide for comfortable editing
-  const displayZoom = Math.min(800 / canvasWidth, 700 / canvasHeight, 1);
+  // Display: fit into ~900px wide, accounting for device pixel ratio for crisp rendering
+  const TARGET_DISPLAY_WIDTH = 900;
+  const TARGET_DISPLAY_HEIGHT = 750;
+  const displayScale = Math.min(TARGET_DISPLAY_WIDTH / canvasWidth, TARGET_DISPLAY_HEIGHT / canvasHeight, 1.5);
+  const cssWidth = Math.round(canvasWidth * displayScale);
+  const cssHeight = Math.round(canvasHeight * displayScale);
+  // Use device pixel ratio so retina screens get a sharp backing buffer
+  const dpr = typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1;
 
   const syncCanvas = useCallback(() => {
     if (fabricRef.current && onCanvasChange) {
@@ -95,15 +100,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     if (!canvasRef.current) return;
 
     const canvas = new FabricCanvas(canvasRef.current);
-    // Set the canvas internal dimensions at full DPI resolution
-    canvas.setDimensions({ width: canvasWidth, height: canvasHeight });
-    // Use Fabric's native zoom for display scaling (preserves mouse coordinates for text editing)
-    canvas.setZoom(displayZoom);
-    // Set the HTML element size to the zoomed dimensions
-    canvas.setDimensions(
-      { width: canvasWidth * displayZoom, height: canvasHeight * displayZoom },
-      { cssOnly: true }
-    );
+    // Backing buffer at display size * DPR for retina sharpness
+    const backingW = Math.round(cssWidth * dpr);
+    const backingH = Math.round(cssHeight * dpr);
+    canvas.setDimensions({ width: backingW, height: backingH });
+    // Zoom maps logical canvas coords (canvasWidth) → backing pixels
+    canvas.setZoom(displayScale * dpr);
+    // CSS size = what user sees on screen
+    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
 
@@ -167,7 +171,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       canvas.dispose();
       fabricRef.current = null;
     };
-  }, [canvasWidth, canvasHeight, bleedPx, mode, displayZoom]);
+  }, [canvasWidth, canvasHeight, bleedPx, mode, displayScale, dpr, cssWidth, cssHeight]);
 
   const addText = (editable: boolean) => {
     const canvas = fabricRef.current;
