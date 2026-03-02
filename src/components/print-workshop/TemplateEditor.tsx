@@ -156,6 +156,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const [drawTextMode, setDrawTextMode] = useState<"off" | "editable" | "locked">("off");
   const drawTextStartRef = useRef<{ x: number; y: number } | null>(null);
   const drawTextRectRef = useRef<Rect | null>(null);
+  const [unlockZoneMode, setUnlockZoneMode] = useState(false);
 
   // Undo/redo history
   const undoStack = useRef<string[]>([]);
@@ -1062,6 +1063,116 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
   };
 
+  // --- Unlock Zone: draw box in use mode to unlock text for editing ---
+  const startUnlockZone = () => {
+    setUnlockZoneMode(true);
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.selection = false;
+    canvas.defaultCursor = "crosshair";
+    canvas.getObjects().forEach((o: any) => o.set({ evented: false }));
+    canvas.renderAll();
+
+    let startPt: { x: number; y: number } | null = null;
+    let rect: Rect | null = null;
+
+    const onMouseDown = (e: any) => {
+      const pointer = canvas.getViewportPoint(e.e);
+      const zoom = canvas.getZoom();
+      startPt = { x: pointer.x / zoom, y: pointer.y / zoom };
+      rect = new Rect({
+        left: startPt.x, top: startPt.y, width: 1, height: 1,
+        fill: "rgba(59,130,246,0.08)", stroke: "#3b82f6",
+        strokeWidth: 2, strokeDashArray: [6, 4],
+        selectable: false, evented: false, name: "_unlockZone",
+      } as any);
+      canvas.add(rect);
+      canvas.renderAll();
+    };
+
+    const onMouseMove = (e: any) => {
+      if (!startPt || !rect) return;
+      const pointer = canvas.getViewportPoint(e.e);
+      const zoom = canvas.getZoom();
+      const x = pointer.x / zoom;
+      const y = pointer.y / zoom;
+      rect.set({
+        left: Math.min(startPt.x, x), top: Math.min(startPt.y, y),
+        width: Math.abs(x - startPt.x), height: Math.abs(y - startPt.y),
+      });
+      canvas.renderAll();
+    };
+
+    const onMouseUp = () => {
+      canvas.off("mouse:down", onMouseDown);
+      canvas.off("mouse:move", onMouseMove);
+      canvas.off("mouse:up", onMouseUp);
+
+      if (rect) {
+        const zoneLeft = rect.left || 0;
+        const zoneTop = rect.top || 0;
+        const zoneRight = zoneLeft + (rect.width || 0);
+        const zoneBottom = zoneTop + (rect.height || 0);
+        canvas.remove(rect);
+
+        // Find all locked text objects whose center falls within the drawn zone
+        let unlocked = 0;
+        canvas.getObjects().forEach((obj: any) => {
+          if (!obj.type?.includes("text") && obj.type !== "i-text" && obj.type !== "textbox") return;
+          if (!obj.locked) return;
+          const br = obj.getBoundingRect();
+          const zoom = canvas.getZoom();
+          const cx = br.left / zoom + br.width / zoom / 2;
+          const cy = br.top / zoom + br.height / zoom / 2;
+
+          if (cx >= zoneLeft && cx <= zoneRight && cy >= zoneTop && cy <= zoneBottom) {
+            obj.locked = false;
+            obj.editable = true;
+            obj.name = "editable_text";
+            obj.set({
+              selectable: true, evented: true, hasControls: true,
+              borderColor: "#3b82f6", cornerColor: "#3b82f6",
+              cornerStyle: "circle", transparentCorners: false,
+            });
+            unlocked++;
+          }
+        });
+
+        if (unlocked > 0) {
+          toast.success(`Unlocked ${unlocked} text ${unlocked === 1 ? "element" : "elements"} for editing`);
+          canvas.renderAll();
+          syncCanvas();
+        } else {
+          toast.info("No locked text found in that area");
+        }
+      }
+
+      endUnlockZone();
+    };
+
+    canvas.on("mouse:down", onMouseDown);
+    canvas.on("mouse:move", onMouseMove);
+    canvas.on("mouse:up", onMouseUp);
+  };
+
+  const endUnlockZone = () => {
+    setUnlockZoneMode(false);
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.selection = false;
+    canvas.defaultCursor = "default";
+    // Re-enable evented on editable objects only
+    canvas.getObjects().forEach((obj: any) => {
+      if (obj.name === "_trimGuide" || obj.name === GUIDE_NAME) return;
+      if (obj.locked || !obj.editable) {
+        obj.set({ selectable: false, evented: false });
+      } else {
+        obj.set({ selectable: true, evented: true });
+      }
+    });
+    canvas.renderAll();
+  };
+
   // Auto-extract removed - user positions PDF manually
 
   const applyFontSize = (sizePt: number) => {
@@ -1264,6 +1375,27 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           </>
         )}
 
+        {mode === "use" && (
+          <>
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant={unlockZoneMode ? "default" : "outline"}
+                    onClick={unlockZoneMode ? endUnlockZone : startUnlockZone}
+                    className="gap-1.5"
+                  >
+                    <Unlock className="h-3.5 w-3.5" />
+                    <span className="text-xs">{unlockZoneMode ? "Cancel" : "Select to Edit"}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Draw a box around text to make it editable</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </>
+        )}
+
         {mode === "use" && selectedObject && (selectedObject as any).editable && (selectedObject as any).type?.includes("image") && (
           <Button size="sm" variant="outline" onClick={() => {
             pickImageFile((imgEl) => {
@@ -1443,8 +1575,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           <Button size="sm" variant="ghost" onClick={endDrawText} className="ml-auto h-6 px-2 text-xs">Cancel</Button>
         </div>
       )}
+      {unlockZoneMode && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-primary/10 border border-primary/30 text-sm text-primary">
+          <Unlock className="h-4 w-4" />
+          <span>Draw a box around locked text to make it editable</span>
+          <Button size="sm" variant="ghost" onClick={endUnlockZone} className="ml-auto h-6 px-2 text-xs">Cancel</Button>
+        </div>
+      )}
 
-      {/* Canvas */}
       <div className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center">
         <div className="relative shadow-lg" style={{ width: cssWidth, height: cssHeight }}>
           <canvas ref={canvasRef} />
