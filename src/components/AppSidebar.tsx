@@ -87,19 +87,25 @@ export function AppSidebar() {
   }, [activeCompany]);
 
   // Track unread chat messages using last_seen_at
-  useEffect(() => {
-    let cancelled = false;
-    const fetchUnread = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || cancelled) return;
+  const [currentUserIdSidebar, setCurrentUserIdSidebar] = useState<string | null>(null);
 
-      // Get channels user is a member of with last_seen_at
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setCurrentUserIdSidebar(data.user.id);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!currentUserIdSidebar) return;
+    let cancelled = false;
+
+    const fetchUnread = async () => {
       const { data: memberships } = await supabase
         .from('chat_channel_members')
         .select('channel_id, last_seen_at')
-        .eq('user_id', user.id);
+        .eq('user_id', currentUserIdSidebar);
 
-      if (!memberships || memberships.length === 0) { setUnreadChatCount(0); return; }
+      if (!memberships || memberships.length === 0) { if (!cancelled) setUnreadChatCount(0); return; }
 
       let total = 0;
       for (const m of memberships) {
@@ -108,7 +114,7 @@ export function AppSidebar() {
           .from('chat_messages')
           .select('*', { count: 'exact', head: true })
           .eq('channel_id', m.channel_id)
-          .neq('user_id', user.id)
+          .neq('user_id', currentUserIdSidebar)
           .gt('created_at', lastSeen);
         total += count || 0;
       }
@@ -117,18 +123,21 @@ export function AppSidebar() {
 
     fetchUnread();
 
-    // Re-check on new messages via realtime
+    // Realtime: instantly increment on new messages from others
     const channel = supabase
       .channel('sidebar-chat-unread')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, () => {
-        fetchUnread();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
+        const msg = payload.new as any;
+        if (msg.user_id !== currentUserIdSidebar) {
+          setUnreadChatCount(prev => prev + 1);
+        }
       })
       .subscribe();
 
     return () => { cancelled = true; supabase.removeChannel(channel); };
-  }, []);
+  }, [currentUserIdSidebar]);
 
-  // Refetch when leaving the chat page (last_seen_at was updated there)
+  // When on chat page, zero out; when leaving, refetch accurate count
   const [wasOnChat, setWasOnChat] = useState(false);
   useEffect(() => {
     if (currentPath === '/chat') {
@@ -136,14 +145,12 @@ export function AppSidebar() {
       setUnreadChatCount(0);
     } else if (wasOnChat) {
       setWasOnChat(false);
-      // Trigger a refetch since last_seen_at was updated while on chat
+      if (!currentUserIdSidebar) return;
       const refetch = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
         const { data: memberships } = await supabase
           .from('chat_channel_members')
           .select('channel_id, last_seen_at')
-          .eq('user_id', user.id);
+          .eq('user_id', currentUserIdSidebar);
         if (!memberships) return;
         let total = 0;
         for (const m of memberships) {
@@ -152,7 +159,7 @@ export function AppSidebar() {
             .from('chat_messages')
             .select('*', { count: 'exact', head: true })
             .eq('channel_id', m.channel_id)
-            .neq('user_id', user.id)
+            .neq('user_id', currentUserIdSidebar)
             .gt('created_at', lastSeen);
           total += count || 0;
         }
