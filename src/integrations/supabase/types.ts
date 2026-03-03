@@ -1547,6 +1547,42 @@ export type Database = {
           },
         ]
       }
+      print_pricing_tiers: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          material: string | null
+          max_quantity: number | null
+          min_quantity: number
+          product_type: string
+          unit_cost: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          material?: string | null
+          max_quantity?: number | null
+          min_quantity?: number
+          product_type?: string
+          unit_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          material?: string | null
+          max_quantity?: number | null
+          min_quantity?: number
+          product_type?: string
+          unit_cost?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       print_templates: {
         Row: {
           bleed_inches: number
