@@ -442,6 +442,25 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           delete safeCanvasData.backgroundImage;
         }
         await canvas.loadFromJSON(safeCanvasData);
+
+        // Pre-load all Google fonts used by text objects so they render correctly in use mode
+        const fontsToLoad = new Set<string>();
+        canvas.getObjects().forEach((obj: any) => {
+          if (obj.fontFamily) {
+            const fontDef = FONT_OPTIONS.find(f => f.value === obj.fontFamily);
+            if (fontDef?.google) fontsToLoad.add(fontDef.value);
+          }
+        });
+        if (fontsToLoad.size > 0) {
+          await Promise.all([...fontsToLoad].map(f => loadGoogleFont(f)));
+          // Force re-render after fonts load so text displays correctly
+          canvas.getObjects().forEach((obj: any) => {
+            if (obj.fontFamily && fontsToLoad.has(obj.fontFamily)) {
+              obj.dirty = true;
+            }
+          });
+          canvas.renderAll();
+        }
       }
 
       // Remove any persisted trim guides / old text covers from older saves.
