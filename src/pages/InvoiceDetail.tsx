@@ -2977,8 +2977,8 @@ const InvoiceDetail = () => {
           </CardContent>
         </Card>}
 
-      {/* Packing Lists Section - For shipped/partial invoices */}
-      {invoice && order && (invoice.invoice_type === 'partial' || invoice.status === 'shipped' || invoice.shipment_number) && (
+      {/* Packing Lists Section - Show on all invoices for admin management */}
+      {invoice && order && (
         <InvoicePackingListSection
           invoiceId={invoiceId!}
           invoice={invoice}
