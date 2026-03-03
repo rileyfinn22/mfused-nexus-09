@@ -12,8 +12,13 @@ import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import {
   ArrowLeft, Package, FileText, ExternalLink, Truck,
-  Loader2, Save, Printer, Download, Eye
+  Loader2, Save, Printer, Download, Eye, Trash2
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { CARRIERS, getTrackingUrl } from "@/lib/trackingUtils";
@@ -223,6 +228,40 @@ export default function WorkshopOrderDetail() {
           <Badge variant="outline" className={STATUS_COLORS[status] || ""}>
             {formatLabel(status)}
           </Badge>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" className="gap-1.5">
+                <Trash2 className="h-4 w-4" /> Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Workshop Order</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete order <strong>{order.order_number}</strong> and all its line items. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={async () => {
+                    // Delete line items first, then the order
+                    await supabase.from("print_orders").delete().eq("workshop_order_id", orderId!);
+                    const { error } = await supabase.from("workshop_orders").delete().eq("id", orderId!);
+                    if (error) {
+                      toast.error("Failed to delete order");
+                    } else {
+                      toast.success("Order deleted");
+                      navigate("/print-workshop");
+                    }
+                  }}
+                >
+                  Delete Order
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save Changes
