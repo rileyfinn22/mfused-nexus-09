@@ -166,8 +166,24 @@ function shouldSkipExportObject(objName: string): boolean {
   if (objName === "_trimGuide") return true;
   if (objName === "_snapGuide") return true;
   if (objName === "pdf_background") return true;
+  if (objName === "mask_cover") return true;
   if (objName.startsWith("_") && objName !== "_ocrKnockout") return true;
   return false;
+}
+
+/**
+ * Set a clipping rectangle on the jsPDF document so nothing renders
+ * outside the page bounds (bleed area). Uses low-level PDF operators.
+ */
+function clipToPageBounds(doc: jsPDF, widthIn: number, heightIn: number) {
+  const k = (doc as any).internal.scaleFactor; // points per unit
+  const pageHeight = heightIn * k;
+  const w = widthIn * k;
+  const h = heightIn * k;
+  // PDF rectangle path: x y w h re W n (clip + discard path)
+  (doc as any).internal.write(
+    `0 0 ${w.toFixed(4)} ${pageHeight.toFixed(4)} re W n`
+  );
 }
 
 function drawRectObject(doc: jsPDF, obj: any, canvasDpi: number) {
@@ -201,6 +217,9 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
     unit: "in",
     format: [totalW, totalH],
   });
+
+  // Clip all rendering to the page bounds so nothing bleeds outside the bleed area
+  clipToPageBounds(doc, totalW, totalH);
 
   // 1. Render the source PDF base layer using the same placement rules as preview
   const pdfData = await fetchSourcePdf(sourcePdfPath);
@@ -403,6 +422,9 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
     unit: "in",
     format: [totalW, totalH],
   });
+
+  // Clip all rendering to the page bounds
+  clipToPageBounds(doc, totalW, totalH);
 
   const CANVAS_DPI = 150;
 
