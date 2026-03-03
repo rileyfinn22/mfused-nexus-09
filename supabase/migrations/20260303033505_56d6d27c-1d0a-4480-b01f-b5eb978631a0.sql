@@ -1,0 +1,1 @@
+ALTER TABLE public.print_orders ADD COLUMN thumbnail_url text;

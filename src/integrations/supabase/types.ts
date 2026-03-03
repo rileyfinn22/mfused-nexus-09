@@ -1473,6 +1473,7 @@ export type Database = {
           quoted_price: number | null
           status: string
           template_name: string
+          thumbnail_url: string | null
           total: number | null
           workshop_order_id: string | null
         }
@@ -1493,6 +1494,7 @@ export type Database = {
           quoted_price?: number | null
           status?: string
           template_name: string
+          thumbnail_url?: string | null
           total?: number | null
           workshop_order_id?: string | null
         }
@@ -1513,6 +1515,7 @@ export type Database = {
           quoted_price?: number | null
           status?: string
           template_name?: string
+          thumbnail_url?: string | null
           total?: number | null
           workshop_order_id?: string | null
         }
