@@ -128,6 +128,13 @@ export function PrintCart({ items, onUpdateQuantity, onRemoveItem, onClearCart }
               {items.map((item) => (
                 <div key={item.id} className="border border-border rounded-lg p-3 space-y-2">
                   <div className="flex items-start justify-between gap-2">
+                    {item.thumbnailUrl && (
+                      <img
+                        src={item.thumbnailUrl}
+                        alt={item.templateName}
+                        className="h-14 w-14 object-contain rounded border border-border shrink-0"
+                      />
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{item.templateName}</p>
                       {item.material && (
