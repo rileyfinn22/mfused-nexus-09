@@ -47,6 +47,7 @@ import NotFound from "./pages/NotFound";
 import ShipmentUpdate from "./pages/ShipmentUpdate";
 import Chat from "./pages/Chat";
 import PrintWorkshop from "./pages/PrintWorkshop";
+import WorkshopOrderDetail from "./pages/WorkshopOrderDetail";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +93,7 @@ const App = () => (
           <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
            <Route path="/chat" element={<DashboardLayout><Chat /></DashboardLayout>} />
            <Route path="/print-workshop" element={<DashboardLayout><PrintWorkshop /></DashboardLayout>} />
+           <Route path="/print-workshop/orders/:orderId" element={<DashboardLayout><WorkshopOrderDetail /></DashboardLayout>} />
           <Route path="/projects" element={<DashboardLayout><Projects /></DashboardLayout>} />
           <Route path="/projects/:projectId" element={<DashboardLayout><ProjectDetail /></DashboardLayout>} />
           

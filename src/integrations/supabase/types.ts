@@ -1474,6 +1474,7 @@ export type Database = {
           status: string
           template_name: string
           total: number | null
+          workshop_order_id: string | null
         }
         Insert: {
           canvas_data?: Json | null
@@ -1493,6 +1494,7 @@ export type Database = {
           status?: string
           template_name: string
           total?: number | null
+          workshop_order_id?: string | null
         }
         Update: {
           canvas_data?: Json | null
@@ -1512,6 +1514,7 @@ export type Database = {
           status?: string
           template_name?: string
           total?: number | null
+          workshop_order_id?: string | null
         }
         Relationships: [
           {
@@ -1533,6 +1536,13 @@ export type Database = {
             columns: ["print_template_id"]
             isOneToOne: false
             referencedRelation: "print_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_orders_workshop_order_id_fkey"
+            columns: ["workshop_order_id"]
+            isOneToOne: false
+            referencedRelation: "workshop_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -2999,6 +3009,74 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workshop_orders: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          order_number: string
+          production_progress: number | null
+          production_status: string | null
+          shipping_cost: number
+          status: string
+          subtotal: number
+          tax: number
+          total: number
+          tracking_carrier: string | null
+          tracking_number: string | null
+          tracking_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          order_number: string
+          production_progress?: number | null
+          production_status?: string | null
+          shipping_cost?: number
+          status?: string
+          subtotal?: number
+          tax?: number
+          total?: number
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          order_number?: string
+          production_progress?: number | null
+          production_status?: string | null
+          shipping_cost?: number
+          status?: string
+          subtotal?: number
+          tax?: number
+          total?: number
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workshop_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
