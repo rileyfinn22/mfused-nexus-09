@@ -85,64 +85,75 @@ async function renderPdfPage(
   await page.render({ canvasContext: renderedCtx, viewport, canvas: renderedCanvas } as any).promise;
 
   const toleranceInches = 0.05;
+  const isLargerThanTemplate =
+    pdfPageWidthInches > templateTotalWidthInches + toleranceInches ||
+    pdfPageHeightInches > templateTotalHeightInches + toleranceInches;
+
   const matchesTrimArea =
     Math.abs(pdfPageWidthInches - trimWidthInches) <= toleranceInches &&
     Math.abs(pdfPageHeightInches - trimHeightInches) <= toleranceInches;
 
-  // Always render background only inside trim area (inside bleed), never full page.
-  // This guarantees outside-of-trim exports stay white.
-  const targetWidthPx = Math.max(1, Math.round(trimWidthInches * dpi));
-  const targetHeightPx = Math.max(1, Math.round(trimHeightInches * dpi));
+  // Case 1: source page is larger than template -> crop centered template area (matches preview)
+  if (isLargerThanTemplate) {
+    const targetWidthPx = Math.max(1, Math.round(templateTotalWidthInches * dpi));
+    const targetHeightPx = Math.max(1, Math.round(templateTotalHeightInches * dpi));
 
-  const trimmedCanvas = document.createElement("canvas");
-  trimmedCanvas.width = targetWidthPx;
-  trimmedCanvas.height = targetHeightPx;
-  const trimmedCtx = trimmedCanvas.getContext("2d")!;
+    const cropWidthPx = Math.min(targetWidthPx, renderedCanvas.width);
+    const cropHeightPx = Math.min(targetHeightPx, renderedCanvas.height);
+    const cropLeftPx = Math.max(0, Math.round((renderedCanvas.width - cropWidthPx) / 2));
+    const cropTopPx = Math.max(0, Math.round((renderedCanvas.height - cropHeightPx) / 2));
 
-  if (matchesTrimArea) {
-    // Exact trim-sized source: fit directly to trim
-    trimmedCtx.drawImage(
+    const croppedCanvas = document.createElement("canvas");
+    croppedCanvas.width = targetWidthPx;
+    croppedCanvas.height = targetHeightPx;
+    const croppedCtx = croppedCanvas.getContext("2d")!;
+
+    croppedCtx.drawImage(
       renderedCanvas,
-      0,
-      0,
-      renderedCanvas.width,
-      renderedCanvas.height,
+      cropLeftPx,
+      cropTopPx,
+      cropWidthPx,
+      cropHeightPx,
       0,
       0,
       targetWidthPx,
       targetHeightPx
     );
-  } else {
-    // Any other source size: cover trim area and crop overflow from center
-    const scale = Math.max(
-      targetWidthPx / renderedCanvas.width,
-      targetHeightPx / renderedCanvas.height
-    );
 
-    const drawWidth = renderedCanvas.width * scale;
-    const drawHeight = renderedCanvas.height * scale;
-    const dx = (targetWidthPx - drawWidth) / 2;
-    const dy = (targetHeightPx - drawHeight) / 2;
-
-    trimmedCtx.drawImage(
-      renderedCanvas,
-      0,
-      0,
-      renderedCanvas.width,
-      renderedCanvas.height,
-      dx,
-      dy,
-      drawWidth,
-      drawHeight
-    );
+    return {
+      dataUrl: croppedCanvas.toDataURL("image/png"),
+      xInches: 0,
+      yInches: 0,
+      widthInches: templateTotalWidthInches,
+      heightInches: templateTotalHeightInches,
+    };
   }
 
+  // Case 2: source page matches trim size -> place inside trim area with bleed margins (matches preview)
+  if (matchesTrimArea) {
+    return {
+      dataUrl: renderedCanvas.toDataURL("image/png"),
+      xInches: bleedInches,
+      yInches: bleedInches,
+      widthInches: trimWidthInches,
+      heightInches: trimHeightInches,
+    };
+  }
+
+  // Case 3: standard fit/center into full template area (matches preview default)
+  const fitScale = Math.min(
+    templateTotalWidthInches / pdfPageWidthInches,
+    templateTotalHeightInches / pdfPageHeightInches
+  );
+  const drawWidthInches = pdfPageWidthInches * fitScale;
+  const drawHeightInches = pdfPageHeightInches * fitScale;
+
   return {
-    dataUrl: trimmedCanvas.toDataURL("image/png"),
-    xInches: bleedInches,
-    yInches: bleedInches,
-    widthInches: trimWidthInches,
-    heightInches: trimHeightInches,
+    dataUrl: renderedCanvas.toDataURL("image/png"),
+    xInches: (templateTotalWidthInches - drawWidthInches) / 2,
+    yInches: (templateTotalHeightInches - drawHeightInches) / 2,
+    widthInches: drawWidthInches,
+    heightInches: drawHeightInches,
   };
 }
 
