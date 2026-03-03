@@ -629,7 +629,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     // In use mode: auto-enter text editing on click
     if (mode === "use") {
-      canvas.on("selection:created", (e) => {
+      const autoEditText = (e: any) => {
         const obj = e.selected?.[0] as any;
         if (obj && obj.type === "i-text" && obj.editable) {
           setTimeout(() => {
@@ -637,22 +637,20 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             const len = (obj.text || "").length;
             obj.selectionStart = len;
             obj.selectionEnd = len;
+            // Also sync the hidden textarea that Fabric creates for actual keyboard input
+            const ta = obj.hiddenTextarea as HTMLTextAreaElement | undefined;
+            if (ta) {
+              ta.value = obj.text || "";
+              ta.selectionStart = len;
+              ta.selectionEnd = len;
+              ta.focus();
+            }
             canvas.renderAll();
           }, 50);
         }
-      });
-      canvas.on("selection:updated", (e) => {
-        const obj = e.selected?.[0] as any;
-        if (obj && obj.type === "i-text" && obj.editable) {
-          setTimeout(() => {
-            obj.enterEditing();
-            const len = (obj.text || "").length;
-            obj.selectionStart = len;
-            obj.selectionEnd = len;
-            canvas.renderAll();
-          }, 50);
-        }
-      });
+      };
+      canvas.on("selection:created", autoEditText);
+      canvas.on("selection:updated", autoEditText);
     }
 
     // Smart snapping guidelines
