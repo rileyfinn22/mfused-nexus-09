@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,7 @@ export default function Chat() {
   const [profileMap, setProfileMap] = useState<Record<string, ChatProfile>>({});
   const [showNewDm, setShowNewDm] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [memberSeenMap, setMemberSeenMap] = useState<Record<string, string>>({}); // userId -> last_seen_at
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [cursorPos, setCursorPos] = useState(0);
@@ -234,6 +235,46 @@ export default function Chat() {
       .eq('user_id', currentUserId)
       .then();
   }, [activeChannel?.id]);
+
+  // Load member seen status for active channel & subscribe to realtime updates
+  useEffect(() => {
+    if (!activeChannel || !currentUserId) return;
+
+    const loadMemberSeen = async () => {
+      const { data } = await supabase
+        .from('chat_channel_members')
+        .select('user_id, last_seen_at')
+        .eq('channel_id', activeChannel.id);
+      if (data) {
+        const map: Record<string, string> = {};
+        data.forEach(m => {
+          if (m.user_id !== currentUserId && m.last_seen_at) {
+            map[m.user_id] = m.last_seen_at;
+          }
+        });
+        setMemberSeenMap(map);
+      }
+    };
+
+    loadMemberSeen();
+
+    const seenChannel = supabase
+      .channel(`seen-${activeChannel.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'chat_channel_members',
+        filter: `channel_id=eq.${activeChannel.id}`,
+      }, (payload) => {
+        const row = payload.new as any;
+        if (row.user_id !== currentUserId && row.last_seen_at) {
+          setMemberSeenMap(prev => ({ ...prev, [row.user_id]: row.last_seen_at }));
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(seenChannel); };
+  }, [activeChannel?.id, currentUserId]);
 
   // Load messages for active channel
   useEffect(() => {
@@ -682,6 +723,22 @@ export default function Chat() {
     return format(d, "EEEE, MMMM d");
   };
 
+  // Compute read receipts: map messageId -> list of userIds who have seen up to that message
+  const seenByMessage = useMemo(() => {
+    const result: Record<string, string[]> = {};
+    Object.entries(memberSeenMap).forEach(([userId, lastSeenAt]) => {
+      for (let j = messages.length - 1; j >= 0; j--) {
+        if (messages[j].created_at <= lastSeenAt) {
+          const msgId = messages[j].id;
+          if (!result[msgId]) result[msgId] = [];
+          result[msgId].push(userId);
+          break;
+        }
+      }
+    });
+    return result;
+  }, [memberSeenMap, messages]);
+
   if (!isVibeAdmin) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -988,6 +1045,26 @@ export default function Chat() {
                           <MessageSquare className="h-3 w-3" />
                           {msg.reply_count} {msg.reply_count === 1 ? "reply" : "replies"}
                         </button>
+                      )}
+                      {/* Read receipts */}
+                      {seenByMessage[msg.id] && seenByMessage[msg.id].length > 0 && (
+                        <div className="flex items-center justify-end gap-0.5 mt-1">
+                          {seenByMessage[msg.id].map((uid) => {
+                            const profile = profileMap[uid];
+                            const name = profile?.display_name || 'Unknown';
+                            const color = profile?.avatar_color || '#888';
+                            return (
+                              <div
+                                key={uid}
+                                title={`Seen by ${name}`}
+                                className="h-4 w-4 rounded-full flex items-center justify-center text-[7px] font-medium text-white shrink-0"
+                                style={{ backgroundColor: color }}
+                              >
+                                {name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                     <div className="opacity-0 group-hover:opacity-100 flex items-start gap-1 shrink-0 transition-opacity">
