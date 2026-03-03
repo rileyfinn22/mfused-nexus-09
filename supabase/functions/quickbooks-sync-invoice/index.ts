@@ -666,7 +666,8 @@ serve(async (req) => {
       }
     }
 
-    // If this is a child invoice with a parent that had a deposit, deduct the deposit amount
+    // Deduct deposits: check both directions
+    // 1. Child invoice looking at parent deposit
     if (invoice.parent_invoice_id && billingPercentage === 100) {
       const { data: parentInvoice } = await supabase
         .from('invoices')
@@ -697,6 +698,47 @@ serve(async (req) => {
 
           calculatedSubtotal -= depositAmount;
           console.log(`Adjusted subtotal after deposit deduction: ${calculatedSubtotal}`);
+        }
+      }
+    }
+
+    // 2. Blanket/parent invoice looking at child deposit invoices
+    if (!invoice.parent_invoice_id && billingPercentage === 100) {
+      const { data: childDeposits } = await supabase
+        .from('invoices')
+        .select('billed_percentage, total, total_paid, invoice_number, quickbooks_id')
+        .eq('parent_invoice_id', invoice.id)
+        .is('deleted_at', null);
+
+      if (childDeposits && childDeposits.length > 0) {
+        const depositChildren = childDeposits.filter(
+          (c: any) => c.quickbooks_id && Number(c.billed_percentage || 100) < 100
+        );
+        
+        for (const child of depositChildren) {
+          const depositAmount = Number(child.total || 0);
+          if (depositAmount > 0) {
+            console.log(`Child deposit invoice ${child.invoice_number} was a ${child.billed_percentage}% deposit of $${depositAmount} — deducting from blanket invoice`);
+
+            const depositItemId = await findOrCreateQBItem('Deposit Applied', 'Previously billed deposit credit', depositAmount);
+
+            lineItems.push({
+              DetailType: 'SalesItemLineDetail',
+              Amount: -depositAmount,
+              Description: `Less: ${child.billed_percentage}% Deposit (Invoice #${child.invoice_number})`,
+              SalesItemLineDetail: {
+                ItemRef: {
+                  value: depositItemId,
+                  name: 'Deposit Applied',
+                },
+                Qty: 1,
+                UnitPrice: -depositAmount,
+              },
+            });
+
+            calculatedSubtotal -= depositAmount;
+            console.log(`Adjusted subtotal after child deposit deduction: ${calculatedSubtotal}`);
+          }
         }
       }
     }
