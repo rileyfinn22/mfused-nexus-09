@@ -286,6 +286,31 @@ export default function Chat() {
     loadMessages();
   }, [activeChannel?.id]);
 
+  const normalizeChatAttachmentPath = (value: string) => {
+    if (!value) return value;
+    if (!value.startsWith("http")) {
+      return decodeURIComponent(value.replace(/^\/+/, ""));
+    }
+
+    try {
+      const parsedUrl = new URL(value);
+      const path = parsedUrl.pathname;
+      const storageMatch = path.match(/\/storage\/v1\/object\/(?:public|sign)\/chat-files\/(.+)$/);
+      if (storageMatch?.[1]) {
+        return decodeURIComponent(storageMatch[1]);
+      }
+
+      const bucketMatch = path.match(/\/chat-files\/(.+)$/);
+      if (bucketMatch?.[1]) {
+        return decodeURIComponent(bucketMatch[1]);
+      }
+    } catch (error) {
+      console.warn("Failed to normalize attachment path", value, error);
+    }
+
+    return value;
+  };
+
   const loadMessages = async () => {
     if (!activeChannel) return;
     const { data } = await supabase
@@ -317,7 +342,10 @@ export default function Chat() {
       const attachmentMap: Record<string, Attachment[]> = {};
       attachments?.forEach((a) => {
         if (!attachmentMap[a.message_id]) attachmentMap[a.message_id] = [];
-        attachmentMap[a.message_id].push(a);
+        attachmentMap[a.message_id].push({
+          ...a,
+          file_url: normalizeChatAttachmentPath(a.file_url),
+        });
       });
 
       const userIds = [...new Set(data.map((m) => m.user_id))];
@@ -1087,30 +1115,12 @@ export default function Chat() {
                             <button
                               key={a.id}
                               onClick={async () => {
-                                let storagePath = a.file_url;
+                                const storagePath = normalizeChatAttachmentPath(a.file_url);
 
-                                if (a.file_url.startsWith("http")) {
-                                  try {
-                                    const parsedUrl = new URL(a.file_url);
-                                    const publicPrefix = "/storage/v1/object/public/chat-files/";
-                                    const signPrefix = "/storage/v1/object/sign/chat-files/";
-
-                                    const extractedPath = parsedUrl.pathname.includes(publicPrefix)
-                                      ? parsedUrl.pathname.split(publicPrefix)[1]
-                                      : parsedUrl.pathname.includes(signPrefix)
-                                        ? parsedUrl.pathname.split(signPrefix)[1]
-                                        : null;
-
-                                    if (!extractedPath) {
-                                      window.open(a.file_url, "_blank");
-                                      return;
-                                    }
-
-                                    storagePath = decodeURIComponent(extractedPath);
-                                  } catch {
-                                    window.open(a.file_url, "_blank");
-                                    return;
-                                  }
+                                if (!storagePath || storagePath.startsWith("http")) {
+                                  toast({ title: "Could not open attachment", variant: "destructive" });
+                                  console.warn("Attachment path unresolved", a.file_url);
+                                  return;
                                 }
 
                                 const { data, error } = await supabase.storage
@@ -1119,6 +1129,7 @@ export default function Chat() {
 
                                 if (error || !data?.signedUrl) {
                                   toast({ title: "Could not open attachment", variant: "destructive" });
+                                  console.warn("Signed URL creation failed", { original: a.file_url, storagePath, error });
                                   return;
                                 }
 
