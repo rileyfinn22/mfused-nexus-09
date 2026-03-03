@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ShoppingCart, DollarSign, Download, Save, Loader2, CheckCircle2 } from "lucide-react";
+import { ShoppingCart, DollarSign, Download } from "lucide-react";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
 import type { CartItem } from "./PrintCart";
 
@@ -13,12 +13,9 @@ interface OrderPanelProps {
   template: any;
   canvasData: any;
   onAddToCart: (item: Omit<CartItem, "id">) => void;
-  onSaveDesign?: () => Promise<void>;
-  isSaving?: boolean;
-  isSaved?: boolean;
 }
 
-export function OrderPanel({ template, canvasData, onAddToCart, onSaveDesign, isSaving, isSaved }: OrderPanelProps) {
+export function OrderPanel({ template, canvasData, onAddToCart }: OrderPanelProps) {
   const [material, setMaterial] = useState<string>(
     (template.material_options as string[])?.[0] || ""
   );
@@ -157,31 +154,6 @@ export function OrderPanel({ template, canvasData, onAddToCart, onSaveDesign, is
             {template.width_inches}" × {template.height_inches}" {template.product_type}
           </Label>
         </div>
-
-        {/* Save Design Button */}
-        <Button
-          onClick={onSaveDesign}
-          disabled={isSaving}
-          variant={isSaved ? "outline" : "secondary"}
-          className="w-full gap-2"
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Saving Design...
-            </>
-          ) : isSaved ? (
-            <>
-              <CheckCircle2 className="h-4 w-4 text-primary" />
-              Design Saved
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4" />
-              Save Design
-            </>
-          )}
-        </Button>
 
         <Button
           onClick={handleGeneratePrintFile}
