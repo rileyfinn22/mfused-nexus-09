@@ -470,9 +470,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       if (mode === "use") {
         const editableObjects: any[] = [];
         canvas.getObjects().forEach((obj: any) => {
-          if (obj.name === "_trimGuide") return;
-          if (obj.name === "_ocrKnockout") return;
-          if (obj.name === "pdf_background") return;
+          if (obj.name === "_trimGuide" || obj.name === "_ocrKnockout" || obj.name === "pdf_background" || obj.name === "mask_cover") {
+            obj.set({ selectable: false, evented: false, hasControls: false });
+            return;
+          }
           if (obj.locked || !obj.editable) {
             obj.set({ selectable: false, evented: false, hasControls: false, lockMovementX: true, lockMovementY: true });
           } else {
@@ -1804,7 +1805,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.selection = mode === "edit";
     canvas.defaultCursor = "default";
     canvas.getObjects().forEach((obj: any) => {
-      if (obj.name === "_trimGuide" || obj.name === GUIDE_NAME || obj.name === "_editHighlight" || obj.name === OCR_KNOCKOUT_NAME || obj.name === "pdf_background") {
+      if (obj.name === "_trimGuide" || obj.name === GUIDE_NAME || obj.name === "_editHighlight" || obj.name === OCR_KNOCKOUT_NAME || obj.name === "pdf_background" || obj.name === "mask_cover") {
         obj.set({ selectable: false, evented: false, hasControls: false });
         return;
       }
