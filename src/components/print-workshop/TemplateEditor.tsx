@@ -2486,9 +2486,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
       {/* Objects panel + Dimensions info */}
       <div className="flex items-start gap-4">
-        <div className="flex-1">
-          <CanvasObjectsPanel canvas={fabricRef.current} onSync={syncCanvas} />
-        </div>
+        {mode === "edit" && (
+          <div className="flex-1">
+            <CanvasObjectsPanel canvas={fabricRef.current} onSync={syncCanvas} />
+          </div>
+        )}
         <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
           <span>{width}" × {height}" label</span>
           <span>{bleed}" bleed</span>
