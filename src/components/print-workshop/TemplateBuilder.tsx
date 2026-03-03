@@ -35,25 +35,58 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
 
   const generateThumbnail = async (): Promise<string | null> => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) return null;
     try {
-      // Hide guides before capturing
-      const guides = canvas.getObjects().filter((o: any) =>
-        o.name === "_trimGuide" || o.name === "_snapGuide" || o.name === "_editHighlight"
-      );
-      guides.forEach((g: any) => g.set({ opacity: 0 }));
-      canvas.renderAll();
+      // Strategy 1: Try capturing from Fabric canvas
+      const canvas = fabricCanvasRef.current;
+      if (canvas) {
+        // Hide guides before capturing
+        const guides = canvas.getObjects().filter((o: any) =>
+          o.name === "_trimGuide" || o.name === "_snapGuide" || o.name === "_editHighlight"
+        );
+        guides.forEach((g: any) => g.set({ opacity: 0 }));
+        canvas.renderAll();
 
-      const dataUrl = canvas.toDataURL({ format: "png", multiplier: 0.5 });
+        let dataUrl: string | null = null;
+        try {
+          dataUrl = canvas.toDataURL({ format: "png", multiplier: 0.5 });
+        } catch {
+          console.warn("Fabric toDataURL failed (tainted canvas), falling back to PDF thumbnail");
+        }
 
-      // Restore guides
-      guides.forEach((g: any) => g.set({ opacity: 1 }));
-      canvas.renderAll();
+        // Restore guides
+        guides.forEach((g: any) => g.set({ opacity: 1 }));
+        canvas.renderAll();
 
-      // Convert to blob and upload
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
+        if (dataUrl && dataUrl !== "data:,") {
+          return await uploadThumbnailBlob(dataUrl);
+        }
+      }
+
+      // Strategy 2: Generate thumbnail from the source PDF
+      if (sourcePdfPath) {
+        const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(sourcePdfPath);
+        const resp = await fetch(urlData.publicUrl);
+        if (resp.ok) {
+          const buf = await resp.arrayBuffer();
+          const { generatePdfThumbnailFromArrayBuffer } = await import("@/lib/pdfThumbnail");
+          const pdfBlob = await generatePdfThumbnailFromArrayBuffer(buf, { maxWidth: 400 });
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          const result = await uploadThumbnailBlob(blobUrl, pdfBlob);
+          URL.revokeObjectURL(blobUrl);
+          return result;
+        }
+      }
+
+      return null;
+    } catch (err) {
+      console.warn("Thumbnail generation failed:", err);
+      return null;
+    }
+  };
+
+  const uploadThumbnailBlob = async (dataUrl: string, existingBlob?: Blob): Promise<string | null> => {
+    try {
+      const blob = existingBlob || await (await fetch(dataUrl)).blob();
       const fileName = `thumbnails/${template?.id || crypto.randomUUID()}_thumb.png`;
       const { error: uploadError } = await supabase.storage
         .from("print-files")
@@ -63,9 +96,9 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         return null;
       }
       const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(fileName);
-      return urlData.publicUrl;
+      return `${urlData.publicUrl}?t=${Date.now()}`;
     } catch (err) {
-      console.warn("Thumbnail generation failed:", err);
+      console.warn("Thumbnail upload failed:", err);
       return null;
     }
   };
