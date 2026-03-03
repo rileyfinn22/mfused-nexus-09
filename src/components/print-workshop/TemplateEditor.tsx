@@ -2200,7 +2200,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           </>
         )}
 
-        {/* Select to Edit - available in both modes */}
+        {/* Select to Edit - admin only */}
+        {mode === "edit" && (
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -2217,6 +2218,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             <TooltipContent side="bottom" className="text-xs">Draw a box around locked text to make it editable</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        )}
 
         {mode === "use" && selectedObject && (selectedObject as any).editable && (selectedObject as any).type?.includes("image") && (
           <Button size="sm" variant="outline" onClick={() => {
