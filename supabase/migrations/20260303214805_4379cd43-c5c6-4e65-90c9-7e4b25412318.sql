@@ -1,0 +1,1 @@
+ALTER TABLE public.invoices ADD COLUMN shipping_note text DEFAULT NULL;

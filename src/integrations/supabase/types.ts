@@ -857,6 +857,7 @@ export type Database = {
           shipping_city: string | null
           shipping_cost: number | null
           shipping_name: string | null
+          shipping_note: string | null
           shipping_state: string | null
           shipping_street: string | null
           shipping_zip: string | null
@@ -892,6 +893,7 @@ export type Database = {
           shipping_city?: string | null
           shipping_cost?: number | null
           shipping_name?: string | null
+          shipping_note?: string | null
           shipping_state?: string | null
           shipping_street?: string | null
           shipping_zip?: string | null
@@ -927,6 +929,7 @@ export type Database = {
           shipping_city?: string | null
           shipping_cost?: number | null
           shipping_name?: string | null
+          shipping_note?: string | null
           shipping_state?: string | null
           shipping_street?: string | null
           shipping_zip?: string | null
