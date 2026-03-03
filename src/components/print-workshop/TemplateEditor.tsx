@@ -2051,14 +2051,21 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     <div className="flex flex-col gap-4">
       {/* Toolbar */}
       <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border flex-wrap">
-        {/* Undo / Redo */}
-        <Button size="sm" variant="ghost" onClick={undo} className="h-8 w-8 p-0" title="Undo (Ctrl+Z)">
-          <Undo2 className="h-3.5 w-3.5" />
-        </Button>
-        <Button size="sm" variant="ghost" onClick={redo} className="h-8 w-8 p-0" title="Redo (Ctrl+Y)">
-          <Redo2 className="h-3.5 w-3.5" />
-        </Button>
-        <div className="w-px h-6 bg-border mx-1" />
+        {/* Undo / Redo - admin only */}
+        {mode === "edit" && (
+          <>
+            <Button size="sm" variant="ghost" onClick={undo} className="h-8 w-8 p-0" title="Undo (Ctrl+Z)">
+              <Undo2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="sm" variant="ghost" onClick={redo} className="h-8 w-8 p-0" title="Redo (Ctrl+Y)">
+              <Redo2 className="h-3.5 w-3.5" />
+            </Button>
+            <div className="w-px h-6 bg-border mx-1" />
+          </>
+        )}
+        {mode === "use" && (
+          <span className="text-xs text-muted-foreground px-2">Click a highlighted field to edit its text</span>
+        )}
         {mode === "edit" && (
           <>
             {/* Draw text box mode */}
@@ -2248,7 +2255,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           </Button>
         )}
 
-        {selectedObject && isTextObject && (
+        {selectedObject && isTextObject && mode === "edit" && (
           <>
             <div className="flex items-center gap-1.5">
               <Select value={fontFamily} onValueChange={(v) => { applyFontFamily(v); setFontSearch(""); }}>
@@ -2344,8 +2351,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           </>
         )}
 
-        {/* Alignment buttons — shown when any object is selected */}
-        {selectedObject && (
+        {/* Alignment buttons — admin only */}
+        {selectedObject && mode === "edit" && (
           <>
             <div className="w-px h-6 bg-border mx-1" />
             <TooltipProvider delayDuration={200}>
