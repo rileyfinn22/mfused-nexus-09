@@ -135,6 +135,7 @@ export default function PrintWorkshop() {
   const handleSelectTemplate = (tmpl: any) => {
     setSelectedTemplate(tmpl);
     setCanvasData(tmpl.canvas_data);
+    setSavedDesign(null);
     setView("use");
   };
 
@@ -273,6 +274,7 @@ export default function PrintWorkshop() {
     toast.success(`"${item.templateName}" added to cart`);
     setView("browse");
     setSelectedTemplate(null);
+    setSavedDesign(null);
   };
 
   const handleUpdateCartQty = (id: string, quantity: number) => {
