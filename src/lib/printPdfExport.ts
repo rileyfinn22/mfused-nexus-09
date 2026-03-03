@@ -309,6 +309,8 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
           console.warn("Could not embed image in PDF export", obj.name);
         }
       }
+    } else if (objectType === "rect") {
+      drawRectObject(doc, obj, CANVAS_DPI);
     }
   }
 
@@ -506,6 +508,8 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
           console.warn("Could not embed image in PDF export", obj.name);
         }
       }
+    } else if (objectType === "rect") {
+      drawRectObject(doc, obj, CANVAS_DPI);
     }
   }
 
