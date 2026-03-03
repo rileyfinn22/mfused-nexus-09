@@ -581,6 +581,14 @@ function CustomerOrderView({
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingFileId, setGeneratingFileId] = useState<string | null>(null);
 
+  const getTemplateThumbnail = (item: any) => {
+    const template = Array.isArray(item?.print_templates)
+      ? item.print_templates[0]
+      : item?.print_templates;
+
+    return template?.thumbnail_url || item?.thumbnail_url || null;
+  };
+
   const buildLineItemPdf = async (item: any) => {
     if (!item.print_template_id) throw new Error("Template reference missing");
     const { data: template, error } = await supabase
@@ -923,9 +931,9 @@ function CustomerOrderView({
                       onClick={() => setPreviewItem(item)}
                       title="Click to preview"
                     >
-                      {item.thumbnail_url || item.print_file_url || item.print_templates?.thumbnail_url ? (
+                      {getTemplateThumbnail(item) ? (
                         <img
-                          src={item.thumbnail_url || item.print_file_url || item.print_templates?.thumbnail_url}
+                          src={getTemplateThumbnail(item)}
                           alt={item.template_name}
                           className="w-full h-full object-contain p-1"
                           onError={(e) => {
@@ -1051,9 +1059,9 @@ function CustomerOrderView({
             <DialogTitle>{previewItem?.template_name}</DialogTitle>
           </DialogHeader>
           <div className="flex items-center justify-center bg-muted/30 rounded-lg p-4 min-h-[300px]">
-            {previewItem?.thumbnail_url || previewItem?.print_file_url || previewItem?.print_templates?.thumbnail_url ? (
+            {getTemplateThumbnail(previewItem) ? (
               <img
-                src={previewItem.thumbnail_url || previewItem.print_file_url || previewItem.print_templates?.thumbnail_url}
+                src={getTemplateThumbnail(previewItem)}
                 alt={previewItem.template_name}
                 className="max-w-full max-h-[400px] object-contain"
               />
