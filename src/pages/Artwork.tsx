@@ -79,6 +79,8 @@ const Artwork = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [stateFilter, setStateFilter] = useState("all");
+  const [availableStates, setAvailableStates] = useState<string[]>([]);
   const [companyFilter, setCompanyFilter] = useState("all");
   const [companies, setCompanies] = useState<any[]>([]);
   const { activeCompanyId, isVibeAdmin: isVibeAdminFromCtx, loading: companyCtxLoading } = useActiveCompany();
@@ -144,6 +146,7 @@ const Artwork = () => {
       fetchTemplates();
       fetchAllArtwork();
       fetchRejectedArtwork();
+      fetchAvailableStates();
       if (isVibeAdmin) {
         fetchCompanies();
       }
@@ -153,13 +156,13 @@ const Artwork = () => {
     if (searchParam) {
       setSearchQuery(searchParam);
     }
-  }, [searchParams, isVibeAdmin, userCompanyId, companyFilter]);
+  }, [searchParams, isVibeAdmin, userCompanyId, companyFilter, stateFilter]);
 
   useEffect(() => {
     if (selectedTemplate) {
       fetchProductsForTemplate();
     }
-  }, [selectedTemplate, companyFilter]);
+  }, [selectedTemplate, companyFilter, stateFilter]);
 
   useEffect(() => {
     if (selectedProduct) {
@@ -187,6 +190,22 @@ const Artwork = () => {
     if (data) setCompanies(data);
   };
 
+  const fetchAvailableStates = async () => {
+    try {
+      let query = supabase
+        .from('product_states')
+        .select('state, product_id');
+      
+      const { data: statesData } = await query;
+      if (statesData) {
+        const uniqueStates = [...new Set(statesData.map(s => s.state))].sort();
+        setAvailableStates(uniqueStates);
+      }
+    } catch (error) {
+      console.error('Error fetching states:', error);
+    }
+  };
+
   const fetchTemplates = async () => {
     try {
       // Get all products
@@ -201,10 +220,22 @@ const Artwork = () => {
       }
       
       const { data: productsData } = await productsQuery;
-      const templateIds = [...new Set(productsData?.filter(p => p.template_id).map(p => p.template_id))];
+      
+      // If state filter is active, get product IDs for that state and filter
+      let filteredProductsData = productsData || [];
+      if (stateFilter !== 'all') {
+        const { data: stateProducts } = await supabase
+          .from('product_states')
+          .select('product_id')
+          .eq('state', stateFilter);
+        const stateProductIds = new Set(stateProducts?.map(sp => sp.product_id) || []);
+        filteredProductsData = filteredProductsData.filter(p => stateProductIds.has(p.id));
+      }
+      
+      const templateIds = [...new Set(filteredProductsData.filter(p => p.template_id).map(p => p.template_id))];
       
       // Get single products (no template)
-      const singleProds = productsData?.filter(p => !p.template_id) || [];
+      const singleProds = filteredProductsData.filter(p => !p.template_id);
       setSingleProducts(singleProds);
       
       // Fetch templates
@@ -259,7 +290,7 @@ const Artwork = () => {
       const templateArtCountMap: Record<string, number> = {};
       
       templatesData?.forEach(template => {
-        const templateProducts = productsData?.filter(p => p.template_id === template.id) || [];
+        const templateProducts = filteredProductsData.filter(p => p.template_id === template.id);
         const templateSkus = templateProducts.map(p => p.item_id).filter(Boolean) as string[];
         
         let hasApproved = false;
@@ -313,7 +344,18 @@ const Artwork = () => {
       }
       
       const { data } = await query;
-      setProducts(data || []);
+      let filteredData = data || [];
+      
+      if (stateFilter !== 'all') {
+        const { data: stateProducts } = await supabase
+          .from('product_states')
+          .select('product_id')
+          .eq('state', stateFilter);
+        const stateProductIds = new Set(stateProducts?.map(sp => sp.product_id) || []);
+        filteredData = filteredData.filter(p => stateProductIds.has(p.id));
+      }
+      
+      setProducts(filteredData);
     } catch (error) {
       console.error('Error fetching products:', error);
     }
@@ -1231,6 +1273,19 @@ const Artwork = () => {
               className="pl-10"
             />
           </div>
+          {availableStates.length > 0 && (
+            <Select value={stateFilter} onValueChange={setStateFilter}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="State" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All States</SelectItem>
+                {availableStates.map((state) => (
+                  <SelectItem key={state} value={state}>{state}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <div className="flex items-center border rounded-lg p-1 bg-muted/30">
             <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8" onClick={() => setViewMode("grid")}>
               <LayoutGrid className="h-4 w-4" />
@@ -1450,6 +1505,19 @@ const Artwork = () => {
               <SelectItem value="all">All Companies</SelectItem>
               {companies.map((company) => (
                 <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {availableStates.length > 0 && (
+          <Select value={stateFilter} onValueChange={setStateFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="State" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All States</SelectItem>
+              {availableStates.map((state) => (
+                <SelectItem key={state} value={state}>{state}</SelectItem>
               ))}
             </SelectContent>
           </Select>
