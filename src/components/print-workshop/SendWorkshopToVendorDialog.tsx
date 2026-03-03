@@ -17,10 +17,22 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Loader2, Send, Check, Package, Mail, FileText,
-  DollarSign, MapPin, Pencil,
+  DollarSign, MapPin, Pencil, Plus, X, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
+
+// Helper: blob to base64
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1] || result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 
 interface Vendor {
   id: string;
@@ -49,7 +61,7 @@ interface PoLineItem {
   printTemplateId: string | null;
   canvasData: any;
   printFileUrl: string | null;
-  autoPrice: number | null; // from tiers
+  autoPrice: number | null;
 }
 
 interface SendWorkshopToVendorDialogProps {
@@ -59,6 +71,9 @@ interface SendWorkshopToVendorDialogProps {
   lineItems: any[];
   onSent: () => void;
 }
+
+// Always BCC these team members
+const INTERNAL_BCC = ["Justin@vibepkg.com", "Riley@vibepkg.com", "Carrie@vibepkg.com"];
 
 export function SendWorkshopToVendorDialog({
   open, onOpenChange, workshopOrder, lineItems, onSent,
@@ -80,7 +95,8 @@ export function SendWorkshopToVendorDialog({
   // Email editable fields
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
-  const [emailRecipients, setEmailRecipients] = useState("");
+  const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
+  const [newRecipient, setNewRecipient] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -118,8 +134,10 @@ export function SendWorkshopToVendorDialog({
   useEffect(() => {
     const vendor = vendors.find((v) => v.id === selectedVendorId);
     if (vendor) {
-      setEmailRecipients(vendor.contact_email || "");
-      setEmailSubject(`PO [auto] From VibePKG`);
+      const recipients: string[] = [];
+      if (vendor.contact_email) recipients.push(vendor.contact_email);
+      setEmailRecipients(recipients);
+      setEmailSubject(`PO [auto] From VibePKG — ${workshopOrder.order_number}`);
       setEmailBody(
         `Dear ${vendor.name},\n\nPlease find attached the purchase order from VibePKG. ` +
         `Please confirm receipt of this order and provide an estimated delivery date.\n\n` +
@@ -151,11 +169,9 @@ export function SendWorkshopToVendorDialog({
 
   const findTierPrice = (item: any): number | null => {
     const qty = Number(item.quantity) || 0;
-    // Try to match by product type from template
     const match = pricingTiers.find((t) => {
-      const typeMatch = true; // default product_type 'label' for now
       const qtyMatch = qty >= t.min_quantity && (t.max_quantity == null || qty <= t.max_quantity);
-      return typeMatch && qtyMatch;
+      return qtyMatch;
     });
     return match ? Number(match.unit_cost) : null;
   };
@@ -166,6 +182,19 @@ export function SendWorkshopToVendorDialog({
       next[idx] = { ...next[idx], [field]: value, total: field === "unitCost" ? value * next[idx].quantity : next[idx].unitCost * value };
       return next;
     });
+  };
+
+  const addRecipient = () => {
+    const email = newRecipient.trim();
+    if (!email || !email.includes("@")) return;
+    if (!emailRecipients.includes(email)) {
+      setEmailRecipients((prev) => [...prev, email]);
+    }
+    setNewRecipient("");
+  };
+
+  const removeRecipient = (email: string) => {
+    setEmailRecipients((prev) => prev.filter((e) => e !== email));
   };
 
   const poTotal = useMemo(() => poLines.reduce((s, l) => s + l.total, 0), [poLines]);
@@ -182,7 +211,7 @@ export function SendWorkshopToVendorDialog({
     }
     setLoading(true);
     setSteps([]);
-    setActiveTab("po"); // show progress
+    setActiveTab("po");
 
     try {
       const vendor = vendors.find((v) => v.id === selectedVendorId)!;
@@ -224,9 +253,9 @@ export function SendWorkshopToVendorDialog({
         .single();
       if (vpoError) throw vpoError;
 
-      // Step 3: Line items + PDFs
-      markStep("Processing line items & files...");
-      const fileUrls: string[] = [];
+      // Step 3: Line items + PDFs — generate files and collect base64 for email
+      markStep("Processing line items & generating print files...");
+      const additionalAttachments: { filename: string; content: string }[] = [];
 
       for (const line of poLines) {
         let printFileUrl: string | null = line.printFileUrl;
@@ -255,6 +284,7 @@ export function SendWorkshopToVendorDialog({
                     bleedInches: Number(template.bleed_inches),
                   });
 
+              // Upload to storage
               const filePath = `vendor-po/${vpoData.id}/${crypto.randomUUID()}_${line.templateName.replace(/\s+/g, "_")}.pdf`;
               const { error: uploadErr } = await supabase.storage
                 .from("print-files")
@@ -262,8 +292,14 @@ export function SendWorkshopToVendorDialog({
               if (!uploadErr) {
                 const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(filePath);
                 printFileUrl = urlData.publicUrl;
-                fileUrls.push(printFileUrl);
               }
+
+              // Convert to base64 for email attachment
+              const base64 = await blobToBase64(blob);
+              additionalAttachments.push({
+                filename: `${line.templateName.replace(/\s+/g, "_")}_print_ready.pdf`,
+                content: base64,
+              });
             }
           } catch (e) {
             console.warn("Could not generate print file for", line.templateName, e);
@@ -297,25 +333,85 @@ export function SendWorkshopToVendorDialog({
         } as any)
         .eq("id", workshopOrder.id);
 
-      // Step 5: Send email
-      if (sendEmail && emailRecipients.trim()) {
+      // Step 5: Generate a simple PO summary PDF as base64 for the email
+      markStep("Preparing PO document...");
+      // We'll use a simple text-based approach for the PO PDF via jsPDF
+      let poPdfBase64 = "";
+      try {
+        const { default: jsPDF } = await import("jspdf");
+        const doc = new jsPDF();
+        doc.setFontSize(18);
+        doc.text("PURCHASE ORDER", 105, 20, { align: "center" });
+        doc.setFontSize(11);
+        doc.text(`PO #: ${nextPoNumber}`, 14, 35);
+        doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 42);
+        doc.text(`Vendor: ${vendor.name}`, 14, 49);
+        doc.text(`Order: ${workshopOrder.order_number}`, 14, 56);
+
+        // Ship to
+        doc.setFontSize(10);
+        doc.text("Ship To:", 14, 68);
+        const shipLines = [
+          workshopOrder.shipping_name,
+          workshopOrder.shipping_street,
+          `${workshopOrder.shipping_city || ""}, ${workshopOrder.shipping_state || ""} ${workshopOrder.shipping_zip || ""}`,
+        ].filter(Boolean);
+        shipLines.forEach((l: string, i: number) => doc.text(l, 14, 74 + i * 6));
+
+        // Line items
+        let y = 74 + shipLines.length * 6 + 12;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text("Item", 14, y);
+        doc.text("Qty", 110, y, { align: "right" });
+        doc.text("Unit Cost", 145, y, { align: "right" });
+        doc.text("Total", 185, y, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        y += 7;
+        for (const line of poLines) {
+          doc.text(line.templateName, 14, y);
+          doc.text(line.quantity.toLocaleString(), 110, y, { align: "right" });
+          doc.text(`$${line.unitCost.toFixed(4)}`, 145, y, { align: "right" });
+          doc.text(`$${line.total.toFixed(2)}`, 185, y, { align: "right" });
+          y += 7;
+        }
+        y += 3;
+        doc.setFont("helvetica", "bold");
+        doc.text("TOTAL:", 145, y, { align: "right" });
+        doc.text(`$${poTotal.toFixed(2)}`, 185, y, { align: "right" });
+
+        if (poNotes) {
+          y += 12;
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.text("Notes: " + poNotes, 14, y, { maxWidth: 170 });
+        }
+
+        poPdfBase64 = doc.output("datauristring").split(",")[1] || "";
+      } catch (e) {
+        console.warn("Could not generate PO PDF:", e);
+      }
+
+      // Step 6: Send email
+      if (sendEmail && emailRecipients.length > 0) {
         markStep("Sending email to vendor...");
-        const recipients = emailRecipients.split(",").map((e) => e.trim()).filter(Boolean);
         const actualSubject = emailSubject.replace("[auto]", nextPoNumber);
 
         try {
           await supabase.functions.invoke("send-vendor-po-email", {
             body: {
               poId: vpoData.id,
-              recipientEmails: recipients,
+              recipientEmails: emailRecipients,
               senderName: "VibePKG",
               senderEmail: user?.email || "orders@vibepkgportal.com",
               customMessage: emailBody,
-              pdfBase64: "", // The edge function requires this but we'll pass empty for now
+              pdfBase64: poPdfBase64,
+              pdfFilename: `PO-${nextPoNumber}.pdf`,
               poNumber: nextPoNumber,
               orderDate: new Date().toISOString(),
               totalAmount: poTotal,
               vendorName: vendor.name,
+              additionalAttachments,
             },
           });
         } catch (e) {
@@ -331,6 +427,53 @@ export function SendWorkshopToVendorDialog({
       toast.error(err.message || "Failed to send to vendor");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Download PO preview
+  const handleDownloadPO = async () => {
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text("PURCHASE ORDER — PREVIEW", 105, 20, { align: "center" });
+      doc.setFontSize(11);
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 35);
+      doc.text(`Vendor: ${selectedVendor?.name || "TBD"}`, 14, 42);
+      doc.text(`Order: ${workshopOrder.order_number}`, 14, 49);
+
+      const shipLines = [
+        workshopOrder.shipping_name,
+        workshopOrder.shipping_street,
+        `${workshopOrder.shipping_city || ""}, ${workshopOrder.shipping_state || ""} ${workshopOrder.shipping_zip || ""}`,
+      ].filter(Boolean);
+      doc.setFontSize(10);
+      doc.text("Ship To:", 14, 61);
+      shipLines.forEach((l: string, i: number) => doc.text(l, 14, 67 + i * 6));
+
+      let y = 67 + shipLines.length * 6 + 12;
+      doc.setFont("helvetica", "bold");
+      doc.text("Item", 14, y);
+      doc.text("Qty", 110, y, { align: "right" });
+      doc.text("Unit Cost", 145, y, { align: "right" });
+      doc.text("Total", 185, y, { align: "right" });
+      doc.setFont("helvetica", "normal");
+      y += 7;
+      for (const line of poLines) {
+        doc.text(line.templateName, 14, y);
+        doc.text(line.quantity.toLocaleString(), 110, y, { align: "right" });
+        doc.text(`$${line.unitCost.toFixed(4)}`, 145, y, { align: "right" });
+        doc.text(`$${line.total.toFixed(2)}`, 185, y, { align: "right" });
+        y += 7;
+      }
+      y += 3;
+      doc.setFont("helvetica", "bold");
+      doc.text("TOTAL:", 145, y, { align: "right" });
+      doc.text(`$${poTotal.toFixed(2)}`, 185, y, { align: "right" });
+
+      doc.save(`PO_Preview_${workshopOrder.order_number}.pdf`);
+    } catch (e) {
+      toast.error("Failed to generate PO preview");
     }
   };
 
@@ -456,6 +599,11 @@ export function SendWorkshopToVendorDialog({
                   </table>
                 </div>
 
+                {/* Download PO Preview */}
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadPO}>
+                  <Download className="h-3.5 w-3.5" /> Download PO Preview
+                </Button>
+
                 {/* Pricing Tiers Reference */}
                 {pricingTiers.length > 0 && (
                   <div className="rounded-lg border border-dashed border-border p-3 bg-muted/20">
@@ -495,14 +643,8 @@ export function SendWorkshopToVendorDialog({
                       id="send-email"
                       checked={sendEmail}
                       onCheckedChange={(v) => setSendEmail(!!v)}
-                      disabled={!selectedVendor?.contact_email}
                     />
-                    <label htmlFor="send-email" className="text-xs cursor-pointer">
-                      Send email
-                      {selectedVendor && !selectedVendor.contact_email && (
-                        <span className="text-muted-foreground ml-1">(no email)</span>
-                      )}
-                    </label>
+                    <label htmlFor="send-email" className="text-xs cursor-pointer">Send email</label>
                   </div>
                 </div>
               </div>
@@ -513,15 +655,36 @@ export function SendWorkshopToVendorDialog({
           <TabsContent value="email" className="mt-3 space-y-3">
             <ScrollArea className="max-h-[340px]">
               <div className="space-y-3">
+                {/* Recipients management */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Recipients (comma-separated)</Label>
-                  <Input
-                    value={emailRecipients}
-                    onChange={(e) => setEmailRecipients(e.target.value)}
-                    placeholder="vendor@example.com"
-                    className="text-sm h-9"
-                  />
+                  <Label className="text-xs">Recipients</Label>
+                  <div className="flex flex-wrap gap-1.5 mb-1.5">
+                    {emailRecipients.map((email) => (
+                      <Badge key={email} variant="secondary" className="text-xs gap-1 pr-1">
+                        {email}
+                        <button onClick={() => removeRecipient(email)} className="ml-0.5 hover:text-destructive">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Input
+                      value={newRecipient}
+                      onChange={(e) => setNewRecipient(e.target.value)}
+                      placeholder="Add email address..."
+                      className="text-sm h-8 flex-1"
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRecipient(); } }}
+                    />
+                    <Button variant="outline" size="sm" className="h-8 gap-1" onClick={addRecipient}>
+                      <Plus className="h-3 w-3" /> Add
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    BCC: {INTERNAL_BCC.join(", ")} (always included)
+                  </p>
                 </div>
+
                 <div className="space-y-1.5">
                   <Label className="text-xs">Subject</Label>
                   <Input
@@ -569,7 +732,7 @@ export function SendWorkshopToVendorDialog({
                     </Badge>
                     {generateFiles && poLines.map((l) => (
                       <Badge key={l.printOrderId} variant="outline" className="text-[10px] gap-1">
-                        <Package className="h-3 w-3" /> {l.templateName.replace(/\s+/g, "_")}.pdf
+                        <Package className="h-3 w-3" /> {l.templateName.replace(/\s+/g, "_")}_print_ready.pdf
                       </Badge>
                     ))}
                   </div>
