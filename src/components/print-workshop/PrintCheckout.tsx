@@ -24,6 +24,7 @@ import {
   Package,
   Image,
   BookOpen,
+  Save,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -55,6 +56,7 @@ export function PrintCheckout({
   // Saved addresses
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
 
   // Shipping address state
   const [shippingName, setShippingName] = useState("");
@@ -88,6 +90,32 @@ export function PrintCheckout({
     setShippingCity(addr.city || "");
     setShippingState(addr.state || "");
     setShippingZip(addr.zip || "");
+  };
+
+  const handleSaveAddress = async () => {
+    if (!isShippingValid || !activeCompanyId) return;
+    setSavingAddress(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase.from("customer_addresses").insert({
+        company_id: activeCompanyId,
+        customer_name: shippingName.trim(),
+        name: shippingName.trim(),
+        street: shippingStreet.trim(),
+        city: shippingCity.trim(),
+        state: shippingState.trim(),
+        zip: shippingZip.trim(),
+        address_type: "shipping",
+        is_default: savedAddresses.length === 0,
+      }).select().single();
+      if (error) throw error;
+      setSavedAddresses((prev) => [...prev, data]);
+      toast.success("Address saved!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save address");
+    } finally {
+      setSavingAddress(false);
+    }
   };
 
   const hasQuoteItems = items.some((i) => i.pricePerUnit == null);
@@ -554,11 +582,24 @@ export function PrintCheckout({
                   />
                 </div>
               </div>
-              {!isShippingValid && (
-                <p className="text-xs text-destructive">
-                  All shipping fields are required
-                </p>
-              )}
+              <div className="flex items-center justify-between">
+                {isShippingValid ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    onClick={handleSaveAddress}
+                    disabled={savingAddress}
+                  >
+                    {savingAddress ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                    Save Address
+                  </Button>
+                ) : (
+                  <p className="text-xs text-destructive">
+                    All shipping fields are required
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
