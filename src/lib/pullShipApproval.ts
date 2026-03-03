@@ -93,6 +93,24 @@ export async function approvePullShipOrder({
       .update({ subtotal: recalculatedSubtotal, total: recalculatedTotal })
       .eq("id", pullOrder.id);
   }
+  // 3.5. Determine if this is a full shipment (all parent items fully shipped after this pull)
+  let isFullShipment = true;
+  if (parentOrder.order_items) {
+    for (const pi of parentOrder.order_items) {
+      const matchingPullItem = pullOrderItems.find(
+        (item) =>
+          item.sku === pi.sku ||
+          item.item_id === (pi as any).products?.item_id ||
+          item.sku === (pi as any).products?.item_id
+      );
+      const currentShipped = Number(pi.shipped_quantity || 0);
+      const pullQty = matchingPullItem ? matchingPullItem.quantity : 0;
+      if (currentShipped + pullQty < pi.quantity) {
+        isFullShipment = false;
+        break;
+      }
+    }
+  }
 
   // 4. Get existing invoices for parent order
   const { data: existingInvoices, error: invoicesError } = await supabase
@@ -136,48 +154,73 @@ export async function approvePullShipOrder({
     blanketInvoice = newBlanket;
   }
 
-  // 6. Calculate next shipment number
-  const childInvoices = existingInvoices?.filter((inv) => inv.shipment_number > 1) || [];
-  const nextShipmentNumber =
-    childInvoices.length > 0
-      ? Math.max(...childInvoices.map((inv) => inv.shipment_number)) + 1
-      : 2;
+  // 6. Determine target invoice: full shipment uses blanket, partial creates child
+  let targetInvoiceId: string;
+  let invoiceNumber: string;
+  let percentageOfOrder: number;
 
-  const invoiceNumber = generateInvoiceNumber(parentOrder.order_number, nextShipmentNumber);
+  if (isFullShipment) {
+    // Full shipment: bill directly against the blanket invoice
+    targetInvoiceId = blanketInvoice.id;
+    invoiceNumber = blanketInvoice.invoice_number;
+    percentageOfOrder = 100;
 
-  // 7. Calculate percentage
-  const blanketTotal = parentOrder.total || 1;
-  const percentageOfOrder = (recalculatedTotal / blanketTotal) * 100;
+    // Update blanket invoice with shipping details and mark as open
+    await supabase
+      .from("invoices")
+      .update({
+        status: "open",
+        shipping_cost: pullOrder.shipping_cost || 0,
+        shipping_name: pullOrder.shipping_name || null,
+        shipping_street: pullOrder.shipping_street || null,
+        shipping_city: pullOrder.shipping_city || null,
+        shipping_state: pullOrder.shipping_state || null,
+        shipping_zip: pullOrder.shipping_zip || null,
+      })
+      .eq("id", blanketInvoice.id);
+  } else {
+    // Partial shipment: create child invoice
+    const childInvoices = existingInvoices?.filter((inv) => inv.shipment_number > 1) || [];
+    const nextShipmentNumber =
+      childInvoices.length > 0
+        ? Math.max(...childInvoices.map((inv) => inv.shipment_number)) + 1
+        : 2;
 
-  // 8. Create child invoice linked to blanket
-  const { data: invoiceData, error: invoiceError } = await supabase
-    .from("invoices")
-    .insert({
-      order_id: pullOrder.parent_order_id,
-      company_id: pullOrder.company_id,
-      invoice_number: invoiceNumber,
-      invoice_type: "partial",
-      invoice_date: new Date().toISOString(),
-      subtotal: recalculatedSubtotal,
-      tax: 0,
-      total: recalculatedTotal,
-      shipping_cost: pullOrder.shipping_cost || 0,
-      shipping_name: pullOrder.shipping_name || null,
-      shipping_street: pullOrder.shipping_street || null,
-      shipping_city: pullOrder.shipping_city || null,
-      shipping_state: pullOrder.shipping_state || null,
-      shipping_zip: pullOrder.shipping_zip || null,
-      shipment_number: nextShipmentNumber,
-      billed_percentage: Number(percentageOfOrder.toFixed(2)),
-      parent_invoice_id: blanketInvoice.id,
-      status: "draft",
-      notes: `Pull & Ship Order: ${pullOrder.order_number}`,
-      created_by: userId,
-    })
-    .select()
-    .single();
+    invoiceNumber = generateInvoiceNumber(parentOrder.order_number, nextShipmentNumber);
 
-  if (invoiceError) throw invoiceError;
+    const blanketTotal = parentOrder.total || 1;
+    percentageOfOrder = (recalculatedTotal / blanketTotal) * 100;
+
+    const { data: invoiceData, error: invoiceError } = await supabase
+      .from("invoices")
+      .insert({
+        order_id: pullOrder.parent_order_id,
+        company_id: pullOrder.company_id,
+        invoice_number: invoiceNumber,
+        invoice_type: "partial",
+        invoice_date: new Date().toISOString(),
+        subtotal: recalculatedSubtotal,
+        tax: 0,
+        total: recalculatedTotal,
+        shipping_cost: pullOrder.shipping_cost || 0,
+        shipping_name: pullOrder.shipping_name || null,
+        shipping_street: pullOrder.shipping_street || null,
+        shipping_city: pullOrder.shipping_city || null,
+        shipping_state: pullOrder.shipping_state || null,
+        shipping_zip: pullOrder.shipping_zip || null,
+        shipment_number: nextShipmentNumber,
+        billed_percentage: Number(percentageOfOrder.toFixed(2)),
+        parent_invoice_id: blanketInvoice.id,
+        status: "draft",
+        notes: `Pull & Ship Order: ${pullOrder.order_number}`,
+        created_by: userId,
+      })
+      .select()
+      .single();
+
+    if (invoiceError) throw invoiceError;
+    targetInvoiceId = invoiceData.id;
+  }
 
   // 9. Update parent order shipped_quantity & create inventory allocations
   for (const pullItem of pullOrderItems) {
@@ -236,7 +279,7 @@ export async function approvePullShipOrder({
       await supabase.from("inventory_allocations").insert({
         inventory_id: inventoryRecord.id,
         order_item_id: allocationOrderItemId,
-        invoice_id: invoiceData.id,
+        invoice_id: targetInvoiceId,
         quantity_allocated: pullItem.quantity,
         allocated_by: userId,
         status: "allocated",
@@ -251,8 +294,8 @@ export async function approvePullShipOrder({
     }
   }
 
-  // 10. Update blanket invoice billed_percentage
-  if (existingInvoices && existingInvoices.length > 0) {
+  // 10. Update blanket invoice billed_percentage (only for partial shipments)
+  if (!isFullShipment && existingInvoices && existingInvoices.length > 0) {
     // Sum all existing child percentages + this new one
     const existingChildPercent = existingInvoices
       .filter((inv) => inv.invoice_type === "partial")
