@@ -792,15 +792,22 @@ serve(async (req) => {
       // Find or create a Shipping item
       const shippingItemId = await findOrCreateQBItem('Shipping', 'Shipping and handling charges', shippingAmount);
       
+      // Use shipping_note as description if available, otherwise default to 'Shipping'
+      const shippingDescription = invoice.shipping_note
+        ? `Shipping - ${invoice.shipping_note}`
+        : 'Shipping';
+      
       lineItems.push({
         DetailType: 'SalesItemLineDetail',
         Amount: shippingAmount,
-        Description: 'Shipping',
+        Description: shippingDescription,
         SalesItemLineDetail: {
           ItemRef: { 
             value: shippingItemId,
             name: 'Shipping',
           },
+          Qty: 1,
+          UnitPrice: shippingAmount,
         },
       });
     }
