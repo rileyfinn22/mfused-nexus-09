@@ -12,9 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Package, Loader2 } from "lucide-react";
+import { Package, Loader2, Truck, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-500/10 text-yellow-700 border-yellow-200",
@@ -35,30 +36,38 @@ interface WorkshopOrder {
   production_status: string | null;
   production_progress: number | null;
   tracking_number: string | null;
+  tracking_url: string | null;
+  tracking_carrier: string | null;
   created_at: string;
   item_count?: number;
 }
 
 export function WorkshopOrders() {
   const navigate = useNavigate();
+  const { isVibeAdmin, activeCompanyId } = useActiveCompany();
   const [orders, setOrders] = useState<WorkshopOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchOrders = async () => {
     setLoading(true);
-    // Fetch workshop orders
-    const { data: woData, error: woError } = await supabase
+    let query = supabase
       .from("workshop_orders")
       .select("*")
       .order("created_at", { ascending: false });
 
+    // Company users only see their company's orders
+    if (!isVibeAdmin && activeCompanyId) {
+      query = query.eq("company_id", activeCompanyId);
+    }
+
+    const { data: woData, error: woError } = await query;
+
     if (woError) {
-      toast.error("Failed to load workshop orders");
+      toast.error("Failed to load orders");
       setLoading(false);
       return;
     }
 
-    // Fetch line item counts per order
     const ids = (woData || []).map((o: any) => o.id);
     let itemCounts: Record<string, number> = {};
     if (ids.length > 0) {
@@ -84,7 +93,7 @@ export function WorkshopOrders() {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [activeCompanyId]);
 
   const formatLabel = (s: string) =>
     s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -102,15 +111,80 @@ export function WorkshopOrders() {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
           <Package className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-1">No workshop orders yet</h3>
+          <h3 className="text-lg font-medium mb-1">No orders yet</h3>
           <p className="text-muted-foreground text-sm">
-            Orders placed from the Print Cart will appear here
+            {isVibeAdmin
+              ? "Orders placed from the Print Cart will appear here"
+              : "Browse templates, customize them, and place your first order!"}
           </p>
         </CardContent>
       </Card>
     );
   }
 
+  // Customer view - card-based order list
+  if (!isVibeAdmin) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {orders.map((order) => {
+          const progress = ["completed", "shipped", "delivered"].includes(order.status)
+            ? 100
+            : (order.production_progress || 0);
+          return (
+            <Card
+              key={order.id}
+              className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all"
+              onClick={() => navigate(`/print-workshop/orders/${order.id}`)}
+            >
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sm">{order.order_number}</span>
+                  <Badge variant="outline" className={`text-xs ${STATUS_COLORS[order.status] || ""}`}>
+                    {formatLabel(order.status)}
+                  </Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {format(new Date(order.created_at), "MMM d, yyyy")} · {order.item_count} item{order.item_count !== 1 ? "s" : ""}
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Production</span>
+                    <span className="font-medium">{progress}%</span>
+                  </div>
+                  <Progress value={progress} className="h-1.5" />
+                </div>
+                {order.tracking_number && (
+                  <div className="flex items-center gap-1.5 text-xs text-primary">
+                    <Truck className="h-3 w-3" />
+                    {order.tracking_url ? (
+                      <a
+                        href={order.tracking_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline flex items-center gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Track Shipment <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <span>{order.tracking_number}</span>
+                    )}
+                  </div>
+                )}
+                {Number(order.total) > 0 && (
+                  <div className="text-sm font-semibold text-right">
+                    ${Number(order.total).toFixed(2)}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Admin view - table
   return (
     <Table>
       <TableHeader>
