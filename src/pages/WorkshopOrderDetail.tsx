@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import {
   ArrowLeft, Package, FileText, ExternalLink, Truck,
-  Loader2, Save, Printer
+  Loader2, Save, Printer, Download, Eye
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -225,20 +225,51 @@ export default function WorkshopOrderDetail() {
               ) : (
                 <div className="space-y-2">
                   {lineItems.filter((i: any) => i.print_file_url).map((item: any) => (
-                    <a
+                    <div
                       key={item.id}
-                      href={item.print_file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 border border-border rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-colors"
+                      className="flex items-center gap-3 border border-border rounded-lg px-3 py-2.5"
                     >
                       <FileText className="h-4 w-4 text-primary shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{item.template_name}</p>
                         <p className="text-xs text-muted-foreground">Print-Ready PDF</p>
                       </div>
-                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    </a>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          title="Preview"
+                          onClick={() => window.open(item.print_file_url, "_blank")}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          title="Download"
+                          onClick={async () => {
+                            try {
+                              const resp = await fetch(item.print_file_url);
+                              const blob = await resp.blob();
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = `${item.template_name.replace(/\s+/g, "_")}_print_ready.pdf`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                            } catch {
+                              toast.error("Failed to download file");
+                            }
+                          }}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
