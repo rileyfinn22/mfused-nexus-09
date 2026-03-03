@@ -145,9 +145,10 @@ interface TemplateEditorProps {
   onSourcePdfChange?: (path: string) => void;
   sourcePdfPath?: string;
   mode: "edit" | "use";
+  fabricCanvasRef?: React.MutableRefObject<FabricCanvas | null>;
 }
 
-export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChange, onSourcePdfChange, sourcePdfPath, mode }: TemplateEditorProps) {
+export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChange, onSourcePdfChange, sourcePdfPath, mode, fabricCanvasRef }: TemplateEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
   const previewPdfUrlRef = useRef<string | null>(null);
@@ -422,6 +423,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.selection = mode === "edit";
 
     fabricRef.current = canvas;
+    if (fabricCanvasRef) fabricCanvasRef.current = canvas;
 
     // Bleed/trim visual guide is rendered as HTML overlay above the canvas
     // (more reliable than Fabric after:render across zoom/retina).

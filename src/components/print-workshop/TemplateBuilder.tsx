@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { TemplateEditor } from "./TemplateEditor";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, Save } from "lucide-react";
+import type { Canvas as FabricCanvas } from "fabric";
 
 interface TemplateBuilderProps {
   template?: any;
@@ -31,6 +32,43 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
   const [canvasData, setCanvasData] = useState<any>(template?.canvas_data || null);
   const [sourcePdfPath, setSourcePdfPath] = useState<string>(template?.source_pdf_path || "");
   const [saving, setSaving] = useState(false);
+  const fabricCanvasRef = useRef<FabricCanvas | null>(null);
+
+  const generateThumbnail = async (): Promise<string | null> => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return null;
+    try {
+      // Hide guides before capturing
+      const guides = canvas.getObjects().filter((o: any) =>
+        o.name === "_trimGuide" || o.name === "_snapGuide" || o.name === "_editHighlight"
+      );
+      guides.forEach((g: any) => g.set({ opacity: 0 }));
+      canvas.renderAll();
+
+      const dataUrl = canvas.toDataURL({ format: "png", multiplier: 0.5 });
+
+      // Restore guides
+      guides.forEach((g: any) => g.set({ opacity: 1 }));
+      canvas.renderAll();
+
+      // Convert to blob and upload
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const fileName = `thumbnails/${template?.id || crypto.randomUUID()}_thumb.png`;
+      const { error: uploadError } = await supabase.storage
+        .from("print-files")
+        .upload(fileName, blob, { upsert: true, contentType: "image/png" });
+      if (uploadError) {
+        console.warn("Thumbnail upload failed:", uploadError);
+        return null;
+      }
+      const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(fileName);
+      return urlData.publicUrl;
+    } catch (err) {
+      console.warn("Thumbnail generation failed:", err);
+      return null;
+    }
+  };
 
   const addMaterial = () => {
     if (newMaterial.trim() && !materialOptions.includes(newMaterial.trim())) {
@@ -68,6 +106,9 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
           })()
         : null;
 
+      // Generate thumbnail from current canvas
+      const thumbnailUrl = await generateThumbnail();
+
       const payload = {
         name: name.trim(),
         description: description.trim() || null,
@@ -79,6 +120,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         material_options: materialOptions,
         canvas_data: sanitizedCanvasData,
         source_pdf_path: sourcePdfPath || null,
+        thumbnail_url: thumbnailUrl || template?.thumbnail_url || null,
         company_id: template?.company_id || null,
         created_by: user?.id || null,
       };
@@ -198,6 +240,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
             onSourcePdfChange={setSourcePdfPath}
             sourcePdfPath={sourcePdfPath}
             mode="edit"
+            fabricCanvasRef={fabricCanvasRef}
           />
         </div>
       </div>
