@@ -86,31 +86,30 @@ export function AppSidebar() {
     checkRole();
   }, [activeCompany]);
 
-  // Track unread chat messages
+  // Track unread chat messages using last_seen_at
   useEffect(() => {
     let cancelled = false;
     const fetchUnread = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || cancelled) return;
 
-      // Get channels user is a member of
+      // Get channels user is a member of with last_seen_at
       const { data: memberships } = await supabase
         .from('chat_channel_members')
-        .select('channel_id, joined_at')
+        .select('channel_id, last_seen_at')
         .eq('user_id', user.id);
 
       if (!memberships || memberships.length === 0) { setUnreadChatCount(0); return; }
 
-      // Count messages in those channels newer than the last time user visited
-      // Simple approach: count messages not by the current user in last 24h
       let total = 0;
       for (const m of memberships) {
+        const lastSeen = m.last_seen_at || new Date(0).toISOString();
         const { count } = await supabase
           .from('chat_messages')
           .select('*', { count: 'exact', head: true })
           .eq('channel_id', m.channel_id)
           .neq('user_id', user.id)
-          .gt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+          .gt('created_at', lastSeen);
         total += count || 0;
       }
       if (!cancelled) setUnreadChatCount(total);
@@ -129,9 +128,38 @@ export function AppSidebar() {
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, []);
 
-  // Reset count when on chat page
+  // Refetch when leaving the chat page (last_seen_at was updated there)
+  const [wasOnChat, setWasOnChat] = useState(false);
   useEffect(() => {
-    if (currentPath === '/chat') setUnreadChatCount(0);
+    if (currentPath === '/chat') {
+      setWasOnChat(true);
+      setUnreadChatCount(0);
+    } else if (wasOnChat) {
+      setWasOnChat(false);
+      // Trigger a refetch since last_seen_at was updated while on chat
+      const refetch = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: memberships } = await supabase
+          .from('chat_channel_members')
+          .select('channel_id, last_seen_at')
+          .eq('user_id', user.id);
+        if (!memberships) return;
+        let total = 0;
+        for (const m of memberships) {
+          const lastSeen = m.last_seen_at || new Date(0).toISOString();
+          const { count } = await supabase
+            .from('chat_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('channel_id', m.channel_id)
+            .neq('user_id', user.id)
+            .gt('created_at', lastSeen);
+          total += count || 0;
+        }
+        setUnreadChatCount(total);
+      };
+      refetch();
+    }
   }, [currentPath]);
 
   const checkRole = async () => {

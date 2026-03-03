@@ -75,18 +75,21 @@ export type Database = {
           channel_id: string
           id: string
           joined_at: string
+          last_seen_at: string | null
           user_id: string
         }
         Insert: {
           channel_id: string
           id?: string
           joined_at?: string
+          last_seen_at?: string | null
           user_id: string
         }
         Update: {
           channel_id?: string
           id?: string
           joined_at?: string
+          last_seen_at?: string | null
           user_id?: string
         }
         Relationships: [
