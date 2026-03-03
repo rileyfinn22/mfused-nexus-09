@@ -666,7 +666,41 @@ serve(async (req) => {
       }
     }
 
-    // Add shipping as a line item if present (full price)
+    // If this is a child invoice with a parent that had a deposit, deduct the deposit amount
+    if (invoice.parent_invoice_id && billingPercentage === 100) {
+      const { data: parentInvoice } = await supabase
+        .from('invoices')
+        .select('billed_percentage, total, total_paid, invoice_number')
+        .eq('id', invoice.parent_invoice_id)
+        .single();
+
+      if (parentInvoice && parentInvoice.billed_percentage && Number(parentInvoice.billed_percentage) < 100) {
+        const depositAmount = Number(parentInvoice.total || 0);
+        if (depositAmount > 0) {
+          console.log(`Parent invoice ${parentInvoice.invoice_number} was a ${parentInvoice.billed_percentage}% deposit of $${depositAmount} — deducting from child invoice`);
+
+          const depositItemId = await findOrCreateQBItem('Deposit Applied', 'Previously billed deposit credit', depositAmount);
+
+          lineItems.push({
+            DetailType: 'SalesItemLineDetail',
+            Amount: -depositAmount,
+            Description: `Less: ${parentInvoice.billed_percentage}% Deposit (Invoice #${parentInvoice.invoice_number})`,
+            SalesItemLineDetail: {
+              ItemRef: {
+                value: depositItemId,
+                name: 'Deposit Applied',
+              },
+              Qty: 1,
+              UnitPrice: -depositAmount,
+            },
+          });
+
+          calculatedSubtotal -= depositAmount;
+          console.log(`Adjusted subtotal after deposit deduction: ${calculatedSubtotal}`);
+        }
+      }
+    }
+
     if (invoice.shipping_cost > 0) {
       const shippingAmount = Number(invoice.shipping_cost);
       calculatedSubtotal += shippingAmount;
