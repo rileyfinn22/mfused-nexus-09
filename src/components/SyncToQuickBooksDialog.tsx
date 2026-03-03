@@ -125,21 +125,50 @@ export function SyncToQuickBooksDialog({
   const thisInvoicePayments = payments.filter(p => p.invoice_id === invoice?.id);
   const thisInvoicePaid = thisInvoicePayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
   
-  // Determine parent deposit info
+  // Determine deposit info - check both directions:
+  // 1. If this is a child, look at parent for deposit
+  // 2. If this is the blanket/parent, look at children for deposit invoices
   const parentInvoice = invoice?.parent_invoice_id 
     ? billingHistory.find(inv => inv.id === invoice.parent_invoice_id)
     : null;
+  
+  // Find deposit child invoices (billed_percentage < 100) for this order
+  const depositChildInvoices = billingHistory.filter(
+    inv => inv.parent_invoice_id === invoice?.id && Number(inv.billed_percentage || 100) < 100 && inv.quickbooks_id
+  );
+  
+  // Deposit from parent (when viewing a child invoice)
   const hasParentDeposit = parentInvoice && Number(parentInvoice.billed_percentage || 100) < 100 && parentInvoice.quickbooks_id;
-  const depositAmount = hasParentDeposit ? Number(parentInvoice.total || 0) : 0;
+  
+  // Deposit from children (when viewing the blanket invoice)
+  const hasChildDeposits = depositChildInvoices.length > 0;
+  
+  // Total deposit amount
+  const depositAmount = hasParentDeposit 
+    ? Number(parentInvoice.total || 0)
+    : hasChildDeposits 
+      ? depositChildInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0)
+      : 0;
+  
+  const hasDeposit = hasParentDeposit || hasChildDeposits;
+  
   const depositPaid = hasParentDeposit 
     ? payments.filter(p => p.invoice_id === parentInvoice.id).reduce((sum, p) => sum + Number(p.amount || 0), 0)
-    : 0;
+    : hasChildDeposits
+      ? payments.filter(p => depositChildInvoices.some(d => d.id === p.invoice_id)).reduce((sum, p) => sum + Number(p.amount || 0), 0)
+      : 0;
+  
+  const depositInvoiceLabel = hasParentDeposit
+    ? `${parentInvoice.billed_percentage}% Deposit (${parentInvoice.invoice_number})`
+    : hasChildDeposits
+      ? depositChildInvoices.map(d => `${d.billed_percentage}% Deposit (${d.invoice_number})`).join(', ')
+      : '';
 
   // Check if this is a re-sync
   const isResync = !!invoice?.quickbooks_id;
 
   // What will actually be billed in QBO for THIS sync
-  const netQBOAmount = hasParentDeposit && billingPercentage === 100
+  const netQBOAmount = hasDeposit && billingPercentage === 100
     ? invoiceTotal - depositAmount
     : (invoiceTotal * billingPercentage) / 100;
 
@@ -242,16 +271,16 @@ export function SyncToQuickBooksDialog({
             )}
 
             {/* Deposit Deduction Notice */}
-            {hasParentDeposit && (
+            {hasDeposit && (
               <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-sm font-medium text-blue-800 dark:text-blue-300">
                   <DollarSign className="h-4 w-4" />
-                  Deposit Deduction
+                  Deposit {hasChildDeposits ? 'Billed via Child Invoice' : 'Deduction'}
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                  <span className="text-blue-700 dark:text-blue-400">Shipped Total</span>
+                  <span className="text-blue-700 dark:text-blue-400">Invoice Total</span>
                   <span className="text-right font-medium">{formatCurrency(invoiceTotal)}</span>
-                  <span className="text-blue-700 dark:text-blue-400">Less {parentInvoice.billed_percentage}% Deposit ({parentInvoice.invoice_number})</span>
+                  <span className="text-blue-700 dark:text-blue-400">Less {depositInvoiceLabel}</span>
                   <span className="text-right font-medium text-destructive">-{formatCurrency(depositAmount)}</span>
                   {depositPaid > 0 && (
                     <>
@@ -262,7 +291,7 @@ export function SyncToQuickBooksDialog({
                 </div>
                 <Separator className="bg-blue-200 dark:bg-blue-800" />
                 <div className="flex items-center justify-between text-sm font-bold">
-                  <span className="text-blue-800 dark:text-blue-300">Net Amount to QBO</span>
+                  <span className="text-blue-800 dark:text-blue-300">Remaining to Bill in QBO</span>
                   <span className="text-primary">{formatCurrency(netQBOAmount)}</span>
                 </div>
               </div>
@@ -317,7 +346,7 @@ export function SyncToQuickBooksDialog({
                   This will create a {billingPercentage}% deposit invoice in QuickBooks
                 </p>
               )}
-              {hasParentDeposit && billingPercentage === 100 && (
+              {hasDeposit && billingPercentage === 100 && (
                 <p className="text-xs text-blue-600">
                   Deposit of {formatCurrency(depositAmount)} will be auto-deducted → Net: {formatCurrency(invoiceTotal - depositAmount)}
                 </p>
