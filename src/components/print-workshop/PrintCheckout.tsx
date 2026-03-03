@@ -269,10 +269,11 @@ export function PrintCheckout({
           console.warn("Could not generate print file for", item.templateName, e);
         }
 
-        // Generate thumbnail from the print-ready PDF blob
+        // Generate/store thumbnail
         let storedThumbnailUrl: string | null = null;
+        
+        // Try uploading the cart item's thumbnail (data URL from canvas capture)
         if (item.thumbnailUrl && item.thumbnailUrl.startsWith("data:")) {
-          // Use existing data URL thumbnail if available
           try {
             const res = await fetch(item.thumbnailUrl);
             const thumbBlob = await res.blob();
@@ -290,6 +291,7 @@ export function PrintCheckout({
             console.warn("Could not upload data URL thumbnail for", item.templateName, e);
           }
         }
+
         // Fallback: generate thumbnail from the print-ready PDF
         if (!storedThumbnailUrl && printFileUrl) {
           try {
@@ -309,6 +311,11 @@ export function PrintCheckout({
           } catch (e) {
             console.warn("Could not generate PDF thumbnail for", item.templateName, e);
           }
+        }
+
+        // Final fallback: use the template's existing thumbnail URL directly
+        if (!storedThumbnailUrl && item.thumbnailUrl && !item.thumbnailUrl.startsWith("data:")) {
+          storedThumbnailUrl = item.thumbnailUrl;
         }
 
         const { error } = await supabase.from("print_orders").insert({

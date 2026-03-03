@@ -579,6 +579,82 @@ function CustomerOrderView({
   const navigate = useNavigate();
   const [previewItem, setPreviewItem] = useState<any>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generatingFileId, setGeneratingFileId] = useState<string | null>(null);
+
+  const buildLineItemPdf = async (item: any) => {
+    if (!item.print_template_id) throw new Error("Template reference missing");
+    const { data: template, error } = await supabase
+      .from("print_templates")
+      .select("width_inches, height_inches, bleed_inches, source_pdf_path")
+      .eq("id", item.print_template_id)
+      .single();
+    if (error || !template) throw new Error("Could not load template");
+
+    if (template.source_pdf_path) {
+      return generatePrintReadyPdf({
+        sourcePdfPath: template.source_pdf_path,
+        canvasData: item.canvas_data,
+        widthInches: Number(template.width_inches),
+        heightInches: Number(template.height_inches),
+        bleedInches: Number(template.bleed_inches),
+      });
+    }
+    return generateCanvasOnlyPdf({
+      canvasData: item.canvas_data,
+      widthInches: Number(template.width_inches),
+      heightInches: Number(template.height_inches),
+      bleedInches: Number(template.bleed_inches),
+    });
+  };
+
+  const downloadLineItemPdf = async (item: any) => {
+    setGeneratingFileId(item.id);
+    try {
+      // Try stored file first
+      if (item.print_file_url) {
+        const a = document.createElement("a");
+        a.href = item.print_file_url;
+        a.download = `${(item.template_name || "print_file").replace(/\s+/g, "_")}_print_ready.pdf`;
+        a.target = "_blank";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      }
+      // Fallback: regenerate from canvas data
+      const blob = await buildLineItemPdf(item);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(item.template_name || "print_file").replace(/\s+/g, "_")}_print_ready.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to download PDF");
+    } finally {
+      setGeneratingFileId(null);
+    }
+  };
+
+  const previewLineItemPdf = async (item: any) => {
+    setGeneratingFileId(item.id);
+    try {
+      if (item.print_file_url) {
+        window.open(item.print_file_url, "_blank");
+        return;
+      }
+      const blob = await buildLineItemPdf(item);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 20000);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to preview PDF");
+    } finally {
+      setGeneratingFileId(null);
+    }
+  };
 
   const buildOrderPdf = async () => {
     setGeneratingPdf(true);
@@ -865,15 +941,28 @@ function CustomerOrderView({
                     <div className="flex-1 min-w-0 space-y-1">
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-semibold text-sm">{item.template_name}</h3>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 shrink-0"
-                          title="Preview"
-                          onClick={() => setPreviewItem(item)}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            title="Preview PDF"
+                            disabled={generatingFileId === item.id}
+                            onClick={() => previewLineItemPdf(item)}
+                          >
+                            {generatingFileId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            title="Download PDF"
+                            disabled={generatingFileId === item.id}
+                            onClick={() => downloadLineItemPdf(item)}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {item.material && (
@@ -980,9 +1069,23 @@ function CustomerOrderView({
               {previewItem?.material && <Badge variant="outline">{previewItem.material}</Badge>}
               <Badge variant="secondary">Qty: {previewItem?.quantity?.toLocaleString()}</Badge>
             </div>
-            {previewItem?.total != null && previewItem.total > 0 && (
-              <span className="font-medium">${Number(previewItem.total).toFixed(2)}</span>
-            )}
+            <div className="flex items-center gap-2">
+              {previewItem && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={generatingFileId === previewItem?.id}
+                  onClick={() => previewItem && downloadLineItemPdf(previewItem)}
+                >
+                  {generatingFileId === previewItem?.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                  Download PDF
+                </Button>
+              )}
+              {previewItem?.total != null && previewItem.total > 0 && (
+                <span className="font-medium">${Number(previewItem.total).toFixed(2)}</span>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
