@@ -332,6 +332,59 @@ export default function Chat() {
     return value;
   };
 
+  const resolveStorageSignedUrl = (signedUrl: string) => {
+    if (!signedUrl) return signedUrl;
+    if (signedUrl.startsWith("http")) return signedUrl;
+    const normalizedPath = signedUrl.startsWith("/") ? signedUrl : `/${signedUrl}`;
+    return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1${normalizedPath}`;
+  };
+
+  const downloadChatAttachment = async (fileUrl: string, fileName: string) => {
+    const storagePath = normalizeChatAttachmentPath(fileUrl);
+
+    if (!storagePath || storagePath.startsWith("http")) {
+      toast({ title: "Could not download attachment", variant: "destructive" });
+      console.warn("Attachment path unresolved", fileUrl);
+      return;
+    }
+
+    const { data, error } = await supabase.storage
+      .from("chat-files")
+      .createSignedUrl(storagePath, 3600);
+
+    if (error || !data?.signedUrl) {
+      toast({ title: "Could not download attachment", variant: "destructive" });
+      console.warn("Signed URL creation failed", { original: fileUrl, storagePath, error });
+      return;
+    }
+
+    const signedUrl = resolveStorageSignedUrl(data.signedUrl);
+
+    try {
+      const response = await fetch(signedUrl);
+      if (!response.ok) throw new Error(`Failed to fetch attachment: ${response.status}`);
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName || "attachment";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (downloadError) {
+      console.warn("Blob download failed, using signed URL fallback", downloadError);
+      const fallbackLink = document.createElement("a");
+      fallbackLink.href = signedUrl;
+      fallbackLink.download = fileName || "attachment";
+      fallbackLink.rel = "noopener noreferrer";
+      document.body.appendChild(fallbackLink);
+      fallbackLink.click();
+      document.body.removeChild(fallbackLink);
+    }
+  };
+
   const loadMessages = async () => {
     if (!activeChannel) return;
     const { data } = await supabase
@@ -1136,34 +1189,7 @@ export default function Chat() {
                           {msg.attachments.map((a) => (
                             <button
                               key={a.id}
-                              onClick={async () => {
-                                const storagePath = normalizeChatAttachmentPath(a.file_url);
-
-                                if (!storagePath || storagePath.startsWith("http")) {
-                                  toast({ title: "Could not open attachment", variant: "destructive" });
-                                  console.warn("Attachment path unresolved", a.file_url);
-                                  return;
-                                }
-
-                                const { data, error } = await supabase.storage
-                                  .from("chat-files")
-                                  .createSignedUrl(storagePath, 3600);
-
-                                if (error || !data?.signedUrl) {
-                                  toast({ title: "Could not open attachment", variant: "destructive" });
-                                  console.warn("Signed URL creation failed", { original: a.file_url, storagePath, error });
-                                  return;
-                                }
-
-                                // Use anchor click to avoid popup blockers
-                                const link = document.createElement("a");
-                                link.href = data.signedUrl;
-                                link.target = "_blank";
-                                link.rel = "noopener noreferrer";
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                              }}
+                              onClick={() => downloadChatAttachment(a.file_url, a.file_name)}
                               className="flex items-center gap-1.5 px-2 py-1 rounded border border-border bg-muted/50 text-xs hover:bg-muted transition-colors cursor-pointer"
                             >
                               <Paperclip className="h-3 w-3" />
