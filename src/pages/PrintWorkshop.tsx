@@ -49,15 +49,45 @@ export default function PrintWorkshop() {
 
   const fetchTemplates = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("print_templates")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) {
-      toast.error("Failed to load templates");
+    
+    if (isVibeAdmin) {
+      // Admins see all templates
+      const { data, error } = await supabase
+        .from("print_templates")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) {
+        toast.error("Failed to load templates");
+      } else {
+        setTemplates(data || []);
+      }
+    } else if (activeCompanyId) {
+      // Company users see global templates + templates assigned to their company
+      const { data: allTemplates, error: tErr } = await supabase
+        .from("print_templates")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (tErr) {
+        toast.error("Failed to load templates");
+        setTemplates([]);
+      } else {
+        const { data: assignments } = await supabase
+          .from("print_template_companies")
+          .select("template_id")
+          .eq("company_id", activeCompanyId);
+
+        const assignedIds = new Set((assignments || []).map((a: any) => a.template_id));
+
+        const visible = (allTemplates || []).filter(
+          (t: any) => t.is_global || assignedIds.has(t.id)
+        );
+        setTemplates(visible);
+      }
     } else {
-      setTemplates(data || []);
+      setTemplates([]);
     }
+    
     setLoading(false);
   };
 

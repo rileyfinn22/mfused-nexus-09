@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { TemplateEditor } from "./TemplateEditor";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -33,6 +34,22 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
   const [sourcePdfPath, setSourcePdfPath] = useState<string>(template?.source_pdf_path || "");
   const [saving, setSaving] = useState(false);
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
+  const [isGlobal, setIsGlobal] = useState(template?.is_global || false);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [assignedCompanyIds, setAssignedCompanyIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Fetch all companies for assignment
+    supabase.from("companies").select("id, name").eq("is_active", true).order("name").then(({ data }) => {
+      setCompanies(data || []);
+    });
+    // Fetch existing assignments
+    if (template?.id) {
+      supabase.from("print_template_companies").select("company_id").eq("template_id", template.id).then(({ data }) => {
+        setAssignedCompanyIds((data || []).map((r: any) => r.company_id));
+      });
+    }
+  }, [template?.id]);
 
   const generateThumbnail = async (): Promise<string | null> => {
     try {
@@ -156,7 +173,10 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         thumbnail_url: thumbnailUrl || template?.thumbnail_url || null,
         company_id: template?.company_id || null,
         created_by: user?.id || null,
+        is_global: isGlobal,
       };
+
+      let templateId = template?.id;
 
       if (template?.id) {
         const { error } = await supabase
@@ -164,14 +184,31 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
           .update(payload as any)
           .eq("id", template.id);
         if (error) throw error;
-        toast.success("Template updated");
       } else {
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from("print_templates")
-          .insert(payload as any);
+          .insert(payload as any)
+          .select("id")
+          .single();
         if (error) throw error;
-        toast.success("Template created");
+        templateId = inserted.id;
       }
+
+      // Sync company assignments
+      if (templateId) {
+        // Delete existing assignments
+        await supabase.from("print_template_companies").delete().eq("template_id", templateId);
+        // Insert new ones
+        if (assignedCompanyIds.length > 0) {
+          const rows = assignedCompanyIds.map((cid) => ({
+            template_id: templateId,
+            company_id: cid,
+          }));
+          await supabase.from("print_template_companies").insert(rows as any);
+        }
+      }
+
+      toast.success(template?.id ? "Template updated" : "Template created");
       onSaved();
     } catch (err: any) {
       toast.error(err.message || "Failed to save template");
@@ -253,6 +290,42 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
                 <Input value={newMaterial} onChange={(e) => setNewMaterial(e.target.value)} placeholder="Add material" className="text-sm" onKeyDown={(e) => e.key === "Enter" && addMaterial()} />
                 <Button size="sm" variant="outline" onClick={addMaterial}>Add</Button>
               </div>
+            </div>
+
+            {/* Company Assignment */}
+            <div className="space-y-2 border-t pt-4">
+              <Label className="font-semibold">Company Access</Label>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="is_global"
+                  checked={isGlobal}
+                  onCheckedChange={(c) => setIsGlobal(!!c)}
+                />
+                <label htmlFor="is_global" className="text-sm">Available to all companies</label>
+              </div>
+              {!isGlobal && (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto border rounded-md p-2">
+                  {companies.map((co) => (
+                    <div key={co.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`co-${co.id}`}
+                        checked={assignedCompanyIds.includes(co.id)}
+                        onCheckedChange={(checked) => {
+                          setAssignedCompanyIds((prev) =>
+                            checked
+                              ? [...prev, co.id]
+                              : prev.filter((id) => id !== co.id)
+                          );
+                        }}
+                      />
+                      <label htmlFor={`co-${co.id}`} className="text-sm">{co.name}</label>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {isGlobal ? "All companies can see this template" : `${assignedCompanyIds.length} company(s) selected`}
+              </p>
             </div>
 
             <Button onClick={handleSave} disabled={saving} className="w-full gap-2">
