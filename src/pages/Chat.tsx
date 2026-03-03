@@ -409,8 +409,23 @@ export default function Chat() {
     if ((!newMessage.trim() && pendingFiles.length === 0) || !activeChannel || !currentUserId) return;
 
     const content = newMessage.trim() || (pendingFiles.length > 0 ? `📎 ${pendingFiles.length} file(s)` : "");
+    const tempId = `temp-${Date.now()}`;
     setNewMessage("");
     setMentionQuery(null);
+
+    // Optimistic: add message to UI immediately
+    const optimisticMsg: Message = {
+      id: tempId,
+      channel_id: activeChannel.id,
+      user_id: currentUserId,
+      content,
+      parent_message_id: null,
+      created_at: new Date().toISOString(),
+      is_edited: false,
+      reply_count: 0,
+      attachments: [],
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
 
     const { data: msg, error } = await supabase
       .from("chat_messages")
@@ -419,8 +434,15 @@ export default function Chat() {
       .single();
 
     if (error) {
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(m => m.id !== tempId));
       toast({ title: "Error sending message", variant: "destructive" });
       return;
+    }
+
+    // Replace temp message with real one
+    if (msg) {
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...optimisticMsg, id: msg.id, created_at: msg.created_at } : m));
     }
 
     if (msg && pendingFiles.length > 0) {
