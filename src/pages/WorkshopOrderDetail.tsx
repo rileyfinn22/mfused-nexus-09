@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import {
   ArrowLeft, Package, FileText, ExternalLink, Truck,
-  Loader2, Save, Printer, Download, Eye, Trash2, Send
+  Loader2, Save, Printer, Download, Eye, Trash2, Send, MapPin, Pencil
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -75,6 +75,14 @@ export default function WorkshopOrderDetail() {
   const [trackingCarrier, setTrackingCarrier] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Editable shipping address
+  const [editingShipping, setEditingShipping] = useState(false);
+  const [shippingName, setShippingName] = useState("");
+  const [shippingStreet, setShippingStreet] = useState("");
+  const [shippingCity, setShippingCity] = useState("");
+  const [shippingState, setShippingState] = useState("");
+  const [shippingZip, setShippingZip] = useState("");
+
   useEffect(() => {
     if (orderId) fetchOrder();
   }, [orderId]);
@@ -101,6 +109,12 @@ export default function WorkshopOrderDetail() {
     setTrackingNumber(o.tracking_number || "");
     setTrackingCarrier(o.tracking_carrier || "");
     setNotes(o.notes || "");
+    setShippingName(o.shipping_name || "");
+    setShippingStreet(o.shipping_street || "");
+    setShippingCity(o.shipping_city || "");
+    setShippingState(o.shipping_state || "");
+    setShippingZip(o.shipping_zip || "");
+    setEditingShipping(false);
     setLoading(false);
   };
 
@@ -120,12 +134,29 @@ export default function WorkshopOrderDetail() {
         tracking_carrier: trackingCarrier || null,
         tracking_url: trackingUrl,
         notes: notes || null,
+        shipping_name: shippingName || null,
+        shipping_street: shippingStreet || null,
+        shipping_city: shippingCity || null,
+        shipping_state: shippingState || null,
+        shipping_zip: shippingZip || null,
         updated_at: new Date().toISOString(),
       } as any)
       .eq("id", orderId!);
 
     if (error) toast.error("Failed to save");
-    else toast.success("Order updated");
+    else {
+      toast.success("Order updated");
+      // Update local order object so dialog sees latest shipping
+      setOrder((prev: any) => ({
+        ...prev,
+        shipping_name: shippingName || null,
+        shipping_street: shippingStreet || null,
+        shipping_city: shippingCity || null,
+        shipping_state: shippingState || null,
+        shipping_zip: shippingZip || null,
+      }));
+      setEditingShipping(false);
+    }
     setSaving(false);
   };
 
@@ -335,7 +366,6 @@ export default function WorkshopOrderDetail() {
           <Badge variant="outline" className={STATUS_COLORS[status] || ""}>
             {formatLabel(status)}
           </Badge>
-          {/* Send to Vendor - primary action */}
           <Button
             variant="default"
             size="sm"
@@ -469,7 +499,7 @@ export default function WorkshopOrderDetail() {
           </Card>
         </div>
 
-        {/* Right: Status, Production, Tracking */}
+        {/* Right: Status, Shipping, Production, Tracking */}
         <div className="space-y-6">
           <Card>
             <CardHeader className="pb-3">
@@ -491,6 +521,61 @@ export default function WorkshopOrderDetail() {
                 <Label>Notes</Label>
                 <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Internal notes..." />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Shipping Address Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MapPin className="h-4 w-4" /> Shipping Address
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-7 w-7 p-0"
+                  onClick={() => setEditingShipping(!editingShipping)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {editingShipping ? (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Name</Label>
+                    <Input value={shippingName} onChange={(e) => setShippingName(e.target.value)} placeholder="Recipient name" className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Street</Label>
+                    <Input value={shippingStreet} onChange={(e) => setShippingStreet(e.target.value)} placeholder="Street address" className="h-8 text-sm" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">City</Label>
+                      <Input value={shippingCity} onChange={(e) => setShippingCity(e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">State</Label>
+                      <Input value={shippingState} onChange={(e) => setShippingState(e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">ZIP</Label>
+                      <Input value={shippingZip} onChange={(e) => setShippingZip(e.target.value)} className="h-8 text-sm" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Click "Save Changes" above to persist</p>
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground leading-relaxed">
+                  {shippingName && <p className="font-medium text-foreground">{shippingName}</p>}
+                  {shippingStreet && <p>{shippingStreet}</p>}
+                  {(shippingCity || shippingState || shippingZip) && (
+                    <p>{[shippingCity, shippingState].filter(Boolean).join(", ")} {shippingZip}</p>
+                  )}
+                  {!shippingName && !shippingStreet && <p className="italic">No shipping address set</p>}
+                </div>
+              )}
             </CardContent>
           </Card>
 
