@@ -20,6 +20,7 @@ import {
   Download,
   ChevronLeft,
   User,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, isToday, isYesterday } from "date-fns";
@@ -307,13 +308,23 @@ export default function Chat() {
     return name.slice(0, 2).toUpperCase();
   };
 
-  // DM helpers
+  // DM helpers — UUIDs contain hyphens so we can't split by "-"
+  // DM channel name format: "dm-<uuid1>-<uuid2>" where each UUID is 36 chars
+  const parseDmUserIds = (channelName: string): [string, string] | null => {
+    if (!channelName.startsWith("dm-")) return null;
+    const rest = channelName.slice(3); // remove "dm-"
+    // rest = "uuid1-uuid2" — uuid1 is 36 chars, then "-", then uuid2 is 36 chars
+    if (rest.length < 73) return null; // 36 + 1 + 36
+    const id1 = rest.slice(0, 36);
+    const id2 = rest.slice(37);
+    return [id1, id2];
+  };
+
   const getDmDisplayName = (channel: Channel): string => {
     if (!currentUserId) return channel.name;
-    // DM channel name format: "dm-userId1-userId2"
-    const parts = channel.name.split("-");
-    if (parts.length >= 3) {
-      const otherUserId = parts[1] === currentUserId ? parts.slice(2).join("-") : parts[1];
+    const ids = parseDmUserIds(channel.name);
+    if (ids) {
+      const otherUserId = ids[0] === currentUserId ? ids[1] : ids[0];
       return getDisplayName(otherUserId);
     }
     return channel.name;
@@ -321,11 +332,30 @@ export default function Chat() {
 
   const getDmOtherUserId = (channel: Channel): string | null => {
     if (!currentUserId) return null;
-    const parts = channel.name.split("-");
-    if (parts.length >= 3) {
-      return parts[1] === currentUserId ? parts.slice(2).join("-") : parts[1];
+    const ids = parseDmUserIds(channel.name);
+    if (ids) {
+      return ids[0] === currentUserId ? ids[1] : ids[0];
     }
     return null;
+  };
+
+  const deleteChannel = async (channelId: string) => {
+    // Delete messages, members, attachments, then channel
+    const { data: msgs } = await supabase.from("chat_messages").select("id").eq("channel_id", channelId);
+    if (msgs && msgs.length > 0) {
+      const msgIds = msgs.map(m => m.id);
+      await supabase.from("chat_message_attachments").delete().in("message_id", msgIds);
+      await supabase.from("chat_messages").delete().eq("channel_id", channelId);
+    }
+    await supabase.from("chat_channel_members").delete().eq("channel_id", channelId);
+    await supabase.from("chat_channels").delete().eq("id", channelId);
+
+    if (activeChannel?.id === channelId) {
+      setActiveChannel(null);
+      setShowMobileSidebar(true);
+    }
+    setChannels(prev => prev.filter(c => c.id !== channelId));
+    toast({ title: "Channel deleted" });
   };
 
   const sendMessage = async (e?: React.FormEvent) => {
@@ -649,28 +679,36 @@ export default function Chat() {
               Channels
             </p>
             {regularChannels.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setActiveChannel(c);
-                  setThreadParent(null);
-                  setShowMobileSidebar(false);
-                }}
-                className={cn(
-                  "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
-                  activeChannel?.id === c.id
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <Hash className="h-4 w-4 shrink-0" />
-                <span className="truncate flex-1">{c.name}</span>
-                {(unreadCounts[c.id] || 0) > 0 && (
-                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
-                    {unreadCounts[c.id] > 99 ? '99+' : unreadCounts[c.id]}
-                  </span>
-                )}
-              </button>
+              <div key={c.id} className="group relative flex items-center">
+                <button
+                  onClick={() => {
+                    setActiveChannel(c);
+                    setThreadParent(null);
+                    setShowMobileSidebar(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                    activeChannel?.id === c.id
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  <Hash className="h-4 w-4 shrink-0" />
+                  <span className="truncate flex-1">{c.name}</span>
+                  {(unreadCounts[c.id] || 0) > 0 && (
+                    <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
+                      {unreadCounts[c.id] > 99 ? '99+' : unreadCounts[c.id]}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteChannel(c.id); }}
+                  className="absolute right-1 hidden group-hover:flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  title="Delete channel"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ))}
 
             {/* Direct Messages Section */}
@@ -723,35 +761,43 @@ export default function Chat() {
                 const dmName = getDmDisplayName(c);
                 const color = otherUserId ? getAvatarColor(otherUserId) : "";
                 return (
-                  <button
-                    key={c.id}
-                    onClick={() => {
-                      setActiveChannel(c);
-                      setThreadParent(null);
-                      setShowMobileSidebar(false);
-                    }}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
-                      activeChannel?.id === c.id
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                    )}
-                  >
-                    <Avatar className="h-5 w-5">
-                      <AvatarFallback
-                        className="text-[9px] text-primary-foreground font-medium"
-                        style={{ backgroundColor: color || undefined }}
-                      >
-                        {dmName.slice(0, 1).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="truncate flex-1">{dmName}</span>
-                    {(unreadCounts[c.id] || 0) > 0 && (
-                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
-                        {unreadCounts[c.id] > 99 ? '99+' : unreadCounts[c.id]}
-                      </span>
-                    )}
-                  </button>
+                  <div key={c.id} className="group relative flex items-center">
+                    <button
+                      onClick={() => {
+                        setActiveChannel(c);
+                        setThreadParent(null);
+                        setShowMobileSidebar(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                        activeChannel?.id === c.id
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      )}
+                    >
+                      <Avatar className="h-5 w-5">
+                        <AvatarFallback
+                          className="text-[9px] text-primary-foreground font-medium"
+                          style={{ backgroundColor: color || undefined }}
+                        >
+                          {dmName.slice(0, 1).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="truncate flex-1">{dmName}</span>
+                      {(unreadCounts[c.id] || 0) > 0 && (
+                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
+                          {unreadCounts[c.id] > 99 ? '99+' : unreadCounts[c.id]}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteChannel(c.id); }}
+                      className="absolute right-1 hidden group-hover:flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      title="Delete conversation"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 );
               })}
             </div>
