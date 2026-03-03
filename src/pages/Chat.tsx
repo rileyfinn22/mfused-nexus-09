@@ -21,6 +21,8 @@ import {
   ChevronLeft,
   User,
   Trash2,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, isToday, isYesterday } from "date-fns";
@@ -86,6 +88,8 @@ export default function Chat() {
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [cursorPos, setCursorPos] = useState(0);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -519,6 +523,45 @@ export default function Chat() {
       content,
       parent_message_id: threadParent.id,
     });
+  };
+
+  const startEditing = (msg: Message) => {
+    setEditingMessageId(msg.id);
+    setEditingContent(msg.content);
+  };
+
+  const cancelEditing = () => {
+    setEditingMessageId(null);
+    setEditingContent("");
+  };
+
+  const saveEdit = async () => {
+    if (!editingMessageId || !editingContent.trim()) return;
+    const { error } = await supabase
+      .from("chat_messages")
+      .update({ content: editingContent.trim(), is_edited: true })
+      .eq("id", editingMessageId);
+    if (error) {
+      toast({ title: "Failed to edit message", variant: "destructive" });
+    } else {
+      setMessages(prev => prev.map(m => m.id === editingMessageId ? { ...m, content: editingContent.trim(), is_edited: true } : m));
+      setThreadMessages(prev => prev.map(m => m.id === editingMessageId ? { ...m, content: editingContent.trim(), is_edited: true } : m));
+    }
+    cancelEditing();
+  };
+
+  const deleteMessage = async (msgId: string) => {
+    const { error } = await supabase
+      .from("chat_messages")
+      .delete()
+      .eq("id", msgId);
+    if (error) {
+      toast({ title: "Failed to delete message", variant: "destructive" });
+    } else {
+      setMessages(prev => prev.filter(m => m.id !== msgId));
+      setThreadMessages(prev => prev.filter(m => m.id !== msgId));
+      if (threadParent?.id === msgId) setThreadParent(null);
+    }
   };
 
   const loadThread = async (parentId: string) => {
@@ -1013,9 +1056,31 @@ export default function Chat() {
                           </span>
                         </div>
                       )}
-                      <p className="text-sm whitespace-pre-wrap break-words">
-                        {renderContent(msg.content)}
-                      </p>
+                      {editingMessageId === msg.id ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <Input
+                            value={editingContent}
+                            onChange={(e) => setEditingContent(e.target.value)}
+                            className="flex-1 text-sm"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+                              if (e.key === "Escape") cancelEditing();
+                            }}
+                            autoFocus
+                          />
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={saveEdit}>
+                            <Check className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={cancelEditing}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap break-words">
+                          {renderContent(msg.content)}
+                          {msg.is_edited && <span className="text-xs text-muted-foreground ml-1">(edited)</span>}
+                        </p>
+                      )}
                       {msg.attachments && msg.attachments.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-1">
                           {msg.attachments.map((a) => (
@@ -1074,15 +1139,38 @@ export default function Chat() {
                         </div>
                       )}
                     </div>
-                    <div className="opacity-0 group-hover:opacity-100 flex items-start gap-1 shrink-0 transition-opacity">
+                    <div className="opacity-0 group-hover:opacity-100 flex items-start gap-0.5 shrink-0 transition-opacity">
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
+                        title="Reply in thread"
                         onClick={() => openThread(msg)}
                       >
                         <Reply className="h-3.5 w-3.5" />
                       </Button>
+                      {msg.user_id === currentUserId && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Edit message"
+                            onClick={() => startEditing(msg)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            title="Delete message"
+                            onClick={() => deleteMessage(msg.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1231,7 +1319,7 @@ export default function Chat() {
 
               {/* Replies */}
               {threadMessages.map((msg) => (
-                <div key={msg.id} className="flex gap-3">
+                <div key={msg.id} className="group flex gap-3 hover:bg-muted/50 rounded-md px-1 py-1">
                   <Avatar className="h-7 w-7 shrink-0">
                     <AvatarFallback
                       className="text-[10px] font-medium"
@@ -1244,17 +1332,49 @@ export default function Chat() {
                       {getInitials(msg.user_id)}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2">
                       <span className="font-semibold text-sm">{getDisplayName(msg.user_id)}</span>
                       <span className="text-xs text-muted-foreground">
                         {formatTimestamp(msg.created_at)}
                       </span>
                     </div>
-                    <p className="text-sm whitespace-pre-wrap">
-                      {renderContent(msg.content)}
-                    </p>
+                    {editingMessageId === msg.id ? (
+                      <div className="flex items-center gap-1 mt-1">
+                        <Input
+                          value={editingContent}
+                          onChange={(e) => setEditingContent(e.target.value)}
+                          className="flex-1 text-sm h-7"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+                            if (e.key === "Escape") cancelEditing();
+                          }}
+                          autoFocus
+                        />
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={saveEdit}>
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={cancelEditing}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">
+                        {renderContent(msg.content)}
+                        {msg.is_edited && <span className="text-xs text-muted-foreground ml-1">(edited)</span>}
+                      </p>
+                    )}
                   </div>
+                  {msg.user_id === currentUserId && editingMessageId !== msg.id && (
+                    <div className="opacity-0 group-hover:opacity-100 flex items-start gap-0.5 shrink-0 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit" onClick={() => startEditing(msg)}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" title="Delete" onClick={() => deleteMessage(msg.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
               <div ref={threadEndRef} />
