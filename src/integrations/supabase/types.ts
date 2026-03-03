@@ -1583,6 +1583,42 @@ export type Database = {
         }
         Relationships: []
       }
+      print_template_companies: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          template_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          template_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_template_companies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_template_companies_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "print_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       print_templates: {
         Row: {
           bleed_inches: number
@@ -1593,6 +1629,7 @@ export type Database = {
           description: string | null
           height_inches: number
           id: string
+          is_global: boolean
           material_options: Json | null
           name: string
           preset_price_per_unit: number | null
@@ -1611,6 +1648,7 @@ export type Database = {
           description?: string | null
           height_inches?: number
           id?: string
+          is_global?: boolean
           material_options?: Json | null
           name: string
           preset_price_per_unit?: number | null
@@ -1629,6 +1667,7 @@ export type Database = {
           description?: string | null
           height_inches?: number
           id?: string
+          is_global?: boolean
           material_options?: Json | null
           name?: string
           preset_price_per_unit?: number | null
