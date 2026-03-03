@@ -166,7 +166,6 @@ function shouldSkipExportObject(objName: string): boolean {
   if (objName === "_trimGuide") return true;
   if (objName === "_snapGuide") return true;
   if (objName === "pdf_background") return true;
-  if (objName === "mask_cover") return true;
   if (objName.startsWith("_") && objName !== "_ocrKnockout") return true;
   return false;
 }
