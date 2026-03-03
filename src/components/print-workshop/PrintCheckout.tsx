@@ -1,10 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ArrowLeft,
   Trash2,
@@ -15,10 +22,12 @@ import {
   ShoppingCart,
   Package,
   Image,
+  BookOpen,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 import type { CartItem } from "./PrintCart";
 
 interface PrintCheckoutProps {
@@ -38,6 +47,11 @@ export function PrintCheckout({
 }: PrintCheckoutProps) {
   const [submitting, setSubmitting] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
+  const { activeCompanyId } = useActiveCompany();
+
+  // Saved addresses
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
 
   // Shipping address state
   const [shippingName, setShippingName] = useState("");
@@ -45,6 +59,33 @@ export function PrintCheckout({
   const [shippingCity, setShippingCity] = useState("");
   const [shippingState, setShippingState] = useState("");
   const [shippingZip, setShippingZip] = useState("");
+
+  useEffect(() => {
+    if (!activeCompanyId) return;
+    setLoadingAddresses(true);
+    supabase
+      .from("customer_addresses")
+      .select("*")
+      .eq("company_id", activeCompanyId)
+      .order("is_default", { ascending: false })
+      .then(({ data }) => {
+        setSavedAddresses(data || []);
+        // Auto-fill default address
+        const def = (data || []).find((a: any) => a.is_default);
+        if (def && !shippingName) {
+          applyAddress(def);
+        }
+        setLoadingAddresses(false);
+      });
+  }, [activeCompanyId]);
+
+  const applyAddress = (addr: any) => {
+    setShippingName(addr.name || addr.customer_name || "");
+    setShippingStreet(addr.street || "");
+    setShippingCity(addr.city || "");
+    setShippingState(addr.state || "");
+    setShippingZip(addr.zip || "");
+  };
 
   const hasQuoteItems = items.some((i) => i.pricePerUnit == null);
   const grandTotal = items.reduce(
@@ -398,6 +439,32 @@ export function PrintCheckout({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {savedAddresses.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs flex items-center gap-1">
+                    <BookOpen className="h-3 w-3" />
+                    Saved Addresses
+                  </Label>
+                  <Select
+                    onValueChange={(val) => {
+                      const addr = savedAddresses.find((a) => a.id === val);
+                      if (addr) applyAddress(addr);
+                    }}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Load a saved address…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {savedAddresses.map((addr) => (
+                        <SelectItem key={addr.id} value={addr.id}>
+                          {addr.name} — {addr.street}, {addr.city}, {addr.state} {addr.zip}
+                          {addr.is_default ? " ★" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label className="text-xs">Name / Company</Label>
                 <Input
