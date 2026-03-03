@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingCart, Trash2, Loader2 } from "lucide-react";
+import { ShoppingCart, Trash2, Loader2, Eye, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { generatePrintReadyPdf } from "@/lib/printPdfExport";
+import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
 
 export interface CartItem {
   id: string;
@@ -35,9 +35,77 @@ interface PrintCartProps {
 export function PrintCart({ items, onUpdateQuantity, onRemoveItem, onClearCart }: PrintCartProps) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const hasQuoteItems = items.some((i) => i.pricePerUnit == null);
   const grandTotal = items.reduce((sum, i) => sum + (i.pricePerUnit ?? 0) * i.quantity, 0);
+
+  const handleDownloadPdf = async (item: CartItem) => {
+    setGeneratingPdf(item.id);
+    try {
+      let blob: Blob;
+      if (item.sourcePdfPath) {
+        blob = await generatePrintReadyPdf({
+          sourcePdfPath: item.sourcePdfPath,
+          canvasData: item.canvasData,
+          widthInches: item.widthInches,
+          heightInches: item.heightInches,
+          bleedInches: item.bleedInches,
+        });
+      } else {
+        blob = await generateCanvasOnlyPdf({
+          canvasData: item.canvasData,
+          widthInches: item.widthInches,
+          heightInches: item.heightInches,
+          bleedInches: item.bleedInches,
+        });
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${item.templateName.replace(/\s+/g, "_")}_print_ready.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error("Failed to generate PDF");
+      console.error(e);
+    } finally {
+      setGeneratingPdf(null);
+    }
+  };
+
+  const handlePreviewPdf = async (item: CartItem) => {
+    setGeneratingPdf(item.id);
+    try {
+      let blob: Blob;
+      if (item.sourcePdfPath) {
+        blob = await generatePrintReadyPdf({
+          sourcePdfPath: item.sourcePdfPath,
+          canvasData: item.canvasData,
+          widthInches: item.widthInches,
+          heightInches: item.heightInches,
+          bleedInches: item.bleedInches,
+        });
+      } else {
+        blob = await generateCanvasOnlyPdf({
+          canvasData: item.canvasData,
+          widthInches: item.widthInches,
+          heightInches: item.heightInches,
+          bleedInches: item.bleedInches,
+        });
+      }
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch (e: any) {
+      toast.error("Failed to generate PDF preview");
+      console.error(e);
+    } finally {
+      setGeneratingPdf(null);
+    }
+  };
 
   const handlePlaceOrder = async () => {
     if (items.length === 0) return;
@@ -161,14 +229,36 @@ export function PrintCart({ items, onUpdateQuantity, onRemoveItem, onClearCart }
                         <p className="text-xs text-muted-foreground">{item.material}</p>
                       )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-destructive shrink-0"
-                      onClick={() => onRemoveItem(item.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        title="Preview PDF"
+                        disabled={generatingPdf === item.id}
+                        onClick={() => handlePreviewPdf(item)}
+                      >
+                        {generatingPdf === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        title="Download PDF"
+                        disabled={generatingPdf === item.id}
+                        onClick={() => handleDownloadPdf(item)}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive shrink-0"
+                        onClick={() => onRemoveItem(item.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
