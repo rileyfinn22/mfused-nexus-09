@@ -175,6 +175,7 @@ export function PrintCart({ items, onUpdateQuantity, onRemoveItem, onClearCart, 
           status: item.pricePerUnit ? "approved" : "pending_quote",
           created_by: user?.id || null,
           print_file_url: printFileUrl,
+          thumbnail_url: item.thumbnailUrl && !item.thumbnailUrl.startsWith("data:") ? item.thumbnailUrl : null,
         } as any);
 
         if (error) throw error;
