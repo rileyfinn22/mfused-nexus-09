@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { Canvas as FabricCanvas } from "fabric";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +23,26 @@ export default function PrintWorkshop() {
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [canvasData, setCanvasData] = useState<any>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const useFabricCanvasRef = useRef<FabricCanvas | null>(null);
+
+  const captureEditedThumbnail = (): string | null => {
+    const canvas = useFabricCanvasRef.current;
+    if (!canvas) return null;
+    try {
+      const guides = canvas.getObjects().filter((o: any) =>
+        o.name === "_trimGuide" || o.name === "_snapGuide" || o.name === "_editHighlight"
+      );
+      guides.forEach((g: any) => g.set({ opacity: 0 }));
+      canvas.renderAll();
+      const dataUrl = canvas.toDataURL({ format: "png", multiplier: 0.5 });
+      guides.forEach((g: any) => g.set({ opacity: 1 }));
+      canvas.renderAll();
+      if (dataUrl && dataUrl !== "data:,") return dataUrl;
+    } catch {
+      console.warn("Could not capture edited thumbnail");
+    }
+    return null;
+  };
 
   const fetchTemplates = async () => {
     setLoading(true);
@@ -105,7 +126,13 @@ export default function PrintWorkshop() {
   };
 
   const handleAddToCart = (item: Omit<CartItem, "id">) => {
-    const newItem: CartItem = { ...item, id: crypto.randomUUID() };
+    // Capture a snapshot of the edited canvas as the cart thumbnail
+    const editedThumb = captureEditedThumbnail();
+    const newItem: CartItem = {
+      ...item,
+      id: crypto.randomUUID(),
+      thumbnailUrl: editedThumb || item.thumbnailUrl,
+    };
     setCartItems((prev) => [...prev, newItem]);
     toast.success(`"${item.templateName}" added to cart`);
     setView("browse");
@@ -278,6 +305,7 @@ export default function PrintWorkshop() {
               onCanvasChange={setCanvasData}
               sourcePdfPath={selectedTemplate.source_pdf_path}
               mode="use"
+              fabricCanvasRef={useFabricCanvasRef}
             />
           </div>
           <div>
