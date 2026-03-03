@@ -853,14 +853,54 @@ serve(async (req) => {
       console.log(`Created deposit line item: $${depositAmount} - ${depositDescription.substring(0, 100)}...`);
     }
 
-    // Validate calculated total matches database total (for logging purposes)
+    // ═══ SAFETY NET: Catch-all deposit guard ═══
+    // Regardless of how deposits were recorded (child invoices, direct payments,
+    // or any future pattern), the QBO invoice should never exceed the actual
+    // balance due. This prevents overbilling if earlier deduction logic missed a case.
+    if (billingPercentage === 100) {
+      const totalPaidOnInvoice = Number(invoice.total_paid || 0);
+      const hasNegativeLineAlready = lineItems.some((li: any) => li.Amount < 0);
+
+      if (totalPaidOnInvoice > 0 && !hasNegativeLineAlready) {
+        console.warn(`⚠️ SAFETY NET: Invoice has $${totalPaidOnInvoice} paid but no deposit deduction was added. Adding catch-all deduction.`);
+
+        const depositItemId = await findOrCreateQBItem(
+          'Deposit Applied',
+          'Previously received deposit',
+          totalPaidOnInvoice
+        );
+
+        lineItems.push({
+          DetailType: 'SalesItemLineDetail',
+          Amount: -totalPaidOnInvoice,
+          Description: 'Less: Deposit Previously Received',
+          SalesItemLineDetail: {
+            ItemRef: {
+              value: depositItemId,
+              name: 'Deposit Applied',
+            },
+            Qty: 1,
+            UnitPrice: -totalPaidOnInvoice,
+          },
+        });
+
+        calculatedSubtotal -= totalPaidOnInvoice;
+        console.log(`Safety net adjusted subtotal: ${calculatedSubtotal}`);
+      }
+    }
+
+    // Validate calculated total matches expected balance
     const calculatedTotal = calculatedSubtotal + Number(invoice.tax || 0);
     const dbTotal = Number(invoice.total);
+    const totalPaidFinal = Number(invoice.total_paid || 0);
+    const expectedQBOAmount = dbTotal - totalPaidFinal;
     
     console.log('Calculated subtotal:', calculatedSubtotal);
     console.log('Calculated total (with tax):', calculatedTotal);
     console.log('Database total:', dbTotal);
-    console.log('Difference:', Math.abs(calculatedTotal - dbTotal));
+    console.log('Total paid:', totalPaidFinal);
+    console.log('Expected QBO amount (balance due):', expectedQBOAmount);
+    console.log('Difference from balance due:', Math.abs(calculatedTotal - expectedQBOAmount));
 
     // NOTE: We no longer add "Deposit Credit Applied" lines for partial invoices.
     // Instead, for partial billing, the line items themselves are adjusted to show
