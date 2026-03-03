@@ -111,7 +111,7 @@ export function CanvasObjectsPanel({ canvas, onSync }: CanvasObjectsPanelProps) 
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <ScrollArea className="max-h-[300px] mt-2">
+        <ScrollArea className="max-h-[500px] mt-2">
           <div className="space-y-1">
             {displayObjects.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-3">No objects on canvas</p>
