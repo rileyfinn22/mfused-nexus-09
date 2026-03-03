@@ -32,6 +32,7 @@ export default function PrintWorkshop() {
   const useFabricCanvasRef = useRef<FabricCanvas | null>(null);
   
   const [savedDesign, setSavedDesign] = useState<{ thumbnailUrl: string | null; templateName: string; savedAt: Date } | null>(null);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const captureEditedThumbnail = (): string | null => {
     const canvas = useFabricCanvasRef.current;
@@ -249,8 +250,8 @@ export default function PrintWorkshop() {
       }
     }
 
-    setView("browse");
-    setSelectedTemplate(null);
+    // Open cart drawer instead of navigating away
+    setCartOpen(true);
   };
 
   const handleUpdateCartQty = (id: string, quantity: number) => {
@@ -446,6 +447,8 @@ export default function PrintWorkshop() {
             onRemoveItem={handleRemoveCartItem}
             onClearCart={handleClearCart}
             onCheckout={() => setView("checkout")}
+            open={cartOpen}
+            onOpenChange={setCartOpen}
           />
         </div>
 

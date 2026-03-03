@@ -31,10 +31,14 @@ interface PrintCartProps {
   onRemoveItem: (id: string) => void;
   onClearCart: () => void;
   onCheckout?: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function PrintCart({ items, onUpdateQuantity, onRemoveItem, onClearCart, onCheckout }: PrintCartProps) {
-  const [open, setOpen] = useState(false);
+export function PrintCart({ items, onUpdateQuantity, onRemoveItem, onClearCart, onCheckout, open: controlledOpen, onOpenChange }: PrintCartProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const [submitting, setSubmitting] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
