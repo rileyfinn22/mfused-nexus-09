@@ -1,39 +1,32 @@
 
 
-## Print Workshop: Cart & Duplication Workflow (Vibe Admin Only)
+# Plan: Move Payment from Blanket Invoice 10737 to Child Invoice 10737-01
 
-All new features gated behind `isVibeAdmin` for testing before client rollout.
+## What happened
+The $3,700 payment (ID `1368166f`) was manually recorded against blanket invoice `10737` (no QuickBooks ID). The actual synced invoice is `10737-01` (QuickBooks ID `24413`). This prevents the payment from syncing to QuickBooks.
 
-### 1. Duplicate Template Action
-- Add a **Copy** button on each template card in `PrintWorkshop.tsx`
-- Clones the `print_templates` row with name `"(Copy) Original Name"`, new UUID, same `canvas_data`, dimensions, materials, price, `source_pdf_path`
-- Refreshes the grid after insert
+## What we will do
 
-### 2. Client-Side Cart State
-- Add `cartItems` state array to `PrintWorkshop.tsx`
-- Interface: `{ id: string, templateId: string, templateName: string, canvasData: any, material: string, quantity: number, pricePerUnit: number | null, thumbnailUrl: string | null }`
-- Pass `addToCart` callback down to `OrderPanel`
+**Single data operation** — move the payment record to the correct invoice:
 
-### 3. Refactor OrderPanel → "Add to Cart"
-- Replace "Create Order" / "Request Quote" button with **"Add to Cart"**
-- On click: push item into cart state, toast confirmation, navigate back to browse
-- Keep "Download Print-Ready PDF" as secondary action
-- Remove direct `print_orders` insert from this component
+```sql
+UPDATE payments 
+SET invoice_id = '70dc161d-62ab-4c50-bf89-8c5eea00f99f'
+WHERE id = '1368166f-e661-4d7f-8c55-4997fdcafc7d';
+```
 
-### 4. New Cart Drawer (`PrintCart.tsx`)
-- Cart icon + badge count in the Print Workshop header bar
-- Opens a `Sheet` (right drawer) listing all cart items:
-  - Template name, material, quantity (editable inline), unit price, line total, remove button
-  - Footer: total item count, grand total (or "Quote needed" label)
-  - **"Place Order"** button
-- On place order: batch-insert each item into `print_orders`, generate print PDFs where applicable, clear cart, toast success
+This will:
+1. Re-link the payment to invoice `10737-01`
+2. The existing `update_invoice_payment_status` trigger will automatically:
+   - Set `10737-01.total_paid = 3700` and `status = paid` (since total = 3700)
+   - Set `10737.total_paid = 0` and `status = open`
+3. The `quickbooks-push-pending-payments` cron (runs every 5 min) will then find this payment (pending sync, invoice has `quickbooks_id`), and push it to QuickBooks against invoice 24413
 
-### 5. Vibe Admin Gate
-- Wrap the entire Print Workshop page route/content behind `isVibeAdmin` check from `useActiveCompany()`
-- Non-admins see nothing or get redirected — this is temporary for testing
+**No code changes needed.** No file modifications.
 
-### Files
-- **Modify**: `src/pages/PrintWorkshop.tsx` — cart state, duplicate handler, admin gate, cart trigger
-- **Modify**: `src/components/print-workshop/OrderPanel.tsx` — switch to "Add to Cart" mode
-- **Create**: `src/components/print-workshop/PrintCart.tsx` — cart drawer component
+## Expected result after execution
+| Invoice | Total | Paid | Status | QBO Synced |
+|---------|-------|------|--------|------------|
+| 10737 (blanket) | $7,659 | $0 | open | no |
+| 10737-01 (child) | $3,700 | $3,700 | paid | yes, payment pushed by cron |
 
