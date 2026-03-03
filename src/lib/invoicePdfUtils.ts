@@ -12,6 +12,7 @@ interface InvoiceData {
   subtotal?: number;
   tax?: number;
   shipping_cost?: number | null;
+  shipping_note?: string | null;
   notes?: string | null;
   companies?: { name: string } | null;
 }
@@ -243,7 +244,17 @@ export const generateInvoicePDF = async (
   if (hasShipping) {
     doc.text('Shipping', totalsX, totalsY);
     doc.text(formatCurrency(invoice.shipping_cost || 0), totalsX + totalsWidth, totalsY, { align: 'right' });
-    totalsY += 8;
+    totalsY += 5;
+    if (invoice.shipping_note) {
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'italic');
+      const noteLines = doc.splitTextToSize(invoice.shipping_note, totalsWidth);
+      doc.text(noteLines, totalsX, totalsY);
+      totalsY += noteLines.length * 4;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+    }
+    totalsY += 3;
   }
   
   // Less Deposit / Payments

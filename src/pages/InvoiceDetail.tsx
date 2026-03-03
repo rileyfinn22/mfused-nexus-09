@@ -44,6 +44,8 @@ const InvoiceDetail = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedItems, setEditedItems] = useState<any[]>([]);
+  const [editShippingCost, setEditShippingCost] = useState<string>('');
+  const [editShippingNote, setEditShippingNote] = useState<string>('');
   const [inventoryAllocations, setInventoryAllocations] = useState<any[]>([]);
   const [relatedInvoices, setRelatedInvoices] = useState<any[]>([]);
   const [totalShippedAllInvoices, setTotalShippedAllInvoices] = useState(0);
@@ -746,7 +748,17 @@ const InvoiceDetail = () => {
     if (hasShipping) {
       doc.text('Shipping', totalsX, totalsY);
       doc.text(formatCurrency(invoice.shipping_cost || 0), totalsX + totalsWidth, totalsY, { align: 'right' });
-      totalsY += 8;
+      totalsY += 5;
+      if (invoice.shipping_note) {
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'italic');
+        const noteLines = doc.splitTextToSize(invoice.shipping_note, totalsWidth);
+        doc.text(noteLines, totalsX, totalsY);
+        totalsY += noteLines.length * 4;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+      }
+      totalsY += 3;
     }
     
     // Less Deposit / Payments
@@ -1058,7 +1070,8 @@ const InvoiceDetail = () => {
       const newSubtotal = isBlanketInvoice
         ? editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0)
         : editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
-      const newTotal = newSubtotal + Number(invoice.tax || 0);
+      const editedShipping = Number(editShippingCost || 0);
+      const newTotal = newSubtotal + Number(invoice.tax || 0) + editedShipping;
 
       // Update order totals (always based on ordered quantities)
       const orderSubtotal = editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0);
@@ -1076,7 +1089,9 @@ const InvoiceDetail = () => {
         error: invoiceError
       } = await supabase.from('invoices').update({
         subtotal: newSubtotal,
-        total: newTotal
+        total: newTotal,
+        shipping_cost: editedShipping,
+        shipping_note: editShippingNote || null,
       }).eq('id', invoiceId);
       if (invoiceError) throw invoiceError;
       toast({
@@ -1415,7 +1430,8 @@ const InvoiceDetail = () => {
           return Number(invoice?.subtotal || 0);
         })()
       : Number(invoice?.subtotal || 0);
-  const displayTotal = isEditMode ? displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0) : (isBlanketDisplay ? displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0) : Number(invoice?.total || 0));
+  const displayShipping = isEditMode ? Number(editShippingCost || 0) : Number(invoice?.shipping_cost || 0);
+  const displayTotal = isEditMode ? displaySubtotal + Number(invoice?.tax || 0) + displayShipping : (isBlanketDisplay ? displaySubtotal + Number(invoice?.tax || 0) + displayShipping : Number(invoice?.total || 0));
   const displayTotalPaid = Number(invoice?.total_paid || 0);
   const displayBalance = displayTotal - displayTotalPaid;
 
@@ -1468,6 +1484,8 @@ const InvoiceDetail = () => {
                     shipped_quantity: item.shipped_quantity || 0
                   })));
                 }
+                setEditShippingCost(String(invoice?.shipping_cost || 0));
+                setEditShippingNote(invoice?.shipping_note || '');
                 setIsEditMode(true);
               }}>
                     <Edit className="h-4 w-4 mr-2" />
@@ -2298,12 +2316,44 @@ const InvoiceDetail = () => {
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-semibold">{formatCurrency(displaySubtotal)}</span>
                 </div>
-                {Number(invoice?.shipping_cost || 0) > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Shipping</span>
-                    <span className="font-semibold">{formatCurrency(invoice.shipping_cost)}</span>
+                {/* Shipping Line - editable for vibe admins */}
+                {(Number(invoice?.shipping_cost || 0) > 0 || (isVibeAdmin && isEditMode)) ? (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm items-center gap-2">
+                      <span className="text-muted-foreground">Shipping</span>
+                      {isVibeAdmin && isEditMode ? (
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editShippingCost}
+                          onChange={(e) => setEditShippingCost(e.target.value)}
+                          className="w-28 text-right h-8"
+                          placeholder="0.00"
+                        />
+                      ) : (
+                        <span className="font-semibold">{formatCurrency(invoice?.shipping_cost)}</span>
+                      )}
+                    </div>
+                    {isVibeAdmin && isEditMode ? (
+                      <Input
+                        value={editShippingNote}
+                        onChange={(e) => setEditShippingNote(e.target.value)}
+                        className="text-xs h-7"
+                        placeholder="Shipping note/description…"
+                      />
+                    ) : invoice?.shipping_note ? (
+                      <p className="text-xs text-muted-foreground pl-1">{invoice.shipping_note}</p>
+                    ) : null}
                   </div>
-                )}
+                ) : isVibeAdmin ? (
+                  <button
+                    onClick={() => { setIsEditMode(true); setEditShippingCost('0'); setEditShippingNote(''); }}
+                    className="text-xs text-primary hover:underline cursor-pointer"
+                  >
+                    + Add Shipping Line
+                  </button>
+                ) : null}
                 {displayTotalPaid > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Less Deposit</span>
