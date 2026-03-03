@@ -117,11 +117,11 @@ export default function Chat() {
     }
   };
 
-  // Load channels
+  // Load channels (after currentUserId is set)
   useEffect(() => {
-    if (!isVibeAdmin) return;
+    if (!isVibeAdmin || !currentUserId) return;
     loadChannels();
-  }, [isVibeAdmin]);
+  }, [isVibeAdmin, currentUserId]);
 
   const loadChannels = async () => {
     const { data } = await supabase
@@ -133,6 +133,21 @@ export default function Chat() {
       if (!activeChannel && data.length > 0) {
         setActiveChannel(data[0]);
         setShowMobileSidebar(false);
+      }
+
+      // Ensure current user has membership rows for all channels (so last_seen_at works)
+      if (currentUserId && data.length > 0) {
+        const { data: existing } = await supabase
+          .from("chat_channel_members")
+          .select("channel_id")
+          .eq("user_id", currentUserId);
+        const existingIds = new Set(existing?.map(e => e.channel_id) || []);
+        const missing = data.filter(ch => !existingIds.has(ch.id));
+        if (missing.length > 0) {
+          await supabase.from("chat_channel_members").insert(
+            missing.map(ch => ({ channel_id: ch.id, user_id: currentUserId }))
+          );
+        }
       }
     }
     setLoading(false);
