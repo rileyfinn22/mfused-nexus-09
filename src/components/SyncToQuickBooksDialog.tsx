@@ -124,6 +124,10 @@ export function SyncToQuickBooksDialog({
   const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
   const thisInvoicePayments = payments.filter(p => p.invoice_id === invoice?.id);
   const thisInvoicePaid = thisInvoicePayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+  // Safety: rely on both live payments + persisted invoice.total_paid so UI never overstates billing
+  const recordedInvoicePaid = Number(invoice?.total_paid || 0);
+  const effectiveInvoicePaid = Math.max(thisInvoicePaid, recordedInvoicePaid);
   
   // Determine deposit info - check both directions:
   // 1. If this is a child, look at parent for deposit
@@ -145,7 +149,7 @@ export function SyncToQuickBooksDialog({
   
   // 3. Deposit recorded as a payment directly on this blanket invoice
   const isBlanket = !invoice?.parent_invoice_id;
-  const hasDirectDepositPayment = isBlanket && !hasChildDeposits && thisInvoicePaid > 0;
+  const hasDirectDepositPayment = isBlanket && !hasChildDeposits && effectiveInvoicePaid > 0;
 
   // Total deposit amount
   const depositAmount = hasParentDeposit 
@@ -153,7 +157,7 @@ export function SyncToQuickBooksDialog({
     : hasChildDeposits 
       ? depositChildInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0)
       : hasDirectDepositPayment
-        ? thisInvoicePaid
+        ? effectiveInvoicePaid
         : 0;
   
   const hasDeposit = hasParentDeposit || hasChildDeposits || hasDirectDepositPayment;
@@ -176,12 +180,17 @@ export function SyncToQuickBooksDialog({
   const isResync = !!invoice?.quickbooks_id;
 
   // What will actually be billed in QBO for THIS sync
-  const netQBOAmount = hasDeposit && billingPercentage === 100
-    ? invoiceTotal - depositAmount
+  // Safety net mirrors backend behavior: never bill above remaining balance when billing 100%
+  const depositOffsetForBilling = billingPercentage === 100
+    ? Math.max(depositAmount, effectiveInvoicePaid)
+    : 0;
+
+  const netQBOAmount = billingPercentage === 100
+    ? Math.max(0, invoiceTotal - depositOffsetForBilling)
     : (invoiceTotal * billingPercentage) / 100;
 
   // Remaining balance on this invoice
-  const thisInvoiceBalance = invoiceTotal - thisInvoicePaid;
+  const thisInvoiceBalance = Math.max(0, invoiceTotal - effectiveInvoicePaid);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
