@@ -9,11 +9,14 @@ import { TemplateEditor } from "@/components/print-workshop/TemplateEditor";
 import { OrderPanel } from "@/components/print-workshop/OrderPanel";
 import { PrintCart, type CartItem } from "@/components/print-workshop/PrintCart";
 import { PrintCheckout } from "@/components/print-workshop/PrintCheckout";
+import { SavedDesignIndicator } from "@/components/print-workshop/SavedDesignIndicator";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkshopOrders } from "@/components/print-workshop/WorkshopOrders";
 import { Plus, Printer, ArrowLeft, Pencil, Trash2, Copy, Package, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
+import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
+import { generatePdfThumbnailFromArrayBuffer } from "@/lib/pdfThumbnail";
 
 type View = "browse" | "build" | "use" | "checkout";
 
@@ -27,6 +30,8 @@ export default function PrintWorkshop() {
   const [canvasData, setCanvasData] = useState<any>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const useFabricCanvasRef = useRef<FabricCanvas | null>(null);
+  const [savingDesign, setSavingDesign] = useState(false);
+  const [savedDesign, setSavedDesign] = useState<{ thumbnailUrl: string | null; templateName: string; savedAt: Date } | null>(null);
 
   const captureEditedThumbnail = (): string | null => {
     const canvas = useFabricCanvasRef.current;
@@ -147,7 +152,112 @@ export default function PrintWorkshop() {
     setView("browse");
     setSelectedTemplate(null);
     setEditingTemplate(null);
+    setSavedDesign(null);
     fetchTemplates();
+  };
+
+  const handleSaveDesign = async () => {
+    if (!selectedTemplate || !canvasData) return;
+    setSavingDesign(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const companyId = activeCompanyId || selectedTemplate.company_id;
+      const saveId = crypto.randomUUID();
+
+      // Generate print-ready PDF
+      let printFileUrl: string | null = null;
+      let pdfBlob: Blob | null = null;
+      try {
+        if (selectedTemplate.source_pdf_path) {
+          pdfBlob = await generatePrintReadyPdf({
+            sourcePdfPath: selectedTemplate.source_pdf_path,
+            canvasData,
+            widthInches: selectedTemplate.width_inches,
+            heightInches: selectedTemplate.height_inches,
+            bleedInches: selectedTemplate.bleed_inches,
+          });
+        } else {
+          pdfBlob = await generateCanvasOnlyPdf({
+            canvasData,
+            widthInches: selectedTemplate.width_inches,
+            heightInches: selectedTemplate.height_inches,
+            bleedInches: selectedTemplate.bleed_inches,
+          });
+        }
+        const pdfPath = `saved-designs/${saveId}/print_ready.pdf`;
+        const { error: pdfErr } = await supabase.storage
+          .from("print-files")
+          .upload(pdfPath, pdfBlob, { contentType: "application/pdf" });
+        if (!pdfErr) {
+          const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(pdfPath);
+          printFileUrl = urlData.publicUrl;
+        }
+      } catch (e) {
+        console.warn("Could not generate print file for save", e);
+      }
+
+      // Generate thumbnail
+      let thumbnailUrl: string | null = null;
+      // Try canvas capture first
+      const editedThumb = captureEditedThumbnail();
+      if (editedThumb && editedThumb.startsWith("data:")) {
+        try {
+          const res = await fetch(editedThumb);
+          const thumbBlob = await res.blob();
+          const thumbPath = `saved-designs/${saveId}/thumbnail.png`;
+          const { error: thumbErr } = await supabase.storage
+            .from("print-files")
+            .upload(thumbPath, thumbBlob, { contentType: "image/png" });
+          if (!thumbErr) {
+            const { data: thumbUrl } = supabase.storage.from("print-files").getPublicUrl(thumbPath);
+            thumbnailUrl = thumbUrl.publicUrl;
+          }
+        } catch {}
+      }
+      // Fallback: generate from PDF
+      if (!thumbnailUrl && pdfBlob) {
+        try {
+          const pdfBuf = await pdfBlob.arrayBuffer();
+          const thumbBlob = await generatePdfThumbnailFromArrayBuffer(pdfBuf, { maxWidth: 400 });
+          const thumbPath = `saved-designs/${saveId}/thumbnail.png`;
+          const { error: thumbErr } = await supabase.storage
+            .from("print-files")
+            .upload(thumbPath, thumbBlob, { contentType: "image/png" });
+          if (!thumbErr) {
+            const { data: thumbUrl } = supabase.storage.from("print-files").getPublicUrl(thumbPath);
+            thumbnailUrl = thumbUrl.publicUrl;
+          }
+        } catch {}
+      }
+
+      // Save record to database
+      const { error: dbErr } = await supabase.from("design_saves").insert({
+        id: saveId,
+        company_id: companyId,
+        template_id: selectedTemplate.id,
+        template_name: selectedTemplate.name,
+        canvas_data: canvasData,
+        thumbnail_url: thumbnailUrl,
+        print_file_url: printFileUrl,
+        source_pdf_path: selectedTemplate.source_pdf_path,
+        width_inches: selectedTemplate.width_inches,
+        height_inches: selectedTemplate.height_inches,
+        bleed_inches: selectedTemplate.bleed_inches,
+        created_by: user?.id || null,
+      } as any);
+
+      if (dbErr) throw dbErr;
+
+      setSavedDesign({
+        thumbnailUrl: thumbnailUrl || editedThumb,
+        templateName: selectedTemplate.name,
+        savedAt: new Date(),
+      });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save design");
+    } finally {
+      setSavingDesign(false);
+    }
   };
 
   const handleAddToCart = (item: Omit<CartItem, "id">) => {
@@ -379,9 +489,22 @@ export default function PrintWorkshop() {
               template={selectedTemplate}
               canvasData={canvasData}
               onAddToCart={handleAddToCart}
+              onSaveDesign={handleSaveDesign}
+              isSaving={savingDesign}
+              isSaved={!!savedDesign}
             />
           </div>
         </div>
+
+        {/* Floating saved design indicator */}
+        {savedDesign && (
+          <SavedDesignIndicator
+            thumbnailUrl={savedDesign.thumbnailUrl}
+            templateName={savedDesign.templateName}
+            savedAt={savedDesign.savedAt}
+            onDismiss={() => setSavedDesign(null)}
+          />
+        )}
       </div>
     );
   }
