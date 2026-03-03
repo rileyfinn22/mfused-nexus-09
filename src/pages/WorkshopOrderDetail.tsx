@@ -700,24 +700,56 @@ function CustomerOrderView({
           </Card>
 
           {/* Tracking */}
-          {order.tracking_number && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Truck className="h-5 w-5 text-primary" />
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">Shipment Tracking</p>
-                    <p className="text-xs text-muted-foreground">{order.tracking_carrier?.toUpperCase()} · {order.tracking_number}</p>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Truck className="h-4 w-4" /> Shipment Tracking
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {order.tracking_number ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+                    <Truck className="h-5 w-5 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">
+                        {order.tracking_carrier ? order.tracking_carrier.toUpperCase() : "Carrier"}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-mono truncate">{order.tracking_number}</p>
+                    </div>
+                    {order.tracking_url && (
+                      <a
+                        href={order.tracking_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                      >
+                        Track Package <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
                   </div>
-                  {order.tracking_url && (
-                    <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                      Track <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                  {["shipped", "delivered"].includes(order.status) && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Package className="h-3.5 w-3.5" />
+                      <span>
+                        Status: <span className="font-medium text-foreground">{formatLabel(order.status)}</span>
+                      </span>
+                    </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mb-3">
+                    <Truck className="h-5 w-5 text-muted-foreground/50" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Tracking not yet available</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    Tracking information will appear here once your order ships.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Order Items with Thumbnails */}
           <Card>
