@@ -585,86 +585,115 @@ function CustomerOrderView({
     try {
       const { default: jsPDF } = await import("jspdf");
       const { default: autoTable } = await import("jspdf-autotable");
-      const { preloadLogo, VIBE_COMPANY } = await import("@/lib/pdfBranding");
-      const doc = new jsPDF({ unit: "pt", format: "letter" });
-      const pageW = doc.internal.pageSize.getWidth();
-      const pageH = doc.internal.pageSize.getHeight();
-      const margin = 50;
+      const doc = new jsPDF(); // default mm units, a4-ish
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
 
-      // ─── GREEN ACCENT BAR AT TOP ───
-      doc.setFillColor(76, 175, 80);
-      doc.rect(0, 0, pageW, 6, "F");
+      const primaryGreen = [76, 175, 80];
+      const darkGray = [51, 51, 51];
+      const mediumGray = [100, 100, 100];
 
-      // ─── LOGO (large, top-left) ───
-      let logoY = 30;
-      try {
-        const logoBase64 = await preloadLogo();
-        if (logoBase64) {
-          doc.addImage(logoBase64, "PNG", margin, logoY, 120, 50);
-        } else {
-          throw new Error("no logo");
-        }
-      } catch {
-        doc.setFontSize(22);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(76, 175, 80);
-        doc.text("Vibe Packaging", margin, logoY + 35);
-      }
+      // ============ HEADER ============
+      let yPos = 15;
 
-      // ─── ORDER CONFIRMATION title (top-right) ───
-      doc.setFontSize(22);
+      // Company name + address on left (matches invoice PDF)
+      doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(33, 33, 33);
-      doc.text("ORDER CONFIRMATION", pageW - margin, logoY + 20, { align: "right" });
+      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.text("ArmorPak Inc. DBA Vibe Packaging", 14, yPos);
 
-      // Order meta (right-aligned, below title)
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 100, 100);
-      doc.text(`Order: ${order.order_number}`, pageW - margin, logoY + 38, { align: "right" });
-      doc.text(`Date: ${format(new Date(order.created_at), "MMMM d, yyyy")}`, pageW - margin, logoY + 52, { align: "right" });
-
-      // ─── DIVIDER ───
-      let y = logoY + 70;
-      doc.setDrawColor(220, 220, 220);
-      doc.setLineWidth(0.75);
-      doc.line(margin, y, pageW - margin, y);
-      y += 28;
-
-      // ─── SHIP TO / ORDER STATUS side-by-side ───
-      // Ship To (left)
       doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(130, 130, 130);
-      doc.text("SHIP TO", margin, y);
-
-      // Status (right)
-      doc.text("STATUS", pageW - margin - 100, y);
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(76, 175, 80);
-      doc.text(formatLabel(order.status), pageW - margin - 100, y + 16);
-
-      // Ship to lines
-      y += 16;
-      doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(33, 33, 33);
-      const shipLines = [
-        order.shipping_name,
-        order.shipping_street,
-        [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") + (order.shipping_zip ? ` ${order.shipping_zip}` : ""),
-      ].filter(Boolean);
-      for (const line of shipLines) {
-        doc.text(line, margin, y);
-        y += 16;
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text("1415 S 700 W", 14, yPos + 7);
+      doc.text("Salt Lake City, UT 84104", 14, yPos + 12);
+      doc.text("www.vibepkg.com", 14, yPos + 17);
+
+      // Logo on right (same size as invoice PDF: 40×25)
+      try {
+        const logoResponse = await fetch("/images/vibe-logo.png");
+        const logoBlob = await logoResponse.blob();
+        const logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(logoBlob);
+        });
+        doc.addImage(logoBase64, "PNG", pageWidth - 54, yPos - 5, 40, 25);
+      } catch {
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+        doc.text("VIBE", pageWidth - 14, yPos + 8, { align: "right" });
       }
 
-      y += 20;
+      yPos += 28;
 
-      // ─── ITEMS TABLE ───
+      // Green divider
+      doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.setLineWidth(0.5);
+      doc.line(14, yPos, pageWidth - 14, yPos);
+
+      yPos += 12;
+
+      // ============ TITLE ============
+      doc.setFontSize(24);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text("Order Confirmation", 14, yPos);
+
+      yPos += 15;
+
+      // ============ SHIP TO & ORDER DETAILS (two columns) ============
+      const leftColX = 14;
+      const rightColX = pageWidth / 2 + 10;
+
+      // Ship To label
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text("Ship to", leftColX, yPos);
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text(order.shipping_name || "", leftColX, yPos + 8);
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      let shipY = yPos + 14;
+      if (order.shipping_street) { doc.text(order.shipping_street, leftColX, shipY); shipY += 5; }
+      const cityLine = [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") + (order.shipping_zip ? ` ${order.shipping_zip}` : "");
+      if (cityLine.trim()) { doc.text(cityLine, leftColX, shipY); }
+
+      // Order details on right
+      const detailsY = yPos;
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+
+      doc.text("Order #:", rightColX, detailsY);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text(order.order_number, rightColX + 45, detailsY);
+
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text("Date:", rightColX, detailsY + 7);
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text(format(new Date(order.created_at), "MMM d, yyyy"), rightColX + 45, detailsY + 7);
+
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text("Status:", rightColX, detailsY + 14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.text(formatLabel(order.status), rightColX + 45, detailsY + 14);
+
+      yPos += 30;
+
+      // ============ ITEMS TABLE ============
       autoTable(doc, {
-        startY: y,
+        startY: yPos,
         head: [["Item", "Material", "Qty", "Unit Price", "Total"]],
         body: lineItems.map((item: any) => [
           item.template_name,
@@ -674,29 +703,21 @@ function CustomerOrderView({
           item.total != null && item.total > 0 ? `$${Number(item.total).toFixed(2)}` : "—",
         ]),
         foot: Number(order.total) > 0 ? [["", "", "", "Total", `$${Number(order.total).toFixed(2)}`]] : undefined,
-        styles: { fontSize: 9, cellPadding: 8, lineColor: [230, 230, 230], lineWidth: 0.5 },
-        headStyles: { fillColor: [45, 45, 45], textColor: 255, fontStyle: "bold", fontSize: 9 },
-        footStyles: { fillColor: [245, 245, 245], textColor: [33, 33, 33], fontStyle: "bold" },
-        alternateRowStyles: { fillColor: [250, 250, 250] },
-        margin: { left: margin, right: margin },
+        styles: { fontSize: 9, cellPadding: 4 },
+        headStyles: { fillColor: [41, 41, 41], textColor: 255 },
+        footStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: "bold" },
+        margin: { left: 14, right: 14 },
       });
 
-      // ─── FOOTER ───
-      // Bottom accent bar
-      doc.setFillColor(76, 175, 80);
-      doc.rect(0, pageH - 50, pageW, 50, "F");
-
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(255, 255, 255);
-      doc.text("Thank you for your order!", pageW / 2, pageH - 32, { align: "center" });
-
+      // ============ FOOTER ============
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
+      doc.setTextColor(128, 128, 128);
+      doc.text("Thank you for your order!", pageWidth / 2, pageHeight - 15, { align: "center" });
       doc.text(
-        `${VIBE_COMPANY.name}  •  ${VIBE_COMPANY.address.street}, ${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}`,
-        pageW / 2,
-        pageH - 18,
+        "ArmorPak Inc. DBA Vibe Packaging | 1415 S 700 W, Salt Lake City, UT 84104",
+        pageWidth / 2,
+        pageHeight - 10,
         { align: "center" }
       );
 
