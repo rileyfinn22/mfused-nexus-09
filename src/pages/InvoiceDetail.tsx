@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package } from "lucide-react";
 import { format } from "date-fns";
 import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -53,6 +53,7 @@ const InvoiceDetail = () => {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showDepositDialog, setShowDepositDialog] = useState(false);
+  const [showShipmentDialog, setShowShipmentDialog] = useState(false);
   const [refreshingLink, setRefreshingLink] = useState(false);
   const [syncingPayment, setSyncingPayment] = useState<string | null>(null);
   const [showPaymentPortal, setShowPaymentPortal] = useState(false);
@@ -1550,6 +1551,10 @@ const InvoiceDetail = () => {
                   <DollarSign className="h-4 w-4 mr-2" />
                   Bill Deposit
                 </Button>}
+              {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button variant="outline" onClick={() => setShowShipmentDialog(true)}>
+                  <Package className="h-4 w-4 mr-2" />
+                  Create Shipment Invoice
+                </Button>}
               {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleCloseInvoice} className="border-green-500 text-green-700 hover:bg-green-50">
                   <CheckCircle2 className="h-4 w-4 mr-2" />
                   Close Invoice
@@ -3042,6 +3047,9 @@ const InvoiceDetail = () => {
 
       {/* Create Deposit Invoice Dialog */}
       <CreateShipmentInvoiceDialog open={showDepositDialog} onOpenChange={setShowDepositDialog} order={order} onSuccess={fetchInvoiceDetails} initialMode="deposit" />
+
+      {/* Create Shipment Invoice Dialog */}
+      <CreateShipmentInvoiceDialog open={showShipmentDialog} onOpenChange={setShowShipmentDialog} order={order} onSuccess={fetchInvoiceDetails} initialMode="shipment" />
 
       {/* Send Invoice Email Dialog */}
       <SendInvoiceEmailDialog 
