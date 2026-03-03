@@ -94,7 +94,7 @@ export default function WorkshopOrderDetail() {
     setLoading(true);
     const [orderRes, itemsRes] = await Promise.all([
       supabase.from("workshop_orders").select("*").eq("id", orderId!).single(),
-      supabase.from("print_orders").select("*").eq("workshop_order_id", orderId!).order("created_at"),
+      supabase.from("print_orders").select("*, print_templates(thumbnail_url)").eq("workshop_order_id", orderId!).order("created_at"),
     ]);
 
     if (orderRes.error) {
@@ -923,9 +923,9 @@ function CustomerOrderView({
                       onClick={() => setPreviewItem(item)}
                       title="Click to preview"
                     >
-                      {item.thumbnail_url || item.print_file_url ? (
+                      {item.thumbnail_url || item.print_file_url || item.print_templates?.thumbnail_url ? (
                         <img
-                          src={item.thumbnail_url || item.print_file_url}
+                          src={item.thumbnail_url || item.print_file_url || item.print_templates?.thumbnail_url}
                           alt={item.template_name}
                           className="w-full h-full object-contain p-1"
                           onError={(e) => {
@@ -1051,9 +1051,9 @@ function CustomerOrderView({
             <DialogTitle>{previewItem?.template_name}</DialogTitle>
           </DialogHeader>
           <div className="flex items-center justify-center bg-muted/30 rounded-lg p-4 min-h-[300px]">
-            {previewItem?.thumbnail_url || previewItem?.print_file_url ? (
+            {previewItem?.thumbnail_url || previewItem?.print_file_url || previewItem?.print_templates?.thumbnail_url ? (
               <img
-                src={previewItem.thumbnail_url || previewItem.print_file_url}
+                src={previewItem.thumbnail_url || previewItem.print_file_url || previewItem.print_templates?.thumbnail_url}
                 alt={previewItem.template_name}
                 className="max-w-full max-h-[400px] object-contain"
               />

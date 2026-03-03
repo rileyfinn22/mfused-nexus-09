@@ -318,6 +318,23 @@ export function PrintCheckout({
           storedThumbnailUrl = item.thumbnailUrl;
         }
 
+        // Fallback to template thumbnail from database
+        if (!storedThumbnailUrl && item.templateId) {
+          const { data: templateData } = await supabase
+            .from("print_templates")
+            .select("thumbnail_url")
+            .eq("id", item.templateId)
+            .maybeSingle();
+          if (templateData?.thumbnail_url) {
+            storedThumbnailUrl = templateData.thumbnail_url;
+          }
+        }
+
+        // Last resort: persist in-memory thumbnail (including data URL)
+        if (!storedThumbnailUrl && item.thumbnailUrl) {
+          storedThumbnailUrl = item.thumbnailUrl;
+        }
+
         const { error } = await supabase.from("print_orders").insert({
           workshop_order_id: workshopOrderId,
           company_id: item.companyId,
