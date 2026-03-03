@@ -378,6 +378,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   // Keyboard shortcuts for undo/redo and delete
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // If a Fabric IText is currently being edited, let all key events pass through
+      const canvas = fabricRef.current;
+      if (canvas) {
+        const active = canvas.getActiveObject() as any;
+        if (active && active.isEditing) return;
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         undo();
@@ -388,13 +395,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       }
       // Delete/Backspace to remove selected object (only when not editing text)
       if ((e.key === "Delete" || e.key === "Backspace") && mode === "edit") {
-        const canvas = fabricRef.current;
         if (!canvas) return;
         const active = canvas.getActiveObject() as any;
         if (!active) return;
-        // Don't delete if user is editing text inside an IText
-        if (active.isEditing) return;
-        // Don't delete background
         if (active.name === "pdf_background") return;
         e.preventDefault();
         canvas.remove(active);
