@@ -4,7 +4,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Scissors } from "lucide-react";
+import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Scissors, Square } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
@@ -164,6 +164,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const drawTextRectRef = useRef<Rect | null>(null);
   const [unlockZoneMode, setUnlockZoneMode] = useState(false);
   const [extractingAll, setExtractingAll] = useState(false);
+  const [drawMaskMode, setDrawMaskMode] = useState(false);
+  const drawMaskStartRef = useRef<{ x: number; y: number } | null>(null);
+  const drawMaskRectRef = useRef<Rect | null>(null);
 
   // Undo/redo history
   const undoStack = useRef<string[]>([]);
@@ -1565,6 +1568,121 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
   };
 
+
+  // --- Draw Mask: click-and-drag to place a white cover-up rectangle ---
+  const startDrawMask = () => {
+    setDrawMaskMode(true);
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.selection = false;
+    canvas.getObjects().forEach((o: any) => {
+      if (o.name === "_trimGuide" || o.name === GUIDE_NAME) return;
+      o.set({ evented: false });
+    });
+    canvas.defaultCursor = "crosshair";
+    canvas.renderAll();
+
+    const onMouseDown = (e: any) => {
+      const pointer = canvas.getViewportPoint(e.e);
+      const zoom = canvas.getZoom();
+      const x = pointer.x / zoom;
+      const y = pointer.y / zoom;
+      drawMaskStartRef.current = { x, y };
+      const rect = new Rect({
+        left: x, top: y, width: 1, height: 1,
+        fill: "rgba(255,255,255,0.6)",
+        stroke: "#ef4444",
+        strokeWidth: 1,
+        strokeDashArray: [4, 4],
+        selectable: false, evented: false,
+        name: "_drawMaskRect",
+      } as any);
+      drawMaskRectRef.current = rect;
+      canvas.add(rect);
+      canvas.renderAll();
+    };
+
+    const onMouseMove = (e: any) => {
+      if (!drawMaskStartRef.current || !drawMaskRectRef.current) return;
+      const pointer = canvas.getViewportPoint(e.e);
+      const zoom = canvas.getZoom();
+      const x = pointer.x / zoom;
+      const y = pointer.y / zoom;
+      const start = drawMaskStartRef.current;
+      drawMaskRectRef.current.set({
+        left: Math.min(start.x, x),
+        top: Math.min(start.y, y),
+        width: Math.abs(x - start.x),
+        height: Math.abs(y - start.y),
+      });
+      canvas.renderAll();
+    };
+
+    const onMouseUp = () => {
+      canvas.off("mouse:down", onMouseDown);
+      canvas.off("mouse:move", onMouseMove);
+      canvas.off("mouse:up", onMouseUp);
+
+      const rect = drawMaskRectRef.current;
+      if (rect) {
+        const w = rect.width || 0;
+        const h = rect.height || 0;
+        const left = rect.left || 0;
+        const top = rect.top || 0;
+        canvas.remove(rect);
+
+        if (w > 5 && h > 5) {
+          const mask = new Rect({
+            left, top, width: w, height: h,
+            fill: "#ffffff",
+            selectable: true,
+            evented: true,
+            hasControls: true,
+            hasBorders: true,
+            strokeWidth: 0,
+            name: "mask_cover",
+          } as any);
+          (mask as any).locked = false;
+          (mask as any).editable = false;
+
+          canvas.add(mask);
+          // Place mask above the background but keep it selectable
+          const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
+          if (bg) {
+            const bgIdx = canvas.getObjects().indexOf(bg);
+            canvas.remove(mask);
+            canvas.insertAt(bgIdx + 1, mask);
+          }
+          canvas.setActiveObject(mask);
+          canvas.renderAll();
+          syncCanvas();
+          toast.success("Mask added — drag or resize it to cover unwanted areas");
+        }
+      }
+
+      drawMaskRectRef.current = null;
+      drawMaskStartRef.current = null;
+      endDrawMask();
+    };
+
+    canvas.on("mouse:down", onMouseDown);
+    canvas.on("mouse:move", onMouseMove);
+    canvas.on("mouse:up", onMouseUp);
+  };
+
+  const endDrawMask = () => {
+    setDrawMaskMode(false);
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.selection = mode === "edit";
+    canvas.defaultCursor = "default";
+    canvas.getObjects().forEach((o: any) => {
+      if (o.name === "_trimGuide" || o.name === GUIDE_NAME || o.name === "_drawMaskRect" || o.name === OCR_KNOCKOUT_NAME) return;
+      o.set({ evented: true });
+    });
+    canvas.renderAll();
+  };
+
   // --- Unlock Zone: draw box in use mode to unlock text for editing ---
   const startUnlockZone = () => {
     setUnlockZoneMode(true);
@@ -1977,6 +2095,23 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             <AiCleanupDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <IconPickerDialog onIconSelected={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <div className="w-px h-6 bg-border mx-1" />
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant={drawMaskMode ? "default" : "outline"}
+                    onClick={drawMaskMode ? endDrawMask : startDrawMask}
+                    className="gap-1.5"
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                    <span className="text-xs">Draw Mask</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Draw a white rectangle to cover unwanted parts of the PDF background</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <div className="w-px h-6 bg-border mx-1" />
             {/* Controls whether extracted text will be editable or locked for end users */}
             <Button
               size="sm"
@@ -2261,6 +2396,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           <Type className="h-4 w-4" />
           <span>Click and drag on the canvas to draw a {drawTextMode === "editable" ? "editable" : "locked"} text box</span>
           <Button size="sm" variant="ghost" onClick={endDrawText} className="ml-auto h-6 px-2 text-xs">Cancel</Button>
+        </div>
+      )}
+      {drawMaskMode && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+          <Square className="h-4 w-4" />
+          <span>Click and drag on the canvas to draw a white mask over unwanted areas</span>
+          <Button size="sm" variant="ghost" onClick={endDrawMask} className="ml-auto h-6 px-2 text-xs">Cancel</Button>
         </div>
       )}
       {unlockZoneMode && (
