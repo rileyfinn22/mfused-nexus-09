@@ -631,6 +631,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         if (obj && obj.type === "i-text" && obj.editable) {
           setTimeout(() => {
             obj.enterEditing();
+            const len = (obj.text || "").length;
+            obj.selectionStart = len;
+            obj.selectionEnd = len;
             canvas.renderAll();
           }, 50);
         }
@@ -640,6 +643,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         if (obj && obj.type === "i-text" && obj.editable) {
           setTimeout(() => {
             obj.enterEditing();
+            const len = (obj.text || "").length;
+            obj.selectionStart = len;
+            obj.selectionEnd = len;
             canvas.renderAll();
           }, 50);
         }
