@@ -177,11 +177,28 @@ export default function Chat() {
       .channel('chat-unread-per-channel')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
         const msg = payload.new as any;
-        if (msg.user_id !== currentUserId && msg.channel_id !== activeChannel?.id) {
-          setUnreadCounts(prev => ({
-            ...prev,
-            [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
-          }));
+        if (msg.user_id !== currentUserId) {
+          // Play notification sound
+          try {
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.setValueAtTime(1046, ctx.currentTime + 0.08);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.25);
+          } catch (e) { /* audio not available */ }
+
+          if (msg.channel_id !== activeChannel?.id) {
+            setUnreadCounts(prev => ({
+              ...prev,
+              [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
+            }));
+          }
         }
       })
       .subscribe();
