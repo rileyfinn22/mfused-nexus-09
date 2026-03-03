@@ -476,10 +476,17 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           if (obj.locked || !obj.editable) {
             obj.set({ selectable: false, evented: false, hasControls: false, lockMovementX: true, lockMovementY: true });
           } else {
+            const isTextObj = obj.type === 'i-text' || obj.type === 'textbox' || obj.type === 'text';
             obj.set({
               selectable: true,
               evented: true,
-              hasControls: true,
+              hasControls: !isTextObj,
+              hasBorders: true,
+              lockMovementX: isTextObj,
+              lockMovementY: isTextObj,
+              lockScalingX: isTextObj,
+              lockScalingY: isTextObj,
+              lockRotation: isTextObj,
               borderColor: "#3b82f6",
               cornerColor: "#3b82f6",
               cornerStyle: "circle",
@@ -1808,7 +1815,17 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       } else if (obj.locked || !obj.editable) {
         obj.set({ selectable: false, evented: false, hasControls: false });
       } else {
-        obj.set({ selectable: true, evented: true, hasControls: true });
+        const isTextObj = obj.type === 'i-text' || obj.type === 'textbox' || obj.type === 'text';
+        obj.set({
+          selectable: true,
+          evented: true,
+          hasControls: !isTextObj,
+          lockMovementX: isTextObj,
+          lockMovementY: isTextObj,
+          lockScalingX: isTextObj,
+          lockScalingY: isTextObj,
+          lockRotation: isTextObj,
+        });
       }
     });
     canvas.renderAll();
