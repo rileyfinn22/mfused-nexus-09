@@ -328,11 +328,7 @@ export const InvoicePackingListSection = ({
       doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
       doc.text('Packing List', 14, yPos);
       
-      // Source file note
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'italic');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text(`Generated from: ${selectedExcelFile.name}`, pageWidth - 14, yPos, { align: 'right' });
+      // No source file note shown to customers
       
       yPos += 15;
       
@@ -577,14 +573,7 @@ export const InvoicePackingListSection = ({
         doc.text(item.value, xPos, summaryY + 6);
       });
       
-      // Note about source
-      const noteY = tableEndY + 35;
-      if (usedUnmatched) {
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-        doc.text('Items extracted from vendor packing list', 14, noteY);
-      }
+      // No vendor source note in customer-facing PDF
       
       // Footer
       doc.setFontSize(9);
@@ -1165,11 +1154,13 @@ export const InvoicePackingListSection = ({
                       <span>{formatFileSize(pl.file_size)}</span>
                       <span>•</span>
                       <span>{format(new Date(pl.created_at), 'MMM d, yyyy h:mm a')}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {pl.source === 'generated' ? 'Generated' : 'Uploaded'}
-                      </Badge>
+                      {isVibeAdmin && (
+                        <Badge variant="outline" className="text-xs">
+                          {pl.source === 'generated' ? 'Generated' : pl.source === 'excel-import' ? 'From Vendor File' : 'Uploaded'}
+                        </Badge>
+                      )}
                     </div>
-                    {pl.notes && (
+                    {isVibeAdmin && pl.notes && (
                       <p className="text-xs text-muted-foreground mt-1">{pl.notes}</p>
                     )}
                   </div>
