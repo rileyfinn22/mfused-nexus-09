@@ -80,6 +80,7 @@ export default function Chat() {
   const [chatProfiles, setChatProfiles] = useState<ChatProfile[]>([]);
   const [profileMap, setProfileMap] = useState<Record<string, ChatProfile>>({});
   const [showNewDm, setShowNewDm] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [cursorPos, setCursorPos] = useState(0);
@@ -135,6 +136,57 @@ export default function Chat() {
     }
     setLoading(false);
   };
+
+  // Track per-channel unread counts
+  useEffect(() => {
+    if (!currentUserId || channels.length === 0) return;
+    let cancelled = false;
+
+    const fetchUnreadCounts = async () => {
+      const counts: Record<string, number> = {};
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      
+      for (const ch of channels) {
+        // Skip the active channel
+        if (ch.id === activeChannel?.id) {
+          counts[ch.id] = 0;
+          continue;
+        }
+        const { count } = await supabase
+          .from('chat_messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('channel_id', ch.id)
+          .neq('user_id', currentUserId)
+          .gt('created_at', cutoff);
+        counts[ch.id] = count || 0;
+      }
+      if (!cancelled) setUnreadCounts(counts);
+    };
+
+    fetchUnreadCounts();
+
+    const realtimeChannel = supabase
+      .channel('chat-unread-per-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
+        const msg = payload.new as any;
+        if (msg.user_id !== currentUserId && msg.channel_id !== activeChannel?.id) {
+          setUnreadCounts(prev => ({
+            ...prev,
+            [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
+          }));
+        }
+      })
+      .subscribe();
+
+    return () => { cancelled = true; supabase.removeChannel(realtimeChannel); };
+  }, [currentUserId, channels.length, activeChannel?.id]);
+
+  // Clear unread count when switching channels
+  useEffect(() => {
+    if (activeChannel) {
+      setUnreadCounts(prev => ({ ...prev, [activeChannel.id]: 0 }));
+    }
+  }, [activeChannel?.id]);
 
   // Load messages for active channel
   useEffect(() => {
@@ -612,7 +664,12 @@ export default function Chat() {
                 )}
               >
                 <Hash className="h-4 w-4 shrink-0" />
-                <span className="truncate">{c.name}</span>
+                <span className="truncate flex-1">{c.name}</span>
+                {(unreadCounts[c.id] || 0) > 0 && (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
+                    {unreadCounts[c.id] > 99 ? '99+' : unreadCounts[c.id]}
+                  </span>
+                )}
               </button>
             ))}
 
@@ -688,7 +745,12 @@ export default function Chat() {
                         {dmName.slice(0, 1).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="truncate">{dmName}</span>
+                    <span className="truncate flex-1">{dmName}</span>
+                    {(unreadCounts[c.id] || 0) > 0 && (
+                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
+                        {unreadCounts[c.id] > 99 ? '99+' : unreadCounts[c.id]}
+                      </span>
+                    )}
                   </button>
                 );
               })}
