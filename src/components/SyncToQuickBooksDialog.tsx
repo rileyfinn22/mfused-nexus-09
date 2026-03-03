@@ -134,11 +134,11 @@ export function SyncToQuickBooksDialog({
   
   // Find deposit child invoices (billed_percentage < 100) for this order
   const depositChildInvoices = billingHistory.filter(
-    inv => inv.parent_invoice_id === invoice?.id && Number(inv.billed_percentage || 100) < 100 && inv.quickbooks_id
+    inv => inv.parent_invoice_id === invoice?.id && Number(inv.billed_percentage || 100) < 100
   );
   
   // Deposit from parent (when viewing a child invoice)
-  const hasParentDeposit = parentInvoice && Number(parentInvoice.billed_percentage || 100) < 100 && parentInvoice.quickbooks_id;
+  const hasParentDeposit = parentInvoice && Number(parentInvoice.billed_percentage || 100) < 100;
   
   // Deposit from children (when viewing the blanket invoice)
   const hasChildDeposits = depositChildInvoices.length > 0;

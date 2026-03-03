@@ -706,8 +706,11 @@ serve(async (req) => {
         .is('deleted_at', null);
 
       if (childDeposits && childDeposits.length > 0) {
+        // Deduct deposit children whether or not they have been synced to QBO yet.
+        // Previously required c.quickbooks_id which caused blanket invoices
+        // (e.g. 10737) to bill the full amount when the deposit wasn't synced first.
         const depositChildren = childDeposits.filter(
-          (c: any) => c.quickbooks_id && Number(c.billed_percentage || 100) < 100
+          (c: any) => Number(c.billed_percentage || 100) < 100
         );
         
         for (const child of depositChildren) {
