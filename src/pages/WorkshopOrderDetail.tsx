@@ -11,8 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft, Package, FileText, ExternalLink, Truck,
-  Loader2, Save, Printer, Download, Eye, Trash2, Send, MapPin, Pencil
+  Loader2, Save, Printer, Download, Eye, Trash2, Send, MapPin, Pencil, Image
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -239,108 +242,12 @@ export default function WorkshopOrderDetail() {
   // Customer read-only view
   if (!isVibeAdmin) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/print-workshop")} className="gap-1.5">
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Printer className="h-6 w-6" /> {order.order_number}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Placed {format(new Date(order.created_at), "MMM d, yyyy h:mm a")}
-            </p>
-          </div>
-          <Badge variant="outline" className={`ml-auto ${STATUS_COLORS[order.status] || ""}`}>
-            {formatLabel(order.status)}
-          </Badge>
-        </div>
-
-        {/* Progress */}
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">Production Progress</span>
-              <span className="text-muted-foreground">{effectiveProgress}%</span>
-            </div>
-            <Progress value={effectiveProgress} className="h-2.5" />
-            {order.production_status && order.production_status !== "pending" && (
-              <p className="text-sm text-muted-foreground">
-                Current stage: <span className="font-medium text-foreground">{formatLabel(order.production_status)}</span>
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Tracking */}
-        {order.tracking_number && (
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Truck className="h-5 w-5 text-primary" />
-                <div className="flex-1">
-                  <p className="font-medium text-sm">Shipment Tracking</p>
-                  <p className="text-xs text-muted-foreground">{order.tracking_carrier?.toUpperCase()} · {order.tracking_number}</p>
-                </div>
-                {order.tracking_url && (
-                  <a
-                    href={order.tracking_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline flex items-center gap-1"
-                  >
-                    Track <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Line Items */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Order Items</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="border border-border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Item</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Material</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Qty</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lineItems.map((item: any, i: number) => (
-                    <tr key={item.id} className={i > 0 ? "border-t border-border" : ""}>
-                      <td className="px-3 py-2 font-medium">{item.template_name}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{item.material || "—"}</td>
-                      <td className="px-3 py-2 text-right">{item.quantity?.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right font-medium">
-                        {item.total != null && item.total > 0 ? `$${Number(item.total).toFixed(2)}` : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                {Number(order.total) > 0 && (
-                  <tfoot className="border-t border-border">
-                    <tr>
-                      <td colSpan={3} className="px-3 py-2 text-right font-semibold">Total</td>
-                      <td className="px-3 py-2 text-right font-semibold text-primary">
-                        ${Number(order.total).toFixed(2)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <CustomerOrderView
+        order={order}
+        lineItems={lineItems}
+        effectiveProgress={effectiveProgress}
+        formatLabel={formatLabel}
+      />
     );
   }
 
@@ -652,6 +559,323 @@ export default function WorkshopOrderDetail() {
         lineItems={lineItems}
         onSent={() => fetchOrder()}
       />
+    </div>
+  );
+}
+
+/* ───────────────────────── Customer Order View ───────────────────────── */
+
+function CustomerOrderView({
+  order,
+  lineItems,
+  effectiveProgress,
+  formatLabel,
+}: {
+  order: any;
+  lineItems: any[];
+  effectiveProgress: number;
+  formatLabel: (s: string) => string;
+}) {
+  const navigate = useNavigate();
+  const [previewItem, setPreviewItem] = useState<any>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const buildOrderPdf = async () => {
+    setGeneratingPdf(true);
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+      const doc = new jsPDF({ unit: "pt", format: "letter" });
+
+      // Header
+      doc.setFontSize(20);
+      doc.setFont("helvetica", "bold");
+      doc.text("Order Confirmation", 40, 50);
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100);
+      doc.text(`Order: ${order.order_number}`, 40, 72);
+      doc.text(`Date: ${format(new Date(order.created_at), "MMMM d, yyyy")}`, 40, 87);
+      doc.text(`Status: ${formatLabel(order.status)}`, 40, 102);
+
+      // Shipping address
+      let y = 130;
+      doc.setTextColor(0);
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.text("Ship To", 40, y);
+      y += 18;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      const shipLines = [
+        order.shipping_name,
+        order.shipping_street,
+        [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") + (order.shipping_zip ? ` ${order.shipping_zip}` : ""),
+      ].filter(Boolean);
+      for (const line of shipLines) {
+        doc.text(line, 40, y);
+        y += 14;
+      }
+
+      // Items table
+      y += 12;
+      autoTable(doc, {
+        startY: y,
+        head: [["Item", "Material", "Qty", "Unit Price", "Total"]],
+        body: lineItems.map((item: any) => [
+          item.template_name,
+          item.material || "—",
+          item.quantity?.toLocaleString(),
+          item.price_per_unit != null ? `$${Number(item.price_per_unit).toFixed(4)}` : "TBD",
+          item.total != null && item.total > 0 ? `$${Number(item.total).toFixed(2)}` : "—",
+        ]),
+        foot: Number(order.total) > 0 ? [["", "", "", "Total", `$${Number(order.total).toFixed(2)}`]] : undefined,
+        styles: { fontSize: 9, cellPadding: 6 },
+        headStyles: { fillColor: [41, 41, 41], textColor: 255 },
+        footStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: "bold" },
+        margin: { left: 40, right: 40 },
+      });
+
+      // Footer
+      const pageH = doc.internal.pageSize.getHeight();
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text("Thank you for your order!", 40, pageH - 30);
+
+      doc.save(`${order.order_number}_confirmation.pdf`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to generate order document");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/print-workshop")} className="gap-1.5">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Printer className="h-6 w-6" /> {order.order_number}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Placed {format(new Date(order.created_at), "MMM d, yyyy h:mm a")}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={`${STATUS_COLORS[order.status] || ""}`}>
+            {formatLabel(order.status)}
+          </Badge>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={buildOrderPdf} disabled={generatingPdf}>
+            {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            Order PDF
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column: items */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Progress */}
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Production Progress</span>
+                <span className="text-muted-foreground">{effectiveProgress}%</span>
+              </div>
+              <Progress value={effectiveProgress} className="h-2.5" />
+              {order.production_status && order.production_status !== "pending" && (
+                <p className="text-sm text-muted-foreground">
+                  Current stage: <span className="font-medium text-foreground">{formatLabel(order.production_status)}</span>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tracking */}
+          {order.tracking_number && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Truck className="h-5 w-5 text-primary" />
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">Shipment Tracking</p>
+                    <p className="text-xs text-muted-foreground">{order.tracking_carrier?.toUpperCase()} · {order.tracking_number}</p>
+                  </div>
+                  {order.tracking_url && (
+                    <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                      Track <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Order Items with Thumbnails */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Package className="h-4 w-4" /> Order Items
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-0 p-0">
+              {lineItems.map((item: any, idx: number) => (
+                <div key={item.id}>
+                  {idx > 0 && <Separator />}
+                  <div className="p-4 flex gap-4">
+                    {/* Thumbnail */}
+                    <button
+                      className="shrink-0 w-20 h-20 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/40 transition-all"
+                      onClick={() => setPreviewItem(item)}
+                      title="Click to preview"
+                    >
+                      {item.thumbnail_url || item.print_file_url ? (
+                        <img
+                          src={item.thumbnail_url || item.print_file_url}
+                          alt={item.template_name}
+                          className="w-full h-full object-contain p-1"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <Image className="h-8 w-8 text-muted-foreground/30" />
+                      )}
+                    </button>
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-sm">{item.template_name}</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 shrink-0"
+                          title="Preview"
+                          onClick={() => setPreviewItem(item)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {item.material && (
+                          <Badge variant="outline" className="text-xs">{item.material}</Badge>
+                        )}
+                        <Badge variant="secondary" className="text-xs">
+                          Qty: {item.quantity?.toLocaleString()}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-xs text-muted-foreground">
+                          {item.price_per_unit != null ? `$${Number(item.price_per_unit).toFixed(4)}/ea` : "Quote pending"}
+                        </span>
+                        <span className="text-sm font-medium">
+                          {item.total != null && item.total > 0 ? `$${Number(item.total).toFixed(2)}` : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {Number(order.total) > 0 && (
+                <>
+                  <Separator />
+                  <div className="p-4 flex justify-between items-center">
+                    <span className="font-semibold text-sm">Order Total</span>
+                    <span className="font-semibold text-primary">${Number(order.total).toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right column: Shipping + Order Info */}
+        <div className="space-y-6">
+          {/* Shipping Address */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MapPin className="h-4 w-4" /> Shipping Address
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm leading-relaxed">
+                {order.shipping_name && <p className="font-medium">{order.shipping_name}</p>}
+                {order.shipping_street && <p className="text-muted-foreground">{order.shipping_street}</p>}
+                {(order.shipping_city || order.shipping_state || order.shipping_zip) && (
+                  <p className="text-muted-foreground">
+                    {[order.shipping_city, order.shipping_state].filter(Boolean).join(", ")} {order.shipping_zip}
+                  </p>
+                )}
+                {!order.shipping_name && !order.shipping_street && (
+                  <p className="text-muted-foreground italic">No shipping address provided</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Order Document Download */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Documents
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={buildOrderPdf}
+                disabled={generatingPdf}
+              >
+                {generatingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Download Order Confirmation
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Thumbnail Preview Dialog */}
+      <Dialog open={!!previewItem} onOpenChange={(open) => !open && setPreviewItem(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{previewItem?.template_name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center bg-muted/30 rounded-lg p-4 min-h-[300px]">
+            {previewItem?.thumbnail_url || previewItem?.print_file_url ? (
+              <img
+                src={previewItem.thumbnail_url || previewItem.print_file_url}
+                alt={previewItem.template_name}
+                className="max-w-full max-h-[400px] object-contain"
+              />
+            ) : (
+              <div className="text-center text-muted-foreground">
+                <Image className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No preview available</p>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex gap-2 flex-wrap">
+              {previewItem?.material && <Badge variant="outline">{previewItem.material}</Badge>}
+              <Badge variant="secondary">Qty: {previewItem?.quantity?.toLocaleString()}</Badge>
+            </div>
+            {previewItem?.total != null && previewItem.total > 0 && (
+              <span className="font-medium">${Number(previewItem.total).toFixed(2)}</span>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

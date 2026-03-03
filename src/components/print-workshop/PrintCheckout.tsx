@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,7 @@ export function PrintCheckout({
   onClearCart,
   onBack,
 }: PrintCheckoutProps) {
+  const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
   const { activeCompanyId } = useActiveCompany();
@@ -238,6 +240,27 @@ export function PrintCheckout({
           console.warn("Could not generate print file for", item.templateName, e);
         }
 
+        // Upload thumbnail snapshot to storage
+        let storedThumbnailUrl: string | null = null;
+        if (item.thumbnailUrl && item.thumbnailUrl.startsWith("data:")) {
+          try {
+            const res = await fetch(item.thumbnailUrl);
+            const thumbBlob = await res.blob();
+            const thumbPath = `orders/${workshopOrderId}/${crypto.randomUUID()}/thumbnail.png`;
+            const { error: thumbErr } = await supabase.storage
+              .from("print-files")
+              .upload(thumbPath, thumbBlob, { contentType: "image/png" });
+            if (!thumbErr) {
+              const { data: thumbUrl } = supabase.storage
+                .from("print-files")
+                .getPublicUrl(thumbPath);
+              storedThumbnailUrl = thumbUrl.publicUrl;
+            }
+          } catch (e) {
+            console.warn("Could not upload thumbnail for", item.templateName, e);
+          }
+        }
+
         const { error } = await supabase.from("print_orders").insert({
           workshop_order_id: workshopOrderId,
           company_id: item.companyId,
@@ -251,6 +274,7 @@ export function PrintCheckout({
           status: item.pricePerUnit ? "approved" : "pending_quote",
           created_by: user?.id || null,
           print_file_url: printFileUrl,
+          thumbnail_url: storedThumbnailUrl,
         } as any);
 
         if (error) throw error;
@@ -260,7 +284,7 @@ export function PrintCheckout({
         `Order ${woData.order_number} placed with ${items.length} item(s)!`
       );
       onClearCart();
-      onBack();
+      navigate(`/print-workshop/orders/${workshopOrderId}`);
     } catch (err: any) {
       toast.error(err.message || "Failed to place order");
     } finally {
