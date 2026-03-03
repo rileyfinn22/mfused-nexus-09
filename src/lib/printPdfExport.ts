@@ -312,6 +312,9 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
     }
   }
 
+  // Force outside of trim/bleed box to white so exported PDF matches canvas preview
+  maskOutsideTrimArea(doc, totalW, totalH, bleedInches);
+
   // 4. Add crop marks
   addCropMarks(doc, totalW, totalH, bleedInches);
 
@@ -377,6 +380,25 @@ function renderTextToCanvas(obj: any, canvasDpi: number, exportDpi: number): HTM
   ctx.fillText(text, 2, 2);
 
   return canvas;
+}
+
+/**
+ * Fill everything outside the trim rectangle with white.
+ * This guarantees art outside the bleed/trim preview does not appear in exports.
+ */
+function maskOutsideTrimArea(doc: jsPDF, totalW: number, totalH: number, bleed: number) {
+  if (bleed <= 0) return;
+
+  doc.setFillColor(255, 255, 255);
+
+  // Top strip
+  doc.rect(0, 0, totalW, bleed, "F");
+  // Bottom strip
+  doc.rect(0, totalH - bleed, totalW, bleed, "F");
+  // Left strip
+  doc.rect(0, bleed, bleed, Math.max(0, totalH - bleed * 2), "F");
+  // Right strip
+  doc.rect(totalW - bleed, bleed, bleed, Math.max(0, totalH - bleed * 2), "F");
 }
 
 /**
@@ -487,6 +509,7 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
     }
   }
 
+  maskOutsideTrimArea(doc, totalW, totalH, bleedInches);
   addCropMarks(doc, totalW, totalH, bleedInches);
   return doc.output("blob");
 }
