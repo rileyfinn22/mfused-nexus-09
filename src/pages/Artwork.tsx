@@ -9,12 +9,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { 
   Search, 
   Plus, 
   Download, 
   Eye, 
+  Check,
   CheckCircle,
+  ChevronsUpDown,
   XCircle,
   Clock,
   FileImage,
@@ -81,6 +85,8 @@ const Artwork = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [stateFilter, setStateFilter] = useState("all");
   const [availableStates, setAvailableStates] = useState<string[]>([]);
+  const [statePopoverOpen, setStatePopoverOpen] = useState(false);
+  const [statePopoverOpen2, setStatePopoverOpen2] = useState(false);
   const US_STATES = [
     'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
     'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
@@ -1278,17 +1284,34 @@ const Artwork = () => {
               className="pl-10"
             />
           </div>
-          <Select value={stateFilter} onValueChange={setStateFilter}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="State" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All States</SelectItem>
-              {US_STATES.map((state) => (
-                <SelectItem key={state} value={state}>{state}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={statePopoverOpen2} onOpenChange={setStatePopoverOpen2}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox" className="w-full sm:w-48 justify-between font-normal">
+                {stateFilter === 'all' ? 'All States' : stateFilter}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-0">
+              <Command>
+                <CommandInput placeholder="Type state..." />
+                <CommandList>
+                  <CommandEmpty>No state found.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem value="all" onSelect={() => { setStateFilter('all'); setStatePopoverOpen2(false); }}>
+                      <Check className={cn("mr-2 h-4 w-4", stateFilter === 'all' ? "opacity-100" : "opacity-0")} />
+                      All States
+                    </CommandItem>
+                    {US_STATES.map((state) => (
+                      <CommandItem key={state} value={state} onSelect={() => { setStateFilter(state); setStatePopoverOpen2(false); }}>
+                        <Check className={cn("mr-2 h-4 w-4", stateFilter === state ? "opacity-100" : "opacity-0")} />
+                        {state}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           <div className="flex items-center border rounded-lg p-1 bg-muted/30">
             <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8" onClick={() => setViewMode("grid")}>
               <LayoutGrid className="h-4 w-4" />
@@ -1512,17 +1535,34 @@ const Artwork = () => {
             </SelectContent>
           </Select>
         )}
-        <Select value={stateFilter} onValueChange={setStateFilter}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="State" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All States</SelectItem>
-            {US_STATES.map((state) => (
-              <SelectItem key={state} value={state}>{state}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover open={statePopoverOpen} onOpenChange={setStatePopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" role="combobox" className="w-full sm:w-48 justify-between font-normal">
+              {stateFilter === 'all' ? 'All States' : stateFilter}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-0">
+            <Command>
+              <CommandInput placeholder="Type state..." />
+              <CommandList>
+                <CommandEmpty>No state found.</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem value="all" onSelect={() => { setStateFilter('all'); setStatePopoverOpen(false); }}>
+                    <Check className={cn("mr-2 h-4 w-4", stateFilter === 'all' ? "opacity-100" : "opacity-0")} />
+                    All States
+                  </CommandItem>
+                  {US_STATES.map((state) => (
+                    <CommandItem key={state} value={state} onSelect={() => { setStateFilter(state); setStatePopoverOpen(false); }}>
+                      <Check className={cn("mr-2 h-4 w-4", stateFilter === state ? "opacity-100" : "opacity-0")} />
+                      {state}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Templates Grid */}
