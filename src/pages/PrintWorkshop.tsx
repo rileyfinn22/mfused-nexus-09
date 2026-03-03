@@ -30,7 +30,7 @@ export default function PrintWorkshop() {
   const [canvasData, setCanvasData] = useState<any>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const useFabricCanvasRef = useRef<FabricCanvas | null>(null);
-  const [savingDesign, setSavingDesign] = useState(false);
+  
   const [savedDesign, setSavedDesign] = useState<{ thumbnailUrl: string | null; templateName: string; savedAt: Date } | null>(null);
 
   const captureEditedThumbnail = (): string | null => {
@@ -157,124 +157,100 @@ export default function PrintWorkshop() {
     fetchTemplates();
   };
 
-  const handleSaveDesign = async () => {
-    if (!selectedTemplate || !canvasData) return;
-    setSavingDesign(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const companyId = activeCompanyId || selectedTemplate.company_id;
-      const saveId = crypto.randomUUID();
-
-      // Generate print-ready PDF
-      let printFileUrl: string | null = null;
-      let pdfBlob: Blob | null = null;
-      try {
-        if (selectedTemplate.source_pdf_path) {
-          pdfBlob = await generatePrintReadyPdf({
-            sourcePdfPath: selectedTemplate.source_pdf_path,
-            canvasData,
-            widthInches: selectedTemplate.width_inches,
-            heightInches: selectedTemplate.height_inches,
-            bleedInches: selectedTemplate.bleed_inches,
-          });
-        } else {
-          pdfBlob = await generateCanvasOnlyPdf({
-            canvasData,
-            widthInches: selectedTemplate.width_inches,
-            heightInches: selectedTemplate.height_inches,
-            bleedInches: selectedTemplate.bleed_inches,
-          });
-        }
-        const pdfPath = `saved-designs/${saveId}/print_ready.pdf`;
-        const { error: pdfErr } = await supabase.storage
-          .from("print-files")
-          .upload(pdfPath, pdfBlob, { contentType: "application/pdf" });
-        if (!pdfErr) {
-          const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(pdfPath);
-          printFileUrl = urlData.publicUrl;
-        }
-      } catch (e) {
-        console.warn("Could not generate print file for save", e);
-      }
-
-      // Generate thumbnail
-      let thumbnailUrl: string | null = null;
-      // Try canvas capture first
-      const editedThumb = captureEditedThumbnail();
-      if (editedThumb && editedThumb.startsWith("data:")) {
-        try {
-          const res = await fetch(editedThumb);
-          const thumbBlob = await res.blob();
-          const thumbPath = `saved-designs/${saveId}/thumbnail.png`;
-          const { error: thumbErr } = await supabase.storage
-            .from("print-files")
-            .upload(thumbPath, thumbBlob, { contentType: "image/png" });
-          if (!thumbErr) {
-            const { data: thumbUrl } = supabase.storage.from("print-files").getPublicUrl(thumbPath);
-            thumbnailUrl = thumbUrl.publicUrl;
-          }
-        } catch {}
-      }
-      // Fallback: generate from PDF
-      if (!thumbnailUrl && pdfBlob) {
-        try {
-          const pdfBuf = await pdfBlob.arrayBuffer();
-          const thumbBlob = await generatePdfThumbnailFromArrayBuffer(pdfBuf, { maxWidth: 400 });
-          const thumbPath = `saved-designs/${saveId}/thumbnail.png`;
-          const { error: thumbErr } = await supabase.storage
-            .from("print-files")
-            .upload(thumbPath, thumbBlob, { contentType: "image/png" });
-          if (!thumbErr) {
-            const { data: thumbUrl } = supabase.storage.from("print-files").getPublicUrl(thumbPath);
-            thumbnailUrl = thumbUrl.publicUrl;
-          }
-        } catch {}
-      }
-
-      // Save record to database
-      const { error: dbErr } = await supabase.from("design_saves").insert({
-        id: saveId,
-        company_id: companyId,
-        template_id: selectedTemplate.id,
-        template_name: selectedTemplate.name,
-        canvas_data: canvasData,
-        thumbnail_url: thumbnailUrl,
-        print_file_url: printFileUrl,
-        source_pdf_path: selectedTemplate.source_pdf_path,
-        width_inches: selectedTemplate.width_inches,
-        height_inches: selectedTemplate.height_inches,
-        bleed_inches: selectedTemplate.bleed_inches,
-        created_by: user?.id || null,
-      } as any);
-
-      if (dbErr) throw dbErr;
-
-      setSavedDesign({
-        thumbnailUrl: thumbnailUrl || editedThumb,
-        templateName: selectedTemplate.name,
-        savedAt: new Date(),
-      });
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save design");
-    } finally {
-      setSavingDesign(false);
-    }
-  };
-
-  const handleAddToCart = (item: Omit<CartItem, "id">) => {
+  const handleAddToCart = async (item: Omit<CartItem, "id">) => {
     const editedThumb = captureEditedThumbnail();
     const newItem: CartItem = {
       ...item,
       id: crypto.randomUUID(),
       thumbnailUrl: editedThumb || item.thumbnailUrl,
-      // For company users, use their active company
       companyId: item.companyId || activeCompanyId,
     };
     setCartItems((prev) => [...prev, newItem]);
     toast.success(`"${item.templateName}" added to cart`);
+
+    // Auto-save design for liability tracking (fire-and-forget)
+    if (selectedTemplate) {
+      try {
+        const saveId = crypto.randomUUID();
+        const companyId = activeCompanyId || selectedTemplate.company_id;
+        let thumbnailUrl: string | null = null;
+        let printFileUrl: string | null = null;
+
+        // Upload thumbnail
+        if (editedThumb) {
+          try {
+            const thumbRes = await fetch(editedThumb);
+            const thumbBlob = await thumbRes.blob();
+            const thumbPath = `saved-designs/${saveId}/thumbnail.png`;
+            const { error: thumbErr } = await supabase.storage
+              .from("print-files")
+              .upload(thumbPath, thumbBlob, { contentType: "image/png" });
+            if (!thumbErr) {
+              const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(thumbPath);
+              thumbnailUrl = urlData.publicUrl;
+            }
+          } catch {}
+        }
+
+        // Upload print-ready PDF
+        try {
+          const hasSourcePdf = !!selectedTemplate.source_pdf_path;
+          let pdfBlob: Blob;
+          if (hasSourcePdf) {
+            const { generatePrintReadyPdf } = await import("@/lib/printPdfExport");
+            pdfBlob = await generatePrintReadyPdf({
+              sourcePdfPath: selectedTemplate.source_pdf_path,
+              canvasData,
+              widthInches: selectedTemplate.width_inches,
+              heightInches: selectedTemplate.height_inches,
+              bleedInches: selectedTemplate.bleed_inches,
+            });
+          } else {
+            const { generateCanvasOnlyPdf } = await import("@/lib/printPdfExport");
+            pdfBlob = await generateCanvasOnlyPdf({
+              canvasData,
+              widthInches: selectedTemplate.width_inches,
+              heightInches: selectedTemplate.height_inches,
+              bleedInches: selectedTemplate.bleed_inches,
+            });
+          }
+          const pdfPath = `saved-designs/${saveId}/print_ready.pdf`;
+          const { error: pdfErr } = await supabase.storage
+            .from("print-files")
+            .upload(pdfPath, pdfBlob, { contentType: "application/pdf" });
+          if (!pdfErr) {
+            const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(pdfPath);
+            printFileUrl = urlData.publicUrl;
+          }
+        } catch {}
+
+        await supabase.from("design_saves").insert({
+          id: saveId,
+          company_id: companyId,
+          template_id: selectedTemplate.id,
+          template_name: selectedTemplate.name,
+          canvas_data: canvasData,
+          thumbnail_url: thumbnailUrl,
+          print_file_url: printFileUrl,
+          source_pdf_path: selectedTemplate.source_pdf_path,
+          width_inches: selectedTemplate.width_inches,
+          height_inches: selectedTemplate.height_inches,
+          bleed_inches: selectedTemplate.bleed_inches,
+          created_by: (await supabase.auth.getUser()).data.user?.id || null,
+        } as any);
+
+        setSavedDesign({
+          thumbnailUrl: thumbnailUrl || editedThumb,
+          templateName: selectedTemplate.name,
+          savedAt: new Date(),
+        });
+      } catch (err) {
+        console.error("Auto-save design failed:", err);
+      }
+    }
+
     setView("browse");
     setSelectedTemplate(null);
-    setSavedDesign(null);
   };
 
   const handleUpdateCartQty = (id: string, quantity: number) => {
@@ -491,9 +467,6 @@ export default function PrintWorkshop() {
               template={selectedTemplate}
               canvasData={canvasData}
               onAddToCart={handleAddToCart}
-              onSaveDesign={handleSaveDesign}
-              isSaving={savingDesign}
-              isSaved={!!savedDesign}
             />
           </div>
         </div>
