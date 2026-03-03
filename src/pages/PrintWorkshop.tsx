@@ -251,7 +251,7 @@ export default function PrintWorkshop() {
     }
 
     // Open cart drawer instead of navigating away
-    setCartOpen(true);
+    // Stay on current view, just show the saved indicator
   };
 
   const handleUpdateCartQty = (id: string, quantity: number) => {
