@@ -585,22 +585,22 @@ function CustomerOrderView({
     try {
       const { default: jsPDF } = await import("jspdf");
       const { default: autoTable } = await import("jspdf-autotable");
+      const { addPdfBranding, addPdfFooter } = await import("@/lib/pdfBranding");
       const doc = new jsPDF({ unit: "pt", format: "letter" });
 
-      // Header
-      doc.setFontSize(20);
-      doc.setFont("helvetica", "bold");
-      doc.text("Order Confirmation", 40, 50);
+      // Branded header with logo + title
+      const yAfterHeader = await addPdfBranding(doc, { documentTitle: "Order Confirmation" });
 
+      let y = yAfterHeader + 8;
       doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100);
-      doc.text(`Order: ${order.order_number}`, 40, 72);
-      doc.text(`Date: ${format(new Date(order.created_at), "MMMM d, yyyy")}`, 40, 87);
-      doc.text(`Status: ${formatLabel(order.status)}`, 40, 102);
+      doc.text(`Order: ${order.order_number}`, 40, y);
+      doc.text(`Date: ${format(new Date(order.created_at), "MMMM d, yyyy")}`, 40, y + 15);
+      doc.text(`Status: ${formatLabel(order.status)}`, 40, y + 30);
 
       // Shipping address
-      let y = 130;
+      y += 55;
       doc.setTextColor(0);
       doc.setFontSize(13);
       doc.setFont("helvetica", "bold");
@@ -637,11 +637,8 @@ function CustomerOrderView({
         margin: { left: 40, right: 40 },
       });
 
-      // Footer
-      const pageH = doc.internal.pageSize.getHeight();
-      doc.setFontSize(8);
-      doc.setTextColor(150);
-      doc.text("Thank you for your order!", 40, pageH - 30);
+      // Branded footer
+      addPdfFooter(doc);
 
       doc.save(`${order.order_number}_confirmation.pdf`);
     } catch (e) {
