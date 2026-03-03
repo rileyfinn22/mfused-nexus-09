@@ -11,13 +11,13 @@ import { PrintCart, type CartItem } from "@/components/print-workshop/PrintCart"
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkshopOrders } from "@/components/print-workshop/WorkshopOrders";
-import { Plus, Printer, ArrowLeft, Pencil, Trash2, Copy, Package } from "lucide-react";
+import { Plus, Printer, ArrowLeft, Pencil, Trash2, Copy, Package, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 
 type View = "browse" | "build" | "use";
 
 export default function PrintWorkshop() {
-  const { isVibeAdmin, loading: roleLoading } = useActiveCompany();
+  const { isVibeAdmin, activeCompanyId, loading: roleLoading } = useActiveCompany();
   const [view, setView] = useState<View>("browse");
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,21 +61,13 @@ export default function PrintWorkshop() {
   };
 
   useEffect(() => {
-    if (!roleLoading && isVibeAdmin) fetchTemplates();
-  }, [roleLoading, isVibeAdmin]);
+    if (!roleLoading) fetchTemplates();
+  }, [roleLoading]);
 
-  // Gate: vibe_admin only
   if (roleLoading) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">
         Loading...
-      </div>
-    );
-  }
-  if (!isVibeAdmin) {
-    return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground">
-        Access restricted to internal admins.
       </div>
     );
   }
@@ -128,12 +120,13 @@ export default function PrintWorkshop() {
   };
 
   const handleAddToCart = (item: Omit<CartItem, "id">) => {
-    // Capture a snapshot of the edited canvas as the cart thumbnail
     const editedThumb = captureEditedThumbnail();
     const newItem: CartItem = {
       ...item,
       id: crypto.randomUUID(),
       thumbnailUrl: editedThumb || item.thumbnailUrl,
+      // For company users, use their active company
+      companyId: item.companyId || activeCompanyId,
     };
     setCartItems((prev) => [...prev, newItem]);
     toast.success(`"${item.templateName}" added to cart`);
@@ -164,7 +157,9 @@ export default function PrintWorkshop() {
               Print Workshop
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Create and customize label templates for on-demand printing
+              {isVibeAdmin
+                ? "Manage templates and process print orders"
+                : "Browse and order custom printed products"}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -174,31 +169,33 @@ export default function PrintWorkshop() {
               onRemoveItem={handleRemoveCartItem}
               onClearCart={handleClearCart}
             />
-            <Button onClick={handleNewTemplate} className="gap-2">
-              <Plus className="h-4 w-4" /> New Template
-            </Button>
+            {isVibeAdmin && (
+              <Button onClick={handleNewTemplate} className="gap-2">
+                <Plus className="h-4 w-4" /> New Template
+              </Button>
+            )}
           </div>
         </div>
 
         <Tabs defaultValue="templates">
           <TabsList>
             <TabsTrigger value="templates" className="gap-1.5">
-              <Printer className="h-3.5 w-3.5" />
-              Templates
+              <ShoppingBag className="h-3.5 w-3.5" />
+              {isVibeAdmin ? "Templates" : "Shop"}
             </TabsTrigger>
             <TabsTrigger value="orders" className="gap-1.5">
               <Package className="h-3.5 w-3.5" />
-              Workshop Orders
+              {isVibeAdmin ? "All Orders" : "My Orders"}
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="templates">
             {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[1, 2, 3].map((i) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map((i) => (
                   <Card key={i} className="animate-pulse">
-                    <CardContent className="p-6">
-                      <div className="h-32 bg-muted rounded mb-4" />
+                    <CardContent className="p-4">
+                      <div className="aspect-[4/3] bg-muted rounded-lg mb-3" />
                       <div className="h-4 bg-muted rounded w-2/3 mb-2" />
                       <div className="h-3 bg-muted rounded w-1/2" />
                     </CardContent>
@@ -211,59 +208,70 @@ export default function PrintWorkshop() {
                   <Printer className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-medium mb-1">No templates yet</h3>
                   <p className="text-muted-foreground text-sm mb-4">
-                    Create your first label template to get started
+                    {isVibeAdmin
+                      ? "Create your first label template to get started"
+                      : "Check back soon for available products"}
                   </p>
-                  <Button onClick={handleNewTemplate} className="gap-2">
-                    <Plus className="h-4 w-4" /> Create Template
-                  </Button>
+                  {isVibeAdmin && (
+                    <Button onClick={handleNewTemplate} className="gap-2">
+                      <Plus className="h-4 w-4" /> Create Template
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {templates.map((tmpl) => (
                   <Card
                     key={tmpl.id}
-                    className="group cursor-pointer hover:border-primary/50 transition-colors"
+                    className="group cursor-pointer hover:border-primary/50 hover:shadow-md transition-all"
                     onClick={() => handleSelectTemplate(tmpl)}
                   >
-                    <CardContent className="p-4">
-                      <div className="h-32 bg-muted/50 rounded-lg mb-3 flex items-center justify-center border border-border">
+                    <CardContent className="p-0">
+                      {/* Thumbnail */}
+                      <div className="aspect-[4/3] bg-muted/30 rounded-t-lg flex items-center justify-center overflow-hidden border-b border-border">
                         {tmpl.thumbnail_url ? (
-                          <img src={tmpl.thumbnail_url} alt={tmpl.name} className="max-h-full object-contain rounded" />
+                          <img src={tmpl.thumbnail_url} alt={tmpl.name} className="w-full h-full object-contain p-3" />
                         ) : (
-                          <Printer className="h-8 w-8 text-muted-foreground/50" />
+                          <Printer className="h-10 w-10 text-muted-foreground/30" />
                         )}
                       </div>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-medium text-sm">{tmpl.name}</h3>
-                          {tmpl.description && (
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{tmpl.description}</p>
-                          )}
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="secondary" className="text-xs">
-                              {tmpl.width_inches}" × {tmpl.height_inches}"
-                            </Badge>
-                            <Badge variant="outline" className="text-xs capitalize">
-                              {tmpl.product_type}
-                            </Badge>
-                            {tmpl.preset_price_per_unit && (
-                              <Badge variant="default" className="text-xs">
-                                ${Number(tmpl.preset_price_per_unit).toFixed(4)}/ea
-                              </Badge>
+                      {/* Details */}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-sm truncate">{tmpl.name}</h3>
+                            {tmpl.description && (
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{tmpl.description}</p>
                             )}
                           </div>
+                          {/* Admin controls */}
+                          {isVibeAdmin && (
+                            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDuplicateTemplate(tmpl)} title="Duplicate">
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditTemplate(tmpl)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDeleteTemplate(tmpl.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDuplicateTemplate(tmpl)} title="Duplicate">
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditTemplate(tmpl)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDeleteTemplate(tmpl.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                        <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+                          <Badge variant="secondary" className="text-xs">
+                            {tmpl.width_inches}" × {tmpl.height_inches}"
+                          </Badge>
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {tmpl.product_type}
+                          </Badge>
+                          {tmpl.preset_price_per_unit != null && (
+                            <Badge className="text-xs bg-primary/10 text-primary border-primary/20">
+                              ${Number(tmpl.preset_price_per_unit).toFixed(4)}/ea
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -281,8 +289,12 @@ export default function PrintWorkshop() {
     );
   }
 
-  // Build mode
+  // Build mode - admin only
   if (view === "build") {
+    if (!isVibeAdmin) {
+      setView("browse");
+      return null;
+    }
     return (
       <TemplateBuilder
         template={editingTemplate}

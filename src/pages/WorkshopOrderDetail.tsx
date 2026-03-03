@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import {
   ArrowLeft, Package, FileText, ExternalLink, Truck,
-  Loader2, Save, Printer, Download, Eye, Trash2
+  Loader2, Save, Printer, Download, Eye, Trash2, Send
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -23,6 +23,8 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { CARRIERS, getTrackingUrl } from "@/lib/trackingUtils";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { SendWorkshopToVendorDialog } from "@/components/print-workshop/SendWorkshopToVendorDialog";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending" },
@@ -57,11 +59,13 @@ const STATUS_COLORS: Record<string, string> = {
 export default function WorkshopOrderDetail() {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const { isVibeAdmin } = useActiveCompany();
   const [order, setOrder] = useState<any>(null);
   const [lineItems, setLineItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generatingFileId, setGeneratingFileId] = useState<string | null>(null);
+  const [sendToVendorOpen, setSendToVendorOpen] = useState(false);
 
   // Editable fields
   const [status, setStatus] = useState("pending");
@@ -127,16 +131,12 @@ export default function WorkshopOrderDetail() {
 
   const buildLineItemPdf = async (item: any) => {
     if (!item.print_template_id) throw new Error("Template reference missing on line item");
-
     const { data: template, error } = await supabase
       .from("print_templates")
       .select("width_inches, height_inches, bleed_inches, source_pdf_path")
       .eq("id", item.print_template_id)
       .single();
-
-    if (error || !template) {
-      throw new Error("Could not load template dimensions for this line item");
-    }
+    if (error || !template) throw new Error("Could not load template dimensions");
 
     if (template.source_pdf_path) {
       return generatePrintReadyPdf({
@@ -147,7 +147,6 @@ export default function WorkshopOrderDetail() {
         bleedInches: Number(template.bleed_inches),
       });
     }
-
     return generateCanvasOnlyPdf({
       canvasData: item.canvas_data,
       widthInches: Number(template.width_inches),
@@ -206,6 +205,115 @@ export default function WorkshopOrderDetail() {
     ? 100
     : productionProgress;
 
+  // Customer read-only view
+  if (!isVibeAdmin) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/print-workshop")} className="gap-1.5">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Printer className="h-6 w-6" /> {order.order_number}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Placed {format(new Date(order.created_at), "MMM d, yyyy h:mm a")}
+            </p>
+          </div>
+          <Badge variant="outline" className={`ml-auto ${STATUS_COLORS[order.status] || ""}`}>
+            {formatLabel(order.status)}
+          </Badge>
+        </div>
+
+        {/* Progress */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium">Production Progress</span>
+              <span className="text-muted-foreground">{effectiveProgress}%</span>
+            </div>
+            <Progress value={effectiveProgress} className="h-2.5" />
+            {order.production_status && order.production_status !== "pending" && (
+              <p className="text-sm text-muted-foreground">
+                Current stage: <span className="font-medium text-foreground">{formatLabel(order.production_status)}</span>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Tracking */}
+        {order.tracking_number && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Truck className="h-5 w-5 text-primary" />
+                <div className="flex-1">
+                  <p className="font-medium text-sm">Shipment Tracking</p>
+                  <p className="text-xs text-muted-foreground">{order.tracking_carrier?.toUpperCase()} · {order.tracking_number}</p>
+                </div>
+                {order.tracking_url && (
+                  <a
+                    href={order.tracking_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary hover:underline flex items-center gap-1"
+                  >
+                    Track <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Line Items */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Order Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="border border-border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Item</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Material</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Qty</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineItems.map((item: any, i: number) => (
+                    <tr key={item.id} className={i > 0 ? "border-t border-border" : ""}>
+                      <td className="px-3 py-2 font-medium">{item.template_name}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{item.material || "—"}</td>
+                      <td className="px-3 py-2 text-right">{item.quantity?.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-medium">
+                        {item.total != null && item.total > 0 ? `$${Number(item.total).toFixed(2)}` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {Number(order.total) > 0 && (
+                  <tfoot className="border-t border-border">
+                    <tr>
+                      <td colSpan={3} className="px-3 py-2 text-right font-semibold">Total</td>
+                      <td className="px-3 py-2 text-right font-semibold text-primary">
+                        ${Number(order.total).toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Admin full view
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -216,8 +324,7 @@ export default function WorkshopOrderDetail() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Printer className="h-6 w-6" />
-              {order.order_number}
+              <Printer className="h-6 w-6" /> {order.order_number}
             </h1>
             <p className="text-sm text-muted-foreground">
               Created {format(new Date(order.created_at), "MMM d, yyyy h:mm a")}
@@ -228,6 +335,15 @@ export default function WorkshopOrderDetail() {
           <Badge variant="outline" className={STATUS_COLORS[status] || ""}>
             {formatLabel(status)}
           </Badge>
+          {/* Send to Vendor - primary action */}
+          <Button
+            variant="default"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setSendToVendorOpen(true)}
+          >
+            <Send className="h-4 w-4" /> Send to Vendor
+          </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="sm" className="gap-1.5">
@@ -246,12 +362,10 @@ export default function WorkshopOrderDetail() {
                 <AlertDialogAction
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   onClick={async () => {
-                    // Delete line items first, then the order
                     await supabase.from("print_orders").delete().eq("workshop_order_id", orderId!);
                     const { error } = await supabase.from("workshop_orders").delete().eq("id", orderId!);
-                    if (error) {
-                      toast.error("Failed to delete order");
-                    } else {
+                    if (error) toast.error("Failed to delete order");
+                    else {
                       toast.success("Order deleted");
                       navigate("/print-workshop");
                     }
@@ -272,7 +386,6 @@ export default function WorkshopOrderDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Line Items + Files */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Line Items */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Line Items</CardTitle>
@@ -317,11 +430,10 @@ export default function WorkshopOrderDetail() {
             </CardContent>
           </Card>
 
-          {/* Attached Files */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="h-4 w-4" /> Attached Print Files
+                <FileText className="h-4 w-4" /> Print Files
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -330,44 +442,21 @@ export default function WorkshopOrderDetail() {
               ) : (
                 <div className="space-y-2">
                   {lineItems.map((item: any) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-3 border border-border rounded-lg px-3 py-2.5"
-                    >
+                    <div key={item.id} className="flex items-center gap-3 border border-border rounded-lg px-3 py-2.5">
                       <FileText className="h-4 w-4 text-primary shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{item.template_name}</p>
                         <p className="text-xs text-muted-foreground">Edited print-ready file</p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          title="Preview"
-                          disabled={generatingFileId === item.id}
-                          onClick={() => previewLineItemPdf(item)}
-                        >
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Preview" disabled={generatingFileId === item.id} onClick={() => previewLineItemPdf(item)}>
                           {generatingFileId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          title="Download"
-                          disabled={generatingFileId === item.id}
-                          onClick={() => downloadLineItemPdf(item)}
-                        >
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Download" disabled={generatingFileId === item.id} onClick={() => downloadLineItemPdf(item)}>
                           <Download className="h-3.5 w-3.5" />
                         </Button>
                         {item.print_file_url && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            title="Open stored file"
-                            onClick={() => window.open(item.print_file_url, "_blank")}
-                          >
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Open stored file" onClick={() => window.open(item.print_file_url, "_blank")}>
                             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
                         )}
@@ -382,7 +471,6 @@ export default function WorkshopOrderDetail() {
 
         {/* Right: Status, Production, Tracking */}
         <div className="space-y-6">
-          {/* Order Status */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Order Status</CardTitle>
@@ -406,7 +494,6 @@ export default function WorkshopOrderDetail() {
             </CardContent>
           </Card>
 
-          {/* Production */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -434,15 +521,12 @@ export default function WorkshopOrderDetail() {
                 <Slider
                   value={[productionProgress]}
                   onValueChange={([v]) => setProductionProgress(v)}
-                  min={0}
-                  max={100}
-                  step={1}
+                  min={0} max={100} step={1}
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Tracking */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -463,19 +547,10 @@ export default function WorkshopOrderDetail() {
               </div>
               <div className="space-y-2">
                 <Label>Tracking Number</Label>
-                <Input
-                  value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value)}
-                  placeholder="Enter tracking number"
-                />
+                <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="Enter tracking number" />
               </div>
               {trackingCarrier && trackingNumber && (
-                <a
-                  href={getTrackingUrl(trackingCarrier, trackingNumber)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                >
+                <a href={getTrackingUrl(trackingCarrier, trackingNumber)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
                   <ExternalLink className="h-3.5 w-3.5" /> Track Shipment
                 </a>
               )}
@@ -483,6 +558,15 @@ export default function WorkshopOrderDetail() {
           </Card>
         </div>
       </div>
+
+      {/* Send to Vendor Dialog */}
+      <SendWorkshopToVendorDialog
+        open={sendToVendorOpen}
+        onOpenChange={setSendToVendorOpen}
+        workshopOrder={order}
+        lineItems={lineItems}
+        onSent={() => fetchOrder()}
+      />
     </div>
   );
 }
