@@ -1397,13 +1397,26 @@ const InvoiceDetail = () => {
 
   // For edit mode, recalculate. Otherwise use stored invoice.total
   const displayItems = editedItems;
+  const isBlanketDisplay = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
+  
+  // For blanket invoices, compute subtotal from shipped quantities when available
   const displaySubtotal = isEditMode 
     ? displayItems.reduce((sum: number, item: any) => {
         const qty = invoice?.invoice_type === 'full' ? Number(item.shipped_quantity || 0) : Number(item.quantity || 0);
         return sum + qty * Number(item.unit_price);
       }, 0) 
-    : Number(invoice?.subtotal || 0);
-  const displayTotal = isEditMode ? displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0) : Number(invoice?.total || 0);
+    : isBlanketDisplay
+      ? (() => {
+          const hasShippedQty = displayItems.some((item: any) => Number(item.shipped_quantity || 0) > 0);
+          if (hasShippedQty) {
+            return displayItems.reduce((sum: number, item: any) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
+          }
+          return Number(invoice?.subtotal || 0);
+        })()
+      : Number(invoice?.subtotal || 0);
+  const displayTotal = isEditMode ? displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0) : (isBlanketDisplay ? displaySubtotal + Number(invoice?.tax || 0) + Number(invoice?.shipping_cost || 0) : Number(invoice?.total || 0));
+  const displayTotalPaid = Number(invoice?.total_paid || 0);
+  const displayBalance = displayTotal - displayTotalPaid;
 
   // Calculate shipped percentage from actual quantities
   const calculateShippedPercentage = () => {
@@ -2284,10 +2297,22 @@ const InvoiceDetail = () => {
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-semibold">{formatCurrency(displaySubtotal)}</span>
                 </div>
+                {Number(invoice?.shipping_cost || 0) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Shipping</span>
+                    <span className="font-semibold">{formatCurrency(invoice.shipping_cost)}</span>
+                  </div>
+                )}
+                {displayTotalPaid > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Less Deposit</span>
+                    <span className="font-semibold text-green-600">({formatCurrency(displayTotalPaid)})</span>
+                  </div>
+                )}
                 <div className="h-px bg-border my-2"></div>
                 <div className="flex justify-between">
-                  <span className="text-lg font-semibold">Total</span>
-                  <span className="text-2xl font-bold">{formatCurrency(displayTotal)}</span>
+                  <span className="text-lg font-semibold">{displayTotalPaid > 0 ? 'Balance Due' : 'Total'}</span>
+                  <span className="text-2xl font-bold">{formatCurrency(displayTotalPaid > 0 ? displayBalance : displayTotal)}</span>
                 </div>
                 {isEditMode && <p className="text-xs text-muted-foreground italic mt-2">
                     Totals will be saved when you click "Save Changes"
