@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Trash2, Eye, EyeOff, ChevronDown, ChevronRight, Lock, Unlock, Layers, MousePointerClick } from "lucide-react";
 import type { Canvas as FabricCanvas, FabricObject } from "fabric";
@@ -111,7 +110,7 @@ export function CanvasObjectsPanel({ canvas, onSync }: CanvasObjectsPanelProps) 
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <ScrollArea className="max-h-[500px] mt-2">
+        <div className="mt-2 max-h-[400px] overflow-y-auto border border-border rounded-md p-1">
           <div className="space-y-1">
             {displayObjects.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-3">No objects on canvas</p>
@@ -161,7 +160,7 @@ export function CanvasObjectsPanel({ canvas, onSync }: CanvasObjectsPanelProps) 
               );
             })}
           </div>
-        </ScrollArea>
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );
