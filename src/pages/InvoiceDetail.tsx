@@ -2513,6 +2513,91 @@ const InvoiceDetail = () => {
         </CardContent>
       </Card>
 
+      {/* Shipments & Invoices Section — blanket invoices only, admin only */}
+      {isVibeAdmin && invoice && invoice.invoice_type === 'full' && invoice.shipment_number === 1 && (
+        <Card className="shadow-lg">
+          <CardContent className="p-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Shipments & Invoices
+                </h2>
+                {relatedInvoices.length > 0 && (() => {
+                  const allInvoices = [invoice, ...relatedInvoices];
+                  const totalBilled = allInvoices.reduce((sum, inv) => sum + Number(inv.total), 0);
+                  const billingProgress = order ? (totalBilled / Number(order.total)) * 100 : 0;
+                  return (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {allInvoices.length} invoice(s) • {formatCurrency(totalBilled)} billed ({billingProgress.toFixed(1)}% of order total)
+                    </p>
+                  );
+                })()}
+              </div>
+              <Button onClick={() => setShowShipmentDialog(true)} size="sm">
+                <Package className="h-4 w-4 mr-2" />
+                Create Shipment Invoice
+              </Button>
+            </div>
+
+            {relatedInvoices.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No shipment invoices created yet. Create your first one to start billing partial shipments.</p>
+            ) : (
+              <div className="space-y-3">
+                {relatedInvoices.map((relInvoice: any, idx: number) => (
+                  <div
+                    key={relInvoice.id}
+                    className="p-4 bg-muted/30 rounded-lg border border-table-border hover:border-primary/40 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/invoices/${relInvoice.id}`)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-sm">
+                            {relInvoice.shipment_number}
+                          </div>
+                          {idx < relatedInvoices.length - 1 && (
+                            <div className="w-0.5 h-8 bg-table-border mt-2"></div>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm font-medium">{relInvoice.invoice_number}</span>
+                            <Badge className={
+                              relInvoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
+                              'bg-purple-500 text-white'
+                            }>
+                              {relInvoice.invoice_type?.toUpperCase() || 'FULL'}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {relInvoice.status.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span>Created: {new Date(relInvoice.created_at).toLocaleDateString()}</span>
+                            {relInvoice.shipping_cost > 0 && (
+                              <span>• Shipping: {formatCurrency(Number(relInvoice.shipping_cost))}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-lg">{formatCurrency(Number(relInvoice.total))}</p>
+                        {order && (
+                          <p className="text-xs text-muted-foreground">
+                            {((Number(relInvoice.total) / Number(order.total)) * 100).toFixed(1)}% of order
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Attached Vendor POs - For Admin View on Full Invoices and Pull & Ship */}
       {isVibeAdmin && (invoice?.invoice_type === 'full' || order?.order_type === 'pull_ship') && vendorPOs.length > 0 && <Card className="shadow-lg">
           <CardContent className="p-8">
@@ -2854,90 +2939,6 @@ const InvoiceDetail = () => {
         />
       )}
 
-      {/* Shipments & Invoices Section — blanket invoices only, admin only */}
-      {isVibeAdmin && invoice && invoice.invoice_type === 'full' && invoice.shipment_number === 1 && (
-        <Card className="shadow-lg">
-          <CardContent className="p-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Shipments & Invoices
-                </h2>
-                {relatedInvoices.length > 0 && (() => {
-                  const allInvoices = [invoice, ...relatedInvoices];
-                  const totalBilled = allInvoices.reduce((sum, inv) => sum + Number(inv.total), 0);
-                  const billingProgress = order ? (totalBilled / Number(order.total)) * 100 : 0;
-                  return (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {allInvoices.length} invoice(s) • {formatCurrency(totalBilled)} billed ({billingProgress.toFixed(1)}% of order total)
-                    </p>
-                  );
-                })()}
-              </div>
-              <Button onClick={() => setShowShipmentDialog(true)} size="sm">
-                <Package className="h-4 w-4 mr-2" />
-                Create Shipment Invoice
-              </Button>
-            </div>
-
-            {relatedInvoices.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No shipment invoices created yet. Create your first one to start billing partial shipments.</p>
-            ) : (
-              <div className="space-y-3">
-                {relatedInvoices.map((relInvoice: any, idx: number) => (
-                  <div
-                    key={relInvoice.id}
-                    className="p-4 bg-muted/30 rounded-lg border border-table-border hover:border-primary/40 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/invoices/${relInvoice.id}`)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-sm">
-                            {relInvoice.shipment_number}
-                          </div>
-                          {idx < relatedInvoices.length - 1 && (
-                            <div className="w-0.5 h-8 bg-table-border mt-2"></div>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-sm font-medium">{relInvoice.invoice_number}</span>
-                            <Badge className={
-                              relInvoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
-                              'bg-purple-500 text-white'
-                            }>
-                              {relInvoice.invoice_type?.toUpperCase() || 'FULL'}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {relInvoice.status.replace('_', ' ')}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                            <span>Created: {new Date(relInvoice.created_at).toLocaleDateString()}</span>
-                            {relInvoice.shipping_cost > 0 && (
-                              <span>• Shipping: {formatCurrency(Number(relInvoice.shipping_cost))}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-lg">{formatCurrency(Number(relInvoice.total))}</p>
-                        {order && (
-                          <p className="text-xs text-muted-foreground">
-                            {((Number(relInvoice.total) / Number(order.total)) * 100).toFixed(1)}% of order
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Related Invoices - For child/partial invoices viewing siblings */}
       {invoice && !(invoice.invoice_type === 'full' && invoice.shipment_number === 1) && relatedInvoices.length > 0 && <Card className="shadow-lg">
