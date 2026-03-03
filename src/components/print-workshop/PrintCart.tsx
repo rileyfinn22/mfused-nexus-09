@@ -30,9 +30,10 @@ interface PrintCartProps {
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemoveItem: (id: string) => void;
   onClearCart: () => void;
+  onCheckout?: () => void;
 }
 
-export function PrintCart({ items, onUpdateQuantity, onRemoveItem, onClearCart }: PrintCartProps) {
+export function PrintCart({ items, onUpdateQuantity, onRemoveItem, onClearCart, onCheckout }: PrintCartProps) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
@@ -294,22 +295,15 @@ export function PrintCart({ items, onUpdateQuantity, onRemoveItem, onClearCart }
                 )}
               </div>
               <Button
-                onClick={handlePlaceOrder}
-                disabled={submitting}
+                onClick={() => {
+                  setOpen(false);
+                  onCheckout?.();
+                }}
                 className="w-full gap-2"
                 size="lg"
               >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Placing Order...
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="h-4 w-4" />
-                    Place Order ({items.length} items)
-                  </>
-                )}
+                <ShoppingCart className="h-4 w-4" />
+                Proceed to Checkout ({items.length} items)
               </Button>
             </div>
           </>
