@@ -81,6 +81,11 @@ const Artwork = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [stateFilter, setStateFilter] = useState("all");
   const [availableStates, setAvailableStates] = useState<string[]>([]);
+  const US_STATES = [
+    'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+    'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+    'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
+  ];
   const [companyFilter, setCompanyFilter] = useState("all");
   const [companies, setCompanies] = useState<any[]>([]);
   const { activeCompanyId, isVibeAdmin: isVibeAdminFromCtx, loading: companyCtxLoading } = useActiveCompany();
@@ -1273,19 +1278,17 @@ const Artwork = () => {
               className="pl-10"
             />
           </div>
-          {availableStates.length > 0 && (
-            <Select value={stateFilter} onValueChange={setStateFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="State" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All States</SelectItem>
-                {availableStates.map((state) => (
-                  <SelectItem key={state} value={state}>{state}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <Select value={stateFilter} onValueChange={setStateFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="State" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All States</SelectItem>
+              {US_STATES.map((state) => (
+                <SelectItem key={state} value={state}>{state}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex items-center border rounded-lg p-1 bg-muted/30">
             <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8" onClick={() => setViewMode("grid")}>
               <LayoutGrid className="h-4 w-4" />
@@ -1509,19 +1512,17 @@ const Artwork = () => {
             </SelectContent>
           </Select>
         )}
-        {availableStates.length > 0 && (
-          <Select value={stateFilter} onValueChange={setStateFilter}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="State" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All States</SelectItem>
-              {availableStates.map((state) => (
-                <SelectItem key={state} value={state}>{state}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <Select value={stateFilter} onValueChange={setStateFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="State" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All States</SelectItem>
+            {US_STATES.map((state) => (
+              <SelectItem key={state} value={state}>{state}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Templates Grid */}
