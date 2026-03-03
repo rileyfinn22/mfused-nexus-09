@@ -741,6 +741,55 @@ serve(async (req) => {
       }
     }
 
+    // 3. Blanket invoice with deposit recorded as a payment (not as a child invoice).
+    //    If the blanket has payments (total_paid > 0) and NO child deposit invoices
+    //    were found above, treat the payment as a deposit that should be deducted
+    //    from the QBO invoice so the customer only sees the remaining balance.
+    if (!invoice.parent_invoice_id && billingPercentage === 100) {
+      const depositAlreadyDeducted = lineItems.some(
+        (li: any) => li.Amount < 0 && li.Description?.includes('Deposit')
+      );
+
+      if (!depositAlreadyDeducted) {
+        // Query actual payments on this invoice
+        const { data: invoicePayments } = await supabase
+          .from('payments')
+          .select('id, amount, payment_method, reference_number, payment_date')
+          .eq('invoice_id', invoice.id);
+
+        const totalPaidOnInvoice = (invoicePayments || []).reduce(
+          (sum: number, p: any) => sum + Number(p.amount || 0), 0
+        );
+
+        if (totalPaidOnInvoice > 0) {
+          console.log(`Blanket invoice has $${totalPaidOnInvoice} in deposit payments recorded directly — deducting from QBO invoice`);
+
+          const depositItemId = await findOrCreateQBItem(
+            'Deposit Applied',
+            'Previously received deposit payment',
+            totalPaidOnInvoice
+          );
+
+          lineItems.push({
+            DetailType: 'SalesItemLineDetail',
+            Amount: -totalPaidOnInvoice,
+            Description: `Less: Deposit Received`,
+            SalesItemLineDetail: {
+              ItemRef: {
+                value: depositItemId,
+                name: 'Deposit Applied',
+              },
+              Qty: 1,
+              UnitPrice: -totalPaidOnInvoice,
+            },
+          });
+
+          calculatedSubtotal -= totalPaidOnInvoice;
+          console.log(`Adjusted subtotal after deposit payment deduction: ${calculatedSubtotal}`);
+        }
+      }
+    }
+
     if (invoice.shipping_cost > 0) {
       const shippingAmount = Number(invoice.shipping_cost);
       calculatedSubtotal += shippingAmount;

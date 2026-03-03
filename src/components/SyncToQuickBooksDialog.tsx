@@ -143,14 +143,20 @@ export function SyncToQuickBooksDialog({
   // Deposit from children (when viewing the blanket invoice)
   const hasChildDeposits = depositChildInvoices.length > 0;
   
+  // 3. Deposit recorded as a payment directly on this blanket invoice
+  const isBlanket = !invoice?.parent_invoice_id;
+  const hasDirectDepositPayment = isBlanket && !hasChildDeposits && thisInvoicePaid > 0;
+
   // Total deposit amount
   const depositAmount = hasParentDeposit 
     ? Number(parentInvoice.total || 0)
     : hasChildDeposits 
       ? depositChildInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0)
-      : 0;
+      : hasDirectDepositPayment
+        ? thisInvoicePaid
+        : 0;
   
-  const hasDeposit = hasParentDeposit || hasChildDeposits;
+  const hasDeposit = hasParentDeposit || hasChildDeposits || hasDirectDepositPayment;
   
   const depositPaid = hasParentDeposit 
     ? payments.filter(p => p.invoice_id === parentInvoice.id).reduce((sum, p) => sum + Number(p.amount || 0), 0)
@@ -162,7 +168,9 @@ export function SyncToQuickBooksDialog({
     ? `${parentInvoice.billed_percentage}% Deposit (${parentInvoice.invoice_number})`
     : hasChildDeposits
       ? depositChildInvoices.map(d => `${d.billed_percentage}% Deposit (${d.invoice_number})`).join(', ')
-      : '';
+      : hasDirectDepositPayment
+        ? 'Deposit Payment Received'
+        : '';
 
   // Check if this is a re-sync
   const isResync = !!invoice?.quickbooks_id;
