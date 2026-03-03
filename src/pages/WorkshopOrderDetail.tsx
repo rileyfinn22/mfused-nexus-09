@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { CARRIERS, getTrackingUrl } from "@/lib/trackingUtils";
+import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending" },
@@ -55,6 +56,7 @@ export default function WorkshopOrderDetail() {
   const [lineItems, setLineItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generatingFileId, setGeneratingFileId] = useState<string | null>(null);
 
   // Editable fields
   const [status, setStatus] = useState("pending");
@@ -116,6 +118,70 @@ export default function WorkshopOrderDetail() {
     if (error) toast.error("Failed to save");
     else toast.success("Order updated");
     setSaving(false);
+  };
+
+  const buildLineItemPdf = async (item: any) => {
+    if (!item.print_template_id) throw new Error("Template reference missing on line item");
+
+    const { data: template, error } = await supabase
+      .from("print_templates")
+      .select("width_inches, height_inches, bleed_inches, source_pdf_path")
+      .eq("id", item.print_template_id)
+      .single();
+
+    if (error || !template) {
+      throw new Error("Could not load template dimensions for this line item");
+    }
+
+    if (template.source_pdf_path) {
+      return generatePrintReadyPdf({
+        sourcePdfPath: template.source_pdf_path,
+        canvasData: item.canvas_data,
+        widthInches: Number(template.width_inches),
+        heightInches: Number(template.height_inches),
+        bleedInches: Number(template.bleed_inches),
+      });
+    }
+
+    return generateCanvasOnlyPdf({
+      canvasData: item.canvas_data,
+      widthInches: Number(template.width_inches),
+      heightInches: Number(template.height_inches),
+      bleedInches: Number(template.bleed_inches),
+    });
+  };
+
+  const previewLineItemPdf = async (item: any) => {
+    setGeneratingFileId(item.id);
+    try {
+      const blob = await buildLineItemPdf(item);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 20000);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to preview PDF");
+    } finally {
+      setGeneratingFileId(null);
+    }
+  };
+
+  const downloadLineItemPdf = async (item: any) => {
+    setGeneratingFileId(item.id);
+    try {
+      const blob = await buildLineItemPdf(item);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(item.template_name || "print_file").replace(/\s+/g, "_")}_print_ready.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to download PDF");
+    } finally {
+      setGeneratingFileId(null);
+    }
   };
 
   const formatLabel = (s: string) =>
@@ -220,11 +286,11 @@ export default function WorkshopOrderDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {lineItems.filter((i: any) => i.print_file_url).length === 0 ? (
-                <p className="text-sm text-muted-foreground">No print files attached</p>
+              {lineItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No line items found</p>
               ) : (
                 <div className="space-y-2">
-                  {lineItems.filter((i: any) => i.print_file_url).map((item: any) => (
+                  {lineItems.map((item: any) => (
                     <div
                       key={item.id}
                       className="flex items-center gap-3 border border-border rounded-lg px-3 py-2.5"
@@ -232,7 +298,7 @@ export default function WorkshopOrderDetail() {
                       <FileText className="h-4 w-4 text-primary shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{item.template_name}</p>
-                        <p className="text-xs text-muted-foreground">Print-Ready PDF</p>
+                        <p className="text-xs text-muted-foreground">Edited print-ready file</p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <Button
@@ -240,34 +306,32 @@ export default function WorkshopOrderDetail() {
                           size="sm"
                           className="h-7 w-7 p-0"
                           title="Preview"
-                          onClick={() => window.open(item.print_file_url, "_blank")}
+                          disabled={generatingFileId === item.id}
+                          onClick={() => previewLineItemPdf(item)}
                         >
-                          <Eye className="h-3.5 w-3.5" />
+                          {generatingFileId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-7 w-7 p-0"
                           title="Download"
-                          onClick={async () => {
-                            try {
-                              const resp = await fetch(item.print_file_url);
-                              const blob = await resp.blob();
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement("a");
-                              a.href = url;
-                              a.download = `${item.template_name.replace(/\s+/g, "_")}_print_ready.pdf`;
-                              document.body.appendChild(a);
-                              a.click();
-                              document.body.removeChild(a);
-                              URL.revokeObjectURL(url);
-                            } catch {
-                              toast.error("Failed to download file");
-                            }
-                          }}
+                          disabled={generatingFileId === item.id}
+                          onClick={() => downloadLineItemPdf(item)}
                         >
                           <Download className="h-3.5 w-3.5" />
                         </Button>
+                        {item.print_file_url && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            title="Open stored file"
+                            onClick={() => window.open(item.print_file_url, "_blank")}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
