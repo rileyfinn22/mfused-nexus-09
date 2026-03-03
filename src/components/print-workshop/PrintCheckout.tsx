@@ -28,6 +28,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
+import { generatePdfThumbnailFromArrayBuffer } from "@/lib/pdfThumbnail";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import type { CartItem } from "./PrintCart";
 
@@ -240,9 +241,10 @@ export function PrintCheckout({
           console.warn("Could not generate print file for", item.templateName, e);
         }
 
-        // Upload thumbnail snapshot to storage
+        // Generate thumbnail from the print-ready PDF blob
         let storedThumbnailUrl: string | null = null;
         if (item.thumbnailUrl && item.thumbnailUrl.startsWith("data:")) {
+          // Use existing data URL thumbnail if available
           try {
             const res = await fetch(item.thumbnailUrl);
             const thumbBlob = await res.blob();
@@ -257,7 +259,27 @@ export function PrintCheckout({
               storedThumbnailUrl = thumbUrl.publicUrl;
             }
           } catch (e) {
-            console.warn("Could not upload thumbnail for", item.templateName, e);
+            console.warn("Could not upload data URL thumbnail for", item.templateName, e);
+          }
+        }
+        // Fallback: generate thumbnail from the print-ready PDF
+        if (!storedThumbnailUrl && printFileUrl) {
+          try {
+            const pdfRes = await fetch(printFileUrl);
+            const pdfBuf = await pdfRes.arrayBuffer();
+            const thumbBlob = await generatePdfThumbnailFromArrayBuffer(pdfBuf, { maxWidth: 400 });
+            const thumbPath = `orders/${workshopOrderId}/${crypto.randomUUID()}/thumbnail.png`;
+            const { error: thumbErr } = await supabase.storage
+              .from("print-files")
+              .upload(thumbPath, thumbBlob, { contentType: "image/png" });
+            if (!thumbErr) {
+              const { data: thumbUrl } = supabase.storage
+                .from("print-files")
+                .getPublicUrl(thumbPath);
+              storedThumbnailUrl = thumbUrl.publicUrl;
+            }
+          } catch (e) {
+            console.warn("Could not generate PDF thumbnail for", item.templateName, e);
           }
         }
 
