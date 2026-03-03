@@ -1087,18 +1087,42 @@ export default function Chat() {
                             <button
                               key={a.id}
                               onClick={async () => {
-                                // If file_url is a full URL (legacy), open directly
-                                if (a.file_url.startsWith('http')) {
-                                  window.open(a.file_url, '_blank');
+                                let storagePath = a.file_url;
+
+                                if (a.file_url.startsWith("http")) {
+                                  try {
+                                    const parsedUrl = new URL(a.file_url);
+                                    const publicPrefix = "/storage/v1/object/public/chat-files/";
+                                    const signPrefix = "/storage/v1/object/sign/chat-files/";
+
+                                    const extractedPath = parsedUrl.pathname.includes(publicPrefix)
+                                      ? parsedUrl.pathname.split(publicPrefix)[1]
+                                      : parsedUrl.pathname.includes(signPrefix)
+                                        ? parsedUrl.pathname.split(signPrefix)[1]
+                                        : null;
+
+                                    if (!extractedPath) {
+                                      window.open(a.file_url, "_blank");
+                                      return;
+                                    }
+
+                                    storagePath = decodeURIComponent(extractedPath);
+                                  } catch {
+                                    window.open(a.file_url, "_blank");
+                                    return;
+                                  }
+                                }
+
+                                const { data, error } = await supabase.storage
+                                  .from("chat-files")
+                                  .createSignedUrl(storagePath, 3600);
+
+                                if (error || !data?.signedUrl) {
+                                  toast({ title: "Could not open attachment", variant: "destructive" });
                                   return;
                                 }
-                                // Otherwise generate a signed URL from the storage path
-                                const { data } = await supabase.storage
-                                  .from("chat-files")
-                                  .createSignedUrl(a.file_url, 3600);
-                                if (data?.signedUrl) {
-                                  window.open(data.signedUrl, '_blank');
-                                }
+
+                                window.open(data.signedUrl, "_blank");
                               }}
                               className="flex items-center gap-1.5 px-2 py-1 rounded border border-border bg-muted/50 text-xs hover:bg-muted transition-colors cursor-pointer"
                             >
