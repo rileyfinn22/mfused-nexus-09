@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Dialog, 
   DialogContent, 
@@ -21,7 +22,8 @@ import {
   Eye,
   FileCheck,
   Loader2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Package
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,8 +66,12 @@ export const InvoicePackingListSection = ({
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [processingExcel, setProcessingExcel] = useState(false);
+  const [applyShippedQty, setApplyShippedQty] = useState(true);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showExcelUploadDialog, setShowExcelUploadDialog] = useState(false);
+  const [showManualShippedDialog, setShowManualShippedDialog] = useState(false);
+  const [manualShippedItems, setManualShippedItems] = useState<any[]>([]);
+  const [savingManualShipped, setSavingManualShipped] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedExcelFile, setSelectedExcelFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
@@ -631,6 +637,11 @@ export const InvoicePackingListSection = ({
         description: successMsg
       });
 
+      // After creating packing list, optionally update shipped quantities
+      if (applyShippedQty && matchedItems.length > 0) {
+        await applyShippedQuantities(matchedItems);
+      }
+
       setShowExcelUploadDialog(false);
       fetchPackingLists();
     } catch (error: any) {
@@ -642,6 +653,127 @@ export const InvoicePackingListSection = ({
       });
     } finally {
       setProcessingExcel(false);
+    }
+  };
+
+  const applyShippedQuantities = async (matchedItems: any[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      for (const match of matchedItems) {
+        const shippedQty = match.shipped_quantity || 0;
+        if (shippedQty <= 0) continue;
+
+        // Update order_item shipped_quantity
+        const { data: currentItem } = await supabase
+          .from('order_items')
+          .select('shipped_quantity')
+          .eq('id', match.order_item_id)
+          .single();
+
+        if (currentItem) {
+          await supabase
+            .from('order_items')
+            .update({ shipped_quantity: shippedQty })
+            .eq('id', match.order_item_id);
+        }
+
+        // Upsert inventory allocation for this invoice
+        const { data: existingAlloc } = await supabase
+          .from('inventory_allocations')
+          .select('id')
+          .eq('invoice_id', invoiceId)
+          .eq('order_item_id', match.order_item_id)
+          .single();
+
+        if (existingAlloc) {
+          await supabase
+            .from('inventory_allocations')
+            .update({ quantity_allocated: shippedQty })
+            .eq('id', existingAlloc.id);
+        } else {
+          await supabase
+            .from('inventory_allocations')
+            .insert({
+              invoice_id: invoiceId,
+              order_item_id: match.order_item_id,
+              quantity_allocated: shippedQty,
+              allocated_by: user?.id,
+              status: 'allocated'
+            });
+        }
+      }
+
+      // Recalculate invoice subtotal based on shipped quantities
+      const orderItems = order?.order_items || editedItems;
+      let newSubtotal = 0;
+      for (const match of matchedItems) {
+        const orderItem = orderItems.find((oi: any) => oi.id === match.order_item_id);
+        if (orderItem) {
+          newSubtotal += (match.shipped_quantity || 0) * Number(orderItem.unit_price || 0);
+        }
+      }
+
+      if (newSubtotal > 0) {
+        const shippingCost = Number(invoice.shipping_cost || 0);
+        const newTotal = newSubtotal + Number(invoice.tax || 0) + shippingCost;
+        
+        await supabase
+          .from('invoices')
+          .update({ subtotal: newSubtotal, total: newTotal })
+          .eq('id', invoiceId);
+      }
+
+      toast({
+        title: "Shipped Quantities Updated",
+        description: `Updated ${matchedItems.length} item(s) with shipped quantities from packing list`
+      });
+
+      onRefresh();
+    } catch (error: any) {
+      console.error('Error applying shipped quantities:', error);
+      toast({
+        title: "Warning",
+        description: "Packing list created but failed to update shipped quantities: " + (error.message || ''),
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleOpenManualShipped = () => {
+    const items = (order?.order_items || editedItems).map((item: any) => ({
+      id: item.id,
+      sku: item.sku,
+      name: item.name,
+      quantity: item.quantity,
+      shipped_quantity: item.shipped_quantity || 0,
+      unit_price: item.unit_price
+    }));
+    setManualShippedItems(items);
+    setShowManualShippedDialog(true);
+  };
+
+  const handleSaveManualShipped = async () => {
+    setSavingManualShipped(true);
+    try {
+      const matchedItems = manualShippedItems
+        .filter(item => item.shipped_quantity > 0)
+        .map(item => ({
+          order_item_id: item.id,
+          shipped_quantity: item.shipped_quantity
+        }));
+
+      if (matchedItems.length === 0) {
+        toast({ title: "No quantities", description: "Please enter at least one shipped quantity", variant: "destructive" });
+        return;
+      }
+
+      await applyShippedQuantities(matchedItems);
+      setShowManualShippedDialog(false);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to save", variant: "destructive" });
+    } finally {
+      setSavingManualShipped(false);
     }
   };
 
@@ -954,14 +1086,22 @@ export const InvoicePackingListSection = ({
       <CardContent className="p-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-lg font-semibold">Packing Lists</h2>
+            <h2 className="text-lg font-semibold">Packing Lists & Shipped Quantities</h2>
             <p className="text-sm text-muted-foreground">
-              Manage packing lists for this shipment
+              Manage packing lists and update shipped quantities
             </p>
           </div>
           
           {isVibeAdmin && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleOpenManualShipped}
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Input Shipped Qty
+              </Button>
               <Button 
                 variant="outline" 
                 size="sm"
@@ -1181,6 +1321,17 @@ export const InvoicePackingListSection = ({
                 <li>A branded VibePKG PDF is generated for your customer</li>
               </ul>
             </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="applyShippedQty"
+                checked={applyShippedQty}
+                onCheckedChange={(checked) => setApplyShippedQty(!!checked)}
+              />
+              <Label htmlFor="applyShippedQty" className="text-sm font-medium cursor-pointer">
+                Also update shipped quantities on the invoice from matched items
+              </Label>
+            </div>
           </div>
           
           <DialogFooter>
@@ -1200,6 +1351,83 @@ export const InvoicePackingListSection = ({
                 <>
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   Create Packing List
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Shipped Quantity Dialog */}
+      <Dialog open={showManualShippedDialog} onOpenChange={setShowManualShippedDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Update Shipped Quantities</DialogTitle>
+            <DialogDescription>
+              Enter the shipped quantity for each item on this invoice. This will update inventory allocations and invoice totals.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-1">
+            <div className="grid grid-cols-[1fr_2fr_80px_80px] gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider pb-2 border-b">
+              <span>SKU</span>
+              <span>Product</span>
+              <span className="text-center">Ordered</span>
+              <span className="text-center">Shipped</span>
+            </div>
+            {manualShippedItems.map((item, idx) => (
+              <div key={item.id} className="grid grid-cols-[1fr_2fr_80px_80px] gap-2 items-center py-2 border-b border-border/50">
+                <span className="font-mono text-xs truncate">{item.sku}</span>
+                <span className="text-sm truncate">{item.name}</span>
+                <span className="text-center text-sm text-muted-foreground">{item.quantity}</span>
+                <Input
+                  type="number"
+                  min="0"
+                  max={item.quantity}
+                  value={item.shipped_quantity}
+                  onChange={(e) => {
+                    const newItems = [...manualShippedItems];
+                    newItems[idx] = { ...newItems[idx], shipped_quantity: parseInt(e.target.value) || 0 };
+                    setManualShippedItems(newItems);
+                  }}
+                  className="h-8 text-center"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between text-sm pt-2">
+            <span className="text-muted-foreground">
+              Total shipped: {manualShippedItems.reduce((sum, i) => sum + (i.shipped_quantity || 0), 0)} / {manualShippedItems.reduce((sum, i) => sum + i.quantity, 0)}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setManualShippedItems(items => items.map(i => ({ ...i, shipped_quantity: i.quantity })));
+              }}
+            >
+              Ship All
+            </Button>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowManualShippedDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveManualShipped} 
+              disabled={savingManualShipped}
+            >
+              {savingManualShipped ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Package className="h-4 w-4 mr-2" />
+                  Save Shipped Quantities
                 </>
               )}
             </Button>
