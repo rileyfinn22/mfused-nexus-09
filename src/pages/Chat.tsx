@@ -140,18 +140,37 @@ export default function Chat() {
         setShowMobileSidebar(false);
       }
 
-      // Ensure current user has membership rows for all channels (so last_seen_at works)
+      // Ensure current user has membership rows for all non-DM channels (so last_seen_at works)
       if (currentUserId && data.length > 0) {
+        const nonDmChannels = data.filter(ch => !ch.is_dm);
         const { data: existing } = await supabase
           .from("chat_channel_members")
           .select("channel_id")
           .eq("user_id", currentUserId);
         const existingIds = new Set(existing?.map(e => e.channel_id) || []);
-        const missing = data.filter(ch => !existingIds.has(ch.id));
+        const missing = nonDmChannels.filter(ch => !existingIds.has(ch.id));
         if (missing.length > 0) {
           await supabase.from("chat_channel_members").insert(
             missing.map(ch => ({ channel_id: ch.id, user_id: currentUserId }))
           );
+        }
+
+        // Also ensure all chat profile users are members of non-DM channels
+        const { data: profiles } = await supabase.from("chat_profiles").select("user_id");
+        if (profiles && nonDmChannels.length > 0) {
+          for (const ch of nonDmChannels) {
+            const { data: members } = await supabase
+              .from("chat_channel_members")
+              .select("user_id")
+              .eq("channel_id", ch.id);
+            const memberIds = new Set(members?.map(m => m.user_id) || []);
+            const missingUsers = profiles.filter(p => !memberIds.has(p.user_id));
+            if (missingUsers.length > 0) {
+              await supabase.from("chat_channel_members").insert(
+                missingUsers.map(p => ({ channel_id: ch.id, user_id: p.user_id }))
+              );
+            }
+          }
         }
       }
     }
@@ -241,24 +260,26 @@ export default function Chat() {
   }, [activeChannel?.id]);
 
   // Load member seen status for active channel & subscribe to realtime updates
+  const loadMemberSeen = useCallback(async () => {
+    if (!activeChannel || !currentUserId) return;
+    const { data } = await supabase
+      .from('chat_channel_members')
+      .select('user_id, last_seen_at')
+      .eq('channel_id', activeChannel.id);
+    if (data) {
+      const map: Record<string, string> = {};
+      data.forEach(m => {
+        if (m.user_id !== currentUserId && m.last_seen_at) {
+          map[m.user_id] = m.last_seen_at;
+        }
+      });
+      setMemberSeenMap(map);
+    }
+  }, [activeChannel?.id, currentUserId]);
+
+  // Load member seen status for active channel & subscribe to realtime updates
   useEffect(() => {
     if (!activeChannel || !currentUserId) return;
-
-    const loadMemberSeen = async () => {
-      const { data } = await supabase
-        .from('chat_channel_members')
-        .select('user_id, last_seen_at')
-        .eq('channel_id', activeChannel.id);
-      if (data) {
-        const map: Record<string, string> = {};
-        data.forEach(m => {
-          if (m.user_id !== currentUserId && m.last_seen_at) {
-            map[m.user_id] = m.last_seen_at;
-          }
-        });
-        setMemberSeenMap(map);
-      }
-    };
 
     loadMemberSeen();
 
@@ -278,7 +299,7 @@ export default function Chat() {
       .subscribe();
 
     return () => { supabase.removeChannel(seenChannel); };
-  }, [activeChannel?.id, currentUserId]);
+  }, [activeChannel?.id, currentUserId, loadMemberSeen]);
 
   // Load messages for active channel
   useEffect(() => {
@@ -390,6 +411,7 @@ export default function Chat() {
         },
         () => {
           loadMessages();
+          loadMemberSeen();
           if (threadParent) loadThread(threadParent.id);
         }
       )
@@ -1133,7 +1155,14 @@ export default function Chat() {
                                   return;
                                 }
 
-                                window.open(data.signedUrl, "_blank");
+                                // Use anchor click to avoid popup blockers
+                                const link = document.createElement("a");
+                                link.href = data.signedUrl;
+                                link.target = "_blank";
+                                link.rel = "noopener noreferrer";
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
                               }}
                               className="flex items-center gap-1.5 px-2 py-1 rounded border border-border bg-muted/50 text-xs hover:bg-muted transition-colors cursor-pointer"
                             >
