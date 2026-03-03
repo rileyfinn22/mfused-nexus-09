@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Canvas as FabricCanvas } from "fabric";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,23 @@ export default function PrintWorkshop() {
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [canvasData, setCanvasData] = useState<any>(null);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartItems, setCartItemsRaw] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem("print_cart");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Persist cart to localStorage on every change
+  const setCartItems = useCallback((updater: CartItem[] | ((prev: CartItem[]) => CartItem[])) => {
+    setCartItemsRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      localStorage.setItem("print_cart", JSON.stringify(next));
+      return next;
+    });
+  }, []);
   const useFabricCanvasRef = useRef<FabricCanvas | null>(null);
   
   const [savedDesign, setSavedDesign] = useState<{ thumbnailUrl: string | null; templateName: string; savedAt: Date } | null>(null);
