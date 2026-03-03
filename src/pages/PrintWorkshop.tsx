@@ -13,7 +13,7 @@ import { SavedDesignIndicator } from "@/components/print-workshop/SavedDesignInd
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkshopOrders } from "@/components/print-workshop/WorkshopOrders";
-import { Plus, Printer, ArrowLeft, Pencil, Trash2, Copy, Package, ShoppingBag } from "lucide-react";
+import { Plus, Printer, ArrowLeft, Pencil, Trash2, Copy, Package, ShoppingBag, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
 import { generatePdfThumbnailFromArrayBuffer } from "@/lib/pdfThumbnail";
@@ -342,12 +342,22 @@ export default function PrintWorkshop() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {templates.map((tmpl) => (
+                {templates.map((tmpl) => {
+                  const inCart = cartItems.some((c) => c.templateId === tmpl.id);
+                  return (
                   <Card
                     key={tmpl.id}
-                    className="group cursor-pointer hover:border-primary/50 hover:shadow-md transition-all"
+                    className="group cursor-pointer hover:border-primary/50 hover:shadow-md transition-all relative"
                     onClick={() => handleSelectTemplate(tmpl)}
                   >
+                    {inCart && (
+                      <div className="absolute top-2 right-2 z-10">
+                        <Badge className="text-[10px] px-1.5 py-0.5 bg-primary text-primary-foreground gap-1">
+                          <ShoppingCart className="h-2.5 w-2.5" />
+                          In Cart
+                        </Badge>
+                      </div>
+                    )}
                     <CardContent className="p-0">
                       {/* Thumbnail */}
                       <div className="aspect-[4/3] bg-muted/30 rounded-t-lg flex items-center justify-center overflow-hidden border-b border-border">
@@ -397,7 +407,8 @@ export default function PrintWorkshop() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </TabsContent>
