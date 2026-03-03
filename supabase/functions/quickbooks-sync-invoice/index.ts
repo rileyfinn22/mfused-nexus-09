@@ -144,25 +144,20 @@ serve(async (req) => {
     console.log('Invoice stored billed_percentage:', invoice.billed_percentage);
     console.log('Inventory allocations found:', allocations?.length || 0);
 
-    // Determine the effective billing percentage:
-    // 1. Calculate from actual invoice/order totals (most accurate)
-    // 2. Fall back to stored billed_percentage if calculation isn't possible
-    // 3. Use requested percentage for new syncs
-    // 4. Default to 100 if nothing else
+    // Determine effective billing percentage (explicit request wins)
     const orderTotal = Number(invoice.orders?.total || 0);
     const invoiceTotal = Number(invoice.total || 0);
-    
+
     let billingPercentage = 100;
-    if (orderTotal > 0 && invoiceTotal > 0 && invoiceTotal < orderTotal) {
-      // Calculate actual percentage from totals
+    if (typeof requestedPercentage === 'number' && requestedPercentage > 0 && requestedPercentage <= 100) {
+      billingPercentage = requestedPercentage;
+      console.log('Using requested billing percentage:', billingPercentage);
+    } else if (orderTotal > 0 && invoiceTotal > 0 && invoiceTotal < orderTotal) {
       billingPercentage = Math.round((invoiceTotal / orderTotal) * 100);
       console.log(`Calculated billing percentage from totals: ${invoiceTotal}/${orderTotal} = ${billingPercentage}%`);
     } else if (invoice.billed_percentage && invoice.billed_percentage < 100) {
       billingPercentage = invoice.billed_percentage;
       console.log('Using stored billed_percentage:', billingPercentage);
-    } else if (requestedPercentage && requestedPercentage < 100) {
-      billingPercentage = requestedPercentage;
-      console.log('Using requested billing percentage:', billingPercentage);
     }
     console.log('Effective billing percentage:', billingPercentage);
 
@@ -777,8 +772,10 @@ serve(async (req) => {
     if (billingPercentage < 100) {
       console.log(`Deposit billing at ${billingPercentage}% - creating single deposit line item`);
       
-      const depositAmount = Number(invoice.total);
-      const orderNumber = invoice.orders?.order_number || invoice.invoice_number;
+      // For direct-on-parent deposit flows, calculate from order total when invoice is full-value.
+      const depositAmount = orderTotal > 0 && invoiceTotal >= orderTotal
+        ? Number(((orderTotal * billingPercentage) / 100).toFixed(2))
+        : Number(invoice.total);
       
       // Build description listing all items in the deposit
       const itemDescriptions = (invoice.orders?.order_items || [])

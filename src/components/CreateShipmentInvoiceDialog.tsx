@@ -162,6 +162,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       .from('invoices')
       .select('*')
       .eq('order_id', order.id)
+      .is('deleted_at', null)
       .order('shipment_number');
     
     setExistingInvoices(data || []);
@@ -284,7 +285,50 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         }
       }
 
-      // Calculate next shipment number (blanket is always 1, so child invoices start at 2)
+      // Deposit is billed directly on the blanket invoice (no child deposit invoice)
+      if (invoiceMode === 'deposit') {
+        const depositPct = parseFloat(depositPercentage);
+        const depositAmount = Number(blanketInvoice.total) * (depositPct / 100);
+
+        const { error: blanketUpdateError } = await supabase
+          .from('invoices')
+          .update({
+            billed_percentage: depositPct,
+            notes: invoiceDescription.trim() || `${depositPercentage}% deposit configured on main invoice`,
+            quickbooks_sync_status: 'pending',
+            status: 'open'
+          })
+          .eq('id', blanketInvoice.id);
+
+        if (blanketUpdateError) throw blanketUpdateError;
+
+        // Cleanup legacy child deposit invoices for this blanket (if any)
+        const { error: cleanupError } = await supabase
+          .from('invoices')
+          .update({
+            deleted_at: new Date().toISOString(),
+            status: 'void'
+          })
+          .eq('parent_invoice_id', blanketInvoice.id)
+          .is('deleted_at', null)
+          .lt('billed_percentage', 100)
+          .ilike('notes', '%deposit%');
+
+        if (cleanupError) {
+          console.warn('Unable to cleanup legacy deposit child invoices:', cleanupError);
+        }
+
+        toast({
+          title: "Deposit Set on Main Invoice",
+          description: `Invoice ${blanketInvoice.invoice_number} set to ${depositPercentage}% deposit (${depositAmount.toFixed(2)})`
+        });
+
+        onSuccess();
+        onOpenChange(false);
+        return;
+      }
+
+      // Shipment invoices remain child invoices
       const childInvoices = existingInvoices.filter(inv => inv.shipment_number > 1);
       const nextShipmentNumber = childInvoices.length > 0 
         ? Math.max(...childInvoices.map(inv => inv.shipment_number)) + 1 
@@ -295,91 +339,79 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       let invoiceType = 'partial';
       let billedPercentage = 0;
 
-      if (invoiceMode === 'deposit') {
-        // Deposit invoice - calculate % of blanket invoice total
-        const depositPct = parseFloat(depositPercentage) / 100;
-        console.log('Deposit calculation:', {
-          depositPercentage,
-          depositPct,
-          blanketTotal: blanketInvoice.total,
-          blanketTotalNumber: Number(blanketInvoice.total)
-        });
-        subtotal = Number(blanketInvoice.total) * depositPct;
-        console.log('Calculated deposit subtotal:', subtotal);
-        billedPercentage = parseFloat(depositPercentage);
-        invoiceType = 'partial'; // Use 'partial' type for deposits (identified by billed_percentage)
-        // Don't allocate any items for deposit invoice
-      } else {
-        // Shipment invoice - based on quantities
-        itemsToShip = order.order_items.filter((item: any) => shipmentQuantities[item.id] > 0);
-        
-        // Calculate how much has already been billed (deposits and previous shipments, excluding blanket)
-        const totalAlreadyBilled = existingInvoices
-          .filter(inv => inv.invoice_type !== 'full') // Exclude blanket invoice
-          .reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
-        
-        const blanketTotal = Number(blanketInvoice.total);
-        const remainingBlanketAmount = Math.max(0, blanketTotal - totalAlreadyBilled);
-        
-        console.log('Blanket total:', blanketTotal);
-        console.log('Total already billed (deposits + shipments):', totalAlreadyBilled);
-        console.log('Remaining blanket amount:', remainingBlanketAmount);
-        
-        // Calculate billing for this shipment with proper handling of overs
-        let baseSubtotal = 0; // Amount within original order (subject to blanket cap)
-        let oversSubtotal = 0; // Amount for overs (always billed in full)
-        
-        itemsToShip.forEach((item: any) => {
-          const shipQty = shipmentQuantities[item.id];
-          const originalOrderQty = item.quantity;
-          const previouslyShipped = item.shipped_quantity || 0;
-          const totalWillBeShipped = previouslyShipped + shipQty;
-          
-          // Determine overs: quantities beyond original order
-          const oversQty = Math.max(0, totalWillBeShipped - originalOrderQty);
-          // Base quantities: within original order limits
-          const baseQty = shipQty - oversQty;
-          
-          console.log(`Item ${item.sku}: shipQty=${shipQty}, originalQty=${originalOrderQty}, previousShipped=${previouslyShipped}, baseQty=${baseQty}, oversQty=${oversQty}`);
-          
-          // Overs are always billed in full
-          oversSubtotal += oversQty * item.unit_price;
-          // Base quantities are subject to blanket cap
-          baseSubtotal += baseQty * item.unit_price;
-        });
-        
-        console.log('Base subtotal (subject to cap):', baseSubtotal);
-        console.log('Overs subtotal (always full):', oversSubtotal);
-        
-        // Apply blanket cap only to base quantities
-        let billedBaseSubtotal = baseSubtotal;
-        if (baseSubtotal > remainingBlanketAmount) {
-          console.log(`Capping base subtotal from ${baseSubtotal} to ${remainingBlanketAmount}`);
-          billedBaseSubtotal = remainingBlanketAmount;
-        }
-        
-        // Total = capped base + full overs
-        subtotal = billedBaseSubtotal + oversSubtotal;
-        console.log('Final shipment subtotal (base + overs):', subtotal);
+      // Shipment invoice - based on quantities
+      itemsToShip = order.order_items.filter((item: any) => shipmentQuantities[item.id] > 0);
+      
+      // Calculate how much has already been billed:
+      // 1) Child invoice totals (shipments)
+      // 2) Deposit billed directly on blanket invoice (if <100%)
+      const totalAlreadyBilledFromChildren = existingInvoices
+        .filter(inv => inv.invoice_type !== 'full') // Exclude blanket invoice
+        .reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
 
+      const blanketTotal = Number(blanketInvoice.total);
+      const blanketDepositAmount = Number(blanketInvoice.billed_percentage || 100) < 100
+        ? blanketTotal * (Number(blanketInvoice.billed_percentage) / 100)
+        : 0;
 
-        // Calculate percentage for shipment based on dollar amount billed vs full value
-        const fullShipmentValue = itemsToShip.reduce((sum: number, item: any) => 
-          sum + (shipmentQuantities[item.id] * item.unit_price), 0
-        );
-        billedPercentage = fullShipmentValue > 0 ? (subtotal / fullShipmentValue) * 100 : 100;
-        console.log('Billed percentage:', billedPercentage, '% (subtotal:', subtotal, '/ full value:', fullShipmentValue, ')');
+      const totalAlreadyBilled = totalAlreadyBilledFromChildren + blanketDepositAmount;
+      const remainingBlanketAmount = Math.max(0, blanketTotal - totalAlreadyBilled);
+      
+      console.log('Blanket total:', blanketTotal);
+      console.log('Total already billed (children + blanket deposit):', totalAlreadyBilled);
+      console.log('Remaining blanket amount:', remainingBlanketAmount);
+      
+      // Calculate billing for this shipment with proper handling of overs
+      let baseSubtotal = 0; // Amount within original order (subject to blanket cap)
+      let oversSubtotal = 0; // Amount for overs (always billed in full)
+      
+      itemsToShip.forEach((item: any) => {
+        const shipQty = shipmentQuantities[item.id];
+        const originalOrderQty = item.quantity;
+        const previouslyShipped = item.shipped_quantity || 0;
+        const totalWillBeShipped = previouslyShipped + shipQty;
         
-        invoiceType = 'partial';
+        // Determine overs: quantities beyond original order
+        const oversQty = Math.max(0, totalWillBeShipped - originalOrderQty);
+        // Base quantities: within original order limits
+        const baseQty = shipQty - oversQty;
+        
+        console.log(`Item ${item.sku}: shipQty=${shipQty}, originalQty=${originalOrderQty}, previousShipped=${previouslyShipped}, baseQty=${baseQty}, oversQty=${oversQty}`);
+        
+        // Overs are always billed in full
+        oversSubtotal += oversQty * item.unit_price;
+        // Base quantities are subject to blanket cap
+        baseSubtotal += baseQty * item.unit_price;
+      });
+      
+      console.log('Base subtotal (subject to cap):', baseSubtotal);
+      console.log('Overs subtotal (always full):', oversSubtotal);
+      
+      // Apply blanket cap only to base quantities
+      let billedBaseSubtotal = baseSubtotal;
+      if (baseSubtotal > remainingBlanketAmount) {
+        console.log(`Capping base subtotal from ${baseSubtotal} to ${remainingBlanketAmount}`);
+        billedBaseSubtotal = remainingBlanketAmount;
       }
+      
+      // Total = capped base + full overs
+      subtotal = billedBaseSubtotal + oversSubtotal;
+      console.log('Final shipment subtotal (base + overs):', subtotal);
+
+      // Calculate percentage for shipment based on dollar amount billed vs full value
+      const fullShipmentValue = itemsToShip.reduce((sum: number, item: any) => 
+        sum + (shipmentQuantities[item.id] * item.unit_price), 0
+      );
+      billedPercentage = fullShipmentValue > 0 ? (subtotal / fullShipmentValue) * 100 : 100;
+      console.log('Billed percentage:', billedPercentage, '% (subtotal:', subtotal, '/ full value:', fullShipmentValue, ')');
+      
+      invoiceType = 'partial';
 
       const tax = 0; // Tax removed - included in unit price
-      const shipping = invoiceMode === 'deposit' ? 0 : (parseFloat(shippingCost) || 0);
+      const shipping = parseFloat(shippingCost) || 0;
       const total = subtotal + shipping;
       
       // Create child invoice linked to blanket invoice - use parent number with suffix
-      // Partial invoices use format: {parent_invoice_number}-{shipment_number-1}
-      // e.g., 10707-01, 10707-02, etc.
       const invoiceNumber = generatePartialInvoiceNumber(blanketInvoice.invoice_number, nextShipmentNumber);
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
@@ -397,7 +429,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
           shipping_cost: shipping,
           total,
           created_by: user.id,
-          notes: invoiceMode === 'deposit' ? `${depositPercentage}% deposit payment` : null,
+          notes: null,
           description: invoiceDescription.trim() || null
         })
         .select()
@@ -513,7 +545,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       }
 
       toast({
-        title: invoiceMode === 'deposit' ? "Deposit Invoice Created" : "Shipment Invoice Created",
+        title: "Shipment Invoice Created",
         description: `Invoice ${invoiceNumber} created successfully`
       });
 
@@ -593,8 +625,8 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  This invoice will bill {depositPercentage}% of the blanket invoice total as a deposit/upfront payment. 
-                  No inventory will be allocated. No shipping cost should be added to deposits.
+                  This sets the deposit percentage directly on the main blanket invoice (no child deposit invoice is created).
+                  Then sync that same invoice to QuickBooks for deposit billing.
                 </AlertDescription>
               </Alert>
             </>
@@ -866,7 +898,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
             </Button>
             <Button onClick={handleCreateShipment} disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {invoiceMode === 'deposit' ? 'Create Deposit Invoice' : 'Create Shipment Invoice'}
+              {invoiceMode === 'deposit' ? 'Set Deposit on Main Invoice' : 'Create Shipment Invoice'}
             </Button>
           </div>
         </div>
