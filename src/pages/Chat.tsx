@@ -138,27 +138,34 @@ export default function Chat() {
     setLoading(false);
   };
 
-  // Track per-channel unread counts
+  // Track per-channel unread counts using last_seen_at
   useEffect(() => {
     if (!currentUserId || channels.length === 0) return;
     let cancelled = false;
 
     const fetchUnreadCounts = async () => {
+      // Get memberships with last_seen_at
+      const { data: memberships } = await supabase
+        .from('chat_channel_members')
+        .select('channel_id, last_seen_at')
+        .eq('user_id', currentUserId);
+
+      const seenMap: Record<string, string> = {};
+      memberships?.forEach(m => { seenMap[m.channel_id] = m.last_seen_at || new Date(0).toISOString(); });
+
       const counts: Record<string, number> = {};
-      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      
       for (const ch of channels) {
-        // Skip the active channel
         if (ch.id === activeChannel?.id) {
           counts[ch.id] = 0;
           continue;
         }
+        const lastSeen = seenMap[ch.id] || new Date(0).toISOString();
         const { count } = await supabase
           .from('chat_messages')
           .select('*', { count: 'exact', head: true })
           .eq('channel_id', ch.id)
           .neq('user_id', currentUserId)
-          .gt('created_at', cutoff);
+          .gt('created_at', lastSeen);
         counts[ch.id] = count || 0;
       }
       if (!cancelled) setUnreadCounts(counts);
@@ -182,11 +189,18 @@ export default function Chat() {
     return () => { cancelled = true; supabase.removeChannel(realtimeChannel); };
   }, [currentUserId, channels.length, activeChannel?.id]);
 
-  // Clear unread count when switching channels
+  // Mark channel as seen when switching to it
   useEffect(() => {
-    if (activeChannel) {
-      setUnreadCounts(prev => ({ ...prev, [activeChannel.id]: 0 }));
-    }
+    if (!activeChannel || !currentUserId) return;
+    setUnreadCounts(prev => ({ ...prev, [activeChannel.id]: 0 }));
+
+    // Update last_seen_at in DB
+    supabase
+      .from('chat_channel_members')
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq('channel_id', activeChannel.id)
+      .eq('user_id', currentUserId)
+      .then();
   }, [activeChannel?.id]);
 
   // Load messages for active channel
