@@ -9,7 +9,9 @@ import { TemplateEditor } from "@/components/print-workshop/TemplateEditor";
 import { OrderPanel } from "@/components/print-workshop/OrderPanel";
 import { PrintCart, type CartItem } from "@/components/print-workshop/PrintCart";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
-import { Plus, Printer, ArrowLeft, Pencil, Trash2, Copy } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WorkshopOrders } from "@/components/print-workshop/WorkshopOrders";
+import { Plus, Printer, ArrowLeft, Pencil, Trash2, Copy, Package } from "lucide-react";
 import { toast } from "sonner";
 
 type View = "browse" | "build" | "use";
@@ -178,84 +180,103 @@ export default function PrintWorkshop() {
           </div>
         </div>
 
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="p-6">
-                  <div className="h-32 bg-muted rounded mb-4" />
-                  <div className="h-4 bg-muted rounded w-2/3 mb-2" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
+        <Tabs defaultValue="templates">
+          <TabsList>
+            <TabsTrigger value="templates" className="gap-1.5">
+              <Printer className="h-3.5 w-3.5" />
+              Templates
+            </TabsTrigger>
+            <TabsTrigger value="orders" className="gap-1.5">
+              <Package className="h-3.5 w-3.5" />
+              Workshop Orders
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="templates">
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardContent className="p-6">
+                      <div className="h-32 bg-muted rounded mb-4" />
+                      <div className="h-4 bg-muted rounded w-2/3 mb-2" />
+                      <div className="h-3 bg-muted rounded w-1/2" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : templates.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                  <Printer className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-1">No templates yet</h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Create your first label template to get started
+                  </p>
+                  <Button onClick={handleNewTemplate} className="gap-2">
+                    <Plus className="h-4 w-4" /> Create Template
+                  </Button>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        ) : templates.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <Printer className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-1">No templates yet</h3>
-              <p className="text-muted-foreground text-sm mb-4">
-                Create your first label template to get started
-              </p>
-              <Button onClick={handleNewTemplate} className="gap-2">
-                <Plus className="h-4 w-4" /> Create Template
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {templates.map((tmpl) => (
-              <Card
-                key={tmpl.id}
-                className="group cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => handleSelectTemplate(tmpl)}
-              >
-                <CardContent className="p-4">
-                  <div className="h-32 bg-muted/50 rounded-lg mb-3 flex items-center justify-center border border-border">
-                    {tmpl.thumbnail_url ? (
-                      <img src={tmpl.thumbnail_url} alt={tmpl.name} className="max-h-full object-contain rounded" />
-                    ) : (
-                      <Printer className="h-8 w-8 text-muted-foreground/50" />
-                    )}
-                  </div>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-medium text-sm">{tmpl.name}</h3>
-                      {tmpl.description && (
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{tmpl.description}</p>
-                      )}
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {tmpl.width_inches}" × {tmpl.height_inches}"
-                        </Badge>
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {tmpl.product_type}
-                        </Badge>
-                        {tmpl.preset_price_per_unit && (
-                          <Badge variant="default" className="text-xs">
-                            ${Number(tmpl.preset_price_per_unit).toFixed(4)}/ea
-                          </Badge>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {templates.map((tmpl) => (
+                  <Card
+                    key={tmpl.id}
+                    className="group cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => handleSelectTemplate(tmpl)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="h-32 bg-muted/50 rounded-lg mb-3 flex items-center justify-center border border-border">
+                        {tmpl.thumbnail_url ? (
+                          <img src={tmpl.thumbnail_url} alt={tmpl.name} className="max-h-full object-contain rounded" />
+                        ) : (
+                          <Printer className="h-8 w-8 text-muted-foreground/50" />
                         )}
                       </div>
-                    </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDuplicateTemplate(tmpl)} title="Duplicate">
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditTemplate(tmpl)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDeleteTemplate(tmpl.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-medium text-sm">{tmpl.name}</h3>
+                          {tmpl.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{tmpl.description}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {tmpl.width_inches}" × {tmpl.height_inches}"
+                            </Badge>
+                            <Badge variant="outline" className="text-xs capitalize">
+                              {tmpl.product_type}
+                            </Badge>
+                            {tmpl.preset_price_per_unit && (
+                              <Badge variant="default" className="text-xs">
+                                ${Number(tmpl.preset_price_per_unit).toFixed(4)}/ea
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDuplicateTemplate(tmpl)} title="Duplicate">
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditTemplate(tmpl)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDeleteTemplate(tmpl.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="orders">
+            <WorkshopOrders />
+          </TabsContent>
+        </Tabs>
       </div>
     );
   }
