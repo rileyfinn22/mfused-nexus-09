@@ -8,13 +8,14 @@ import { TemplateBuilder } from "@/components/print-workshop/TemplateBuilder";
 import { TemplateEditor } from "@/components/print-workshop/TemplateEditor";
 import { OrderPanel } from "@/components/print-workshop/OrderPanel";
 import { PrintCart, type CartItem } from "@/components/print-workshop/PrintCart";
+import { PrintCheckout } from "@/components/print-workshop/PrintCheckout";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkshopOrders } from "@/components/print-workshop/WorkshopOrders";
 import { Plus, Printer, ArrowLeft, Pencil, Trash2, Copy, Package, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 
-type View = "browse" | "build" | "use";
+type View = "browse" | "build" | "use" | "checkout";
 
 export default function PrintWorkshop() {
   const { isVibeAdmin, activeCompanyId, loading: roleLoading } = useActiveCompany();
@@ -168,6 +169,7 @@ export default function PrintWorkshop() {
               onUpdateQuantity={handleUpdateCartQty}
               onRemoveItem={handleRemoveCartItem}
               onClearCart={handleClearCart}
+              onCheckout={() => setView("checkout")}
             />
             {isVibeAdmin && (
               <Button onClick={handleNewTemplate} className="gap-2">
@@ -325,6 +327,7 @@ export default function PrintWorkshop() {
             onUpdateQuantity={handleUpdateCartQty}
             onRemoveItem={handleRemoveCartItem}
             onClearCart={handleClearCart}
+            onCheckout={() => setView("checkout")}
           />
         </div>
 
@@ -350,6 +353,19 @@ export default function PrintWorkshop() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // Checkout mode
+  if (view === "checkout") {
+    return (
+      <PrintCheckout
+        items={cartItems}
+        onUpdateQuantity={handleUpdateCartQty}
+        onRemoveItem={handleRemoveCartItem}
+        onClearCart={handleClearCart}
+        onBack={() => setView("browse")}
+      />
     );
   }
 

@@ -3023,7 +3023,12 @@ export type Database = {
           order_number: string
           production_progress: number | null
           production_status: string | null
+          shipping_city: string | null
           shipping_cost: number
+          shipping_name: string | null
+          shipping_state: string | null
+          shipping_street: string | null
+          shipping_zip: string | null
           status: string
           subtotal: number
           tax: number
@@ -3042,7 +3047,12 @@ export type Database = {
           order_number: string
           production_progress?: number | null
           production_status?: string | null
+          shipping_city?: string | null
           shipping_cost?: number
+          shipping_name?: string | null
+          shipping_state?: string | null
+          shipping_street?: string | null
+          shipping_zip?: string | null
           status?: string
           subtotal?: number
           tax?: number
@@ -3061,7 +3071,12 @@ export type Database = {
           order_number?: string
           production_progress?: number | null
           production_status?: string | null
+          shipping_city?: string | null
           shipping_cost?: number
+          shipping_name?: string | null
+          shipping_state?: string | null
+          shipping_street?: string | null
+          shipping_zip?: string | null
           status?: string
           subtotal?: number
           tax?: number
