@@ -494,13 +494,9 @@ export default function Chat() {
           .upload(path, file);
 
         if (!uploadErr) {
-          const { data: urlData } = supabase.storage
-            .from("chat-files")
-            .getPublicUrl(path);
-
           await supabase.from("chat_message_attachments").insert({
             message_id: msg.id,
-            file_url: urlData.publicUrl,
+            file_url: path,
             file_name: file.name,
             file_type: file.type,
             file_size: file.size,
@@ -1023,17 +1019,28 @@ export default function Chat() {
                       {msg.attachments && msg.attachments.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-1">
                           {msg.attachments.map((a) => (
-                            <a
+                            <button
                               key={a.id}
-                              href={a.file_url}
-                              target="_blank"
-                              rel="noopener"
-                              className="flex items-center gap-1.5 px-2 py-1 rounded border border-border bg-muted/50 text-xs hover:bg-muted transition-colors"
+                              onClick={async () => {
+                                // If file_url is a full URL (legacy), open directly
+                                if (a.file_url.startsWith('http')) {
+                                  window.open(a.file_url, '_blank');
+                                  return;
+                                }
+                                // Otherwise generate a signed URL from the storage path
+                                const { data } = await supabase.storage
+                                  .from("chat-files")
+                                  .createSignedUrl(a.file_url, 3600);
+                                if (data?.signedUrl) {
+                                  window.open(data.signedUrl, '_blank');
+                                }
+                              }}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded border border-border bg-muted/50 text-xs hover:bg-muted transition-colors cursor-pointer"
                             >
                               <Paperclip className="h-3 w-3" />
                               <span className="truncate max-w-[150px]">{a.file_name}</span>
                               <Download className="h-3 w-3 text-muted-foreground" />
-                            </a>
+                            </button>
                           ))}
                         </div>
                       )}
