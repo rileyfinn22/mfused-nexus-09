@@ -25,6 +25,17 @@ interface BillingHistoryItem {
   quickbooks_id: string | null;
   status: string;
   id: string;
+  shipment_number: number | null;
+  parent_invoice_id: string | null;
+}
+
+interface PaymentItem {
+  id: string;
+  invoice_id: string;
+  amount: number;
+  payment_date: string;
+  payment_method: string;
+  quickbooks_id: string | null;
 }
 
 export function SyncToQuickBooksDialog({ 
@@ -36,6 +47,7 @@ export function SyncToQuickBooksDialog({
 }: SyncToQuickBooksDialogProps) {
   const [billingPercentage, setBillingPercentage] = useState(100);
   const [billingHistory, setBillingHistory] = useState<BillingHistoryItem[]>([]);
+  const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'review' | 'configure'>('review');
 
@@ -62,12 +74,24 @@ export function SyncToQuickBooksDialog({
     try {
       const { data } = await supabase
         .from('invoices')
-        .select('id, invoice_number, invoice_type, billed_percentage, total, total_paid, quickbooks_id, status')
+        .select('id, invoice_number, invoice_type, billed_percentage, total, total_paid, quickbooks_id, status, shipment_number, parent_invoice_id')
         .eq('order_id', invoice.order_id)
         .is('deleted_at', null)
         .order('shipment_number', { ascending: true });
       
-      setBillingHistory(data || []);
+      setBillingHistory((data as BillingHistoryItem[]) || []);
+
+      // Load all payments for this order's invoices
+      if (data && data.length > 0) {
+        const invoiceIds = data.map((inv: any) => inv.id);
+        const { data: paymentData } = await supabase
+          .from('payments')
+          .select('id, invoice_id, amount, payment_date, payment_method, quickbooks_id')
+          .in('invoice_id', invoiceIds)
+          .order('payment_date', { ascending: true });
+        
+        setPayments((paymentData as PaymentItem[]) || []);
+      }
     } catch (e) {
       console.error('Failed to load billing history', e);
     } finally {
@@ -88,10 +112,18 @@ export function SyncToQuickBooksDialog({
     }).format(amount);
   };
 
-  // Calculate what's already been billed in QBO
-  const syncedInvoices = billingHistory.filter(inv => inv.quickbooks_id && inv.id !== invoice?.id);
+  // Calculate order-wide totals
+  const allInvoices = billingHistory;
+  const orderTotal = allInvoices.find(inv => inv.invoice_type === 'full' && inv.shipment_number === 1)?.total || invoiceTotal;
+  
+  // Total billed in QBO (synced invoices excluding blanket parent if it has children)
+  const syncedInvoices = allInvoices.filter(inv => inv.quickbooks_id);
   const totalBilledInQBO = syncedInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
-  const totalPaidInQBO = syncedInvoices.reduce((sum, inv) => sum + Number(inv.total_paid || 0), 0);
+  
+  // Total payments across all invoices in this order  
+  const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const thisInvoicePayments = payments.filter(p => p.invoice_id === invoice?.id);
+  const thisInvoicePaid = thisInvoicePayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
   
   // Determine parent deposit info
   const parentInvoice = invoice?.parent_invoice_id 
@@ -99,137 +131,156 @@ export function SyncToQuickBooksDialog({
     : null;
   const hasParentDeposit = parentInvoice && Number(parentInvoice.billed_percentage || 100) < 100 && parentInvoice.quickbooks_id;
   const depositAmount = hasParentDeposit ? Number(parentInvoice.total || 0) : 0;
+  const depositPaid = hasParentDeposit 
+    ? payments.filter(p => p.invoice_id === parentInvoice.id).reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    : 0;
 
   // Check if this is a re-sync
   const isResync = !!invoice?.quickbooks_id;
 
-  // Determine the effective amount that will be billed in QBO
-  const effectiveBillAmount = billingPercentage < 100
-    ? (invoiceTotal * billingPercentage) / 100
-    : invoiceTotal - (hasParentDeposit ? depositAmount : 0);
+  // What will actually be billed in QBO for THIS sync
+  const netQBOAmount = hasParentDeposit && billingPercentage === 100
+    ? invoiceTotal - depositAmount
+    : (invoiceTotal * billingPercentage) / 100;
+
+  // Remaining balance on this invoice
+  const thisInvoiceBalance = invoiceTotal - thisInvoicePaid;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isResync ? 'Re-Sync' : 'Sync'} Invoice to QuickBooks
           </DialogTitle>
           <DialogDescription>
             {step === 'review' 
-              ? 'Review billing history before syncing.'
+              ? 'Review billing & payment status before syncing.'
               : 'Configure what to bill in QuickBooks.'
             }
           </DialogDescription>
         </DialogHeader>
 
         {step === 'review' ? (
-          <div className="space-y-4 py-2">
-            {/* Current Invoice Info */}
+          <div className="space-y-3 py-2">
+            {/* This Invoice Summary */}
             <div className="rounded-lg border p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">This Invoice</span>
-                <Badge variant="outline">{invoice?.invoice_number}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {invoice?.invoice_type === 'full' ? 'Blanket' : 'Shipment'}
+                  </Badge>
+                  <Badge variant="outline">{invoice?.invoice_number}</Badge>
+                </div>
               </div>
-              <div className="flex items-center justify-between text-sm">
+              <Separator />
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <span className="text-muted-foreground">Invoice Total</span>
-                <span className="font-semibold">{formatCurrency(invoiceTotal)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Type</span>
-                <Badge variant="secondary" className="text-xs">
-                  {invoice?.invoice_type === 'full' ? 'Blanket' : 'Shipment'}
-                </Badge>
+                <span className="text-right font-semibold">{formatCurrency(invoiceTotal)}</span>
+                
+                <span className="text-muted-foreground">Paid</span>
+                <span className="text-right font-medium text-green-600">{thisInvoicePaid > 0 ? formatCurrency(thisInvoicePaid) : '—'}</span>
+                
+                <span className="text-muted-foreground">Balance Due</span>
+                <span className="text-right font-semibold">{formatCurrency(thisInvoiceBalance)}</span>
               </div>
               {isResync && (
-                <div className="flex items-center gap-1 text-xs text-amber-600">
+                <div className="flex items-center gap-1 text-xs text-amber-600 pt-1">
                   <AlertCircle className="h-3 w-3" />
-                  Already synced — this will update the existing QBO invoice
+                  Already synced — will update existing QBO invoice
                 </div>
               )}
             </div>
 
-            {/* Billing History */}
-            {billingHistory.length > 1 && (
-              <>
-                <Separator />
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Order Billing History</h4>
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                    {billingHistory
-                      .filter(inv => inv.id !== invoice?.id)
-                      .map(inv => (
-                        <div key={inv.id} className="flex items-center justify-between text-xs rounded-md bg-muted/50 px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono">{inv.invoice_number}</span>
-                            {inv.quickbooks_id ? (
-                              <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200">
-                                <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
-                                In QBO
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[10px]">Not synced</Badge>
-                            )}
-                            {Number(inv.billed_percentage || 100) < 100 && (
-                              <Badge variant="secondary" className="text-[10px]">
-                                {inv.billed_percentage}% Deposit
-                              </Badge>
-                            )}
-                          </div>
-                          <span className="font-medium">{formatCurrency(Number(inv.total))}</span>
+            {/* Order-Wide Billing History */}
+            {allInvoices.length > 1 && (
+              <div className="rounded-lg border p-3 space-y-2">
+                <h4 className="text-sm font-medium">Order Billing Summary</h4>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {allInvoices.map(inv => {
+                    const invPaid = payments.filter(p => p.invoice_id === inv.id).reduce((s, p) => s + Number(p.amount || 0), 0);
+                    const isCurrent = inv.id === invoice?.id;
+                    return (
+                      <div key={inv.id} className={`flex items-center justify-between text-xs rounded-md px-3 py-2 ${isCurrent ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'}`}>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-mono shrink-0">{inv.invoice_number}</span>
+                          {inv.quickbooks_id ? (
+                            <CheckCircle2 className="h-3 w-3 text-green-600 shrink-0" />
+                          ) : (
+                            <span className="text-muted-foreground">·</span>
+                          )}
+                          {Number(inv.billed_percentage || 100) < 100 && (
+                            <Badge variant="secondary" className="text-[10px] shrink-0">
+                              {inv.billed_percentage}% Dep
+                            </Badge>
+                          )}
+                          {isCurrent && (
+                            <Badge className="text-[10px] shrink-0">Current</Badge>
+                          )}
                         </div>
-                      ))}
-                  </div>
+                        <div className="text-right shrink-0 ml-2">
+                          <div className="font-medium">{formatCurrency(Number(inv.total))}</div>
+                          {invPaid > 0 && (
+                            <div className="text-green-600 text-[10px]">Paid {formatCurrency(invPaid)}</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </>
+                <Separator />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <span className="text-muted-foreground">Total Billed in QBO</span>
+                  <span className="text-right font-medium">{formatCurrency(totalBilledInQBO)}</span>
+                  <span className="text-muted-foreground">Total Payments Received</span>
+                  <span className="text-right font-medium text-green-600">{formatCurrency(totalPayments)}</span>
+                  <span className="text-muted-foreground">Outstanding in QBO</span>
+                  <span className="text-right font-semibold">{formatCurrency(totalBilledInQBO - totalPayments)}</span>
+                </div>
+              </div>
             )}
 
             {/* Deposit Deduction Notice */}
             {hasParentDeposit && (
-              <>
-                <Separator />
-                <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 space-y-1">
-                  <div className="flex items-center gap-1.5 text-sm font-medium text-blue-800 dark:text-blue-300">
-                    <DollarSign className="h-4 w-4" />
-                    Deposit Will Be Deducted
-                  </div>
-                  <p className="text-xs text-blue-700 dark:text-blue-400">
-                    A {parentInvoice.billed_percentage}% deposit of {formatCurrency(depositAmount)} was previously billed on invoice {parentInvoice.invoice_number}. 
-                    This will be automatically subtracted as a credit line in QuickBooks.
-                  </p>
-                  <div className="flex items-center justify-between pt-1 text-sm">
-                    <span className="text-blue-700 dark:text-blue-400">Shipped Total</span>
-                    <span className="font-medium">{formatCurrency(invoiceTotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-blue-700 dark:text-blue-400">Less Deposit</span>
-                    <span className="font-medium text-red-600">-{formatCurrency(depositAmount)}</span>
-                  </div>
-                  <Separator className="bg-blue-200 dark:bg-blue-800" />
-                  <div className="flex items-center justify-between text-sm font-bold">
-                    <span className="text-blue-800 dark:text-blue-300">Net QBO Amount</span>
-                    <span className="text-primary">{formatCurrency(invoiceTotal - depositAmount)}</span>
-                  </div>
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-blue-800 dark:text-blue-300">
+                  <DollarSign className="h-4 w-4" />
+                  Deposit Deduction
                 </div>
-              </>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                  <span className="text-blue-700 dark:text-blue-400">Shipped Total</span>
+                  <span className="text-right font-medium">{formatCurrency(invoiceTotal)}</span>
+                  <span className="text-blue-700 dark:text-blue-400">Less {parentInvoice.billed_percentage}% Deposit ({parentInvoice.invoice_number})</span>
+                  <span className="text-right font-medium text-destructive">-{formatCurrency(depositAmount)}</span>
+                  {depositPaid > 0 && (
+                    <>
+                      <span className="text-blue-700 dark:text-blue-400 text-xs">↳ Deposit Paid</span>
+                      <span className="text-right text-xs text-green-600">{formatCurrency(depositPaid)}</span>
+                    </>
+                  )}
+                </div>
+                <Separator className="bg-blue-200 dark:bg-blue-800" />
+                <div className="flex items-center justify-between text-sm font-bold">
+                  <span className="text-blue-800 dark:text-blue-300">Net Amount to QBO</span>
+                  <span className="text-primary">{formatCurrency(netQBOAmount)}</span>
+                </div>
+              </div>
             )}
 
-            {/* Summary */}
-            {!hasParentDeposit && totalBilledInQBO > 0 && (
-              <>
-                <Separator />
-                <div className="rounded-lg bg-muted p-3 space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Previously billed in QBO</span>
-                    <span className="font-medium">{formatCurrency(totalBilledInQBO)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">This invoice</span>
-                    <span className="font-medium">{formatCurrency(invoiceTotal)}</span>
-                  </div>
-                </div>
-              </>
-            )}
+            {/* What Will Happen */}
+            <div className="rounded-lg bg-muted p-3 space-y-1">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">What Will Sync</h4>
+              <div className="flex items-center justify-between text-sm">
+                <span>Amount billed to QBO</span>
+                <span className="font-bold text-primary text-lg">{formatCurrency(netQBOAmount)}</span>
+              </div>
+              {thisInvoicePaid > 0 && !isResync && (
+                <p className="text-xs text-muted-foreground">
+                  {formatCurrency(thisInvoicePaid)} already paid — sync payments separately after billing.
+                </p>
+              )}
+            </div>
           </div>
         ) : (
           /* Configure step */
@@ -292,7 +343,7 @@ export function SyncToQuickBooksDialog({
               </Button>
               <Button onClick={handleSync} disabled={syncing}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? 'Syncing...' : isResync ? 'Re-Sync to QBO' : hasParentDeposit ? `Bill ${formatCurrency(invoiceTotal - depositAmount)} to QBO` : `Bill ${formatCurrency(invoiceTotal)} to QBO`}
+                {syncing ? 'Syncing...' : isResync ? 'Re-Sync to QBO' : `Bill ${formatCurrency(netQBOAmount)} to QBO`}
               </Button>
             </>
           ) : (
