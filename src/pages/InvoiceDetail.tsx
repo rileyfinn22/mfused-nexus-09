@@ -1031,85 +1031,94 @@ const InvoiceDetail = () => {
   const handleSaveQuantities = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      // For blanket invoices, we need to create inventory allocations if quantities are being set
+
       const isBlanketInvoice = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
-      
-      // Update each order item
-      for (const item of editedItems) {
-        const newShippedQty = Number(item.shipped_quantity) || 0;
-        // For blanket invoices, total should be based on ORDERED quantity, not shipped
+
+      // Update all order items in parallel instead of one-by-one
+      const orderItemUpdates = editedItems.map(item => {
         const orderedTotal = Number(item.quantity) * Number(item.unit_price);
-        const shippedTotal = newShippedQty * Number(item.unit_price);
-        
-        const {
-          error
-        } = await supabase.from('order_items').update({
-          shipped_quantity: newShippedQty,
+        return supabase.from('order_items').update({
+          shipped_quantity: Number(item.shipped_quantity) || 0,
           unit_price: item.unit_price,
-          total: orderedTotal // Always use ordered quantity for item total
+          total: orderedTotal
         }).eq('id', item.id);
-        if (error) throw error;
-        
-        // Only create allocations for shipment/partial invoices, NOT blanket invoices
-        if (!isBlanketInvoice && newShippedQty > 0) {
-          // Check if allocation already exists
-          const { data: existingAlloc } = await supabase
+      });
+
+      const orderItemResults = await Promise.all(orderItemUpdates);
+      const orderItemError = orderItemResults.find(r => r.error);
+      if (orderItemError?.error) throw orderItemError.error;
+
+      // Handle allocations in parallel (only for non-blanket invoices)
+      if (!isBlanketInvoice) {
+        const itemsNeedingAlloc = editedItems.filter(item => (Number(item.shipped_quantity) || 0) > 0);
+
+        if (itemsNeedingAlloc.length > 0) {
+          // Fetch all existing allocations in one query instead of per-item
+          const { data: existingAllocs } = await supabase
             .from('inventory_allocations')
-            .select('id, quantity_allocated')
-            .eq('invoice_id', invoiceId)
-            .eq('order_item_id', item.id)
-            .single();
-          
-          if (existingAlloc) {
-            // Update existing allocation
-            await supabase
-              .from('inventory_allocations')
-              .update({ quantity_allocated: newShippedQty })
-              .eq('id', existingAlloc.id);
-          } else {
-            // Create new allocation
-            await supabase
-              .from('inventory_allocations')
-              .insert({
+            .select('id, order_item_id, quantity_allocated')
+            .eq('invoice_id', invoiceId);
+
+          const allocUpdates: Promise<any>[] = [];
+          const allocInserts: any[] = [];
+
+          for (const item of itemsNeedingAlloc) {
+            const newShippedQty = Number(item.shipped_quantity) || 0;
+            const existing = existingAllocs?.find(a => a.order_item_id === item.id);
+
+            if (existing) {
+              allocUpdates.push(
+                supabase.from('inventory_allocations')
+                  .update({ quantity_allocated: newShippedQty })
+                  .eq('id', existing.id)
+              );
+            } else {
+              allocInserts.push({
                 invoice_id: invoiceId,
                 order_item_id: item.id,
                 quantity_allocated: newShippedQty,
                 allocated_by: user?.id,
                 status: 'allocated'
               });
+            }
           }
+
+          // Run updates in parallel + batch insert new allocations
+          await Promise.all([
+            ...allocUpdates,
+            ...(allocInserts.length > 0
+              ? [supabase.from('inventory_allocations').insert(allocInserts)]
+              : [])
+          ]);
         }
       }
 
-      // Recalculate totals - blanket uses ordered quantities, shipments use shipped
+      // Recalculate totals
       const newSubtotal = isBlanketInvoice
         ? editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0)
         : editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
       const editedShipping = Number(editShippingCost || 0);
       const newTotal = newSubtotal + Number(invoice.tax || 0) + editedShipping;
 
-      // Update order totals (always based on ordered quantities)
+      // Update order and invoice totals in parallel
       const orderSubtotal = editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0);
       const orderTotal = orderSubtotal + Number(invoice.tax || 0);
-      const {
-        error: orderError
-      } = await supabase.from('orders').update({
-        subtotal: orderSubtotal,
-        total: orderTotal
-      }).eq('id', invoice.order_id);
-      if (orderError) throw orderError;
 
-      // Update invoice totals
-      const {
-        error: invoiceError
-      } = await supabase.from('invoices').update({
-        subtotal: newSubtotal,
-        total: newTotal,
-        shipping_cost: editedShipping,
-        shipping_note: editShippingNote || null,
-      }).eq('id', invoiceId);
-      if (invoiceError) throw invoiceError;
+      const [orderResult, invoiceResult] = await Promise.all([
+        supabase.from('orders').update({
+          subtotal: orderSubtotal,
+          total: orderTotal
+        }).eq('id', invoice.order_id),
+        supabase.from('invoices').update({
+          subtotal: newSubtotal,
+          total: newTotal,
+          shipping_cost: editedShipping,
+          shipping_note: editShippingNote || null,
+        }).eq('id', invoiceId)
+      ]);
+
+      if (orderResult.error) throw orderResult.error;
+      if (invoiceResult.error) throw invoiceResult.error;
       toast({
         title: "Success",
         description: "Prices and quantities updated successfully"
