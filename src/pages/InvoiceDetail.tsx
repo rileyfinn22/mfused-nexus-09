@@ -1082,10 +1082,8 @@ const InvoiceDetail = () => {
         }
       }
 
-      // Recalculate totals - blanket uses ordered quantities, shipments use shipped
-      const newSubtotal = isBlanketInvoice
-        ? editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0)
-        : editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
+      // Recalculate totals - always use shipped quantities × price
+      const newSubtotal = editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
       const editedShipping = Number(editShippingCost || 0);
       const newTotal = newSubtotal + Number(invoice.tax || 0) + editedShipping;
 
