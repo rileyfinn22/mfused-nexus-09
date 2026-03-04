@@ -580,7 +580,7 @@ const Products = () => {
         price: newTemplatePrice ? parseFloat(newTemplatePrice) : null,
         cost: newTemplateCost ? parseFloat(newTemplateCost) : null,
         state: newTemplateState.trim() || null,
-        company_id: companyFilter,
+        company_id: targetCompanyId,
       });
 
       if (error) throw error;
