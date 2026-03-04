@@ -1093,10 +1093,8 @@ const InvoiceDetail = () => {
         }
       }
 
-      // Recalculate totals
-      const newSubtotal = isBlanketInvoice
-        ? editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0)
-        : editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
+      // Recalculate totals - always use shipped quantities for billing
+      const newSubtotal = editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
       const editedShipping = Number(editShippingCost || 0);
       const newTotal = newSubtotal + Number(invoice.tax || 0) + editedShipping;
 
