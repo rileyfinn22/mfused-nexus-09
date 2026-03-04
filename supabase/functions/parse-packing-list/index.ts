@@ -91,17 +91,6 @@ serve(async (req) => {
       return union === 0 ? 0 : inter / union;
     };
 
-    // Containment: fraction of smaller set tokens found in larger set
-    // Handles cases where vendor name is a subset of order name (missing sub-brand words)
-    const containment = (a: string[], b: string[]) => {
-      if (a.length === 0 || b.length === 0) return 0;
-      const shorter = a.length <= b.length ? a : b;
-      const longer = new Set(a.length <= b.length ? b : a);
-      let hits = 0;
-      for (const t of shorter) if (longer.has(t)) hits++;
-      return hits / shorter.length;
-    };
-
     const orderItemsList = orderItems.map((item: any) => ({
       id: item.id,
       name: item.name,
@@ -332,16 +321,14 @@ ${parsedContent}`;
 
       let best: { item: any; score: number } | null = null;
       for (const item of orderItemsList) {
-        const jaccardScore = jaccard(lineTokens, item._name_tokens);
-        const containScore = containment(lineTokens, item._name_tokens);
+        const base = jaccard(lineTokens, item._name_tokens);
         const substringBoost = item._name_norm && (item._name_norm.includes(nameNorm) || nameNorm.includes(item._name_norm)) ? 0.15 : 0;
-        // Use the better of jaccard or containment, plus substring boost
-        const score = Math.min(1, Math.max(jaccardScore, containScore * 0.9) + substringBoost);
+        const score = Math.min(1, base + substringBoost);
         if (!best || score > best.score) best = { item, score };
       }
 
       const bestScore = best?.score ?? 0;
-      if (!best || bestScore < 0.50) {
+      if (!best || bestScore < 0.55) {
         // Below threshold = don't match
         unmatched.push({ 
           name: line.name, 

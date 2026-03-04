@@ -300,7 +300,7 @@ const InvoiceDetail = () => {
     // Fetch related invoices for the same order
     const {
       data: relatedData
-    } = await supabase.from('invoices').select('*').eq('order_id', invoiceData.order_id).neq('id', invoiceId).is('deleted_at', null).order('shipment_number');
+    } = await supabase.from('invoices').select('*').eq('order_id', invoiceData.order_id).neq('id', invoiceId).order('shipment_number');
     if (relatedData) {
       setRelatedInvoices(relatedData);
     }
@@ -1031,92 +1031,85 @@ const InvoiceDetail = () => {
   const handleSaveQuantities = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-
+      
+      // For blanket invoices, we need to create inventory allocations if quantities are being set
       const isBlanketInvoice = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
-
-      // Update all order items in parallel instead of one-by-one
-      const orderItemUpdates = editedItems.map(item => {
+      
+      // Update each order item
+      for (const item of editedItems) {
+        const newShippedQty = Number(item.shipped_quantity) || 0;
+        // For blanket invoices, total should be based on ORDERED quantity, not shipped
         const orderedTotal = Number(item.quantity) * Number(item.unit_price);
-        return supabase.from('order_items').update({
-          shipped_quantity: Number(item.shipped_quantity) || 0,
+        const shippedTotal = newShippedQty * Number(item.unit_price);
+        
+        const {
+          error
+        } = await supabase.from('order_items').update({
+          shipped_quantity: newShippedQty,
           unit_price: item.unit_price,
-          total: orderedTotal
+          total: orderedTotal // Always use ordered quantity for item total
         }).eq('id', item.id);
-      });
-
-      const orderItemResults = await Promise.all(orderItemUpdates);
-      const orderItemError = orderItemResults.find(r => r.error);
-      if (orderItemError?.error) throw orderItemError.error;
-
-      // Handle allocations in parallel (only for non-blanket invoices)
-      if (!isBlanketInvoice) {
-        const itemsNeedingAlloc = editedItems.filter(item => (Number(item.shipped_quantity) || 0) > 0);
-
-        if (itemsNeedingAlloc.length > 0) {
-          // Fetch all existing allocations in one query instead of per-item
-          const { data: existingAllocs } = await supabase
+        if (error) throw error;
+        
+        // Only create allocations for shipment/partial invoices, NOT blanket invoices
+        if (!isBlanketInvoice && newShippedQty > 0) {
+          // Check if allocation already exists
+          const { data: existingAlloc } = await supabase
             .from('inventory_allocations')
-            .select('id, order_item_id, quantity_allocated')
-            .eq('invoice_id', invoiceId);
-
-          const allocUpdates: Promise<any>[] = [];
-          const allocInserts: any[] = [];
-
-          for (const item of itemsNeedingAlloc) {
-            const newShippedQty = Number(item.shipped_quantity) || 0;
-            const existing = existingAllocs?.find(a => a.order_item_id === item.id);
-
-            if (existing) {
-              allocUpdates.push(
-                supabase.from('inventory_allocations')
-                  .update({ quantity_allocated: newShippedQty })
-                  .eq('id', existing.id)
-              );
-            } else {
-              allocInserts.push({
+            .select('id, quantity_allocated')
+            .eq('invoice_id', invoiceId)
+            .eq('order_item_id', item.id)
+            .single();
+          
+          if (existingAlloc) {
+            // Update existing allocation
+            await supabase
+              .from('inventory_allocations')
+              .update({ quantity_allocated: newShippedQty })
+              .eq('id', existingAlloc.id);
+          } else {
+            // Create new allocation
+            await supabase
+              .from('inventory_allocations')
+              .insert({
                 invoice_id: invoiceId,
                 order_item_id: item.id,
                 quantity_allocated: newShippedQty,
                 allocated_by: user?.id,
                 status: 'allocated'
               });
-            }
           }
-
-          // Run updates in parallel + batch insert new allocations
-          await Promise.all([
-            ...allocUpdates,
-            ...(allocInserts.length > 0
-              ? [supabase.from('inventory_allocations').insert(allocInserts)]
-              : [])
-          ]);
         }
       }
 
-      // Recalculate totals - always use shipped quantities for billing
-      const newSubtotal = editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
+      // Recalculate totals - blanket uses ordered quantities, shipments use shipped
+      const newSubtotal = isBlanketInvoice
+        ? editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0)
+        : editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
       const editedShipping = Number(editShippingCost || 0);
       const newTotal = newSubtotal + Number(invoice.tax || 0) + editedShipping;
 
-      // Update order and invoice totals in parallel
+      // Update order totals (always based on ordered quantities)
       const orderSubtotal = editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0);
       const orderTotal = orderSubtotal + Number(invoice.tax || 0);
+      const {
+        error: orderError
+      } = await supabase.from('orders').update({
+        subtotal: orderSubtotal,
+        total: orderTotal
+      }).eq('id', invoice.order_id);
+      if (orderError) throw orderError;
 
-      const [orderResult, invoiceResult] = await Promise.all([
-        supabase.from('orders').update({
-          subtotal: orderSubtotal,
-          total: orderTotal
-        }).eq('id', invoice.order_id),
-        supabase.from('invoices').update({
-          subtotal: newSubtotal,
-          total: newTotal,
-          shipping_cost: editedShipping,
-          shipping_note: editShippingNote || null,
-        }).eq('id', invoiceId)
-      ]);
-
-      if (orderResult.error) throw orderResult.error;
-      if (invoiceResult.error) throw invoiceResult.error;
+      // Update invoice totals
+      const {
+        error: invoiceError
+      } = await supabase.from('invoices').update({
+        subtotal: newSubtotal,
+        total: newTotal,
+        shipping_cost: editedShipping,
+        shipping_note: editShippingNote || null,
+      }).eq('id', invoiceId);
+      if (invoiceError) throw invoiceError;
       toast({
         title: "Success",
         description: "Prices and quantities updated successfully"
@@ -2254,36 +2247,7 @@ const InvoiceDetail = () => {
                   {invoice?.invoice_type === 'full' ? (
                     <>
                       <TableHead className="text-center">Ordered</TableHead>
-                      <TableHead className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          Shipped
-                          {isEditMode && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-5 px-1.5 text-[10px] text-primary"
-                              onClick={() => {
-                                setEditedItems(items => items.map(item => {
-                                  const orderItem = order?.order_items?.find((oi: any) => oi.sku === item.sku);
-                                  const currentShipped = Number(item.shipped_quantity || 0);
-                                  const orderedQty = orderItem?.quantity || item.quantity || 0;
-                                  if (currentShipped === 0) {
-                                    return {
-                                      ...item,
-                                      quantity: orderedQty,
-                                      shipped_quantity: orderedQty,
-                                      total: orderedQty * Number(item.unit_price)
-                                    };
-                                  }
-                                  return item;
-                                }));
-                              }}
-                            >
-                              Ship All
-                            </Button>
-                          )}
-                        </div>
-                      </TableHead>
+                      <TableHead className="text-center">Shipped</TableHead>
                     </>
                   ) : (
                     <TableHead className="text-center">Quantity</TableHead>
@@ -2510,7 +2474,8 @@ const InvoiceDetail = () => {
                   <div>
                     <p className="text-xs text-muted-foreground">Original Order Total</p>
                     <p className="text-lg font-semibold text-muted-foreground">
-                      {formatCurrency(Number(order?.total || 0))}
+                      {formatCurrency(order?.order_items?.reduce((sum: number, item: any) => 
+                        sum + (item.quantity * item.unit_price), 0) || 0)}
                     </p>
                   </div>
                   <div>
