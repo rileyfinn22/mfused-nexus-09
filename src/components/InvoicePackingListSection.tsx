@@ -883,13 +883,45 @@ export const InvoicePackingListSection = ({
       
       yPos += 40;
       
-      // Items table
-      const itemsForPacking = editedItems.length > 0 ? editedItems : (order?.order_items || []);
+      // Items table - always prioritize shipped quantities for this invoice
+      const { data: allocationItems, error: allocationError } = await supabase
+        .from('inventory_allocations')
+        .select(`
+          quantity_allocated,
+          order_items(item_id, sku, name, id)
+        `)
+        .eq('invoice_id', invoiceId)
+        .gt('quantity_allocated', 0);
+
+      if (allocationError) {
+        console.error('Error loading allocation items for packing list:', allocationError);
+      }
+
+      const allocatedPackingItems = (allocationItems || [])
+        .filter((alloc: any) => alloc.order_items)
+        .map((alloc: any) => ({
+          item_id: alloc.order_items.item_id,
+          sku: alloc.order_items.sku,
+          name: alloc.order_items.name,
+          quantity: Number(alloc.quantity_allocated || 0),
+        }))
+        .filter((item: any) => item.quantity > 0);
+
+      const fallbackShippedItems = (editedItems.length > 0 ? editedItems : (order?.order_items || []))
+        .map((item: any) => ({
+          item_id: item.item_id,
+          sku: item.sku,
+          name: item.name,
+          quantity: Number(item.shipped_quantity ?? item.quantity ?? 0),
+        }))
+        .filter((item: any) => item.quantity > 0);
+
+      const itemsForPacking = allocatedPackingItems.length > 0 ? allocatedPackingItems : fallbackShippedItems;
       const tableData = itemsForPacking.map((item: any) => [
         item.item_id || 'N/A',
         item.sku || '',
         item.name || '',
-        (item.quantity || 0).toLocaleString()
+        item.quantity.toLocaleString()
       ]);
       
       autoTable(doc, {
