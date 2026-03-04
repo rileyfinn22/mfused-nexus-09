@@ -1708,9 +1708,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     let rect: Rect | null = null;
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
-      startPt = { x: pointer.x / zoom, y: pointer.y / zoom };
+      const pointer = canvas.getScenePoint(e.e);
+      startPt = { x: pointer.x, y: pointer.y };
       rect = new Rect({
         left: startPt.x, top: startPt.y, width: 1, height: 1,
         fill: "rgba(59,130,246,0.08)", stroke: "#3b82f6",
@@ -1723,10 +1722,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (e: any) => {
       if (!startPt || !rect) return;
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
-      const x = pointer.x / zoom;
-      const y = pointer.y / zoom;
+      const pointer = canvas.getScenePoint(e.e);
+      const x = pointer.x;
+      const y = pointer.y;
       rect.set({
         left: Math.min(startPt.x, x), top: Math.min(startPt.y, y),
         width: Math.abs(x - startPt.x), height: Math.abs(y - startPt.y),
