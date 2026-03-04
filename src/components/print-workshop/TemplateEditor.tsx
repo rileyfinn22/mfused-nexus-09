@@ -412,15 +412,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    const canvas = new FabricCanvas(canvasRef.current);
-    // Backing buffer at display size * DPR for retina sharpness
-    const backingW = Math.round(cssWidth * dpr);
-    const backingH = Math.round(cssHeight * dpr);
-    canvas.setDimensions({ width: backingW, height: backingH });
-    // Zoom maps logical canvas coords (canvasWidth) → backing pixels
-    canvas.setZoom(displayScale * dpr);
-    // CSS size = what user sees on screen
-    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
+    const canvas = new FabricCanvas(canvasRef.current, {
+      enableRetinaScaling: true,
+    });
+    // Keep logical zoom deterministic across devices; Fabric manages DPR internally.
+    canvas.setDimensions({ width: cssWidth, height: cssHeight });
+    // Zoom maps logical canvas coords (canvasWidth) → on-screen CSS pixels
+    canvas.setZoom(displayScale);
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
 
