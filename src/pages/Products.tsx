@@ -683,8 +683,7 @@ const Products = () => {
               <Button 
                 variant="outline" 
                 onClick={() => setCreateTemplateOpen(true)}
-                disabled={companyFilter === 'all'}
-                title={companyFilter === 'all' ? 'Select a company first' : 'Create new template'}
+                title="Create new template"
               >
                 <Layers className="h-4 w-4 mr-1.5" />
                 Add Template
