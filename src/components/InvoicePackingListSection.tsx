@@ -693,13 +693,45 @@ export const InvoicePackingListSection = ({
         }
       }
 
-      // Recalculate invoice subtotal based on shipped quantities
-      const orderItems = order?.order_items || editedItems;
-      let newSubtotal = 0;
+      // Recalculate invoice subtotal based on ALL order items, not just matched ones
+      const allOrderItems = order?.order_items || editedItems;
+      const isBlanketInvoice = invoice.invoice_type === 'full';
+      
+      // Build a map of updated shipped quantities from matched items
+      const shippedMap = new Map<string, number>();
       for (const match of matchedItems) {
-        const orderItem = orderItems.find((oi: any) => oi.id === match.order_item_id);
-        if (orderItem) {
-          newSubtotal += (match.shipped_quantity || 0) * Number(orderItem.unit_price || 0);
+        shippedMap.set(match.order_item_id, match.shipped_quantity || 0);
+      }
+      
+      // Fetch all current allocations for this invoice to include unmatched items too
+      const { data: allAllocations } = await supabase
+        .from('inventory_allocations')
+        .select('order_item_id, quantity_allocated')
+        .eq('invoice_id', invoiceId);
+      
+      let newSubtotal = 0;
+      if (isBlanketInvoice) {
+        // Blanket invoices: subtotal = sum of ordered qty × unit price for ALL items
+        newSubtotal = allOrderItems.reduce((sum: number, oi: any) => 
+          sum + Number(oi.quantity || 0) * Number(oi.unit_price || 0), 0);
+      } else {
+        // Partial/shipment invoices: subtotal = sum of allocated qty × unit price for ALL allocated items
+        const allocMap = new Map<string, number>();
+        // Start with existing allocations
+        if (allAllocations) {
+          for (const alloc of allAllocations) {
+            allocMap.set(alloc.order_item_id, alloc.quantity_allocated);
+          }
+        }
+        // Override with newly matched quantities
+        for (const [itemId, qty] of shippedMap) {
+          allocMap.set(itemId, qty);
+        }
+        for (const [itemId, qty] of allocMap) {
+          const orderItem = allOrderItems.find((oi: any) => oi.id === itemId);
+          if (orderItem) {
+            newSubtotal += qty * Number(orderItem.unit_price || 0);
+          }
         }
       }
 
