@@ -943,7 +943,23 @@ const InvoiceDetail = () => {
     yPos += 40;
     
     // ============ ITEMS TABLE ============
-    const itemsForPacking = editedItems.length > 0 ? editedItems : (order?.order_items || []);
+    // Use inventory allocations for shipped quantities when available
+    let itemsForPacking: any[] = [];
+    if (inventoryAllocations.length > 0) {
+      // Use allocated (shipped) quantities from inventory_allocations
+      itemsForPacking = inventoryAllocations
+        .filter((alloc: any) => alloc.quantity_allocated > 0)
+        .map((alloc: any) => ({
+          item_id: alloc.order_items?.item_id,
+          sku: alloc.order_items?.sku,
+          name: alloc.order_items?.name,
+          quantity: alloc.quantity_allocated,
+        }));
+    }
+    // Fallback to editedItems or order items if no allocations
+    if (itemsForPacking.length === 0) {
+      itemsForPacking = editedItems.length > 0 ? editedItems : (order?.order_items || []);
+    }
     const tableData = itemsForPacking.map((item: any) => [
       item.item_id || 'N/A',
       item.sku || '',
