@@ -932,51 +932,46 @@ export function CompanyProductTemplates({
         </Dialog>
       </div>
 
-      {/* Edit Template Dialog (inside selected template view) */}
-      <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && setEditingTemplate(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Template</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label htmlFor="templateName2">Template Name</Label>
-              <Input
-                id="templateName2"
-                value={editTemplateName}
-                onChange={(e) => setEditTemplateName(e.target.value)}
-                placeholder="Enter template name"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+        {/* Edit Template Dialog (inside selected template view) */}
+        <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && setEditingTemplate(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Template</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
               <div className="space-y-2">
-                <Label htmlFor="templatePrice2">Default Price ($)</Label>
-                <Input id="templatePrice2" type="number" step="0.01" value={editTemplatePrice} onChange={(e) => setEditTemplatePrice(e.target.value)} placeholder="0.00" />
+                <Label htmlFor="templateName2">Template Name</Label>
+                <Input id="templateName2" value={editTemplateName} onChange={(e) => setEditTemplateName(e.target.value)} placeholder="Enter template name" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="templatePrice2">Default Price ($)</Label>
+                  <Input id="templatePrice2" type="number" step="0.01" value={editTemplatePrice} onChange={(e) => setEditTemplatePrice(e.target.value)} placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="templateCost2">Default Cost ($)</Label>
+                  <Input id="templateCost2" type="number" step="0.01" value={editTemplateCost} onChange={(e) => setEditTemplateCost(e.target.value)} placeholder="0.00" />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="templateCost2">Default Cost ($)</Label>
-                <Input id="templateCost2" type="number" step="0.01" value={editTemplateCost} onChange={(e) => setEditTemplateCost(e.target.value)} placeholder="0.00" />
+                <Label htmlFor="templateState2">State</Label>
+                <Input id="templateState2" value={editTemplateState} onChange={(e) => setEditTemplateState(e.target.value)} placeholder="e.g., WA, CA, general" />
+                <p className="text-xs text-muted-foreground">Link this template to a specific state/region</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="templateDescription2">Description / Specs</Label>
+                <Textarea id="templateDescription2" value={editTemplateDescription} onChange={(e) => setEditTemplateDescription(e.target.value)} placeholder="Enter template description, specifications, dimensions, etc." rows={4} />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditingTemplate(null)}>Cancel</Button>
+                <Button onClick={handleSaveTemplate} disabled={savingTemplate || !editTemplateName.trim()}>
+                  {savingTemplate ? "Saving..." : "Save Changes"}
+                </Button>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="templateState2">State</Label>
-              <Input id="templateState2" value={editTemplateState} onChange={(e) => setEditTemplateState(e.target.value)} placeholder="e.g., WA, CA, general" />
-              <p className="text-xs text-muted-foreground">Link this template to a specific state/region</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="templateDescription2">Description / Specs</Label>
-              <Textarea id="templateDescription2" value={editTemplateDescription} onChange={(e) => setEditTemplateDescription(e.target.value)} placeholder="Enter template description, specifications, dimensions, etc." rows={4} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditingTemplate(null)}>Cancel</Button>
-              <Button onClick={handleSaveTemplate} disabled={savingTemplate || !editTemplateName.trim()}>
-                {savingTemplate ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </DialogContent>
+        </Dialog>
+      </div>
     );
   }
 
