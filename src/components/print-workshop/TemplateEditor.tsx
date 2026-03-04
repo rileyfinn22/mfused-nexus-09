@@ -771,7 +771,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       canvas.dispose();
       fabricRef.current = null;
     };
-  }, [canvasWidth, canvasHeight, bleedPx, mode, displayScale, dpr, cssWidth, cssHeight, getSelectionLockedState]);
+  }, [canvasWidth, canvasHeight, bleedPx, mode, displayScale, cssWidth, cssHeight, getSelectionLockedState]);
 
   const addText = (editable: boolean) => {
     const canvas = fabricRef.current;
