@@ -560,10 +560,12 @@ const Products = () => {
   const handleCreateTemplate = async () => {
     if (!newTemplateName.trim()) return;
     
-    if (!companyFilter || companyFilter === 'all') {
+    const targetCompanyId = companyFilter !== 'all' ? companyFilter : newTemplateCompanyId;
+    
+    if (!targetCompanyId) {
       toast({
         title: "Company required",
-        description: "Please select a company before creating a template.",
+        description: "Please select a company for this template.",
         variant: "destructive",
       });
       return;
