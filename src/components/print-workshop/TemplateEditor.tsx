@@ -1738,7 +1738,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     let rect: Rect | null = null;
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getScenePoint(e.e);
+      const pointer = getScenePointer(canvas, e.e);
       startPt = { x: pointer.x, y: pointer.y };
       rect = new Rect({
         left: startPt.x, top: startPt.y, width: 1, height: 1,
