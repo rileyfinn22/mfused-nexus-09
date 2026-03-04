@@ -711,9 +711,18 @@ export const InvoicePackingListSection = ({
       
       let newSubtotal = 0;
       if (isBlanketInvoice) {
-        // Blanket invoices: subtotal = sum of ordered qty × unit price for ALL items
+        // Blanket invoices: subtotal = sum of shipped qty × unit price for ALL items
         newSubtotal = allOrderItems.reduce((sum: number, oi: any) => 
-          sum + Number(oi.quantity || 0) * Number(oi.unit_price || 0), 0);
+          sum + Number(oi.shipped_quantity || 0) * Number(oi.unit_price || 0), 0);
+        // Update with latest shipped quantities from matched items
+        for (const match of matchedItems) {
+          const orderItem = allOrderItems.find((oi: any) => oi.id === match.order_item_id);
+          if (orderItem) {
+            // Remove old value, add new
+            newSubtotal -= Number(orderItem.shipped_quantity || 0) * Number(orderItem.unit_price || 0);
+            newSubtotal += Number(match.shipped_quantity || 0) * Number(orderItem.unit_price || 0);
+          }
+        }
       } else {
         // Partial/shipment invoices: subtotal = sum of allocated qty × unit price for ALL allocated items
         const allocMap = new Map<string, number>();
