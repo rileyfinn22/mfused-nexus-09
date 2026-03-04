@@ -430,10 +430,25 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const canvas = new FabricCanvas(canvasRef.current, {
       enableRetinaScaling: true,
     });
-    // Keep logical scene size in print pixels; scale only the CSS viewport.
-    canvas.setDimensions({ width: canvasWidth, height: canvasHeight }, { backstoreOnly: true } as any);
-    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true } as any);
+    // Keep logical scene size in print pixels; scale visual display with zoom + explicit CSS sizing.
+    canvas.setDimensions({ width: canvasWidth, height: canvasHeight });
     canvas.setZoom(displayScale);
+
+    const cssWidthPx = `${cssWidth}px`;
+    const cssHeightPx = `${cssHeight}px`;
+    if (canvas.lowerCanvasEl) {
+      canvas.lowerCanvasEl.style.width = cssWidthPx;
+      canvas.lowerCanvasEl.style.height = cssHeightPx;
+    }
+    if (canvas.upperCanvasEl) {
+      canvas.upperCanvasEl.style.width = cssWidthPx;
+      canvas.upperCanvasEl.style.height = cssHeightPx;
+    }
+    if (canvas.wrapperEl) {
+      canvas.wrapperEl.style.width = cssWidthPx;
+      canvas.wrapperEl.style.height = cssHeightPx;
+    }
+
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
 
