@@ -69,9 +69,9 @@ export default function PrintWorkshop() {
     return null;
   };
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     setLoading(true);
-    
+
     if (isVibeAdmin) {
       // Admins see all templates
       const { data, error } = await supabase
@@ -109,13 +109,30 @@ export default function PrintWorkshop() {
     } else {
       setTemplates([]);
     }
-    
+
     setLoading(false);
-  };
+  }, [activeCompanyId, isVibeAdmin]);
 
   useEffect(() => {
     if (!roleLoading) fetchTemplates();
-  }, [roleLoading]);
+  }, [roleLoading, fetchTemplates]);
+
+  useEffect(() => {
+    if (roleLoading) return;
+
+    const refreshOnFocus = () => fetchTemplates();
+    const refreshOnVisible = () => {
+      if (!document.hidden) fetchTemplates();
+    };
+
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnVisible);
+
+    return () => {
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnVisible);
+    };
+  }, [roleLoading, fetchTemplates]);
 
   if (roleLoading) {
     return (
@@ -149,9 +166,21 @@ export default function PrintWorkshop() {
     }
   };
 
-  const handleSelectTemplate = (tmpl: any) => {
-    setSelectedTemplate(tmpl);
-    setCanvasData(tmpl.canvas_data);
+  const handleSelectTemplate = async (tmpl: any) => {
+    let latestTemplate = tmpl;
+
+    const { data, error } = await supabase
+      .from("print_templates")
+      .select("*")
+      .eq("id", tmpl.id)
+      .single();
+
+    if (!error && data) {
+      latestTemplate = data;
+    }
+
+    setSelectedTemplate(latestTemplate);
+    setCanvasData(latestTemplate.canvas_data);
     setSavedDesign(null);
     setView("use");
   };
