@@ -467,6 +467,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         if (safeCanvasData?.backgroundImage?.src?.startsWith("blob:")) {
           delete safeCanvasData.backgroundImage;
         }
+
+        await preloadFontsForCanvasData(safeCanvasData);
         await canvas.loadFromJSON(safeCanvasData);
       }
 
