@@ -436,8 +436,8 @@ Thank you for your business.`;
   return (
     <>
       <Dialog open={open && !showEmailPreview} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[85vh]">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
               PO {vendorPoNumber} Preview
