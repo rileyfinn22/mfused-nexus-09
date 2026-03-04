@@ -1752,7 +1752,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (e: any) => {
       if (!startPt || !rect) return;
-      const pointer = canvas.getScenePoint(e.e);
+      const pointer = getScenePointer(canvas, e.e);
       const x = pointer.x;
       const y = pointer.y;
       rect.set({
