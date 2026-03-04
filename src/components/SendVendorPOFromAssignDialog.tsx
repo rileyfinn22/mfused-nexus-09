@@ -449,6 +449,7 @@ Thank you for your business.`;
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : po && vendor ? (
+            <ScrollArea className="flex-1 overflow-y-auto pr-2">
             <div className="space-y-4">
               {/* PO Header Info */}
               <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
