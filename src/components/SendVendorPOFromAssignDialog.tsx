@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Send, ArrowLeft, Edit, Save, X, Eye } from "lucide-react";
+import { Loader2, Send, ArrowLeft, Edit, Save, X, Eye, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
