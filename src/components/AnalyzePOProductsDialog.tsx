@@ -13,12 +13,18 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { FileUp, Loader2, Sparkles, Package, Check, FolderTree, FileText } from "lucide-react";
+import { FileUp, Loader2, Sparkles, Package, Check, FolderTree, FileText, ChevronDown, ChevronUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface ExtractedProduct {
   name: string;
@@ -29,6 +35,15 @@ interface ExtractedProduct {
   selected?: boolean;
   suggested_template?: string | null;
   template_id?: string | null;
+  matchStatus?: 'existing' | 'new';
+  existingProductId?: string | null;
+  // Editable fields for new products
+  editName?: string;
+  editState?: string;
+  editCost?: number | null;
+  editDescription?: string;
+  editProductType?: string;
+  expanded?: boolean;
 }
 
 interface Template {
@@ -43,6 +58,10 @@ interface Template {
 interface AnalyzePOProductsDialogProps {
   onProductsAdded: () => void;
   selectedCompanyId?: string;
+}
+
+function normalizeName(name: string): string {
+  return (name || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: AnalyzePOProductsDialogProps) {
@@ -125,29 +144,17 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
 
   const handleAnalyze = async () => {
     if (inputMode === "pdf" && !file) {
-      toast({
-        title: "No file selected",
-        description: "Please select a PDF file to analyze.",
-        variant: "destructive",
-      });
+      toast({ title: "No file selected", description: "Please select a PDF file to analyze.", variant: "destructive" });
       return;
     }
 
     if (inputMode === "text" && !textInput.trim()) {
-      toast({
-        title: "No text provided",
-        description: "Please paste some text to analyze.",
-        variant: "destructive",
-      });
+      toast({ title: "No text provided", description: "Please paste some text to analyze.", variant: "destructive" });
       return;
     }
 
     if (isVibeAdmin && !companyId) {
-      toast({
-        title: "Company required",
-        description: "Please select a company.",
-        variant: "destructive",
-      });
+      toast({ title: "Company required", description: "Please select a company.", variant: "destructive" });
       return;
     }
 
@@ -170,14 +177,11 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-po-products`,
           {
             method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session?.access_token}`,
-            },
+            headers: { 'Authorization': `Bearer ${session?.access_token}` },
             body: formData,
           }
         );
       } else {
-        // Text mode - send JSON
         response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-po-products`,
           {
@@ -202,11 +206,20 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
       }
 
       if (result.products && result.products.length > 0) {
-        // Store templates from the response
         const returnedTemplates: Template[] = result.templates || [];
         setTemplates(returnedTemplates);
 
-        // Match suggested templates to actual template IDs
+        // Fetch existing products for this company to detect repeats
+        const { data: existingProducts } = await supabase
+          .from('products')
+          .select('id, name')
+          .eq('company_id', companyId);
+
+        const existingMap = new Map<string, string>();
+        (existingProducts || []).forEach(p => {
+          existingMap.set(normalizeName(p.name), p.id);
+        });
+
         const normalizeTemplate = (value: string) =>
           (value || '')
             .toLowerCase()
@@ -215,48 +228,55 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
             .replace(/[^a-z0-9]+/g, ' ')
             .trim();
 
-        const productsWithTemplates = result.products.map((p: ExtractedProduct) => {
+        const productsWithStatus = result.products.map((p: ExtractedProduct) => {
           let matchedTemplateId: string | null = null;
 
-          // Prefer deterministic matching from the backend when available
           if (p.template_id) {
             matchedTemplateId = p.template_id;
           } else if (p.suggested_template) {
             const wanted = normalizeTemplate(p.suggested_template);
-
-            // Try exact-ish match first
-            let matchedTemplate = returnedTemplates.find(
-              t => normalizeTemplate(t.name) === wanted
-            );
-
-            // Fallback: containment / closest token overlap
+            let matchedTemplate = returnedTemplates.find(t => normalizeTemplate(t.name) === wanted);
             if (!matchedTemplate) {
               matchedTemplate = returnedTemplates.find(t => {
                 const cand = normalizeTemplate(t.name);
                 return cand.includes(wanted) || wanted.includes(cand);
               });
             }
-
             if (matchedTemplate) {
               matchedTemplateId = matchedTemplate.id;
             }
           }
 
+          // Check if product already exists
+          const normalized = normalizeName(p.name);
+          const existingId = existingMap.get(normalized) || null;
+          const isExisting = !!existingId;
+
           return {
             ...p,
-            selected: true,
-            template_id: matchedTemplateId
+            selected: !isExisting, // New items selected by default, existing unselected
+            template_id: matchedTemplateId,
+            matchStatus: isExisting ? 'existing' as const : 'new' as const,
+            existingProductId: existingId,
+            // Pre-fill editable fields for new items
+            editName: p.name,
+            editState: p.state || '',
+            editCost: p.cost ?? null,
+            editDescription: p.description || '',
+            editProductType: p.product_type || '',
+            expanded: false,
           };
         });
 
-        setExtractedProducts(productsWithTemplates);
+        setExtractedProducts(productsWithStatus);
         setCustomerName(result.customer_name);
         setStep("review");
         
-        const matchedCount = productsWithTemplates.filter((p: ExtractedProduct) => p.template_id).length;
+        const newCount = productsWithStatus.filter((p: ExtractedProduct) => p.matchStatus === 'new').length;
+        const existingCount = productsWithStatus.filter((p: ExtractedProduct) => p.matchStatus === 'existing').length;
         toast({
           title: "Analysis complete",
-          description: `Found ${result.products.length} products. ${matchedCount} matched to templates.`,
+          description: `Found ${result.products.length} products: ${newCount} new, ${existingCount} already in catalog.`,
         });
       } else {
         toast({
@@ -293,6 +313,18 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     );
   };
 
+  const toggleExpanded = (index: number) => {
+    setExtractedProducts(prev =>
+      prev.map((p, i) => i === index ? { ...p, expanded: !p.expanded } : p)
+    );
+  };
+
+  const updateEditField = (index: number, field: string, value: any) => {
+    setExtractedProducts(prev =>
+      prev.map((p, i) => i === index ? { ...p, [field]: value } : p)
+    );
+  };
+
   const stripAnyTemplatePrefix = (name: string, allTemplates: Template[], keepTemplateId?: string | null) => {
     const n = String(name || '').trim();
     if (!n) return n;
@@ -309,32 +341,28 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     const selectedProducts = extractedProducts.filter(p => p.selected);
     
     if (selectedProducts.length === 0) {
-      toast({
-        title: "No products selected",
-        description: "Please select at least one product to import.",
-        variant: "destructive",
-      });
+      toast({ title: "No products selected", description: "Please select at least one product to import.", variant: "destructive" });
       return;
     }
 
     setImporting(true);
 
     try {
-      // Create products with template associations
-      // When a template is assigned, always use the template's description
       const productsToInsert = selectedProducts.map(p => {
         const selectedTemplate = p.template_id ? templates.find(t => t.id === p.template_id) : null;
         
-        // Ensure product name has template prefix when template is assigned
-        let finalName = p.name;
+        // Use edited fields for new products
+        const productName = p.matchStatus === 'new' ? (p.editName || p.name) : p.name;
+        const productState = p.matchStatus === 'new' ? (p.editState || p.state || null) : (p.state || null);
+        const productCost = p.matchStatus === 'new' ? (p.editCost ?? p.cost ?? null) : (p.cost ?? null);
+        const productDescription = p.matchStatus === 'new' ? (p.editDescription || p.description || null) : (p.description || null);
+        const productType = p.matchStatus === 'new' ? (p.editProductType || p.product_type || null) : (p.product_type || null);
+        
+        let finalName = productName;
         if (selectedTemplate) {
           const templatePrefix = `${selectedTemplate.name} - `;
-
-          // If the name already has the selected template prefix, keep as-is.
-          // Otherwise, strip any OTHER template prefix first to avoid
-          // "Template A - Template B - Variant".
-          if (!String(p.name || '').startsWith(templatePrefix)) {
-            const baseName = stripAnyTemplatePrefix(p.name, templates, selectedTemplate.id);
+          if (!String(productName || '').startsWith(templatePrefix)) {
+            const baseName = stripAnyTemplatePrefix(productName, templates, selectedTemplate.id);
             finalName = `${selectedTemplate.name} - ${baseName}`;
           }
         }
@@ -342,13 +370,11 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
         return {
           company_id: companyId,
           name: finalName,
-          // Always inherit template description when template is assigned
-          description: selectedTemplate?.description || p.description || null,
-          // Prioritize template state when template is assigned
-          state: selectedTemplate?.state || p.state || null,
-          cost: p.cost || selectedTemplate?.cost || null,
+          description: selectedTemplate?.description || productDescription || null,
+          state: selectedTemplate?.state || productState || null,
+          cost: productCost || selectedTemplate?.cost || null,
           price: selectedTemplate?.price || null,
-          product_type: p.product_type || null,
+          product_type: productType || null,
           template_id: p.template_id || null,
         };
       });
@@ -393,8 +419,9 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
   };
 
   const selectedCount = extractedProducts.filter(p => p.selected).length;
-  const templatedCount = extractedProducts.filter(p => p.selected && p.template_id).length;
-  const singleCount = extractedProducts.filter(p => p.selected && !p.template_id).length;
+  const newCount = extractedProducts.filter(p => p.matchStatus === 'new').length;
+  const existingCount = extractedProducts.filter(p => p.matchStatus === 'existing').length;
+  const selectedNewCount = extractedProducts.filter(p => p.selected && p.matchStatus === 'new').length;
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => isOpen ? setOpen(true) : handleClose()}>
@@ -536,18 +563,28 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                 />
                 <span className="text-sm">Select all</span>
               </div>
-              <div className="text-sm text-muted-foreground">
-                {selectedCount} selected · {templatedCount} templated · {singleCount} single
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-300 dark:text-green-400 dark:border-green-700">
+                  {existingCount} existing
+                </Badge>
+                <Badge variant="outline" className="bg-orange-500/10 text-orange-700 border-orange-300 dark:text-orange-400 dark:border-orange-700">
+                  {newCount} new
+                </Badge>
+                <span>· {selectedCount} selected</span>
               </div>
             </div>
 
-            <ScrollArea className="h-[350px] border rounded-lg">
+            <ScrollArea className="h-[400px] border rounded-lg">
               <div className="p-2 space-y-2">
                 {extractedProducts.map((product, index) => (
                   <Card 
                     key={index}
                     className={`p-3 transition-colors ${
-                      product.selected ? 'border-primary/50 bg-primary/5' : 'opacity-60'
+                      product.selected 
+                        ? product.matchStatus === 'existing' 
+                          ? 'border-green-300 bg-green-500/5 dark:border-green-700' 
+                          : 'border-primary/50 bg-primary/5' 
+                        : 'opacity-60'
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -560,7 +597,20 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                         <div className="flex items-center gap-2">
                           <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                           <span className="font-medium text-sm truncate">{product.name}</span>
+                          {product.matchStatus === 'existing' ? (
+                            <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-300 dark:text-green-400 dark:border-green-700 shrink-0 text-[10px] px-1.5 py-0">
+                              Existing
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-orange-500/10 text-orange-700 border-orange-300 dark:text-orange-400 dark:border-orange-700 shrink-0 text-[10px] px-1.5 py-0">
+                              New
+                            </Badge>
+                          )}
                         </div>
+
+                        {product.matchStatus === 'existing' && !product.selected && (
+                          <p className="text-xs text-muted-foreground italic">Already in your catalog</p>
+                        )}
                         
                         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                           {product.state && (
@@ -604,6 +654,66 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                             <span className="text-xs text-muted-foreground">Single</span>
                           )}
                         </div>
+
+                        {/* Inline edit for new products */}
+                        {product.matchStatus === 'new' && product.selected && (
+                          <Collapsible open={product.expanded} onOpenChange={() => toggleExpanded(index)}>
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground">
+                                {product.expanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
+                                Edit details
+                              </Button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-2 space-y-2 border-t pt-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Name</Label>
+                                  <Input
+                                    value={product.editName || ''}
+                                    onChange={(e) => updateEditField(index, 'editName', e.target.value)}
+                                    className="h-7 text-xs"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs">State</Label>
+                                  <Input
+                                    value={product.editState || ''}
+                                    onChange={(e) => updateEditField(index, 'editState', e.target.value)}
+                                    className="h-7 text-xs"
+                                    placeholder="e.g., AZ, CA"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Cost</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.001"
+                                    value={product.editCost ?? ''}
+                                    onChange={(e) => updateEditField(index, 'editCost', e.target.value ? parseFloat(e.target.value) : null)}
+                                    className="h-7 text-xs"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Type</Label>
+                                  <Input
+                                    value={product.editProductType || ''}
+                                    onChange={(e) => updateEditField(index, 'editProductType', e.target.value)}
+                                    className="h-7 text-xs"
+                                    placeholder="e.g., bag, sleeve"
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Description</Label>
+                                <Textarea
+                                  value={product.editDescription || ''}
+                                  onChange={(e) => updateEditField(index, 'editDescription', e.target.value)}
+                                  className="h-14 text-xs resize-none"
+                                />
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        )}
                       </div>
                     </div>
                   </Card>
@@ -626,7 +736,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                     Importing...
                   </>
                 ) : (
-                  <>Import {selectedCount} Products</>
+                  <>Import {selectedCount} Products ({selectedNewCount} new)</>
                 )}
               </Button>
             </div>
