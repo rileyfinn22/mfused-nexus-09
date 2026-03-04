@@ -1,32 +1,41 @@
 
 
-# Plan: Move Payment from Blanket Invoice 10737 to Child Invoice 10737-01
+## Plan: Show Repeat vs New Status for Each PO Line Item
 
-## What happened
-The $3,700 payment (ID `1368166f`) was manually recorded against blanket invoice `10737` (no QuickBooks ID). The actual synced invoice is `10737-01` (QuickBooks ID `24413`). This prevents the payment from syncing to QuickBooks.
+### Problem
+When analyzing an uploaded PO, all extracted products are displayed the same way. There's no indication of whether a product already exists in the system (repeat) or is entirely new.
 
-## What we will do
+### Solution
 
-**Single data operation** — move the payment record to the correct invoice:
+**1. After AI extraction, check each product against the existing `products` table**
 
-```sql
-UPDATE payments 
-SET invoice_id = '70dc161d-62ab-4c50-bf89-8c5eea00f99f'
-WHERE id = '1368166f-e661-4d7f-8c55-4997fdcafc7d';
-```
+In `AnalyzePOProductsDialog.tsx`, after receiving the AI-extracted products, query the `products` table for the selected company and compare each extracted product by name (normalized) to identify matches.
 
-This will:
-1. Re-link the payment to invoice `10737-01`
-2. The existing `update_invoice_payment_status` trigger will automatically:
-   - Set `10737-01.total_paid = 3700` and `status = paid` (since total = 3700)
-   - Set `10737.total_paid = 0` and `status = open`
-3. The `quickbooks-push-pending-payments` cron (runs every 5 min) will then find this payment (pending sync, invoice has `quickbooks_id`), and push it to QuickBooks against invoice 24413
+Each `ExtractedProduct` gets a new field:
+- `matchStatus`: `'existing'` | `'new'`
+- `existingProductId`: the matched product's ID (if existing)
 
-**No code changes needed.** No file modifications.
+**2. Update the review UI to display status per line item**
 
-## Expected result after execution
-| Invoice | Total | Paid | Status | QBO Synced |
-|---------|-------|------|--------|------------|
-| 10737 (blanket) | $7,659 | $0 | open | no |
-| 10737-01 (child) | $3,700 | $3,700 | paid | yes, payment pushed by cron |
+- **Existing/Repeat items**: Show a green "Existing" badge next to the product name. These are products already in the system — importing them would create duplicates, so they default to `selected: false` with a note like "Already in catalog".
+- **New items**: Show an orange "New" badge. These default to `selected: true`. For new items without a template match, show a small inline "Create Product" action that opens a quick-add form (name, description, state, cost pre-filled from the extraction) to create it as a standalone product.
+
+**3. Inline new product creation**
+
+For "new" items that the user wants to add but hasn't matched to a template, add an inline expandable section (or small dialog trigger) with pre-filled fields (name, description, state, cost, product_type) so the user can confirm/edit details before import. This replaces the current blind bulk insert.
+
+### Technical Details
+
+**File: `src/components/AnalyzePOProductsDialog.tsx`**
+
+- Add `matchStatus` and `existingProductId` to the `ExtractedProduct` interface
+- After `handleAnalyze` receives products, query `supabase.from('products').select('id, name').eq('company_id', companyId)` to get all existing products for the company
+- Normalize and compare names (case-insensitive, trimmed) to flag each as existing or new
+- Update the review card UI:
+  - Add a Badge showing "Existing" (green) or "New" (orange)
+  - Existing items: unselected by default, grayed styling, tooltip "Already in your catalog"
+  - New items: selected by default, editable inline fields (name, state, cost) that can be tweaked before import
+- Keep the current import flow but skip items flagged as existing (unless user explicitly re-selects them)
+
+No backend/edge function changes needed — the matching is done client-side against the products table after extraction.
 
