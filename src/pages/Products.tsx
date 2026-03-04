@@ -596,6 +596,7 @@ const Products = () => {
       setNewTemplatePrice("");
       setNewTemplateCost("");
       setNewTemplateState("");
+      setNewTemplateCompanyId("");
       fetchTemplates();
     } catch (error) {
       console.error('Error creating template:', error);
