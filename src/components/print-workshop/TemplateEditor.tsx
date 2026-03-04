@@ -1626,7 +1626,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getScenePoint(e.e);
+      const pointer = getScenePointer(canvas, e.e);
       const x = pointer.x;
       const y = pointer.y;
       drawMaskStartRef.current = { x, y };
