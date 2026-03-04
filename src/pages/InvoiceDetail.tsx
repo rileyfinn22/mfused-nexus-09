@@ -1424,29 +1424,31 @@ const InvoiceDetail = () => {
   const displayItems = editedItems;
   const isBlanketDisplay = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
   
-  // Invoice totals always use shipped qty × price for all invoice types
-  const getShippedQtyForItem = (item: any) => {
-    if (invoice?.invoice_type === 'full') {
-      const orderItem = order?.order_items?.find((oi: any) => oi.sku === item.sku);
-      return Number(orderItem?.shipped_quantity || item.shipped_quantity || 0);
+  const displayShipping = isEditMode ? Number(editShippingCost || 0) : Number(invoice?.shipping_cost || 0);
+  
+  // Unified total calculation using shared calculator
+  const computeDisplayTotals = () => {
+    if (isEditMode) {
+      // Edit mode: always use shipped qty from edited items
+      const items = blanketTotalItems(editedItems);
+      return calculateInvoiceTotals(items, Number(invoice?.tax || 0), displayShipping);
     }
-    // Partial invoices: quantity = allocated quantity
-    return Number(item.quantity || 0);
+    if (isBlanketDisplay) {
+      // Blanket display: compute from shipped quantities on order items
+      const items = displayItems.map((item: any) => {
+        const orderItem = order?.order_items?.find((oi: any) => oi.id === item.id);
+        return {
+          quantity: Number(orderItem?.shipped_quantity || item.shipped_quantity || 0),
+          unit_price: Number(item.unit_price || 0),
+        };
+      });
+      return calculateInvoiceTotals(items, Number(invoice?.tax || 0), displayShipping);
+    }
+    // Partial invoices or non-blanket: use stored DB values
+    return { subtotal: Number(invoice?.subtotal || 0), total: Number(invoice?.subtotal || 0) + Number(invoice?.tax || 0) + displayShipping };
   };
   
-  const displaySubtotal = isEditMode 
-    ? displayItems.reduce((sum: number, item: any) => {
-        const editedItem = editedItems.find((ei: any) => ei.id === item.id);
-        const qty = invoice?.invoice_type === 'full' 
-          ? Number(editedItem?.shipped_quantity || item.shipped_quantity || 0)
-          : Number(item.quantity || 0);
-        return sum + qty * Number(item.unit_price);
-      }, 0) 
-    : isBlanketDisplay
-      ? displayItems.reduce((sum: number, item: any) => sum + getShippedQtyForItem(item) * Number(item.unit_price), 0)
-      : Number(invoice?.subtotal || 0);
-  const displayShipping = isEditMode ? Number(editShippingCost || 0) : Number(invoice?.shipping_cost || 0);
-  const displayTotal = displaySubtotal + Number(invoice?.tax || 0) + displayShipping;
+  const { subtotal: displaySubtotal, total: displayTotal } = computeDisplayTotals();
   const displayTotalPaid = Number(invoice?.total_paid || 0);
   const displayBalance = displayTotal - displayTotalPaid;
 
