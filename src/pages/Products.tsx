@@ -123,6 +123,7 @@ const Products = () => {
   const [newTemplatePrice, setNewTemplatePrice] = useState("");
   const [newTemplateCost, setNewTemplateCost] = useState("");
   const [newTemplateState, setNewTemplateState] = useState("");
+  const [newTemplateCompanyId, setNewTemplateCompanyId] = useState("");
   const [creatingTemplate, setCreatingTemplate] = useState(false);
 
   useEffect(() => {
