@@ -1082,10 +1082,8 @@ const InvoiceDetail = () => {
         }
       }
 
-      // Recalculate totals - blanket uses ordered quantities, shipments use shipped
-      const newSubtotal = isBlanketInvoice
-        ? editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0)
-        : editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
+      // Recalculate totals - always use shipped quantities × price
+      const newSubtotal = editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
       const editedShipping = Number(editShippingCost || 0);
       const newTotal = newSubtotal + Number(invoice.tax || 0) + editedShipping;
 
@@ -1431,26 +1429,26 @@ const InvoiceDetail = () => {
   const displayItems = editedItems;
   const isBlanketDisplay = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
   
-  // Subtotal must match what's shown per line item on the invoice:
-  // - Blanket (full) invoices: ordered qty × price (line items show ordered qty as the billing basis)
-  // - Partial/shipment invoices: allocated qty × price
+  // Invoice totals always use shipped qty × price for all invoice types
+  const getShippedQtyForItem = (item: any) => {
+    if (invoice?.invoice_type === 'full') {
+      const orderItem = order?.order_items?.find((oi: any) => oi.sku === item.sku);
+      return Number(orderItem?.shipped_quantity || item.shipped_quantity || 0);
+    }
+    // Partial invoices: quantity = allocated quantity
+    return Number(item.quantity || 0);
+  };
+  
   const displaySubtotal = isEditMode 
     ? displayItems.reduce((sum: number, item: any) => {
-        if (invoice?.invoice_type === 'full') {
-          // Blanket: use ordered qty (matches line item total column)
-          const orderItem = order?.order_items?.find((oi: any) => oi.sku === item.sku);
-          const orderedQty = orderItem?.quantity || item.quantity || 0;
-          return sum + Number(orderedQty) * Number(item.unit_price);
-        }
-        // Partial: use the allocated/displayed quantity
-        return sum + Number(item.quantity || 0) * Number(item.unit_price);
+        const editedItem = editedItems.find((ei: any) => ei.id === item.id);
+        const qty = invoice?.invoice_type === 'full' 
+          ? Number(editedItem?.shipped_quantity || item.shipped_quantity || 0)
+          : Number(item.quantity || 0);
+        return sum + qty * Number(item.unit_price);
       }, 0) 
     : isBlanketDisplay
-      ? displayItems.reduce((sum: number, item: any) => {
-          const orderItem = order?.order_items?.find((oi: any) => oi.sku === item.sku);
-          const orderedQty = orderItem?.quantity || item.quantity || 0;
-          return sum + Number(orderedQty) * Number(item.unit_price);
-        }, 0)
+      ? displayItems.reduce((sum: number, item: any) => sum + getShippedQtyForItem(item) * Number(item.unit_price), 0)
       : Number(invoice?.subtotal || 0);
   const displayShipping = isEditMode ? Number(editShippingCost || 0) : Number(invoice?.shipping_cost || 0);
   const displayTotal = displaySubtotal + Number(invoice?.tax || 0) + displayShipping;
@@ -2321,8 +2319,8 @@ const InvoiceDetail = () => {
                         {isEditMode ? <Input type="number" step="0.001" min="0" value={item.unit_price} onChange={e => handlePriceChange(item.id, parseFloat(e.target.value) || 0)} className="w-28 text-right" /> : formatUnitPrice(Number(item.unit_price))}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {/* For blanket invoices, show total based on ordered qty; for partial/shipped, use shipped qty */}
-                        {formatCurrency((invoice?.invoice_type === 'full' ? orderedQty : shippedQty) * Number(item.unit_price))}
+                        {/* Line total = shipped qty × price for all invoice types */}
+                        {formatCurrency(shippedQty * Number(item.unit_price))}
                       </TableCell>
                     </TableRow>;
               })}
