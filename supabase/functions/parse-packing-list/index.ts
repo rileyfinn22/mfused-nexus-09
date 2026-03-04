@@ -91,6 +91,17 @@ serve(async (req) => {
       return union === 0 ? 0 : inter / union;
     };
 
+    // Containment: fraction of smaller set tokens found in larger set
+    // Handles cases where vendor name is a subset of order name (missing sub-brand words)
+    const containment = (a: string[], b: string[]) => {
+      if (a.length === 0 || b.length === 0) return 0;
+      const shorter = a.length <= b.length ? a : b;
+      const longer = new Set(a.length <= b.length ? b : a);
+      let hits = 0;
+      for (const t of shorter) if (longer.has(t)) hits++;
+      return hits / shorter.length;
+    };
+
     const orderItemsList = orderItems.map((item: any) => ({
       id: item.id,
       name: item.name,
