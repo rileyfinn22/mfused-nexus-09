@@ -332,14 +332,16 @@ ${parsedContent}`;
 
       let best: { item: any; score: number } | null = null;
       for (const item of orderItemsList) {
-        const base = jaccard(lineTokens, item._name_tokens);
+        const jaccardScore = jaccard(lineTokens, item._name_tokens);
+        const containScore = containment(lineTokens, item._name_tokens);
         const substringBoost = item._name_norm && (item._name_norm.includes(nameNorm) || nameNorm.includes(item._name_norm)) ? 0.15 : 0;
-        const score = Math.min(1, base + substringBoost);
+        // Use the better of jaccard or containment, plus substring boost
+        const score = Math.min(1, Math.max(jaccardScore, containScore * 0.9) + substringBoost);
         if (!best || score > best.score) best = { item, score };
       }
 
       const bestScore = best?.score ?? 0;
-      if (!best || bestScore < 0.55) {
+      if (!best || bestScore < 0.50) {
         // Below threshold = don't match
         unmatched.push({ 
           name: line.name, 
