@@ -1254,7 +1254,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     toast.info(`Draw a rectangle over text to extract as ${zoneExtractLocked ? "locked" : "editable"}`, { duration: 3000 });
 
     const onMouseDown = (opt: any) => {
-      const pointer = canvas.getScenePoint(opt.e);
+      const pointer = getScenePointer(canvas, opt.e);
       zoneStartRef.current = { x: pointer.x, y: pointer.y };
       const rect = new Rect({
         left: pointer.x,
