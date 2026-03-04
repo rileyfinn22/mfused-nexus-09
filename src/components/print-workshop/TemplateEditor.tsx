@@ -207,6 +207,21 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     previewPdfUrlRef.current = url;
   };
 
+  const getScenePointer = useCallback((canvas: FabricCanvas, evt: Event) => {
+    const anyCanvas = canvas as any;
+
+    if (typeof anyCanvas.getScenePoint === "function") {
+      const pt = anyCanvas.getScenePoint(evt);
+      if (pt && Number.isFinite(pt.x) && Number.isFinite(pt.y)) {
+        return { x: pt.x, y: pt.y };
+      }
+    }
+
+    const pointer = anyCanvas.getPointer?.(evt) || { x: 0, y: 0 };
+    const zoom = canvas.getZoom() || 1;
+    return { x: pointer.x / zoom, y: pointer.y / zoom };
+  }, []);
+
   /**
    * Build knockout bounds from OCR percentage data relative to a reference area.
    * refLeft/refTop/refW/refH define the reference rectangle (crop area or full canvas).
