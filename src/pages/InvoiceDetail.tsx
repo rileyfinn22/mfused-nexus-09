@@ -29,6 +29,7 @@ import autoTable from "jspdf-autotable";
 import { addPdfBranding, addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
 import { EditableDescription } from "@/components/EditableDescription";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
+import { calculateInvoiceTotals, blanketTotalItems, partialTotalItems } from "@/lib/invoiceTotals";
 
 const InvoiceDetail = () => {
   const {
