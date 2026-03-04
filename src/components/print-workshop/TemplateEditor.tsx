@@ -1275,7 +1275,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (opt: any) => {
       if (!zoneStartRef.current || !zoneRectRef.current) return;
-      const pointer = canvas.getScenePoint(opt.e);
+      const pointer = getScenePointer(canvas, opt.e);
       const left = Math.min(zoneStartRef.current.x, pointer.x);
       const top = Math.min(zoneStartRef.current.y, pointer.y);
       const w = Math.abs(pointer.x - zoneStartRef.current.x);
