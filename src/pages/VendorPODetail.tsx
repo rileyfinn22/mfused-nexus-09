@@ -25,6 +25,7 @@ const VendorPODetail = () => {
   // Get returnTo parameter from URL to navigate back properly
   const searchParams = new URLSearchParams(window.location.search);
   const returnTo = searchParams.get('returnTo') || '/vendor-pos';
+  const autoSend = searchParams.get('send') === 'true';
   const [po, setPO] = useState<any>(null);
   const [poItems, setPOItems] = useState<any[]>([]);
   const [poPayments, setPOPayments] = useState<any[]>([]);
@@ -896,6 +897,14 @@ Thank you for your business.`;
     setShowEmailPreview(true);
     fetchArtworkFiles();
   };
+
+  // Auto-open send dialog when navigated with ?send=true
+  useEffect(() => {
+    if (autoSend && po && vendor?.contact_email && !showEmailPreview) {
+      setShowEmailPreview(true);
+    }
+  }, [autoSend, po, vendor]);
+
 
   // Show loading while checking admin status or loading PO data
   if (isAdmin === null || loading) {

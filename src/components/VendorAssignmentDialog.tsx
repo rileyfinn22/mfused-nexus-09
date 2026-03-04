@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle } from "lucide-react";
+import { Loader2, CheckCircle, Send } from "lucide-react";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
 
 interface VendorAssignmentDialogProps {
@@ -745,14 +745,26 @@ export const VendorAssignmentDialog = ({
                         </td>
                         <td className="p-3">
                           {assignments[item.id]?.vendorPoNumber ? (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="h-8 px-2 text-xs"
-                              onClick={() => navigate(`/vendor-pos/${assignments[item.id]?.vendorPoId}`)}
-                            >
-                              {assignments[item.id]?.vendorPoNumber}
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="h-8 px-2 text-xs"
+                                onClick={() => navigate(`/vendor-pos/${assignments[item.id]?.vendorPoId}`)}
+                              >
+                                {assignments[item.id]?.vendorPoNumber}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs gap-1"
+                                onClick={() => navigate(`/vendor-pos/${assignments[item.id]?.vendorPoId}?send=true`)}
+                                title="Send PO to Vendor"
+                              >
+                                <Send className="h-3 w-3" />
+                                Send
+                              </Button>
+                            </div>
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>
                           )}
