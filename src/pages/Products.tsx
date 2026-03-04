@@ -123,6 +123,7 @@ const Products = () => {
   const [newTemplatePrice, setNewTemplatePrice] = useState("");
   const [newTemplateCost, setNewTemplateCost] = useState("");
   const [newTemplateState, setNewTemplateState] = useState("");
+  const [newTemplateCompanyId, setNewTemplateCompanyId] = useState("");
   const [creatingTemplate, setCreatingTemplate] = useState(false);
 
   useEffect(() => {
@@ -560,10 +561,12 @@ const Products = () => {
   const handleCreateTemplate = async () => {
     if (!newTemplateName.trim()) return;
     
-    if (!companyFilter || companyFilter === 'all') {
+    const targetCompanyId = companyFilter !== 'all' ? companyFilter : newTemplateCompanyId;
+    
+    if (!targetCompanyId) {
       toast({
         title: "Company required",
-        description: "Please select a company before creating a template.",
+        description: "Please select a company for this template.",
         variant: "destructive",
       });
       return;
@@ -577,7 +580,7 @@ const Products = () => {
         price: newTemplatePrice ? parseFloat(newTemplatePrice) : null,
         cost: newTemplateCost ? parseFloat(newTemplateCost) : null,
         state: newTemplateState.trim() || null,
-        company_id: companyFilter,
+        company_id: targetCompanyId,
       });
 
       if (error) throw error;
@@ -593,6 +596,7 @@ const Products = () => {
       setNewTemplatePrice("");
       setNewTemplateCost("");
       setNewTemplateState("");
+      setNewTemplateCompanyId("");
       fetchTemplates();
     } catch (error) {
       console.error('Error creating template:', error);
@@ -683,8 +687,7 @@ const Products = () => {
               <Button 
                 variant="outline" 
                 onClick={() => setCreateTemplateOpen(true)}
-                disabled={companyFilter === 'all'}
-                title={companyFilter === 'all' ? 'Select a company first' : 'Create new template'}
+                title="Create new template"
               >
                 <Layers className="h-4 w-4 mr-1.5" />
                 Add Template
@@ -1221,6 +1224,24 @@ const Products = () => {
           </DialogHeader>
 
           <div className="space-y-4">
+            {companyFilter === 'all' && (
+              <div className="space-y-2">
+                <Label>Company <span className="text-destructive">*</span></Label>
+                <Select value={newTemplateCompanyId} onValueChange={setNewTemplateCompanyId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Template name <span className="text-destructive">*</span></Label>
               <Input 
@@ -1328,7 +1349,7 @@ const Products = () => {
             <Button variant="outline" onClick={() => setCreateTemplateOpen(false)} disabled={creatingTemplate}>
               Cancel
             </Button>
-            <Button onClick={handleCreateTemplate} disabled={creatingTemplate || !newTemplateName.trim()}>
+            <Button onClick={handleCreateTemplate} disabled={creatingTemplate || !newTemplateName.trim() || (companyFilter === 'all' && !newTemplateCompanyId)}>
               {creatingTemplate ? "Creating..." : "Create Template"}
             </Button>
           </DialogFooter>
