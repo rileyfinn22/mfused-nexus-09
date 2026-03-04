@@ -1526,7 +1526,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (e: any) => {
       if (!drawTextStartRef.current || !drawTextRectRef.current) return;
-      const pointer = canvas.getScenePoint(e.e);
+      const pointer = getScenePointer(canvas, e.e);
       const x = pointer.x;
       const y = pointer.y;
       const start = drawTextStartRef.current;
