@@ -2247,7 +2247,36 @@ const InvoiceDetail = () => {
                   {invoice?.invoice_type === 'full' ? (
                     <>
                       <TableHead className="text-center">Ordered</TableHead>
-                      <TableHead className="text-center">Shipped</TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          Shipped
+                          {isEditMode && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px] text-primary"
+                              onClick={() => {
+                                setEditedItems(items => items.map(item => {
+                                  const orderItem = order?.order_items?.find((oi: any) => oi.sku === item.sku);
+                                  const currentShipped = Number(item.shipped_quantity || 0);
+                                  const orderedQty = orderItem?.quantity || item.quantity || 0;
+                                  if (currentShipped === 0) {
+                                    return {
+                                      ...item,
+                                      quantity: orderedQty,
+                                      shipped_quantity: orderedQty,
+                                      total: orderedQty * Number(item.unit_price)
+                                    };
+                                  }
+                                  return item;
+                                }));
+                              }}
+                            >
+                              Ship All
+                            </Button>
+                          )}
+                        </div>
+                      </TableHead>
                     </>
                   ) : (
                     <TableHead className="text-center">Quantity</TableHead>
