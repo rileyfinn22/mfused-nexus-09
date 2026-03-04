@@ -1349,7 +1349,7 @@ const Products = () => {
             <Button variant="outline" onClick={() => setCreateTemplateOpen(false)} disabled={creatingTemplate}>
               Cancel
             </Button>
-            <Button onClick={handleCreateTemplate} disabled={creatingTemplate || !newTemplateName.trim()}>
+            <Button onClick={handleCreateTemplate} disabled={creatingTemplate || !newTemplateName.trim() || (companyFilter === 'all' && !newTemplateCompanyId)}>
               {creatingTemplate ? "Creating..." : "Create Template"}
             </Button>
           </DialogFooter>
