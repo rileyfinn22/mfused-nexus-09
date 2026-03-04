@@ -352,6 +352,18 @@ Please confirm receipt of this order and provide an estimated delivery date.
 Thank you for your business.`;
   };
 
+  const handleDownloadPdf = async () => {
+    try {
+      const pdfBase64 = await generatePdfBase64();
+      const link = document.createElement("a");
+      link.href = `data:application/pdf;base64,${pdfBase64}`;
+      link.download = `PO-${po.po_number}.pdf`;
+      link.click();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
   const handleOpenEmailDialog = () => {
     setShowEmailPreview(true);
     fetchArtworkFiles();
