@@ -1,32 +1,41 @@
 
+Goal: make invoice totals come from the invoice line-item section logic only, and stop packing-list flow from using separate math.
 
-# Plan: Move Payment from Blanket Invoice 10737 to Child Invoice 10737-01
+1) Align the source of truth for totals
+- Create one shared invoice-total calculator (used by both Invoice Detail and Packing List save flow).
+- Inputs: current invoice type, line items shown for that invoice, shipped/allocated quantity basis, unit price, shipping, tax.
+- Output: subtotal + total.
+- This removes the current split logic where each screen recalculates differently.
 
-## What happened
-The $3,700 payment (ID `1368166f`) was manually recorded against blanket invoice `10737` (no QuickBooks ID). The actual synced invoice is `10737-01` (QuickBooks ID `24413`). This prevents the payment from syncing to QuickBooks.
+2) Fix packing-list save behavior (current root issue)
+- In `InvoicePackingListSection.tsx`, keep packing-list upload/parsing + shipped quantity/allocation updates.
+- Replace the current local subtotal logic in `applyShippedQuantities` with the shared calculator.
+- Remove “all order items blanket math” branch that bypasses invoice section logic.
+- Always persist totals (including zero), not only when subtotal > 0.
 
-## What we will do
+3) Fix Invoice Detail math consistency
+- In `InvoiceDetail.tsx`, use the same shared calculator for:
+  - on-screen totals,
+  - save action (`handleSaveQuantities`),
+  - any shipped-qty updates.
+- Remove SKU-based lookups for quantity math (use order-item id to avoid collisions/mis-pairing).
+- Keep line total = quantity basis used by invoice section × unit price, so row totals and footer totals always match.
 
-**Single data operation** — move the payment record to the correct invoice:
+4) Prevent unrelated order-level corruption
+- In `handleSaveQuantities`, stop recalculating/updating parent order financial totals from invoice edit state (this is currently mixing invoice edits into order totals).
+- Limit save scope to invoice totals + shipped/allocation data relevant to the invoice.
 
-```sql
-UPDATE payments 
-SET invoice_id = '70dc161d-62ab-4c50-bf89-8c5eea00f99f'
-WHERE id = '1368166f-e661-4d7f-8c55-4997fdcafc7d';
-```
+5) Data correction for already-affected invoices
+- Run a one-time backend recalculation for mismatched invoices (including 10708) using the same shared formula so invoice tile totals and invoice detail totals match immediately.
 
-This will:
-1. Re-link the payment to invoice `10737-01`
-2. The existing `update_invoice_payment_status` trigger will automatically:
-   - Set `10737-01.total_paid = 3700` and `status = paid` (since total = 3700)
-   - Set `10737.total_paid = 0` and `status = open`
-3. The `quickbooks-push-pending-payments` cron (runs every 5 min) will then find this payment (pending sync, invoice has `quickbooks_id`), and push it to QuickBooks against invoice 24413
-
-**No code changes needed.** No file modifications.
-
-## Expected result after execution
-| Invoice | Total | Paid | Status | QBO Synced |
-|---------|-------|------|--------|------------|
-| 10737 (blanket) | $7,659 | $0 | open | no |
-| 10737-01 (child) | $3,700 | $3,700 | paid | yes, payment pushed by cron |
-
+Technical details
+- Files to update:
+  - `src/components/InvoicePackingListSection.tsx`
+  - `src/pages/InvoiceDetail.tsx`
+  - (optional helper) `src/lib/invoiceTotals.ts`
+- No schema/RLS changes needed.
+- Regression checks:
+  - Upload packing list with apply shipped ON: totals update to invoice-section math only.
+  - Manual shipped edit + save: totals match line items exactly.
+  - Invoice list amount equals invoice detail total for the same invoice.
+  - Verify invoice 10708 and 10748 specifically after backfill.
