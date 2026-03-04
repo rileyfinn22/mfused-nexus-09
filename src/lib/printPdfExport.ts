@@ -40,7 +40,8 @@ interface ExportOptions {
  */
 async function fetchSourcePdf(path: string): Promise<ArrayBuffer> {
   const { data } = supabase.storage.from("print-files").getPublicUrl(path);
-  const resp = await fetch(data.publicUrl);
+  const cacheBustedUrl = `${data.publicUrl}${data.publicUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(path)}-${Date.now()}`;
+  const resp = await fetch(cacheBustedUrl, { cache: "no-store" });
   if (!resp.ok) throw new Error(`Failed to fetch source PDF: ${resp.statusText}`);
   return resp.arrayBuffer();
 }

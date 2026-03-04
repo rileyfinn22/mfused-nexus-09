@@ -82,7 +82,8 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
       // Strategy 2: Generate thumbnail from the source PDF
       if (sourcePdfPath) {
         const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(sourcePdfPath);
-        const resp = await fetch(urlData.publicUrl);
+        const cacheBustedUrl = `${urlData.publicUrl}${urlData.publicUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(sourcePdfPath)}-${Date.now()}`;
+        const resp = await fetch(cacheBustedUrl, { cache: "no-store" });
         if (resp.ok) {
           const buf = await resp.arrayBuffer();
           const { generatePdfThumbnailFromArrayBuffer } = await import("@/lib/pdfThumbnail");
