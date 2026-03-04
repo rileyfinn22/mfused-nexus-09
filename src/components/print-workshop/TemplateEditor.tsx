@@ -415,9 +415,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const canvas = new FabricCanvas(canvasRef.current, {
       enableRetinaScaling: true,
     });
-    // Keep logical zoom deterministic across devices; Fabric manages DPR internally.
-    canvas.setDimensions({ width: cssWidth, height: cssHeight });
-    // Zoom maps logical canvas coords (canvasWidth) → on-screen CSS pixels
+    // Keep logical scene size in print pixels; scale only the CSS viewport.
+    canvas.setDimensions({ width: canvasWidth, height: canvasHeight }, { backstoreOnly: true } as any);
+    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true } as any);
     canvas.setZoom(displayScale);
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
