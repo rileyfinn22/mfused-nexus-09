@@ -694,6 +694,12 @@ export const InvoicePackingListSection = ({
         }
       }
 
+      // Fetch all current allocations for this invoice
+      const { data: allAllocations } = await supabase
+        .from('inventory_allocations')
+        .select('order_item_id, quantity_allocated')
+        .eq('invoice_id', invoiceId);
+
       // Recalculate invoice subtotal using shared calculator
       // Build final allocation map: start with existing, override with new matches
       const allocMap = new Map<string, number>();
