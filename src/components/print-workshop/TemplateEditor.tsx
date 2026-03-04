@@ -415,9 +415,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const canvas = new FabricCanvas(canvasRef.current, {
       enableRetinaScaling: true,
     });
-    // Keep logical zoom deterministic across devices; Fabric manages DPR internally.
-    canvas.setDimensions({ width: cssWidth, height: cssHeight });
-    // Zoom maps logical canvas coords (canvasWidth) → on-screen CSS pixels
+    // Keep logical scene size in print pixels; scale only the CSS viewport.
+    canvas.setDimensions({ width: canvasWidth, height: canvasHeight }, { backstoreOnly: true } as any);
+    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true } as any);
     canvas.setZoom(displayScale);
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
@@ -1476,10 +1476,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
-      const x = pointer.x / zoom;
-      const y = pointer.y / zoom;
+      const pointer = canvas.getScenePoint(e.e);
+      const x = pointer.x;
+      const y = pointer.y;
       drawTextStartRef.current = { x, y };
       const rect = new Rect({
         left: x, top: y, width: 1, height: 1,
@@ -1497,10 +1496,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (e: any) => {
       if (!drawTextStartRef.current || !drawTextRectRef.current) return;
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
-      const x = pointer.x / zoom;
-      const y = pointer.y / zoom;
+      const pointer = canvas.getScenePoint(e.e);
+      const x = pointer.x;
+      const y = pointer.y;
       const start = drawTextStartRef.current;
       drawTextRectRef.current.set({
         left: Math.min(start.x, x),
@@ -1598,10 +1596,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
-      const x = pointer.x / zoom;
-      const y = pointer.y / zoom;
+      const pointer = canvas.getScenePoint(e.e);
+      const x = pointer.x;
+      const y = pointer.y;
       drawMaskStartRef.current = { x, y };
       const rect = new Rect({
         left: x, top: y, width: 1, height: 1,
@@ -1619,10 +1616,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (e: any) => {
       if (!drawMaskStartRef.current || !drawMaskRectRef.current) return;
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
-      const x = pointer.x / zoom;
-      const y = pointer.y / zoom;
+      const pointer = canvas.getScenePoint(e.e);
+      const x = pointer.x;
+      const y = pointer.y;
       const start = drawMaskStartRef.current;
       drawMaskRectRef.current.set({
         left: Math.min(start.x, x),
@@ -1712,9 +1708,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     let rect: Rect | null = null;
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
-      startPt = { x: pointer.x / zoom, y: pointer.y / zoom };
+      const pointer = canvas.getScenePoint(e.e);
+      startPt = { x: pointer.x, y: pointer.y };
       rect = new Rect({
         left: startPt.x, top: startPt.y, width: 1, height: 1,
         fill: "rgba(59,130,246,0.08)", stroke: "#3b82f6",
@@ -1727,10 +1722,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (e: any) => {
       if (!startPt || !rect) return;
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
-      const x = pointer.x / zoom;
-      const y = pointer.y / zoom;
+      const pointer = canvas.getScenePoint(e.e);
+      const x = pointer.x;
+      const y = pointer.y;
       rect.set({
         left: Math.min(startPt.x, x), top: Math.min(startPt.y, y),
         width: Math.abs(x - startPt.x), height: Math.abs(y - startPt.y),
