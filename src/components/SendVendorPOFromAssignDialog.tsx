@@ -176,11 +176,11 @@ export function SendVendorPOFromAssignDialog({
     doc.setFont("helvetica", "normal");
     doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
     yPos += 8;
-    doc.text(VIBE_COMPANY.address, 14, yPos);
+    doc.text(VIBE_COMPANY.address.street, 14, yPos);
     yPos += 5;
-    doc.text(`${VIBE_COMPANY.city}, ${VIBE_COMPANY.state} ${VIBE_COMPANY.zip}`, 14, yPos);
+    doc.text(`${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}`, 14, yPos);
     yPos += 5;
-    doc.text(`${VIBE_COMPANY.phone} | ${VIBE_COMPANY.email}`, 14, yPos);
+    doc.text("accounting@vibepkg.com", 14, yPos);
     yPos += 10;
 
     // Divider

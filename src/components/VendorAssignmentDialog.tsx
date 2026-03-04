@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle, Send } from "lucide-react";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
+import { SendVendorPOFromAssignDialog } from "@/components/SendVendorPOFromAssignDialog";
 
 interface VendorAssignmentDialogProps {
   open: boolean;
@@ -42,6 +43,7 @@ export const VendorAssignmentDialog = ({
   const [bulkVendorId, setBulkVendorId] = useState<string>("");
   const [bulkCost, setBulkCost] = useState<string>("");
   const [freshOrderItems, setFreshOrderItems] = useState<any[]>([]);
+  const [sendPOData, setSendPOData] = useState<{ id: string; number: string } | null>(null);
   const { syncVendorPO, checkConnection } = useQuickBooksAutoSync();
 
   useEffect(() => {
@@ -613,6 +615,7 @@ export const VendorAssignmentDialog = ({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl max-h-[85vh]">
         <DialogHeader>
@@ -758,8 +761,8 @@ export const VendorAssignmentDialog = ({
                                 variant="outline"
                                 size="sm"
                                 className="h-7 px-2 text-xs gap-1"
-                                onClick={() => navigate(`/vendor-pos/${assignments[item.id]?.vendorPoId}?send=true`)}
-                                title="Send PO to Vendor"
+                                onClick={() => setSendPOData({ id: assignments[item.id]?.vendorPoId!, number: assignments[item.id]?.vendorPoNumber! })}
+                                title="Preview & Send PO to Vendor"
                               >
                                 <Send className="h-3 w-3" />
                                 Send
@@ -804,5 +807,15 @@ export const VendorAssignmentDialog = ({
         )}
       </DialogContent>
     </Dialog>
+
+    {sendPOData && (
+      <SendVendorPOFromAssignDialog
+        open={!!sendPOData}
+        onOpenChange={(open) => { if (!open) setSendPOData(null); }}
+        vendorPoId={sendPOData.id}
+        vendorPoNumber={sendPOData.number}
+      />
+    )}
+    </>
   );
 };
