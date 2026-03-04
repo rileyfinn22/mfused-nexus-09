@@ -1083,22 +1083,16 @@ const InvoiceDetail = () => {
         }
       }
 
-      // Recalculate totals - always use shipped quantities × price
-      const newSubtotal = editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
+      // Recalculate totals using shared calculator - shipped qty × price
+      const totalItems = blanketTotalItems(editedItems);
       const editedShipping = Number(editShippingCost || 0);
-      const newTotal = newSubtotal + Number(invoice.tax || 0) + editedShipping;
+      const { subtotal: newSubtotal, total: newTotal } = calculateInvoiceTotals(
+        totalItems,
+        Number(invoice.tax || 0),
+        editedShipping
+      );
 
-      // Update order totals (always based on ordered quantities)
-      const orderSubtotal = editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0);
-      const orderTotal = orderSubtotal + Number(invoice.tax || 0);
-      const {
-        error: orderError
-      } = await supabase.from('orders').update({
-        subtotal: orderSubtotal,
-        total: orderTotal
-      }).eq('id', invoice.order_id);
-      if (orderError) throw orderError;
-
+      // NOTE: Do NOT update order totals from invoice edit - invoice scope only
       // Update invoice totals
       const {
         error: invoiceError
