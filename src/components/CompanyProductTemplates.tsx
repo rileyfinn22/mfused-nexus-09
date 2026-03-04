@@ -930,7 +930,6 @@ export function CompanyProductTemplates({
             </div>
           </DialogContent>
         </Dialog>
-      </div>
 
         {/* Edit Template Dialog (inside selected template view) */}
         <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && setEditingTemplate(null)}>
