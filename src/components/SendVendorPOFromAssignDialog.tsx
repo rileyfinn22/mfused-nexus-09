@@ -579,13 +579,22 @@ Thank you for your business.`;
                 </div>
               </div>
             </div>
+            </ScrollArea>
           ) : (
             <p className="text-center text-muted-foreground py-8">Failed to load PO details</p>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDownloadPdf}
+              disabled={loading || !po}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
             </Button>
             <Button
               onClick={handleOpenEmailDialog}
