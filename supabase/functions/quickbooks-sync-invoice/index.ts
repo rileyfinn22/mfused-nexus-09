@@ -569,6 +569,9 @@ serve(async (req) => {
     let lineItems = [];
     let calculatedSubtotal = 0;
 
+    // Track which order_item IDs are covered by allocations
+    const allocatedOrderItemIds = new Set<string>();
+
     if (allocations && allocations.length > 0) {
       // Use inventory allocations for line items
       console.log('Using inventory allocations for line items');
@@ -578,6 +581,7 @@ serve(async (req) => {
         const unitPrice = item.unit_price;
         const fullAmount = qty * unitPrice;
         calculatedSubtotal += fullAmount;
+        allocatedOrderItemIds.add(item.id);
         
         // Find or create the QB item using the product name
         const qbItemId = await findOrCreateQBItem(item.name, item.description || item.name, unitPrice);
@@ -597,6 +601,39 @@ serve(async (req) => {
           },
           Description: item.description || item.name,
         });
+      }
+
+      // Also include order items that have shipped_quantity but NO allocation for this invoice
+      // This handles cases where some items were shipped directly (not via Pull & Ship)
+      const nonAllocatedShippedItems = (invoice.orders?.order_items || [])
+        .filter((item: any) => item.shipped_quantity > 0 && !allocatedOrderItemIds.has(item.id));
+
+      if (nonAllocatedShippedItems.length > 0) {
+        console.log(`Including ${nonAllocatedShippedItems.length} non-allocated shipped items`);
+        for (const item of nonAllocatedShippedItems) {
+          const qty = item.shipped_quantity;
+          const unitPrice = item.unit_price;
+          const fullAmount = qty * unitPrice;
+          calculatedSubtotal += fullAmount;
+
+          const qbItemId = await findOrCreateQBItem(item.name, item.description || item.name, unitPrice);
+
+          console.log(`Non-allocated item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, QB Item ID: ${qbItemId}`);
+
+          lineItems.push({
+            DetailType: 'SalesItemLineDetail',
+            Amount: fullAmount,
+            SalesItemLineDetail: {
+              ItemRef: {
+                value: qbItemId,
+                name: item.name,
+              },
+              Qty: qty,
+              UnitPrice: unitPrice,
+            },
+            Description: item.description || item.name,
+          });
+        }
       }
     } else {
       // Fallback: Use order items with shipped_quantity or all items
