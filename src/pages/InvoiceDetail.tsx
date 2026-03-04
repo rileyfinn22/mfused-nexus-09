@@ -2681,240 +2681,84 @@ const InvoiceDetail = () => {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {vendorPOs.map(po => <Card key={po.id} className="border hover:border-primary/50 transition-colors">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary capitalize">
-                          {po.status.replace('_', ' ')}
-                        </span>
+            <div className="space-y-4">
+              {vendorPOs.map(po => {
+                const poItems = po.vendor_po_items || [];
+                const shippedTotal = poItems.reduce((sum: number, item: any) => sum + ((item.shipped_quantity || 0) * (item.final_unit_cost || item.unit_cost || 0)), 0);
+                const orderedTotal = Number(po.total || 0);
+                return (
+                  <Card key={po.id} className="border hover:border-primary/50 transition-colors">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <h3 className="font-semibold">{po.vendors?.name || 'Unknown Vendor'}</h3>
+                            <p className="text-xs text-muted-foreground">PO: {po.po_number}</p>
+                          </div>
+                          <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary capitalize">
+                            {po.status.replace('_', ' ')}
+                          </span>
+                          {po.expected_delivery_date && (
+                            <span className="text-xs text-muted-foreground">
+                              Delivery: {new Date(po.expected_delivery_date).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Shipped / Ordered</p>
+                            <p className="text-sm font-bold">
+                              {formatCurrency(shippedTotal)} / {formatCurrency(orderedTotal)}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => navigate(`/vendor-pos/${po.id}?returnTo=/invoices/${invoiceId}`)}>
+                              <FileText className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    
-                    <h3 className="font-semibold mb-1">{po.vendors?.name || 'Unknown Vendor'}</h3>
-                    <p className="text-xs text-muted-foreground mb-1">PO: {po.po_number}</p>
-                    
-                    {po.expected_delivery_date && <p className="text-xs text-muted-foreground mb-3">
-                        Delivery: {new Date(po.expected_delivery_date).toLocaleDateString()}
-                      </p>}
-                    
-                    <div className="flex justify-between items-center pt-3 border-t">
-                      <div>
-                        <p className="text-xs text-muted-foreground">PO Total</p>
-                        <p className="text-lg font-bold">{formatCurrency(Number(po.total))}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={async () => {
-                          // Generate and download PDF for this PO - matching VendorPODetail format
-                          const doc = new jsPDF();
-                          const pageWidth = doc.internal.pageSize.getWidth();
-                          const pageHeight = doc.internal.pageSize.getHeight();
-                          
-                          // Colors
-                          const primaryGreen = [76, 175, 80];
-                          const darkGray = [51, 51, 51];
-                          const lightGray = [248, 248, 248];
-                          const mediumGray = [100, 100, 100];
-                          
-                          // ============ HEADER SECTION ============
-                          let yPos = 15;
-                          
-                          // Company name and address on left
-                          doc.setFontSize(16);
-                          doc.setFont('helvetica', 'bold');
-                          doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-                          doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
-                          
-                          doc.setFontSize(9);
-                          doc.setFont('helvetica', 'normal');
-                          doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-                          doc.text('1415 S 700 W', 14, yPos + 7);
-                          doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
-                          doc.text('www.vibepkg.com', 14, yPos + 17);
-                          
-                          // Logo on right
-                          try {
-                            const logoResponse = await fetch('/images/vibe-logo.png');
-                            const logoBlob = await logoResponse.blob();
-                            const logoBase64 = await new Promise<string>((resolve) => {
-                              const reader = new FileReader();
-                              reader.onloadend = () => resolve(reader.result as string);
-                              reader.readAsDataURL(logoBlob);
-                            });
-                            doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
-                          } catch (error) {
-                            doc.setFontSize(14);
-                            doc.setFont('helvetica', 'bold');
-                            doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-                            doc.text('VIBE', pageWidth - 14, yPos + 8, { align: 'right' });
-                          }
-                          
-                          yPos += 28;
-                          
-                          // Divider line
-                          doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-                          doc.setLineWidth(0.5);
-                          doc.line(14, yPos, pageWidth - 14, yPos);
-                          
-                          yPos += 12;
-                          
-                          // ============ PO TITLE ============
-                          doc.setFontSize(24);
-                          doc.setFont('helvetica', 'bold');
-                          doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-                          doc.text('Purchase Order', 14, yPos);
-                          
-                          yPos += 15;
-                          
-                          // ============ VENDOR & PO DETAILS SECTION ============
-                          const leftColX = 14;
-                          const rightColX = pageWidth / 2 + 10;
-                          
-                          // Vendor section (left)
-                          doc.setFontSize(10);
-                          doc.setFont('helvetica', 'bold');
-                          doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-                          doc.text('Vendor', leftColX, yPos);
-                          
-                          doc.setFontSize(11);
-                          doc.setFont('helvetica', 'bold');
-                          doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-                          doc.text(po.vendors?.name || 'Unknown', leftColX, yPos + 8);
-                          
-                          doc.setFontSize(9);
-                          doc.setFont('helvetica', 'normal');
-                          doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-                          
-                          let vendorY = yPos + 14;
-                          if (po.vendors?.contact_name) {
-                            doc.text(po.vendors.contact_name, leftColX, vendorY);
-                            vendorY += 5;
-                          }
-                          if (po.vendors?.contact_email) {
-                            doc.text(po.vendors.contact_email, leftColX, vendorY);
-                          }
-                          
-                          // PO details on right
-                          const detailsStartY = yPos;
-                          doc.setFontSize(9);
-                          doc.setFont('helvetica', 'normal');
-                          doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-                          
-                          doc.text('PO #:', rightColX, detailsStartY);
-                          doc.setFont('helvetica', 'bold');
-                          doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-                          doc.text(po.po_number, rightColX + 45, detailsStartY);
-                          
-                          doc.setFont('helvetica', 'normal');
-                          doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-                          doc.text('Date:', rightColX, detailsStartY + 7);
-                          doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-                          doc.text(new Date(po.order_date).toLocaleDateString(), rightColX + 45, detailsStartY + 7);
-                          
-                          if (po.expected_delivery_date) {
-                            doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-                            doc.text('Due Date:', rightColX, detailsStartY + 14);
-                            doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-                            doc.text(new Date(po.expected_delivery_date).toLocaleDateString(), rightColX + 45, detailsStartY + 14);
-                          }
-                          
-                          yPos += 35;
-                          
-                          // ============ ITEMS TABLE ============
-                          const tableData = (po.vendor_po_items || []).map((item: any) => [
-                            item.sku,
-                            item.name,
-                            item.quantity.toLocaleString(),
-                            `$${Number(item.unit_cost).toFixed(3)}`,
-                            `$${Number(item.total).toFixed(2)}`
-                          ]);
-
-                          autoTable(doc, {
-                            startY: yPos,
-                            head: [['SKU', 'DESCRIPTION', 'QTY', 'UNIT COST', 'AMOUNT']],
-                            body: tableData,
-                            theme: 'plain',
-                            headStyles: { 
-                              fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]], 
-                              textColor: 255,
-                              fontStyle: 'bold',
-                              fontSize: 9,
-                              cellPadding: 4
-                            },
-                            bodyStyles: {
-                              fontSize: 9,
-                              cellPadding: 4,
-                              textColor: [darkGray[0], darkGray[1], darkGray[2]],
-                              lineWidth: 0
-                            },
-                            alternateRowStyles: {
-                              fillColor: [lightGray[0], lightGray[1], lightGray[2]]
-                            },
-                            columnStyles: {
-                              0: { cellWidth: 30 },
-                              1: { cellWidth: 'auto' },
-                              2: { cellWidth: 20, halign: 'center' },
-                              3: { cellWidth: 28, halign: 'right' },
-                              4: { cellWidth: 28, halign: 'right', fontStyle: 'bold' }
-                            },
-                            margin: { left: 14, right: 14 },
-                            showHead: 'firstPage',
-                            tableLineWidth: 0,
-                            tableWidth: 'auto'
-                          });
-
-                          // ============ TOTALS SECTION ============
-                          const finalY = (doc as any).lastAutoTable.finalY + 10;
-                          const totalAmount = (po.vendor_po_items || []).reduce((sum: number, item: any) => sum + Number(item.total), 0);
-                          
-                          const totalsWidth = 80;
-                          const totalsX = pageWidth - totalsWidth - 14;
-                          
-                          // Divider line before total
-                          doc.setDrawColor(200, 200, 200);
-                          doc.setLineWidth(0.3);
-                          doc.line(totalsX, finalY, pageWidth - 14, finalY);
-                          
-                          // Total - emphasized
-                          doc.setFontSize(11);
-                          doc.setFont('helvetica', 'bold');
-                          doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-                          doc.text('TOTAL', totalsX, finalY + 8);
-                          doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - 14, finalY + 8, { align: 'right' });
-
-                          // ============ FOOTER ============
-                          const footerY = Math.max(finalY + 30, pageHeight - 20);
-                          if (footerY < pageHeight - 10) {
-                            doc.setFontSize(9);
-                            doc.setFont('helvetica', 'bold');
-                            doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-                            doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
-                          }
-
-                          doc.save(`vendor-po-${po.po_number}.pdf`);
-                          
-                          toast({
-                            title: "PDF Downloaded",
-                            description: "Vendor PO has been downloaded"
-                          });
-                        }}>
-                          <Download className="h-3 w-3 mr-1" />
-                          Download
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/vendor-pos/${po.id}?returnTo=/invoices/${invoiceId}`)}>
-                          <FileText className="h-3 w-3 mr-1" />
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {po.vendor_po_items?.length || 0} item{po.vendor_po_items?.length !== 1 ? 's' : ''}
-                    </div>
-                  </CardContent>
-                </Card>)}
+                      
+                      {/* Inline items table */}
+                      {poItems.length > 0 && (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs">Item</TableHead>
+                              <TableHead className="text-xs">SKU</TableHead>
+                              <TableHead className="text-xs text-right">Ordered</TableHead>
+                              <TableHead className="text-xs text-right">Shipped</TableHead>
+                              <TableHead className="text-xs text-right">Unit Cost</TableHead>
+                              <TableHead className="text-xs text-right">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {poItems.map((item: any) => {
+                              const shipped = item.shipped_quantity || 0;
+                              const unitCost = item.final_unit_cost || item.unit_cost || 0;
+                              const itemTotal = shipped > 0 ? shipped * unitCost : item.quantity * unitCost;
+                              return (
+                                <TableRow key={item.id} className="text-xs">
+                                  <TableCell className="font-medium py-2">{item.name}</TableCell>
+                                  <TableCell className="font-mono text-muted-foreground py-2">{item.sku}</TableCell>
+                                  <TableCell className="text-right py-2">{item.quantity?.toLocaleString()}</TableCell>
+                                  <TableCell className={cn("text-right py-2 font-medium", shipped > 0 ? "text-success" : "text-muted-foreground")}>
+                                    {shipped > 0 ? shipped.toLocaleString() : '—'}
+                                  </TableCell>
+                                  <TableCell className="text-right py-2">{formatUnitPrice(unitCost)}</TableCell>
+                                  <TableCell className="text-right py-2 font-medium">{formatCurrency(itemTotal)}</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
             {/* Profit Summary */}
