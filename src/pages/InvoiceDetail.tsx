@@ -300,7 +300,7 @@ const InvoiceDetail = () => {
     // Fetch related invoices for the same order
     const {
       data: relatedData
-    } = await supabase.from('invoices').select('*').eq('order_id', invoiceData.order_id).neq('id', invoiceId).order('shipment_number');
+    } = await supabase.from('invoices').select('*').eq('order_id', invoiceData.order_id).neq('id', invoiceId).is('deleted_at', null).order('shipment_number');
     if (relatedData) {
       setRelatedInvoices(relatedData);
     }
@@ -2512,8 +2512,7 @@ const InvoiceDetail = () => {
                   <div>
                     <p className="text-xs text-muted-foreground">Original Order Total</p>
                     <p className="text-lg font-semibold text-muted-foreground">
-                      {formatCurrency(order?.order_items?.reduce((sum: number, item: any) => 
-                        sum + (item.quantity * item.unit_price), 0) || 0)}
+                      {formatCurrency(Number(order?.total || 0))}
                     </p>
                   </div>
                   <div>
