@@ -1224,6 +1224,24 @@ const Products = () => {
           </DialogHeader>
 
           <div className="space-y-4">
+            {companyFilter === 'all' && (
+              <div className="space-y-2">
+                <Label>Company <span className="text-destructive">*</span></Label>
+                <Select value={newTemplateCompanyId} onValueChange={setNewTemplateCompanyId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Template name <span className="text-destructive">*</span></Label>
               <Input 
