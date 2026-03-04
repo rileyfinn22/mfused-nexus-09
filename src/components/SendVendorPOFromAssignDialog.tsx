@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Send, ArrowLeft, Edit, Save, X, Eye } from "lucide-react";
+import { Loader2, Send, ArrowLeft, Edit, Save, X, Eye, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
@@ -352,6 +352,18 @@ Please confirm receipt of this order and provide an estimated delivery date.
 Thank you for your business.`;
   };
 
+  const handleDownloadPdf = async () => {
+    try {
+      const pdfBase64 = await generatePdfBase64();
+      const link = document.createElement("a");
+      link.href = `data:application/pdf;base64,${pdfBase64}`;
+      link.download = `PO-${po.po_number}.pdf`;
+      link.click();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
   const handleOpenEmailDialog = () => {
     setShowEmailPreview(true);
     fetchArtworkFiles();
@@ -424,8 +436,8 @@ Thank you for your business.`;
   return (
     <>
       <Dialog open={open && !showEmailPreview} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[85vh]">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
               PO {vendorPoNumber} Preview
@@ -437,6 +449,7 @@ Thank you for your business.`;
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : po && vendor ? (
+            <ScrollArea className="flex-1 overflow-y-auto pr-2">
             <div className="space-y-4">
               {/* PO Header Info */}
               <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
@@ -566,13 +579,22 @@ Thank you for your business.`;
                 </div>
               </div>
             </div>
+            </ScrollArea>
           ) : (
             <p className="text-center text-muted-foreground py-8">Failed to load PO details</p>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDownloadPdf}
+              disabled={loading || !po}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
             </Button>
             <Button
               onClick={handleOpenEmailDialog}
