@@ -207,6 +207,21 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     previewPdfUrlRef.current = url;
   };
 
+  const getScenePointer = useCallback((canvas: FabricCanvas, evt: Event) => {
+    const anyCanvas = canvas as any;
+
+    if (typeof anyCanvas.getScenePoint === "function") {
+      const pt = anyCanvas.getScenePoint(evt);
+      if (pt && Number.isFinite(pt.x) && Number.isFinite(pt.y)) {
+        return { x: pt.x, y: pt.y };
+      }
+    }
+
+    const pointer = anyCanvas.getPointer?.(evt) || { x: 0, y: 0 };
+    const zoom = canvas.getZoom() || 1;
+    return { x: pointer.x / zoom, y: pointer.y / zoom };
+  }, []);
+
   /**
    * Build knockout bounds from OCR percentage data relative to a reference area.
    * refLeft/refTop/refW/refH define the reference rectangle (crop area or full canvas).
@@ -415,10 +430,25 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const canvas = new FabricCanvas(canvasRef.current, {
       enableRetinaScaling: true,
     });
-    // Keep logical scene size in print pixels; scale only the CSS viewport.
-    canvas.setDimensions({ width: canvasWidth, height: canvasHeight }, { backstoreOnly: true } as any);
-    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true } as any);
+    // Keep logical scene size in print pixels; scale visual display with zoom + explicit CSS sizing.
+    canvas.setDimensions({ width: canvasWidth, height: canvasHeight });
     canvas.setZoom(displayScale);
+
+    const cssWidthPx = `${cssWidth}px`;
+    const cssHeightPx = `${cssHeight}px`;
+    if (canvas.lowerCanvasEl) {
+      canvas.lowerCanvasEl.style.width = cssWidthPx;
+      canvas.lowerCanvasEl.style.height = cssHeightPx;
+    }
+    if (canvas.upperCanvasEl) {
+      canvas.upperCanvasEl.style.width = cssWidthPx;
+      canvas.upperCanvasEl.style.height = cssHeightPx;
+    }
+    if (canvas.wrapperEl) {
+      canvas.wrapperEl.style.width = cssWidthPx;
+      canvas.wrapperEl.style.height = cssHeightPx;
+    }
+
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
 
@@ -1224,7 +1254,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     toast.info(`Draw a rectangle over text to extract as ${zoneExtractLocked ? "locked" : "editable"}`, { duration: 3000 });
 
     const onMouseDown = (opt: any) => {
-      const pointer = canvas.getScenePoint(opt.e);
+      const pointer = getScenePointer(canvas, opt.e);
       zoneStartRef.current = { x: pointer.x, y: pointer.y };
       const rect = new Rect({
         left: pointer.x,
@@ -1245,7 +1275,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (opt: any) => {
       if (!zoneStartRef.current || !zoneRectRef.current) return;
-      const pointer = canvas.getScenePoint(opt.e);
+      const pointer = getScenePointer(canvas, opt.e);
       const left = Math.min(zoneStartRef.current.x, pointer.x);
       const top = Math.min(zoneStartRef.current.y, pointer.y);
       const w = Math.abs(pointer.x - zoneStartRef.current.x);
@@ -1476,7 +1506,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getScenePoint(e.e);
+      const pointer = getScenePointer(canvas, e.e);
       const x = pointer.x;
       const y = pointer.y;
       drawTextStartRef.current = { x, y };
@@ -1496,7 +1526,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (e: any) => {
       if (!drawTextStartRef.current || !drawTextRectRef.current) return;
-      const pointer = canvas.getScenePoint(e.e);
+      const pointer = getScenePointer(canvas, e.e);
       const x = pointer.x;
       const y = pointer.y;
       const start = drawTextStartRef.current;
@@ -1596,7 +1626,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getScenePoint(e.e);
+      const pointer = getScenePointer(canvas, e.e);
       const x = pointer.x;
       const y = pointer.y;
       drawMaskStartRef.current = { x, y };
@@ -1616,7 +1646,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (e: any) => {
       if (!drawMaskStartRef.current || !drawMaskRectRef.current) return;
-      const pointer = canvas.getScenePoint(e.e);
+      const pointer = getScenePointer(canvas, e.e);
       const x = pointer.x;
       const y = pointer.y;
       const start = drawMaskStartRef.current;
@@ -1708,7 +1738,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     let rect: Rect | null = null;
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getScenePoint(e.e);
+      const pointer = getScenePointer(canvas, e.e);
       startPt = { x: pointer.x, y: pointer.y };
       rect = new Rect({
         left: startPt.x, top: startPt.y, width: 1, height: 1,
@@ -1722,7 +1752,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (e: any) => {
       if (!startPt || !rect) return;
-      const pointer = canvas.getScenePoint(e.e);
+      const pointer = getScenePointer(canvas, e.e);
       const x = pointer.x;
       const y = pointer.y;
       rect.set({
