@@ -294,8 +294,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const cssWidth = Math.round(canvasWidth * displayScale);
   const cssHeight = Math.round(canvasHeight * displayScale);
   const displayBleedPx = Math.max(1, Math.round(bleedPx * displayScale));
-  // Use device pixel ratio so retina screens get a sharp backing buffer
-  const dpr = typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1;
+  // Let Fabric handle retina backing-store scaling internally for consistent cross-device rendering.
 
   const serializeCanvasState = useCallback((includePdfBackground: boolean) => {
     if (!fabricRef.current) return null;
