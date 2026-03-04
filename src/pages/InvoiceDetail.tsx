@@ -29,6 +29,7 @@ import autoTable from "jspdf-autotable";
 import { addPdfBranding, addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
 import { EditableDescription } from "@/components/EditableDescription";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
+import { calculateInvoiceTotals, blanketTotalItems, partialTotalItems } from "@/lib/invoiceTotals";
 
 const InvoiceDetail = () => {
   const {
@@ -1082,22 +1083,16 @@ const InvoiceDetail = () => {
         }
       }
 
-      // Recalculate totals - always use shipped quantities × price
-      const newSubtotal = editedItems.reduce((sum, item) => sum + Number(item.shipped_quantity || 0) * Number(item.unit_price), 0);
+      // Recalculate totals using shared calculator - shipped qty × price
+      const totalItems = blanketTotalItems(editedItems);
       const editedShipping = Number(editShippingCost || 0);
-      const newTotal = newSubtotal + Number(invoice.tax || 0) + editedShipping;
+      const { subtotal: newSubtotal, total: newTotal } = calculateInvoiceTotals(
+        totalItems,
+        Number(invoice.tax || 0),
+        editedShipping
+      );
 
-      // Update order totals (always based on ordered quantities)
-      const orderSubtotal = editedItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price), 0);
-      const orderTotal = orderSubtotal + Number(invoice.tax || 0);
-      const {
-        error: orderError
-      } = await supabase.from('orders').update({
-        subtotal: orderSubtotal,
-        total: orderTotal
-      }).eq('id', invoice.order_id);
-      if (orderError) throw orderError;
-
+      // NOTE: Do NOT update order totals from invoice edit - invoice scope only
       // Update invoice totals
       const {
         error: invoiceError
@@ -1429,29 +1424,31 @@ const InvoiceDetail = () => {
   const displayItems = editedItems;
   const isBlanketDisplay = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
   
-  // Invoice totals always use shipped qty × price for all invoice types
-  const getShippedQtyForItem = (item: any) => {
-    if (invoice?.invoice_type === 'full') {
-      const orderItem = order?.order_items?.find((oi: any) => oi.sku === item.sku);
-      return Number(orderItem?.shipped_quantity || item.shipped_quantity || 0);
+  const displayShipping = isEditMode ? Number(editShippingCost || 0) : Number(invoice?.shipping_cost || 0);
+  
+  // Unified total calculation using shared calculator
+  const computeDisplayTotals = () => {
+    if (isEditMode) {
+      // Edit mode: always use shipped qty from edited items
+      const items = blanketTotalItems(editedItems);
+      return calculateInvoiceTotals(items, Number(invoice?.tax || 0), displayShipping);
     }
-    // Partial invoices: quantity = allocated quantity
-    return Number(item.quantity || 0);
+    if (isBlanketDisplay) {
+      // Blanket display: compute from shipped quantities on order items
+      const items = displayItems.map((item: any) => {
+        const orderItem = order?.order_items?.find((oi: any) => oi.id === item.id);
+        return {
+          quantity: Number(orderItem?.shipped_quantity || item.shipped_quantity || 0),
+          unit_price: Number(item.unit_price || 0),
+        };
+      });
+      return calculateInvoiceTotals(items, Number(invoice?.tax || 0), displayShipping);
+    }
+    // Partial invoices or non-blanket: use stored DB values
+    return { subtotal: Number(invoice?.subtotal || 0), total: Number(invoice?.subtotal || 0) + Number(invoice?.tax || 0) + displayShipping };
   };
   
-  const displaySubtotal = isEditMode 
-    ? displayItems.reduce((sum: number, item: any) => {
-        const editedItem = editedItems.find((ei: any) => ei.id === item.id);
-        const qty = invoice?.invoice_type === 'full' 
-          ? Number(editedItem?.shipped_quantity || item.shipped_quantity || 0)
-          : Number(item.quantity || 0);
-        return sum + qty * Number(item.unit_price);
-      }, 0) 
-    : isBlanketDisplay
-      ? displayItems.reduce((sum: number, item: any) => sum + getShippedQtyForItem(item) * Number(item.unit_price), 0)
-      : Number(invoice?.subtotal || 0);
-  const displayShipping = isEditMode ? Number(editShippingCost || 0) : Number(invoice?.shipping_cost || 0);
-  const displayTotal = displaySubtotal + Number(invoice?.tax || 0) + displayShipping;
+  const { subtotal: displaySubtotal, total: displayTotal } = computeDisplayTotals();
   const displayTotalPaid = Number(invoice?.total_paid || 0);
   const displayBalance = displayTotal - displayTotalPaid;
 

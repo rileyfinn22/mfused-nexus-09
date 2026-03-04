@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { calculateInvoiceTotals } from "@/lib/invoiceTotals";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -693,66 +694,45 @@ export const InvoicePackingListSection = ({
         }
       }
 
-      // Recalculate invoice subtotal based on ALL order items, not just matched ones
-      const allOrderItems = order?.order_items || editedItems;
-      const isBlanketInvoice = invoice.invoice_type === 'full';
-      
-      // Build a map of updated shipped quantities from matched items
-      const shippedMap = new Map<string, number>();
-      for (const match of matchedItems) {
-        shippedMap.set(match.order_item_id, match.shipped_quantity || 0);
-      }
-      
-      // Fetch all current allocations for this invoice to include unmatched items too
+      // Fetch all current allocations for this invoice
       const { data: allAllocations } = await supabase
         .from('inventory_allocations')
         .select('order_item_id, quantity_allocated')
         .eq('invoice_id', invoiceId);
-      
-      let newSubtotal = 0;
-      if (isBlanketInvoice) {
-        // Blanket invoices: subtotal = sum of shipped qty × unit price for ALL items
-        newSubtotal = allOrderItems.reduce((sum: number, oi: any) => 
-          sum + Number(oi.shipped_quantity || 0) * Number(oi.unit_price || 0), 0);
-        // Update with latest shipped quantities from matched items
-        for (const match of matchedItems) {
-          const orderItem = allOrderItems.find((oi: any) => oi.id === match.order_item_id);
-          if (orderItem) {
-            // Remove old value, add new
-            newSubtotal -= Number(orderItem.shipped_quantity || 0) * Number(orderItem.unit_price || 0);
-            newSubtotal += Number(match.shipped_quantity || 0) * Number(orderItem.unit_price || 0);
-          }
+
+      // Recalculate invoice subtotal using shared calculator
+      // Build final allocation map: start with existing, override with new matches
+      const allocMap = new Map<string, number>();
+      if (allAllocations) {
+        for (const alloc of allAllocations) {
+          allocMap.set(alloc.order_item_id, alloc.quantity_allocated);
         }
-      } else {
-        // Partial/shipment invoices: subtotal = sum of allocated qty × unit price for ALL allocated items
-        const allocMap = new Map<string, number>();
-        // Start with existing allocations
-        if (allAllocations) {
-          for (const alloc of allAllocations) {
-            allocMap.set(alloc.order_item_id, alloc.quantity_allocated);
-          }
-        }
-        // Override with newly matched quantities
-        for (const [itemId, qty] of shippedMap) {
-          allocMap.set(itemId, qty);
-        }
-        for (const [itemId, qty] of allocMap) {
-          const orderItem = allOrderItems.find((oi: any) => oi.id === itemId);
-          if (orderItem) {
-            newSubtotal += qty * Number(orderItem.unit_price || 0);
-          }
-        }
+      }
+      for (const match of matchedItems) {
+        allocMap.set(match.order_item_id, match.shipped_quantity || 0);
       }
 
-      if (newSubtotal > 0) {
-        const shippingCost = Number(invoice.shipping_cost || 0);
-        const newTotal = newSubtotal + Number(invoice.tax || 0) + shippingCost;
-        
-        await supabase
-          .from('invoices')
-          .update({ subtotal: newSubtotal, total: newTotal })
-          .eq('id', invoiceId);
-      }
+      const allOrderItems = order?.order_items || editedItems;
+      const totalItems = Array.from(allocMap.entries()).map(([itemId, qty]) => {
+        const orderItem = allOrderItems.find((oi: any) => oi.id === itemId);
+        return {
+          quantity: qty,
+          unit_price: Number(orderItem?.unit_price || 0),
+        };
+      });
+
+      const shippingCost = Number(invoice.shipping_cost || 0);
+      const { subtotal: newSubtotal, total: newTotal } = calculateInvoiceTotals(
+        totalItems,
+        Number(invoice.tax || 0),
+        shippingCost
+      );
+
+      // Always persist totals (even if zero)
+      await supabase
+        .from('invoices')
+        .update({ subtotal: newSubtotal, total: newTotal })
+        .eq('id', invoiceId);
 
       toast({
         title: "Shipped Quantities Updated",
