@@ -1596,10 +1596,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
-      const x = pointer.x / zoom;
-      const y = pointer.y / zoom;
+      const pointer = canvas.getScenePoint(e.e);
+      const x = pointer.x;
+      const y = pointer.y;
       drawMaskStartRef.current = { x, y };
       const rect = new Rect({
         left: x, top: y, width: 1, height: 1,
@@ -1617,10 +1616,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const onMouseMove = (e: any) => {
       if (!drawMaskStartRef.current || !drawMaskRectRef.current) return;
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
-      const x = pointer.x / zoom;
-      const y = pointer.y / zoom;
+      const pointer = canvas.getScenePoint(e.e);
+      const x = pointer.x;
+      const y = pointer.y;
       const start = drawMaskStartRef.current;
       drawMaskRectRef.current.set({
         left: Math.min(start.x, x),
