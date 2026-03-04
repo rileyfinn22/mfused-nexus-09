@@ -294,8 +294,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const cssWidth = Math.round(canvasWidth * displayScale);
   const cssHeight = Math.round(canvasHeight * displayScale);
   const displayBleedPx = Math.max(1, Math.round(bleedPx * displayScale));
-  // Use device pixel ratio so retina screens get a sharp backing buffer
-  const dpr = typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1;
+  // Let Fabric handle retina backing-store scaling internally for consistent cross-device rendering.
 
   const serializeCanvasState = useCallback((includePdfBackground: boolean) => {
     if (!fabricRef.current) return null;
@@ -413,15 +412,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    const canvas = new FabricCanvas(canvasRef.current);
-    // Backing buffer at display size * DPR for retina sharpness
-    const backingW = Math.round(cssWidth * dpr);
-    const backingH = Math.round(cssHeight * dpr);
-    canvas.setDimensions({ width: backingW, height: backingH });
-    // Zoom maps logical canvas coords (canvasWidth) → backing pixels
-    canvas.setZoom(displayScale * dpr);
-    // CSS size = what user sees on screen
-    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
+    const canvas = new FabricCanvas(canvasRef.current, {
+      enableRetinaScaling: true,
+    });
+    // Keep logical zoom deterministic across devices; Fabric manages DPR internally.
+    canvas.setDimensions({ width: cssWidth, height: cssHeight });
+    // Zoom maps logical canvas coords (canvasWidth) → on-screen CSS pixels
+    canvas.setZoom(displayScale);
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
 
@@ -774,7 +771,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       canvas.dispose();
       fabricRef.current = null;
     };
-  }, [canvasWidth, canvasHeight, bleedPx, mode, displayScale, dpr, cssWidth, cssHeight, getSelectionLockedState]);
+  }, [canvasWidth, canvasHeight, bleedPx, mode, displayScale, cssWidth, cssHeight, getSelectionLockedState]);
 
   const addText = (editable: boolean) => {
     const canvas = fabricRef.current;
