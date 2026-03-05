@@ -38,7 +38,9 @@ export function calculateInvoiceTotals(
  */
 export function blanketTotalItems(orderItems: any[]): InvoiceTotalItem[] {
   return orderItems.map((item) => ({
-    quantity: Number(item.shipped_quantity || 0),
+    quantity: Number(item.shipped_quantity || 0) > 0
+      ? Number(item.shipped_quantity)
+      : Number(item.quantity || 0),
     unit_price: Number(item.unit_price || 0),
   }));
 }
