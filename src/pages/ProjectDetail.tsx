@@ -452,10 +452,10 @@ const ProjectDetail = () => {
                       id: inv.id,
                       reference: inv.invoice_number,
                       date: new Date(inv.invoice_date),
-                      details: isBlanketOrder(inv) ? 'Blanket Order' : (inv.invoice_type || 'Standard'),
+                      details: !inv.parent_invoice_id && inv.invoice_type === 'full' ? 'Blanket' : inv.invoice_type === 'partial' ? 'Shipped' : (inv.invoice_type || 'Standard'),
                       status: inv.status,
-                      amount: isBlanketOrder(inv) ? 0 : (inv.total || 0),
-                      isOrder: isBlanketOrder(inv),
+                      amount: inv.total || 0,
+                      isOrder: false,
                       onClick: () => navigate(`/invoices/${inv.id}`)
                     })),
                     ...payments.map(pay => {
