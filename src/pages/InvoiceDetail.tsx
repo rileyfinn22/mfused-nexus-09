@@ -1086,11 +1086,19 @@ const InvoiceDetail = () => {
       // Recalculate totals using shared calculator - shipped qty × price
       const totalItems = blanketTotalItems(editedItems);
       const editedShipping = Number(editShippingCost || 0);
-      const { subtotal: newSubtotal, total: newTotal } = calculateInvoiceTotals(
+      let { subtotal: newSubtotal, total: newTotal } = calculateInvoiceTotals(
         totalItems,
         Number(invoice.tax || 0),
         editedShipping
       );
+
+      // For blanket invoices: never save less than the original order total
+      if (invoice.invoice_type === 'full' && invoice.shipment_number === 1 && order) {
+        const orderSubtotal = Number(order.subtotal || 0);
+        const orderTotal = Number(order.total || 0);
+        if (newSubtotal < orderSubtotal) newSubtotal = orderSubtotal;
+        if (newTotal < orderTotal) newTotal = orderTotal;
+      }
 
       // NOTE: Do NOT update order totals from invoice edit - invoice scope only
       // Update invoice totals

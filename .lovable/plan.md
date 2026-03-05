@@ -1,63 +1,41 @@
 
 
-## Problem
+## Plan: Show Repeat vs New Status for Each PO Line Item
 
-Invoice 10717's blanket has `total = $54,200` in the DB, but the order total is `$271,000`. This happened because the save logic (`blanketTotalItems`) recalculated the total using shipped quantities and overwrote the DB. Four blanket invoices are affected (totals lower than their order):
+### Problem
+When analyzing an uploaded PO, all extracted products are displayed the same way. There's no indication of whether a product already exists in the system (repeat) or is entirely new.
 
-| Invoice | DB Total | Order Total |
-|---------|----------|-------------|
-| 10704 | $25,607 | $65,407 |
-| 10714 | $202,015 | $327,500 |
-| 10717 | $54,200 | $271,000 |
-| 10724 | $24,010 | $37,420 |
+### Solution
 
-There are two issues:
-1. **DB is corrupted** -- these 4 blankets need their totals restored to the order amount
-2. **Save logic will re-corrupt** -- when someone edits shipped quantities and saves, line 1087-1104 recalculates using `blanketTotalItems()` and writes the result to DB. This means if some items haven't shipped yet, it writes a mixed total. It should apply the same MAX(order total, shipped total) rule on save.
+**1. After AI extraction, check each product against the existing `products` table**
 
-## Fix
+In `AnalyzePOProductsDialog.tsx`, after receiving the AI-extracted products, query the `products` table for the selected company and compare each extracted product by name (normalized) to identify matches.
 
-### 1. Database fix -- restore 4 corrupted blanket invoices
+Each `ExtractedProduct` gets a new field:
+- `matchStatus`: `'existing'` | `'new'`
+- `existingProductId`: the matched product's ID (if existing)
 
-Run an UPDATE to set blanket invoice subtotal/total back to order values WHERE the invoice total is currently lower than the order total (only fixes the "under" cases, doesn't touch legitimate overs):
+**2. Update the review UI to display status per line item**
 
-```sql
-UPDATE invoices 
-SET subtotal = o.subtotal, total = o.total, tax = o.tax
-FROM orders o
-WHERE invoices.order_id = o.id
-  AND invoices.deleted_at IS NULL
-  AND invoices.invoice_type = 'full'
-  AND invoices.shipment_number = 1
-  AND invoices.total < o.total
-```
+- **Existing/Repeat items**: Show a green "Existing" badge next to the product name. These are products already in the system — importing them would create duplicates, so they default to `selected: false` with a note like "Already in catalog".
+- **New items**: Show an orange "New" badge. These default to `selected: true`. For new items without a template match, show a small inline "Create Product" action that opens a quick-add form (name, description, state, cost pre-filled from the extraction) to create it as a standalone product.
 
-### 2. Fix save logic in `InvoiceDetail.tsx` (line ~1086-1104)
+**3. Inline new product creation**
 
-After computing the shipped-based total, apply the MAX rule before writing to DB:
+For "new" items that the user wants to add but hasn't matched to a template, add an inline expandable section (or small dialog trigger) with pre-filled fields (name, description, state, cost, product_type) so the user can confirm/edit details before import. This replaces the current blind bulk insert.
 
-```typescript
-// Recalculate shipped total
-const totalItems = blanketTotalItems(editedItems);
-const { subtotal: shippedSubtotal, total: shippedTotal } = calculateInvoiceTotals(...);
+### Technical Details
 
-// For blanket invoices: never save less than the original order total
-let newSubtotal = shippedSubtotal;
-let newTotal = shippedTotal;
-if (invoice.invoice_type === 'full' && invoice.shipment_number === 1 && order) {
-  const orderSubtotal = Number(order.subtotal || 0);
-  const orderTotal = Number(order.total || 0);
-  if (newSubtotal < orderSubtotal) newSubtotal = orderSubtotal;
-  if (newTotal < orderTotal) newTotal = orderTotal;
-}
-```
+**File: `src/components/AnalyzePOProductsDialog.tsx`**
 
-### 3. Invoices list page (`Invoices.tsx`)
+- Add `matchStatus` and `existingProductId` to the `ExtractedProduct` interface
+- After `handleAnalyze` receives products, query `supabase.from('products').select('id, name').eq('company_id', companyId)` to get all existing products for the company
+- Normalize and compare names (case-insensitive, trimmed) to flag each as existing or new
+- Update the review card UI:
+  - Add a Badge showing "Existing" (green) or "New" (orange)
+  - Existing items: unselected by default, grayed styling, tooltip "Already in your catalog"
+  - New items: selected by default, editable inline fields (name, state, cost) that can be tweaked before import
+- Keep the current import flow but skip items flagged as existing (unless user explicitly re-selects them)
 
-The list page reads `invoice.total` directly from DB (line 752). After fixes #1 and #2, the DB values will be correct, so no change needed here. The `computeDisplayTotals` MAX logic on the detail page also remains correct as a safety net.
-
-### Summary
-- One DB update to fix 4 corrupted blankets
-- One code change in the save handler to prevent future corruption
-- Display logic (already using MAX) stays as-is
+No backend/edge function changes needed — the matching is done client-side against the products table after extraction.
 
