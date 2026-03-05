@@ -1434,16 +1434,22 @@ const InvoiceDetail = () => {
       return calculateInvoiceTotals(items, Number(invoice?.tax || 0), displayShipping);
     }
     if (isBlanketDisplay) {
-      // Blanket display: compute from shipped quantities on order items
-      const items = displayItems.map((item: any) => {
+      // Blanket display: show MAX(original order total, shipped total)
+      // This keeps the open invoice at the original amount until shipped overs exceed it
+      const originalItems = displayItems.map((item: any) => ({
+        quantity: Number(item.quantity || 0),
+        unit_price: Number(item.unit_price || 0),
+      }));
+      const shippedItems = displayItems.map((item: any) => {
         const orderItem = order?.order_items?.find((oi: any) => oi.id === item.id);
-        const shippedQty = Number(orderItem?.shipped_quantity || item.shipped_quantity || 0);
         return {
-          quantity: shippedQty > 0 ? shippedQty : Number(item.quantity || 0),
+          quantity: Number(orderItem?.shipped_quantity || item.shipped_quantity || 0),
           unit_price: Number(item.unit_price || 0),
         };
       });
-      return calculateInvoiceTotals(items, Number(invoice?.tax || 0), displayShipping);
+      const originalTotals = calculateInvoiceTotals(originalItems, Number(invoice?.tax || 0), displayShipping);
+      const shippedTotals = calculateInvoiceTotals(shippedItems, Number(invoice?.tax || 0), displayShipping);
+      return shippedTotals.subtotal > originalTotals.subtotal ? shippedTotals : originalTotals;
     }
     // Partial invoices or non-blanket: use stored DB values
     return { subtotal: Number(invoice?.subtotal || 0), total: Number(invoice?.subtotal || 0) + Number(invoice?.tax || 0) + displayShipping };
