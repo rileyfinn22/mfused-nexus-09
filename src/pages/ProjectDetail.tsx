@@ -583,9 +583,9 @@ const ProjectDetail = () => {
                 </TableHeader>
                 <TableBody>
                   {invoices.map((invoice) => {
-                    const isOrder = isBlanketOrder(invoice);
-                    const displayTotal = isOrder ? 0 : invoice.total;
-                    const displayPaid = isOrder ? 0 : (invoice.total_paid || 0);
+                    const isParent = !invoice.parent_invoice_id && invoice.invoice_type === 'full';
+                    const typeLabel = isParent ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type || 'Standard');
+                    const balance = (invoice.total || 0) - (invoice.total_paid || 0);
                     return (
                       <TableRow 
                         key={invoice.id} 
@@ -594,25 +594,24 @@ const ProjectDetail = () => {
                       >
                         <TableCell className="font-medium">
                           {invoice.invoice_number}
-                          {isOrder && <span className="ml-2 text-muted-foreground">(Order)</span>}
                         </TableCell>
                         <TableCell>{new Date(invoice.invoice_date).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{isOrder ? 'Blanket Order' : (invoice.invoice_type || 'Standard')}</Badge>
+                          <Badge variant="outline">{typeLabel}</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant={invoice.status === 'paid' ? 'default' : invoice.status === 'billed' ? 'default' : 'secondary'}>
                             {invoice.status}
                           </Badge>
                         </TableCell>
-                        <TableCell className={`text-right ${isOrder ? 'text-muted-foreground' : ''}`}>
-                          {isOrder ? <span className="text-muted-foreground italic">$0.00</span> : formatCurrency(invoice.total)}
+                        <TableCell className="text-right">
+                          {formatCurrency(invoice.total)}
                         </TableCell>
-                        <TableCell className={`text-right ${isOrder ? 'text-muted-foreground' : 'text-green-600'}`}>
-                          {isOrder ? <span className="italic">$0.00</span> : formatCurrency(invoice.total_paid || 0)}
+                        <TableCell className="text-right text-green-600">
+                          {formatCurrency(invoice.total_paid || 0)}
                         </TableCell>
-                        <TableCell className={`text-right ${isOrder ? 'text-muted-foreground' : 'text-orange-600'}`}>
-                          {isOrder ? <span className="italic">$0.00</span> : formatCurrency((invoice.total || 0) - (invoice.total_paid || 0))}
+                        <TableCell className={`text-right ${balance > 0 ? 'text-orange-600' : ''}`}>
+                          {formatCurrency(balance)}
                         </TableCell>
                       </TableRow>
                     );
