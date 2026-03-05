@@ -1,41 +1,49 @@
 
 
-## Plan: Show Repeat vs New Status for Each PO Line Item
+## Problem
 
-### Problem
-When analyzing an uploaded PO, all extracted products are displayed the same way. There's no indication of whether a product already exists in the system (repeat) or is entirely new.
+The `blanketTotalItems()` function in `src/lib/invoiceTotals.ts` always uses `shipped_quantity`, falling back to 0 when it hasn't been set. This means:
 
-### Solution
+- New orders with `shipped_quantity = 0` show $0 invoice totals
+- Saving an invoice in edit mode overwrites the DB total with $0
+- The display calculation in `computeDisplayTotals()` also hits this same issue
 
-**1. After AI extraction, check each product against the existing `products` table**
+The desired behavior: **use `shipped_quantity` only when it's been explicitly updated (> 0); otherwise fall back to the original `quantity`**.
 
-In `AnalyzePOProductsDialog.tsx`, after receiving the AI-extracted products, query the `products` table for the selected company and compare each extracted product by name (normalized) to identify matches.
+## Changes
 
-Each `ExtractedProduct` gets a new field:
-- `matchStatus`: `'existing'` | `'new'`
-- `existingProductId`: the matched product's ID (if existing)
+### 1. Update `blanketTotalItems()` in `src/lib/invoiceTotals.ts`
 
-**2. Update the review UI to display status per line item**
+Change the quantity logic from:
+```ts
+quantity: Number(item.shipped_quantity || 0)
+```
+to:
+```ts
+quantity: Number(item.shipped_quantity || 0) > 0 
+  ? Number(item.shipped_quantity) 
+  : Number(item.quantity || 0)
+```
 
-- **Existing/Repeat items**: Show a green "Existing" badge next to the product name. These are products already in the system — importing them would create duplicates, so they default to `selected: false` with a note like "Already in catalog".
-- **New items**: Show an orange "New" badge. These default to `selected: true`. For new items without a template match, show a small inline "Create Product" action that opens a quick-add form (name, description, state, cost pre-filled from the extraction) to create it as a standalone product.
+This means the function now accepts items with both `shipped_quantity` and `quantity` fields and picks the right one.
 
-**3. Inline new product creation**
+### 2. Update `computeDisplayTotals()` in `src/pages/InvoiceDetail.tsx` (~line 1438-1444)
 
-For "new" items that the user wants to add but hasn't matched to a template, add an inline expandable section (or small dialog trigger) with pre-filled fields (name, description, state, cost, product_type) so the user can confirm/edit details before import. This replaces the current blind bulk insert.
+The blanket display path manually builds quantity from `shipped_quantity || 0`. Apply the same fallback:
+```ts
+const shippedQty = Number(orderItem?.shipped_quantity || item.shipped_quantity || 0);
+return {
+  quantity: shippedQty > 0 ? shippedQty : Number(item.quantity || 0),
+  unit_price: Number(item.unit_price || 0),
+};
+```
 
-### Technical Details
+### 3. Verify partial/child invoice logic is unaffected
 
-**File: `src/components/AnalyzePOProductsDialog.tsx`**
+Partial invoices use `partialTotalItems()` which reads `item.quantity` (set to `quantity_allocated` from inventory_allocations). This path is correct and unchanged -- allocations are only created when items are actually shipped/pulled, so their quantities are always meaningful.
 
-- Add `matchStatus` and `existingProductId` to the `ExtractedProduct` interface
-- After `handleAnalyze` receives products, query `supabase.from('products').select('id, name').eq('company_id', companyId)` to get all existing products for the company
-- Normalize and compare names (case-insensitive, trimmed) to flag each as existing or new
-- Update the review card UI:
-  - Add a Badge showing "Existing" (green) or "New" (orange)
-  - Existing items: unselected by default, grayed styling, tooltip "Already in your catalog"
-  - New items: selected by default, editable inline fields (name, state, cost) that can be tweaked before import
-- Keep the current import flow but skip items flagged as existing (unless user explicitly re-selects them)
-
-No backend/edge function changes needed — the matching is done client-side against the products table after extraction.
+### What stays the same
+- The save logic on ~line 1087 already calls `blanketTotalItems(editedItems)` -- with the fix above, it will correctly use order quantity as fallback for unshipped items
+- Partial/child invoice creation in `pullShipApproval.ts` is unaffected (it uses actual pull quantities)
+- The edit mode shipped_quantity fields remain fully functional -- once a user updates shipped_qty to a non-zero value, that value is used for totals
 
