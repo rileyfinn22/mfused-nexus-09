@@ -261,10 +261,6 @@ const ProjectDetail = () => {
   const accrualMargin = totalRevenue > 0 ? (accrualProfit / totalRevenue) * 100 : 0;
   const cashMargin = totalPaid > 0 ? (cashProfit / totalPaid) * 100 : 0;
   
-  // Helper to determine if invoice is the blanket/parent order
-  const isBlanketOrder = (invoice: any) => {
-    return !invoice.parent_invoice_id && invoice.status !== 'billed' && invoice.status !== 'paid';
-  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
