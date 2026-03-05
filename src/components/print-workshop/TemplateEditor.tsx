@@ -98,6 +98,9 @@ const FONT_OPTIONS = [
 
 const loadedFonts = new Set<string>();
 
+const findFontOption = (fontFamily: string) =>
+  FONT_OPTIONS.find((font) => font.value.toLowerCase() === fontFamily.trim().toLowerCase());
+
 function loadGoogleFont(fontFamily: string): Promise<void> {
   if (loadedFonts.has(fontFamily)) return Promise.resolve();
   return new Promise((resolve) => {
@@ -112,6 +115,29 @@ function loadGoogleFont(fontFamily: string): Promise<void> {
     link.onerror = () => resolve();
     document.head.appendChild(link);
   });
+}
+
+async function preloadFontsForCanvasData(data: any): Promise<void> {
+  if (!data || !Array.isArray(data.objects)) return;
+
+  const families = new Set<string>();
+  for (const obj of data.objects) {
+    if (!obj || typeof obj !== "object") continue;
+
+    const rawFamily = typeof obj.fontFamily === "string" ? obj.fontFamily.trim() : "";
+    if (!rawFamily) continue;
+
+    const matched = findFontOption(rawFamily);
+    const normalizedFamily = matched?.value || rawFamily;
+    obj.fontFamily = normalizedFamily;
+
+    if (matched?.google) {
+      families.add(matched.value);
+    }
+  }
+
+  if (families.size === 0) return;
+  await Promise.all(Array.from(families).map((family) => loadGoogleFont(family)));
 }
 
 // Snap guide helpers
@@ -441,6 +467,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         if (safeCanvasData?.backgroundImage?.src?.startsWith("blob:")) {
           delete safeCanvasData.backgroundImage;
         }
+
+        await preloadFontsForCanvasData(safeCanvasData);
         await canvas.loadFromJSON(safeCanvasData);
       }
 
