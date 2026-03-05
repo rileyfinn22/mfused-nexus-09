@@ -1437,8 +1437,9 @@ const InvoiceDetail = () => {
       // Blanket display: compute from shipped quantities on order items
       const items = displayItems.map((item: any) => {
         const orderItem = order?.order_items?.find((oi: any) => oi.id === item.id);
+        const shippedQty = Number(orderItem?.shipped_quantity || item.shipped_quantity || 0);
         return {
-          quantity: Number(orderItem?.shipped_quantity || item.shipped_quantity || 0),
+          quantity: shippedQty > 0 ? shippedQty : Number(item.quantity || 0),
           unit_price: Number(item.unit_price || 0),
         };
       });
