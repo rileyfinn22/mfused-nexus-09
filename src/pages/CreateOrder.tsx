@@ -58,6 +58,7 @@ interface OrderItem {
   name?: string;
   item_id?: string | null;
   description?: string | null;
+  poLineName?: string; // Original PO line name for match verification
 }
 
 const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[] => {
