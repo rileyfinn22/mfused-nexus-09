@@ -58,6 +58,7 @@ interface OrderItem {
   name?: string;
   item_id?: string | null;
   description?: string | null;
+  poLineName?: string; // Original PO line name for match verification
 }
 
 const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[] => {
@@ -74,6 +75,7 @@ const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[]
       existing.name = existing.name || item.name;
       existing.item_id = existing.item_id || item.item_id;
       existing.description = existing.description || item.description;
+      existing.poLineName = existing.poLineName || item.poLineName;
     } else {
       merged.set(key, { ...item });
     }
@@ -829,6 +831,7 @@ const CreateOrder = () => {
                 name: item.name || null,
                 item_id: item.item_id || null,
                 description: item.description || null,
+                poLineName: item.name || null,
               });
             } else {
               newUnmatched.push(item);
@@ -986,6 +989,7 @@ const CreateOrder = () => {
               name: item.name || null,
               item_id: item.item_id || null,
               description: item.description || null,
+              poLineName: item.name || null,
             });
           } else {
             // Unmatched item
@@ -2614,6 +2618,11 @@ const CreateOrder = () => {
                       <TableCell className="font-mono text-xs">{displayItemId}</TableCell>
                       <TableCell className="font-medium">
                         {displayName}
+                        {item.poLineName && item.poLineName !== displayName && (
+                          <span className="block text-xs text-muted-foreground font-normal mt-0.5">
+                            PO Line: {item.poLineName}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
                         {displayDescription}

@@ -657,13 +657,19 @@ Return ONLY valid JSON:
         const productBrands = productTokens.filter(t => IMPORTANT_PRODUCT_LINES.includes(t.toLowerCase()));
         
         if (poBrands.length > 0) {
-          const brandMatch = poBrands.some(pb => productBrands.includes(pb));
-          if (brandMatch) {
-            score += 40; // STRONG boost for matching brand - this is the most important differentiator
-            console.log(`    Brand match: ${poBrands.join(',')} matches ${productBrands.join(',')}`);
+          // ALL PO brand tokens must match — prevents "Fire ATF" matching a product with just "Fire"
+          const allBrandsMatch = poBrands.every(pb => productBrands.includes(pb));
+          const anyBrandMatch = poBrands.some(pb => productBrands.includes(pb));
+          if (allBrandsMatch) {
+            score += 40; // STRONG boost for matching all brands
+            console.log(`    Brand match (all): ${poBrands.join(',')} matches ${productBrands.join(',')}`);
+          } else if (anyBrandMatch && productBrands.length > 0) {
+            // Partial brand match — some overlap but not complete. Penalise rather than skip
+            // to allow it as a last-resort candidate, but strongly prefer full matches.
+            score -= 20;
+            console.log(`    Brand PARTIAL match: PO wants ${poBrands.join(',')} but product only has ${productBrands.join(',')}`);
           } else if (productBrands.length > 0) {
-            // If the product clearly belongs to a different line, don't match it.
-            // This is better than a "best of bad" match; it will surface as an unmatched line item.
+            // No brand overlap at all — skip
             console.log(`    Brand MISMATCH (skipping): PO wants ${poBrands.join(',')} but product is ${productBrands.join(',')}`);
             continue;
           } else {
