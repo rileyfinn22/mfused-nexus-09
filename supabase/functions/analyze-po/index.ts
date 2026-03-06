@@ -451,6 +451,7 @@ Keep these in the name for matching.
 
 4. FOR ORDER INFO:
 - po_number: Look for "PO #", "Order #"
+- po_total: The GRAND TOTAL / TOTAL amount shown on the PO document (as a number, e.g. 1234.56). Look for "Total", "Grand Total", "Amount Due", etc.
 - due_date: Format as YYYY-MM-DD if found
 - customer_name: Customer/Vendor name
 
