@@ -326,13 +326,19 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
   };
 
   const stripAnyTemplatePrefix = (name: string, allTemplates: Template[], keepTemplateId?: string | null) => {
-    const n = String(name || '').trim();
+    let n = String(name || '').trim();
     if (!n) return n;
 
     for (const t of allTemplates) {
       if (keepTemplateId && t.id === keepTemplateId) continue;
       const prefix = `${t.name} - `;
       if (n.startsWith(prefix)) return n.slice(prefix.length).trim();
+      // Also strip close variants (e.g. "AZ Sleeve - " vs template "AZ Sleeves")
+      const baseNoS = t.name.replace(/s$/i, '');
+      const variantPrefix = `${baseNoS} - `;
+      if (n.toLowerCase().startsWith(variantPrefix.toLowerCase())) {
+        return n.slice(variantPrefix.length).trim();
+      }
     }
     return n;
   };

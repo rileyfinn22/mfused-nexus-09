@@ -155,8 +155,20 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
         const tempSKU = generateTempSKU();
         
         // Prepend template name to product name when template is selected
+        // Strip any existing template prefix variant to prevent stacking
+        let variantLabel = name;
+        if (selectedTemplate) {
+          const baseNoS = selectedTemplate.name.replace(/s$/i, '');
+          const patterns = [`${selectedTemplate.name} - `, `${baseNoS} - `];
+          for (const p of patterns) {
+            if (variantLabel.toLowerCase().startsWith(p.toLowerCase())) {
+              variantLabel = variantLabel.slice(p.length).trim();
+              break;
+            }
+          }
+        }
         const fullProductName = selectedTemplate 
-          ? `${selectedTemplate.name} - ${name}`
+          ? `${selectedTemplate.name} - ${variantLabel}`
           : name;
 
         const { data: product, error: productError } = await supabase

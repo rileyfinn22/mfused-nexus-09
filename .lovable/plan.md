@@ -1,41 +1,41 @@
 
 
-## Problem
+## Plan: Show Repeat vs New Status for Each PO Line Item
 
-38 products have stacked/duplicate template prefixes. The template name is **"AZ Sleeves"** but during creation, the input variant name already contained "AZ Sleeve -", so the prefixing logic produced:
+### Problem
+When analyzing an uploaded PO, all extracted products are displayed the same way. There's no indication of whether a product already exists in the system (repeat) or is entirely new.
 
-`AZ Sleeves - AZ Sleeve - Twisted - Sour Applez`
+### Solution
 
-When it should be:
+**1. After AI extraction, check each product against the existing `products` table**
 
-`AZ Sleeves - Twisted - Sour Applez`
+In `AnalyzePOProductsDialog.tsx`, after receiving the AI-extracted products, query the `products` table for the selected company and compare each extracted product by name (normalized) to identify matches.
 
-## Fix
+Each `ExtractedProduct` gets a new field:
+- `matchStatus`: `'existing'` | `'new'`
+- `existingProductId`: the matched product's ID (if existing)
 
-### 1. Database cleanup -- rename 38 affected products
+**2. Update the review UI to display status per line item**
 
-Strip the redundant "AZ Sleeve - " segment from all products matching the pattern `AZ Sleeves - AZ Sleeve - %`:
+- **Existing/Repeat items**: Show a green "Existing" badge next to the product name. These are products already in the system — importing them would create duplicates, so they default to `selected: false` with a note like "Already in catalog".
+- **New items**: Show an orange "New" badge. These default to `selected: true`. For new items without a template match, show a small inline "Create Product" action that opens a quick-add form (name, description, state, cost pre-filled from the extraction) to create it as a standalone product.
 
-```sql
-UPDATE products
-SET name = REPLACE(name, 'AZ Sleeves - AZ Sleeve - ', 'AZ Sleeves - ')
-WHERE name LIKE 'AZ Sleeves - AZ Sleeve - %';
-```
+**3. Inline new product creation**
 
-### 2. Harden prefix logic to prevent future stacking
+For "new" items that the user wants to add but hasn't matched to a template, add an inline expandable section (or small dialog trigger) with pre-filled fields (name, description, state, cost, product_type) so the user can confirm/edit details before import. This replaces the current blind bulk insert.
 
-In both `QuickAddProductsDialog.tsx` (line ~131) and `AnalyzePOProductsDialog.tsx`, before prepending the template name, strip any existing occurrence of the template name (or close variant) from the input name. This is the same anti-stacking pattern referenced in the memory notes.
+### Technical Details
 
-The check: if the variant label already starts with the template name (case-insensitive, with or without trailing "s"), strip it before building `[Template Name] - [Variant Label]`.
+**File: `src/components/AnalyzePOProductsDialog.tsx`**
 
-```typescript
-// Before: "AZ Sleeve - Twisted - Sour Applez"
-// Template: "AZ Sleeves"
-// Normalize: strip "AZ Sleeve(s) - " prefix → "Twisted - Sour Applez"
-// Result: "AZ Sleeves - Twisted - Sour Applez"
-```
+- Add `matchStatus` and `existingProductId` to the `ExtractedProduct` interface
+- After `handleAnalyze` receives products, query `supabase.from('products').select('id, name').eq('company_id', companyId)` to get all existing products for the company
+- Normalize and compare names (case-insensitive, trimmed) to flag each as existing or new
+- Update the review card UI:
+  - Add a Badge showing "Existing" (green) or "New" (orange)
+  - Existing items: unselected by default, grayed styling, tooltip "Already in your catalog"
+  - New items: selected by default, editable inline fields (name, state, cost) that can be tweaked before import
+- Keep the current import flow but skip items flagged as existing (unless user explicitly re-selects them)
 
-### Summary
-- One DB update to fix 38 product names
-- One code guard in the Quick Add and PO analysis flows to prevent recurrence
+No backend/edge function changes needed — the matching is done client-side against the products table after extraction.
 
