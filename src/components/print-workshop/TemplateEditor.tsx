@@ -2106,7 +2106,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           </>
         )}
         {mode === "use" && (
-          <span className="text-xs text-muted-foreground px-2">Click a highlighted field to edit its text</span>
+          <div className="flex flex-col gap-0.5 px-2">
+            <span className="text-xs text-muted-foreground">Click a highlighted field to edit its text</span>
+            <span className="text-xs text-muted-foreground">Triple-click a text field to unlock &amp; reposition it</span>
+          </div>
         )}
         {mode === "edit" && (
           <>
