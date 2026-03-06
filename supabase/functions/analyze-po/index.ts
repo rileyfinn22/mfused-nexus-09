@@ -451,6 +451,7 @@ Keep these in the name for matching.
 
 4. FOR ORDER INFO:
 - po_number: Look for "PO #", "Order #"
+- po_total: The GRAND TOTAL / TOTAL amount shown on the PO document (as a number, e.g. 1234.56). Look for "Total", "Grand Total", "Amount Due", etc.
 - due_date: Format as YYYY-MM-DD if found
 - customer_name: Customer/Vendor name
 
@@ -463,6 +464,7 @@ CRITICAL: unit_price MUST be a number (0.218), NOT a string or formatted currenc
 Return ONLY valid JSON:
 {
   "po_number": "...",
+  "po_total": 0.0,
   "customer_name": "...",
   "customer_email": null,
   "customer_phone": null,
@@ -778,6 +780,7 @@ Return ONLY valid JSON:
           success: true, 
           items: matchedItems,
           poNumber: extractedData.po_number || null,
+          poTotal: Number(extractedData.po_total) || null,
           customerName: extractedData.customer_name || null,
           shippingAddress: {
             name: extractedData.shipping_name,

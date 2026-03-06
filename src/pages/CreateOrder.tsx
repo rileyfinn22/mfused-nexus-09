@@ -125,6 +125,7 @@ const CreateOrder = () => {
   const [existingOrderNumber, setExistingOrderNumber] = useState<string | null>(null);
   
   const [unmatchedPoItems, setUnmatchedPoItems] = useState<any[]>([]);
+  const [poDocumentTotal, setPoDocumentTotal] = useState<number | null>(null);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
@@ -846,9 +847,14 @@ const CreateOrder = () => {
           }
         }
 
-        // Extract PO number from data or filename
+        // Extract PO number and total from data or filename
         const poNum = functionData?.poNumber || file.name.replace('.pdf', '');
         setUploadedPOs(prev => [...prev, { filename: file.name, poNumber: poNum }]);
+        
+        // Capture PO document total if available
+        if (functionData?.poTotal) {
+          setPoDocumentTotal(prev => (prev || 0) + Number(functionData.poTotal));
+        }
         
         // Update form PO number field (combine multiple)
         setFormData(prev => ({
@@ -1003,6 +1009,11 @@ const CreateOrder = () => {
         if (newUnmatched.length > 0) {
           setUnmatchedPoItems(prev => [...prev, ...newUnmatched]);
         }
+      }
+
+      // Capture PO document total if available
+      if (functionData?.poTotal) {
+        setPoDocumentTotal(prev => (prev || 0) + Number(functionData.poTotal));
       }
 
       // Extract PO number if available
@@ -2086,12 +2097,13 @@ const CreateOrder = () => {
                     variant="ghost"
                     size="sm"
                     className="h-6 text-xs text-muted-foreground hover:text-destructive"
-                    onClick={() => {
-                      setSelectedItems([]);
-                      setUnmatchedPoItems([]);
-                      setUploadedPOs([]);
-                      setTextInput("");
-                      setFormData(prev => ({ ...prev, poNumber: "" }));
+                     onClick={() => {
+                       setSelectedItems([]);
+                       setUnmatchedPoItems([]);
+                       setUploadedPOs([]);
+                       setTextInput("");
+                       setPoDocumentTotal(null);
+                       setFormData(prev => ({ ...prev, poNumber: "" }));
                       toast({
                         title: "Analysis cleared",
                         description: "You can now re-analyze with different input or hints",
@@ -2827,10 +2839,23 @@ const CreateOrder = () => {
           {/* Totals */}
           <div className="flex justify-end">
             <div className="w-80 space-y-2">
+              {poDocumentTotal !== null && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">PO Document Total:</span>
+                  <span className={`font-medium ${Math.abs(poDocumentTotal - total) > 0.01 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                    ${poDocumentTotal.toFixed(2)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="font-semibold text-lg">Total:</span>
                 <span className="font-bold text-xl">${total.toFixed(2)}</span>
               </div>
+              {poDocumentTotal !== null && Math.abs(poDocumentTotal - total) > 0.01 && (
+                <p className="text-xs text-amber-500">
+                  Difference: ${Math.abs(poDocumentTotal - total).toFixed(2)} — verify line item prices match the PO
+                </p>
+              )}
             </div>
           </div>
         </div>
