@@ -77,6 +77,7 @@ const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[]
       existing.item_id = existing.item_id || item.item_id;
       existing.description = existing.description || item.description;
       existing.poLineName = existing.poLineName || item.poLineName;
+      existing.poLineQty = existing.poLineQty || item.poLineQty;
     } else {
       merged.set(key, { ...item });
     }
