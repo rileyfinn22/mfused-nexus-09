@@ -835,6 +835,7 @@ const CreateOrder = () => {
                 item_id: item.item_id || null,
                 description: item.description || null,
                 poLineName: item.name || null,
+                poLineQty: item.quantity || null,
               });
             } else {
               newUnmatched.push(item);
