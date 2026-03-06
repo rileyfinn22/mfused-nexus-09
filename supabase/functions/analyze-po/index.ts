@@ -464,6 +464,7 @@ CRITICAL: unit_price MUST be a number (0.218), NOT a string or formatted currenc
 Return ONLY valid JSON:
 {
   "po_number": "...",
+  "po_total": 0.0,
   "customer_name": "...",
   "customer_email": null,
   "customer_phone": null,
