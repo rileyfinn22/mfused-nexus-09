@@ -1011,6 +1011,11 @@ const CreateOrder = () => {
         }
       }
 
+      // Capture PO document total if available
+      if (functionData?.poTotal) {
+        setPoDocumentTotal(prev => (prev || 0) + Number(functionData.poTotal));
+      }
+
       // Extract PO number if available
       if (functionData?.poNumber) {
         setFormData(prev => ({
