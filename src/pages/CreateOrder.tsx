@@ -2618,6 +2618,11 @@ const CreateOrder = () => {
                       <TableCell className="font-mono text-xs">{displayItemId}</TableCell>
                       <TableCell className="font-medium">
                         {displayName}
+                        {item.poLineName && item.poLineName !== displayName && (
+                          <span className="block text-xs text-muted-foreground font-normal mt-0.5">
+                            PO Line: {item.poLineName}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
                         {displayDescription}
