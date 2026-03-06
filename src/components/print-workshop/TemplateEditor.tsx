@@ -625,22 +625,17 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.on("object:modified", () => { clearGuidelines(canvas); syncCanvas(); });
     canvas.on("text:changed", syncCanvas);
 
-    // In use mode: auto-enter text editing on click, triple-click to unlock movement
+    // In use mode: auto-enter text editing on click
     if (mode === "use") {
-      const tripleClickTimers = new WeakMap<any, { count: number; timer: ReturnType<typeof setTimeout> }>();
-      // Track which objects are in "move mode" so autoEditText skips them
-      const moveModeObjects = new Set<any>();
-
       const autoEditText = (e: any) => {
         const obj = e.selected?.[0] as any;
-        if (obj && obj.type === "i-text" && obj.editable && !moveModeObjects.has(obj)) {
+        if (obj && obj.type === "i-text" && obj.editable) {
           setTimeout(() => {
-            // Re-check in case move mode was toggled during the timeout
-            if (moveModeObjects.has(obj)) return;
             obj.enterEditing();
             const len = (obj.text || "").length;
             obj.selectionStart = len;
             obj.selectionEnd = len;
+            // Also sync the hidden textarea that Fabric creates for actual keyboard input
             const ta = obj.hiddenTextarea as HTMLTextAreaElement | undefined;
             if (ta) {
               ta.value = obj.text || "";
@@ -654,54 +649,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       };
       canvas.on("selection:created", autoEditText);
       canvas.on("selection:updated", autoEditText);
-
-      // Triple-click on a text object to toggle movement lock
-      canvas.on("mouse:down", (e: any) => {
-        const target = e.target as any;
-        if (!target || target.type !== "i-text" || !target.editable) return;
-
-        let state = tripleClickTimers.get(target);
-        if (!state) {
-          state = { count: 0, timer: setTimeout(() => {}, 0) };
-          tripleClickTimers.set(target, state);
-        }
-        clearTimeout(state.timer);
-        state.count++;
-        state.timer = setTimeout(() => { state!.count = 0; }, 500);
-
-        if (state.count >= 3) {
-          state.count = 0;
-          const wasInMoveMode = moveModeObjects.has(target);
-          if (wasInMoveMode) {
-            // Re-lock: back to text edit mode
-            moveModeObjects.delete(target);
-            target.set({ lockMovementX: true, lockMovementY: true });
-            toast("Text field locked in place");
-          } else {
-            // Unlock: enter move mode
-            moveModeObjects.add(target);
-            target.set({ lockMovementX: false, lockMovementY: false });
-            target.exitEditing?.();
-            // Deselect and reselect to clear editing state cleanly
-            canvas.discardActiveObject();
-            canvas.setActiveObject(target);
-          }
-          canvas.renderAll();
-          if (!wasInMoveMode) {
-            toast("Text field unlocked — drag to reposition");
-          }
-        }
-      });
-
-      // Re-lock movement when deselecting
-      canvas.on("selection:cleared", () => {
-        canvas.getObjects().forEach((obj: any) => {
-          if (obj.type === "i-text" && obj.editable) {
-            obj.set({ lockMovementX: true, lockMovementY: true });
-            moveModeObjects.delete(obj);
-          }
-        });
-      });
     }
 
     // Smart snapping guidelines
@@ -2122,10 +2069,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           </>
         )}
         {mode === "use" && (
-          <div className="flex flex-col gap-0.5 px-2">
-            <span className="text-xs text-muted-foreground">Click a highlighted field to edit its text</span>
-            <span className="text-xs text-muted-foreground">Triple-click a text field to unlock &amp; reposition it</span>
-          </div>
+          <span className="text-xs text-muted-foreground px-2">Click a highlighted field to edit its text</span>
         )}
         {mode === "edit" && (
           <>
