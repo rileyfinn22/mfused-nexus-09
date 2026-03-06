@@ -780,6 +780,7 @@ Return ONLY valid JSON:
           success: true, 
           items: matchedItems,
           poNumber: extractedData.po_number || null,
+          poTotal: Number(extractedData.po_total) || null,
           customerName: extractedData.customer_name || null,
           shippingAddress: {
             name: extractedData.shipping_name,
