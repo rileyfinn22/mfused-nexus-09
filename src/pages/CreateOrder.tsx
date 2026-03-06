@@ -2839,10 +2839,23 @@ const CreateOrder = () => {
           {/* Totals */}
           <div className="flex justify-end">
             <div className="w-80 space-y-2">
+              {poDocumentTotal !== null && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">PO Document Total:</span>
+                  <span className={`font-medium ${Math.abs(poDocumentTotal - total) > 0.01 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                    ${poDocumentTotal.toFixed(2)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="font-semibold text-lg">Total:</span>
                 <span className="font-bold text-xl">${total.toFixed(2)}</span>
               </div>
+              {poDocumentTotal !== null && Math.abs(poDocumentTotal - total) > 0.01 && (
+                <p className="text-xs text-amber-500">
+                  Difference: ${Math.abs(poDocumentTotal - total).toFixed(2)} — verify line item prices match the PO
+                </p>
+              )}
             </div>
           </div>
         </div>
