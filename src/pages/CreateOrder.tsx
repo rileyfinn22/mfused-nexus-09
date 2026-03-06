@@ -2097,12 +2097,13 @@ const CreateOrder = () => {
                     variant="ghost"
                     size="sm"
                     className="h-6 text-xs text-muted-foreground hover:text-destructive"
-                    onClick={() => {
-                      setSelectedItems([]);
-                      setUnmatchedPoItems([]);
-                      setUploadedPOs([]);
-                      setTextInput("");
-                      setFormData(prev => ({ ...prev, poNumber: "" }));
+                     onClick={() => {
+                       setSelectedItems([]);
+                       setUnmatchedPoItems([]);
+                       setUploadedPOs([]);
+                       setTextInput("");
+                       setPoDocumentTotal(null);
+                       setFormData(prev => ({ ...prev, poNumber: "" }));
                       toast({
                         title: "Analysis cleared",
                         description: "You can now re-analyze with different input or hints",
