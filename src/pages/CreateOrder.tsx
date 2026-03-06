@@ -989,6 +989,7 @@ const CreateOrder = () => {
               name: item.name || null,
               item_id: item.item_id || null,
               description: item.description || null,
+              poLineName: item.name || null,
             });
           } else {
             // Unmatched item
