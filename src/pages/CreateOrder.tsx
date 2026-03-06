@@ -2668,12 +2668,19 @@ const CreateOrder = () => {
                             >
                               <Minus className="h-3 w-3" />
                             </Button>
-                            <span 
-                              className="w-12 text-center font-medium cursor-pointer hover:bg-muted px-2 py-1 rounded"
-                              onClick={() => handleQuantityClick(itemKey, item.quantity)}
-                            >
-                              {item.quantity}
-                            </span>
+                            <div className="flex flex-col items-center">
+                              <span 
+                                className="w-12 text-center font-medium cursor-pointer hover:bg-muted px-2 py-1 rounded"
+                                onClick={() => handleQuantityClick(itemKey, item.quantity)}
+                              >
+                                {item.quantity}
+                              </span>
+                              {item.poLineQty && item.poLineQty !== item.quantity && (
+                                <span className="text-xs text-muted-foreground font-normal">
+                                  PO Qty: {item.poLineQty}
+                                </span>
+                              )}
+                            </div>
                             <Button
                               type="button"
                               variant="outline"
