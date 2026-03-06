@@ -59,6 +59,7 @@ interface OrderItem {
   item_id?: string | null;
   description?: string | null;
   poLineName?: string; // Original PO line name for match verification
+  poLineQty?: number; // Original PO line quantity for match verification
 }
 
 const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[] => {
@@ -76,6 +77,7 @@ const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[]
       existing.item_id = existing.item_id || item.item_id;
       existing.description = existing.description || item.description;
       existing.poLineName = existing.poLineName || item.poLineName;
+      existing.poLineQty = existing.poLineQty || item.poLineQty;
     } else {
       merged.set(key, { ...item });
     }
@@ -833,6 +835,7 @@ const CreateOrder = () => {
                 item_id: item.item_id || null,
                 description: item.description || null,
                 poLineName: item.name || null,
+                poLineQty: item.quantity || null,
               });
             } else {
               newUnmatched.push(item);
@@ -996,6 +999,7 @@ const CreateOrder = () => {
               item_id: item.item_id || null,
               description: item.description || null,
               poLineName: item.name || null,
+              poLineQty: item.quantity || null,
             });
           } else {
             // Unmatched item
@@ -2664,12 +2668,19 @@ const CreateOrder = () => {
                             >
                               <Minus className="h-3 w-3" />
                             </Button>
-                            <span 
-                              className="w-12 text-center font-medium cursor-pointer hover:bg-muted px-2 py-1 rounded"
-                              onClick={() => handleQuantityClick(itemKey, item.quantity)}
-                            >
-                              {item.quantity}
-                            </span>
+                            <div className="flex flex-col items-center">
+                              <span 
+                                className="w-12 text-center font-medium cursor-pointer hover:bg-muted px-2 py-1 rounded"
+                                onClick={() => handleQuantityClick(itemKey, item.quantity)}
+                              >
+                                {item.quantity}
+                              </span>
+                              {item.poLineQty && item.poLineQty !== item.quantity && (
+                                <span className="text-xs text-muted-foreground font-normal">
+                                  PO Qty: {item.poLineQty}
+                                </span>
+                              )}
+                            </div>
                             <Button
                               type="button"
                               variant="outline"
