@@ -628,11 +628,15 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     // In use mode: auto-enter text editing on click, triple-click to unlock movement
     if (mode === "use") {
       const tripleClickTimers = new WeakMap<any, { count: number; timer: ReturnType<typeof setTimeout> }>();
+      // Track which objects are in "move mode" so autoEditText skips them
+      const moveModeObjects = new Set<any>();
 
       const autoEditText = (e: any) => {
         const obj = e.selected?.[0] as any;
-        if (obj && obj.type === "i-text" && obj.editable) {
+        if (obj && obj.type === "i-text" && obj.editable && !moveModeObjects.has(obj)) {
           setTimeout(() => {
+            // Re-check in case move mode was toggled during the timeout
+            if (moveModeObjects.has(obj)) return;
             obj.enterEditing();
             const len = (obj.text || "").length;
             obj.selectionStart = len;
@@ -667,14 +671,25 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
         if (state.count >= 3) {
           state.count = 0;
-          const isLocked = target.lockMovementX;
-          target.set({ lockMovementX: !isLocked, lockMovementY: !isLocked });
-          if (!isLocked) {
-            // Unlocking movement — exit editing so user can drag
+          const wasInMoveMode = moveModeObjects.has(target);
+          if (wasInMoveMode) {
+            // Re-lock: back to text edit mode
+            moveModeObjects.delete(target);
+            target.set({ lockMovementX: true, lockMovementY: true });
+            toast("Text field locked in place");
+          } else {
+            // Unlock: enter move mode
+            moveModeObjects.add(target);
+            target.set({ lockMovementX: false, lockMovementY: false });
             target.exitEditing?.();
+            // Deselect and reselect to clear editing state cleanly
+            canvas.discardActiveObject();
+            canvas.setActiveObject(target);
           }
           canvas.renderAll();
-          toast(isLocked ? "Text field unlocked — drag to reposition" : "Text field locked in place");
+          if (!wasInMoveMode) {
+            toast("Text field unlocked — drag to reposition");
+          }
         }
       });
 
@@ -683,6 +698,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         canvas.getObjects().forEach((obj: any) => {
           if (obj.type === "i-text" && obj.editable) {
             obj.set({ lockMovementX: true, lockMovementY: true });
+            moveModeObjects.delete(obj);
           }
         });
       });
