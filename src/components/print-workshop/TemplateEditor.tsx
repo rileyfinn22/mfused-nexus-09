@@ -625,8 +625,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.on("object:modified", () => { clearGuidelines(canvas); syncCanvas(); });
     canvas.on("text:changed", syncCanvas);
 
-    // In use mode: auto-enter text editing on click
+    // In use mode: auto-enter text editing on click, triple-click to unlock movement
     if (mode === "use") {
+      const tripleClickTimers = new WeakMap<any, { count: number; timer: ReturnType<typeof setTimeout> }>();
+
       const autoEditText = (e: any) => {
         const obj = e.selected?.[0] as any;
         if (obj && obj.type === "i-text" && obj.editable) {
@@ -635,7 +637,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             const len = (obj.text || "").length;
             obj.selectionStart = len;
             obj.selectionEnd = len;
-            // Also sync the hidden textarea that Fabric creates for actual keyboard input
             const ta = obj.hiddenTextarea as HTMLTextAreaElement | undefined;
             if (ta) {
               ta.value = obj.text || "";
@@ -649,6 +650,42 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       };
       canvas.on("selection:created", autoEditText);
       canvas.on("selection:updated", autoEditText);
+
+      // Triple-click on a text object to toggle movement lock
+      canvas.on("mouse:down", (e: any) => {
+        const target = e.target as any;
+        if (!target || target.type !== "i-text" || !target.editable) return;
+
+        let state = tripleClickTimers.get(target);
+        if (!state) {
+          state = { count: 0, timer: setTimeout(() => {}, 0) };
+          tripleClickTimers.set(target, state);
+        }
+        clearTimeout(state.timer);
+        state.count++;
+        state.timer = setTimeout(() => { state!.count = 0; }, 500);
+
+        if (state.count >= 3) {
+          state.count = 0;
+          const isLocked = target.lockMovementX;
+          target.set({ lockMovementX: !isLocked, lockMovementY: !isLocked });
+          if (!isLocked) {
+            // Unlocking movement — exit editing so user can drag
+            target.exitEditing?.();
+          }
+          canvas.renderAll();
+          toast(isLocked ? "Text field unlocked — drag to reposition" : "Text field locked in place");
+        }
+      });
+
+      // Re-lock movement when deselecting
+      canvas.on("selection:cleared", () => {
+        canvas.getObjects().forEach((obj: any) => {
+          if (obj.type === "i-text" && obj.editable) {
+            obj.set({ lockMovementX: true, lockMovementY: true });
+          }
+        });
+      });
     }
 
     // Smart snapping guidelines
