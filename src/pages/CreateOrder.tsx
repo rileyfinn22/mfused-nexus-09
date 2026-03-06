@@ -125,6 +125,7 @@ const CreateOrder = () => {
   const [existingOrderNumber, setExistingOrderNumber] = useState<string | null>(null);
   
   const [unmatchedPoItems, setUnmatchedPoItems] = useState<any[]>([]);
+  const [poDocumentTotal, setPoDocumentTotal] = useState<number | null>(null);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
