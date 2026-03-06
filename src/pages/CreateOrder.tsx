@@ -847,9 +847,14 @@ const CreateOrder = () => {
           }
         }
 
-        // Extract PO number from data or filename
+        // Extract PO number and total from data or filename
         const poNum = functionData?.poNumber || file.name.replace('.pdf', '');
         setUploadedPOs(prev => [...prev, { filename: file.name, poNumber: poNum }]);
+        
+        // Capture PO document total if available
+        if (functionData?.poTotal) {
+          setPoDocumentTotal(prev => (prev || 0) + Number(functionData.poTotal));
+        }
         
         // Update form PO number field (combine multiple)
         setFormData(prev => ({
