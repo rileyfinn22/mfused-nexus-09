@@ -1177,7 +1177,9 @@ const OrderDetail = () => {
                 total: newItemTotal,
                 description: item.description,
                 item_id: item.item_id,
-                name: item.name
+                name: item.name,
+                sku: item.sku || item.item_id,
+                product_id: item.product_id
               })
               .eq('id', item.id);
           })()
