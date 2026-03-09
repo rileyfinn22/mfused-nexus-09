@@ -1177,7 +1177,9 @@ const OrderDetail = () => {
                 total: newItemTotal,
                 description: item.description,
                 item_id: item.item_id,
-                name: item.name
+                name: item.name,
+                sku: item.sku || item.item_id,
+                product_id: item.product_id
               })
               .eq('id', item.id);
           })()
@@ -2338,7 +2340,57 @@ const OrderDetail = () => {
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{item.item_id || '-'}</TableCell>
-                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {isEditMode ? (
+                          <Popover open={openCombobox[`edit-item-${item.id}`]} onOpenChange={(open) => setOpenCombobox(prev => ({ ...prev, [`edit-item-${item.id}`]: open }))}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-between text-left font-medium h-auto py-1.5 px-2">
+                                <span className="truncate text-sm">{item.name}</span>
+                                <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[350px] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Search products..." />
+                                <CommandList>
+                                  <CommandEmpty>No product found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {products.slice(0, 50).map((product) => (
+                                      <CommandItem
+                                        key={product.id}
+                                        value={`${product.name} ${product.item_id || ''}`}
+                                        onSelect={() => {
+                                          setEditedItems(items => items.map(i => 
+                                            i.id === item.id ? {
+                                              ...i,
+                                              product_id: product.id,
+                                              sku: product.item_id || product.id.slice(0, 8),
+                                              item_id: product.item_id || null,
+                                              name: product.name,
+                                              description: product.description || '',
+                                              unit_price: i.unit_price || product.price || 0,
+                                              total: Number(i.quantity) * (i.unit_price || product.price || 0),
+                                            } : i
+                                          ));
+                                          setOpenCombobox(prev => ({ ...prev, [`edit-item-${item.id}`]: false }));
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm truncate">{product.name}</p>
+                                          {product.item_id && <p className="text-xs text-muted-foreground">{product.item_id}</p>}
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        ) : (
+                          item.name
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-xs">{item.description || '-'}</TableCell>
                       <TableCell className="text-right">
                         {isEditMode ? (
