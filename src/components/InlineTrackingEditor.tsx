@@ -109,11 +109,11 @@ export function InlineTrackingEditor({
             rel="noopener noreferrer"
             className="text-xs font-mono text-primary hover:underline flex items-center gap-1"
           >
-            {trackingNumber}
+            {savedNumber}
             <ExternalLink className="h-3 w-3" />
           </a>
         ) : (
-          <span className="text-xs font-mono">{trackingNumber}</span>
+          <span className="text-xs font-mono">{savedNumber}</span>
         )}
         <Button
           size="sm"
