@@ -2946,6 +2946,9 @@ export type Database = {
           status: string
           total: number
           total_paid: number | null
+          tracking_carrier: string | null
+          tracking_number: string | null
+          tracking_url: string | null
           updated_at: string
           vendor_id: string
         }
@@ -2976,6 +2979,9 @@ export type Database = {
           status?: string
           total?: number
           total_paid?: number | null
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
           vendor_id: string
         }
@@ -3006,6 +3012,9 @@ export type Database = {
           status?: string
           total?: number
           total_paid?: number | null
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
           vendor_id?: string
         }
