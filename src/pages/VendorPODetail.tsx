@@ -1126,6 +1126,61 @@ Thank you for your business.`;
             </div>
           </div>
 
+            {/* Tracking Information */}
+              <div className="mt-4 pt-4 border-t">
+                <Label className="text-xs text-muted-foreground mb-2 block">Tracking Information</Label>
+                {isEditMode ? (
+                  <div className="space-y-2">
+                    <Select
+                      value={editedPO.tracking_carrier || ''}
+                      onValueChange={(val) => setEditedPO({...editedPO, tracking_carrier: val})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select carrier..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CARRIERS.map(c => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      placeholder="Tracking number"
+                      value={editedPO.tracking_number || ''}
+                      onChange={(e) => setEditedPO({...editedPO, tracking_number: e.target.value})}
+                    />
+                  </div>
+                ) : (
+                  <div className="text-sm">
+                    {po.tracking_number ? (
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        {po.tracking_carrier && (
+                          <Badge variant="outline" className="text-xs">
+                            {CARRIERS.find(c => c.value === po.tracking_carrier)?.label || po.tracking_carrier}
+                          </Badge>
+                        )}
+                        {(() => {
+                          const url = getTrackingUrl(po.tracking_carrier || '', po.tracking_number);
+                          return url ? (
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                              {po.tracking_number}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span>{po.tracking_number}</span>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">Not set</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Vendor Info */}
           <div className="p-8 border-b">
             <h2 className="text-lg font-semibold mb-4">Vendor Information</h2>
