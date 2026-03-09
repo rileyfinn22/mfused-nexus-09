@@ -54,8 +54,8 @@ export function InlineTrackingEditor({
   };
 
   const handleCancel = () => {
-    setCarrier(trackingCarrier || "");
-    setNumber(trackingNumber || "");
+    setCarrier(savedCarrier || "");
+    setNumber(savedNumber || "");
     setEditing(false);
   };
 
