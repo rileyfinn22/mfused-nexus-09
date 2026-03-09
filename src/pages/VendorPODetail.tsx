@@ -1000,6 +1000,12 @@ Thank you for your business.`;
                 <p className="text-sm text-muted-foreground">
                   Customer: {po.orders?.customer_name || 'N/A'}
                 </p>
+                <InlineTrackingEditor
+                  vendorPoId={po.id}
+                  trackingCarrier={po.tracking_carrier}
+                  trackingNumber={po.tracking_number}
+                  onUpdated={fetchPODetails}
+                />
               </div>
               <div className="text-right">
                 {(() => {
