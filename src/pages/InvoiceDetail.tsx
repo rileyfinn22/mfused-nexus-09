@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package, ChevronsUpDown } from "lucide-react";
 import { format } from "date-fns";
 import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -30,6 +30,7 @@ import { addPdfBranding, addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBrand
 import { EditableDescription } from "@/components/EditableDescription";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
 import { calculateInvoiceTotals, blanketTotalItems, partialTotalItems } from "@/lib/invoiceTotals";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 const InvoiceDetail = () => {
   const {
@@ -71,6 +72,8 @@ const InvoiceDetail = () => {
   const [orderAttachments, setOrderAttachments] = useState<any[]>([]);
   const [sendingNotice, setSendingNotice] = useState<string | null>(null);
   const [showNoticeDialog, setShowNoticeDialog] = useState<"billed" | "payment_due" | null>(null);
+  const [products, setProducts] = useState<any[]>([]);
+  const [openCombobox, setOpenCombobox] = useState<Record<string, boolean>>({});
   const {
     syncInvoice,
     checkConnection
@@ -226,6 +229,16 @@ const InvoiceDetail = () => {
     console.log('Fetched invoice with company:', invoiceData);
     setInvoice(invoiceData);
     setOrder(invoiceData.orders);
+
+    // Fetch products for the company (for product picker in edit mode)
+    if (invoiceData.company_id) {
+      const { data: productsData } = await supabase
+        .from('products')
+        .select('id, name, item_id, description, price')
+        .eq('company_id', invoiceData.company_id)
+        .order('name');
+      if (productsData) setProducts(productsData);
+    }
 
     // Fetch inventory allocations for this invoice to get actual pulled items
     const {
@@ -1048,7 +1061,12 @@ const InvoiceDetail = () => {
         } = await supabase.from('order_items').update({
           shipped_quantity: newShippedQty,
           unit_price: item.unit_price,
-          total: orderedTotal // Always use ordered quantity for item total
+          total: orderedTotal,
+          name: item.name,
+          sku: item.sku || item.item_id,
+          item_id: item.item_id,
+          product_id: item.product_id,
+          description: item.description,
         }).eq('id', item.id);
         if (error) throw error;
         
@@ -2290,8 +2308,56 @@ const InvoiceDetail = () => {
                   : (invoice?.invoice_type === 'partial' ? item.quantity || 0 : orderItem?.shipped_quantity || 0);
                 
                 return <TableRow key={item.id}>
-                      <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell className="font-mono text-xs">{item.sku || item.item_id || '-'}</TableCell>
+                      <TableCell className="font-medium">
+                        {isEditMode ? (
+                          <Popover open={openCombobox[`inv-item-${item.id}`]} onOpenChange={(open) => setOpenCombobox(prev => ({ ...prev, [`inv-item-${item.id}`]: open }))}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-between text-left font-medium h-auto py-1.5 px-2">
+                                <span className="truncate text-sm">{item.name}</span>
+                                <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[350px] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Search products..." />
+                                <CommandList>
+                                  <CommandEmpty>No product found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {products.slice(0, 50).map((product) => (
+                                      <CommandItem
+                                        key={product.id}
+                                        value={`${product.name} ${product.item_id || ''}`}
+                                        onSelect={() => {
+                                          setEditedItems(items => items.map(i => 
+                                            i.id === item.id ? {
+                                              ...i,
+                                              product_id: product.id,
+                                              sku: product.item_id || product.id.slice(0, 8),
+                                              item_id: product.item_id || null,
+                                              name: product.name,
+                                              description: product.description || '',
+                                            } : i
+                                          ));
+                                          setOpenCombobox(prev => ({ ...prev, [`inv-item-${item.id}`]: false }));
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm truncate">{product.name}</p>
+                                          {product.item_id && <p className="text-xs text-muted-foreground">{product.item_id}</p>}
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        ) : (
+                          item.name
+                        )}
+                      </TableCell>
                       <TableCell className="max-w-xs">
                         {isVibeAdmin ? (
                           <EditableDescription
