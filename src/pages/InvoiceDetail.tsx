@@ -230,6 +230,16 @@ const InvoiceDetail = () => {
     setInvoice(invoiceData);
     setOrder(invoiceData.orders);
 
+    // Fetch products for the company (for product picker in edit mode)
+    if (invoiceData.company_id) {
+      const { data: productsData } = await supabase
+        .from('products')
+        .select('id, name, item_id, description, price')
+        .eq('company_id', invoiceData.company_id)
+        .order('name');
+      if (productsData) setProducts(productsData);
+    }
+
     // Fetch inventory allocations for this invoice to get actual pulled items
     const {
       data: allocationsData
