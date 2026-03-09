@@ -72,6 +72,8 @@ const InvoiceDetail = () => {
   const [orderAttachments, setOrderAttachments] = useState<any[]>([]);
   const [sendingNotice, setSendingNotice] = useState<string | null>(null);
   const [showNoticeDialog, setShowNoticeDialog] = useState<"billed" | "payment_due" | null>(null);
+  const [products, setProducts] = useState<any[]>([]);
+  const [openCombobox, setOpenCombobox] = useState<Record<string, boolean>>({});
   const {
     syncInvoice,
     checkConnection
