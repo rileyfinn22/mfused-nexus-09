@@ -2813,7 +2813,7 @@ const InvoiceDetail = () => {
                           vendorPoId={po.id}
                           trackingCarrier={po.tracking_carrier}
                           trackingNumber={po.tracking_number}
-                          onUpdated={fetchInvoiceData}
+                          onUpdated={fetchInvoiceDetails}
                           compact
                         />
                       </div>
