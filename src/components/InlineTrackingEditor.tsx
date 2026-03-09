@@ -27,6 +27,8 @@ export function InlineTrackingEditor({
   const [carrier, setCarrier] = useState(trackingCarrier || "");
   const [number, setNumber] = useState(trackingNumber || "");
   const [saving, setSaving] = useState(false);
+  const [savedCarrier, setSavedCarrier] = useState(trackingCarrier);
+  const [savedNumber, setSavedNumber] = useState(trackingNumber);
 
   const handleSave = async () => {
     setSaving(true);
@@ -45,9 +47,10 @@ export function InlineTrackingEditor({
       toast({ title: "Error", description: "Failed to save tracking", variant: "destructive" });
       return;
     }
+    setSavedCarrier(carrier || null);
+    setSavedNumber(number || null);
     toast({ title: "Tracking Updated" });
     setEditing(false);
-    onUpdated?.();
   };
 
   const handleCancel = () => {
