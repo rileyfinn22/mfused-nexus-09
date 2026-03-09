@@ -253,7 +253,7 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
           name: product?.name || "",
           description: product?.description || null,
           quantity: item.quantity,
-          shipped_quantity: item.quantity,
+          shipped_quantity: 0,
           unit_price: price,
           total: itemTotal,
         };
