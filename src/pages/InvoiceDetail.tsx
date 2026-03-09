@@ -2832,7 +2832,8 @@ const InvoiceDetail = () => {
                               <span className="text-xs font-mono">{po.tracking_number}</span>
                             );
                           })()}
-                      </div>
+                        </div>
+                      )}
                       
                       {/* Inline items table */}
                       {poItems.length > 0 && (
