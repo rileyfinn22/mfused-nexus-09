@@ -17,6 +17,7 @@ import { EmailPreviewDialog, AdditionalAttachment, ArtworkFile } from "@/compone
 import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
 import { UpdateBillDialog } from "@/components/UpdateBillDialog";
 import { VendorPOPackingListSection } from "@/components/VendorPOPackingListSection";
+import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
