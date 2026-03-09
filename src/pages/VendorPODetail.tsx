@@ -18,6 +18,7 @@ import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentD
 import { UpdateBillDialog } from "@/components/UpdateBillDialog";
 import { VendorPOPackingListSection } from "@/components/VendorPOPackingListSection";
 import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
+import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
