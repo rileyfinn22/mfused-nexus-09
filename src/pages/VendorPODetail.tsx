@@ -1123,10 +1123,8 @@ Thank you for your business.`;
                   </div>
                 )}
               </div>
-            </div>
-          </div>
 
-            {/* Tracking Information */}
+              {/* Tracking Information */}
               <div className="mt-4 pt-4 border-t">
                 <Label className="text-xs text-muted-foreground mb-2 block">Tracking Information</Label>
                 {isEditMode ? (
