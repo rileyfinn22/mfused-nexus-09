@@ -27,6 +27,8 @@ export function InlineTrackingEditor({
   const [carrier, setCarrier] = useState(trackingCarrier || "");
   const [number, setNumber] = useState(trackingNumber || "");
   const [saving, setSaving] = useState(false);
+  const [savedCarrier, setSavedCarrier] = useState(trackingCarrier);
+  const [savedNumber, setSavedNumber] = useState(trackingNumber);
 
   const handleSave = async () => {
     setSaving(true);
@@ -45,14 +47,15 @@ export function InlineTrackingEditor({
       toast({ title: "Error", description: "Failed to save tracking", variant: "destructive" });
       return;
     }
+    setSavedCarrier(carrier || null);
+    setSavedNumber(number || null);
     toast({ title: "Tracking Updated" });
     setEditing(false);
-    onUpdated?.();
   };
 
   const handleCancel = () => {
-    setCarrier(trackingCarrier || "");
-    setNumber(trackingNumber || "");
+    setCarrier(savedCarrier || "");
+    setNumber(savedNumber || "");
     setEditing(false);
   };
 
@@ -88,9 +91,9 @@ export function InlineTrackingEditor({
     );
   }
 
-  if (trackingNumber) {
-    const url = getTrackingUrl(trackingCarrier || "", trackingNumber);
-    const carrierLabel = CARRIERS.find((c) => c.value === trackingCarrier)?.label || trackingCarrier;
+  if (savedNumber) {
+    const url = getTrackingUrl(savedCarrier || "", savedNumber);
+    const carrierLabel = CARRIERS.find((c) => c.value === savedCarrier)?.label || savedCarrier;
     return (
       <div className={`flex items-center gap-2 ${compact ? "" : "mt-2"}`}>
         <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -106,11 +109,11 @@ export function InlineTrackingEditor({
             rel="noopener noreferrer"
             className="text-xs font-mono text-primary hover:underline flex items-center gap-1"
           >
-            {trackingNumber}
+            {savedNumber}
             <ExternalLink className="h-3 w-3" />
           </a>
         ) : (
-          <span className="text-xs font-mono">{trackingNumber}</span>
+          <span className="text-xs font-mono">{savedNumber}</span>
         )}
         <Button
           size="sm"
