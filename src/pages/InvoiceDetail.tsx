@@ -1061,7 +1061,12 @@ const InvoiceDetail = () => {
         } = await supabase.from('order_items').update({
           shipped_quantity: newShippedQty,
           unit_price: item.unit_price,
-          total: orderedTotal // Always use ordered quantity for item total
+          total: orderedTotal,
+          name: item.name,
+          sku: item.sku || item.item_id,
+          item_id: item.item_id,
+          product_id: item.product_id,
+          description: item.description,
         }).eq('id', item.id);
         if (error) throw error;
         
