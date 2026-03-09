@@ -28,6 +28,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addPdfBranding, addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
 import { EditableDescription } from "@/components/EditableDescription";
+import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
 import { calculateInvoiceTotals, blanketTotalItems, partialTotalItems } from "@/lib/invoiceTotals";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
