@@ -1130,12 +1130,25 @@ const InvoiceDetail = () => {
         shipping_note: editShippingNote || null,
       }).eq('id', invoiceId);
       if (invoiceError) throw invoiceError;
+      // Update local state instead of refetching
+      const updatedOrderItems = (order?.order_items || []).map((oi: any) => {
+        const edited = editedItems.find((ei: any) => ei.id === oi.id);
+        return edited ? { ...oi, ...edited } : oi;
+      });
+      setOrder({ ...order, order_items: updatedOrderItems });
+      setInvoice({
+        ...invoice,
+        subtotal: newSubtotal,
+        total: newTotal,
+        shipping_cost: editedShipping,
+        shipping_note: editShippingNote || null,
+        orders: { ...(invoice?.orders || {}), order_items: updatedOrderItems },
+      });
       toast({
         title: "Success",
         description: "Prices and quantities updated successfully"
       });
       setIsEditMode(false);
-      fetchInvoiceDetails();
     } catch (error: any) {
       console.error('Save error:', error);
       toast({
