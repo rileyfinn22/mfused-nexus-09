@@ -16,6 +16,8 @@ interface InlineTrackingEditorProps {
   compact?: boolean;
 }
 
+const isCustomCarrier = (val: string) => val !== "" && !CARRIERS.some((c) => c.value === val);
+
 export function InlineTrackingEditor({
   vendorPoId,
   trackingCarrier,
@@ -25,18 +27,22 @@ export function InlineTrackingEditor({
 }: InlineTrackingEditorProps) {
   const [editing, setEditing] = useState(false);
   const [carrier, setCarrier] = useState(trackingCarrier || "");
+  const [customCarrier, setCustomCarrier] = useState(isCustomCarrier(trackingCarrier || "") ? trackingCarrier || "" : "");
+  const [useCustom, setUseCustom] = useState(isCustomCarrier(trackingCarrier || ""));
   const [number, setNumber] = useState(trackingNumber || "");
   const [saving, setSaving] = useState(false);
   const [savedCarrier, setSavedCarrier] = useState(trackingCarrier);
   const [savedNumber, setSavedNumber] = useState(trackingNumber);
 
+  const effectiveCarrier = useCustom ? customCarrier : carrier;
+
   const handleSave = async () => {
     setSaving(true);
-    const trackingUrl = number ? getTrackingUrl(carrier, number) : null;
+    const trackingUrl = number ? getTrackingUrl(effectiveCarrier, number) : null;
     const { error } = await supabase
       .from("vendor_pos")
       .update({
-        tracking_carrier: carrier || null,
+        tracking_carrier: effectiveCarrier || null,
         tracking_number: number || null,
         tracking_url: trackingUrl || null,
       } as any)
@@ -47,34 +53,66 @@ export function InlineTrackingEditor({
       toast({ title: "Error", description: "Failed to save tracking", variant: "destructive" });
       return;
     }
-    setSavedCarrier(carrier || null);
+    setSavedCarrier(effectiveCarrier || null);
     setSavedNumber(number || null);
     toast({ title: "Tracking Updated" });
     setEditing(false);
   };
 
   const handleCancel = () => {
-    setCarrier(savedCarrier || "");
+    const sc = savedCarrier || "";
+    const isCust = isCustomCarrier(sc);
+    setCarrier(isCust ? "" : sc);
+    setCustomCarrier(isCust ? sc : "");
+    setUseCustom(isCust);
     setNumber(savedNumber || "");
     setEditing(false);
+  };
+
+  const handleCarrierSelect = (val: string) => {
+    if (val === "__custom__") {
+      setUseCustom(true);
+      setCarrier("");
+    } else {
+      setUseCustom(false);
+      setCarrier(val);
+    }
   };
 
   if (editing) {
     return (
       <div className={`flex items-center gap-2 ${compact ? "" : "mt-2"}`} onClick={(e) => e.stopPropagation()}>
         <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <Select value={carrier} onValueChange={setCarrier}>
-          <SelectTrigger className="h-7 w-[120px] text-xs">
-            <SelectValue placeholder="Carrier" />
-          </SelectTrigger>
-          <SelectContent>
-            {CARRIERS.map((c) => (
-              <SelectItem key={c.value} value={c.value}>
-                {c.label}
+        {useCustom ? (
+          <div className="flex items-center gap-1">
+            <Input
+              placeholder="Carrier name"
+              value={customCarrier}
+              onChange={(e) => setCustomCarrier(e.target.value)}
+              className="h-7 text-xs w-[120px]"
+              autoFocus
+            />
+            <Button size="sm" variant="ghost" className="h-7 px-1 text-xs text-muted-foreground" onClick={() => { setUseCustom(false); setCustomCarrier(""); }}>
+              ← list
+            </Button>
+          </div>
+        ) : (
+          <Select value={carrier} onValueChange={handleCarrierSelect}>
+            <SelectTrigger className="h-7 w-[120px] text-xs">
+              <SelectValue placeholder="Carrier" />
+            </SelectTrigger>
+            <SelectContent>
+              {CARRIERS.map((c) => (
+                <SelectItem key={c.value} value={c.value}>
+                  {c.label}
+                </SelectItem>
+              ))}
+              <SelectItem value="__custom__" className="text-muted-foreground italic">
+                Type manually…
               </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            </SelectContent>
+          </Select>
+        )}
         <Input
           placeholder="Tracking #"
           value={number}
