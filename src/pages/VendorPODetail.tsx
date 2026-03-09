@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, Edit, Save, X, Plus, Send, DollarSign, Trash2, FileCheck, Paperclip, Upload, FileText, ExternalLink } from "lucide-react";
+import { ArrowLeft, Download, Edit, Save, X, Plus, Send, DollarSign, Trash2, FileCheck, Paperclip, Upload, FileText, ExternalLink, Package } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -17,6 +17,7 @@ import { EmailPreviewDialog, AdditionalAttachment, ArtworkFile } from "@/compone
 import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
 import { UpdateBillDialog } from "@/components/UpdateBillDialog";
 import { VendorPOPackingListSection } from "@/components/VendorPOPackingListSection";
+import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
@@ -196,6 +197,9 @@ const VendorPODetail = () => {
           ship_to_city: editedPO.ship_to_city,
           ship_to_state: editedPO.ship_to_state,
           ship_to_zip: editedPO.ship_to_zip,
+          tracking_carrier: editedPO.tracking_carrier || null,
+          tracking_number: editedPO.tracking_number || null,
+          tracking_url: editedPO.tracking_url || null,
           total: newTotal
         })
         .eq('id', poId);
@@ -1113,6 +1117,59 @@ Thank you for your business.`;
                           <p>{[po.ship_to_city, po.ship_to_state, po.ship_to_zip].filter(Boolean).join(', ')}</p>
                         )}
                       </>
+                    ) : (
+                      <p className="text-muted-foreground">Not set</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Tracking Information */}
+              <div className="mt-4 pt-4 border-t">
+                <Label className="text-xs text-muted-foreground mb-2 block">Tracking Information</Label>
+                {isEditMode ? (
+                  <div className="space-y-2">
+                    <Select
+                      value={editedPO.tracking_carrier || ''}
+                      onValueChange={(val) => setEditedPO({...editedPO, tracking_carrier: val})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select carrier..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CARRIERS.map(c => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      placeholder="Tracking number"
+                      value={editedPO.tracking_number || ''}
+                      onChange={(e) => setEditedPO({...editedPO, tracking_number: e.target.value})}
+                    />
+                  </div>
+                ) : (
+                  <div className="text-sm">
+                    {po.tracking_number ? (
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        {po.tracking_carrier && (
+                          <Badge variant="outline" className="text-xs">
+                            {CARRIERS.find(c => c.value === po.tracking_carrier)?.label || po.tracking_carrier}
+                          </Badge>
+                        )}
+                        {(() => {
+                          const url = getTrackingUrl(po.tracking_carrier || '', po.tracking_number);
+                          return url ? (
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                              {po.tracking_number}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span>{po.tracking_number}</span>
+                          );
+                        })()}
+                      </div>
                     ) : (
                       <p className="text-muted-foreground">Not set</p>
                     )}
