@@ -1135,11 +1135,14 @@ const InvoiceDetail = () => {
   };
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity < 0) return;
+    const isBlanket = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
     setEditedItems(items => items.map(item => item.id === itemId ? {
       ...item,
-      quantity: newQuantity,
-      shipped_quantity: newQuantity,
-      total: newQuantity * Number(item.unit_price)
+      // For blanket invoices, only update shipped_quantity - keep original ordered quantity intact
+      ...(isBlanket
+        ? { shipped_quantity: newQuantity }
+        : { quantity: newQuantity, shipped_quantity: newQuantity, total: newQuantity * Number(item.unit_price) }
+      )
     } : item));
   };
   const handleSyncToQuickBooks = async (billingPercentage: number) => {
