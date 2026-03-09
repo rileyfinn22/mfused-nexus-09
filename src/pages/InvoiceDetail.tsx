@@ -28,7 +28,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addPdfBranding, addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
 import { EditableDescription } from "@/components/EditableDescription";
-import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
+import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
 import { calculateInvoiceTotals, blanketTotalItems, partialTotalItems } from "@/lib/invoiceTotals";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -2806,34 +2806,16 @@ const InvoiceDetail = () => {
                         </div>
                       </div>
 
-                      {/* Tracking Info */}
-                      {po.tracking_number && (
-                        <div className="flex items-center gap-2 mb-3 px-1">
-                          <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">Tracking:</span>
-                          {po.tracking_carrier && (
-                            <Badge variant="outline" className="text-xs py-0 h-5">
-                              {CARRIERS.find(c => c.value === po.tracking_carrier)?.label || po.tracking_carrier}
-                            </Badge>
-                          )}
-                          {(() => {
-                            const url = getTrackingUrl(po.tracking_carrier || '', po.tracking_number);
-                            return url ? (
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs font-mono text-primary hover:underline flex items-center gap-1"
-                              >
-                                {po.tracking_number}
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
-                            ) : (
-                              <span className="text-xs font-mono">{po.tracking_number}</span>
-                            );
-                          })()}
-                        </div>
-                      )}
+                      {/* Tracking Info - Inline Editable */}
+                      <div className="mb-3 px-1">
+                        <InlineTrackingEditor
+                          vendorPoId={po.id}
+                          trackingCarrier={po.tracking_carrier}
+                          trackingNumber={po.tracking_number}
+                          onUpdated={fetchInvoiceDetails}
+                          compact
+                        />
+                      </div>
                       
                       {/* Inline items table */}
                       {poItems.length > 0 && (
