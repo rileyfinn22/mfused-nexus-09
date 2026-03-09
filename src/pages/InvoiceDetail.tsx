@@ -2324,7 +2324,7 @@ const InvoiceDetail = () => {
                                 <CommandList>
                                   <CommandEmpty>No product found.</CommandEmpty>
                                   <CommandGroup>
-                                    {products.slice(0, 50).map((product) => (
+                                    {products.map((product) => (
                                       <CommandItem
                                         key={product.id}
                                         value={`${product.name} ${product.item_id || ''}`}
