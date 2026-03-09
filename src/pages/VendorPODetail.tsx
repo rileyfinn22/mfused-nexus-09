@@ -197,6 +197,9 @@ const VendorPODetail = () => {
           ship_to_city: editedPO.ship_to_city,
           ship_to_state: editedPO.ship_to_state,
           ship_to_zip: editedPO.ship_to_zip,
+          tracking_carrier: editedPO.tracking_carrier || null,
+          tracking_number: editedPO.tracking_number || null,
+          tracking_url: editedPO.tracking_url || null,
           total: newTotal
         })
         .eq('id', poId);
