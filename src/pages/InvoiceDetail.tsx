@@ -1050,9 +1050,30 @@ const InvoiceDetail = () => {
       // For blanket invoices, we need to create inventory allocations if quantities are being set
       const isBlanketInvoice = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
       
+      // For blanket invoices, fetch current DB shipped_quantity to avoid overwriting
+      // values set by child shipment invoices
+      let dbShippedMap: Record<string, number> = {};
+      if (isBlanketInvoice && order?.id) {
+        const { data: currentItems } = await supabase
+          .from('order_items')
+          .select('id, shipped_quantity')
+          .eq('order_id', order.id);
+        if (currentItems) {
+          for (const ci of currentItems) {
+            dbShippedMap[ci.id] = ci.shipped_quantity || 0;
+          }
+        }
+      }
+      
       // Update each order item
       for (const item of editedItems) {
-        const newShippedQty = Number(item.shipped_quantity) || 0;
+        const editedShippedQty = Number(item.shipped_quantity) || 0;
+        // For blanket invoices, use the MAX of DB value and edited value to prevent
+        // accidentally resetting shipped quantities set by child invoices
+        const dbShipped = dbShippedMap[item.id] ?? 0;
+        const newShippedQty = isBlanketInvoice
+          ? Math.max(editedShippedQty, dbShipped)
+          : editedShippedQty;
         // For blanket invoices, total should be based on ORDERED quantity, not shipped
         const orderedTotal = Number(item.quantity) * Number(item.unit_price);
         const shippedTotal = newShippedQty * Number(item.unit_price);
