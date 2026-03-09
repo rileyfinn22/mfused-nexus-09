@@ -91,9 +91,9 @@ export function InlineTrackingEditor({
     );
   }
 
-  if (trackingNumber) {
-    const url = getTrackingUrl(trackingCarrier || "", trackingNumber);
-    const carrierLabel = CARRIERS.find((c) => c.value === trackingCarrier)?.label || trackingCarrier;
+  if (savedNumber) {
+    const url = getTrackingUrl(savedCarrier || "", savedNumber);
+    const carrierLabel = CARRIERS.find((c) => c.value === savedCarrier)?.label || savedCarrier;
     return (
       <div className={`flex items-center gap-2 ${compact ? "" : "mt-2"}`}>
         <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
