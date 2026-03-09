@@ -30,6 +30,7 @@ import { addPdfBranding, addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBrand
 import { EditableDescription } from "@/components/EditableDescription";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
 import { calculateInvoiceTotals, blanketTotalItems, partialTotalItems } from "@/lib/invoiceTotals";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 const InvoiceDetail = () => {
   const {
