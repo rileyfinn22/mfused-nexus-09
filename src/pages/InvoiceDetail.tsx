@@ -2805,6 +2805,34 @@ const InvoiceDetail = () => {
                           </div>
                         </div>
                       </div>
+
+                      {/* Tracking Info */}
+                      {po.tracking_number && (
+                        <div className="flex items-center gap-2 mb-3 px-1">
+                          <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Tracking:</span>
+                          {po.tracking_carrier && (
+                            <Badge variant="outline" className="text-xs py-0 h-5">
+                              {CARRIERS.find(c => c.value === po.tracking_carrier)?.label || po.tracking_carrier}
+                            </Badge>
+                          )}
+                          {(() => {
+                            const url = getTrackingUrl(po.tracking_carrier || '', po.tracking_number);
+                            return url ? (
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-mono text-primary hover:underline flex items-center gap-1"
+                              >
+                                {po.tracking_number}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              <span className="text-xs font-mono">{po.tracking_number}</span>
+                            );
+                          })()}
+                      </div>
                       
                       {/* Inline items table */}
                       {poItems.length > 0 && (
