@@ -139,9 +139,10 @@ const VendorPODetail = () => {
       // Update existing items with edited quantities and costs
       for (const item of poItems) {
         if (!item.isNew) {
-          // Update existing items - use quantity for PO total calculations (not shipped_quantity)
+          // Use shipped_quantity if available, otherwise fall back to ordered quantity
+          const effectiveQty = Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity);
           // Round to 2 decimal places to avoid floating point precision issues
-          const newTotal = Math.round(Number(item.quantity) * Number(item.unit_cost) * 100) / 100;
+          const newTotal = Math.round(effectiveQty * Number(item.unit_cost) * 100) / 100;
           
           const { error: updateError } = await supabase
             .from('vendor_po_items')
