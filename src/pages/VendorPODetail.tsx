@@ -1413,8 +1413,9 @@ Thank you for your business.`;
                             // Round to 4 decimal places to avoid floating point precision issues
                             const newCost = Math.round((parseFloat(e.target.value) || 0) * 10000) / 10000;
                             updated[index].unit_cost = newCost;
-                            // Round total to 2 decimal places
-                            updated[index].total = Math.round(updated[index].quantity * newCost * 100) / 100;
+                            // Use shipped_quantity for total if available, otherwise ordered quantity
+                            const effectiveQty = updated[index].shipped_quantity > 0 ? updated[index].shipped_quantity : updated[index].quantity;
+                            updated[index].total = Math.round(effectiveQty * newCost * 100) / 100;
                             setPOItems(updated);
                           }}
                           className="w-28 text-right"
