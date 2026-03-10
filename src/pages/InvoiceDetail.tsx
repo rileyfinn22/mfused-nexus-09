@@ -1123,6 +1123,53 @@ const InvoiceDetail = () => {
         }
       }
 
+      // Sync shipped quantities to linked vendor PO items
+      try {
+        for (const item of editedItems) {
+          const newShippedQty = isBlanketInvoice
+            ? Math.max(Number(item.shipped_quantity) || 0, dbShippedMap[item.id] ?? 0)
+            : Number(item.shipped_quantity) || 0;
+          if (newShippedQty > 0) {
+            // Find vendor_po_items linked to this order_item_id and update their shipped_quantity
+            const { data: linkedVPOItems } = await supabase
+              .from('vendor_po_items')
+              .select('id, unit_cost')
+              .eq('order_item_id', item.id);
+            if (linkedVPOItems && linkedVPOItems.length > 0) {
+              for (const vpoItem of linkedVPOItems) {
+                const vpoTotal = Math.round(newShippedQty * Number(vpoItem.unit_cost) * 100) / 100;
+                await supabase
+                  .from('vendor_po_items')
+                  .update({ shipped_quantity: newShippedQty, total: vpoTotal })
+                  .eq('id', vpoItem.id);
+              }
+              // Also update the parent vendor PO total
+              const vendorPoIds = [...new Set(linkedVPOItems.map((v: any) => v.id))];
+              // Get all vendor_po_ids for these items
+              const { data: vpoItemsFull } = await supabase
+                .from('vendor_po_items')
+                .select('vendor_po_id')
+                .eq('order_item_id', item.id);
+              if (vpoItemsFull) {
+                const uniquePoIds = [...new Set(vpoItemsFull.map((v: any) => v.vendor_po_id))];
+                for (const vpId of uniquePoIds) {
+                  const { data: allItems } = await supabase
+                    .from('vendor_po_items')
+                    .select('total')
+                    .eq('vendor_po_id', vpId);
+                  if (allItems) {
+                    const poTotal = Math.round(allItems.reduce((s: number, i: any) => s + Number(i.total), 0) * 100) / 100;
+                    await supabase.from('vendor_pos').update({ total: poTotal }).eq('id', vpId);
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.error('Vendor PO sync error (non-fatal):', syncErr);
+      }
+
       // Recalculate totals using shared calculator - shipped qty × price
       const totalItems = blanketTotalItems(editedItems);
       const editedShipping = Number(editShippingCost || 0);
