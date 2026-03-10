@@ -115,7 +115,15 @@ const VendorPODetail = () => {
       .order('created_at', { ascending: true });
 
     if (itemsData) {
-      setPOItems(itemsData);
+      // Recalculate totals based on effective quantity (shipped if > 0, otherwise ordered)
+      const recalculated = itemsData.map((item: any) => {
+        const effectiveQty = Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity);
+        return {
+          ...item,
+          total: Math.round(effectiveQty * Number(item.unit_cost) * 100) / 100,
+        };
+      });
+      setPOItems(recalculated);
     }
 
     // Fetch PO payments
@@ -1368,7 +1376,30 @@ Thank you for your business.`;
                       )}
                     </TableCell>
                     <TableCell className="text-center">
-                      {item.sku === 'SHIPPING' ? '-' : item.quantity}
+                      {item.sku === 'SHIPPING' ? '-' : (
+                        isEditMode && item.isNew ? (
+                          <Input
+                            type="number"
+                            min="0"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const updated = [...poItems];
+                              const newQty = parseInt(e.target.value) || 0;
+                              updated[index].quantity = newQty;
+                              // For new items, sync shipped = ordered
+                              if (updated[index].shipped_quantity === 0) {
+                                updated[index].shipped_quantity = newQty;
+                              }
+                              const effectiveQty = updated[index].shipped_quantity > 0 ? updated[index].shipped_quantity : newQty;
+                              updated[index].total = Math.round(effectiveQty * Number(updated[index].unit_cost) * 100) / 100;
+                              setPOItems(updated);
+                            }}
+                            className="w-24 text-center"
+                          />
+                        ) : (
+                          item.quantity
+                        )
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       {item.sku === 'SHIPPING' ? '-' : (
