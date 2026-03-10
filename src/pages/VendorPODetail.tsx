@@ -115,7 +115,15 @@ const VendorPODetail = () => {
       .order('created_at', { ascending: true });
 
     if (itemsData) {
-      setPOItems(itemsData);
+      // Recalculate totals based on effective quantity (shipped if > 0, otherwise ordered)
+      const recalculated = itemsData.map((item: any) => {
+        const effectiveQty = Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity);
+        return {
+          ...item,
+          total: Math.round(effectiveQty * Number(item.unit_cost) * 100) / 100,
+        };
+      });
+      setPOItems(recalculated);
     }
 
     // Fetch PO payments
