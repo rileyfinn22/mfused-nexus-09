@@ -25,6 +25,7 @@ import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
 import { cn } from "@/lib/utils";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
+import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 
 
 const STAGE_DEFINITIONS = [
@@ -1388,11 +1389,64 @@ const OrderDetail = () => {
       description: "Generating packing list PDF..."
     });
   };
-  const handleDownloadInvoice = () => {
+  const handleDownloadInvoice = async () => {
+    // Find the first/primary invoice for this order
+    const targetInvoice = invoices.find(inv => inv.invoice_type === 'full' || !inv.invoice_type) || invoices[0];
+    
+    if (!targetInvoice) {
+      toast({
+        title: "No Invoice",
+        description: "No invoice has been created for this order yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     toast({
       title: "Downloading Invoice",
       description: "Generating invoice PDF..."
     });
+    
+    try {
+      const invoiceData = {
+        invoice_number: targetInvoice.invoice_number,
+        invoice_date: targetInvoice.invoice_date,
+        due_date: targetInvoice.due_date,
+        total: targetInvoice.total,
+        total_paid: targetInvoice.total_paid,
+        subtotal: targetInvoice.subtotal,
+        tax: targetInvoice.tax,
+        shipping_cost: targetInvoice.shipping_cost,
+        shipping_note: targetInvoice.shipping_note,
+        notes: targetInvoice.notes,
+        companies: { name: order.customer_name },
+      };
+      
+      const orderData = {
+        order_number: order.order_number,
+        customer_name: order.customer_name,
+        po_number: order.po_number,
+        billing_street: order.billing_street,
+        billing_city: order.billing_city,
+        billing_state: order.billing_state,
+        billing_zip: order.billing_zip,
+        shipping_street: order.shipping_street,
+        shipping_city: order.shipping_city,
+        shipping_state: order.shipping_state,
+        shipping_zip: order.shipping_zip,
+        order_items: order.order_items,
+      };
+      
+      await generateInvoicePDF(invoiceData, orderData);
+      toast({ title: "Invoice Downloaded" });
+    } catch (error) {
+      console.error('Error generating invoice PDF:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate invoice PDF",
+        variant: "destructive",
+      });
+    }
   };
 
   // Re-upload PO handlers
