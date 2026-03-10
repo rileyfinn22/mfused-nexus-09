@@ -1376,8 +1376,30 @@ Thank you for your business.`;
                       )}
                     </TableCell>
                     <TableCell className="text-center">
-                      {item.sku === 'SHIPPING' ? '-' : item.quantity}
-                    </TableCell>
+                      {item.sku === 'SHIPPING' ? '-' : (
+                        isEditMode && item.isNew ? (
+                          <Input
+                            type="number"
+                            min="0"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const updated = [...poItems];
+                              const newQty = parseInt(e.target.value) || 0;
+                              updated[index].quantity = newQty;
+                              // For new items, sync shipped = ordered
+                              if (updated[index].shipped_quantity === 0) {
+                                updated[index].shipped_quantity = newQty;
+                              }
+                              const effectiveQty = updated[index].shipped_quantity > 0 ? updated[index].shipped_quantity : newQty;
+                              updated[index].total = Math.round(effectiveQty * Number(updated[index].unit_cost) * 100) / 100;
+                              setPOItems(updated);
+                            }}
+                            className="w-24 text-center"
+                          />
+                        ) : (
+                          item.quantity
+                        )
+                      )}
                     <TableCell className="text-center">
                       {item.sku === 'SHIPPING' ? '-' : (
                         isEditMode ? (
