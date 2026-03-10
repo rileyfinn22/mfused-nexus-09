@@ -1400,6 +1400,7 @@ Thank you for your business.`;
                           item.quantity
                         )
                       )}
+                    </TableCell>
                     <TableCell className="text-center">
                       {item.sku === 'SHIPPING' ? '-' : (
                         isEditMode ? (
