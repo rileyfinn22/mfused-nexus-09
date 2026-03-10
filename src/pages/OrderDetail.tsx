@@ -25,6 +25,7 @@ import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
 import { cn } from "@/lib/utils";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
+import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 
 
 const STAGE_DEFINITIONS = [
