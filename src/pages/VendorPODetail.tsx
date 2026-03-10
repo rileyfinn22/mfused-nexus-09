@@ -1384,8 +1384,9 @@ Thank you for your business.`;
                               if (updated[index].isNew) {
                                 updated[index].quantity = newQuantity;
                               }
-                              // Round total to 2 decimal places to avoid floating point precision issues
-                              updated[index].total = Math.round(updated[index].quantity * Number(updated[index].unit_cost) * 100) / 100;
+                              // Use shipped_quantity for total if available, otherwise ordered quantity
+                              const effectiveQty = updated[index].shipped_quantity > 0 ? updated[index].shipped_quantity : updated[index].quantity;
+                              updated[index].total = Math.round(effectiveQty * Number(updated[index].unit_cost) * 100) / 100;
                               setPOItems(updated);
                             }}
                             className="w-24 text-center"
