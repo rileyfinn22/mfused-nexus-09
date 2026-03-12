@@ -1024,8 +1024,12 @@ Thank you for your business.`;
                         return <Badge className="bg-green-500 text-white">Paid</Badge>;
                       case 'partial':
                         return <Badge variant="default">Partial Paid</Badge>;
+                      case 'sent':
+                        return <Badge variant="destructive">Sent</Badge>;
+                      case 'created':
+                        return <Badge variant="secondary">Created</Badge>;
                       case 'unpaid':
-                        return <Badge variant="destructive">Unpaid</Badge>;
+                        return <Badge variant="destructive">Sent</Badge>;
                       default:
                         return <Badge variant="secondary">{po.status.replace('_', ' ')}</Badge>;
                     }

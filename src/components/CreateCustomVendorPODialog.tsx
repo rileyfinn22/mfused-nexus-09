@@ -185,7 +185,7 @@ export function CreateCustomVendorPODialog({
           order_date: new Date().toISOString(),
           expected_delivery_date: expectedDeliveryDate ? new Date(expectedDeliveryDate).toISOString() : null,
           total: calculateTotal(),
-          status: "draft"
+          status: "created"
         })
         .select()
         .single();

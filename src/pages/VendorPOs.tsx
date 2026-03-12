@@ -265,7 +265,7 @@ const VendorPOs = () => {
     let matchesPaymentStatus = true;
     if (paymentStatusFilter !== "all") {
       if (paymentStatusFilter === "unpaid") {
-        matchesPaymentStatus = po.status === 'unpaid' || (!po.total_paid || po.total_paid === 0);
+        matchesPaymentStatus = po.status === 'unpaid' || po.status === 'sent' || (!po.total_paid || po.total_paid === 0);
       } else {
         matchesPaymentStatus = po.status === paymentStatusFilter;
       }
