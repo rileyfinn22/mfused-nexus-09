@@ -140,17 +140,20 @@ const VendorPOs = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'sent':
       case 'unpaid': return 'destructive';
       case 'partial': return 'default';
       case 'paid': return 'default';
-      case 'draft': return 'secondary';
+      case 'created': return 'secondary';
       default: return 'secondary';
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'unpaid': return 'Unpaid';
+      case 'created': return 'Created';
+      case 'sent':
+      case 'unpaid': return 'Sent';
       case 'partial': return 'Partial Paid';
       case 'paid': return 'Paid';
       default: return status.replace('_', ' ');
@@ -159,11 +162,11 @@ const VendorPOs = () => {
 
   // Calculate summary amounts
   const summaryAmounts = useMemo(() => {
-    const nonDraftPOs = pos.filter(po => po.status !== 'draft');
+    const nonCreatedPOs = pos.filter(po => po.status !== 'created');
     
-    const unpaidPOs = nonDraftPOs.filter(po => po.status === 'unpaid' || (!po.total_paid || po.total_paid === 0));
-    const partialPOs = nonDraftPOs.filter(po => po.status === 'partial');
-    const paidPOs = nonDraftPOs.filter(po => po.status === 'paid');
+    const unpaidPOs = nonCreatedPOs.filter(po => po.status === 'unpaid' || po.status === 'sent' || (!po.total_paid || po.total_paid === 0));
+    const partialPOs = nonCreatedPOs.filter(po => po.status === 'partial');
+    const paidPOs = nonCreatedPOs.filter(po => po.status === 'paid');
 
     const unpaidAmount = unpaidPOs.reduce((sum, po) => {
       const total = po.final_total ?? po.total ?? 0;
@@ -188,7 +191,7 @@ const VendorPOs = () => {
   // Calculate aging buckets
   const agingBuckets = useMemo(() => {
     const today = new Date();
-    const nonDraftPOs = pos.filter(po => po.status !== 'draft' && po.status !== 'paid');
+    const nonCreatedPOs = pos.filter(po => po.status !== 'created' && po.status !== 'paid');
 
     const buckets = [
       { label: 'Current (0-30 days)', amount: 0, count: 0, color: 'hsl(var(--success))' },
@@ -197,7 +200,7 @@ const VendorPOs = () => {
       { label: '90+ days', amount: 0, count: 0, color: 'hsl(var(--destructive))' },
     ];
 
-    nonDraftPOs.forEach(po => {
+    nonCreatedPOs.forEach(po => {
       const orderDate = new Date(po.order_date);
       const daysDiff = Math.floor((today.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
       const remaining = (po.final_total ?? po.total ?? 0) - (po.total_paid || 0);
@@ -262,7 +265,7 @@ const VendorPOs = () => {
     let matchesPaymentStatus = true;
     if (paymentStatusFilter !== "all") {
       if (paymentStatusFilter === "unpaid") {
-        matchesPaymentStatus = po.status === 'unpaid' || (!po.total_paid || po.total_paid === 0);
+        matchesPaymentStatus = po.status === 'unpaid' || po.status === 'sent' || (!po.total_paid || po.total_paid === 0);
       } else {
         matchesPaymentStatus = po.status === paymentStatusFilter;
       }

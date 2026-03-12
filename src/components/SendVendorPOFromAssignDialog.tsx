@@ -407,7 +407,7 @@ Thank you for your business.`;
 
       if (response.error) throw response.error;
 
-      await supabase.from("vendor_pos").update({ status: "submitted" }).eq("id", vendorPoId);
+      await supabase.from("vendor_pos").update({ status: "sent" }).eq("id", vendorPoId);
 
       toast({
         title: "PO Sent",
@@ -480,10 +480,10 @@ Thank you for your business.`;
               {/* Status */}
               <div className="flex items-center justify-between">
                 <Badge
-                  variant={po.status === "submitted" ? "default" : "secondary"}
+                  variant={po.status === "sent" ? "default" : "secondary"}
                   className="capitalize"
                 >
-                  {po.status}
+                  {po.status === 'sent' ? 'Sent' : po.status === 'created' ? 'Created' : po.status}
                 </Badge>
                 {!isEditing ? (
                   <Button variant="outline" size="sm" onClick={startEditing}>
