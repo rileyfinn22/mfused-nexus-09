@@ -140,17 +140,20 @@ const VendorPOs = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'sent':
       case 'unpaid': return 'destructive';
       case 'partial': return 'default';
       case 'paid': return 'default';
-      case 'draft': return 'secondary';
+      case 'created': return 'secondary';
       default: return 'secondary';
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'unpaid': return 'Unpaid';
+      case 'created': return 'Created';
+      case 'sent':
+      case 'unpaid': return 'Sent';
       case 'partial': return 'Partial Paid';
       case 'paid': return 'Paid';
       default: return status.replace('_', ' ');
