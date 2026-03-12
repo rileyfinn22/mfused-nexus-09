@@ -162,11 +162,11 @@ const VendorPOs = () => {
 
   // Calculate summary amounts
   const summaryAmounts = useMemo(() => {
-    const nonDraftPOs = pos.filter(po => po.status !== 'draft');
+    const nonCreatedPOs = pos.filter(po => po.status !== 'created');
     
-    const unpaidPOs = nonDraftPOs.filter(po => po.status === 'unpaid' || (!po.total_paid || po.total_paid === 0));
-    const partialPOs = nonDraftPOs.filter(po => po.status === 'partial');
-    const paidPOs = nonDraftPOs.filter(po => po.status === 'paid');
+    const unpaidPOs = nonCreatedPOs.filter(po => po.status === 'unpaid' || po.status === 'sent' || (!po.total_paid || po.total_paid === 0));
+    const partialPOs = nonCreatedPOs.filter(po => po.status === 'partial');
+    const paidPOs = nonCreatedPOs.filter(po => po.status === 'paid');
 
     const unpaidAmount = unpaidPOs.reduce((sum, po) => {
       const total = po.final_total ?? po.total ?? 0;
