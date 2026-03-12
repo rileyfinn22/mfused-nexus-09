@@ -992,9 +992,16 @@ export default function ProductionDetail() {
     try {
       if (!orderId) return;
 
+      const updateData: any = { production_progress: targetPercent };
+      // Clear delayed flag when production is complete
+      if (targetPercent >= 100) {
+        updateData.is_delayed = false;
+        updateData.delay_reason = null;
+      }
+
       const { error } = await supabase
         .from('orders')
-        .update({ production_progress: targetPercent })
+        .update(updateData)
         .eq('id', orderId);
 
       if (error) throw error;
