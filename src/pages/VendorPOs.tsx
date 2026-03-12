@@ -200,7 +200,7 @@ const VendorPOs = () => {
       { label: '90+ days', amount: 0, count: 0, color: 'hsl(var(--destructive))' },
     ];
 
-    nonDraftPOs.forEach(po => {
+    nonCreatedPOs.forEach(po => {
       const orderDate = new Date(po.order_date);
       const daysDiff = Math.floor((today.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
       const remaining = (po.final_total ?? po.total ?? 0) - (po.total_paid || 0);
