@@ -191,7 +191,7 @@ const VendorPOs = () => {
   // Calculate aging buckets
   const agingBuckets = useMemo(() => {
     const today = new Date();
-    const nonDraftPOs = pos.filter(po => po.status !== 'draft' && po.status !== 'paid');
+    const nonCreatedPOs = pos.filter(po => po.status !== 'created' && po.status !== 'paid');
 
     const buckets = [
       { label: 'Current (0-30 days)', amount: 0, count: 0, color: 'hsl(var(--success))' },
