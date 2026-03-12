@@ -705,8 +705,8 @@ export default function Production() {
           </div>
           </div>
 
-          {/* Delay Indicator */}
-          {order.is_delayed && (
+          {/* Delay Indicator - hide when production is complete */}
+          {order.is_delayed && progress < 100 && (
             <Popover>
               <PopoverTrigger asChild>
                 <button
