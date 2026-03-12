@@ -407,7 +407,7 @@ Thank you for your business.`;
 
       if (response.error) throw response.error;
 
-      await supabase.from("vendor_pos").update({ status: "submitted" }).eq("id", vendorPoId);
+      await supabase.from("vendor_pos").update({ status: "sent" }).eq("id", vendorPoId);
 
       toast({
         title: "PO Sent",
