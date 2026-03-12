@@ -829,10 +829,10 @@ const VendorPODetail = () => {
 
       if (response.error) throw response.error;
 
-      // Update PO status to submitted
+      // Update PO status to sent
       await supabase
         .from('vendor_pos')
-        .update({ status: 'submitted' })
+        .update({ status: 'sent' })
         .eq('id', poId);
 
       toast({
