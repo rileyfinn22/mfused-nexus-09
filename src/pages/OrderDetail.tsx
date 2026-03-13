@@ -2442,7 +2442,17 @@ const OrderDetail = () => {
                             </PopoverContent>
                           </Popover>
                         ) : (
-                          item.name
+                          <div className="flex items-center gap-1.5">
+                            {item.name}
+                            {(() => {
+                              const hasApprovedArt = orderArtwork.some((art: any) => art.sku === item.sku && art.is_approved);
+                              return hasApprovedArt ? (
+                                <span className="inline-block w-2 h-2 rounded-full bg-success flex-shrink-0" title="Art approved" />
+                              ) : (
+                                <span className="inline-block w-2 h-2 rounded-full bg-warning flex-shrink-0" title="No approved art" />
+                              );
+                            })()}
+                          </div>
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-xs">{item.description || '-'}</TableCell>
