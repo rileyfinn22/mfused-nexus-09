@@ -46,7 +46,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     setLoadingPOs(true);
     const { data } = await supabase
       .from("vendor_pos")
-      .select("id, po_number, total, description, vendor_id, vendors(name), orders(order_number, customer_name)")
+      .select("id, po_number, total, description, vendor_id, company_id, vendors(name), orders(order_number, customer_name)")
       .order("created_at", { ascending: false })
       .limit(500);
     setVendorPOs(data || []);
@@ -78,6 +78,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     const amt = parseFloat(financedAmount);
     const rate = parseFloat(exchangeRate);
 
+    // 1. Add to financing tracker
     const { error } = await supabase.from("financed_invoices").insert({
       vendor_po_id: selectedPO.id,
       financed_amount: amt,
@@ -89,15 +90,32 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
 
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Vendor PO added to financing" });
-      onSuccess();
-      onOpenChange(false);
-      setSelectedPO(null);
-      setSearchQuery("");
-      setFinancedAmount("");
-      setNotes("");
+      setLoading(false);
+      return;
     }
+
+    // 2. Auto-record vendor PO payment so it shows as paid in bills/projects
+    const { data: { user } } = await supabase.auth.getUser();
+    const companyId = selectedPO.company_id;
+    if (companyId) {
+      await supabase.from("vendor_po_payments").insert({
+        vendor_po_id: selectedPO.id,
+        company_id: companyId,
+        amount: amt,
+        payment_method: "financing",
+        payment_date: financedDate,
+        notes: `Paid via PO financing${notes ? ` - ${notes}` : ""}`,
+        created_by: user?.id || null,
+      });
+    }
+
+    toast({ title: "Vendor PO added to financing & marked as paid" });
+    onSuccess();
+    onOpenChange(false);
+    setSelectedPO(null);
+    setSearchQuery("");
+    setFinancedAmount("");
+    setNotes("");
     setLoading(false);
   };
 
