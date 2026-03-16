@@ -169,8 +169,8 @@ export default function Financing() {
                           {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
                         </td>
                         <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{poDesc}</td>
-                        <td className="px-2 py-1.5 font-mono whitespace-nowrap cursor-pointer hover:underline" onClick={() => invoice && navigate(`/invoices/${inv.invoice_id}`)}>
-                          {invoice?.invoice_number || "—"}
+                        <td className="px-2 py-1.5 font-mono whitespace-nowrap">
+                          {invoice?.invoice_number || inv.invoice_number || "—"}
                         </td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.financed_amount)}</td>
                         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(inv.financed_date).toLocaleDateString()}</td>
