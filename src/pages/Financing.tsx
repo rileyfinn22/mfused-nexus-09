@@ -145,11 +145,10 @@ export default function Financing() {
                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Invoice</th>
                     <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Financed</th>
                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
-                    <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Aging</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Fee Tier</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Fee</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Repaid</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Balance</th>
+                     <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Aging</th>
+                     <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Fee</th>
+                     <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Repaid</th>
+                     <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Balance</th>
                     <th className="px-2 py-2"></th>
                   </tr>
                 </thead>
