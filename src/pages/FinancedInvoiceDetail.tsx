@@ -28,6 +28,12 @@ export default function FinancedInvoiceDetail() {
   const [trackingNumber, setTrackingNumber] = useState("");
   const [trackingUrl, setTrackingUrl] = useState("");
   const [shipmentNotes, setShipmentNotes] = useState("");
+  const [financedAmount, setFinancedAmount] = useState("");
+  const [rmbAmount, setRmbAmount] = useState("");
+  const [exchangeRate, setExchangeRate] = useState("");
+  const [financedDate, setFinancedDate] = useState("");
+  const [paidBackAmount, setPaidBackAmount] = useState("");
+  const [status, setStatus] = useState("open");
 
   useEffect(() => {
     checkAdminAndFetch();
