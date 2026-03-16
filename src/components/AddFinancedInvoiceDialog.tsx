@@ -190,7 +190,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
                           <span className="text-muted-foreground">${po.total?.toFixed(2)}</span>
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {po.description || (po.orders as any)?.customer_name || "—"}
+                          {po.description || (po.orders as any)?.description || (po.orders as any)?.customer_name || "—"}
                           {(po.vendors as any)?.name && ` • ${(po.vendors as any).name}`}
                         </div>
                       </button>
