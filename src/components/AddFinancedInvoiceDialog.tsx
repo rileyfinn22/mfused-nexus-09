@@ -247,6 +247,10 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
             <Label>Notes</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
+          <div className="flex items-center gap-2">
+            <Checkbox id="send-notif" checked={sendNotification} onCheckedChange={(v) => setSendNotification(!!v)} />
+            <Label htmlFor="send-notif" className="text-sm font-normal cursor-pointer">Send email notification to finance company</Label>
+          </div>
           <Button onClick={handleSubmit} disabled={loading || !selectedPO || !financedAmount} className="w-full">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Submit for Financing
