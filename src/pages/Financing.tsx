@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Financing() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -24,6 +25,27 @@ export default function Financing() {
   const [depositOpen, setDepositOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+
+  // Check for preselected vendor PO from URL params (e.g. from "Send to Finance" button)
+  const preselectedVendorPO = useMemo(() => {
+    const addPO = searchParams.get("addPO");
+    if (!addPO) return null;
+    return {
+      id: addPO,
+      po_number: searchParams.get("poNumber") || "",
+      total: parseFloat(searchParams.get("poTotal") || "0"),
+      description: searchParams.get("poDesc") || null,
+    };
+  }, [searchParams]);
+
+  // Auto-open dialog when navigated with addPO param
+  useEffect(() => {
+    if (preselectedVendorPO && isAdmin) {
+      setAddOpen(true);
+      // Clear URL params after opening
+      setSearchParams({}, { replace: true });
+    }
+  }, [preselectedVendorPO, isAdmin]);
 
   useEffect(() => {
     checkAdmin();
@@ -41,7 +63,7 @@ export default function Financing() {
   const fetchData = async () => {
     setLoading(true);
     const [invRes, depRes] = await Promise.all([
-      supabase.from("financed_invoices").select("*, invoices(invoice_number, total, orders(order_number, customer_name))").order("financed_date", { ascending: false }),
+      supabase.from("financed_invoices").select("*, invoices(invoice_number, total, orders(order_number, customer_name)), vendor_pos(po_number, description, total)").order("financed_date", { ascending: false }),
       supabase.from("finance_deposits").select("*").order("payment_date", { ascending: false }),
     ]);
     setInvoices(invRes.data || []);
@@ -118,9 +140,10 @@ export default function Financing() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Invoice</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Customer</TableHead>
+                     <TableHead>Vendor PO</TableHead>
+                     <TableHead>Description</TableHead>
+                     <TableHead>Invoice</TableHead>
+                     <TableHead>Customer</TableHead>
                     <TableHead className="text-right">Financed</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Aging</TableHead>
@@ -135,15 +158,19 @@ export default function Financing() {
                 <TableBody>
                   {invoices.map((inv) => {
                     const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
-                    const invoice = inv.invoices as any;
-                    const order = invoice?.orders as any;
-                    return (
-                      <TableRow key={inv.id}>
-                        <TableCell className="font-mono text-sm cursor-pointer hover:underline" onClick={() => invoice && navigate(`/invoices/${inv.invoice_id}`)}>
-                          {invoice?.invoice_number || "—"}
-                        </TableCell>
-                        <TableCell>{order?.order_number || "—"}</TableCell>
-                        <TableCell>{order?.customer_name || "—"}</TableCell>
+                     const invoice = inv.invoices as any;
+                     const order = invoice?.orders as any;
+                     const vendorPO = inv.vendor_pos as any;
+                     return (
+                       <TableRow key={inv.id}>
+                         <TableCell className="font-mono text-sm cursor-pointer hover:underline" onClick={() => vendorPO && navigate(`/vendor-pos/${inv.vendor_po_id}`)}>
+                           {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
+                         </TableCell>
+                         <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">{vendorPO?.description || "—"}</TableCell>
+                         <TableCell className="font-mono text-sm cursor-pointer hover:underline" onClick={() => invoice && navigate(`/invoices/${inv.invoice_id}`)}>
+                           {invoice?.invoice_number || "—"}
+                         </TableCell>
+                         <TableCell>{order?.customer_name || "—"}</TableCell>
                         <TableCell className="text-right">{formatUSD(inv.financed_amount)}</TableCell>
                         <TableCell>{new Date(inv.financed_date).toLocaleDateString()}</TableCell>
                         <TableCell>
@@ -202,7 +229,7 @@ export default function Financing() {
         </Card>
       )}
 
-      <AddFinancedInvoiceDialog open={addOpen} onOpenChange={setAddOpen} onSuccess={fetchData} />
+      <AddFinancedInvoiceDialog open={addOpen} onOpenChange={setAddOpen} onSuccess={fetchData} preselectedVendorPO={preselectedVendorPO} />
       <RecordFinanceRepaymentDialog open={repayOpen} onOpenChange={setRepayOpen} onSuccess={fetchData} invoice={selectedInvoice} />
       <RecordFinanceDepositDialog open={depositOpen} onOpenChange={setDepositOpen} onSuccess={fetchData} />
       <GenerateFinanceLinkDialog open={linkOpen} onOpenChange={setLinkOpen} />

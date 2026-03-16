@@ -1,54 +1,85 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  preselectedVendorPO?: { id: string; po_number: string; total: number; description: string | null } | null;
 }
 
-export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess }: Props) {
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
+export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, preselectedVendorPO }: Props) {
+  const [vendorPOs, setVendorPOs] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPO, setSelectedPO] = useState<any>(null);
   const [financedAmount, setFinancedAmount] = useState("");
   const [exchangeRate, setExchangeRate] = useState("7.2");
   const [financedDate, setFinancedDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [loadingPOs, setLoadingPOs] = useState(false);
 
   useEffect(() => {
-    if (open) fetchInvoices();
-  }, [open]);
+    if (open) {
+      fetchVendorPOs();
+      if (preselectedVendorPO) {
+        setSelectedPO(preselectedVendorPO);
+        setFinancedAmount(preselectedVendorPO.total?.toString() || "");
+        setSearchQuery(preselectedVendorPO.po_number);
+      } else {
+        setSelectedPO(null);
+        setSearchQuery("");
+        setFinancedAmount("");
+      }
+    }
+  }, [open, preselectedVendorPO]);
 
-  const fetchInvoices = async () => {
-    setLoadingInvoices(true);
+  const fetchVendorPOs = async () => {
+    setLoadingPOs(true);
     const { data } = await supabase
-      .from("invoices")
-      .select("id, invoice_number, total, orders(order_number, customer_name)")
-      .is("deleted_at", null)
+      .from("vendor_pos")
+      .select("id, po_number, total, description, vendor_id, vendors(name), orders(order_number, customer_name)")
       .order("created_at", { ascending: false })
-      .limit(200);
-    setInvoices(data || []);
-    setLoadingInvoices(false);
+      .limit(500);
+    setVendorPOs(data || []);
+    setLoadingPOs(false);
+  };
+
+  const filteredPOs = useMemo(() => {
+    if (!searchQuery.trim()) return vendorPOs.slice(0, 20);
+    const q = searchQuery.toLowerCase();
+    return vendorPOs.filter(
+      (po) =>
+        po.po_number?.toLowerCase().includes(q) ||
+        po.description?.toLowerCase().includes(q) ||
+        (po.orders as any)?.order_number?.toLowerCase().includes(q) ||
+        (po.orders as any)?.customer_name?.toLowerCase().includes(q) ||
+        (po.vendors as any)?.name?.toLowerCase().includes(q)
+    );
+  }, [vendorPOs, searchQuery]);
+
+  const handleSelectPO = (po: any) => {
+    setSelectedPO(po);
+    setSearchQuery(po.po_number);
+    setFinancedAmount(po.total?.toString() || "");
   };
 
   const handleSubmit = async () => {
-    if (!selectedInvoiceId || !financedAmount) return;
+    if (!selectedPO || !financedAmount) return;
     setLoading(true);
     const amt = parseFloat(financedAmount);
     const rate = parseFloat(exchangeRate);
 
     const { error } = await supabase.from("financed_invoices").insert({
-      invoice_id: selectedInvoiceId,
+      vendor_po_id: selectedPO.id,
       financed_amount: amt,
       financed_amount_rmb: amt * rate,
       exchange_rate: rate,
@@ -59,38 +90,89 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess }: Prop
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Invoice added to financing" });
+      toast({ title: "Vendor PO added to financing" });
       onSuccess();
       onOpenChange(false);
-      setSelectedInvoiceId("");
+      setSelectedPO(null);
+      setSearchQuery("");
       setFinancedAmount("");
       setNotes("");
     }
     setLoading(false);
   };
 
+  const showDropdown = searchQuery.trim().length > 0 && !selectedPO;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Invoice to Financing</DialogTitle>
+          <DialogTitle>Add Vendor PO to Financing</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {/* Vendor PO Search */}
           <div>
-            <Label>Invoice</Label>
-            <Select value={selectedInvoiceId} onValueChange={setSelectedInvoiceId}>
-              <SelectTrigger>
-                <SelectValue placeholder={loadingInvoices ? "Loading..." : "Select invoice"} />
-              </SelectTrigger>
-              <SelectContent>
-                {invoices.map((inv) => (
-                  <SelectItem key={inv.id} value={inv.id}>
-                    {inv.invoice_number} — {(inv.orders as any)?.customer_name || "N/A"} (${inv.total?.toFixed(2)})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Vendor PO</Label>
+            {selectedPO ? (
+              <div className="flex items-center gap-2 p-2 border rounded-lg bg-muted/50">
+                <div className="flex-1">
+                  <span className="font-mono font-semibold text-sm">PO #{selectedPO.po_number}</span>
+                  {selectedPO.description && (
+                    <p className="text-xs text-muted-foreground truncate">{selectedPO.description}</p>
+                  )}
+                </div>
+                <Badge variant="secondary">${selectedPO.total?.toFixed(2)}</Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedPO(null);
+                    setSearchQuery("");
+                    setFinancedAmount("");
+                  }}
+                  className="h-6 px-2 text-xs"
+                >
+                  Change
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={loadingPOs ? "Loading..." : "Search by PO #, description, customer..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+                {showDropdown && filteredPOs.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 max-h-48 overflow-auto border rounded-lg bg-popover shadow-md">
+                    {filteredPOs.map((po) => (
+                      <button
+                        key={po.id}
+                        onClick={() => handleSelectPO(po)}
+                        className="w-full text-left px-3 py-2 hover:bg-accent text-sm border-b last:border-b-0 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-medium">PO #{po.po_number}</span>
+                          <span className="text-muted-foreground">${po.total?.toFixed(2)}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {po.description || (po.orders as any)?.customer_name || "—"}
+                          {(po.vendors as any)?.name && ` • ${(po.vendors as any).name}`}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {showDropdown && filteredPOs.length === 0 && (
+                  <div className="absolute z-50 w-full mt-1 border rounded-lg bg-popover shadow-md p-3 text-sm text-muted-foreground text-center">
+                    No vendor POs found
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
           <div>
             <Label>Financed Amount (USD)</Label>
             <Input type="number" step="0.01" value={financedAmount} onChange={(e) => setFinancedAmount(e.target.value)} placeholder="0.00" />
@@ -111,7 +193,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess }: Prop
             <Label>Notes</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
-          <Button onClick={handleSubmit} disabled={loading || !selectedInvoiceId || !financedAmount} className="w-full">
+          <Button onClick={handleSubmit} disabled={loading || !selectedPO || !financedAmount} className="w-full">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Add to Financing
           </Button>
