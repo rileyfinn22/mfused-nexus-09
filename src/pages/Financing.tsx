@@ -222,32 +222,6 @@ export default function Financing() {
         </CardContent>
       </Card>
 
-      {/* Deposit History */}
-      {deposits.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle>Deposit History</CardTitle></CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {deposits.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell>{new Date(d.payment_date).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right">{formatUSD(d.amount)}</TableCell>
-                    <TableCell className="text-muted-foreground">{d.notes || "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
 
       <AddFinancedInvoiceDialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setPreselectedVendorPO(null); }} onSuccess={fetchData} preselectedVendorPO={preselectedVendorPO} />
       <RecordFinanceRepaymentDialog open={repayOpen} onOpenChange={setRepayOpen} onSuccess={fetchData} invoice={selectedInvoice} />
