@@ -202,11 +202,15 @@ export default function FinancedInvoiceDetail() {
         </Button>
         <div>
           <h1 className="text-xl font-bold">
-            Financed {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : `Entry`}
+            {isFinanceUser
+              ? `Financed Entry`
+              : `Financed ${vendorPO?.po_number ? `PO #${vendorPO.po_number}` : `Entry`}`}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—"}
-            {vendorPO?.vendors?.name && ` • ${vendorPO.vendors.name}`}
+            {isFinanceUser
+              ? (record.description || "—")
+              : (vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—")}
+            {!isFinanceUser && vendorPO?.vendors?.name && ` • ${vendorPO.vendors.name}`}
           </p>
         </div>
         <div className="ml-auto flex gap-2">
