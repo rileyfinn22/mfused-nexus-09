@@ -674,8 +674,50 @@ export type Database = {
         }
         Relationships: []
       }
+      financed_invoice_documents: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          financed_invoice_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          financed_invoice_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          financed_invoice_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financed_invoice_documents_financed_invoice_id_fkey"
+            columns: ["financed_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "financed_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financed_invoices: {
         Row: {
+          carrier: string | null
           created_at: string
           exchange_rate: number
           financed_amount: number
@@ -683,14 +725,19 @@ export type Database = {
           financed_date: string
           id: string
           invoice_id: string | null
+          invoice_number: string | null
           notes: string | null
           paid_back_amount: number
           paid_back_date: string | null
+          shipment_notes: string | null
           status: string
+          tracking_number: string | null
+          tracking_url: string | null
           updated_at: string
           vendor_po_id: string | null
         }
         Insert: {
+          carrier?: string | null
           created_at?: string
           exchange_rate?: number
           financed_amount?: number
@@ -698,14 +745,19 @@ export type Database = {
           financed_date?: string
           id?: string
           invoice_id?: string | null
+          invoice_number?: string | null
           notes?: string | null
           paid_back_amount?: number
           paid_back_date?: string | null
+          shipment_notes?: string | null
           status?: string
+          tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
           vendor_po_id?: string | null
         }
         Update: {
+          carrier?: string | null
           created_at?: string
           exchange_rate?: number
           financed_amount?: number
@@ -713,10 +765,14 @@ export type Database = {
           financed_date?: string
           id?: string
           invoice_id?: string | null
+          invoice_number?: string | null
           notes?: string | null
           paid_back_amount?: number
           paid_back_date?: string | null
+          shipment_notes?: string | null
           status?: string
+          tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
           vendor_po_id?: string | null
         }
