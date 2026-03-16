@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, AlertTriangle, Banknote, Link2, RefreshCw, ChevronDown, AlertCircle } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Plus, AlertTriangle, Banknote, Link2, RefreshCw, ChevronDown, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { calculateFinanceFee, getAgingBadgeVariant, formatUSD } from "@/lib/financeUtils";
@@ -13,6 +14,7 @@ import { AddFinancedPaymentDialog } from "@/components/AddFinancedPaymentDialog"
 import { RecordFinanceRepaymentDialog } from "@/components/RecordFinanceRepaymentDialog";
 import { RecordFinanceDepositDialog } from "@/components/RecordFinanceDepositDialog";
 import { GenerateFinanceLinkDialog } from "@/components/GenerateFinanceLinkDialog";
+import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Financing() {
@@ -28,13 +30,14 @@ export default function Financing() {
   const [repayOpen, setRepayOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
+  const [acceptOpen, setAcceptOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [preselectedVendorPO, setPreselectedVendorPO] = useState<{ id: string; po_number: string; total: number; description: string | null } | null>(null);
+  const [activeTab, setActiveTab] = useState("active");
 
   const isVibeAdmin = userRole === "vibe_admin";
   const isFinanceUser = userRole === "finance";
 
-  // Check for preselected vendor PO from URL params (e.g. from "Send to Finance" button)
   useEffect(() => {
     const addPO = searchParams.get("addPO");
     if (addPO && isVibeAdmin) {
@@ -49,22 +52,16 @@ export default function Financing() {
     }
   }, [searchParams, isVibeAdmin]);
 
-  useEffect(() => {
-    checkAccess();
-  }, []);
+  useEffect(() => { checkAccess(); }, []);
 
   const checkAccess = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
     const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).in("role", ["vibe_admin", "finance"]);
     if (!data || data.length === 0) { navigate("/dashboard"); return; }
-
     const roles = data.map((r: any) => r.role as string);
-    if (roles.includes("vibe_admin")) {
-      setUserRole("vibe_admin");
-    } else {
-      setUserRole("finance");
-    }
+    if (roles.includes("vibe_admin")) setUserRole("vibe_admin");
+    else setUserRole("finance");
     setIsAuthorized(true);
     fetchData();
   };
@@ -82,14 +79,116 @@ export default function Financing() {
 
   if (!isAuthorized) return null;
 
-  const totalFinanced = invoices.reduce((s, i) => s + (i.financed_amount || 0), 0);
-  const totalOutstanding = invoices.filter(i => i.status === "open").reduce((s, i) => {
+  // Split invoices by finance_status
+  const pendingInvoices = invoices.filter(i => i.finance_status === "pending");
+  const activeInvoices = invoices.filter(i => !i.finance_status || i.finance_status === "active");
+  const completedInvoices = invoices.filter(i => i.finance_status === "completed");
+
+  // Summary cards only count active entries
+  const totalFinanced = activeInvoices.reduce((s, i) => s + (i.financed_amount || 0), 0);
+  const totalOutstanding = activeInvoices.filter(i => i.status === "open").reduce((s, i) => {
     const fee = calculateFinanceFee(i.financed_amount, i.financed_date, i.paid_back_amount);
     return s + (i.financed_amount + fee.feeAmount - i.paid_back_amount);
   }, 0);
-  const requiredDeposit = invoices.filter(i => i.status === "open").reduce((s, i) => s + i.financed_amount, 0) * 0.10;
+  const requiredDeposit = activeInvoices.filter(i => i.status === "open").reduce((s, i) => s + i.financed_amount, 0) * 0.10;
   const currentDeposit = deposits.reduce((s, d) => s + (d.amount || 0), 0);
   const depositShortfall = Math.max(0, requiredDeposit - currentDeposit);
+
+  const renderActiveRow = (inv: any, idx: number) => {
+    const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
+    const invoice = inv.invoices as any;
+    const order = invoice?.orders as any;
+    const vendorPO = inv.vendor_pos as any;
+    const poOrder = vendorPO?.orders as any;
+    const adminDesc = vendorPO?.description || poOrder?.description || poOrder?.customer_name || order?.description || order?.customer_name || "—";
+    const displayDesc = isFinanceUser ? (inv.description || "—") : (inv.description || adminDesc);
+    const needsPOLink = isVibeAdmin && !inv.vendor_po_id && inv.created_by_role === "finance";
+
+    return (
+      <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer`} onClick={() => navigate(`/financing/${inv.id}`)}>
+        {isVibeAdmin && (
+          <td className="px-2 py-1.5 font-mono whitespace-nowrap">
+            {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : needsPOLink ? (
+              <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1 text-amber-500"><AlertCircle className="h-3 w-3" /><span className="text-[10px]">Needs PO</span></span></TooltipTrigger><TooltipContent><p className="text-xs">Added by finance company — needs vendor PO link</p></TooltipContent></Tooltip>
+            ) : "—"}
+          </td>
+        )}
+        <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{displayDesc}</td>
+        <td className="px-2 py-1.5 font-mono whitespace-nowrap">{invoice?.invoice_number || inv.invoice_number || "—"}</td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.financed_amount)}</td>
+        <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
+        <td className="px-2 py-1.5 text-center"><Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}d</Badge></td>
+        <td className={`px-2 py-1.5 text-right whitespace-nowrap font-medium ${fee.daysAging <= 60 ? "text-yellow-500" : "text-orange-600"}`}>
+          {formatUSD(fee.feeAmount)} <span className="text-[10px] opacity-75">({fee.daysAging <= 60 ? "5%" : "7%"})</span>
+        </td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.paid_back_amount)}</td>
+        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{formatUSD(inv.financed_amount + fee.feeAmount - inv.paid_back_amount)}</td>
+        <td className="px-2 py-1.5">
+          {inv.status !== "paid" && isVibeAdmin && (
+            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); setSelectedInvoice({ ...inv, invoice_number: invoice?.invoice_number }); setRepayOpen(true); }}>Repay</Button>
+          )}
+        </td>
+      </tr>
+    );
+  };
+
+  const renderPendingRow = (inv: any, idx: number) => {
+    const vendorPO = inv.vendor_pos as any;
+    const poOrder = vendorPO?.orders as any;
+    const desc = isFinanceUser ? (inv.description || vendorPO?.description || "—") : (vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—");
+
+    return (
+      <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer`} onClick={() => navigate(`/financing/${inv.id}`)}>
+        {isVibeAdmin && (
+          <td className="px-2 py-1.5 font-mono whitespace-nowrap">
+            {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
+          </td>
+        )}
+        <td className="px-2 py-1.5 max-w-[200px] truncate text-muted-foreground">{desc}</td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.financed_amount)}</td>
+        <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.created_at || inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
+        <td className="px-2 py-1.5 text-center">
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-500 border-amber-500/30">
+            <Clock className="h-2.5 w-2.5 mr-1" /> Waiting
+          </Badge>
+        </td>
+        <td className="px-2 py-1.5">
+          {isFinanceUser && (
+            <Button size="sm" variant="default" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); setSelectedInvoice(inv); setAcceptOpen(true); }}>
+              Accept
+            </Button>
+          )}
+        </td>
+      </tr>
+    );
+  };
+
+  const renderCompletedRow = (inv: any, idx: number) => {
+    const invoice = inv.invoices as any;
+    const vendorPO = inv.vendor_pos as any;
+    const poOrder = vendorPO?.orders as any;
+    const desc = isFinanceUser ? (inv.description || "—") : (vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—");
+
+    return (
+      <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer opacity-70`} onClick={() => navigate(`/financing/${inv.id}`)}>
+        {isVibeAdmin && (
+          <td className="px-2 py-1.5 font-mono whitespace-nowrap">
+            {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
+          </td>
+        )}
+        <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{desc}</td>
+        <td className="px-2 py-1.5 font-mono whitespace-nowrap">{invoice?.invoice_number || inv.invoice_number || "—"}</td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.financed_amount)}</td>
+        <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.paid_back_amount)}</td>
+        <td className="px-2 py-1.5 text-center">
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-green-500 border-green-500/30">
+            <CheckCircle2 className="h-2.5 w-2.5 mr-1" /> Paid
+          </Badge>
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -107,7 +206,7 @@ export default function Financing() {
                 <Banknote className="mr-2 h-4 w-4" /> Record Deposit
               </Button>
               <Button size="sm" onClick={() => setAddOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" /> Add Vendor PO
+                <Plus className="mr-2 h-4 w-4" /> Submit for Financing
               </Button>
             </>
           )}
@@ -119,10 +218,10 @@ export default function Financing() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards — only active entries */}
       <div className={`grid grid-cols-1 gap-4 ${isVibeAdmin ? "md:grid-cols-5" : "md:grid-cols-3"}`}>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Financed</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Active Financed</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-24" /> : formatUSD(totalFinanced)}</p></CardContent>
         </Card>
         <Card>
@@ -147,9 +246,7 @@ export default function Financing() {
                   </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-72 p-0" align="start">
-                  <div className="p-3 border-b border-border">
-                    <p className="text-xs font-semibold text-muted-foreground">Deposit History</p>
-                  </div>
+                  <div className="p-3 border-b border-border"><p className="text-xs font-semibold text-muted-foreground">Deposit History</p></div>
                   {deposits.length === 0 ? (
                     <p className="text-xs text-muted-foreground text-center py-4">No deposits yet</p>
                   ) : (
@@ -180,110 +277,116 @@ export default function Financing() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Repaid</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold text-green-500">
-            {loading ? <Skeleton className="h-8 w-24" /> : formatUSD(invoices.reduce((s, i) => s + (i.paid_back_amount || 0), 0))}
+            {loading ? <Skeleton className="h-8 w-24" /> : formatUSD(activeInvoices.reduce((s, i) => s + (i.paid_back_amount || 0), 0))}
           </p></CardContent>
         </Card>
       </div>
 
-      {/* Financed Invoices Table */}
-      <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>Financed Invoices</CardTitle>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="pending" className="gap-1.5">
+              Pending {pendingInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{pendingInvoices.length}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="active" className="gap-1.5">
+              Active {activeInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{activeInvoices.length}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="completed" className="gap-1.5">
+              Completed {completedInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{completedInvoices.length}</Badge>}
+            </TabsTrigger>
+          </TabsList>
           <Button variant="ghost" size="icon" onClick={fetchData}><RefreshCw className="h-4 w-4" /></Button>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div>
-          ) : invoices.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No financed invoices yet</p>
-          ) : (
-            <div className="w-full">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-border bg-muted">
-                    {isVibeAdmin && <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vendor PO</th>}
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Description</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Invoice</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Financed</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
-                    <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Aging</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Fee</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Repaid</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Balance</th>
-                    <th className="px-2 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((inv, idx) => {
-                    const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
-                    const invoice = inv.invoices as any;
-                    const order = invoice?.orders as any;
-                    const vendorPO = inv.vendor_pos as any;
-                    const poOrder = vendorPO?.orders as any;
+        </div>
 
-                    // Description logic: finance users see the custom description field only
-                    // Admins see PO-derived description as before
-                    const adminDesc = vendorPO?.description || poOrder?.description || poOrder?.customer_name || order?.description || order?.customer_name || "—";
-                    const displayDesc = isFinanceUser
-                      ? (inv.description || "—")
-                      : (inv.description || adminDesc);
+        {/* PENDING TAB */}
+        <TabsContent value="pending">
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div>
+              ) : pendingInvoices.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8 text-sm">No pending requests</p>
+              ) : (
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-border bg-muted">
+                      {isVibeAdmin && <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vendor PO</th>}
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Description</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Amount</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Submitted</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                      <th className="px-2 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>{pendingInvoices.map(renderPendingRow)}</tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                    // Visual cue for admins: entry created by finance without linked PO
-                    const needsPOLink = isVibeAdmin && !inv.vendor_po_id && inv.created_by_role === "finance";
+        {/* ACTIVE TAB */}
+        <TabsContent value="active">
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div>
+              ) : activeInvoices.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8 text-sm">No active financed invoices</p>
+              ) : (
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-border bg-muted">
+                      {isVibeAdmin && <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vendor PO</th>}
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Description</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Invoice</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Financed</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Aging</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Fee</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Repaid</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Balance</th>
+                      <th className="px-2 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>{activeInvoices.map(renderActiveRow)}</tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                    return (
-                      <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer`} onClick={() => navigate(`/financing/${inv.id}`)}>
-                        {isVibeAdmin && (
-                          <td className="px-2 py-1.5 font-mono whitespace-nowrap">
-                            {vendorPO?.po_number ? (
-                              `PO #${vendorPO.po_number}`
-                            ) : needsPOLink ? (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex items-center gap-1 text-amber-500">
-                                    <AlertCircle className="h-3 w-3" />
-                                    <span className="text-[10px]">Needs PO</span>
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="text-xs">Added by finance company — needs vendor PO link</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            ) : "—"}
-                          </td>
-                        )}
-                        <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{displayDesc}</td>
-                        <td className="px-2 py-1.5 font-mono whitespace-nowrap">
-                          {invoice?.invoice_number || inv.invoice_number || "—"}
-                        </td>
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.financed_amount)}</td>
-                        <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
-                        <td className="px-2 py-1.5 text-center">
-                          <Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}d</Badge>
-                        </td>
-                        <td className={`px-2 py-1.5 text-right whitespace-nowrap font-medium ${fee.daysAging <= 60 ? "text-yellow-500" : "text-orange-600"}`}>
-                          {formatUSD(fee.feeAmount)} <span className="text-[10px] opacity-75">({fee.daysAging <= 60 ? "5%" : "7%"})</span>
-                        </td>
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.paid_back_amount)}</td>
-                        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{formatUSD(inv.financed_amount + fee.feeAmount - inv.paid_back_amount)}</td>
-                        <td className="px-2 py-1.5">
-                          {inv.status !== "paid" && isVibeAdmin && (
-                            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); setSelectedInvoice({ ...inv, invoice_number: invoice?.invoice_number }); setRepayOpen(true); }}>
-                              Repay
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {/* COMPLETED TAB */}
+        <TabsContent value="completed">
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div>
+              ) : completedInvoices.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8 text-sm">No completed entries</p>
+              ) : (
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-border bg-muted">
+                      {isVibeAdmin && <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vendor PO</th>}
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Description</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Invoice</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Financed</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Repaid</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>{completedInvoices.map(renderCompletedRow)}</tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-      {/* Admin-only dialogs */}
+      {/* Dialogs */}
       {isVibeAdmin && (
         <>
           <AddFinancedInvoiceDialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setPreselectedVendorPO(null); }} onSuccess={fetchData} preselectedVendorPO={preselectedVendorPO} />
@@ -292,10 +395,11 @@ export default function Financing() {
           <GenerateFinanceLinkDialog open={linkOpen} onOpenChange={setLinkOpen} />
         </>
       )}
-
-      {/* Finance user dialog */}
       {isFinanceUser && (
-        <AddFinancedPaymentDialog open={addPaymentOpen} onOpenChange={setAddPaymentOpen} onSuccess={fetchData} />
+        <>
+          <AddFinancedPaymentDialog open={addPaymentOpen} onOpenChange={setAddPaymentOpen} onSuccess={fetchData} />
+          <AcceptFinanceRequestDialog open={acceptOpen} onOpenChange={setAcceptOpen} onSuccess={fetchData} invoice={selectedInvoice} />
+        </>
       )}
     </div>
   );
