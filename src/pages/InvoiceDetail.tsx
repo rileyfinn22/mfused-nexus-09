@@ -1545,12 +1545,12 @@ const InvoiceDetail = () => {
       return calculateInvoiceTotals(items, Number(invoice?.tax || 0), displayShipping);
     }
     if (isBlanketDisplay) {
-      // Blanket display: show MAX(original order total, shipped total)
-      // This keeps the open invoice at the original amount until shipped overs exceed it
-      const originalItems = displayItems.map((item: any) => ({
-        quantity: Number(item.quantity || 0),
-        unit_price: Number(item.unit_price || 0),
-      }));
+      // Check if any shipped quantities have been entered
+      const hasAnyShipped = displayItems.some((item: any) => {
+        const orderItem = order?.order_items?.find((oi: any) => oi.id === item.id);
+        return Number(orderItem?.shipped_quantity || item.shipped_quantity || 0) > 0;
+      });
+      
       const shippedItems = displayItems.map((item: any) => {
         const orderItem = order?.order_items?.find((oi: any) => oi.id === item.id);
         return {
@@ -1558,9 +1558,20 @@ const InvoiceDetail = () => {
           unit_price: Number(item.unit_price || 0),
         };
       });
-      const originalTotals = calculateInvoiceTotals(originalItems, Number(invoice?.tax || 0), displayShipping);
       const shippedTotals = calculateInvoiceTotals(shippedItems, Number(invoice?.tax || 0), displayShipping);
-      return shippedTotals.subtotal > originalTotals.subtotal ? shippedTotals : originalTotals;
+      
+      if (hasAnyShipped) {
+        // Shipped quantities exist — use actual shipped total (no MAX floor)
+        return shippedTotals;
+      }
+      
+      // Nothing shipped yet — show original order total as baseline
+      const originalItems = displayItems.map((item: any) => ({
+        quantity: Number(item.quantity || 0),
+        unit_price: Number(item.unit_price || 0),
+      }));
+      const originalTotals = calculateInvoiceTotals(originalItems, Number(invoice?.tax || 0), displayShipping);
+      return originalTotals;
     }
     // Partial invoices or non-blanket: use stored DB values
     return { subtotal: Number(invoice?.subtotal || 0), total: Number(invoice?.subtotal || 0) + Number(invoice?.tax || 0) + displayShipping };
