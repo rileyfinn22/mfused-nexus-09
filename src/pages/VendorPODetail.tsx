@@ -885,8 +885,8 @@ const VendorPODetail = () => {
   };
 
   const getDefaultEmailMessage = () => {
-    if (!po || !vendor) return '';
-    const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+    const itemsTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+    const totalAmount = itemsTotal + Number(po.shipping_cost || 0);
     return `Dear ${vendor.contact_name || vendor.name},
 
 Please find attached the purchase order from ${VIBE_COMPANY.name}.
