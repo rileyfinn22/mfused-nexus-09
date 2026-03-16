@@ -74,7 +74,10 @@ export default function Financing() {
   if (!isAdmin) return null;
 
   const totalFinanced = invoices.reduce((s, i) => s + (i.financed_amount || 0), 0);
-  const totalOutstanding = invoices.filter(i => i.status === "open").reduce((s, i) => s + (i.financed_amount - i.paid_back_amount), 0);
+  const totalOutstanding = invoices.filter(i => i.status === "open").reduce((s, i) => {
+    const fee = calculateFinanceFee(i.financed_amount, i.financed_date, i.paid_back_amount);
+    return s + (i.financed_amount + fee.feeAmount - i.paid_back_amount);
+  }, 0);
   const requiredDeposit = invoices.filter(i => i.status === "open").reduce((s, i) => s + i.financed_amount, 0) * 0.10;
   const currentDeposit = deposits.reduce((s, d) => s + (d.amount || 0), 0);
   const depositShortfall = Math.max(0, requiredDeposit - currentDeposit);
@@ -145,11 +148,10 @@ export default function Financing() {
                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Invoice</th>
                     <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Financed</th>
                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
-                    <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Aging</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Fee Tier</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Fee</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Repaid</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Balance</th>
+                     <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Aging</th>
+                     <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Fee</th>
+                     <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Repaid</th>
+                     <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Balance</th>
                     <th className="px-2 py-2"></th>
                   </tr>
                 </thead>
@@ -175,10 +177,11 @@ export default function Financing() {
                         <td className="px-2 py-1.5 text-center">
                           <Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}d</Badge>
                         </td>
-                        <td className="px-2 py-1.5 whitespace-nowrap">{fee.feeTier}</td>
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(fee.feeAmount)}</td>
+                        <td className={`px-2 py-1.5 text-right whitespace-nowrap font-medium ${fee.daysAging <= 60 ? "text-yellow-500" : "text-orange-600"}`}>
+                          {formatUSD(fee.feeAmount)} <span className="text-[10px] opacity-75">({fee.daysAging <= 60 ? "5%" : "7%"})</span>
+                        </td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.paid_back_amount)}</td>
-                        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{formatUSD(fee.balance)}</td>
+                        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{formatUSD(inv.financed_amount + fee.feeAmount - inv.paid_back_amount)}</td>
                         <td className="px-2 py-1.5">
                           {inv.status !== "paid" && (
                             <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => { setSelectedInvoice({ ...inv, invoice_number: invoice?.invoice_number }); setRepayOpen(true); }}>
