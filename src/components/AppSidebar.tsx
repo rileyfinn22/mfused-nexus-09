@@ -75,6 +75,10 @@ const vendorNavigationItems = [
   { title: "My Production", url: "/production", icon: Factory },
 ];
 
+const financeNavigationItems = [
+  { title: "Financing", url: "/financing", icon: Landmark },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
@@ -82,6 +86,7 @@ export function AppSidebar() {
   const { activeCompany } = useCompany();
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
+  const [isFinance, setIsFinance] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   useEffect(() => {
@@ -176,6 +181,7 @@ export function AppSidebar() {
     if (activeCompany) {
       setIsVibeAdmin(activeCompany.role === 'vibe_admin');
       setIsVendor(activeCompany.role === 'vendor');
+      setIsFinance(activeCompany.role === 'finance');
       return;
     }
 
@@ -191,12 +197,15 @@ export function AppSidebar() {
       const role = data?.role as string;
       setIsVibeAdmin(role === 'vibe_admin');
       setIsVendor(role === 'vendor');
+      setIsFinance(role === 'finance');
     }
   };
 
-  const navigationItems = isVendor 
-    ? vendorNavigationItems 
-    : (isVibeAdmin ? vibeAdminNavigationItems : companyNavigationItems);
+  const navigationItems = isFinance
+    ? financeNavigationItems
+    : isVendor 
+      ? vendorNavigationItems 
+      : (isVibeAdmin ? vibeAdminNavigationItems : companyNavigationItems);
 
   const isActive = (path: string) => currentPath === path;
   const isCollapsed = state === "collapsed";
