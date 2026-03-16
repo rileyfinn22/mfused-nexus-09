@@ -739,6 +739,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       fontFamily: "Arial",
       fill: "#000000",
       editable: true,
+      originX: "left",
+      originY: "top",
     });
     (text as any).locked = !editable;
     (text as any).editable = editable;
