@@ -466,13 +466,32 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
               fontFamilies.add(obj.fontFamily);
             }
           });
-          const googleFontEntries = FONT_OPTIONS.filter(f => f.google && fontFamilies.has(f.value));
-          if (googleFontEntries.length > 0) {
-            await Promise.all(googleFontEntries.map(f => loadGoogleFont(f.value)));
+
+          // Substitute platform-specific fonts (e.g. Helvetica on Mac → Inter everywhere)
+          fontFamilies.forEach((font) => {
+            const substitute = PLATFORM_FONT_SUBSTITUTES[font];
+            if (substitute) {
+              safeCanvasData.objects.forEach((obj: any) => {
+                if (obj?.fontFamily === font) {
+                  obj.fontFamily = substitute;
+                }
+              });
+              fontFamilies.delete(font);
+              fontFamilies.add(substitute);
+            }
+          });
+
+          // Load any font that isn't a basic web-safe font as a Google Font
+          const fontsToLoad = Array.from(fontFamilies).filter(f => !WEB_SAFE_FONTS.has(f));
+          if (fontsToLoad.length > 0) {
+            await Promise.all(fontsToLoad.map(f => loadGoogleFont(f)));
           }
         }
 
         await canvas.loadFromJSON(safeCanvasData);
+
+        // Wait for all fonts to be fully rasterized by the browser
+        await document.fonts.ready;
 
         // Force re-measure all text objects now that fonts are loaded
         canvas.getObjects().forEach((obj: any) => {
