@@ -19,6 +19,7 @@ export default function FinancedInvoiceDetail() {
   const [saving, setSaving] = useState(false);
   const [record, setRecord] = useState<any>(null);
   const [documents, setDocuments] = useState<any[]>([]);
+  const [isFinanceUser, setIsFinanceUser] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   // Editable fields
@@ -44,6 +45,9 @@ export default function FinancedInvoiceDetail() {
     if (!user) { navigate("/login"); return; }
     const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).in("role", ["vibe_admin", "finance"]);
     if (!data || data.length === 0) { navigate("/dashboard"); return; }
+    const roles = data.map((r: any) => r.role);
+    const hasVibeAdmin = roles.includes("vibe_admin");
+    setIsFinanceUser(!hasVibeAdmin && roles.includes("finance"));
     fetchRecord();
     fetchDocuments();
   };
@@ -198,11 +202,15 @@ export default function FinancedInvoiceDetail() {
         </Button>
         <div>
           <h1 className="text-xl font-bold">
-            Financed {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : `Entry`}
+            {isFinanceUser
+              ? `Financed Entry`
+              : `Financed ${vendorPO?.po_number ? `PO #${vendorPO.po_number}` : `Entry`}`}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—"}
-            {vendorPO?.vendors?.name && ` • ${vendorPO.vendors.name}`}
+            {isFinanceUser
+              ? (record.description || "—")
+              : (vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—")}
+            {!isFinanceUser && vendorPO?.vendors?.name && ` • ${vendorPO.vendors.name}`}
           </p>
         </div>
         <div className="ml-auto flex gap-2">
