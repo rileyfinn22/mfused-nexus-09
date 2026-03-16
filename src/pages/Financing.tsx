@@ -118,9 +118,10 @@ export default function Financing() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Invoice</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Customer</TableHead>
+                     <TableHead>Vendor PO</TableHead>
+                     <TableHead>Description</TableHead>
+                     <TableHead>Invoice</TableHead>
+                     <TableHead>Customer</TableHead>
                     <TableHead className="text-right">Financed</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Aging</TableHead>
