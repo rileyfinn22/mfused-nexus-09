@@ -124,6 +124,7 @@ export default function FinancedInvoiceDetail() {
     } else {
       toast({ title: "Saved successfully" });
       setTrackingUrl(finalTrackingUrl);
+      fetchRecord();
     }
     setSaving(false);
   };
