@@ -623,6 +623,110 @@ export type Database = {
           },
         ]
       }
+      finance_deposits: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          payment_date: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+        }
+        Relationships: []
+      }
+      finance_share_links: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          is_active: boolean
+          label: string | null
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          token?: string
+        }
+        Relationships: []
+      }
+      financed_invoices: {
+        Row: {
+          created_at: string
+          exchange_rate: number
+          financed_amount: number
+          financed_amount_rmb: number
+          financed_date: string
+          id: string
+          invoice_id: string | null
+          notes: string | null
+          paid_back_amount: number
+          paid_back_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          exchange_rate?: number
+          financed_amount?: number
+          financed_amount_rmb?: number
+          financed_date?: string
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          paid_back_amount?: number
+          paid_back_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          exchange_rate?: number
+          financed_amount?: number
+          financed_amount_rmb?: number
+          financed_date?: string
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          paid_back_amount?: number
+          paid_back_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financed_invoices_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           available: number
@@ -3321,6 +3425,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_finance_data_by_token: { Args: { p_token: string }; Returns: Json }
       get_invitation_details: {
         Args: { token_param: string }
         Returns: {

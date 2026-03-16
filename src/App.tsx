@@ -48,6 +48,8 @@ import ShipmentUpdate from "./pages/ShipmentUpdate";
 import Chat from "./pages/Chat";
 import PrintWorkshop from "./pages/PrintWorkshop";
 import WorkshopOrderDetail from "./pages/WorkshopOrderDetail";
+import Financing from "./pages/Financing";
+import FinanceView from "./pages/FinanceView";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +63,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
           <Route path="/shipment-update" element={<ShipmentUpdate />} />
+          <Route path="/finance-view" element={<FinanceView />} />
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -94,6 +97,7 @@ const App = () => (
            <Route path="/chat" element={<DashboardLayout><Chat /></DashboardLayout>} />
            <Route path="/print-workshop" element={<DashboardLayout><PrintWorkshop /></DashboardLayout>} />
            <Route path="/print-workshop/orders/:orderId" element={<DashboardLayout><WorkshopOrderDetail /></DashboardLayout>} />
+           <Route path="/financing" element={<DashboardLayout><Financing /></DashboardLayout>} />
           <Route path="/projects" element={<DashboardLayout><Projects /></DashboardLayout>} />
           <Route path="/projects/:projectId" element={<DashboardLayout><ProjectDetail /></DashboardLayout>} />
           

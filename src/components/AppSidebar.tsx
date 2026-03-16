@@ -14,7 +14,8 @@ import {
   ChevronRight,
   Calculator,
   MessageSquare,
-  Printer
+  Printer,
+  Landmark
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -66,6 +67,7 @@ const vibeAdminNavigationItems = [
   { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Message Hub", url: "/chat", icon: MessageSquare },
   { title: "Print Workshop", url: "/print-workshop", icon: Printer },
+  { title: "Financing", url: "/financing", icon: Landmark },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

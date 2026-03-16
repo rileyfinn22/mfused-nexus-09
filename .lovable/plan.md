@@ -1,98 +1,41 @@
 
 
-# PO Financing Tracker
+## Plan: Show Repeat vs New Status for Each PO Line Item
 
-## Overview
+### Problem
+When analyzing an uploaded PO, all extracted products are displayed the same way. There's no indication of whether a product already exists in the system (repeat) or is entirely new.
 
-A dedicated financing dashboard that tracks invoices sent to your PO financing company, calculates aging-based fees, and shows deposit requirements. Two access modes: (1) Vibe Admin sees it as a sidebar page in the portal (USD/English), (2) the finance company accesses a standalone token-based shared page (RMB/Chinese) — similar to how ShipmentUpdate works with share links.
+### Solution
 
-## Fee Structure (codified)
+**1. After AI extraction, check each product against the existing `products` table**
 
-- Days 0–60: 5% flat fee on financed amount
-- Days 61–90: 7% flat fee on financed amount  
-- Days 90+: 7% + 0.05% per day beyond 90 on unpaid balance
-- Deposit requirement: 10% of total financed amount must be maintained
+In `AnalyzePOProductsDialog.tsx`, after receiving the AI-extracted products, query the `products` table for the selected company and compare each extracted product by name (normalized) to identify matches.
 
-## Database Schema
+Each `ExtractedProduct` gets a new field:
+- `matchStatus`: `'existing'` | `'new'`
+- `existingProductId`: the matched product's ID (if existing)
 
-**New table: `financed_invoices`**
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid PK | |
-| invoice_id | uuid FK → invoices | Link to portal invoice |
-| financed_amount | numeric | Amount in USD sent to finance co |
-| financed_amount_rmb | numeric | Amount in RMB |
-| exchange_rate | numeric | USD→RMB rate used |
-| financed_date | timestamptz | Date funds were received |
-| paid_back_date | timestamptz | Date fully repaid (null if open) |
-| paid_back_amount | numeric | Amount repaid so far |
-| status | text | 'open', 'paid', 'overdue' |
-| notes | text | |
-| created_at / updated_at | timestamptz | |
+**2. Update the review UI to display status per line item**
 
-**New table: `finance_share_links`**
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid PK | |
-| token | text UNIQUE | Share token |
-| label | text | e.g. "Q1 2026 Financing" |
-| is_active | boolean | |
-| expires_at | timestamptz | |
-| created_at | timestamptz | |
+- **Existing/Repeat items**: Show a green "Existing" badge next to the product name. These are products already in the system — importing them would create duplicates, so they default to `selected: false` with a note like "Already in catalog".
+- **New items**: Show an orange "New" badge. These default to `selected: true`. For new items without a template match, show a small inline "Create Product" action that opens a quick-add form (name, description, state, cost pre-filled from the extraction) to create it as a standalone product.
 
-**New table: `finance_deposits`**
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid PK | |
-| amount | numeric | Deposit payment amount |
-| payment_date | timestamptz | |
-| notes | text | |
-| created_at | timestamptz | |
+**3. Inline new product creation**
 
-**RLS**: All three tables — vibe_admin only. No company/vendor access. The public finance view uses a security-definer function (like shipment updates) to bypass RLS via token validation.
+For "new" items that the user wants to add but hasn't matched to a template, add an inline expandable section (or small dialog trigger) with pre-filled fields (name, description, state, cost, product_type) so the user can confirm/edit details before import. This replaces the current blind bulk insert.
 
-## Pages & Components
+### Technical Details
 
-### 1. `/financing` — Vibe Admin Dashboard (English/USD)
-- Added to `vibeAdminNavigationItems` only
-- Redirect guard for non-admins
-- **Summary cards**: Total Financed, Total Outstanding, Required Deposit (10%), Current Deposit Balance, Deposit Shortfall
-- **Table**: Each financed invoice with order number, customer, financed amount, date, days aging, calculated fee tier, fee amount, amount repaid, balance, status
-- **Actions**: Add invoice to financing, record repayment, manage deposit, generate share link
-- Color-coded aging: green (0-60), amber (61-90), red (90+)
+**File: `src/components/AnalyzePOProductsDialog.tsx`**
 
-### 2. `/finance-view?token=xxx` — Finance Company View (Chinese/RMB, no auth)
-- Standalone page (no DashboardLayout, no sidebar) — same pattern as ShipmentUpdate
-- Token-validated via security-definer function
-- All labels in Chinese, amounts in RMB (¥)
-- Same table structure: invoice ref, financed amount (RMB), date, aging days, fee tier, fee amount, repaid, balance, status
-- Summary cards with deposit info
-- Read-only view (no edit actions)
+- Add `matchStatus` and `existingProductId` to the `ExtractedProduct` interface
+- After `handleAnalyze` receives products, query `supabase.from('products').select('id, name').eq('company_id', companyId)` to get all existing products for the company
+- Normalize and compare names (case-insensitive, trimmed) to flag each as existing or new
+- Update the review card UI:
+  - Add a Badge showing "Existing" (green) or "New" (orange)
+  - Existing items: unselected by default, grayed styling, tooltip "Already in your catalog"
+  - New items: selected by default, editable inline fields (name, state, cost) that can be tweaked before import
+- Keep the current import flow but skip items flagged as existing (unless user explicitly re-selects them)
 
-### 3. Security-definer functions
-- `get_finance_data_by_token(p_token text)` — returns all financed invoices + deposit summary for a valid token
-- Fee calculation done in frontend (simple date math)
-
-## Key Implementation Details
-
-- Exchange rate stored per invoice so historical amounts are stable
-- Fee calculation is pure frontend math based on `financed_date` vs today
-- Deposit requirement = SUM(financed_amount WHERE status='open') × 10%
-- Actual deposit = SUM(finance_deposits.amount)
-- The finance company link works exactly like shipment share links — no login needed, token in URL
-- Invoices on the Vibe Admin side link to the portal invoice detail page
-- No trace of financing data appears in company/vendor navigation, queries, or UI
-
-## Files to Create/Modify
-
-1. **Migration**: Create `financed_invoices`, `finance_share_links`, `finance_deposits` tables with RLS
-2. **Migration**: Create `get_finance_data_by_token` security-definer function
-3. **`src/pages/Financing.tsx`** — Admin dashboard
-4. **`src/pages/FinanceView.tsx`** — Public Chinese/RMB view
-5. **`src/components/AddFinancedInvoiceDialog.tsx`** — Dialog to add invoice to financing
-6. **`src/components/RecordFinanceRepaymentDialog.tsx`** — Record repayment
-7. **`src/components/GenerateFinanceLinkDialog.tsx`** — Generate share token
-8. **`src/components/RecordFinanceDepositDialog.tsx`** — Record deposit payment
-9. **`src/App.tsx`** — Add routes
-10. **`src/components/AppSidebar.tsx`** — Add to vibeAdminNavigationItems only
+No backend/edge function changes needed — the matching is done client-side against the products table after extraction.
 
