@@ -428,10 +428,14 @@ export default function Production() {
       }
       
       // Use production_progress from the database directly
-      const ordersWithProgress = ordersData.map(order => ({
+      const allActiveOrders = ordersData.map(order => ({
         ...order,
         production_progress: order.production_progress ?? 0,
       }));
+
+      // Split: orders at 100% progress move to the completed section even if status is still 'in production'
+      const stillInProgress = allActiveOrders.filter(o => (o.production_progress ?? 0) < 100);
+      const doneFromActive = allActiveOrders.filter(o => (o.production_progress ?? 0) >= 100);
 
       // Completed/shipped/delivered orders are always 100% complete
       const completedWithProgress = completedOrdersData.map(order => ({
@@ -439,8 +443,8 @@ export default function Production() {
         production_progress: 100,
       }));
       
-      setOrders(ordersWithProgress);
-      setCompletedOrders(completedWithProgress);
+      setOrders(stillInProgress);
+      setCompletedOrders([...doneFromActive, ...completedWithProgress]);
     } catch (error: any) {
       console.error('Error fetching production orders:', error);
       toast({
