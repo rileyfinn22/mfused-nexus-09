@@ -124,7 +124,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
       });
     }
 
-    toast({ title: "Vendor PO added to financing & marked as paid" });
+    toast({ title: "Vendor PO submitted for financing (pending approval)" });
     onSuccess();
     onOpenChange(false);
     setSelectedPO(null);
