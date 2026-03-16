@@ -21,6 +21,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPO, setSelectedPO] = useState<any>(null);
   const [financedAmount, setFinancedAmount] = useState("");
+  const [rmbAmount, setRmbAmount] = useState("");
   const [exchangeRate, setExchangeRate] = useState("7.2");
   const [financedDate, setFinancedDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
@@ -32,12 +33,15 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
       fetchVendorPOs();
       if (preselectedVendorPO) {
         setSelectedPO(preselectedVendorPO);
-        setFinancedAmount(preselectedVendorPO.total?.toString() || "");
+        const usd = preselectedVendorPO.total?.toString() || "";
+        setFinancedAmount(usd);
+        setRmbAmount(usd ? (parseFloat(usd) * 7.2).toFixed(2) : "");
         setSearchQuery(preselectedVendorPO.po_number);
       } else {
         setSelectedPO(null);
         setSearchQuery("");
         setFinancedAmount("");
+        setRmbAmount("");
       }
     }
   }, [open, preselectedVendorPO]);
@@ -75,7 +79,9 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
   const handleSelectPO = (po: any) => {
     setSelectedPO(po);
     setSearchQuery(po.po_number);
-    setFinancedAmount(po.total?.toString() || "");
+    const usd = po.total?.toString() || "";
+    setFinancedAmount(usd);
+    setRmbAmount(usd ? (parseFloat(usd) * parseFloat(exchangeRate)).toFixed(2) : "");
   };
 
   const handleSubmit = async () => {
@@ -121,6 +127,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     setSelectedPO(null);
     setSearchQuery("");
     setFinancedAmount("");
+    setRmbAmount("");
     setNotes("");
     setLoading(false);
   };
@@ -199,15 +206,29 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
 
           <div>
             <Label>Financed Amount (USD)</Label>
-            <Input type="number" step="0.01" value={financedAmount} onChange={(e) => setFinancedAmount(e.target.value)} placeholder="0.00" />
+            <Input type="number" step="0.01" value={financedAmount} onChange={(e) => {
+              const usd = e.target.value;
+              setFinancedAmount(usd);
+              if (usd && exchangeRate) setRmbAmount((parseFloat(usd) * parseFloat(exchangeRate)).toFixed(2));
+              else setRmbAmount("");
+            }} placeholder="0.00" />
           </div>
           <div>
             <Label>Exchange Rate (USD → RMB)</Label>
-            <Input type="number" step="0.0001" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} />
+            <Input type="number" step="0.0001" value={exchangeRate} onChange={(e) => {
+              const rate = e.target.value;
+              setExchangeRate(rate);
+              if (financedAmount && rate) setRmbAmount((parseFloat(financedAmount) * parseFloat(rate)).toFixed(2));
+            }} />
           </div>
           <div>
             <Label>RMB Amount</Label>
-            <Input disabled value={financedAmount && exchangeRate ? (parseFloat(financedAmount) * parseFloat(exchangeRate)).toFixed(2) : ""} />
+            <Input type="number" step="0.01" value={rmbAmount} onChange={(e) => {
+              const rmb = e.target.value;
+              setRmbAmount(rmb);
+              if (rmb && exchangeRate) setFinancedAmount((parseFloat(rmb) / parseFloat(exchangeRate)).toFixed(2));
+              else setFinancedAmount("");
+            }} placeholder="0.00" />
           </div>
           <div>
             <Label>Financed Date</Label>
