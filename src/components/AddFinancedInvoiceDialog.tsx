@@ -46,7 +46,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     setLoadingPOs(true);
     const { data } = await supabase
       .from("vendor_pos")
-      .select("id, po_number, total, description, vendor_id, company_id, vendors(name), orders(order_number, customer_name)")
+      .select("id, po_number, total, description, notes, vendor_id, company_id, vendors(name), orders(order_number, customer_name), vendor_po_items(name)")
       .order("created_at", { ascending: false })
       .limit(500);
     setVendorPOs(data || []);
