@@ -56,14 +56,20 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
   const filteredPOs = useMemo(() => {
     if (!searchQuery.trim()) return vendorPOs.slice(0, 20);
     const q = searchQuery.toLowerCase();
-    return vendorPOs.filter(
-      (po) =>
+    return vendorPOs.filter((po) => {
+      const itemNames = Array.isArray(po.vendor_po_items)
+        ? (po.vendor_po_items as any[]).map((i: any) => i.name?.toLowerCase() || "").join(" ")
+        : "";
+      return (
         po.po_number?.toLowerCase().includes(q) ||
         po.description?.toLowerCase().includes(q) ||
+        po.notes?.toLowerCase().includes(q) ||
+        itemNames.includes(q) ||
         (po.orders as any)?.order_number?.toLowerCase().includes(q) ||
         (po.orders as any)?.customer_name?.toLowerCase().includes(q) ||
         (po.vendors as any)?.name?.toLowerCase().includes(q)
-    );
+      );
+    });
   }, [vendorPOs, searchQuery]);
 
   const handleSelectPO = (po: any) => {
