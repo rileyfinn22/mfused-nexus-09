@@ -1499,6 +1499,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             editable: true,
             padding: 4,
             width: w,
+            originX: "left",
+            originY: "top",
           } as any);
           (textObj as any).locked = !isEditable;
           (textObj as any).editable = isEditable;
