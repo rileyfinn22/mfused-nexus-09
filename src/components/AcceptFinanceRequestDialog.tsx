@@ -58,11 +58,36 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
 
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Request accepted & moved to Active" });
-      onSuccess();
-      onOpenChange(false);
+      setLoading(false);
+      return;
     }
+
+    // Auto-record vendor PO payment if linked to a vendor PO
+    if (invoice.vendor_po_id) {
+      // Get vendor PO company_id
+      const { data: vpo } = await supabase
+        .from("vendor_pos")
+        .select("company_id")
+        .eq("id", invoice.vendor_po_id)
+        .maybeSingle();
+
+      if (vpo?.company_id) {
+        const { data: { user } } = await supabase.auth.getUser();
+        await supabase.from("vendor_po_payments").insert({
+          vendor_po_id: invoice.vendor_po_id,
+          company_id: vpo.company_id,
+          amount: amt,
+          payment_method: "financing",
+          payment_date: financedDate,
+          notes: `Paid via PO financing${notes ? ` - ${notes}` : ""}`,
+          created_by: user?.id || null,
+        });
+      }
+    }
+
+    toast({ title: "Request accepted & moved to Active" });
+    onSuccess();
+    onOpenChange(false);
     setLoading(false);
   };
 
