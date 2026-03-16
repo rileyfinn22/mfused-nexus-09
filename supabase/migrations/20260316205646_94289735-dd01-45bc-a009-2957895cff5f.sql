@@ -1,0 +1,1 @@
+ALTER TABLE public.vendor_pos ADD COLUMN IF NOT EXISTS shipping_cost numeric NOT NULL DEFAULT 0;

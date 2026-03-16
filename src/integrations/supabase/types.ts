@@ -3113,6 +3113,7 @@ export type Database = {
           ship_to_state: string | null
           ship_to_street: string | null
           ship_to_zip: string | null
+          shipping_cost: number
           status: string
           total: number
           total_paid: number | null
@@ -3146,6 +3147,7 @@ export type Database = {
           ship_to_state?: string | null
           ship_to_street?: string | null
           ship_to_zip?: string | null
+          shipping_cost?: number
           status?: string
           total?: number
           total_paid?: number | null
@@ -3179,6 +3181,7 @@ export type Database = {
           ship_to_state?: string | null
           ship_to_street?: string | null
           ship_to_zip?: string | null
+          shipping_cost?: number
           status?: string
           total?: number
           total_paid?: number | null
