@@ -626,21 +626,33 @@ export type Database = {
       finance_deposits: {
         Row: {
           amount: number
+          confirmation_status: string
+          confirmed_at: string | null
+          confirmed_by: string | null
           created_at: string
+          dispute_note: string | null
           id: string
           notes: string | null
           payment_date: string
         }
         Insert: {
           amount?: number
+          confirmation_status?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
+          dispute_note?: string | null
           id?: string
           notes?: string | null
           payment_date?: string
         }
         Update: {
           amount?: number
+          confirmation_status?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
+          dispute_note?: string | null
           id?: string
           notes?: string | null
           payment_date?: string
@@ -650,8 +662,12 @@ export type Database = {
       finance_repayments: {
         Row: {
           amount: number
+          confirmation_status: string
+          confirmed_at: string | null
+          confirmed_by: string | null
           created_at: string
           created_by: string | null
+          dispute_note: string | null
           financed_invoice_id: string
           id: string
           notes: string | null
@@ -661,8 +677,12 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          confirmation_status?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
           created_by?: string | null
+          dispute_note?: string | null
           financed_invoice_id: string
           id?: string
           notes?: string | null
@@ -672,8 +692,12 @@ export type Database = {
         }
         Update: {
           amount?: number
+          confirmation_status?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
           created_by?: string | null
+          dispute_note?: string | null
           financed_invoice_id?: string
           id?: string
           notes?: string | null
