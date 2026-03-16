@@ -30,7 +30,7 @@ interface RecentOrder {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { activeCompanyId, isVibeAdmin, activeCompanyRole } = useActiveCompany();
+  const { activeCompanyId, isVibeAdmin, activeCompanyRole, isFinancePortalUser } = useActiveCompany();
   const [loading, setLoading] = useState(true);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [openOrdersCount, setOpenOrdersCount] = useState(0);
@@ -40,17 +40,17 @@ const Dashboard = () => {
 
   // Finance-only users should never see the dashboard
   useEffect(() => {
-    if (activeCompanyRole === 'finance') {
+    if (isFinancePortalUser || activeCompanyRole === 'finance') {
       navigate('/financing', { replace: true });
     }
-  }, [activeCompanyRole, navigate]);
+  }, [isFinancePortalUser, activeCompanyRole, navigate]);
 
   useEffect(() => {
-    if (activeCompanyId || isVibeAdmin) {
+    if (!isFinancePortalUser && (activeCompanyId || isVibeAdmin)) {
       setLoading(true);
       fetchDashboardData(activeCompanyId, isVibeAdmin);
     }
-  }, [activeCompanyId, isVibeAdmin]);
+  }, [activeCompanyId, isVibeAdmin, isFinancePortalUser]);
 
   const fetchDashboardData = async (companyId: string | null, isAdmin: boolean) => {
     try {
