@@ -130,75 +130,67 @@ export default function Financing() {
           <CardTitle>Financed Invoices</CardTitle>
           <Button variant="ghost" size="icon" onClick={fetchData}><RefreshCw className="h-4 w-4" /></Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
-            <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+            <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div>
           ) : invoices.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">No financed invoices yet</p>
           ) : (
-            <div className="overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                     <TableHead>Vendor PO</TableHead>
-                     <TableHead>Description</TableHead>
-                     <TableHead>Invoice</TableHead>
-                     <TableHead>Customer</TableHead>
-                    <TableHead className="text-right">Financed</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Aging</TableHead>
-                    <TableHead>Fee Tier</TableHead>
-                    <TableHead className="text-right">Fee</TableHead>
-                    <TableHead className="text-right">Repaid</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoices.map((inv) => {
+            <div className="w-full">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-border bg-muted">
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vendor PO</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Description</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Invoice</th>
+                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Financed</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
+                    <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Aging</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Fee Tier</th>
+                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Fee</th>
+                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Repaid</th>
+                    <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Balance</th>
+                    <th className="px-2 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map((inv, idx) => {
                     const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
-                     const invoice = inv.invoices as any;
-                     const order = invoice?.orders as any;
-                     const vendorPO = inv.vendor_pos as any;
-                     const poOrder = vendorPO?.orders as any;
-                     const poDesc = vendorPO?.description || poOrder?.description || poOrder?.customer_name || order?.description || order?.customer_name || "—";
-                     return (
-                       <TableRow key={inv.id}>
-                         <TableCell className="font-mono text-sm cursor-pointer hover:underline" onClick={() => vendorPO && navigate(`/vendor-pos/${inv.vendor_po_id}`)}>
-                           {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
-                         </TableCell>
-                         <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">{poDesc}</TableCell>
-                         <TableCell className="font-mono text-sm cursor-pointer hover:underline" onClick={() => invoice && navigate(`/invoices/${inv.invoice_id}`)}>
-                           {invoice?.invoice_number || "—"}
-                         </TableCell>
-                         <TableCell>{order?.customer_name || "—"}</TableCell>
-                        <TableCell className="text-right">{formatUSD(inv.financed_amount)}</TableCell>
-                        <TableCell>{new Date(inv.financed_date).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Badge variant={getAgingBadgeVariant(fee.daysAging)}>{fee.daysAging}d</Badge>
-                        </TableCell>
-                        <TableCell className="text-xs">{fee.feeTier}</TableCell>
-                        <TableCell className="text-right">{formatUSD(fee.feeAmount)}</TableCell>
-                        <TableCell className="text-right">{formatUSD(inv.paid_back_amount)}</TableCell>
-                        <TableCell className="text-right font-semibold">{formatUSD(fee.balance)}</TableCell>
-                        <TableCell>
-                          <Badge variant={inv.status === "paid" ? "default" : inv.status === "overdue" ? "destructive" : "secondary"}>
-                            {inv.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
+                    const invoice = inv.invoices as any;
+                    const order = invoice?.orders as any;
+                    const vendorPO = inv.vendor_pos as any;
+                    const poOrder = vendorPO?.orders as any;
+                    const poDesc = vendorPO?.description || poOrder?.description || poOrder?.customer_name || order?.description || order?.customer_name || "—";
+                    return (
+                      <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70`}>
+                        <td className="px-2 py-1.5 font-mono whitespace-nowrap cursor-pointer hover:underline" onClick={() => vendorPO && navigate(`/vendor-pos/${inv.vendor_po_id}`)}>
+                          {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
+                        </td>
+                        <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{poDesc}</td>
+                        <td className="px-2 py-1.5 font-mono whitespace-nowrap cursor-pointer hover:underline" onClick={() => invoice && navigate(`/invoices/${inv.invoice_id}`)}>
+                          {invoice?.invoice_number || "—"}
+                        </td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.financed_amount)}</td>
+                        <td className="px-2 py-1.5 whitespace-nowrap">{new Date(inv.financed_date).toLocaleDateString()}</td>
+                        <td className="px-2 py-1.5 text-center">
+                          <Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}d</Badge>
+                        </td>
+                        <td className="px-2 py-1.5 whitespace-nowrap">{fee.feeTier}</td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(fee.feeAmount)}</td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.paid_back_amount)}</td>
+                        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{formatUSD(fee.balance)}</td>
+                        <td className="px-2 py-1.5">
                           {inv.status !== "paid" && (
-                            <Button size="sm" variant="outline" onClick={() => { setSelectedInvoice({ ...inv, invoice_number: invoice?.invoice_number }); setRepayOpen(true); }}>
+                            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => { setSelectedInvoice({ ...inv, invoice_number: invoice?.invoice_number }); setRepayOpen(true); }}>
                               Repay
                             </Button>
                           )}
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     );
                   })}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>
