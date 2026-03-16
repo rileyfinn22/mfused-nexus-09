@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Search } from "lucide-react";
@@ -25,6 +26,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
   const [exchangeRate, setExchangeRate] = useState("7.2");
   const [financedDate, setFinancedDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
+  const [sendNotification, setSendNotification] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingPOs, setLoadingPOs] = useState(false);
 
@@ -112,19 +114,21 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     // Note: vendor PO payment is NOT recorded at pending stage.
     // It will be recorded when the finance company accepts and activates the request.
 
-    // Notify finance company
-    try {
-      await supabase.functions.invoke("send-finance-notification", {
-        body: {
-          type: "new_pending",
-          poNumber: selectedPO.po_number,
-          description: selectedPO.description || "",
-          amount: amt,
-          notes: notes || undefined,
-        },
-      });
-    } catch (e) {
-      console.error("Notification failed:", e);
+    // Optionally notify finance company
+    if (sendNotification) {
+      try {
+        await supabase.functions.invoke("send-finance-notification", {
+          body: {
+            type: "new_pending",
+            poNumber: selectedPO.po_number,
+            description: selectedPO.description || "",
+            amount: amt,
+            notes: notes || undefined,
+          },
+        });
+      } catch (e) {
+        console.error("Notification failed:", e);
+      }
     }
 
     toast({ title: "Vendor PO submitted for financing (pending approval)" });
@@ -243,6 +247,10 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
           <div>
             <Label>Notes</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox id="send-notif" checked={sendNotification} onCheckedChange={(v) => setSendNotification(!!v)} />
+            <Label htmlFor="send-notif" className="text-sm font-normal cursor-pointer">Send email notification to finance company</Label>
           </div>
           <Button onClick={handleSubmit} disabled={loading || !selectedPO || !financedAmount} className="w-full">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
