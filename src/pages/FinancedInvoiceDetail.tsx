@@ -68,6 +68,12 @@ export default function FinancedInvoiceDetail() {
     setTrackingNumber(data.tracking_number || "");
     setTrackingUrl(data.tracking_url || "");
     setShipmentNotes(data.shipment_notes || "");
+    setFinancedAmount(String(data.financed_amount || ""));
+    setRmbAmount(String(data.financed_amount_rmb || ""));
+    setExchangeRate(String(data.exchange_rate || "7.2"));
+    setFinancedDate(data.financed_date?.split("T")[0] || "");
+    setPaidBackAmount(String(data.paid_back_amount || "0"));
+    setStatus(data.status || "open");
     setLoading(false);
   };
 
