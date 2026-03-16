@@ -252,67 +252,87 @@ export default function FinancedInvoiceDetail() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <div>
               <Label className="text-xs">Financed Amount (USD)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={financedAmount}
-                onChange={(e) => {
-                  setFinancedAmount(e.target.value);
-                  const usd = parseFloat(e.target.value) || 0;
-                  const rate = parseFloat(exchangeRate) || 7.2;
-                  setRmbAmount((usd * rate).toFixed(2));
-                }}
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={financedAmount}
+                  onChange={(e) => {
+                    setFinancedAmount(e.target.value);
+                    const usd = parseFloat(e.target.value) || 0;
+                    const rate = parseFloat(exchangeRate) || 7.2;
+                    setRmbAmount((usd * rate).toFixed(2));
+                  }}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="h-8 flex items-center text-sm font-medium">{formatUSD(currentFinanced)}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">RMB Amount</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={rmbAmount}
-                onChange={(e) => {
-                  setRmbAmount(e.target.value);
-                  const rmb = parseFloat(e.target.value) || 0;
-                  const rate = parseFloat(exchangeRate) || 7.2;
-                  setFinancedAmount((rmb / rate).toFixed(2));
-                }}
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={rmbAmount}
+                  onChange={(e) => {
+                    setRmbAmount(e.target.value);
+                    const rmb = parseFloat(e.target.value) || 0;
+                    const rate = parseFloat(exchangeRate) || 7.2;
+                    setFinancedAmount((rmb / rate).toFixed(2));
+                  }}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="h-8 flex items-center text-sm font-medium">¥{parseFloat(rmbAmount || "0").toLocaleString()}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Exchange Rate</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={exchangeRate}
-                onChange={(e) => {
-                  setExchangeRate(e.target.value);
-                  const rate = parseFloat(e.target.value) || 7.2;
-                  const usd = parseFloat(financedAmount) || 0;
-                  setRmbAmount((usd * rate).toFixed(2));
-                }}
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={exchangeRate}
+                  onChange={(e) => {
+                    setExchangeRate(e.target.value);
+                    const rate = parseFloat(e.target.value) || 7.2;
+                    const usd = parseFloat(financedAmount) || 0;
+                    setRmbAmount((usd * rate).toFixed(2));
+                  }}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="h-8 flex items-center text-sm font-medium">{exchangeRate}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Financed Date</Label>
-              <Input
-                type="date"
-                value={financedDate}
-                onChange={(e) => setFinancedDate(e.target.value)}
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  type="date"
+                  value={financedDate}
+                  onChange={(e) => setFinancedDate(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="h-8 flex items-center text-sm font-medium">{financedDate ? new Date(financedDate).toLocaleDateString() : "—"}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Paid Back</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={paidBackAmount}
-                onChange={(e) => setPaidBackAmount(e.target.value)}
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={paidBackAmount}
+                  onChange={(e) => setPaidBackAmount(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="h-8 flex items-center text-sm font-medium">{formatUSD(currentPaidBack)}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Aging / Fee / Balance</Label>
