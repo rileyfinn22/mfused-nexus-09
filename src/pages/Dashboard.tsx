@@ -30,13 +30,20 @@ interface RecentOrder {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
+  const { activeCompanyId, isVibeAdmin, activeCompanyRole } = useActiveCompany();
   const [loading, setLoading] = useState(true);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [openOrdersCount, setOpenOrdersCount] = useState(0);
   const [inventoryValue, setInventoryValue] = useState(0);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
+
+  // Finance-only users should never see the dashboard
+  useEffect(() => {
+    if (activeCompanyRole === 'finance') {
+      navigate('/financing', { replace: true });
+    }
+  }, [activeCompanyRole, navigate]);
 
   useEffect(() => {
     if (activeCompanyId || isVibeAdmin) {
