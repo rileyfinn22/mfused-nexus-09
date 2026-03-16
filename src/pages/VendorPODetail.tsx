@@ -836,9 +836,9 @@ const VendorPODetail = () => {
         content: a.base64,
       }));
       
-      const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+      const itemsTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+      const totalAmount = itemsTotal + Number(po.shipping_cost || 0);
       
-      // Use the dedicated vendor PO email function
       const response = await supabase.functions.invoke('send-vendor-po-email', {
         body: {
           poId: poId,
