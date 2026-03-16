@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { calculateFinanceFee, getAgingBadgeVariant, formatUSD } from "@/lib/financeUtils";
 import { AddFinancedInvoiceDialog } from "@/components/AddFinancedInvoiceDialog";
-import { AddFinancedPaymentDialog } from "@/components/AddFinancedPaymentDialog";
+
 import { RecordFinanceRepaymentDialog } from "@/components/RecordFinanceRepaymentDialog";
 import { RecordFinanceDepositDialog } from "@/components/RecordFinanceDepositDialog";
 import { GenerateFinanceLinkDialog } from "@/components/GenerateFinanceLinkDialog";
