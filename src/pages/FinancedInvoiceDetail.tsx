@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X, History, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X, History, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import { calculateFinanceFee, formatUSD } from "@/lib/financeUtils";
 import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
 
@@ -590,23 +590,36 @@ export default function FinancedInvoiceDetail() {
               <p className="text-sm text-muted-foreground text-center py-4">No repayments recorded yet</p>
             ) : (
               <table className="w-full text-xs border-collapse">
-                <thead>
+                 <thead>
                   <tr className="border-b-2 border-border bg-muted">
                     <th className="px-2 py-2 text-left font-medium text-muted-foreground">Date</th>
                     <th className="px-2 py-2 text-right font-medium text-muted-foreground">Amount</th>
                     <th className="px-2 py-2 text-left font-medium text-muted-foreground">Method</th>
                     <th className="px-2 py-2 text-left font-medium text-muted-foreground">Reference</th>
                     <th className="px-2 py-2 text-left font-medium text-muted-foreground">Notes</th>
+                    <th className="px-2 py-2 text-center font-medium text-muted-foreground">Confirmation</th>
                   </tr>
                 </thead>
                 <tbody>
                   {repayments.map((r, idx) => (
-                    <tr key={r.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""}`}>
+                    <tr key={r.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} ${r.confirmation_status === "disputed" ? "bg-destructive/5" : ""}`}>
                       <td className="px-2 py-1.5 whitespace-nowrap">{new Date(r.payment_date + "T00:00:00").toLocaleDateString()}</td>
                       <td className="px-2 py-1.5 text-right font-medium whitespace-nowrap">{formatUSD(r.amount)}</td>
                       <td className="px-2 py-1.5 capitalize">{r.payment_method || "—"}</td>
                       <td className="px-2 py-1.5 font-mono text-muted-foreground">{r.reference_number || "—"}</td>
                       <td className="px-2 py-1.5 text-muted-foreground max-w-[200px] truncate">{r.notes || "—"}</td>
+                      <td className="px-2 py-1.5 text-center">
+                        {r.confirmation_status === "confirmed" ? (
+                          <Badge variant="success" className="text-[10px] px-1.5 py-0 gap-1"><CheckCircle2 className="h-2.5 w-2.5" />Confirmed</Badge>
+                        ) : r.confirmation_status === "disputed" ? (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Badge variant="danger" className="text-[10px] px-1.5 py-0 gap-1"><AlertTriangle className="h-2.5 w-2.5" />Disputed</Badge>
+                            {r.dispute_note && <span className="text-[10px] text-destructive">{r.dispute_note}</span>}
+                          </div>
+                        ) : (
+                          <Badge variant="warning" className="text-[10px] px-1.5 py-0 gap-1"><Clock className="h-2.5 w-2.5" />Pending</Badge>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -614,7 +627,7 @@ export default function FinancedInvoiceDetail() {
                   <tr className="border-t-2 border-border bg-muted">
                     <td className="px-2 py-1.5 font-semibold">Total</td>
                     <td className="px-2 py-1.5 text-right font-bold">{formatUSD(repayments.reduce((s: number, r: any) => s + (r.amount || 0), 0))}</td>
-                    <td colSpan={3}></td>
+                    <td colSpan={4}></td>
                   </tr>
                 </tfoot>
               </table>

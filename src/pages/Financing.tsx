@@ -15,6 +15,7 @@ import { RecordFinanceRepaymentDialog } from "@/components/RecordFinanceRepaymen
 import { RecordFinanceDepositDialog } from "@/components/RecordFinanceDepositDialog";
 import { GenerateFinanceLinkDialog } from "@/components/GenerateFinanceLinkDialog";
 import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
+import { FinanceConfirmationsTab } from "@/components/FinanceConfirmationsTab";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Financing() {
@@ -37,6 +38,7 @@ export default function Financing() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [pendingConfirmations, setPendingConfirmations] = useState(0);
 
   const isVibeAdmin = userRole === "vibe_admin";
   const isFinanceUser = userRole === "finance";
@@ -77,6 +79,12 @@ export default function Financing() {
     ]);
     setInvoices(invRes.data || []);
     setDeposits(depRes.data || []);
+    // Count pending confirmations
+    const [repConf, depConf] = await Promise.all([
+      supabase.from("finance_repayments").select("id", { count: "exact", head: true }).eq("confirmation_status", "pending"),
+      supabase.from("finance_deposits").select("id", { count: "exact", head: true }).eq("confirmation_status", "pending"),
+    ]);
+    setPendingConfirmations((repConf.count || 0) + (depConf.count || 0));
     setLoading(false);
   };
 
@@ -339,6 +347,9 @@ export default function Financing() {
             <TabsTrigger value="completed" className="gap-1.5">
               Completed {completedInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{completedInvoices.length}</Badge>}
             </TabsTrigger>
+            <TabsTrigger value="confirmations" className="gap-1.5">
+              Confirmations {pendingConfirmations > 0 && <Badge variant="warning" className="text-[10px] px-1.5 py-0 ml-1">{pendingConfirmations}</Badge>}
+            </TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={fetchData}><RefreshCw className="h-4 w-4" /></Button>
@@ -454,6 +465,11 @@ export default function Financing() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* CONFIRMATIONS TAB */}
+        <TabsContent value="confirmations">
+          <FinanceConfirmationsTab isVibeAdmin={isVibeAdmin} isFinanceUser={isFinanceUser} />
         </TabsContent>
       </Tabs>
 
