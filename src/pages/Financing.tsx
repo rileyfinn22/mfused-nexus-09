@@ -156,7 +156,7 @@ export default function Financing() {
                     <div className="max-h-48 overflow-y-auto divide-y divide-border">
                       {deposits.map((d) => (
                         <div key={d.id} className="px-3 py-2 flex justify-between items-center text-xs">
-                          <span className="text-muted-foreground">{new Date(d.payment_date + "T00:00:00").toLocaleDateString()}</span>
+                          <span className="text-muted-foreground">{new Date(String(d.payment_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</span>
                           <span className="font-medium">{formatUSD(d.amount)}</span>
                         </div>
                       ))}
@@ -257,7 +257,7 @@ export default function Financing() {
                           {invoice?.invoice_number || inv.invoice_number || "—"}
                         </td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.financed_amount)}</td>
-                        <td className="px-2 py-1.5 whitespace-nowrap">{new Date(inv.financed_date + "T00:00:00").toLocaleDateString()}</td>
+                        <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
                         <td className="px-2 py-1.5 text-center">
                           <Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}d</Badge>
                         </td>
