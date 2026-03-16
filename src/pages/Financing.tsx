@@ -82,20 +82,80 @@ export default function Financing() {
 
   if (!isAuthorized) return null;
 
-  // Split invoices by finance_status
-  const pendingInvoices = invoices.filter(i => i.finance_status === "pending");
-  const activeInvoices = invoices.filter(i => !i.finance_status || i.finance_status === "active");
-  const completedInvoices = invoices.filter(i => i.finance_status === "completed");
+  // Filter helper
+  const filterBySearchAndDate = (list: any[]) => {
+    let filtered = list;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter((i) => {
+        const vpo = i.vendor_pos as any;
+        const inv = i.invoices as any;
+        const poOrder = vpo?.orders as any;
+        return (
+          vpo?.po_number?.toLowerCase().includes(q) ||
+          vpo?.description?.toLowerCase().includes(q) ||
+          poOrder?.customer_name?.toLowerCase().includes(q) ||
+          poOrder?.order_number?.toLowerCase().includes(q) ||
+          i.description?.toLowerCase().includes(q) ||
+          i.invoice_number?.toLowerCase().includes(q) ||
+          inv?.invoice_number?.toLowerCase().includes(q) ||
+          i.notes?.toLowerCase().includes(q)
+        );
+      });
+    }
+    if (dateFrom) filtered = filtered.filter((i) => (i.financed_date || i.created_at) >= dateFrom);
+    if (dateTo) filtered = filtered.filter((i) => (i.financed_date || i.created_at) <= dateTo + "T23:59:59");
+    return filtered;
+  };
 
-  // Summary cards only count active entries
-  const totalFinanced = activeInvoices.reduce((s, i) => s + (i.financed_amount || 0), 0);
-  const totalOutstanding = activeInvoices.filter(i => i.status === "open").reduce((s, i) => {
+  // Split invoices by finance_status
+  const pendingInvoices = filterBySearchAndDate(invoices.filter(i => i.finance_status === "pending"));
+  const activeInvoices = filterBySearchAndDate(invoices.filter(i => !i.finance_status || i.finance_status === "active"));
+  const completedInvoices = filterBySearchAndDate(invoices.filter(i => i.finance_status === "completed"));
+
+  // Summary cards only count active entries (unfiltered)
+  const allActive = invoices.filter(i => !i.finance_status || i.finance_status === "active");
+  const totalFinanced = allActive.reduce((s, i) => s + (i.financed_amount || 0), 0);
+  const totalOutstanding = allActive.filter(i => i.status === "open").reduce((s, i) => {
     const fee = calculateFinanceFee(i.financed_amount, i.financed_date, i.paid_back_amount);
     return s + (i.financed_amount + fee.feeAmount - i.paid_back_amount);
   }, 0);
-  const requiredDeposit = activeInvoices.filter(i => i.status === "open").reduce((s, i) => s + i.financed_amount, 0) * 0.10;
+  const requiredDeposit = allActive.filter(i => i.status === "open").reduce((s, i) => s + i.financed_amount, 0) * 0.10;
   const currentDeposit = deposits.reduce((s, d) => s + (d.amount || 0), 0);
   const depositShortfall = Math.max(0, requiredDeposit - currentDeposit);
+
+  const exportCSV = () => {
+    const tab = activeTab === "pending" ? pendingInvoices : activeTab === "active" ? activeInvoices : completedInvoices;
+    const headers = ["Description", "Financed Amount", "Date", "Status", "Paid Back", "Notes"];
+    if (isVibeAdmin) headers.unshift("Vendor PO");
+    if (activeTab === "active") headers.push("Fee", "Balance");
+
+    const rows = tab.map((inv) => {
+      const vpo = inv.vendor_pos as any;
+      const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
+      const row: string[] = [];
+      if (isVibeAdmin) row.push(vpo?.po_number ? `PO #${vpo.po_number}` : "");
+      row.push(
+        inv.description || vpo?.description || "",
+        String(inv.financed_amount || 0),
+        inv.financed_date || "",
+        inv.finance_status || "",
+        String(inv.paid_back_amount || 0),
+        inv.notes || "",
+      );
+      if (activeTab === "active") row.push(String(fee.feeAmount.toFixed(2)), String((inv.financed_amount + fee.feeAmount - inv.paid_back_amount).toFixed(2)));
+      return row;
+    });
+
+    const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${(c || "").replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `financing-${activeTab}-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const renderActiveRow = (inv: any, idx: number) => {
     const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
