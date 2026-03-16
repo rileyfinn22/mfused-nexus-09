@@ -110,6 +110,12 @@ export default function FinancedInvoiceDetail() {
         tracking_number: trackingNumber || null,
         tracking_url: finalTrackingUrl || null,
         shipment_notes: shipmentNotes || null,
+        financed_amount: parseFloat(financedAmount) || 0,
+        financed_amount_rmb: parseFloat(rmbAmount) || 0,
+        exchange_rate: parseFloat(exchangeRate) || 7.2,
+        financed_date: financedDate || record.financed_date,
+        paid_back_amount: parseFloat(paidBackAmount) || 0,
+        status,
       })
       .eq("id", id!);
 
