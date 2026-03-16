@@ -355,21 +355,29 @@ export default function FinancedInvoiceDetail() {
           <CardContent className="space-y-3">
             <div>
               <Label className="text-xs">Invoice Number</Label>
-              <Input
-                value={invoiceNumber}
-                onChange={(e) => setInvoiceNumber(e.target.value)}
-                placeholder="Enter invoice number..."
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                  placeholder="Enter invoice number..."
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="text-sm font-medium py-1">{invoiceNumber || "—"}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Notes</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add notes..."
-                className="min-h-[80px] text-sm"
-              />
+              {editing ? (
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add notes..."
+                  className="min-h-[80px] text-sm"
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground py-1 whitespace-pre-wrap">{notes || "—"}</p>
+              )}
             </div>
           </CardContent>
         </Card>
