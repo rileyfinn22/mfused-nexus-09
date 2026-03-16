@@ -8,7 +8,8 @@ export function calculateFinanceFee(financedAmount: number, financedDate: string
   dailyRate: number;
 } {
   const now = new Date();
-  const start = new Date(financedDate + (financedDate.includes("T") ? "" : "T00:00:00"));
+  const dateStr = String(financedDate).split("T")[0];
+  const start = new Date(dateStr + "T00:00:00");
   const daysAging = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
   const balance = financedAmount - paidBackAmount;
 

@@ -156,7 +156,7 @@ export default function Financing() {
                     <div className="max-h-48 overflow-y-auto divide-y divide-border">
                       {deposits.map((d) => (
                         <div key={d.id} className="px-3 py-2 flex justify-between items-center text-xs">
-                          <span className="text-muted-foreground">{new Date(d.payment_date + "T00:00:00").toLocaleDateString()}</span>
+                          <span className="text-muted-foreground">{new Date(String(d.payment_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</span>
                           <span className="font-medium">{formatUSD(d.amount)}</span>
                         </div>
                       ))}
