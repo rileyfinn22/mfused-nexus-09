@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Financing() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -24,6 +25,27 @@ export default function Financing() {
   const [depositOpen, setDepositOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+
+  // Check for preselected vendor PO from URL params (e.g. from "Send to Finance" button)
+  const preselectedVendorPO = useMemo(() => {
+    const addPO = searchParams.get("addPO");
+    if (!addPO) return null;
+    return {
+      id: addPO,
+      po_number: searchParams.get("poNumber") || "",
+      total: parseFloat(searchParams.get("poTotal") || "0"),
+      description: searchParams.get("poDesc") || null,
+    };
+  }, [searchParams]);
+
+  // Auto-open dialog when navigated with addPO param
+  useEffect(() => {
+    if (preselectedVendorPO && isAdmin) {
+      setAddOpen(true);
+      // Clear URL params after opening
+      setSearchParams({}, { replace: true });
+    }
+  }, [preselectedVendorPO, isAdmin]);
 
   useEffect(() => {
     checkAdmin();
