@@ -1004,6 +1004,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           fill: region.color || "#000000",
           editable: true,
           padding: 0,
+          originX: "left",
+          originY: "top",
         });
         (textObj as any)._fontSizePt = fontSizePtVal;
         (textObj as any).locked = true;
