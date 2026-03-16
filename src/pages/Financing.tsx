@@ -286,42 +286,38 @@ export default function Financing() {
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Armropak Outstanding</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold text-amber-500">{loading ? <Skeleton className="h-8 w-24" /> : formatUSD(totalOutstanding)}</p></CardContent>
         </Card>
-        {isVibeAdmin && (
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Required Deposit (10%)</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-24" /> : formatUSD(requiredDeposit)}</p></CardContent>
-          </Card>
-        )}
-        {isVibeAdmin && (
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Deposit Balance</CardTitle></CardHeader>
-            <CardContent>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button className="flex items-center gap-1 text-2xl font-bold text-green-500 hover:underline cursor-pointer">
-                    {loading ? <Skeleton className="h-8 w-24" /> : formatUSD(currentDeposit)}
-                    <ChevronDown className="h-4 w-4 opacity-60" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-72 p-0" align="start">
-                  <div className="p-3 border-b border-border"><p className="text-xs font-semibold text-muted-foreground">Deposit History</p></div>
-                  {deposits.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4">No deposits yet</p>
-                  ) : (
-                    <div className="max-h-48 overflow-y-auto divide-y divide-border">
-                      {deposits.map((d) => (
-                        <div key={d.id} className="px-3 py-2 flex justify-between items-center text-xs">
-                          <span className="text-muted-foreground">{new Date(String(d.payment_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</span>
-                          <span className="font-medium">{formatUSD(d.amount)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </PopoverContent>
-              </Popover>
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Required Deposit (10%)</CardTitle></CardHeader>
+          <CardContent><p className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-24" /> : formatUSD(requiredDeposit)}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Deposit Balance</CardTitle></CardHeader>
+          <CardContent>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="flex items-center gap-1 text-2xl font-bold text-green-500 hover:underline cursor-pointer">
+                  {loading ? <Skeleton className="h-8 w-24" /> : formatUSD(currentDeposit)}
+                  <ChevronDown className="h-4 w-4 opacity-60" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-0" align="start">
+                <div className="p-3 border-b border-border"><p className="text-xs font-semibold text-muted-foreground">Deposit History</p></div>
+                {deposits.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No deposits yet</p>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto divide-y divide-border">
+                    {deposits.map((d) => (
+                      <div key={d.id} className="px-3 py-2 flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground">{new Date(String(d.payment_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</span>
+                        <span className="font-medium">{formatUSD(d.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Repaid</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold text-green-500">
