@@ -87,19 +87,21 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
       }
     }
 
-    // Notify vibe admins
-    try {
-      const vendorPO = invoice.vendor_pos as any;
-      await supabase.functions.invoke("send-finance-notification", {
-        body: {
-          type: "request_accepted",
-          poNumber: vendorPO?.po_number || "",
-          amount: amt,
-          financedDate,
-        },
-      });
-    } catch (e) {
-      console.error("Notification failed:", e);
+    // Optionally notify vibe admins
+    if (sendNotification) {
+      try {
+        const vendorPO = invoice.vendor_pos as any;
+        await supabase.functions.invoke("send-finance-notification", {
+          body: {
+            type: "request_accepted",
+            poNumber: vendorPO?.po_number || "",
+            amount: amt,
+            financedDate,
+          },
+        });
+      } catch (e) {
+        console.error("Notification failed:", e);
+      }
     }
 
     toast({ title: "Request accepted & moved to Active" });
