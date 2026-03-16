@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 import { Loader2, AlertTriangle } from "lucide-react";
 import { calculateFinanceFee, getAgingBadgeVariant, formatRMB } from "@/lib/financeUtils";
 import { Toaster } from "@/components/ui/toaster";
