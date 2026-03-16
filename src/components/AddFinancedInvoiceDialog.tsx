@@ -79,7 +79,9 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
   const handleSelectPO = (po: any) => {
     setSelectedPO(po);
     setSearchQuery(po.po_number);
-    setFinancedAmount(po.total?.toString() || "");
+    const usd = po.total?.toString() || "";
+    setFinancedAmount(usd);
+    setRmbAmount(usd ? (parseFloat(usd) * parseFloat(exchangeRate)).toFixed(2) : "");
   };
 
   const handleSubmit = async () => {
