@@ -26,7 +26,7 @@ export default function Financing() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [addOpen, setAddOpen] = useState(false);
-  const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  
   const [repayOpen, setRepayOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
