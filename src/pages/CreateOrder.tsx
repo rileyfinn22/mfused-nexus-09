@@ -1912,6 +1912,12 @@ const CreateOrder = () => {
             </div>
           </div>
           <div className="flex gap-3">
+            {orderId && (
+              <Button variant="ghost" size="sm" onClick={handleSyncSpecs} disabled={syncingSpecs} title="Update product specs from latest templates">
+                {syncingSpecs ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+                Sync Specs
+              </Button>
+            )}
             <Button variant="outline" onClick={() => saveOrder(true)} disabled={loading}>
               <Save className="h-4 w-4 mr-2" />
               {orderId ? "Update Draft" : "Save Draft"}
