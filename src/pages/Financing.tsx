@@ -74,7 +74,10 @@ export default function Financing() {
   if (!isAdmin) return null;
 
   const totalFinanced = invoices.reduce((s, i) => s + (i.financed_amount || 0), 0);
-  const totalOutstanding = invoices.filter(i => i.status === "open").reduce((s, i) => s + (i.financed_amount - i.paid_back_amount), 0);
+  const totalOutstanding = invoices.filter(i => i.status === "open").reduce((s, i) => {
+    const fee = calculateFinanceFee(i.financed_amount, i.financed_date, i.paid_back_amount);
+    return s + (i.financed_amount + fee.feeAmount - i.paid_back_amount);
+  }, 0);
   const requiredDeposit = invoices.filter(i => i.status === "open").reduce((s, i) => s + i.financed_amount, 0) * 0.10;
   const currentDeposit = deposits.reduce((s, d) => s + (d.amount || 0), 0);
   const depositShortfall = Math.max(0, requiredDeposit - currentDeposit);
