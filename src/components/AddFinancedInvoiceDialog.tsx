@@ -113,19 +113,21 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     // Note: vendor PO payment is NOT recorded at pending stage.
     // It will be recorded when the finance company accepts and activates the request.
 
-    // Notify finance company
-    try {
-      await supabase.functions.invoke("send-finance-notification", {
-        body: {
-          type: "new_pending",
-          poNumber: selectedPO.po_number,
-          description: selectedPO.description || "",
-          amount: amt,
-          notes: notes || undefined,
-        },
-      });
-    } catch (e) {
-      console.error("Notification failed:", e);
+    // Optionally notify finance company
+    if (sendNotification) {
+      try {
+        await supabase.functions.invoke("send-finance-notification", {
+          body: {
+            type: "new_pending",
+            poNumber: selectedPO.po_number,
+            description: selectedPO.description || "",
+            amount: amt,
+            notes: notes || undefined,
+          },
+        });
+      } catch (e) {
+        console.error("Notification failed:", e);
+      }
     }
 
     toast({ title: "Vendor PO submitted for financing (pending approval)" });
