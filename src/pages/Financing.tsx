@@ -174,10 +174,11 @@ export default function Financing() {
                         <td className="px-2 py-1.5 text-center">
                           <Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}d</Badge>
                         </td>
-                        <td className="px-2 py-1.5 whitespace-nowrap">{fee.feeTier}</td>
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(fee.feeAmount)}</td>
+                        <td className={`px-2 py-1.5 text-right whitespace-nowrap font-medium ${fee.daysAging <= 60 ? "text-yellow-500" : "text-orange-600"}`}>
+                          {formatUSD(fee.feeAmount)} <span className="text-[10px] opacity-75">({fee.daysAging <= 60 ? "5%" : "7%"})</span>
+                        </td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.paid_back_amount)}</td>
-                        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{formatUSD(fee.balance)}</td>
+                        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{formatUSD(inv.financed_amount + fee.feeAmount - inv.paid_back_amount)}</td>
                         <td className="px-2 py-1.5">
                           {inv.status !== "paid" && (
                             <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => { setSelectedInvoice({ ...inv, invoice_number: invoice?.invoice_number }); setRepayOpen(true); }}>
