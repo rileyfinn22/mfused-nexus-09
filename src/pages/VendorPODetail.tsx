@@ -1498,11 +1498,34 @@ Thank you for your business.`;
               </TableBody>
             </Table>
 
-            {/* Total */}
+            {/* Shipping & Total */}
             <div className="flex justify-end mt-6 pt-6 border-t">
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground mb-2">Total Amount</p>
-                <p className="text-2xl font-bold">${poItems.reduce((sum, item) => sum + Number(item.total), 0).toFixed(2)}</p>
+              <div className="w-72 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">${poItems.reduce((sum, item) => sum + Number(item.total), 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Shipping</span>
+                  {isEditMode ? (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editedPO.shipping_cost || 0}
+                      onChange={(e) => setEditedPO({ ...editedPO, shipping_cost: parseFloat(e.target.value) || 0 })}
+                      className="w-28 text-right"
+                    />
+                  ) : (
+                    <span className="font-medium">${Number(po.shipping_cost || 0).toFixed(2)}</span>
+                  )}
+                </div>
+                <div className="flex justify-between items-center pt-3 border-t">
+                  <span className="text-sm font-semibold">Total</span>
+                  <span className="text-2xl font-bold">
+                    ${(poItems.reduce((sum, item) => sum + Number(item.total), 0) + Number(isEditMode ? (editedPO.shipping_cost || 0) : (po.shipping_cost || 0))).toFixed(2)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
