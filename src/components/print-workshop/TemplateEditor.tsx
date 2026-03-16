@@ -1361,6 +1361,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             fill: detectedColor,
             editable: true,
             padding: 0,
+            originX: "left",
+            originY: "top",
           });
           (text as any)._fontSizePt = finalFontSizePt;
           (text as any).locked = isLocked;
