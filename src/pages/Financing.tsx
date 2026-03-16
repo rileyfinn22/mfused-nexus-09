@@ -164,8 +164,8 @@ export default function Financing() {
                     const poOrder = vendorPO?.orders as any;
                     const poDesc = vendorPO?.description || poOrder?.description || poOrder?.customer_name || order?.description || order?.customer_name || "—";
                     return (
-                      <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70`}>
-                        <td className="px-2 py-1.5 font-mono whitespace-nowrap cursor-pointer hover:underline" onClick={() => vendorPO && navigate(`/vendor-pos/${inv.vendor_po_id}`)}>
+                      <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer`} onClick={() => navigate(`/financing/${inv.id}`)}>
+                        <td className="px-2 py-1.5 font-mono whitespace-nowrap">
                           {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
                         </td>
                         <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{poDesc}</td>
