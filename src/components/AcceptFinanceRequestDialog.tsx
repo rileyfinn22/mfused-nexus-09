@@ -179,6 +179,10 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
             <Label>Notes</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
+          <div className="flex items-center gap-2">
+            <Checkbox id="accept-notif" checked={sendNotification} onCheckedChange={(v) => setSendNotification(!!v)} />
+            <Label htmlFor="accept-notif" className="text-sm font-normal cursor-pointer">Send email notification to Vibe admins</Label>
+          </div>
           <Button onClick={handleSubmit} disabled={loading || !financedAmount} className="w-full">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Accept & Activate
