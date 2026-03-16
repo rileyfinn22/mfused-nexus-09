@@ -109,20 +109,8 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
       return;
     }
 
-    // 2. Auto-record vendor PO payment so it shows as paid in bills/projects
-    const { data: { user } } = await supabase.auth.getUser();
-    const companyId = selectedPO.company_id;
-    if (companyId) {
-      await supabase.from("vendor_po_payments").insert({
-        vendor_po_id: selectedPO.id,
-        company_id: companyId,
-        amount: amt,
-        payment_method: "financing",
-        payment_date: financedDate,
-        notes: `Paid via PO financing${notes ? ` - ${notes}` : ""}`,
-        created_by: user?.id || null,
-      });
-    }
+    // Note: vendor PO payment is NOT recorded at pending stage.
+    // It will be recorded when the finance company accepts and activates the request.
 
     toast({ title: "Vendor PO submitted for financing (pending approval)" });
     onSuccess();
