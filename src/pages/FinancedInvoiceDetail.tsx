@@ -539,6 +539,41 @@ export default function FinancedInvoiceDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* Subtle edit log indicator */}
+      {editLogs.length > 0 && (
+        <div className="pt-2 pb-6">
+          <button
+            onClick={() => setShowLogs(!showLogs)}
+            className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          >
+            <History className="h-3 w-3" />
+            {editLogs.length} edit{editLogs.length !== 1 ? "s" : ""}
+          </button>
+          {showLogs && (
+            <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto">
+              {editLogs.map((log) => {
+                const changes = log.changes as Record<string, { from: any; to: any }>;
+                const fieldNames = Object.keys(changes);
+                return (
+                  <div key={log.id} className="text-[10px] text-muted-foreground/60 flex gap-2">
+                    <span className="whitespace-nowrap shrink-0">
+                      {new Date(log.changed_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                    </span>
+                    <span className="truncate">
+                      {fieldNames.map((f) => {
+                        const label = f.replace(/_/g, " ");
+                        const c = changes[f];
+                        return `${label}: ${c.from ?? "—"} → ${c.to ?? "—"}`;
+                      }).join(" · ")}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
