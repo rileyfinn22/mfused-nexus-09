@@ -215,18 +215,31 @@ export default function FinancedInvoiceDetail() {
           </p>
         </div>
         <div className="ml-auto flex gap-2">
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium"
-          >
-            <option value="open">Open</option>
-            <option value="paid">Paid</option>
-          </select>
-          <Button size="sm" onClick={handleSave} disabled={saving}>
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? "Saving..." : "Save"}
-          </Button>
+          {!editing ? (
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+          ) : (
+            <>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium"
+              >
+                <option value="open">Open</option>
+                <option value="paid">Paid</option>
+              </select>
+              <Button size="sm" variant="ghost" onClick={() => { setEditing(false); fetchRecord(); }}>
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button size="sm" onClick={() => { handleSave().then(() => setEditing(false)); }} disabled={saving}>
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
