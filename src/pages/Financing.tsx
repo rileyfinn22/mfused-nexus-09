@@ -277,7 +277,7 @@ export default function Financing() {
       </div>
 
       {/* Summary Cards — only active entries */}
-      <div className={`grid grid-cols-1 gap-4 ${isVibeAdmin ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Active Financed</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-24" /> : formatUSD(totalFinanced)}</p></CardContent>
