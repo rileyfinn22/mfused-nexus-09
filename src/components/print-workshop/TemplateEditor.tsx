@@ -794,23 +794,54 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         snappedY = true;
       }
 
-      // Snap to other objects' centers
+      // Snap to other objects' edges and centers
       if (!snappedX || !snappedY) {
         canvas.getObjects().forEach((other: any) => {
-          if (other === obj || other.name === "_textCover" || other.name === OCR_KNOCKOUT_NAME || other.name === GUIDE_NAME) return;
+          if (other === obj || other.name === "_textCover" || other.name === OCR_KNOCKOUT_NAME || other.name === GUIDE_NAME || other.name === "_trimGuide" || other.name === "_editHighlight") return;
           const obr = other.getBoundingRect();
-          const oCX = obr.left / zoom + obr.width / zoom / 2;
-          const oCY = obr.top / zoom + obr.height / zoom / 2;
+          const oLeft = obr.left / zoom;
+          const oTop = obr.top / zoom;
+          const oW = obr.width / zoom;
+          const oH = obr.height / zoom;
+          const oRight = oLeft + oW;
+          const oBottom = oTop + oH;
+          const oCX = oLeft + oW / 2;
+          const oCY = oTop + oH / 2;
 
-          if (!snappedX && Math.abs(objCenterX - oCX) < SNAP_THRESHOLD) {
-            obj.set({ left: oCX - objW / 2 + offX });
-            guides.push({ x1: oCX, y1: 0, x2: oCX, y2: canvasHeight });
-            snappedX = true;
+          // X: edge-to-edge snapping (left-left, right-right, left-right, right-left)
+          if (!snappedX) {
+            trySnapX(objLeft, oLeft, { x1: oLeft, y1: 0, x2: oLeft, y2: canvasHeight });
           }
-          if (!snappedY && Math.abs(objCenterY - oCY) < SNAP_THRESHOLD) {
-            obj.set({ top: oCY - objH / 2 + offY });
-            guides.push({ x1: 0, y1: oCY, x2: canvasWidth, y2: oCY });
-            snappedY = true;
+          if (!snappedX) {
+            trySnapX(objRight, oRight, { x1: oRight, y1: 0, x2: oRight, y2: canvasHeight });
+          }
+          if (!snappedX) {
+            trySnapX(objLeft, oRight, { x1: oRight, y1: 0, x2: oRight, y2: canvasHeight });
+          }
+          if (!snappedX) {
+            trySnapX(objRight, oLeft, { x1: oLeft, y1: 0, x2: oLeft, y2: canvasHeight });
+          }
+          // X: center-to-center
+          if (!snappedX) {
+            trySnapX(objCenterX, oCX, { x1: oCX, y1: 0, x2: oCX, y2: canvasHeight });
+          }
+
+          // Y: edge-to-edge snapping (top-top, bottom-bottom, top-bottom, bottom-top)
+          if (!snappedY) {
+            trySnapY(objTop, oTop, { x1: 0, y1: oTop, x2: canvasWidth, y2: oTop });
+          }
+          if (!snappedY) {
+            trySnapY(objBottom, oBottom, { x1: 0, y1: oBottom, x2: canvasWidth, y2: oBottom });
+          }
+          if (!snappedY) {
+            trySnapY(objTop, oBottom, { x1: 0, y1: oBottom, x2: canvasWidth, y2: oBottom });
+          }
+          if (!snappedY) {
+            trySnapY(objBottom, oTop, { x1: 0, y1: oTop, x2: canvasWidth, y2: oTop });
+          }
+          // Y: center-to-center
+          if (!snappedY) {
+            trySnapY(objCenterY, oCY, { x1: 0, y1: oCY, x2: canvasWidth, y2: oCY });
           }
         });
       }
