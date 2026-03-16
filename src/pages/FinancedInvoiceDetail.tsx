@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText } from "lucide-react";
+import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X } from "lucide-react";
 import { calculateFinanceFee, formatUSD } from "@/lib/financeUtils";
 
 export default function FinancedInvoiceDetail() {
