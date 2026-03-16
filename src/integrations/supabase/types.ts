@@ -688,6 +688,7 @@ export type Database = {
           paid_back_date: string | null
           status: string
           updated_at: string
+          vendor_po_id: string | null
         }
         Insert: {
           created_at?: string
@@ -702,6 +703,7 @@ export type Database = {
           paid_back_date?: string | null
           status?: string
           updated_at?: string
+          vendor_po_id?: string | null
         }
         Update: {
           created_at?: string
@@ -716,6 +718,7 @@ export type Database = {
           paid_back_date?: string | null
           status?: string
           updated_at?: string
+          vendor_po_id?: string | null
         }
         Relationships: [
           {
@@ -723,6 +726,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financed_invoices_vendor_po_id_fkey"
+            columns: ["vendor_po_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_pos"
             referencedColumns: ["id"]
           },
         ]
