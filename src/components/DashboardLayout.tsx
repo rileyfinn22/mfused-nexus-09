@@ -20,6 +20,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { toast } = useToast();
   const { activeCompany, loading: companyLoading } = useCompany();
   const [loading, setLoading] = useState(true);
+  const isFinanceUser = activeCompany?.role === 'finance';
+
+  // Redirect finance users to /financing if they try to access other pages
+  useEffect(() => {
+    if (!companyLoading && isFinanceUser) {
+      const path = window.location.pathname;
+      if (!path.startsWith('/financing')) {
+        navigate('/financing');
+      }
+    }
+  }, [isFinanceUser, companyLoading, navigate]);
 
   useEffect(() => {
     checkAuth();

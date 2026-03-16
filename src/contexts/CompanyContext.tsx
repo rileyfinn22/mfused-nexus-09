@@ -29,6 +29,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const ROLE_PRECEDENCE = [
     "vibe_admin",
     "company",
+    "finance",
     "vendor",
   ];
 
