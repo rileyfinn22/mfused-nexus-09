@@ -647,6 +647,50 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_repayments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          financed_invoice_id: string
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string | null
+          reference_number: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          financed_invoice_id: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          reference_number?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          financed_invoice_id?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          reference_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_repayments_financed_invoice_id_fkey"
+            columns: ["financed_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "financed_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_share_links: {
         Row: {
           created_at: string
