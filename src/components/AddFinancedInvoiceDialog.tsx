@@ -127,6 +127,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     setSelectedPO(null);
     setSearchQuery("");
     setFinancedAmount("");
+    setRmbAmount("");
     setNotes("");
     setLoading(false);
   };
