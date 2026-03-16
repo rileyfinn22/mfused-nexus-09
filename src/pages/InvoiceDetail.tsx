@@ -1179,8 +1179,9 @@ const InvoiceDetail = () => {
         editedShipping
       );
 
-      // For blanket invoices: never save less than the original order total
-      if (invoice.invoice_type === 'full' && invoice.shipment_number === 1 && order) {
+      // For blanket invoices: only floor to order total if NOTHING has shipped yet
+      const anyShipped = editedItems.some((item: any) => Number(item.shipped_quantity || 0) > 0);
+      if (invoice.invoice_type === 'full' && invoice.shipment_number === 1 && order && !anyShipped) {
         const orderSubtotal = Number(order.subtotal || 0);
         const orderTotal = Number(order.total || 0);
         if (newSubtotal < orderSubtotal) newSubtotal = orderSubtotal;
