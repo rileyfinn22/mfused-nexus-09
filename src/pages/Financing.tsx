@@ -34,6 +34,9 @@ export default function Financing() {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [preselectedVendorPO, setPreselectedVendorPO] = useState<{ id: string; po_number: string; total: number; description: string | null } | null>(null);
   const [activeTab, setActiveTab] = useState("active");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const isVibeAdmin = userRole === "vibe_admin";
   const isFinanceUser = userRole === "finance";
