@@ -192,7 +192,22 @@ export default function Login() {
         } else if (pendingRedirect) {
           navigate(pendingRedirect);
         } else {
-          navigate("/dashboard");
+          // Check if finance-only user
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (currentUser) {
+            const { data: roles } = await supabase
+              .from("user_roles")
+              .select("role")
+              .eq("user_id", currentUser.id);
+            const roleList = (roles || []).map((r: any) => r.role);
+            if (roleList.length === 1 && roleList[0] === "finance") {
+              navigate("/financing");
+            } else {
+              navigate("/dashboard");
+            }
+          } else {
+            navigate("/dashboard");
+          }
         }
       }
     } catch (error: any) {

@@ -10,10 +10,23 @@ const Index = () => {
   useEffect(() => {
     let active = true;
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      if (data.session) navigate("/dashboard", { replace: true });
-    });
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!active || !data.session) return;
+
+      // Check if user is finance-only — send them straight to /financing
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.session.user.id);
+
+      const roleList = (roles || []).map((r: any) => r.role);
+      if (roleList.length === 1 && roleList[0] === "finance") {
+        navigate("/financing", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
+    })();
 
     return () => {
       active = false;
