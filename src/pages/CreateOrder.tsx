@@ -149,6 +149,7 @@ const CreateOrder = () => {
   const [autoSavedOrderId, setAutoSavedOrderId] = useState<string | null>(null);
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [syncingSpecs, setSyncingSpecs] = useState(false);
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState({
