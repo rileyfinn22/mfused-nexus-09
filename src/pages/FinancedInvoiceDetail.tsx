@@ -22,6 +22,8 @@ export default function FinancedInvoiceDetail() {
   const [isFinanceUser, setIsFinanceUser] = useState(false);
   const [editing, setEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [editLogs, setEditLogs] = useState<any[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
 
   // Editable fields
   const [invoiceNumber, setInvoiceNumber] = useState("");
