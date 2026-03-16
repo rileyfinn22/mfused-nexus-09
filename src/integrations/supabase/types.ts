@@ -715,6 +715,38 @@ export type Database = {
           },
         ]
       }
+      financed_invoice_edit_log: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          changes: Json
+          financed_invoice_id: string
+          id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          changes?: Json
+          financed_invoice_id: string
+          id?: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          changes?: Json
+          financed_invoice_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financed_invoice_edit_log_financed_invoice_id_fkey"
+            columns: ["financed_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "financed_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financed_invoices: {
         Row: {
           carrier: string | null
