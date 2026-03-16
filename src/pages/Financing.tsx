@@ -466,6 +466,11 @@ export default function Financing() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* CONFIRMATIONS TAB */}
+        <TabsContent value="confirmations">
+          <FinanceConfirmationsTab isVibeAdmin={isVibeAdmin} isFinanceUser={isFinanceUser} />
+        </TabsContent>
       </Tabs>
 
       {/* Dialogs */}
