@@ -161,12 +161,14 @@ export default function Financing() {
                      const invoice = inv.invoices as any;
                      const order = invoice?.orders as any;
                      const vendorPO = inv.vendor_pos as any;
+                     const poOrder = vendorPO?.orders as any;
+                     const poDesc = vendorPO?.description || poOrder?.description || poOrder?.customer_name || order?.description || order?.customer_name || "—";
                      return (
                        <TableRow key={inv.id}>
                          <TableCell className="font-mono text-sm cursor-pointer hover:underline" onClick={() => vendorPO && navigate(`/vendor-pos/${inv.vendor_po_id}`)}>
                            {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
                          </TableCell>
-                         <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">{vendorPO?.description || "—"}</TableCell>
+                         <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">{poDesc}</TableCell>
                          <TableCell className="font-mono text-sm cursor-pointer hover:underline" onClick={() => invoice && navigate(`/invoices/${inv.invoice_id}`)}>
                            {invoice?.invoice_number || "—"}
                          </TableCell>
