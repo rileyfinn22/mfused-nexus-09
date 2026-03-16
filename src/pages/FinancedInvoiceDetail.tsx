@@ -94,9 +94,17 @@ export default function FinancedInvoiceDetail() {
     setDocuments(data || []);
   };
 
+  const fetchEditLogs = async () => {
+    const { data } = await supabase
+      .from("financed_invoice_edit_log")
+      .select("*")
+      .eq("financed_invoice_id", id!)
+      .order("changed_at", { ascending: false });
+    setEditLogs(data || []);
+  };
+
   const handleSave = async () => {
     setSaving(true);
-    // Auto-generate tracking URL if not manually set
     let finalTrackingUrl = trackingUrl;
     if (!finalTrackingUrl && carrier && trackingNumber) {
       const carrierLower = carrier.toLowerCase().trim();
@@ -109,27 +117,49 @@ export default function FinancedInvoiceDetail() {
       finalTrackingUrl = urlMap[carrierLower] || "";
     }
 
+    const newValues: Record<string, any> = {
+      invoice_number: invoiceNumber || null,
+      notes: notes || null,
+      carrier: carrier || null,
+      tracking_number: trackingNumber || null,
+      tracking_url: finalTrackingUrl || null,
+      shipment_notes: shipmentNotes || null,
+      financed_amount: parseFloat(financedAmount) || 0,
+      financed_amount_rmb: parseFloat(rmbAmount) || 0,
+      exchange_rate: parseFloat(exchangeRate) || 7.2,
+      financed_date: financedDate || record.financed_date,
+      paid_back_amount: parseFloat(paidBackAmount) || 0,
+      status,
+    };
+
+    // Diff changes against current record
+    const changes: Record<string, { from: any; to: any }> = {};
+    for (const key of Object.keys(newValues)) {
+      const oldVal = record[key];
+      const newVal = newValues[key];
+      if (String(oldVal ?? "") !== String(newVal ?? "")) {
+        changes[key] = { from: oldVal, to: newVal };
+      }
+    }
+
     const { error } = await supabase
       .from("financed_invoices")
-      .update({
-        invoice_number: invoiceNumber || null,
-        notes: notes || null,
-        carrier: carrier || null,
-        tracking_number: trackingNumber || null,
-        tracking_url: finalTrackingUrl || null,
-        shipment_notes: shipmentNotes || null,
-        financed_amount: parseFloat(financedAmount) || 0,
-        financed_amount_rmb: parseFloat(rmbAmount) || 0,
-        exchange_rate: parseFloat(exchangeRate) || 7.2,
-        financed_date: financedDate || record.financed_date,
-        paid_back_amount: parseFloat(paidBackAmount) || 0,
-        status,
-      })
+      .update(newValues)
       .eq("id", id!);
 
     if (error) {
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
     } else {
+      // Log changes if any
+      if (Object.keys(changes).length > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        await supabase.from("financed_invoice_edit_log").insert({
+          financed_invoice_id: id!,
+          changed_by: user?.id || null,
+          changes,
+        });
+        fetchEditLogs();
+      }
       toast({ title: "Saved successfully" });
       setTrackingUrl(finalTrackingUrl);
       fetchRecord();
