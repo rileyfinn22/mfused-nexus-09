@@ -391,10 +391,7 @@ export default function Financing() {
         </>
       )}
       {isFinanceUser && (
-        <>
-          <AddFinancedPaymentDialog open={addPaymentOpen} onOpenChange={setAddPaymentOpen} onSuccess={fetchData} />
-          <AcceptFinanceRequestDialog open={acceptOpen} onOpenChange={setAcceptOpen} onSuccess={fetchData} invoice={selectedInvoice} />
-        </>
+        <AcceptFinanceRequestDialog open={acceptOpen} onOpenChange={setAcceptOpen} onSuccess={fetchData} invoice={selectedInvoice} />
       )}
     </div>
   );
