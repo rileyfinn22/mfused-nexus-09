@@ -280,7 +280,30 @@ export default function FinancedInvoiceDetail() {
         </div>
       </div>
 
-      {/* Editable financial fields */}
+      {/* Pending banner for finance users */}
+      {record.finance_status === "pending" && isFinanceUser && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="flex items-center justify-between py-4">
+            <div>
+              <p className="text-sm font-medium">This request is pending your review</p>
+              <p className="text-xs text-muted-foreground">Review the documents and notes below, then accept to activate financing.</p>
+            </div>
+            <Button onClick={() => setAcceptOpen(true)} className="gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Accept & Activate
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {record.finance_status === "pending" && isVibeAdmin && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="py-4">
+            <p className="text-sm font-medium text-amber-600">Pending — awaiting finance company review</p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Financial Details</CardTitle>
