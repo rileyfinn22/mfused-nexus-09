@@ -50,6 +50,7 @@ import PrintWorkshop from "./pages/PrintWorkshop";
 import WorkshopOrderDetail from "./pages/WorkshopOrderDetail";
 import Financing from "./pages/Financing";
 import FinanceView from "./pages/FinanceView";
+import FinancedInvoiceDetail from "./pages/FinancedInvoiceDetail";
 
 const queryClient = new QueryClient();
 
