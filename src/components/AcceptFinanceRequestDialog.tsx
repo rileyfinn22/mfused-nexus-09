@@ -24,6 +24,7 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
   const [financedDate, setFinancedDate] = useState(new Date().toISOString().split("T")[0]);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [notes, setNotes] = useState("");
+  const [sendNotification, setSendNotification] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Pre-fill when invoice changes
