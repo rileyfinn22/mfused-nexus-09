@@ -197,6 +197,7 @@ export function AppSidebar() {
       const role = data?.role as string;
       setIsVibeAdmin(role === 'vibe_admin');
       setIsVendor(role === 'vendor');
+      setIsFinance(role === 'finance');
     }
   };
 
