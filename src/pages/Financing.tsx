@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { calculateFinanceFee, getAgingBadgeVariant, formatUSD } from "@/lib/financeUtils";
 import { AddFinancedInvoiceDialog } from "@/components/AddFinancedInvoiceDialog";
-import { AddFinancedPaymentDialog } from "@/components/AddFinancedPaymentDialog";
+
 import { RecordFinanceRepaymentDialog } from "@/components/RecordFinanceRepaymentDialog";
 import { RecordFinanceDepositDialog } from "@/components/RecordFinanceDepositDialog";
 import { GenerateFinanceLinkDialog } from "@/components/GenerateFinanceLinkDialog";
@@ -26,7 +26,7 @@ export default function Financing() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [addOpen, setAddOpen] = useState(false);
-  const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  
   const [repayOpen, setRepayOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -210,11 +210,6 @@ export default function Financing() {
               </Button>
             </>
           )}
-          {isFinanceUser && (
-            <Button size="sm" onClick={() => setAddPaymentOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Add Invoice Payment
-            </Button>
-          )}
         </div>
       </div>
 
@@ -396,10 +391,7 @@ export default function Financing() {
         </>
       )}
       {isFinanceUser && (
-        <>
-          <AddFinancedPaymentDialog open={addPaymentOpen} onOpenChange={setAddPaymentOpen} onSuccess={fetchData} />
-          <AcceptFinanceRequestDialog open={acceptOpen} onOpenChange={setAcceptOpen} onSuccess={fetchData} invoice={selectedInvoice} />
-        </>
+        <AcceptFinanceRequestDialog open={acceptOpen} onOpenChange={setAcceptOpen} onSuccess={fetchData} invoice={selectedInvoice} />
       )}
     </div>
   );

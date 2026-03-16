@@ -9,8 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X, History } from "lucide-react";
+import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X, History, CheckCircle2 } from "lucide-react";
 import { calculateFinanceFee, formatUSD } from "@/lib/financeUtils";
+import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
 
 export default function FinancedInvoiceDetail() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +25,8 @@ export default function FinancedInvoiceDetail() {
   const [uploading, setUploading] = useState(false);
   const [editLogs, setEditLogs] = useState<any[]>([]);
   const [showLogs, setShowLogs] = useState(false);
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
 
   // Editable fields
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -50,6 +53,7 @@ export default function FinancedInvoiceDetail() {
     if (!data || data.length === 0) { navigate("/dashboard"); return; }
     const roles = data.map((r: any) => r.role);
     const hasVibeAdmin = roles.includes("vibe_admin");
+    setIsVibeAdmin(hasVibeAdmin);
     setIsFinanceUser(!hasVibeAdmin && roles.includes("finance"));
     fetchRecord();
     fetchDocuments();
@@ -276,7 +280,30 @@ export default function FinancedInvoiceDetail() {
         </div>
       </div>
 
-      {/* Editable financial fields */}
+      {/* Pending banner for finance users */}
+      {record.finance_status === "pending" && isFinanceUser && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="flex items-center justify-between py-4">
+            <div>
+              <p className="text-sm font-medium">This request is pending your review</p>
+              <p className="text-xs text-muted-foreground">Review the documents and notes below, then accept to activate financing.</p>
+            </div>
+            <Button onClick={() => setAcceptOpen(true)} className="gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Accept & Activate
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {record.finance_status === "pending" && isVibeAdmin && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="py-4">
+            <p className="text-sm font-medium text-amber-600">Pending — awaiting finance company review</p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Financial Details</CardTitle>
@@ -573,6 +600,16 @@ export default function FinancedInvoiceDetail() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Accept dialog for finance users */}
+      {isFinanceUser && (
+        <AcceptFinanceRequestDialog
+          open={acceptOpen}
+          onOpenChange={setAcceptOpen}
+          onSuccess={() => { fetchRecord(); fetchEditLogs(); }}
+          invoice={record}
+        />
       )}
     </div>
   );
