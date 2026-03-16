@@ -118,7 +118,7 @@ export default function FinancedInvoiceDetail() {
     setRepayments(data || []);
   };
 
-
+  const handleSave = async () => {
     setSaving(true);
     let finalTrackingUrl = trackingUrl;
     if (!finalTrackingUrl && carrier && trackingNumber) {
@@ -579,7 +579,7 @@ export default function FinancedInvoiceDetail() {
       </Card>
 
       {/* Repayment Ledger */}
-      {record.finance_status === "active" && (
+      {(record.finance_status === "active" || record.finance_status === "completed") && (
         <Card>
           <CardHeader className="flex-row items-center justify-between pb-3">
             <CardTitle className="text-sm">Repayment History</CardTitle>
@@ -669,3 +669,4 @@ export default function FinancedInvoiceDetail() {
     </div>
   );
 }
+
