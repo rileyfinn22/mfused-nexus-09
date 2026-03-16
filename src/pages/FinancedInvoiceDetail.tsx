@@ -391,49 +391,72 @@ export default function FinancedInvoiceDetail() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Carrier</Label>
-                <Input
-                  value={carrier}
-                  onChange={(e) => setCarrier(e.target.value)}
-                  placeholder="UPS, FedEx, DHL..."
-                  className="h-8 text-sm"
-                />
+                {editing ? (
+                  <Input
+                    value={carrier}
+                    onChange={(e) => setCarrier(e.target.value)}
+                    placeholder="UPS, FedEx, DHL..."
+                    className="h-8 text-sm"
+                  />
+                ) : (
+                  <p className="text-sm font-medium py-1">{carrier || "—"}</p>
+                )}
               </div>
               <div>
                 <Label className="text-xs">Tracking Number</Label>
-                <Input
-                  value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value)}
-                  placeholder="Tracking #"
-                  className="h-8 text-sm"
-                />
-              </div>
-            </div>
-            <div>
-              <Label className="text-xs">Tracking URL</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={trackingUrl}
-                  onChange={(e) => setTrackingUrl(e.target.value)}
-                  placeholder="Auto-generated or paste URL..."
-                  className="h-8 text-sm"
-                />
-                {trackingUrl && (
-                  <Button size="sm" variant="outline" className="h-8 px-2" asChild>
-                    <a href={trackingUrl} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  </Button>
+                {editing ? (
+                  <Input
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    placeholder="Tracking #"
+                    className="h-8 text-sm"
+                  />
+                ) : (
+                  <p className="text-sm font-medium py-1">{trackingNumber || "—"}</p>
                 )}
               </div>
             </div>
             <div>
+              <Label className="text-xs">Tracking URL</Label>
+              {editing ? (
+                <div className="flex gap-2">
+                  <Input
+                    value={trackingUrl}
+                    onChange={(e) => setTrackingUrl(e.target.value)}
+                    placeholder="Auto-generated or paste URL..."
+                    className="h-8 text-sm"
+                  />
+                  {trackingUrl && (
+                    <Button size="sm" variant="outline" className="h-8 px-2" asChild>
+                      <a href={trackingUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                trackingUrl ? (
+                  <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline py-1 inline-flex items-center gap-1">
+                    {trackingUrl.length > 50 ? trackingUrl.slice(0, 50) + "…" : trackingUrl}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-1">—</p>
+                )
+              )}
+            </div>
+            <div>
               <Label className="text-xs">Shipment Notes</Label>
-              <Textarea
-                value={shipmentNotes}
-                onChange={(e) => setShipmentNotes(e.target.value)}
-                placeholder="Shipment details, ETA, special instructions..."
-                className="min-h-[60px] text-sm"
-              />
+              {editing ? (
+                <Textarea
+                  value={shipmentNotes}
+                  onChange={(e) => setShipmentNotes(e.target.value)}
+                  placeholder="Shipment details, ETA, special instructions..."
+                  className="min-h-[60px] text-sm"
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground py-1 whitespace-pre-wrap">{shipmentNotes || "—"}</p>
+              )}
             </div>
           </CardContent>
         </Card>
