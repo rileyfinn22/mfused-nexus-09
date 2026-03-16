@@ -38,6 +38,7 @@ export default function Financing() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [pendingConfirmations, setPendingConfirmations] = useState(0);
 
   const isVibeAdmin = userRole === "vibe_admin";
   const isFinanceUser = userRole === "finance";
