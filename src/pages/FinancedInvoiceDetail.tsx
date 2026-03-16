@@ -109,7 +109,16 @@ export default function FinancedInvoiceDetail() {
     setEditLogs(data || []);
   };
 
-  const handleSave = async () => {
+  const fetchRepayments = async () => {
+    const { data } = await supabase
+      .from("finance_repayments")
+      .select("*")
+      .eq("financed_invoice_id", id!)
+      .order("payment_date", { ascending: false });
+    setRepayments(data || []);
+  };
+
+
     setSaving(true);
     let finalTrackingUrl = trackingUrl;
     if (!finalTrackingUrl && carrier && trackingNumber) {
