@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles, Paperclip, Clock } from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles, Paperclip, Clock, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -149,6 +149,7 @@ const CreateOrder = () => {
   const [autoSavedOrderId, setAutoSavedOrderId] = useState<string | null>(null);
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [syncingSpecs, setSyncingSpecs] = useState(false);
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState({
@@ -1507,6 +1508,39 @@ const CreateOrder = () => {
     );
   });
 
+  const handleSyncSpecs = async () => {
+    setSyncingSpecs(true);
+    try {
+      const productIds = selectedItems.map(i => i.productId).filter(Boolean);
+      if (productIds.length === 0) { setSyncingSpecs(false); return; }
+
+      const { data: latestProducts } = await supabase
+        .from('products')
+        .select('id, name, item_id, description, state')
+        .in('id', productIds);
+
+      if (latestProducts && latestProducts.length > 0) {
+        const productMap = new Map(latestProducts.map(p => [p.id, p]));
+        setSelectedItems(prev => prev.map(item => {
+          const latest = productMap.get(item.productId);
+          if (latest) {
+            return { ...item, name: latest.name, item_id: latest.item_id, description: latest.description };
+          }
+          return item;
+        }));
+        // Also update the products list in memory
+        setProducts(prev => prev.map(p => {
+          const latest = productMap.get(p.id);
+          return latest ? { ...p, name: latest.name, item_id: latest.item_id, description: latest.description, state: latest.state } : p;
+        }));
+        toast({ title: "Specs synced", description: `Updated specs for ${latestProducts.length} product(s)` });
+      }
+    } catch (err) {
+      toast({ title: "Error syncing specs", variant: "destructive" });
+    }
+    setSyncingSpecs(false);
+  };
+
   const saveOrder = async (isDraft: boolean) => {
     if (selectedItems.length === 0) {
       toast({
@@ -1912,6 +1946,12 @@ const CreateOrder = () => {
             </div>
           </div>
           <div className="flex gap-3">
+            {orderId && (
+              <Button variant="ghost" size="sm" onClick={handleSyncSpecs} disabled={syncingSpecs} title="Update product specs from latest templates">
+                {syncingSpecs ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+                Sync Specs
+              </Button>
+            )}
             <Button variant="outline" onClick={() => saveOrder(true)} disabled={loading}>
               <Save className="h-4 w-4 mr-2" />
               {orderId ? "Update Draft" : "Save Draft"}
