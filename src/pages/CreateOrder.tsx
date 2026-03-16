@@ -1508,6 +1508,39 @@ const CreateOrder = () => {
     );
   });
 
+  const handleSyncSpecs = async () => {
+    setSyncingSpecs(true);
+    try {
+      const productIds = selectedItems.map(i => i.productId).filter(Boolean);
+      if (productIds.length === 0) { setSyncingSpecs(false); return; }
+
+      const { data: latestProducts } = await supabase
+        .from('products')
+        .select('id, name, item_id, description, state')
+        .in('id', productIds);
+
+      if (latestProducts && latestProducts.length > 0) {
+        const productMap = new Map(latestProducts.map(p => [p.id, p]));
+        setSelectedItems(prev => prev.map(item => {
+          const latest = productMap.get(item.productId);
+          if (latest) {
+            return { ...item, name: latest.name, item_id: latest.item_id, description: latest.description };
+          }
+          return item;
+        }));
+        // Also update the products list in memory
+        setProducts(prev => prev.map(p => {
+          const latest = productMap.get(p.id);
+          return latest ? { ...p, name: latest.name, item_id: latest.item_id, description: latest.description, state: latest.state } : p;
+        }));
+        toast({ title: "Specs synced", description: `Updated specs for ${latestProducts.length} product(s)` });
+      }
+    } catch (err) {
+      toast({ title: "Error syncing specs", variant: "destructive" });
+    }
+    setSyncingSpecs(false);
+  };
+
   const saveOrder = async (isDraft: boolean) => {
     if (selectedItems.length === 0) {
       toast({
