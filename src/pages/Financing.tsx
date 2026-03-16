@@ -25,27 +25,23 @@ export default function Financing() {
   const [depositOpen, setDepositOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [preselectedVendorPO, setPreselectedVendorPO] = useState<{ id: string; po_number: string; total: number; description: string | null } | null>(null);
 
   // Check for preselected vendor PO from URL params (e.g. from "Send to Finance" button)
-  const preselectedVendorPO = useMemo(() => {
-    const addPO = searchParams.get("addPO");
-    if (!addPO) return null;
-    return {
-      id: addPO,
-      po_number: searchParams.get("poNumber") || "",
-      total: parseFloat(searchParams.get("poTotal") || "0"),
-      description: searchParams.get("poDesc") || null,
-    };
-  }, [searchParams]);
-
-  // Auto-open dialog when navigated with addPO param
   useEffect(() => {
-    if (preselectedVendorPO && isAdmin) {
+    const addPO = searchParams.get("addPO");
+    if (addPO && isAdmin) {
+      setPreselectedVendorPO({
+        id: addPO,
+        po_number: searchParams.get("poNumber") || "",
+        total: parseFloat(searchParams.get("poTotal") || "0"),
+        description: searchParams.get("poDesc") || null,
+      });
       setAddOpen(true);
-      // Clear URL params after opening
+      // Clear URL params after capturing
       setSearchParams({}, { replace: true });
     }
-  }, [preselectedVendorPO, isAdmin]);
+  }, [searchParams, isAdmin]);
 
   useEffect(() => {
     checkAdmin();
