@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 import { Loader2, AlertTriangle } from "lucide-react";
 import { calculateFinanceFee, getAgingBadgeVariant, formatRMB } from "@/lib/financeUtils";
 import { Toaster } from "@/components/ui/toaster";
@@ -106,58 +106,48 @@ export default function FinanceView() {
         {/* Invoices Table */}
         <Card>
           <CardHeader><CardTitle>融资发票明细</CardTitle></CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {invoices.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">暂无融资记录</p>
             ) : (
-              <div className="overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                       <TableHead>采购单号</TableHead>
-                       <TableHead>描述</TableHead>
-                       <TableHead>发票编号</TableHead>
-                       <TableHead>客户</TableHead>
-                       <TableHead className="text-right">融资金额 (¥)</TableHead>
-                       <TableHead>融资日期</TableHead>
-                       <TableHead>账龄</TableHead>
-                       <TableHead>费率</TableHead>
-                       <TableHead className="text-right">手续费 (¥)</TableHead>
-                       <TableHead className="text-right">已还款 (¥)</TableHead>
-                       <TableHead className="text-right">余额 (¥)</TableHead>
-                       <TableHead>状态</TableHead>
-                     </TableRow>
-                   </TableHeader>
-                   <TableBody>
-                     {invoices.map((inv: any) => {
-                       const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
-                       const rate = inv.exchange_rate || 7.2;
-                       const statusMap: Record<string, string> = { open: "未还", paid: "已还", overdue: "逾期" };
-                       return (
-                         <TableRow key={inv.id}>
-                           <TableCell className="font-mono text-sm">{inv.vendor_po_number ? `PO #${inv.vendor_po_number}` : "—"}</TableCell>
-                           <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">{inv.vendor_po_description || "—"}</TableCell>
-                           <TableCell className="font-mono text-sm">{inv.invoice_number || "—"}</TableCell>
-                           <TableCell>{inv.customer_name || "—"}</TableCell>
-                          <TableCell className="text-right">{formatRMB(inv.financed_amount_rmb)}</TableCell>
-                          <TableCell>{new Date(inv.financed_date).toLocaleDateString("zh-CN")}</TableCell>
-                          <TableCell>
-                            <Badge variant={getAgingBadgeVariant(fee.daysAging)}>{fee.daysAging}天</Badge>
-                          </TableCell>
-                          <TableCell className="text-xs">{fee.feeTier}</TableCell>
-                          <TableCell className="text-right">{formatRMB(fee.feeAmount * rate)}</TableCell>
-                          <TableCell className="text-right">{formatRMB(inv.paid_back_amount * rate)}</TableCell>
-                          <TableCell className="text-right font-semibold">{formatRMB(fee.balance * rate)}</TableCell>
-                          <TableCell>
-                            <Badge variant={inv.status === "paid" ? "default" : inv.status === "overdue" ? "destructive" : "secondary"}>
-                              {statusMap[inv.status] || inv.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
+              <div className="w-full">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-border bg-muted">
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">发票编号</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">描述</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">融资金额 (¥)</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">融资日期</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">账龄</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">费率</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">手续费 (¥)</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">已还款 (¥)</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">余额 (¥)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.map((inv: any, idx: number) => {
+                      const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
+                      const rate = inv.exchange_rate || 7.2;
+                      const desc = inv.vendor_po_description || inv.customer_name || "—";
+                      return (
+                        <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""}`}>
+                          <td className="px-2 py-1.5 font-mono whitespace-nowrap">{inv.invoice_number || inv.vendor_po_number ? `PO #${inv.vendor_po_number}` : "—"}</td>
+                          <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{desc}</td>
+                          <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatRMB(inv.financed_amount_rmb)}</td>
+                          <td className="px-2 py-1.5 whitespace-nowrap">{new Date(inv.financed_date).toLocaleDateString("zh-CN")}</td>
+                          <td className="px-2 py-1.5 text-center">
+                            <Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}天</Badge>
+                          </td>
+                          <td className="px-2 py-1.5 whitespace-nowrap">{fee.feeTier}</td>
+                          <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatRMB(fee.feeAmount * rate)}</td>
+                          <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatRMB(inv.paid_back_amount * rate)}</td>
+                          <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{formatRMB(fee.balance * rate)}</td>
+                        </tr>
                       );
                     })}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             )}
           </CardContent>
