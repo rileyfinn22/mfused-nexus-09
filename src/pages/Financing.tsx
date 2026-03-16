@@ -210,11 +210,6 @@ export default function Financing() {
               </Button>
             </>
           )}
-          {isFinanceUser && (
-            <Button size="sm" onClick={() => setAddPaymentOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Add Invoice Payment
-            </Button>
-          )}
         </div>
       </div>
 
