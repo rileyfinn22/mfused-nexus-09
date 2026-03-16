@@ -79,6 +79,12 @@ export default function Financing() {
     ]);
     setInvoices(invRes.data || []);
     setDeposits(depRes.data || []);
+    // Count pending confirmations
+    const [repConf, depConf] = await Promise.all([
+      supabase.from("finance_repayments").select("id", { count: "exact", head: true }).eq("confirmation_status", "pending"),
+      supabase.from("finance_deposits").select("id", { count: "exact", head: true }).eq("confirmation_status", "pending"),
+    ]);
+    setPendingConfirmations((repConf.count || 0) + (depConf.count || 0));
     setLoading(false);
   };
 
