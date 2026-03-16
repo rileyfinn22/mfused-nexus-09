@@ -59,6 +59,7 @@ export default function FinancedInvoiceDetail() {
     fetchRecord();
     fetchDocuments();
     fetchEditLogs();
+    fetchRepayments();
   };
 
   const fetchRecord = async () => {
