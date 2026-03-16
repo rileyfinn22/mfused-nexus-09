@@ -43,7 +43,6 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
         setFinancedAmount("");
         setRmbAmount("");
       }
-      }
     }
   }, [open, preselectedVendorPO]);
 
