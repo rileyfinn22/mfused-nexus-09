@@ -86,6 +86,7 @@ export function AppSidebar() {
   const { activeCompany } = useCompany();
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
+  const [isFinance, setIsFinance] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   useEffect(() => {
