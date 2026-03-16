@@ -141,7 +141,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Vendor PO to Financing</DialogTitle>
+          <DialogTitle>Submit Vendor PO for Financing</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           {/* Vendor PO Search */}
