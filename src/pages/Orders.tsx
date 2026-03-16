@@ -275,25 +275,7 @@ const Orders = () => {
   }, [companyFilter]);
 
   const draftOrders = filteredOrders.filter(o => o.status.toLowerCase() === 'draft');
-  const pendingOrdersList = filteredOrders.filter(o => 
-    ['pending', 'pending_pull'].includes(o.status.toLowerCase()) ||
-    // Include "in production" orders with 0% progress in pending section
-    (o.status.toLowerCase() === 'in production' && o.productionProgress === 0 && o.order_type !== 'pull_ship' && !o.parent_order_id)
-  );
-  const completedStatuses = ['shipped', 'delivered', 'completed'];
-  const productionOrders = filteredOrders.filter(o => 
-    !['draft', 'pending', 'pending_pull'].includes(o.status.toLowerCase()) &&
-    !completedStatuses.includes(o.status.toLowerCase()) &&
-    o.order_type !== 'pull_ship' &&
-    !o.parent_order_id &&
-    // Exclude 0% progress orders (they show in pending)
-    !(o.status.toLowerCase() === 'in production' && o.productionProgress === 0)
-  );
-  const completedOrders = filteredOrders.filter(o => 
-    completedStatuses.includes(o.status.toLowerCase()) &&
-    o.order_type !== 'pull_ship' &&
-    !o.parent_order_id
-  );
+  const allNonDraftOrders = filteredOrders.filter(o => o.status.toLowerCase() !== 'draft');
 
   return (
     <div className="space-y-6">
@@ -463,143 +445,18 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
           </div>
         )}
 
-        {/* Pending Orders (Awaiting Production) */}
+        {/* All Orders */}
         <div className="space-y-3">
-          <h2 className="text-lg font-medium">Pending Orders - Awaiting Production</h2>
+          <h2 className="text-lg font-medium">All Orders</h2>
           <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-              <div className="bg-muted border-b-2 border-border">
-                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  <div className="col-span-2">Order # / Type</div>
-                  <div className="col-span-1">Date</div>
-                  {isVibeAdmin && <div className="col-span-2">Company</div>}
-                  <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>Description</div>
-                  <div className="col-span-1">Total</div>
-                  <div className="col-span-1">Checklist</div>
-                  <div className="col-span-1">Est. Delivery</div>
-                  <div className="col-span-2">Actions</div>
-                </div>
-              </div>
-            <div className="divide-y divide-border">
-              {loading ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  Loading orders...
-                </div>
-              ) : pendingOrdersList.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  No pending orders
-                </div>
-              ) : pendingOrdersList.map((order) => {
-                const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estimated_delivery_date)?.toLocaleDateString() ?? 'Not set' : 'Not set';
-                const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
-                const OrderIcon = orderTypeInfo.icon;
-                
-                return (
-                  <div 
-                    key={order.id} 
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors even:bg-muted/40"
-                  >
-                    <div className="col-span-2 space-y-1">
-                      <div className="font-medium font-mono text-base">{order.order_number}</div>
-                      {orderTypeInfo.show && (
-                        <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
-                          <OrderIcon className="h-2.5 w-2.5" />
-                          {orderTypeInfo.label}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="col-span-1 text-sm text-muted-foreground">
-                      {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
-                    </div>
-                    {isVibeAdmin && (
-                      <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
-                    )}
-                    <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
-                      <EditableDescription 
-                        value={order.description} 
-                        onSave={(text) => handleDescriptionChange(order.id, text)} 
-                      />
-                    </div>
-                    <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
-                    <div className="col-span-1">
-                      <div className="flex gap-1 items-center">
-                        <div className="flex items-center" title="Art Approved">
-                          {order.artApproved ? (
-                            <CheckCircle className="h-3.5 w-3.5 text-success" />
-                          ) : (
-                            <Circle className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="flex items-center" title="Order Finalized">
-                          {order.order_finalized ? (
-                            <CheckCircle className="h-3.5 w-3.5 text-success" />
-                          ) : (
-                            <Circle className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="flex items-center" title="Vibe Processed">
-                          {order.vibe_processed ? (
-                            <CheckCircle className="h-3.5 w-3.5 text-success" />
-                          ) : (
-                            <Circle className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-span-1 text-sm text-muted-foreground">
-                      {estDelivery}
-                    </div>
-                    <div className="col-span-2 flex gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 w-6 p-0"
-                        onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
-                        title="View Order"
-                      >
-                        <Eye className="h-3 w-3" />
-                      </Button>
-                      {canEditOrder(order) && (
-                        <>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-6 w-6 p-0"
-                            onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/edit/${order.id}`)}
-                            title="Edit Order"
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                            onClick={(e) => confirmDelete(order.id, e)}
-                            title="Delete Order"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Production Orders */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-medium">Orders in Production</h2>
-          <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-          <div className="bg-muted border-b-2 border-border">
+            <div className="bg-muted border-b-2 border-border">
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-2">Order # / Type</div>
                 <div className="col-span-1">Date</div>
                 {isVibeAdmin && <div className="col-span-1">Company</div>}
                 <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Description</div>
                 <div className="col-span-1">Total</div>
-                <div className="col-span-2">Progress</div>
+                <div className="col-span-2">Status / Progress</div>
                 <div className="col-span-1">Est. Delivery</div>
                 <div className="col-span-2">Actions</div>
               </div>
@@ -609,12 +466,11 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                 <div className="text-center py-12 text-muted-foreground">
                   Loading orders...
                 </div>
-              ) : productionOrders.length === 0 ? (
+              ) : allNonDraftOrders.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  No orders in production
+                  No orders found
                 </div>
-              ) : productionOrders.map((order) => {
-                // Use actual production progress for "in production" orders, otherwise use status-based progress
+              ) : allNonDraftOrders.map((order) => {
                 const progress = order.status === 'in production' && order.productionProgress !== undefined 
                   ? order.productionProgress 
                   : getProgressForStatus(order.status);
@@ -626,6 +482,8 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                   : null;
                 const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
                 const OrderIcon = orderTypeInfo.icon;
+                const completedStatuses = ['shipped', 'delivered', 'completed'];
+                const isCompleted = completedStatuses.includes(order.status.toLowerCase());
                 
                 return (
                   <div 
@@ -655,11 +513,45 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                     </div>
                     <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
                     <div className="col-span-2 space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className={`capitalize ${getStatusColor(order.status)}`}>{order.status.replace('_', ' ')}</span>
-                        <span className="text-muted-foreground">{progress}%</span>
-                      </div>
-                      <Progress value={progress} className="h-1" />
+                      {isCompleted ? (
+                        <Badge variant="success" className="flex items-center gap-1 w-fit">
+                          <CheckCircle className="h-3 w-3" />
+                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                        </Badge>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-xs">
+                            <span className={`capitalize ${getStatusColor(order.status)}`}>{order.status.replace('_', ' ')}</span>
+                            {progress > 0 && <span className="text-muted-foreground">{progress}%</span>}
+                          </div>
+                          {progress > 0 && <Progress value={progress} className="h-1" />}
+                          {!isCompleted && ['pending', 'pending_pull'].includes(order.status.toLowerCase()) && (
+                            <div className="flex gap-1 items-center mt-0.5">
+                              <div className="flex items-center" title="Art Approved">
+                                {order.artApproved ? (
+                                  <CheckCircle className="h-3 w-3 text-success" />
+                                ) : (
+                                  <Circle className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </div>
+                              <div className="flex items-center" title="Order Finalized">
+                                {order.order_finalized ? (
+                                  <CheckCircle className="h-3 w-3 text-success" />
+                                ) : (
+                                  <Circle className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </div>
+                              <div className="flex items-center" title="Vibe Processed">
+                                {order.vibe_processed ? (
+                                  <CheckCircle className="h-3 w-3 text-success" />
+                                ) : (
+                                  <Circle className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                     <div className="col-span-1">
                       {estDelivery ? (
@@ -712,86 +604,6 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
             </div>
           </div>
         </div>
-
-        {/* Completed Orders */}
-        {completedOrders.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-lg font-medium">Completed Orders</h2>
-            <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-              <div className="bg-muted border-b-2 border-border">
-                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  <div className="col-span-2">Order # / Type</div>
-                  <div className="col-span-1">Date</div>
-                  {isVibeAdmin && <div className="col-span-1">Company</div>}
-                  <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Description</div>
-                  <div className="col-span-1">Total</div>
-                  <div className="col-span-2">Status</div>
-                  <div className="col-span-1">Completed</div>
-                  <div className="col-span-2">Actions</div>
-                </div>
-              </div>
-              <div className="divide-y divide-border">
-                {completedOrders.map((order) => {
-                  const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
-                  const OrderIcon = orderTypeInfo.icon;
-                  const completionDate = order.updated_at ? new Date(order.updated_at).toLocaleDateString() : '-';
-                  
-                  return (
-                    <div 
-                      key={order.id} 
-                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors even:bg-muted/40"
-                    >
-                      <div className="col-span-2 space-y-1">
-                        <div className="font-medium font-mono text-base">{order.order_number}</div>
-                        {orderTypeInfo.show && (
-                          <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
-                            <OrderIcon className="h-2.5 w-2.5" />
-                            {orderTypeInfo.label}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="col-span-1 text-sm text-muted-foreground">
-                        {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
-                      </div>
-                      {isVibeAdmin && (
-                        <div className="col-span-1 text-sm font-medium truncate">{order.companies?.name || '-'}</div>
-                      )}
-                      <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>
-                        <EditableDescription 
-                          value={order.description} 
-                          onSave={(text) => handleDescriptionChange(order.id, text)} 
-                        />
-                      </div>
-                      <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
-                      <div className="col-span-2 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="success" className="flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3" />
-                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="col-span-1 text-sm text-success font-medium">
-                        {completionDate}
-                      </div>
-                      <div className="col-span-2 flex gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 w-6 p-0"
-                          onClick={() => navigate(order.order_type === 'pull_ship' ? `/pull-ship-orders/${order.id}` : `/orders/${order.id}`)}
-                          title="View Order"
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <AlertDialog open={deleteOrderId !== null} onOpenChange={(open) => !open && setDeleteOrderId(null)}>
