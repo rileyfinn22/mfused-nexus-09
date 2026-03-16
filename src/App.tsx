@@ -97,6 +97,7 @@ const App = () => (
            <Route path="/chat" element={<DashboardLayout><Chat /></DashboardLayout>} />
            <Route path="/print-workshop" element={<DashboardLayout><PrintWorkshop /></DashboardLayout>} />
            <Route path="/print-workshop/orders/:orderId" element={<DashboardLayout><WorkshopOrderDetail /></DashboardLayout>} />
+           <Route path="/financing" element={<DashboardLayout><Financing /></DashboardLayout>} />
           <Route path="/projects" element={<DashboardLayout><Projects /></DashboardLayout>} />
           <Route path="/projects/:projectId" element={<DashboardLayout><ProjectDetail /></DashboardLayout>} />
           
