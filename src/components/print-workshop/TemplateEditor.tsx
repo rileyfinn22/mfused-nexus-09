@@ -496,8 +496,16 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         // Force re-measure all text objects now that fonts are loaded
         canvas.getObjects().forEach((obj: any) => {
           if (obj.type === 'i-text' || obj.type === 'textbox' || obj.type === 'text') {
+            // Normalize origin to left/top for consistent positioning across save/load
+            if (obj.originX !== 'left' || obj.originY !== 'top') {
+              obj.set({ originX: 'left', originY: 'top' });
+            }
+            // Preserve position across re-measurement to prevent nudging
+            const savedLeft = obj.left;
+            const savedTop = obj.top;
             obj.set({ dirty: true });
             obj.initDimensions?.();
+            obj.set({ left: savedLeft, top: savedTop });
             obj.setCoords?.();
           }
         });
@@ -735,6 +743,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       fontFamily: "Arial",
       fill: "#000000",
       editable: true,
+      originX: "left",
+      originY: "top",
     });
     (text as any).locked = !editable;
     (text as any).editable = editable;
@@ -998,6 +1008,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
           fill: region.color || "#000000",
           editable: true,
           padding: 0,
+          originX: "left",
+          originY: "top",
         });
         (textObj as any)._fontSizePt = fontSizePtVal;
         (textObj as any).locked = true;
@@ -1353,6 +1365,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             fill: detectedColor,
             editable: true,
             padding: 0,
+            originX: "left",
+            originY: "top",
           });
           (text as any)._fontSizePt = finalFontSizePt;
           (text as any).locked = isLocked;
@@ -1489,6 +1503,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             editable: true,
             padding: 4,
             width: w,
+            originX: "left",
+            originY: "top",
           } as any);
           (textObj as any).locked = !isEditable;
           (textObj as any).editable = isEditable;
@@ -1926,6 +1942,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       fill,
       editable: true,
       padding: 4,
+      originX: "left",
+      originY: "top",
     });
     (newText as any).locked = false;
     (newText as any).editable = true;
