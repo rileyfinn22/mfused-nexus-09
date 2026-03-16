@@ -41,7 +41,7 @@ export default function Financing() {
   const fetchData = async () => {
     setLoading(true);
     const [invRes, depRes] = await Promise.all([
-      supabase.from("financed_invoices").select("*, invoices(invoice_number, total, orders(order_number, customer_name))").order("financed_date", { ascending: false }),
+      supabase.from("financed_invoices").select("*, invoices(invoice_number, total, orders(order_number, customer_name)), vendor_pos(po_number, description, total)").order("financed_date", { ascending: false }),
       supabase.from("finance_deposits").select("*").order("payment_date", { ascending: false }),
     ]);
     setInvoices(invRes.data || []);
