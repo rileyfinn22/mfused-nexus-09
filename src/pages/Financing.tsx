@@ -347,6 +347,9 @@ export default function Financing() {
             <TabsTrigger value="completed" className="gap-1.5">
               Completed {completedInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{completedInvoices.length}</Badge>}
             </TabsTrigger>
+            <TabsTrigger value="confirmations" className="gap-1.5">
+              Confirmations {pendingConfirmations > 0 && <Badge variant="warning" className="text-[10px] px-1.5 py-0 ml-1">{pendingConfirmations}</Badge>}
+            </TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={fetchData}><RefreshCw className="h-4 w-4" /></Button>
