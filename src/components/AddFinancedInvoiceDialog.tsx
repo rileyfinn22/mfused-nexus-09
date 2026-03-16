@@ -25,6 +25,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
   const [exchangeRate, setExchangeRate] = useState("7.2");
   const [financedDate, setFinancedDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
+  const [sendNotification, setSendNotification] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingPOs, setLoadingPOs] = useState(false);
 
