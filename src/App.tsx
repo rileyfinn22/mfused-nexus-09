@@ -48,6 +48,8 @@ import ShipmentUpdate from "./pages/ShipmentUpdate";
 import Chat from "./pages/Chat";
 import PrintWorkshop from "./pages/PrintWorkshop";
 import WorkshopOrderDetail from "./pages/WorkshopOrderDetail";
+import Financing from "./pages/Financing";
+import FinanceView from "./pages/FinanceView";
 
 const queryClient = new QueryClient();
 
