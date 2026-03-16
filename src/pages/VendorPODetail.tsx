@@ -784,22 +784,34 @@ const VendorPODetail = () => {
 
     // ============ TOTALS SECTION ============
     const finalY = (doc as any).lastAutoTable.finalY + 10;
-    const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+    const itemsTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+    const shippingCost = Number(po.shipping_cost || 0);
+    const totalAmount = itemsTotal + shippingCost;
     
     const totalsWidth = 80;
     const totalsX = pageWidth - totalsWidth - 14;
     
-    // Divider line before total
+    if (shippingCost > 0) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text('Subtotal', totalsX, finalY + 4);
+      doc.text(`$${itemsTotal.toFixed(2)}`, pageWidth - 14, finalY + 4, { align: 'right' });
+      
+      doc.text('Shipping', totalsX, finalY + 12);
+      doc.text(`$${shippingCost.toFixed(2)}`, pageWidth - 14, finalY + 12, { align: 'right' });
+    }
+    
+    const totalLineY = shippingCost > 0 ? finalY + 16 : finalY;
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.3);
-    doc.line(totalsX, finalY, pageWidth - 14, finalY);
+    doc.line(totalsX, totalLineY, pageWidth - 14, totalLineY);
     
-    // Total - emphasized
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('TOTAL', totalsX, finalY + 8);
-    doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - 14, finalY + 8, { align: 'right' });
+    doc.text('TOTAL', totalsX, totalLineY + 8);
+    doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - 14, totalLineY + 8, { align: 'right' });
 
     // ============ FOOTER ============
     const footerY = Math.max(finalY + 30, pageHeight - 20);
