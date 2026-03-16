@@ -984,6 +984,10 @@ Thank you for your business.`;
                 <DollarSign className="h-4 w-4 mr-2" />
                 Record Payment
               </Button>
+              <Button variant="outline" onClick={() => navigate(`/financing?addPO=${po.id}&poNumber=${po.po_number}&poTotal=${po.total}&poDesc=${encodeURIComponent(po.description || '')}`)}>
+                <Banknote className="h-4 w-4 mr-2" />
+                Send to Finance
+              </Button>
             </>
           )}
           {vendor?.contact_email && (

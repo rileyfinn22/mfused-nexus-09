@@ -135,15 +135,19 @@ export default function Financing() {
                 <TableBody>
                   {invoices.map((inv) => {
                     const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
-                    const invoice = inv.invoices as any;
-                    const order = invoice?.orders as any;
-                    return (
-                      <TableRow key={inv.id}>
-                        <TableCell className="font-mono text-sm cursor-pointer hover:underline" onClick={() => invoice && navigate(`/invoices/${inv.invoice_id}`)}>
-                          {invoice?.invoice_number || "—"}
-                        </TableCell>
-                        <TableCell>{order?.order_number || "—"}</TableCell>
-                        <TableCell>{order?.customer_name || "—"}</TableCell>
+                     const invoice = inv.invoices as any;
+                     const order = invoice?.orders as any;
+                     const vendorPO = inv.vendor_pos as any;
+                     return (
+                       <TableRow key={inv.id}>
+                         <TableCell className="font-mono text-sm cursor-pointer hover:underline" onClick={() => vendorPO && navigate(`/vendor-pos/${inv.vendor_po_id}`)}>
+                           {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
+                         </TableCell>
+                         <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">{vendorPO?.description || "—"}</TableCell>
+                         <TableCell className="font-mono text-sm cursor-pointer hover:underline" onClick={() => invoice && navigate(`/invoices/${inv.invoice_id}`)}>
+                           {invoice?.invoice_number || "—"}
+                         </TableCell>
+                         <TableCell>{order?.customer_name || "—"}</TableCell>
                         <TableCell className="text-right">{formatUSD(inv.financed_amount)}</TableCell>
                         <TableCell>{new Date(inv.financed_date).toLocaleDateString()}</TableCell>
                         <TableCell>
