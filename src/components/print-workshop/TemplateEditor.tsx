@@ -98,12 +98,27 @@ const FONT_OPTIONS = [
 
 const loadedFonts = new Set<string>();
 
+// Web-safe fonts that exist on all platforms and don't need Google loading
+const WEB_SAFE_FONTS = new Set([
+  "Arial", "Verdana", "Georgia", "Times New Roman", "Courier New", "Impact",
+  "Trebuchet MS", "Comic Sans MS", "Tahoma", "Lucida Console",
+]);
+
+// Fonts that only exist on specific OS — map to cross-platform Google Font equivalents
+const PLATFORM_FONT_SUBSTITUTES: Record<string, string> = {
+  "Helvetica": "Inter",           // Helvetica only on Mac; Inter is a close cross-platform match
+  "Helvetica Neue": "Inter",
+  "San Francisco": "Inter",
+  "Segoe UI": "Inter",
+  "Lucida Grande": "Nunito Sans",
+};
+
 function loadGoogleFont(fontFamily: string): Promise<void> {
   if (loadedFonts.has(fontFamily)) return Promise.resolve();
   return new Promise((resolve) => {
     const encoded = fontFamily.replace(/ /g, "+");
     const link = document.createElement("link");
-    link.href = `https://fonts.googleapis.com/css2?family=${encoded}:wght@400;700&display=swap`;
+    link.href = `https://fonts.googleapis.com/css2?family=${encoded}:wght@100;200;300;400;500;600;700;800;900&display=swap`;
     link.rel = "stylesheet";
     link.onload = () => {
       loadedFonts.add(fontFamily);
