@@ -100,6 +100,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
       exchange_rate: rate,
       financed_date: financedDate,
       notes: notes || null,
+      finance_status: "pending",
     });
 
     if (error) {
@@ -108,22 +109,10 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
       return;
     }
 
-    // 2. Auto-record vendor PO payment so it shows as paid in bills/projects
-    const { data: { user } } = await supabase.auth.getUser();
-    const companyId = selectedPO.company_id;
-    if (companyId) {
-      await supabase.from("vendor_po_payments").insert({
-        vendor_po_id: selectedPO.id,
-        company_id: companyId,
-        amount: amt,
-        payment_method: "financing",
-        payment_date: financedDate,
-        notes: `Paid via PO financing${notes ? ` - ${notes}` : ""}`,
-        created_by: user?.id || null,
-      });
-    }
+    // Note: vendor PO payment is NOT recorded at pending stage.
+    // It will be recorded when the finance company accepts and activates the request.
 
-    toast({ title: "Vendor PO added to financing & marked as paid" });
+    toast({ title: "Vendor PO submitted for financing (pending approval)" });
     onSuccess();
     onOpenChange(false);
     setSelectedPO(null);
@@ -140,7 +129,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Vendor PO to Financing</DialogTitle>
+          <DialogTitle>Submit Vendor PO for Financing</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           {/* Vendor PO Search */}
@@ -242,7 +231,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
           </div>
           <Button onClick={handleSubmit} disabled={loading || !selectedPO || !financedAmount} className="w-full">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Add to Financing
+            Submit for Financing
           </Button>
         </div>
       </DialogContent>

@@ -33,14 +33,21 @@ export function RecordFinanceRepaymentDialog({ open, onOpenChange, onSuccess, in
     const newPaidBack = invoice.paid_back_amount + amt;
     const fullyPaid = newPaidBack >= invoice.financed_amount;
 
+    const updateData: Record<string, any> = {
+      paid_back_amount: newPaidBack,
+      status: fullyPaid ? "paid" : "open",
+      paid_back_date: fullyPaid ? new Date().toISOString() : null,
+    };
+    if (fullyPaid) {
+      updateData.finance_status = "completed";
+    }
+    if (notes) {
+      updateData.notes = `${invoice.invoice_number || ""} repayment: ${notes}`;
+    }
+
     const { error } = await supabase
       .from("financed_invoices")
-      .update({
-        paid_back_amount: newPaidBack,
-        status: fullyPaid ? "paid" : "open",
-        paid_back_date: fullyPaid ? new Date().toISOString() : null,
-        notes: notes ? `${invoice.invoice_number || ""} repayment: ${notes}` : undefined,
-      })
+      .update(updateData)
       .eq("id", invoice.id);
 
     if (error) {
