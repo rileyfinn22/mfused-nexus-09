@@ -100,6 +100,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
       exchange_rate: rate,
       financed_date: financedDate,
       notes: notes || null,
+      finance_status: "pending",
     });
 
     if (error) {
