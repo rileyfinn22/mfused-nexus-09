@@ -45,6 +45,9 @@ export default function FinancedInvoiceDetail() {
     if (!user) { navigate("/login"); return; }
     const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).in("role", ["vibe_admin", "finance"]);
     if (!data || data.length === 0) { navigate("/dashboard"); return; }
+    const roles = data.map((r: any) => r.role);
+    const hasVibeAdmin = roles.includes("vibe_admin");
+    setIsFinanceUser(!hasVibeAdmin && roles.includes("finance"));
     fetchRecord();
     fetchDocuments();
   };
