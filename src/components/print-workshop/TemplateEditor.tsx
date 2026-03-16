@@ -441,7 +441,32 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         if (safeCanvasData?.backgroundImage?.src?.startsWith("blob:")) {
           delete safeCanvasData.backgroundImage;
         }
+
+        // Pre-load all Google Fonts used in the canvas BEFORE restoring objects
+        // so text measurements are correct on every device (not just the designer's cached browser).
+        if (Array.isArray(safeCanvasData.objects)) {
+          const fontFamilies = new Set<string>();
+          safeCanvasData.objects.forEach((obj: any) => {
+            if (obj?.fontFamily && typeof obj.fontFamily === "string") {
+              fontFamilies.add(obj.fontFamily);
+            }
+          });
+          const googleFontEntries = FONT_OPTIONS.filter(f => f.google && fontFamilies.has(f.value));
+          if (googleFontEntries.length > 0) {
+            await Promise.all(googleFontEntries.map(f => loadGoogleFont(f.value)));
+          }
+        }
+
         await canvas.loadFromJSON(safeCanvasData);
+
+        // Force re-measure all text objects now that fonts are loaded
+        canvas.getObjects().forEach((obj: any) => {
+          if (obj.type === 'i-text' || obj.type === 'textbox' || obj.type === 'text') {
+            obj.set({ dirty: true });
+            obj.initDimensions?.();
+            obj.setCoords?.();
+          }
+        });
       }
 
       // Remove any persisted trim guides / old text covers from older saves.
