@@ -277,13 +277,13 @@ export default function Financing() {
       </div>
 
       {/* Summary Cards — only active entries */}
-      <div className={`grid grid-cols-1 gap-4 ${isVibeAdmin ? "md:grid-cols-5" : "md:grid-cols-3"}`}>
+      <div className={`grid grid-cols-1 gap-4 ${isVibeAdmin ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Active Financed</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-24" /> : formatUSD(totalFinanced)}</p></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Outstanding</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Armropak Outstanding</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold text-amber-500">{loading ? <Skeleton className="h-8 w-24" /> : formatUSD(totalOutstanding)}</p></CardContent>
         </Card>
         {isVibeAdmin && (
@@ -320,16 +320,6 @@ export default function Financing() {
                 </PopoverContent>
               </Popover>
             </CardContent>
-          </Card>
-        )}
-        {isVibeAdmin && (
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-1">
-              {depositShortfall > 0 && <AlertTriangle className="h-3 w-3 text-destructive" />} Deposit Shortfall
-            </CardTitle></CardHeader>
-            <CardContent><p className={`text-2xl font-bold ${depositShortfall > 0 ? "text-destructive" : "text-green-500"}`}>
-              {loading ? <Skeleton className="h-8 w-24" /> : depositShortfall > 0 ? formatUSD(depositShortfall) : "—"}
-            </p></CardContent>
           </Card>
         )}
         <Card>
