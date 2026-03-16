@@ -91,7 +91,7 @@ export default function Financing() {
             <Banknote className="mr-2 h-4 w-4" /> Record Deposit
           </Button>
           <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Add Invoice
+            <Plus className="mr-2 h-4 w-4" /> Add Vendor PO
           </Button>
         </div>
       </div>
