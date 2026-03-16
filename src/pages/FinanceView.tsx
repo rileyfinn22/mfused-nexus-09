@@ -114,29 +114,31 @@ export default function FinanceView() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>发票编号</TableHead>
-                      <TableHead>订单编号</TableHead>
-                      <TableHead>客户</TableHead>
-                      <TableHead className="text-right">融资金额 (¥)</TableHead>
-                      <TableHead>融资日期</TableHead>
-                      <TableHead>账龄</TableHead>
-                      <TableHead>费率</TableHead>
-                      <TableHead className="text-right">手续费 (¥)</TableHead>
-                      <TableHead className="text-right">已还款 (¥)</TableHead>
-                      <TableHead className="text-right">余额 (¥)</TableHead>
-                      <TableHead>状态</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {invoices.map((inv: any) => {
-                      const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
-                      const rate = inv.exchange_rate || 7.2;
-                      const statusMap: Record<string, string> = { open: "未还", paid: "已还", overdue: "逾期" };
-                      return (
-                        <TableRow key={inv.id}>
-                          <TableCell className="font-mono text-sm">{inv.invoice_number || "—"}</TableCell>
-                          <TableCell>{inv.order_number || "—"}</TableCell>
-                          <TableCell>{inv.customer_name || "—"}</TableCell>
+                       <TableHead>采购单号</TableHead>
+                       <TableHead>描述</TableHead>
+                       <TableHead>发票编号</TableHead>
+                       <TableHead>客户</TableHead>
+                       <TableHead className="text-right">融资金额 (¥)</TableHead>
+                       <TableHead>融资日期</TableHead>
+                       <TableHead>账龄</TableHead>
+                       <TableHead>费率</TableHead>
+                       <TableHead className="text-right">手续费 (¥)</TableHead>
+                       <TableHead className="text-right">已还款 (¥)</TableHead>
+                       <TableHead className="text-right">余额 (¥)</TableHead>
+                       <TableHead>状态</TableHead>
+                     </TableRow>
+                   </TableHeader>
+                   <TableBody>
+                     {invoices.map((inv: any) => {
+                       const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
+                       const rate = inv.exchange_rate || 7.2;
+                       const statusMap: Record<string, string> = { open: "未还", paid: "已还", overdue: "逾期" };
+                       return (
+                         <TableRow key={inv.id}>
+                           <TableCell className="font-mono text-sm">{inv.vendor_po_number ? `PO #${inv.vendor_po_number}` : "—"}</TableCell>
+                           <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">{inv.vendor_po_description || "—"}</TableCell>
+                           <TableCell className="font-mono text-sm">{inv.invoice_number || "—"}</TableCell>
+                           <TableCell>{inv.customer_name || "—"}</TableCell>
                           <TableCell className="text-right">{formatRMB(inv.financed_amount_rmb)}</TableCell>
                           <TableCell>{new Date(inv.financed_date).toLocaleDateString("zh-CN")}</TableCell>
                           <TableCell>
