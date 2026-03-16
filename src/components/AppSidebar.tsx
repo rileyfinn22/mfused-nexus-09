@@ -181,6 +181,7 @@ export function AppSidebar() {
     if (activeCompany) {
       setIsVibeAdmin(activeCompany.role === 'vibe_admin');
       setIsVendor(activeCompany.role === 'vendor');
+      setIsFinance(activeCompany.role === 'finance');
       return;
     }
 
