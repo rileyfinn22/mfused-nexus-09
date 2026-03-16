@@ -53,6 +53,7 @@ export default function FinancedInvoiceDetail() {
     if (!data || data.length === 0) { navigate("/dashboard"); return; }
     const roles = data.map((r: any) => r.role);
     const hasVibeAdmin = roles.includes("vibe_admin");
+    setIsVibeAdmin(hasVibeAdmin);
     setIsFinanceUser(!hasVibeAdmin && roles.includes("finance"));
     fetchRecord();
     fetchDocuments();
