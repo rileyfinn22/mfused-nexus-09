@@ -27,6 +27,7 @@ export default function FinancedInvoiceDetail() {
   const [showLogs, setShowLogs] = useState(false);
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [repayments, setRepayments] = useState<any[]>([]);
 
   // Editable fields
   const [invoiceNumber, setInvoiceNumber] = useState("");
