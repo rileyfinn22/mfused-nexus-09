@@ -754,6 +754,7 @@ export type Database = {
           created_by_role: string | null
           description: string | null
           exchange_rate: number
+          finance_status: string
           financed_amount: number
           financed_amount_rmb: number
           financed_date: string
@@ -776,6 +777,7 @@ export type Database = {
           created_by_role?: string | null
           description?: string | null
           exchange_rate?: number
+          finance_status?: string
           financed_amount?: number
           financed_amount_rmb?: number
           financed_date?: string
@@ -798,6 +800,7 @@ export type Database = {
           created_by_role?: string | null
           description?: string | null
           exchange_rate?: number
+          finance_status?: string
           financed_amount?: number
           financed_amount_rmb?: number
           financed_date?: string
