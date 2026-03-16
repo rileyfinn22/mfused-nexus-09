@@ -601,6 +601,16 @@ export default function FinancedInvoiceDetail() {
           )}
         </div>
       )}
+
+      {/* Accept dialog for finance users */}
+      {isFinanceUser && (
+        <AcceptFinanceRequestDialog
+          open={acceptOpen}
+          onOpenChange={setAcceptOpen}
+          onSuccess={() => { fetchRecord(); fetchEditLogs(); }}
+          invoice={record}
+        />
+      )}
     </div>
   );
 }
