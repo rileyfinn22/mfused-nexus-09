@@ -711,7 +711,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     }
 
     // Smart snapping guidelines
-    const SNAP_THRESHOLD = 12; // pixels in canvas coords
+    const SNAP_THRESHOLD = 6; // pixels in canvas coords – reduced to prevent "magnet repel" feel
     canvas.on("object:moving", (e) => {
       const obj = e.target;
       if (!obj) return;
