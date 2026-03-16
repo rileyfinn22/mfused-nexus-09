@@ -496,6 +496,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         // Force re-measure all text objects now that fonts are loaded
         canvas.getObjects().forEach((obj: any) => {
           if (obj.type === 'i-text' || obj.type === 'textbox' || obj.type === 'text') {
+            // Normalize origin to left/top for consistent positioning across save/load
+            if (obj.originX !== 'left' || obj.originY !== 'top') {
+              obj.set({ originX: 'left', originY: 'top' });
+            }
             // Preserve position across re-measurement to prevent nudging
             const savedLeft = obj.left;
             const savedTop = obj.top;
