@@ -604,14 +604,6 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
             </div>
           </div>
         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <AlertDialog open={deleteOrderId !== null} onOpenChange={(open) => !open && setDeleteOrderId(null)}>
