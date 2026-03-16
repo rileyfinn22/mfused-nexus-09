@@ -50,7 +50,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     setLoadingPOs(true);
     const { data } = await supabase
       .from("vendor_pos")
-      .select("id, po_number, total, description, notes, vendor_id, company_id, vendors(name), orders(order_number, customer_name), vendor_po_items(name)")
+      .select("id, po_number, total, description, notes, vendor_id, company_id, vendors(name), orders(order_number, customer_name, description), vendor_po_items(name)")
       .order("created_at", { ascending: false })
       .limit(500);
     setVendorPOs(data || []);
@@ -64,10 +64,12 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
       const itemNames = Array.isArray(po.vendor_po_items)
         ? (po.vendor_po_items as any[]).map((i: any) => i.name?.toLowerCase() || "").join(" ")
         : "";
+      const orderDesc = (po.orders as any)?.description?.toLowerCase() || "";
       return (
         po.po_number?.toLowerCase().includes(q) ||
         po.description?.toLowerCase().includes(q) ||
         po.notes?.toLowerCase().includes(q) ||
+        orderDesc.includes(q) ||
         itemNames.includes(q) ||
         (po.orders as any)?.order_number?.toLowerCase().includes(q) ||
         (po.orders as any)?.customer_name?.toLowerCase().includes(q) ||
@@ -188,7 +190,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
                           <span className="text-muted-foreground">${po.total?.toFixed(2)}</span>
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {po.description || (po.orders as any)?.customer_name || "—"}
+                          {po.description || (po.orders as any)?.description || (po.orders as any)?.customer_name || "—"}
                           {(po.vendors as any)?.name && ` • ${(po.vendors as any).name}`}
                         </div>
                       </button>
