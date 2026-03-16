@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, DollarSign, AlertTriangle, Banknote, Link2, RefreshCw } from "lucide-react";
+import { Plus, DollarSign, AlertTriangle, Banknote, Link2, RefreshCw, ChevronDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { calculateFinanceFee, getAgingBadgeVariant, formatUSD } from "@/lib/financeUtils";
 import { AddFinancedInvoiceDialog } from "@/components/AddFinancedInvoiceDialog";
 import { RecordFinanceRepaymentDialog } from "@/components/RecordFinanceRepaymentDialog";
@@ -111,7 +112,33 @@ export default function Financing() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Deposit Balance</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold text-green-500">{loading ? <Skeleton className="h-8 w-24" /> : formatUSD(currentDeposit)}</p></CardContent>
+          <CardContent>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="flex items-center gap-1 text-2xl font-bold text-green-500 hover:underline cursor-pointer">
+                  {loading ? <Skeleton className="h-8 w-24" /> : formatUSD(currentDeposit)}
+                  <ChevronDown className="h-4 w-4 opacity-60" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-0" align="start">
+                <div className="p-3 border-b border-border">
+                  <p className="text-xs font-semibold text-muted-foreground">Deposit History</p>
+                </div>
+                {deposits.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No deposits yet</p>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto divide-y divide-border">
+                    {deposits.map((d) => (
+                      <div key={d.id} className="px-3 py-2 flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground">{new Date(d.payment_date).toLocaleDateString()}</span>
+                        <span className="font-medium">{formatUSD(d.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-1">
@@ -195,32 +222,6 @@ export default function Financing() {
         </CardContent>
       </Card>
 
-      {/* Deposit History */}
-      {deposits.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle>Deposit History</CardTitle></CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {deposits.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell>{new Date(d.payment_date).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right">{formatUSD(d.amount)}</TableCell>
-                    <TableCell className="text-muted-foreground">{d.notes || "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
 
       <AddFinancedInvoiceDialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setPreselectedVendorPO(null); }} onSuccess={fetchData} preselectedVendorPO={preselectedVendorPO} />
       <RecordFinanceRepaymentDialog open={repayOpen} onOpenChange={setRepayOpen} onSuccess={fetchData} invoice={selectedInvoice} />
