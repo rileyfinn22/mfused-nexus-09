@@ -184,8 +184,10 @@ export default function FinancedInvoiceDetail() {
   const vendorPO = record.vendor_pos as any;
   const invoice = record.invoices as any;
   const poOrder = vendorPO?.orders as any;
-  const fee = calculateFinanceFee(record.financed_amount, record.financed_date, record.paid_back_amount);
-  const balance = record.financed_amount + fee.feeAmount - record.paid_back_amount;
+  const currentFinanced = parseFloat(financedAmount) || 0;
+  const currentPaidBack = parseFloat(paidBackAmount) || 0;
+  const fee = calculateFinanceFee(currentFinanced, financedDate || record.financed_date, currentPaidBack);
+  const balance = currentFinanced + fee.feeAmount - currentPaidBack;
 
   return (
     <div className="space-y-6">
@@ -204,9 +206,14 @@ export default function FinancedInvoiceDetail() {
           </p>
         </div>
         <div className="ml-auto flex gap-2">
-          <Badge variant={record.status === "paid" ? "default" : "secondary"} className="text-xs">
-            {record.status}
-          </Badge>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium"
+          >
+            <option value="open">Open</option>
+            <option value="paid">Paid</option>
+          </select>
           <Button size="sm" onClick={handleSave} disabled={saving}>
             <Save className="mr-2 h-4 w-4" />
             {saving ? "Saving..." : "Save"}
@@ -214,33 +221,88 @@ export default function FinancedInvoiceDetail() {
         </div>
       </div>
 
-      {/* Summary row */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        <Card className="p-3">
-          <p className="text-[10px] text-muted-foreground uppercase">Financed</p>
-          <p className="text-sm font-bold">{formatUSD(record.financed_amount)}</p>
-        </Card>
-        <Card className="p-3">
-          <p className="text-[10px] text-muted-foreground uppercase">RMB</p>
-          <p className="text-sm font-bold">¥{record.financed_amount_rmb?.toLocaleString()}</p>
-        </Card>
-        <Card className="p-3">
-          <p className="text-[10px] text-muted-foreground uppercase">Date</p>
-          <p className="text-sm font-bold">{new Date(record.financed_date).toLocaleDateString()}</p>
-        </Card>
-        <Card className="p-3">
-          <p className="text-[10px] text-muted-foreground uppercase">Aging</p>
-          <p className="text-sm font-bold">{fee.daysAging} days</p>
-        </Card>
-        <Card className="p-3">
-          <p className="text-[10px] text-muted-foreground uppercase">Fee ({fee.daysAging <= 60 ? "5%" : "7%"})</p>
-          <p className={`text-sm font-bold ${fee.daysAging <= 60 ? "text-yellow-500" : "text-orange-600"}`}>{formatUSD(fee.feeAmount)}</p>
-        </Card>
-        <Card className="p-3">
-          <p className="text-[10px] text-muted-foreground uppercase">Balance</p>
-          <p className="text-sm font-bold">{formatUSD(balance)}</p>
-        </Card>
-      </div>
+      {/* Editable financial fields */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Financial Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div>
+              <Label className="text-xs">Financed Amount (USD)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={financedAmount}
+                onChange={(e) => {
+                  setFinancedAmount(e.target.value);
+                  const usd = parseFloat(e.target.value) || 0;
+                  const rate = parseFloat(exchangeRate) || 7.2;
+                  setRmbAmount((usd * rate).toFixed(2));
+                }}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">RMB Amount</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={rmbAmount}
+                onChange={(e) => {
+                  setRmbAmount(e.target.value);
+                  const rmb = parseFloat(e.target.value) || 0;
+                  const rate = parseFloat(exchangeRate) || 7.2;
+                  setFinancedAmount((rmb / rate).toFixed(2));
+                }}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Exchange Rate</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={exchangeRate}
+                onChange={(e) => {
+                  setExchangeRate(e.target.value);
+                  const rate = parseFloat(e.target.value) || 7.2;
+                  const usd = parseFloat(financedAmount) || 0;
+                  setRmbAmount((usd * rate).toFixed(2));
+                }}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Financed Date</Label>
+              <Input
+                type="date"
+                value={financedDate}
+                onChange={(e) => setFinancedDate(e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Paid Back</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={paidBackAmount}
+                onChange={(e) => setPaidBackAmount(e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Aging / Fee / Balance</Label>
+              <div className="h-8 flex items-center text-sm gap-2">
+                <span className="font-medium">{fee.daysAging}d</span>
+                <span className={`font-bold ${fee.daysAging <= 60 ? "text-yellow-500" : "text-orange-600"}`}>{formatUSD(fee.feeAmount)}</span>
+                <span className="font-bold">{formatUSD(balance)}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Invoice & Notes */}
