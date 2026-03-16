@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -18,6 +19,9 @@ interface Props {
 
 export function RecordFinanceRepaymentDialog({ open, onOpenChange, onSuccess, invoice }: Props) {
   const [amount, setAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paymentMethod, setPaymentMethod] = useState("wire");
+  const [referenceNumber, setReferenceNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -30,25 +34,18 @@ export function RecordFinanceRepaymentDialog({ open, onOpenChange, onSuccess, in
     if (!amt || amt <= 0) return;
     setLoading(true);
 
-    const newPaidBack = invoice.paid_back_amount + amt;
-    const fullyPaid = newPaidBack >= invoice.financed_amount;
+    const { data: { user } } = await supabase.auth.getUser();
 
-    const updateData: Record<string, any> = {
-      paid_back_amount: newPaidBack,
-      status: fullyPaid ? "paid" : "open",
-      paid_back_date: fullyPaid ? new Date().toISOString() : null,
-    };
-    if (fullyPaid) {
-      updateData.finance_status = "completed";
-    }
-    if (notes) {
-      updateData.notes = `${invoice.invoice_number || ""} repayment: ${notes}`;
-    }
-
-    const { error } = await supabase
-      .from("financed_invoices")
-      .update(updateData)
-      .eq("id", invoice.id);
+    // Insert into repayment ledger — trigger auto-updates financed_invoices
+    const { error } = await supabase.from("finance_repayments").insert({
+      financed_invoice_id: invoice.id,
+      amount: amt,
+      payment_date: paymentDate,
+      payment_method: paymentMethod,
+      reference_number: referenceNumber || null,
+      notes: notes || null,
+      created_by: user?.id || null,
+    });
 
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -58,6 +55,8 @@ export function RecordFinanceRepaymentDialog({ open, onOpenChange, onSuccess, in
       onOpenChange(false);
       setAmount("");
       setNotes("");
+      setReferenceNumber("");
+      setPaymentMethod("wire");
     }
     setLoading(false);
   };
@@ -75,6 +74,29 @@ export function RecordFinanceRepaymentDialog({ open, onOpenChange, onSuccess, in
           <div>
             <Label>Payment Amount (USD)</Label>
             <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+          </div>
+          <div>
+            <Label>Payment Date</Label>
+            <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+          </div>
+          <div>
+            <Label>Payment Method</Label>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="wire">Wire Transfer</SelectItem>
+                <SelectItem value="check">Check</SelectItem>
+                <SelectItem value="ach">ACH</SelectItem>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Reference #</Label>
+            <Input value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} placeholder="Check #, wire ref, etc." />
           </div>
           <div>
             <Label>Notes</Label>
