@@ -205,15 +205,29 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
 
           <div>
             <Label>Financed Amount (USD)</Label>
-            <Input type="number" step="0.01" value={financedAmount} onChange={(e) => setFinancedAmount(e.target.value)} placeholder="0.00" />
+            <Input type="number" step="0.01" value={financedAmount} onChange={(e) => {
+              const usd = e.target.value;
+              setFinancedAmount(usd);
+              if (usd && exchangeRate) setRmbAmount((parseFloat(usd) * parseFloat(exchangeRate)).toFixed(2));
+              else setRmbAmount("");
+            }} placeholder="0.00" />
           </div>
           <div>
             <Label>Exchange Rate (USD → RMB)</Label>
-            <Input type="number" step="0.0001" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} />
+            <Input type="number" step="0.0001" value={exchangeRate} onChange={(e) => {
+              const rate = e.target.value;
+              setExchangeRate(rate);
+              if (financedAmount && rate) setRmbAmount((parseFloat(financedAmount) * parseFloat(rate)).toFixed(2));
+            }} />
           </div>
           <div>
             <Label>RMB Amount</Label>
-            <Input disabled value={financedAmount && exchangeRate ? (parseFloat(financedAmount) * parseFloat(exchangeRate)).toFixed(2) : ""} />
+            <Input type="number" step="0.01" value={rmbAmount} onChange={(e) => {
+              const rmb = e.target.value;
+              setRmbAmount(rmb);
+              if (rmb && exchangeRate) setFinancedAmount((parseFloat(rmb) / parseFloat(exchangeRate)).toFixed(2));
+              else setFinancedAmount("");
+            }} placeholder="0.00" />
           </div>
           <div>
             <Label>Financed Date</Label>
