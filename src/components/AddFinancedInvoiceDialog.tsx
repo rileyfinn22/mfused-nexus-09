@@ -243,7 +243,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
           </div>
           <Button onClick={handleSubmit} disabled={loading || !selectedPO || !financedAmount} className="w-full">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Add to Financing
+            Submit for Financing
           </Button>
         </div>
       </DialogContent>
