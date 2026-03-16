@@ -118,7 +118,7 @@ export default function FinancedInvoiceDetail() {
     setRepayments(data || []);
   };
 
-
+  const handleSave = async () => {
     setSaving(true);
     let finalTrackingUrl = trackingUrl;
     if (!finalTrackingUrl && carrier && trackingNumber) {
