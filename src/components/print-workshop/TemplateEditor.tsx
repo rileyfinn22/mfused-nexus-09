@@ -1938,6 +1938,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       fill,
       editable: true,
       padding: 4,
+      originX: "left",
+      originY: "top",
     });
     (newText as any).locked = false;
     (newText as any).editable = true;
