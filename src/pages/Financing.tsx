@@ -1,16 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Plus, AlertTriangle, Banknote, Link2, RefreshCw, ChevronDown, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
+import { Plus, AlertTriangle, Banknote, Link2, RefreshCw, ChevronDown, AlertCircle, Clock, CheckCircle2, Search, Download } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { calculateFinanceFee, getAgingBadgeVariant, formatUSD } from "@/lib/financeUtils";
 import { AddFinancedInvoiceDialog } from "@/components/AddFinancedInvoiceDialog";
-
 import { RecordFinanceRepaymentDialog } from "@/components/RecordFinanceRepaymentDialog";
 import { RecordFinanceDepositDialog } from "@/components/RecordFinanceDepositDialog";
 import { GenerateFinanceLinkDialog } from "@/components/GenerateFinanceLinkDialog";
@@ -34,6 +34,9 @@ export default function Financing() {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [preselectedVendorPO, setPreselectedVendorPO] = useState<{ id: string; po_number: string; total: number; description: string | null } | null>(null);
   const [activeTab, setActiveTab] = useState("active");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const isVibeAdmin = userRole === "vibe_admin";
   const isFinanceUser = userRole === "finance";
@@ -79,20 +82,80 @@ export default function Financing() {
 
   if (!isAuthorized) return null;
 
-  // Split invoices by finance_status
-  const pendingInvoices = invoices.filter(i => i.finance_status === "pending");
-  const activeInvoices = invoices.filter(i => !i.finance_status || i.finance_status === "active");
-  const completedInvoices = invoices.filter(i => i.finance_status === "completed");
+  // Filter helper
+  const filterBySearchAndDate = (list: any[]) => {
+    let filtered = list;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter((i) => {
+        const vpo = i.vendor_pos as any;
+        const inv = i.invoices as any;
+        const poOrder = vpo?.orders as any;
+        return (
+          vpo?.po_number?.toLowerCase().includes(q) ||
+          vpo?.description?.toLowerCase().includes(q) ||
+          poOrder?.customer_name?.toLowerCase().includes(q) ||
+          poOrder?.order_number?.toLowerCase().includes(q) ||
+          i.description?.toLowerCase().includes(q) ||
+          i.invoice_number?.toLowerCase().includes(q) ||
+          inv?.invoice_number?.toLowerCase().includes(q) ||
+          i.notes?.toLowerCase().includes(q)
+        );
+      });
+    }
+    if (dateFrom) filtered = filtered.filter((i) => (i.financed_date || i.created_at) >= dateFrom);
+    if (dateTo) filtered = filtered.filter((i) => (i.financed_date || i.created_at) <= dateTo + "T23:59:59");
+    return filtered;
+  };
 
-  // Summary cards only count active entries
-  const totalFinanced = activeInvoices.reduce((s, i) => s + (i.financed_amount || 0), 0);
-  const totalOutstanding = activeInvoices.filter(i => i.status === "open").reduce((s, i) => {
+  // Split invoices by finance_status
+  const pendingInvoices = filterBySearchAndDate(invoices.filter(i => i.finance_status === "pending"));
+  const activeInvoices = filterBySearchAndDate(invoices.filter(i => !i.finance_status || i.finance_status === "active"));
+  const completedInvoices = filterBySearchAndDate(invoices.filter(i => i.finance_status === "completed"));
+
+  // Summary cards only count active entries (unfiltered)
+  const allActive = invoices.filter(i => !i.finance_status || i.finance_status === "active");
+  const totalFinanced = allActive.reduce((s, i) => s + (i.financed_amount || 0), 0);
+  const totalOutstanding = allActive.filter(i => i.status === "open").reduce((s, i) => {
     const fee = calculateFinanceFee(i.financed_amount, i.financed_date, i.paid_back_amount);
     return s + (i.financed_amount + fee.feeAmount - i.paid_back_amount);
   }, 0);
-  const requiredDeposit = activeInvoices.filter(i => i.status === "open").reduce((s, i) => s + i.financed_amount, 0) * 0.10;
+  const requiredDeposit = allActive.filter(i => i.status === "open").reduce((s, i) => s + i.financed_amount, 0) * 0.10;
   const currentDeposit = deposits.reduce((s, d) => s + (d.amount || 0), 0);
   const depositShortfall = Math.max(0, requiredDeposit - currentDeposit);
+
+  const exportCSV = () => {
+    const tab = activeTab === "pending" ? pendingInvoices : activeTab === "active" ? activeInvoices : completedInvoices;
+    const headers = ["Description", "Financed Amount", "Date", "Status", "Paid Back", "Notes"];
+    if (isVibeAdmin) headers.unshift("Vendor PO");
+    if (activeTab === "active") headers.push("Fee", "Balance");
+
+    const rows = tab.map((inv) => {
+      const vpo = inv.vendor_pos as any;
+      const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
+      const row: string[] = [];
+      if (isVibeAdmin) row.push(vpo?.po_number ? `PO #${vpo.po_number}` : "");
+      row.push(
+        inv.description || vpo?.description || "",
+        String(inv.financed_amount || 0),
+        inv.financed_date || "",
+        inv.finance_status || "",
+        String(inv.paid_back_amount || 0),
+        inv.notes || "",
+      );
+      if (activeTab === "active") row.push(String(fee.feeAmount.toFixed(2)), String((inv.financed_amount + fee.feeAmount - inv.paid_back_amount).toFixed(2)));
+      return row;
+    });
+
+    const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${(c || "").replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `financing-${activeTab}-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const renderActiveRow = (inv: any, idx: number) => {
     const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
@@ -291,7 +354,34 @@ export default function Financing() {
               Completed {completedInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{completedInvoices.length}</Badge>}
             </TabsTrigger>
           </TabsList>
-          <Button variant="ghost" size="icon" onClick={fetchData}><RefreshCw className="h-4 w-4" /></Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={fetchData}><RefreshCw className="h-4 w-4" /></Button>
+            <Button variant="outline" size="sm" onClick={exportCSV} className="gap-1.5">
+              <Download className="h-3.5 w-3.5" /> Export
+            </Button>
+          </div>
+        </div>
+
+        {/* Search & Filters */}
+        <div className="flex items-center gap-3 pt-2">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search PO, description, customer..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-8 text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span>From</span>
+            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-[130px] text-xs" />
+            <span>To</span>
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-[130px] text-xs" />
+            {(dateFrom || dateTo || searchQuery) && (
+              <Button variant="ghost" size="sm" className="h-8 text-xs px-2" onClick={() => { setSearchQuery(""); setDateFrom(""); setDateTo(""); }}>Clear</Button>
+            )}
+          </div>
         </div>
 
         {/* PENDING TAB */}

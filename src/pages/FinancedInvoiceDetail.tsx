@@ -27,6 +27,7 @@ export default function FinancedInvoiceDetail() {
   const [showLogs, setShowLogs] = useState(false);
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [repayments, setRepayments] = useState<any[]>([]);
 
   // Editable fields
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -58,6 +59,7 @@ export default function FinancedInvoiceDetail() {
     fetchRecord();
     fetchDocuments();
     fetchEditLogs();
+    fetchRepayments();
   };
 
   const fetchRecord = async () => {
@@ -107,7 +109,16 @@ export default function FinancedInvoiceDetail() {
     setEditLogs(data || []);
   };
 
-  const handleSave = async () => {
+  const fetchRepayments = async () => {
+    const { data } = await supabase
+      .from("finance_repayments")
+      .select("*")
+      .eq("financed_invoice_id", id!)
+      .order("payment_date", { ascending: false });
+    setRepayments(data || []);
+  };
+
+
     setSaving(true);
     let finalTrackingUrl = trackingUrl;
     if (!finalTrackingUrl && carrier && trackingNumber) {
@@ -567,7 +578,51 @@ export default function FinancedInvoiceDetail() {
         </CardContent>
       </Card>
 
-      {/* Subtle edit log indicator */}
+      {/* Repayment Ledger */}
+      {record.finance_status === "active" && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between pb-3">
+            <CardTitle className="text-sm">Repayment History</CardTitle>
+            <Badge variant="secondary" className="text-[10px]">{repayments.length} payment{repayments.length !== 1 ? "s" : ""}</Badge>
+          </CardHeader>
+          <CardContent>
+            {repayments.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No repayments recorded yet</p>
+            ) : (
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-border bg-muted">
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">Date</th>
+                    <th className="px-2 py-2 text-right font-medium text-muted-foreground">Amount</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">Method</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">Reference</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {repayments.map((r, idx) => (
+                    <tr key={r.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""}`}>
+                      <td className="px-2 py-1.5 whitespace-nowrap">{new Date(r.payment_date + "T00:00:00").toLocaleDateString()}</td>
+                      <td className="px-2 py-1.5 text-right font-medium whitespace-nowrap">{formatUSD(r.amount)}</td>
+                      <td className="px-2 py-1.5 capitalize">{r.payment_method || "—"}</td>
+                      <td className="px-2 py-1.5 font-mono text-muted-foreground">{r.reference_number || "—"}</td>
+                      <td className="px-2 py-1.5 text-muted-foreground max-w-[200px] truncate">{r.notes || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-border bg-muted">
+                    <td className="px-2 py-1.5 font-semibold">Total</td>
+                    <td className="px-2 py-1.5 text-right font-bold">{formatUSD(repayments.reduce((s: number, r: any) => s + (r.amount || 0), 0))}</td>
+                    <td colSpan={3}></td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {editLogs.length > 0 && (
         <div className="pt-2 pb-6">
           <button
