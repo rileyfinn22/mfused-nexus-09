@@ -315,7 +315,7 @@ const InvoiceDetail = () => {
     // Fetch related invoices for the same order
     const {
       data: relatedData
-    } = await supabase.from('invoices').select('*').eq('order_id', invoiceData.order_id).neq('id', invoiceId).order('shipment_number');
+    } = await supabase.from('invoices').select('*').eq('order_id', invoiceData.order_id).neq('id', invoiceId).is('deleted_at', null).order('shipment_number');
     if (relatedData) {
       setRelatedInvoices(relatedData);
     }
