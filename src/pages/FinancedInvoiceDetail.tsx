@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText } from "lucide-react";
+import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X } from "lucide-react";
 import { calculateFinanceFee, formatUSD } from "@/lib/financeUtils";
 
 export default function FinancedInvoiceDetail() {
@@ -20,6 +20,7 @@ export default function FinancedInvoiceDetail() {
   const [record, setRecord] = useState<any>(null);
   const [documents, setDocuments] = useState<any[]>([]);
   const [isFinanceUser, setIsFinanceUser] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   // Editable fields
@@ -214,18 +215,31 @@ export default function FinancedInvoiceDetail() {
           </p>
         </div>
         <div className="ml-auto flex gap-2">
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium"
-          >
-            <option value="open">Open</option>
-            <option value="paid">Paid</option>
-          </select>
-          <Button size="sm" onClick={handleSave} disabled={saving}>
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? "Saving..." : "Save"}
-          </Button>
+          {!editing ? (
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+          ) : (
+            <>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium"
+              >
+                <option value="open">Open</option>
+                <option value="paid">Paid</option>
+              </select>
+              <Button size="sm" variant="ghost" onClick={() => { setEditing(false); fetchRecord(); }}>
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button size="sm" onClick={() => { handleSave().then(() => setEditing(false)); }} disabled={saving}>
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -238,67 +252,87 @@ export default function FinancedInvoiceDetail() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <div>
               <Label className="text-xs">Financed Amount (USD)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={financedAmount}
-                onChange={(e) => {
-                  setFinancedAmount(e.target.value);
-                  const usd = parseFloat(e.target.value) || 0;
-                  const rate = parseFloat(exchangeRate) || 7.2;
-                  setRmbAmount((usd * rate).toFixed(2));
-                }}
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={financedAmount}
+                  onChange={(e) => {
+                    setFinancedAmount(e.target.value);
+                    const usd = parseFloat(e.target.value) || 0;
+                    const rate = parseFloat(exchangeRate) || 7.2;
+                    setRmbAmount((usd * rate).toFixed(2));
+                  }}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="h-8 flex items-center text-sm font-medium">{formatUSD(currentFinanced)}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">RMB Amount</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={rmbAmount}
-                onChange={(e) => {
-                  setRmbAmount(e.target.value);
-                  const rmb = parseFloat(e.target.value) || 0;
-                  const rate = parseFloat(exchangeRate) || 7.2;
-                  setFinancedAmount((rmb / rate).toFixed(2));
-                }}
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={rmbAmount}
+                  onChange={(e) => {
+                    setRmbAmount(e.target.value);
+                    const rmb = parseFloat(e.target.value) || 0;
+                    const rate = parseFloat(exchangeRate) || 7.2;
+                    setFinancedAmount((rmb / rate).toFixed(2));
+                  }}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="h-8 flex items-center text-sm font-medium">¥{parseFloat(rmbAmount || "0").toLocaleString()}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Exchange Rate</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={exchangeRate}
-                onChange={(e) => {
-                  setExchangeRate(e.target.value);
-                  const rate = parseFloat(e.target.value) || 7.2;
-                  const usd = parseFloat(financedAmount) || 0;
-                  setRmbAmount((usd * rate).toFixed(2));
-                }}
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={exchangeRate}
+                  onChange={(e) => {
+                    setExchangeRate(e.target.value);
+                    const rate = parseFloat(e.target.value) || 7.2;
+                    const usd = parseFloat(financedAmount) || 0;
+                    setRmbAmount((usd * rate).toFixed(2));
+                  }}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="h-8 flex items-center text-sm font-medium">{exchangeRate}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Financed Date</Label>
-              <Input
-                type="date"
-                value={financedDate}
-                onChange={(e) => setFinancedDate(e.target.value)}
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  type="date"
+                  value={financedDate}
+                  onChange={(e) => setFinancedDate(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="h-8 flex items-center text-sm font-medium">{financedDate ? new Date(financedDate).toLocaleDateString() : "—"}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Paid Back</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={paidBackAmount}
-                onChange={(e) => setPaidBackAmount(e.target.value)}
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={paidBackAmount}
+                  onChange={(e) => setPaidBackAmount(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="h-8 flex items-center text-sm font-medium">{formatUSD(currentPaidBack)}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Aging / Fee / Balance</Label>
@@ -321,21 +355,29 @@ export default function FinancedInvoiceDetail() {
           <CardContent className="space-y-3">
             <div>
               <Label className="text-xs">Invoice Number</Label>
-              <Input
-                value={invoiceNumber}
-                onChange={(e) => setInvoiceNumber(e.target.value)}
-                placeholder="Enter invoice number..."
-                className="h-8 text-sm"
-              />
+              {editing ? (
+                <Input
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                  placeholder="Enter invoice number..."
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="text-sm font-medium py-1">{invoiceNumber || "—"}</p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Notes</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add notes..."
-                className="min-h-[80px] text-sm"
-              />
+              {editing ? (
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add notes..."
+                  className="min-h-[80px] text-sm"
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground py-1 whitespace-pre-wrap">{notes || "—"}</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -349,49 +391,72 @@ export default function FinancedInvoiceDetail() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Carrier</Label>
-                <Input
-                  value={carrier}
-                  onChange={(e) => setCarrier(e.target.value)}
-                  placeholder="UPS, FedEx, DHL..."
-                  className="h-8 text-sm"
-                />
+                {editing ? (
+                  <Input
+                    value={carrier}
+                    onChange={(e) => setCarrier(e.target.value)}
+                    placeholder="UPS, FedEx, DHL..."
+                    className="h-8 text-sm"
+                  />
+                ) : (
+                  <p className="text-sm font-medium py-1">{carrier || "—"}</p>
+                )}
               </div>
               <div>
                 <Label className="text-xs">Tracking Number</Label>
-                <Input
-                  value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value)}
-                  placeholder="Tracking #"
-                  className="h-8 text-sm"
-                />
-              </div>
-            </div>
-            <div>
-              <Label className="text-xs">Tracking URL</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={trackingUrl}
-                  onChange={(e) => setTrackingUrl(e.target.value)}
-                  placeholder="Auto-generated or paste URL..."
-                  className="h-8 text-sm"
-                />
-                {trackingUrl && (
-                  <Button size="sm" variant="outline" className="h-8 px-2" asChild>
-                    <a href={trackingUrl} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  </Button>
+                {editing ? (
+                  <Input
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    placeholder="Tracking #"
+                    className="h-8 text-sm"
+                  />
+                ) : (
+                  <p className="text-sm font-medium py-1">{trackingNumber || "—"}</p>
                 )}
               </div>
             </div>
             <div>
+              <Label className="text-xs">Tracking URL</Label>
+              {editing ? (
+                <div className="flex gap-2">
+                  <Input
+                    value={trackingUrl}
+                    onChange={(e) => setTrackingUrl(e.target.value)}
+                    placeholder="Auto-generated or paste URL..."
+                    className="h-8 text-sm"
+                  />
+                  {trackingUrl && (
+                    <Button size="sm" variant="outline" className="h-8 px-2" asChild>
+                      <a href={trackingUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                trackingUrl ? (
+                  <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline py-1 inline-flex items-center gap-1">
+                    {trackingUrl.length > 50 ? trackingUrl.slice(0, 50) + "…" : trackingUrl}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-1">—</p>
+                )
+              )}
+            </div>
+            <div>
               <Label className="text-xs">Shipment Notes</Label>
-              <Textarea
-                value={shipmentNotes}
-                onChange={(e) => setShipmentNotes(e.target.value)}
-                placeholder="Shipment details, ETA, special instructions..."
-                className="min-h-[60px] text-sm"
-              />
+              {editing ? (
+                <Textarea
+                  value={shipmentNotes}
+                  onChange={(e) => setShipmentNotes(e.target.value)}
+                  placeholder="Shipment details, ETA, special instructions..."
+                  className="min-h-[60px] text-sm"
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground py-1 whitespace-pre-wrap">{shipmentNotes || "—"}</p>
+              )}
             </div>
           </CardContent>
         </Card>
