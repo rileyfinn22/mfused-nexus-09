@@ -75,6 +75,10 @@ const vendorNavigationItems = [
   { title: "My Production", url: "/production", icon: Factory },
 ];
 
+const financeNavigationItems = [
+  { title: "Financing", url: "/financing", icon: Landmark },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
