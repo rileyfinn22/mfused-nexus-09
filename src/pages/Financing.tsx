@@ -130,13 +130,13 @@ export default function Financing() {
           <CardTitle>Financed Invoices</CardTitle>
           <Button variant="ghost" size="icon" onClick={fetchData}><RefreshCw className="h-4 w-4" /></Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
-            <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+            <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div>
           ) : invoices.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">No financed invoices yet</p>
           ) : (
-            <div className="overflow-auto">
+            <div className="w-full">
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="border-b-2 border-border bg-muted">
