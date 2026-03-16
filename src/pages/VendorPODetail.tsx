@@ -194,7 +194,9 @@ const VendorPODetail = () => {
       }
 
       // Calculate new total from all items - round to 2 decimal places
-      const newTotal = Math.round(poItems.reduce((sum, item) => sum + Number(item.total), 0) * 100) / 100;
+      const itemsTotal = Math.round(poItems.reduce((sum, item) => sum + Number(item.total), 0) * 100) / 100;
+      const shippingCost = Number(editedPO.shipping_cost) || 0;
+      const newTotal = Math.round((itemsTotal + shippingCost) * 100) / 100;
 
       // Update the PO
       const { error: poError } = await supabase
@@ -210,6 +212,7 @@ const VendorPODetail = () => {
           tracking_carrier: editedPO.tracking_carrier || null,
           tracking_number: editedPO.tracking_number || null,
           tracking_url: editedPO.tracking_url || null,
+          shipping_cost: shippingCost,
           total: newTotal
         })
         .eq('id', poId);
