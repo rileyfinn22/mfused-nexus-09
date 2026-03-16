@@ -18,19 +18,18 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { activeCompany, loading: companyLoading } = useCompany();
+  const { activeCompany, loading: companyLoading, isFinancePortalUser } = useCompany();
   const [loading, setLoading] = useState(true);
-  const isFinanceUser = activeCompany?.role === 'finance';
 
-  // Redirect finance users to /financing if they try to access other pages
+  // Finance portal users should only ever see /financing routes
   useEffect(() => {
-    if (!companyLoading && isFinanceUser) {
+    if (!companyLoading && isFinancePortalUser) {
       const path = window.location.pathname;
       if (!path.startsWith('/financing')) {
-        navigate('/financing');
+        navigate('/financing', { replace: true });
       }
     }
-  }, [isFinanceUser, companyLoading, navigate]);
+  }, [isFinancePortalUser, companyLoading, navigate]);
 
   useEffect(() => {
     checkAuth();

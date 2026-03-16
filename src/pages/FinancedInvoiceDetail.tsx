@@ -42,8 +42,8 @@ export default function FinancedInvoiceDetail() {
   const checkAdminAndFetch = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
-    const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "vibe_admin").maybeSingle();
-    if (!data) { navigate("/dashboard"); return; }
+    const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).in("role", ["vibe_admin", "finance"]);
+    if (!data || data.length === 0) { navigate("/dashboard"); return; }
     fetchRecord();
     fetchDocuments();
   };

@@ -177,11 +177,25 @@ export function AppSidebar() {
   }, [currentPath]);
 
   const checkRole = async () => {
+    if (isFinancePortalUser) {
+      setIsVibeAdmin(false);
+      setIsVendor(false);
+      setIsFinance(true);
+      return;
+    }
+
+    if (hasVibeAdminRole) {
+      setIsVibeAdmin(true);
+      setIsVendor(false);
+      setIsFinance(false);
+      return;
+    }
+
     // Use the active company's role if available
     if (activeCompany) {
       setIsVibeAdmin(activeCompany.role === 'vibe_admin');
       setIsVendor(activeCompany.role === 'vendor');
-      setIsFinance(activeCompany.role === 'finance');
+      setIsFinance(activeCompany.role === 'finance' || hasFinanceRole);
       return;
     }
 
@@ -191,13 +205,11 @@ export function AppSidebar() {
       const { data } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      const role = data?.role as string;
-      setIsVibeAdmin(role === 'vibe_admin');
-      setIsVendor(role === 'vendor');
-      setIsFinance(role === 'finance');
+        .eq('user_id', user.id);
+      const roles = (data || []).map((row: any) => row.role as string);
+      setIsVibeAdmin(roles.includes('vibe_admin'));
+      setIsVendor(roles.includes('vendor'));
+      setIsFinance(roles.includes('finance') && !roles.includes('vibe_admin'));
     }
   };
 
