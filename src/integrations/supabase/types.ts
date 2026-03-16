@@ -719,6 +719,8 @@ export type Database = {
         Row: {
           carrier: string | null
           created_at: string
+          created_by_role: string | null
+          description: string | null
           exchange_rate: number
           financed_amount: number
           financed_amount_rmb: number
@@ -739,6 +741,8 @@ export type Database = {
         Insert: {
           carrier?: string | null
           created_at?: string
+          created_by_role?: string | null
+          description?: string | null
           exchange_rate?: number
           financed_amount?: number
           financed_amount_rmb?: number
@@ -759,6 +763,8 @@ export type Database = {
         Update: {
           carrier?: string | null
           created_at?: string
+          created_by_role?: string | null
+          description?: string | null
           exchange_rate?: number
           financed_amount?: number
           financed_amount_rmb?: number
