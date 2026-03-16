@@ -15,6 +15,7 @@ import { RecordFinanceRepaymentDialog } from "@/components/RecordFinanceRepaymen
 import { RecordFinanceDepositDialog } from "@/components/RecordFinanceDepositDialog";
 import { GenerateFinanceLinkDialog } from "@/components/GenerateFinanceLinkDialog";
 import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
+import { FinanceConfirmationsTab } from "@/components/FinanceConfirmationsTab";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Financing() {
