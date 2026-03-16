@@ -17,7 +17,14 @@ import { useCompany } from "@/contexts/CompanyContext";
  * }
  */
 export function useActiveCompany() {
-  const { activeCompany, isMultiCompany, loading } = useCompany();
+  const {
+    activeCompany,
+    isMultiCompany,
+    loading,
+    hasFinanceRole,
+    hasVibeAdminRole,
+    isFinancePortalUser,
+  } = useCompany();
 
   return {
     activeCompanyId: activeCompany?.id || null,
@@ -25,6 +32,9 @@ export function useActiveCompany() {
     activeCompanyRole: activeCompany?.role || null,
     isMultiCompany,
     loading,
-    isVibeAdmin: activeCompany?.role === 'vibe_admin',
+    isVibeAdmin: hasVibeAdminRole || activeCompany?.role === 'vibe_admin',
+    hasFinanceRole,
+    hasVibeAdminRole,
+    isFinancePortalUser,
   };
 }

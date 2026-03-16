@@ -13,6 +13,9 @@ interface CompanyContextType {
   setActiveCompany: (company: Company) => void;
   loading: boolean;
   isMultiCompany: boolean;
+  hasFinanceRole: boolean;
+  hasVibeAdminRole: boolean;
+  isFinancePortalUser: boolean;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -23,6 +26,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [activeCompany, setActiveCompanyState] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasFinanceRole, setHasFinanceRole] = useState(false);
+  const [hasVibeAdminRole, setHasVibeAdminRole] = useState(false);
 
   // Highest privilege first. If a user has multiple role rows for the same company,
   // we pick the most privileged one to keep UI + permissions stable.
@@ -37,11 +42,13 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     loadCompanies();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") {
+      if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         loadCompanies();
       } else if (event === "SIGNED_OUT") {
         setCompanies([]);
         setActiveCompanyState(null);
+        setHasFinanceRole(false);
+        setHasVibeAdminRole(false);
         localStorage.removeItem(ACTIVE_COMPANY_KEY);
       }
     });
@@ -53,6 +60,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
+        setCompanies([]);
+        setActiveCompanyState(null);
+        setHasFinanceRole(false);
+        setHasVibeAdminRole(false);
         setLoading(false);
         return;
       }
@@ -72,9 +83,17 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error("Error fetching user companies:", error);
+        setCompanies([]);
+        setActiveCompanyState(null);
+        setHasFinanceRole(false);
+        setHasVibeAdminRole(false);
         setLoading(false);
         return;
       }
+
+      const roleSet = new Set((userRoles || []).map((ur: any) => String(ur.role)));
+      setHasFinanceRole(roleSet.has("finance"));
+      setHasVibeAdminRole(roleSet.has("vibe_admin"));
 
       // De-dupe by company_id and choose the highest-privilege role per company.
       const byCompanyId = new Map<string, Company>();
@@ -111,15 +130,21 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       // Restore saved active company or use first one
       const savedCompanyId = localStorage.getItem(ACTIVE_COMPANY_KEY);
       const savedCompany = companyList.find((c) => c.id === savedCompanyId);
-      
+
       if (savedCompany) {
         setActiveCompanyState(savedCompany);
       } else if (companyList.length > 0) {
         setActiveCompanyState(companyList[0]);
         localStorage.setItem(ACTIVE_COMPANY_KEY, companyList[0].id);
+      } else {
+        setActiveCompanyState(null);
       }
     } catch (err) {
       console.error("Error loading companies:", err);
+      setCompanies([]);
+      setActiveCompanyState(null);
+      setHasFinanceRole(false);
+      setHasVibeAdminRole(false);
     } finally {
       setLoading(false);
     }
@@ -138,6 +163,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setActiveCompany,
         loading,
         isMultiCompany: companies.length > 1,
+        hasFinanceRole,
+        hasVibeAdminRole,
+        isFinancePortalUser: hasFinanceRole && !hasVibeAdminRole,
       }}
     >
       {children}
