@@ -53,6 +53,7 @@ export default function FinancedInvoiceDetail() {
     setIsFinanceUser(!hasVibeAdmin && roles.includes("finance"));
     fetchRecord();
     fetchDocuments();
+    fetchEditLogs();
   };
 
   const fetchRecord = async () => {
