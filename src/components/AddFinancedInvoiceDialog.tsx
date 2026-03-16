@@ -33,7 +33,9 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
       fetchVendorPOs();
       if (preselectedVendorPO) {
         setSelectedPO(preselectedVendorPO);
-        setFinancedAmount(preselectedVendorPO.total?.toString() || "");
+        const usd = preselectedVendorPO.total?.toString() || "";
+        setFinancedAmount(usd);
+        setRmbAmount(usd ? (parseFloat(usd) * 7.2).toFixed(2) : "");
         setSearchQuery(preselectedVendorPO.po_number);
       } else {
         setSelectedPO(null);
