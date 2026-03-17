@@ -187,7 +187,7 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
                 <tbody>
                   {sortedDeposits.map((d, idx) => (
                     <tr key={d.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} ${d.confirmation_status === "disputed" ? "bg-destructive/5" : ""}`}>
-                      <td className="px-2 py-1.5 whitespace-nowrap">{new Date(d.payment_date).toLocaleDateString()}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">{new Date(d.payment_date.split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
                       <td className="px-2 py-1.5 text-right font-medium whitespace-nowrap">{formatUSD(d.amount)}</td>
                       <td className="px-2 py-1.5 text-muted-foreground max-w-[200px] truncate">{d.notes || "—"}</td>
                       <td className="px-2 py-1.5 text-center">{statusBadge(d.confirmation_status, d.dispute_note)}</td>
