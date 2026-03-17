@@ -1424,10 +1424,6 @@ Thank you for your business.`;
                               const updated = [...poItems];
                               const newQty = parseInt(e.target.value) || 0;
                               updated[index].quantity = newQty;
-                              // For new items, sync shipped = ordered
-                              if (updated[index].shipped_quantity === 0) {
-                                updated[index].shipped_quantity = newQty;
-                              }
                               const effectiveQty = updated[index].shipped_quantity > 0 ? updated[index].shipped_quantity : newQty;
                               updated[index].total = Math.round(effectiveQty * Number(updated[index].unit_cost) * 100) / 100;
                               setPOItems(updated);
