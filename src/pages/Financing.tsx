@@ -351,18 +351,6 @@ export default function Financing() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-1">
-            {depositShortfall > 0 && <AlertTriangle className="h-3 w-3 text-destructive" />} {t("depositShortfall")}
-          </CardTitle></CardHeader>
-          <CardContent>
-            {loading ? <Skeleton className="h-8 w-24" /> : depositShortfall > 0 ? (
-              <CardCurrency usd={depositShortfall} rmb={depositShortfallRMB} lang={lang} colorClass="text-destructive" />
-            ) : (
-              <p className="text-2xl font-bold text-green-500">—</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("totalRepaid")}</CardTitle></CardHeader>
           <CardContent>{loading ? <Skeleton className="h-8 w-24" /> : <CardCurrency usd={totalRepaidUSD} rmb={totalRepaidRMB} lang={lang} colorClass="text-green-500" />}</CardContent>
         </Card>
