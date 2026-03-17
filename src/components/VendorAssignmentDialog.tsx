@@ -571,7 +571,7 @@ export const VendorAssignmentDialog = ({
               name: item.name,
               description: item.description || null,
               quantity: item.quantity,
-              shipped_quantity: item.quantity,
+              shipped_quantity: 0,
               unit_cost: parseFloat(bulkCost),
               total: newItemTotal
             } as any);
