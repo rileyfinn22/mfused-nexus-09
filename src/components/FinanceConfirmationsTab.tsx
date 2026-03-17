@@ -112,7 +112,7 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
     <div className="space-y-6">
       {/* Repayments Section */}
       <div>
-        <h3 className="text-sm font-semibold mb-2">Repayments</h3>
+        <h3 className="text-sm font-semibold mb-2">Armorpak Payment Confirmations — Repayments</h3>
         <Card>
           <CardContent className="p-0">
             {sortedRepayments.length === 0 ? (
