@@ -181,7 +181,7 @@ const VendorPODetail = () => {
               name: item.name,
               description: item.description || null,
               quantity: item.quantity,
-              shipped_quantity: item.quantity,
+              shipped_quantity: 0,
               unit_cost: item.unit_cost,
               total: item.total
             } as any);
