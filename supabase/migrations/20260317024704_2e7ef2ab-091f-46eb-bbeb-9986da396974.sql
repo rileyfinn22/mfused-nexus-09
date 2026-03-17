@@ -1,0 +1,1 @@
+UPDATE vendor_po_items SET shipped_quantity = 0 WHERE vendor_po_id = '3b4a340c-b896-46f7-82fa-12f9af112e7c';
