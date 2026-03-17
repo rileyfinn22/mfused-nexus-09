@@ -5,7 +5,7 @@ export type FinanceLang = "en" | "zh";
 const translations: Record<string, Record<FinanceLang, string>> = {
   // Page titles
   "invoiceFinancing": { en: "Invoice Financing", zh: "发票融资" },
-  "poFinancingTracker": { en: "PO Financing Tracker", zh: "采购订单融资追踪" },
+  "poFinancingTracker": { en: "Weiyi Financing", zh: "威意融资" },
   "financeTrackingPlatform": { en: "Finance Tracking Platform", zh: "融资跟踪平台" },
 
   // Summary cards
