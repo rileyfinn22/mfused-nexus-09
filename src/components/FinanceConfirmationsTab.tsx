@@ -8,13 +8,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import { CheckCircle2, Clock, AlertTriangle, X } from "lucide-react";
 import { formatUSD } from "@/lib/financeUtils";
+import { DualCurrency } from "@/components/DualCurrency";
+import type { FinanceLang } from "@/lib/financeI18n";
+import { useFinanceLang } from "@/lib/financeI18n";
 
 interface Props {
   isVibeAdmin: boolean;
   isFinanceUser: boolean;
+  lang?: FinanceLang;
 }
 
-export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
+export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser, lang: langProp }: Props) {
+  const { t, lang: hookLang } = useFinanceLang();
+  const lang = langProp ?? hookLang;
+
   const [repayments, setRepayments] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +36,7 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
     const [repRes, depRes] = await Promise.all([
       supabase
         .from("finance_repayments")
-        .select("*, financed_invoices(id, description, financed_amount, vendor_pos(po_number, description))")
+        .select("*, financed_invoices(id, description, financed_amount, exchange_rate, vendor_pos(po_number, description))")
         .order("payment_date", { ascending: false }),
       supabase
         .from("finance_deposits")
@@ -55,7 +62,7 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
     if (error) {
       toast({ title: "Error confirming", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Confirmed" });
+      toast({ title: t("confirmed") });
       fetchAll();
     }
   };
@@ -77,7 +84,7 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Disputed — flagged for review" });
+      toast({ title: t("disputed") });
       setDisputeId(null);
       setDisputeNote("");
       fetchAll();
@@ -85,17 +92,16 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
   };
 
   const statusBadge = (status: string, note?: string) => {
-    if (status === "confirmed") return <Badge variant="success" className="text-[10px] px-1.5 py-0 gap-1"><CheckCircle2 className="h-2.5 w-2.5" />Confirmed</Badge>;
+    if (status === "confirmed") return <Badge variant="success" className="text-[10px] px-1.5 py-0 gap-1"><CheckCircle2 className="h-2.5 w-2.5" />{t("confirmed")}</Badge>;
     if (status === "disputed") return (
       <div className="flex flex-col gap-0.5">
-        <Badge variant="danger" className="text-[10px] px-1.5 py-0 gap-1"><AlertTriangle className="h-2.5 w-2.5" />Disputed</Badge>
+        <Badge variant="danger" className="text-[10px] px-1.5 py-0 gap-1"><AlertTriangle className="h-2.5 w-2.5" />{t("disputed")}</Badge>
         {note && <span className="text-[10px] text-destructive max-w-[150px] truncate">{note}</span>}
       </div>
     );
-    return <Badge variant="warning" className="text-[10px] px-1.5 py-0 gap-1"><Clock className="h-2.5 w-2.5" />Pending</Badge>;
+    return <Badge variant="warning" className="text-[10px] px-1.5 py-0 gap-1"><Clock className="h-2.5 w-2.5" />{t("pendingStatus")}</Badge>;
   };
 
-  // Sort: pending first
   const sortedRepayments = [...repayments].sort((a, b) => {
     const order: Record<string, number> = { pending: 0, disputed: 1, confirmed: 2 };
     return (order[a.confirmation_status] ?? 0) - (order[b.confirmation_status] ?? 0);
@@ -112,21 +118,21 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
     <div className="space-y-6">
       {/* Repayments Section */}
       <div>
-        <h3 className="text-sm font-semibold mb-2">Armorpak Payment Confirmations — Repayments</h3>
+        <h3 className="text-sm font-semibold mb-2">{t("repaymentConfirmations")}</h3>
         <Card>
           <CardContent className="p-0">
             {sortedRepayments.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8 text-sm">No repayments to confirm</p>
+              <p className="text-muted-foreground text-center py-8 text-sm">{t("noRepayments")}</p>
             ) : (
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="border-b-2 border-border bg-muted">
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">Date</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">Description</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground">Amount</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">Method</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">Reference</th>
-                    <th className="px-2 py-2 text-center font-medium text-muted-foreground">Status</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">{t("date")}</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">{t("description")}</th>
+                    <th className="px-2 py-2 text-right font-medium text-muted-foreground">{t("amount")}</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">{t("method")}</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">{t("reference")}</th>
+                    <th className="px-2 py-2 text-center font-medium text-muted-foreground">{t("status")}</th>
                     {isFinanceUser && <th className="px-2 py-2"></th>}
                   </tr>
                 </thead>
@@ -134,11 +140,14 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
                   {sortedRepayments.map((r, idx) => {
                     const fi = r.financed_invoices as any;
                     const desc = fi?.description || fi?.vendor_pos?.description || "—";
+                    const rate = fi?.exchange_rate || 7.2;
                     return (
                       <tr key={r.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} ${r.confirmation_status === "disputed" ? "bg-destructive/5" : ""}`}>
                         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(r.payment_date + "T00:00:00").toLocaleDateString()}</td>
                         <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{desc}</td>
-                        <td className="px-2 py-1.5 text-right font-medium whitespace-nowrap">{formatUSD(r.amount)}</td>
+                        <td className="px-2 py-1.5 text-right font-medium whitespace-nowrap">
+                          <DualCurrency usd={r.amount} rmb={r.amount * rate} lang={lang} />
+                        </td>
                         <td className="px-2 py-1.5 capitalize">{r.payment_method || "—"}</td>
                         <td className="px-2 py-1.5 font-mono text-muted-foreground">{r.reference_number || "—"}</td>
                         <td className="px-2 py-1.5 text-center">{statusBadge(r.confirmation_status, r.dispute_note)}</td>
@@ -147,10 +156,10 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
                             {r.confirmation_status === "pending" && (
                               <div className="flex gap-1">
                                 <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-green-600 border-green-600/30 hover:bg-green-500/10" onClick={() => handleConfirm(r.id, "finance_repayments")}>
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />Confirm
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />{t("confirm")}
                                 </Button>
                                 <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { setDisputeId(r.id); setDisputeType("repayment"); setDisputeNote(""); }}>
-                                  <X className="h-3 w-3 mr-1" />Dispute
+                                  <X className="h-3 w-3 mr-1" />{t("dispute")}
                                 </Button>
                               </div>
                             )}
@@ -168,19 +177,19 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
 
       {/* Deposits Section */}
       <div>
-        <h3 className="text-sm font-semibold mb-2">Deposits</h3>
+        <h3 className="text-sm font-semibold mb-2">{t("depositsSection")}</h3>
         <Card>
           <CardContent className="p-0">
             {sortedDeposits.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8 text-sm">No deposits to confirm</p>
+              <p className="text-muted-foreground text-center py-8 text-sm">{t("noDepositsConfirm")}</p>
             ) : (
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="border-b-2 border-border bg-muted">
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">Date</th>
-                    <th className="px-2 py-2 text-right font-medium text-muted-foreground">Amount</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">Notes</th>
-                    <th className="px-2 py-2 text-center font-medium text-muted-foreground">Status</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">{t("date")}</th>
+                    <th className="px-2 py-2 text-right font-medium text-muted-foreground">{t("amount")}</th>
+                    <th className="px-2 py-2 text-left font-medium text-muted-foreground">{t("notes")}</th>
+                    <th className="px-2 py-2 text-center font-medium text-muted-foreground">{t("status")}</th>
                     {isFinanceUser && <th className="px-2 py-2"></th>}
                   </tr>
                 </thead>
@@ -196,10 +205,10 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
                           {d.confirmation_status === "pending" && (
                             <div className="flex gap-1">
                               <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-green-600 border-green-600/30 hover:bg-green-500/10" onClick={() => handleConfirm(d.id, "finance_deposits")}>
-                                <CheckCircle2 className="h-3 w-3 mr-1" />Confirm
+                                <CheckCircle2 className="h-3 w-3 mr-1" />{t("confirm")}
                               </Button>
                               <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { setDisputeId(d.id); setDisputeType("deposit"); setDisputeNote(""); }}>
-                                <X className="h-3 w-3 mr-1" />Dispute
+                                <X className="h-3 w-3 mr-1" />{t("dispute")}
                               </Button>
                             </div>
                           )}
@@ -219,17 +228,17 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser }: Props) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <Card className="w-full max-w-md">
             <CardContent className="pt-6 space-y-4">
-              <h3 className="text-sm font-semibold">Dispute this {disputeType}</h3>
-              <p className="text-xs text-muted-foreground">Explain why this payment doesn't match your records.</p>
+              <h3 className="text-sm font-semibold">{t("disputeThis")} {disputeType}</h3>
+              <p className="text-xs text-muted-foreground">{t("disputeExplain")}</p>
               <Input
-                placeholder="Reason for dispute..."
+                placeholder={t("disputeReason")}
                 value={disputeNote}
                 onChange={(e) => setDisputeNote(e.target.value)}
                 className="text-sm"
               />
               <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => { setDisputeId(null); setDisputeNote(""); }}>Cancel</Button>
-                <Button variant="destructive" size="sm" onClick={handleDispute} disabled={!disputeNote.trim()}>Submit Dispute</Button>
+                <Button variant="outline" size="sm" onClick={() => { setDisputeId(null); setDisputeNote(""); }}>{t("cancel")}</Button>
+                <Button variant="destructive" size="sm" onClick={handleDispute} disabled={!disputeNote.trim()}>{t("submitDispute")}</Button>
               </div>
             </CardContent>
           </Card>
