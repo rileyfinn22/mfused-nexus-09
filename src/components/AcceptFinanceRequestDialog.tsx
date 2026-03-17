@@ -8,16 +8,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { formatUSD } from "@/lib/financeUtils";
+import { useFinanceLang } from "@/lib/financeI18n";
+import type { FinanceLang } from "@/lib/financeI18n";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   invoice: any;
+  lang?: FinanceLang;
 }
 
-export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invoice }: Props) {
+export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invoice, lang: langProp }: Props) {
+  const { t, lang: hookLang } = useFinanceLang();
+  const lang = langProp ?? hookLang;
+
   const [financedAmount, setFinancedAmount] = useState("");
   const [rmbAmount, setRmbAmount] = useState("");
   const [exchangeRate, setExchangeRate] = useState("7.2");
@@ -27,7 +32,6 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
   const [sendNotification, setSendNotification] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Pre-fill when invoice changes
   const handleOpen = () => {
     if (invoice) {
       setFinancedAmount(String(invoice.financed_amount || ""));
@@ -64,9 +68,7 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
       return;
     }
 
-    // Auto-record vendor PO payment if linked to a vendor PO
     if (invoice.vendor_po_id) {
-      // Get vendor PO company_id
       const { data: vpo } = await supabase
         .from("vendor_pos")
         .select("company_id")
@@ -87,7 +89,6 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
       }
     }
 
-    // Optionally notify vibe admins
     if (sendNotification) {
       try {
         const vendorPO = invoice.vendor_pos as any;
@@ -104,7 +105,7 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
       }
     }
 
-    toast({ title: "Request accepted & moved to Active" });
+    toast({ title: t("acceptActivate") });
     onSuccess();
     onOpenChange(false);
     setLoading(false);
@@ -114,14 +115,14 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
     <Dialog open={open} onOpenChange={(v) => { if (v) handleOpen(); onOpenChange(v); }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Accept & Process Request</DialogTitle>
+          <DialogTitle>{t("acceptProcessRequest")}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Confirm the financing details. The request will move to <strong>Active</strong> and aging/fees will start from the financed date.
+          {t("acceptDesc")}
         </p>
         <div className="space-y-4">
           <div>
-            <Label>Financed Amount (USD)</Label>
+            <Label>{t("financedAmountUSD")}</Label>
             <Input
               type="number"
               step="0.01"
@@ -136,7 +137,7 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
             />
           </div>
           <div>
-            <Label>Exchange Rate (USD → RMB)</Label>
+            <Label>{t("exchangeRate")}</Label>
             <Input
               type="number"
               step="0.0001"
@@ -149,7 +150,7 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
             />
           </div>
           <div>
-            <Label>RMB Amount</Label>
+            <Label>{t("rmbAmount")}</Label>
             <Input
               type="number"
               step="0.01"
@@ -164,28 +165,28 @@ export function AcceptFinanceRequestDialog({ open, onOpenChange, onSuccess, invo
             />
           </div>
           <div>
-            <Label>Financed Date (when paid)</Label>
+            <Label>{t("financedDateWhenPaid")}</Label>
             <Input type="date" value={financedDate} onChange={(e) => setFinancedDate(e.target.value)} />
           </div>
           <div>
-            <Label>Invoice Number</Label>
+            <Label>{t("invoiceNumber")}</Label>
             <Input
               value={invoiceNumber}
               onChange={(e) => setInvoiceNumber(e.target.value)}
-              placeholder="Your invoice #"
+              placeholder={t("yourInvoiceNumber")}
             />
           </div>
           <div>
-            <Label>Notes</Label>
+            <Label>{t("notes")}</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
           <div className="flex items-center gap-2">
             <Checkbox id="accept-notif" checked={sendNotification} onCheckedChange={(v) => setSendNotification(!!v)} />
-            <Label htmlFor="accept-notif" className="text-sm font-normal cursor-pointer">Send email notification to Vibe admins</Label>
+            <Label htmlFor="accept-notif" className="text-sm font-normal cursor-pointer">{t("sendNotification")}</Label>
           </div>
           <Button onClick={handleSubmit} disabled={loading || !financedAmount} className="w-full">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Accept & Activate
+            {t("acceptActivate")}
           </Button>
         </div>
       </DialogContent>

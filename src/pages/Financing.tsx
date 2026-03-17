@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Plus, AlertTriangle, Banknote, Link2, RefreshCw, ChevronDown, AlertCircle, Clock, CheckCircle2, Search, Download } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { calculateFinanceFee, getAgingBadgeVariant, formatUSD } from "@/lib/financeUtils";
+import { calculateFinanceFee, getAgingBadgeVariant, formatUSD, formatRMB } from "@/lib/financeUtils";
 import { AddFinancedInvoiceDialog } from "@/components/AddFinancedInvoiceDialog";
 import { RecordFinanceRepaymentDialog } from "@/components/RecordFinanceRepaymentDialog";
 import { RecordFinanceDepositDialog } from "@/components/RecordFinanceDepositDialog";
@@ -17,6 +17,9 @@ import { GenerateFinanceLinkDialog } from "@/components/GenerateFinanceLinkDialo
 import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
 import { FinanceConfirmationsTab } from "@/components/FinanceConfirmationsTab";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFinanceLang } from "@/lib/financeI18n";
+import { FinanceLangToggle } from "@/components/FinanceLangToggle";
+import { CardCurrency, DualCurrency } from "@/components/DualCurrency";
 
 export default function Financing() {
   const navigate = useNavigate();
@@ -39,6 +42,8 @@ export default function Financing() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [pendingConfirmations, setPendingConfirmations] = useState(0);
+
+  const { lang, toggleLang, t } = useFinanceLang();
 
   const isVibeAdmin = userRole === "vibe_admin";
   const isFinanceUser = userRole === "finance";
@@ -79,7 +84,6 @@ export default function Financing() {
     ]);
     setInvoices(invRes.data || []);
     setDeposits(depRes.data || []);
-    // Count pending confirmations
     const [repConf, depConf] = await Promise.all([
       supabase.from("finance_repayments").select("id", { count: "exact", head: true }).eq("confirmation_status", "pending"),
       supabase.from("finance_deposits").select("id", { count: "exact", head: true }).eq("confirmation_status", "pending"),
@@ -90,7 +94,6 @@ export default function Financing() {
 
   if (!isAuthorized) return null;
 
-  // Filter helper
   const filterBySearchAndDate = (list: any[]) => {
     let filtered = list;
     if (searchQuery.trim()) {
@@ -116,21 +119,31 @@ export default function Financing() {
     return filtered;
   };
 
-  // Split invoices by finance_status
   const pendingInvoices = filterBySearchAndDate(invoices.filter(i => i.finance_status === "pending"));
   const activeInvoices = filterBySearchAndDate(invoices.filter(i => !i.finance_status || i.finance_status === "active"));
   const completedInvoices = filterBySearchAndDate(invoices.filter(i => i.finance_status === "completed"));
 
-  // Summary cards only count active entries (unfiltered)
   const allActive = invoices.filter(i => !i.finance_status || i.finance_status === "active");
   const totalFinanced = allActive.reduce((s, i) => s + (i.financed_amount || 0), 0);
+  const totalFinancedRMB = allActive.reduce((s, i) => s + (i.financed_amount_rmb || 0), 0);
   const totalOutstanding = allActive.filter(i => i.status === "open").reduce((s, i) => {
     const fee = calculateFinanceFee(i.financed_amount, i.financed_date, i.paid_back_amount);
     return s + (i.financed_amount + fee.feeAmount - i.paid_back_amount);
   }, 0);
+  const totalOutstandingRMB = allActive.filter(i => i.status === "open").reduce((s, i) => {
+    const fee = calculateFinanceFee(i.financed_amount, i.financed_date, i.paid_back_amount);
+    const rate = i.exchange_rate || 7.2;
+    return s + ((i.financed_amount + fee.feeAmount - i.paid_back_amount) * rate);
+  }, 0);
   const requiredDeposit = allActive.filter(i => i.status === "open").reduce((s, i) => s + i.financed_amount, 0) * 0.10;
+  const requiredDepositRMB = allActive.filter(i => i.status === "open").reduce((s, i) => s + (i.financed_amount_rmb || i.financed_amount * (i.exchange_rate || 7.2)), 0) * 0.10;
   const currentDeposit = deposits.reduce((s, d) => s + (d.amount || 0), 0);
+  const avgRate = allActive.length > 0 ? allActive.reduce((s, i) => s + (i.exchange_rate || 7.2), 0) / allActive.length : 7.2;
+  const currentDepositRMB = currentDeposit * avgRate;
   const depositShortfall = Math.max(0, requiredDeposit - currentDeposit);
+  const depositShortfallRMB = Math.max(0, requiredDepositRMB - currentDepositRMB);
+  const totalRepaidUSD = activeInvoices.reduce((s, i) => s + (i.paid_back_amount || 0), 0);
+  const totalRepaidRMB = activeInvoices.reduce((s, i) => s + ((i.paid_back_amount || 0) * (i.exchange_rate || 7.2)), 0);
 
   const exportCSV = () => {
     const tab = activeTab === "pending" ? pendingInvoices : activeTab === "active" ? activeInvoices : completedInvoices;
@@ -165,6 +178,13 @@ export default function Financing() {
     URL.revokeObjectURL(url);
   };
 
+  const renderDualAmount = (usd: number, rate: number) => {
+    const rmb = usd * rate;
+    return (
+      <DualCurrency usd={usd} rmb={rmb} lang={lang} />
+    );
+  };
+
   const renderActiveRow = (inv: any, idx: number) => {
     const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
     const invoice = inv.invoices as any;
@@ -174,29 +194,30 @@ export default function Financing() {
     const adminDesc = vendorPO?.description || poOrder?.description || poOrder?.customer_name || order?.description || order?.customer_name || "—";
     const displayDesc = isFinanceUser ? (inv.description || "—") : (inv.description || adminDesc);
     const needsPOLink = isVibeAdmin && !inv.vendor_po_id && inv.created_by_role === "finance";
+    const rate = inv.exchange_rate || 7.2;
 
     return (
       <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer`} onClick={() => navigate(`/financing/${inv.id}`)}>
         {isVibeAdmin && (
           <td className="px-2 py-1.5 font-mono whitespace-nowrap">
             {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : needsPOLink ? (
-              <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1 text-amber-500"><AlertCircle className="h-3 w-3" /><span className="text-[10px]">Needs PO</span></span></TooltipTrigger><TooltipContent><p className="text-xs">Added by finance company — needs vendor PO link</p></TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1 text-amber-500"><AlertCircle className="h-3 w-3" /><span className="text-[10px]">{t("needsPO")}</span></span></TooltipTrigger><TooltipContent><p className="text-xs">{t("addedByFinance")}</p></TooltipContent></Tooltip>
             ) : "—"}
           </td>
         )}
         <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{displayDesc}</td>
         <td className="px-2 py-1.5 font-mono whitespace-nowrap">{invoice?.invoice_number || inv.invoice_number || "—"}</td>
-        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.financed_amount)}</td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
-        <td className="px-2 py-1.5 text-center"><Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}d</Badge></td>
+        <td className="px-2 py-1.5 text-center"><Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}{t("days")}</Badge></td>
         <td className={`px-2 py-1.5 text-right whitespace-nowrap font-medium ${fee.daysAging <= 60 ? "text-yellow-500" : "text-orange-600"}`}>
-          {formatUSD(fee.feeAmount)} <span className="text-[10px] opacity-75">({fee.daysAging <= 60 ? "5%" : "7%"})</span>
+          {renderDualAmount(fee.feeAmount, rate)} <span className="text-[10px] opacity-75">({fee.daysAging <= 60 ? "5%" : "7%"})</span>
         </td>
-        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.paid_back_amount)}</td>
-        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{formatUSD(inv.financed_amount + fee.feeAmount - inv.paid_back_amount)}</td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.paid_back_amount, rate)}</td>
+        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{renderDualAmount(inv.financed_amount + fee.feeAmount - inv.paid_back_amount, rate)}</td>
         <td className="px-2 py-1.5">
           {inv.status !== "paid" && isVibeAdmin && (
-            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); setSelectedInvoice({ ...inv, invoice_number: invoice?.invoice_number }); setRepayOpen(true); }}>Repay</Button>
+            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); setSelectedInvoice({ ...inv, invoice_number: invoice?.invoice_number }); setRepayOpen(true); }}>{t("repay")}</Button>
           )}
         </td>
       </tr>
@@ -207,6 +228,7 @@ export default function Financing() {
     const vendorPO = inv.vendor_pos as any;
     const poOrder = vendorPO?.orders as any;
     const desc = isFinanceUser ? (inv.description || vendorPO?.description || "—") : (vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—");
+    const rate = inv.exchange_rate || 7.2;
 
     return (
       <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer`} onClick={() => navigate(`/financing/${inv.id}`)}>
@@ -216,17 +238,17 @@ export default function Financing() {
           </td>
         )}
         <td className="px-2 py-1.5 max-w-[200px] truncate text-muted-foreground">{desc}</td>
-        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.financed_amount)}</td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.created_at || inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
         <td className="px-2 py-1.5 text-center">
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-500 border-amber-500/30">
-            <Clock className="h-2.5 w-2.5 mr-1" /> Waiting
+            <Clock className="h-2.5 w-2.5 mr-1" /> {t("waiting")}
           </Badge>
         </td>
         <td className="px-2 py-1.5">
           {isFinanceUser && (
             <Button size="sm" variant="default" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); setSelectedInvoice(inv); setAcceptOpen(true); }}>
-              Accept
+              {t("accept")}
             </Button>
           )}
         </td>
@@ -239,6 +261,7 @@ export default function Financing() {
     const vendorPO = inv.vendor_pos as any;
     const poOrder = vendorPO?.orders as any;
     const desc = isFinanceUser ? (inv.description || "—") : (vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—");
+    const rate = inv.exchange_rate || 7.2;
 
     return (
       <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer opacity-70`} onClick={() => navigate(`/financing/${inv.id}`)}>
@@ -249,12 +272,12 @@ export default function Financing() {
         )}
         <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{desc}</td>
         <td className="px-2 py-1.5 font-mono whitespace-nowrap">{invoice?.invoice_number || inv.invoice_number || "—"}</td>
-        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.financed_amount)}</td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
-        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatUSD(inv.paid_back_amount)}</td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.paid_back_amount, rate)}</td>
         <td className="px-2 py-1.5 text-center">
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-green-500 border-green-500/30">
-            <CheckCircle2 className="h-2.5 w-2.5 mr-1" /> Paid
+            <CheckCircle2 className="h-2.5 w-2.5 mr-1" /> {t("paid")}
           </Badge>
         </td>
       </tr>
@@ -265,53 +288,54 @@ export default function Financing() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">
-          {isFinanceUser ? "Invoice Financing" : "PO Financing Tracker"}
+          {isFinanceUser ? t("invoiceFinancing") : t("poFinancingTracker")}
         </h1>
         <div className="flex gap-2">
+          <FinanceLangToggle lang={lang} onToggle={toggleLang} />
           {isVibeAdmin && (
             <>
               <Button variant="outline" size="sm" onClick={() => setLinkOpen(true)}>
-                <Link2 className="mr-2 h-4 w-4" /> Share Link
+                <Link2 className="mr-2 h-4 w-4" /> {t("shareLink")}
               </Button>
               <Button variant="outline" size="sm" onClick={() => setDepositOpen(true)}>
-                <Banknote className="mr-2 h-4 w-4" /> Record Deposit
+                <Banknote className="mr-2 h-4 w-4" /> {t("recordDeposit")}
               </Button>
               <Button size="sm" onClick={() => setAddOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" /> Submit for Financing
+                <Plus className="mr-2 h-4 w-4" /> {t("submitForFinancing")}
               </Button>
             </>
           )}
         </div>
       </div>
 
-      {/* Summary Cards — only active entries */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Active Financed</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-24" /> : formatUSD(totalFinanced)}</p></CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("activeFinanced")}</CardTitle></CardHeader>
+          <CardContent>{loading ? <Skeleton className="h-8 w-24" /> : <CardCurrency usd={totalFinanced} rmb={totalFinancedRMB} lang={lang} />}</CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Armropak Outstanding</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold text-amber-500">{loading ? <Skeleton className="h-8 w-24" /> : formatUSD(totalOutstanding)}</p></CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("armorpakOutstanding")}</CardTitle></CardHeader>
+          <CardContent>{loading ? <Skeleton className="h-8 w-24" /> : <CardCurrency usd={totalOutstanding} rmb={totalOutstandingRMB} lang={lang} colorClass="text-amber-500" />}</CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Required Deposit (10%)</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-24" /> : formatUSD(requiredDeposit)}</p></CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("requiredDeposit")}</CardTitle></CardHeader>
+          <CardContent>{loading ? <Skeleton className="h-8 w-24" /> : <CardCurrency usd={requiredDeposit} rmb={requiredDepositRMB} lang={lang} />}</CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Deposit Balance</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("depositBalance")}</CardTitle></CardHeader>
           <CardContent>
             <Popover>
               <PopoverTrigger asChild>
-                <button className="flex items-center gap-1 text-2xl font-bold text-green-500 hover:underline cursor-pointer">
-                  {loading ? <Skeleton className="h-8 w-24" /> : formatUSD(currentDeposit)}
+                <button className="flex items-center gap-1 hover:underline cursor-pointer">
+                  <CardCurrency usd={currentDeposit} rmb={currentDepositRMB} lang={lang} colorClass="text-green-500" />
                   <ChevronDown className="h-4 w-4 opacity-60" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-72 p-0" align="start">
-                <div className="p-3 border-b border-border"><p className="text-xs font-semibold text-muted-foreground">Deposit History</p></div>
+                <div className="p-3 border-b border-border"><p className="text-xs font-semibold text-muted-foreground">{t("depositHistory")}</p></div>
                 {deposits.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-4">No deposits yet</p>
+                  <p className="text-xs text-muted-foreground text-center py-4">{t("noDeposits")}</p>
                 ) : (
                   <div className="max-h-48 overflow-y-auto divide-y divide-border">
                     {deposits.map((d) => (
@@ -327,10 +351,20 @@ export default function Financing() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Repaid</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold text-green-500">
-            {loading ? <Skeleton className="h-8 w-24" /> : formatUSD(activeInvoices.reduce((s, i) => s + (i.paid_back_amount || 0), 0))}
-          </p></CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-1">
+            {depositShortfall > 0 && <AlertTriangle className="h-3 w-3 text-destructive" />} {t("depositShortfall")}
+          </CardTitle></CardHeader>
+          <CardContent>
+            {loading ? <Skeleton className="h-8 w-24" /> : depositShortfall > 0 ? (
+              <CardCurrency usd={depositShortfall} rmb={depositShortfallRMB} lang={lang} colorClass="text-destructive" />
+            ) : (
+              <p className="text-2xl font-bold text-green-500">—</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("totalRepaid")}</CardTitle></CardHeader>
+          <CardContent>{loading ? <Skeleton className="h-8 w-24" /> : <CardCurrency usd={totalRepaidUSD} rmb={totalRepaidRMB} lang={lang} colorClass="text-green-500" />}</CardContent>
         </Card>
       </div>
 
@@ -339,22 +373,22 @@ export default function Financing() {
         <div className="flex items-center justify-between">
           <TabsList>
             <TabsTrigger value="pending" className="gap-1.5">
-              Pending {pendingInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{pendingInvoices.length}</Badge>}
+              {t("pending")} {pendingInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{pendingInvoices.length}</Badge>}
             </TabsTrigger>
             <TabsTrigger value="active" className="gap-1.5">
-              Active {activeInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{activeInvoices.length}</Badge>}
+              {t("active")} {activeInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{activeInvoices.length}</Badge>}
             </TabsTrigger>
             <TabsTrigger value="completed" className="gap-1.5">
-              Completed {completedInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{completedInvoices.length}</Badge>}
+              {t("completed")} {completedInvoices.length > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{completedInvoices.length}</Badge>}
             </TabsTrigger>
             <TabsTrigger value="confirmations" className="gap-1.5">
-              Confirmations {pendingConfirmations > 0 && <Badge variant="warning" className="text-[10px] px-1.5 py-0 ml-1">{pendingConfirmations}</Badge>}
+              {t("confirmations")} {pendingConfirmations > 0 && <Badge variant="warning" className="text-[10px] px-1.5 py-0 ml-1">{pendingConfirmations}</Badge>}
             </TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={fetchData}><RefreshCw className="h-4 w-4" /></Button>
             <Button variant="outline" size="sm" onClick={exportCSV} className="gap-1.5">
-              <Download className="h-3.5 w-3.5" /> Export
+              <Download className="h-3.5 w-3.5" /> {t("export")}
             </Button>
           </div>
         </div>
@@ -364,19 +398,19 @@ export default function Financing() {
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Search PO, description, customer..."
+              placeholder={t("searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 h-8 text-xs"
             />
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span>From</span>
+            <span>{t("from")}</span>
             <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-[130px] text-xs" />
-            <span>To</span>
+            <span>{t("to")}</span>
             <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-[130px] text-xs" />
             {(dateFrom || dateTo || searchQuery) && (
-              <Button variant="ghost" size="sm" className="h-8 text-xs px-2" onClick={() => { setSearchQuery(""); setDateFrom(""); setDateTo(""); }}>Clear</Button>
+              <Button variant="ghost" size="sm" className="h-8 text-xs px-2" onClick={() => { setSearchQuery(""); setDateFrom(""); setDateTo(""); }}>{t("clear")}</Button>
             )}
           </div>
         </div>
@@ -388,16 +422,16 @@ export default function Financing() {
               {loading ? (
                 <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div>
               ) : pendingInvoices.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8 text-sm">No pending requests</p>
+                <p className="text-muted-foreground text-center py-8 text-sm">{t("noPending")}</p>
               ) : (
                 <table className="w-full text-xs border-collapse">
                   <thead>
                     <tr className="border-b-2 border-border bg-muted">
-                      {isVibeAdmin && <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vendor PO</th>}
-                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Description</th>
-                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Amount</th>
-                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Submitted</th>
-                      <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                      {isVibeAdmin && <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("vendorPO")}</th>}
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("description")}</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("amount")}</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("submitted")}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">{t("status")}</th>
                       <th className="px-2 py-2"></th>
                     </tr>
                   </thead>
@@ -415,20 +449,20 @@ export default function Financing() {
               {loading ? (
                 <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div>
               ) : activeInvoices.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8 text-sm">No active financed invoices</p>
+                <p className="text-muted-foreground text-center py-8 text-sm">{t("noActive")}</p>
               ) : (
                 <table className="w-full text-xs border-collapse">
                   <thead>
                     <tr className="border-b-2 border-border bg-muted">
-                      {isVibeAdmin && <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vendor PO</th>}
-                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Description</th>
-                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Invoice</th>
-                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Financed</th>
-                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
-                      <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Aging</th>
-                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Fee</th>
-                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Repaid</th>
-                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Balance</th>
+                      {isVibeAdmin && <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("vendorPO")}</th>}
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("description")}</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("invoice")}</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("financed")}</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("date")}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">{t("aging")}</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("fee")}</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("repaid")}</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("balance")}</th>
                       <th className="px-2 py-2"></th>
                     </tr>
                   </thead>
@@ -446,18 +480,18 @@ export default function Financing() {
               {loading ? (
                 <div className="space-y-2 p-4">{[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div>
               ) : completedInvoices.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8 text-sm">No completed entries</p>
+                <p className="text-muted-foreground text-center py-8 text-sm">{t("noCompleted")}</p>
               ) : (
                 <table className="w-full text-xs border-collapse">
                   <thead>
                     <tr className="border-b-2 border-border bg-muted">
-                      {isVibeAdmin && <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vendor PO</th>}
-                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Description</th>
-                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Invoice</th>
-                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Financed</th>
-                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
-                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Repaid</th>
-                      <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                      {isVibeAdmin && <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("vendorPO")}</th>}
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("description")}</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("invoice")}</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("financed")}</th>
+                      <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("date")}</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("repaid")}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">{t("status")}</th>
                     </tr>
                   </thead>
                   <tbody>{completedInvoices.map(renderCompletedRow)}</tbody>
@@ -469,7 +503,7 @@ export default function Financing() {
 
         {/* CONFIRMATIONS TAB */}
         <TabsContent value="confirmations">
-          <FinanceConfirmationsTab isVibeAdmin={isVibeAdmin} isFinanceUser={isFinanceUser} />
+          <FinanceConfirmationsTab isVibeAdmin={isVibeAdmin} isFinanceUser={isFinanceUser} lang={lang} />
         </TabsContent>
       </Tabs>
 
@@ -483,7 +517,7 @@ export default function Financing() {
         </>
       )}
       {isFinanceUser && (
-        <AcceptFinanceRequestDialog open={acceptOpen} onOpenChange={setAcceptOpen} onSuccess={fetchData} invoice={selectedInvoice} />
+        <AcceptFinanceRequestDialog open={acceptOpen} onOpenChange={setAcceptOpen} onSuccess={fetchData} invoice={selectedInvoice} lang={lang} />
       )}
     </div>
   );
