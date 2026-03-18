@@ -429,9 +429,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     const canvas = new FabricCanvas(canvasRef.current, {
       enableRetinaScaling: true,
+      width: canvasWidth,
+      height: canvasHeight,
     });
-    // Keep logical zoom deterministic across devices; Fabric manages DPR internally.
-    canvas.setDimensions({ width: cssWidth, height: cssHeight });
+    // Set CSS display size separately from backstore to avoid cursor misalignment.
+    // Fabric's upper-canvas (event/cursor layer) must match CSS dims exactly.
+    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
     // Zoom maps logical canvas coords (canvasWidth) → on-screen CSS pixels
     canvas.setZoom(displayScale);
     canvas.backgroundColor = "#ffffff";
