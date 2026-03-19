@@ -877,11 +877,15 @@ const Artwork = () => {
   };
 
   const getTemplateDisplayThumbnail = (template: ProductTemplate) => {
+    if (templateDerivedThumbnails[template.id]) {
+      return templateDerivedThumbnails[template.id];
+    }
+
     if (template.thumbnail_url && !isLegacyGeneratedTemplateMockupUrl(template.thumbnail_url)) {
       return template.thumbnail_url;
     }
 
-    return templateDerivedThumbnails[template.id] || null;
+    return null;
   };
 
   // Get all artwork stats

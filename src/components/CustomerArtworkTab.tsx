@@ -102,6 +102,7 @@ export function CustomerArtworkTab({
   
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
+  const [templateDerivedThumbnails, setTemplateDerivedThumbnails] = useState<Record<string, string>>({});
   
   // Dialogs
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -137,7 +138,7 @@ export function CustomerArtworkTab({
       // Get templates that have products
       let productsQuery = supabase
         .from('products')
-        .select('template_id, item_id');
+        .select('template_id, item_id, image_url');
       
       if (!isVibeAdmin && userCompanyId) {
         productsQuery = productsQuery.eq('company_id', userCompanyId);
@@ -155,10 +156,10 @@ export function CustomerArtworkTab({
         .in('id', templateIds.length > 0 ? templateIds : ['none'])
         .order('name');
       
-      // Fetch customer artwork counts per SKU
+      // Fetch customer artwork counts per SKU + first usable proof thumbnail
       let artworkQuery = supabase
         .from('artwork_files')
-        .select('sku, is_approved')
+        .select('sku, is_approved, preview_url, artwork_url, filename')
         .eq('artwork_type', 'customer');
       
       if (!isVibeAdmin && userCompanyId) {
@@ -170,7 +171,9 @@ export function CustomerArtworkTab({
       const { data: artworkData } = await artworkQuery;
       
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
-      artworkData?.forEach(art => {
+      const skuThumbnails: Record<string, string | null> = {};
+
+      artworkData?.forEach((art) => {
         if (!counts[art.sku]) {
           counts[art.sku] = { total: 0, approved: 0, pending: 0 };
         }
@@ -180,24 +183,51 @@ export function CustomerArtworkTab({
         } else {
           counts[art.sku].pending++;
         }
+
+        if (!skuThumbnails[art.sku]) {
+          const thumbnail = getArtworkThumbnail({
+            preview_url: art.preview_url,
+            artwork_url: art.artwork_url,
+            filename: art.filename,
+          });
+
+          if (thumbnail.type === 'image' && thumbnail.src) {
+            skuThumbnails[art.sku] = thumbnail.src;
+          }
+        }
       });
       setArtworkCounts(counts);
       
       // Calculate template status based on product artwork
       const templateStatusMap: Record<string, ArtworkStatus> = {};
-      templatesData?.forEach(template => {
-        const templateProducts = productsData?.filter(p => p.template_id === template.id) || [];
-        const templateSkus = templateProducts.map(p => p.item_id).filter(Boolean) as string[];
+      const derivedThumbs: Record<string, string> = {};
+
+      templatesData?.forEach((template) => {
+        const templateProducts = productsData?.filter((p) => p.template_id === template.id) || [];
+        const templateSkus = templateProducts.map((p) => p.item_id).filter(Boolean) as string[];
         
         let hasApproved = false;
         let hasPending = false;
         
-        templateSkus.forEach(sku => {
+        templateSkus.forEach((sku) => {
           if (counts[sku]) {
             if (counts[sku].approved > 0) hasApproved = true;
             if (counts[sku].pending > 0) hasPending = true;
           }
+
+          if (!derivedThumbs[template.id] && skuThumbnails[sku]) {
+            derivedThumbs[template.id] = skuThumbnails[sku]!;
+          }
         });
+
+        if (!derivedThumbs[template.id]) {
+          for (const product of templateProducts) {
+            if (product.image_url) {
+              derivedThumbs[template.id] = product.image_url;
+              break;
+            }
+          }
+        }
         
         if (hasApproved && !hasPending) {
           templateStatusMap[template.id] = 'approved';
@@ -207,8 +237,9 @@ export function CustomerArtworkTab({
           templateStatusMap[template.id] = 'no_art';
         }
       });
+
       setTemplateStatus(templateStatusMap);
-      
+      setTemplateDerivedThumbnails(derivedThumbs);
       setTemplates(templatesData || []);
     } catch (error) {
       console.error('Error fetching templates:', error);
