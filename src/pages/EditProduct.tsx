@@ -219,7 +219,7 @@ const EditProduct = () => {
       if (error) throw error;
 
       toast.success("Product updated successfully");
-      navigate('/products');
+      navigate(-1);
     } catch (error) {
       console.error('Error updating product:', error);
       toast.error("Failed to update product");
