@@ -121,6 +121,9 @@ const Artwork = () => {
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
   
+  // Derived template thumbnails from product artwork (fallback when template.thumbnail_url is null)
+  const [templateDerivedThumbnails, setTemplateDerivedThumbnails] = useState<Record<string, string>>({});
+  
   // View mode
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   
