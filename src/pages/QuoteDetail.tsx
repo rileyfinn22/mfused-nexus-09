@@ -127,10 +127,14 @@ const QuoteDetail = () => {
   const [showVendorDialog, setShowVendorDialog] = useState(false);
   const [responseQuote, setResponseQuote] = useState<{ id: string; quote_number: string; status: string } | null>(null);
   const [convertLoading, setConvertLoading] = useState<'order' | 'invoice' | null>(null);
+  const [quoteDocuments, setQuoteDocuments] = useState<{ id: string; file_name: string; file_path: string; file_size: number | null; file_type: string | null; notes: string | null; created_at: string }[]>([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     checkRole();
     fetchQuote();
+    fetchQuoteDocuments();
   }, [quoteId]);
 
   const checkRole = async () => {
