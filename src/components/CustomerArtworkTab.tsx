@@ -483,19 +483,12 @@ export function CustomerArtworkTab({
   };
 
   const getTemplateDisplayThumbnail = (template: ProductTemplate) => {
-    if (template.thumbnail_url && !isLegacyGeneratedTemplateMockupUrl(template.thumbnail_url)) {
-      return template.thumbnail_url;
+    if (templateDerivedThumbnails[template.id]) {
+      return templateDerivedThumbnails[template.id];
     }
 
-    const templateProducts = products.filter((product) => product.template_id === template.id);
-    for (const product of templateProducts) {
-      const sku = product.item_id || '';
-      if (sku && artworkCounts[sku]?.total > 0) {
-        return null;
-      }
-      if (product.image_url) {
-        return product.image_url;
-      }
+    if (template.thumbnail_url && !isLegacyGeneratedTemplateMockupUrl(template.thumbnail_url)) {
+      return template.thumbnail_url;
     }
 
     return null;

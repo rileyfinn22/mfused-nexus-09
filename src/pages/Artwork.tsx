@@ -337,30 +337,24 @@ const Artwork = () => {
       setTemplateStatus(templateStatusMap);
       setTemplateArtworkCounts(templateArtCountMap);
       
-      // Build derived thumbnails for templates without a usable dedicated thumbnail
+      // Build derived thumbnails from the first available interior proof/artwork
       const derivedThumbs: Record<string, string> = {};
       templatesData?.forEach(template => {
-        const hasUsableTemplateThumbnail = Boolean(
-          template.thumbnail_url && !isLegacyGeneratedTemplateMockupUrl(template.thumbnail_url)
-        );
+        const templateProducts = filteredProductsData.filter(p => p.template_id === template.id);
+        const templateSkus = templateProducts.map(p => p.item_id).filter(Boolean) as string[];
 
-        if (!hasUsableTemplateThumbnail) {
-          const templateProducts = filteredProductsData.filter(p => p.template_id === template.id);
-          const templateSkus = templateProducts.map(p => p.item_id).filter(Boolean) as string[];
-          // Also check product image_url as fallback
-          for (const sku of templateSkus) {
-            if (skuThumbnails[sku]) {
-              derivedThumbs[template.id] = skuThumbnails[sku]!;
-              break;
-            }
+        for (const sku of templateSkus) {
+          if (skuThumbnails[sku]) {
+            derivedThumbs[template.id] = skuThumbnails[sku]!;
+            break;
           }
-          // If no artwork thumbnail found, try product image_url
-          if (!derivedThumbs[template.id]) {
-            for (const prod of templateProducts) {
-              if (prod.image_url) {
-                derivedThumbs[template.id] = prod.image_url;
-                break;
-              }
+        }
+
+        if (!derivedThumbs[template.id]) {
+          for (const prod of templateProducts) {
+            if (prod.image_url) {
+              derivedThumbs[template.id] = prod.image_url;
+              break;
             }
           }
         }

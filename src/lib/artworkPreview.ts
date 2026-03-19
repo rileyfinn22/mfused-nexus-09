@@ -52,7 +52,7 @@ export function isLegacyGeneratedTemplateMockupUrl(url: string | null | undefine
     return false;
   }
 
-  return /(?:-v3)\.(?:png|jpe?g|webp|gif)$/i.test(url) || /mockup/i.test(url);
+  return /(?:-v3|-v4)\.(?:png|jpe?g|webp|gif)$/i.test(url) || /mockup/i.test(url);
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
