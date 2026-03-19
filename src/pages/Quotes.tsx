@@ -59,6 +59,13 @@ const Quotes = () => {
   const [companyFilter, setCompanyFilter] = useState("all");
   const [companies, setCompanies] = useState<Company[]>([]);
 
+  // Redirect non-admin users away from quotes
+  useEffect(() => {
+    if (isVibeAdmin === false) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isVibeAdmin, navigate]);
+
   useEffect(() => {
     fetchQuotes();
     if (isVibeAdmin) {
