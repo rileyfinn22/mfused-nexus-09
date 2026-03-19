@@ -209,7 +209,7 @@ const AddArtworkDialog = ({
       let previewUrl: string | null = null;
       if (formData.previewFile) {
         const previewExt = formData.previewFile.name.split('.').pop();
-        const previewName = `${formData.sku}/preview-${Date.now()}.${previewExt}`;
+        const previewName = buildManualArtworkPreviewPath(formData.sku, previewExt);
 
         const { error: previewError } = await supabase.storage
           .from('artwork')
