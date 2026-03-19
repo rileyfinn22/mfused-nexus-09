@@ -941,15 +941,18 @@ export function CustomerArtworkTab({
         </Card>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredTemplates.map((template) => (
+          {filteredTemplates.map((template) => {
+            const templateThumbnail = getTemplateDisplayThumbnail(template);
+
+            return (
             <Card
               key={template.id}
               className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
               onClick={() => setSelectedTemplate(template)}
             >
               <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                {template.thumbnail_url ? (
-                  <img src={template.thumbnail_url} alt={template.name} className="w-full h-full object-cover" />
+                {templateThumbnail ? (
+                  <img src={templateThumbnail} alt={template.name} className="w-full h-full object-cover" />
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
