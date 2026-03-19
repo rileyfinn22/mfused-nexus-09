@@ -1725,7 +1725,7 @@ const CreateOrder = () => {
         // Update existing items and add new ones, preserving vendor assignments
         for (const item of selectedItems) {
           const product = products.find(p => p.id === item.productId);
-          const price = item.unit_price ?? product?.cost ?? 0;
+          const price = item.unit_price ?? 0;
           const itemTotal = price * item.quantity;
           
           const existingItem = existingItemsMap.get(item.productId);
