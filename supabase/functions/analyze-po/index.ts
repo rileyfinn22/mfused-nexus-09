@@ -325,7 +325,7 @@ serve(async (req) => {
         // Strain type indicators
         if (/^(sat|sativa|hyb|hybrid|ind|indica|tbd)$/.test(t)) return true;
         // Common noise that isn't product-identifying
-        if (/^(super|fog|cart|cartridge|pre|roll|preroll)$/.test(t)) return true;
+        if (/^(super|fog|cart|cartridge|pre|roll|preroll|jefe|plus|pouch|pouches)$/.test(t)) return true;
         // Multipliers like "1x", "2x"
         if (/^\d+x$/.test(t)) return true;
         // Parenthetical content
