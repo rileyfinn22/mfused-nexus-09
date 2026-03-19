@@ -456,6 +456,17 @@ export function CustomerArtworkTab({
       return template.thumbnail_url;
     }
 
+    const templateProducts = products.filter((product) => product.template_id === template.id);
+    for (const product of templateProducts) {
+      const sku = product.item_id || '';
+      if (sku && artworkCounts[sku]?.total > 0) {
+        return null;
+      }
+      if (product.image_url) {
+        return product.image_url;
+      }
+    }
+
     return null;
   };
 
