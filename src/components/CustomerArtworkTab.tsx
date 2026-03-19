@@ -344,7 +344,7 @@ export function CustomerArtworkTab({
 
       if (newThumbnailFile) {
         const fileExt = newThumbnailFile.name.split('.').pop();
-        const fileName = `${selectedFile.sku}/preview-${Date.now()}.${fileExt}`;
+        const fileName = buildManualArtworkPreviewPath(selectedFile.sku, fileExt);
         
         const { error: uploadError } = await supabase.storage
           .from('artwork')
