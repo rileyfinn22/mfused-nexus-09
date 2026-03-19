@@ -298,26 +298,18 @@ const BulkArtworkUploadDialog = ({
           .from('artwork')
           .getPublicUrl(storagePath);
 
-        // Auto-generate PDF thumbnail (first page) for better browsing
+        // Auto-generate a clean flat preview for PDF proofs
         let previewUrl: string | null = null;
         if (isPdf) {
           try {
-            const arrayBuffer = await fileBlob.arrayBuffer();
-            const thumbBlob = await generatePdfThumbnailFromArrayBuffer(arrayBuffer, { maxWidth: 700 });
-            const previewPath = `${match.selectedSku}/preview-${Date.now()}.png`;
-
-            const { error: previewError } = await supabase.storage
-              .from('artwork')
-              .upload(previewPath, thumbBlob, { contentType: 'image/png' });
-
-            if (!previewError) {
-              const { data: { publicUrl: thumbUrl } } = supabase.storage
-                .from('artwork')
-                .getPublicUrl(previewPath);
-              previewUrl = thumbUrl;
-            }
+            previewUrl = await createFlatArtworkPreviewFromArtwork({
+              artworkUrl: publicUrl,
+              filename: match.filename,
+              sku: match.selectedSku!,
+              contextLabel: match.filename,
+            });
           } catch (e) {
-            console.warn('Failed to generate PDF thumbnail for', match.filename, e);
+            console.warn('Failed to generate flat artwork preview for', match.filename, e);
           }
         }
 

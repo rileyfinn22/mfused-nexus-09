@@ -330,28 +330,41 @@ export function CustomerArtworkTab({
   };
 
   const handleEditThumbnail = async () => {
-    if (!newThumbnailFile || !selectedFile) {
+    if (!selectedFile) {
       toast({
         title: "Missing file",
-        description: "Please select a thumbnail image",
+        description: "Please select an artwork file",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      const fileExt = newThumbnailFile.name.split('.').pop();
-      const fileName = `${selectedFile.sku}/preview-${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('artwork')
-        .upload(fileName, newThumbnailFile);
+      let publicUrl: string;
 
-      if (uploadError) throw uploadError;
+      if (newThumbnailFile) {
+        const fileExt = newThumbnailFile.name.split('.').pop();
+        const fileName = `${selectedFile.sku}/preview-${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('artwork')
+          .upload(fileName, newThumbnailFile);
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('artwork')
-        .getPublicUrl(fileName);
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl: uploadedUrl } } = supabase.storage
+          .from('artwork')
+          .getPublicUrl(fileName);
+
+        publicUrl = uploadedUrl;
+      } else {
+        publicUrl = await createFlatArtworkPreviewFromArtwork({
+          artworkUrl: selectedFile.artwork_url,
+          filename: selectedFile.filename,
+          sku: selectedFile.sku,
+          contextLabel: selectedFile.filename,
+        });
+      }
 
       const { error: updateError } = await supabase
         .from('artwork_files')
@@ -362,7 +375,9 @@ export function CustomerArtworkTab({
 
       toast({
         title: "Success",
-        description: "Thumbnail updated successfully",
+        description: newThumbnailFile
+          ? "Thumbnail updated successfully"
+          : "Flat proof preview generated successfully",
       });
 
       setEditThumbnailDialogOpen(false);
