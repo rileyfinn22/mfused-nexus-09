@@ -1637,7 +1637,7 @@ const Artwork = () => {
                           const { error: dbErr } = await supabase.from('product_templates').update({ thumbnail_url: publicUrl }).eq('id', template.id);
                           if (dbErr) throw dbErr;
                           toast({ title: "Thumbnail updated" });
-                          fetchData();
+                          fetchTemplates();
                         } catch (err) {
                           console.error(err);
                           toast({ title: "Failed to upload thumbnail", variant: "destructive" });
