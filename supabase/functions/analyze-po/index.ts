@@ -274,7 +274,7 @@ serve(async (req) => {
     };
 
     // IMPORTANT: These are key product line identifiers that must NEVER be dropped
-    const IMPORTANT_PRODUCT_LINES = ['ion', 'fatty', 'vape', 'live', 'line', 'fire', 'atf', 'anthos', 'frx', 'rebel', 'cc'];
+    const IMPORTANT_PRODUCT_LINES = ['ion', 'fatty', 'vape', 'live', 'line', 'fire', 'atf', 'anthos', 'frx', 'rebel', 'cc', 'loud', 'twisted', 'vibes'];
     
     // Color variants - CRITICAL for matching different color products
     const COLOR_WORDS = ['blue', 'green', 'orange', 'red', 'purple', 'pink', 'black', 'white', 'yellow', 'gold', 'silver', 'brown', 'grey', 'gray'];
