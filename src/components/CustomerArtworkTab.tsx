@@ -451,6 +451,14 @@ export function CustomerArtworkTab({
     return productName;
   };
 
+  const getTemplateDisplayThumbnail = (template: ProductTemplate) => {
+    if (template.thumbnail_url && !isLegacyGeneratedTemplateMockupUrl(template.thumbnail_url)) {
+      return template.thumbnail_url;
+    }
+
+    return null;
+  };
+
   // Get all artwork stats
   const totalArtwork = Object.values(artworkCounts).reduce((sum, c) => sum + c.total, 0);
 
