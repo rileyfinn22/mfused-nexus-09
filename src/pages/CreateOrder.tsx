@@ -2648,7 +2648,7 @@ const CreateOrder = () => {
                   const product = products.find(p => p.id === item.productId);
                   // IMPORTANT: the total uses ALL selectedItems, so we must render rows even if the
                   // product isn't currently in the loaded product list (e.g. query limit).
-                  const price = Number(item.unit_price ?? product?.cost ?? 0);
+                  const price = Number(item.unit_price ?? 0);
                   const amount = price * item.quantity;
                   const itemKey = getItemKey(item);
 
