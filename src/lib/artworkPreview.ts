@@ -15,9 +15,43 @@ const PDF_PREVIEW_OPTIONS = {
   scale: 1.5,
 };
 
+const FLAT_ARTWORK_PREVIEW_PREFIX = "flat-preview-";
+const MANUAL_ARTWORK_PREVIEW_PREFIX = "manual-preview-";
+
 const getFileExtension = (filename: string) => filename.split(".").pop()?.toLowerCase() ?? "";
 
 const isPdfFile = (filename: string) => getFileExtension(filename) === "pdf";
+
+export function buildManualArtworkPreviewPath(sku: string, extension?: string): string {
+  const normalizedExtension = extension?.replace(/^\./, "").toLowerCase() || "png";
+  return `${sku}/${MANUAL_ARTWORK_PREVIEW_PREFIX}${Date.now()}.${normalizedExtension}`;
+}
+
+export function isUsableArtworkPreviewUrl(
+  filename: string,
+  previewUrl: string | null | undefined,
+): previewUrl is string {
+  if (!previewUrl) {
+    return false;
+  }
+
+  if (!isPdfFile(filename)) {
+    return true;
+  }
+
+  return (
+    previewUrl.includes(`/${FLAT_ARTWORK_PREVIEW_PREFIX}`) ||
+    previewUrl.includes(`/${MANUAL_ARTWORK_PREVIEW_PREFIX}`)
+  );
+}
+
+export function isLegacyGeneratedTemplateMockupUrl(url: string | null | undefined): boolean {
+  if (!url) {
+    return false;
+  }
+
+  return /(?:-v3|-v4)\.(?:png|jpe?g|webp|gif)$/i.test(url) || /mockup/i.test(url);
+}
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
   return await new Promise((resolve, reject) => {
@@ -48,7 +82,7 @@ async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
 }
 
 async function uploadPreviewBlob(sku: string, blob: Blob): Promise<string> {
-  const previewPath = `${sku}/preview-${Date.now()}.png`;
+  const previewPath = `${sku}/${FLAT_ARTWORK_PREVIEW_PREFIX}${Date.now()}.png`;
 
   const { error: uploadError } = await supabase.storage
     .from("artwork")
