@@ -43,7 +43,9 @@ import {
   Clock,
   PlayCircle,
   ShoppingCart,
-  Receipt
+  Receipt,
+  Upload,
+  X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
