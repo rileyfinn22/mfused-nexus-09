@@ -1638,9 +1638,9 @@ const Artwork = () => {
               onClick={() => setSelectedTemplate(template)}
             >
               <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                {/* Show template thumbnail if available, otherwise package icon */}
-                {template.thumbnail_url ? (
-                  <img src={template.thumbnail_url} alt={template.name} className="w-full h-full object-cover" />
+                {/* Show template thumbnail if available, fall back to derived artwork thumbnail, then package icon */}
+                {(template.thumbnail_url || templateDerivedThumbnails[template.id]) ? (
+                  <img src={template.thumbnail_url || templateDerivedThumbnails[template.id]} alt={template.name} className="w-full h-full object-cover" />
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
