@@ -41,7 +41,6 @@ const companyNavigationItems = [
   { title: "Orders", url: "/orders", icon: ClipboardList },
   { title: "Production", url: "/production", icon: Factory },
   { title: "Invoices", url: "/invoices", icon: FileText },
-  { title: "Quotes", url: "/quotes", icon: Calculator },
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Pull & Ship", url: "/pull-ship", icon: Truck },
   { title: "My POs", url: "/my-pos", icon: FolderOpen },

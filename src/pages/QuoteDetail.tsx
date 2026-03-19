@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +43,9 @@ import {
   Clock,
   PlayCircle,
   ShoppingCart,
-  Receipt
+  Receipt,
+  Upload,
+  X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -124,10 +127,14 @@ const QuoteDetail = () => {
   const [showVendorDialog, setShowVendorDialog] = useState(false);
   const [responseQuote, setResponseQuote] = useState<{ id: string; quote_number: string; status: string } | null>(null);
   const [convertLoading, setConvertLoading] = useState<'order' | 'invoice' | null>(null);
+  const [quoteDocuments, setQuoteDocuments] = useState<{ id: string; file_name: string; file_path: string; file_size: number | null; file_type: string | null; notes: string | null; created_at: string }[]>([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     checkRole();
     fetchQuote();
+    fetchQuoteDocuments();
   }, [quoteId]);
 
   const checkRole = async () => {
@@ -607,6 +614,66 @@ const QuoteDetail = () => {
   // Check if any items have price breaks
   const hasAnyPriceBreaks = items.some(item => item.price_breaks && item.price_breaks.length > 0);
 
+  const fetchQuoteDocuments = async () => {
+    const { data } = await supabase
+      .from('quote_documents')
+      .select('*')
+      .eq('quote_id', quoteId)
+      .order('created_at', { ascending: false });
+    setQuoteDocuments(data || []);
+  };
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !quoteId) return;
+    setUploadingDoc(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      for (const file of Array.from(files)) {
+        const filePath = `quote-documents/${quoteId}/${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('quote-documents')
+          .upload(filePath, file);
+        if (uploadError) throw uploadError;
+
+        const { error: insertError } = await supabase
+          .from('quote_documents')
+          .insert({
+            quote_id: quoteId,
+            file_name: file.name,
+            file_path: filePath,
+            file_size: file.size,
+            file_type: file.type,
+            created_by: user?.id,
+          });
+        if (insertError) throw insertError;
+      }
+      toast({ title: "Uploaded", description: "Document(s) attached to quote" });
+      fetchQuoteDocuments();
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploadingDoc(false);
+      if (docInputRef.current) docInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteDoc = async (docId: string, filePath: string) => {
+    try {
+      await supabase.storage.from('quote-documents').remove([filePath]);
+      await supabase.from('quote_documents').delete().eq('id', docId);
+      toast({ title: "Deleted", description: "Document removed" });
+      fetchQuoteDocuments();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const getDocDownloadUrl = async (filePath: string) => {
+    const { data } = await supabase.storage.from('quote-documents').createSignedUrl(filePath, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
 
   return (
     <div className="space-y-6">
@@ -989,6 +1056,66 @@ const QuoteDetail = () => {
                     </a>
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Vendor Quote Documents (Vibe Admin only) */}
+          {isVibeAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Vendor Quote Documents
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <input
+                  ref={docInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleDocUpload}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => docInputRef.current?.click()}
+                  disabled={uploadingDoc}
+                >
+                  {uploadingDoc ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  {uploadingDoc ? 'Uploading...' : 'Attach Document'}
+                </Button>
+                {quoteDocuments.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    No vendor quote documents attached yet
+                  </p>
+                )}
+                {quoteDocuments.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between p-2 bg-muted rounded-lg gap-2">
+                    <button
+                      onClick={() => getDocDownloadUrl(doc.file_path)}
+                      className="flex items-center gap-2 min-w-0 flex-1 text-left hover:underline"
+                    >
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="text-sm font-medium truncate">{doc.file_name}</span>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => handleDeleteDoc(doc.id, doc.file_path)}
+                    >
+                      <X className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           )}
