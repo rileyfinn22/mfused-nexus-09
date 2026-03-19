@@ -274,14 +274,14 @@ serve(async (req) => {
     };
 
     // IMPORTANT: These are key product line identifiers that must NEVER be dropped
-    const IMPORTANT_PRODUCT_LINES = ['ion', 'fatty', 'vape', 'live', 'line', 'fire', 'atf', 'anthos', 'frx', 'rebel', 'cc'];
+    const IMPORTANT_PRODUCT_LINES = ['ion', 'fatty', 'vape', 'live', 'line', 'fire', 'atf', 'anthos', 'frx', 'rebel', 'cc', 'loud', 'twisted', 'vibes'];
     
     // Color variants - CRITICAL for matching different color products
     const COLOR_WORDS = ['blue', 'green', 'orange', 'red', 'purple', 'pink', 'black', 'white', 'yellow', 'gold', 'silver', 'brown', 'grey', 'gray'];
     
     // Common strain/flavor words that should be kept
     const STRAIN_WORDS = [
-      'twisted', 'wild', 'watermelon', 'watermellon', 'strawberry', 'lemon', 'grape',
+      'wild', 'watermelon', 'watermellon', 'strawberry', 'lemon', 'grape',
       'mango', 'blueberry', 'cherry', 'orange', 'apple', 'peach', 'melon', 'banana',
       'pineapple', 'raspberry', 'blackberry', 'mint', 'vanilla', 'chocolate', 'coffee',
       'og', 'kush', 'haze', 'diesel', 'cookies', 'gelato', 'runtz', 'zkittlez',
@@ -325,7 +325,7 @@ serve(async (req) => {
         // Strain type indicators
         if (/^(sat|sativa|hyb|hybrid|ind|indica|tbd)$/.test(t)) return true;
         // Common noise that isn't product-identifying
-        if (/^(super|fog|cart|cartridge|pre|roll|preroll)$/.test(t)) return true;
+        if (/^(super|fog|cart|cartridge|pre|roll|preroll|jefe|plus|pouch|pouches)$/.test(t)) return true;
         // Multipliers like "1x", "2x"
         if (/^\d+x$/.test(t)) return true;
         // Parenthetical content
@@ -363,8 +363,19 @@ serve(async (req) => {
     const buildVariantLabelFromPoLine = (rawName: string): string => {
       const tokens = extractIdentifierTokens(rawName);
       if (!tokens.length) return '';
-      // Capitalize each token
-      return tokens.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' ');
+      
+      // Separate brand/line tokens from strain/variant tokens
+      const brandTokens = tokens.filter(t => IMPORTANT_PRODUCT_LINES.includes(t.toLowerCase()));
+      const strainTokens = tokens.filter(t => !IMPORTANT_PRODUCT_LINES.includes(t.toLowerCase()));
+      
+      const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+      
+      // Build: "Brand - Strain Name" (e.g., "Loud - Notorious THC" or "Fire - ATF")
+      const parts: string[] = [];
+      if (brandTokens.length > 0) parts.push(brandTokens.map(capitalize).join(' '));
+      if (strainTokens.length > 0) parts.push(strainTokens.map(capitalize).join(' '));
+      
+      return parts.join(' - ');
     };
 
     const canonicalizeItemNameFromHint = (rawLine: string, hint: string | undefined | null): string | null => {
