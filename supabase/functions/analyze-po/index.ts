@@ -715,14 +715,31 @@ Return ONLY valid JSON:
         if (score > bestScore) {
           bestScore = score;
           bestMatch = p;
+          bestMatchProductTokens = productNonBrandTokens;
           console.log(`  Candidate: "${p.name}" (score: ${score})`);
         }
       }
 
-      // Require minimum score threshold
+      // Require minimum score threshold AND strain/flavor token overlap
+      // This prevents matching "Stoopid Gas" to "Notorious THC" just because they share state+type+brand
       if (bestMatch && bestScore >= 30) {
-        console.log(`✓ SMART MATCH: "${poName}" -> "${bestMatch.name}" (score: ${bestScore})`);
-        return bestMatch;
+        // If both PO and product have non-brand identifier tokens (strain/flavor names),
+        // at least one must overlap. Otherwise it's a different product entirely.
+        const poNonBrand = poTokens.filter(t => !IMPORTANT_PRODUCT_LINES.includes(t.toLowerCase()));
+        const prodNonBrand = bestMatchProductTokens || [];
+        
+        if (poNonBrand.length > 0 && prodNonBrand.length > 0) {
+          const hasOverlap = poNonBrand.some(pt => prodNonBrand.includes(pt));
+          if (!hasOverlap) {
+            console.log(`✗ REJECTED weak match: "${poName}" -> "${bestMatch.name}" — no strain/flavor token overlap (PO: [${poNonBrand.join(',')}] vs Product: [${prodNonBrand.join(',')}])`);
+            bestMatch = null;
+          }
+        }
+        
+        if (bestMatch) {
+          console.log(`✓ SMART MATCH: "${poName}" -> "${bestMatch.name}" (score: ${bestScore})`);
+          return bestMatch;
+        }
       }
 
       // STEP 3: Fallback - Try exact match on item_id/SKU
