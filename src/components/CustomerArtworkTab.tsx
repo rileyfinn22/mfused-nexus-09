@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { createFlatArtworkPreviewFromArtwork } from "@/lib/artworkPreview";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
 import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
 import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkViewerDialog";
@@ -329,28 +330,41 @@ export function CustomerArtworkTab({
   };
 
   const handleEditThumbnail = async () => {
-    if (!newThumbnailFile || !selectedFile) {
+    if (!selectedFile) {
       toast({
         title: "Missing file",
-        description: "Please select a thumbnail image",
+        description: "Please select an artwork file",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      const fileExt = newThumbnailFile.name.split('.').pop();
-      const fileName = `${selectedFile.sku}/preview-${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('artwork')
-        .upload(fileName, newThumbnailFile);
+      let publicUrl: string;
 
-      if (uploadError) throw uploadError;
+      if (newThumbnailFile) {
+        const fileExt = newThumbnailFile.name.split('.').pop();
+        const fileName = `${selectedFile.sku}/preview-${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('artwork')
+          .upload(fileName, newThumbnailFile);
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('artwork')
-        .getPublicUrl(fileName);
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl: uploadedUrl } } = supabase.storage
+          .from('artwork')
+          .getPublicUrl(fileName);
+
+        publicUrl = uploadedUrl;
+      } else {
+        publicUrl = await createFlatArtworkPreviewFromArtwork({
+          artworkUrl: selectedFile.artwork_url,
+          filename: selectedFile.filename,
+          sku: selectedFile.sku,
+          contextLabel: selectedFile.filename,
+        });
+      }
 
       const { error: updateError } = await supabase
         .from('artwork_files')
@@ -361,7 +375,9 @@ export function CustomerArtworkTab({
 
       toast({
         title: "Success",
-        description: "Thumbnail updated successfully",
+        description: newThumbnailFile
+          ? "Thumbnail updated successfully"
+          : "Flat proof preview generated successfully",
       });
 
       setEditThumbnailDialogOpen(false);
@@ -628,7 +644,9 @@ export function CustomerArtworkTab({
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Edit Thumbnail</DialogTitle>
-              <DialogDescription>Upload a new thumbnail image for {selectedFile?.filename}</DialogDescription>
+              <DialogDescription>
+                Upload a replacement thumbnail, or auto-generate a clean flat proof preview from {selectedFile?.filename}.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               {selectedFile?.preview_url && (
@@ -638,11 +656,13 @@ export function CustomerArtworkTab({
                 </div>
               )}
               <div>
-                <Label htmlFor="newThumbnail">New Thumbnail Image *</Label>
+                <Label htmlFor="newThumbnail">Replacement Thumbnail Image</Label>
                 <Input id="newThumbnail" type="file" accept="image/*" onChange={(e) => setNewThumbnailFile(e.target.files?.[0] || null)} className="mt-2" />
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleEditThumbnail} className="flex-1" disabled={!newThumbnailFile}>Update Thumbnail</Button>
+                <Button onClick={handleEditThumbnail} className="flex-1" disabled={!selectedFile}>
+                  {newThumbnailFile ? 'Update Thumbnail' : 'Auto-Generate Flat Proof'}
+                </Button>
                 <Button variant="outline" onClick={() => { setEditThumbnailDialogOpen(false); setNewThumbnailFile(null); }} className="flex-1">Cancel</Button>
               </div>
             </div>
