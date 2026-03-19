@@ -121,6 +121,9 @@ const Artwork = () => {
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
   
+  // Derived template thumbnails from product artwork (fallback when template.thumbnail_url is null)
+  const [templateDerivedThumbnails, setTemplateDerivedThumbnails] = useState<Record<string, string>>({});
+  
   // View mode
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   
@@ -329,6 +332,32 @@ const Artwork = () => {
       });
       setTemplateStatus(templateStatusMap);
       setTemplateArtworkCounts(templateArtCountMap);
+      
+      // Build derived thumbnails for templates without a dedicated thumbnail
+      const derivedThumbs: Record<string, string> = {};
+      templatesData?.forEach(template => {
+        if (!template.thumbnail_url) {
+          const templateProducts = filteredProductsData.filter(p => p.template_id === template.id);
+          const templateSkus = templateProducts.map(p => p.item_id).filter(Boolean) as string[];
+          // Also check product image_url as fallback
+          for (const sku of templateSkus) {
+            if (skuThumbnails[sku]) {
+              derivedThumbs[template.id] = skuThumbnails[sku]!;
+              break;
+            }
+          }
+          // If no artwork thumbnail found, try product image_url
+          if (!derivedThumbs[template.id]) {
+            for (const prod of templateProducts) {
+              if (prod.image_url) {
+                derivedThumbs[template.id] = prod.image_url;
+                break;
+              }
+            }
+          }
+        }
+      });
+      setTemplateDerivedThumbnails(derivedThumbs);
       
       setTemplates(templatesData || []);
     } catch (error) {
@@ -1609,9 +1638,9 @@ const Artwork = () => {
               onClick={() => setSelectedTemplate(template)}
             >
               <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                {/* Show template thumbnail if available, otherwise package icon */}
-                {template.thumbnail_url ? (
-                  <img src={template.thumbnail_url} alt={template.name} className="w-full h-full object-cover" />
+                {/* Show template thumbnail if available, fall back to derived artwork thumbnail, then package icon */}
+                {(template.thumbnail_url || templateDerivedThumbnails[template.id]) ? (
+                  <img src={template.thumbnail_url || templateDerivedThumbnails[template.id]} alt={template.name} className="w-full h-full object-cover" />
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
