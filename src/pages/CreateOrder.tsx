@@ -1811,7 +1811,7 @@ const CreateOrder = () => {
         // New order - insert all items
         const orderItems = selectedItems.map(item => {
           const product = products.find(p => p.id === item.productId);
-          const price = item.unit_price ?? product?.cost ?? 0;
+          const price = item.unit_price ?? 0;
           const itemTotal = price * item.quantity;
           
           return {
