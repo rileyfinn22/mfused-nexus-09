@@ -614,6 +614,66 @@ const QuoteDetail = () => {
   // Check if any items have price breaks
   const hasAnyPriceBreaks = items.some(item => item.price_breaks && item.price_breaks.length > 0);
 
+  const fetchQuoteDocuments = async () => {
+    const { data } = await supabase
+      .from('quote_documents')
+      .select('*')
+      .eq('quote_id', quoteId)
+      .order('created_at', { ascending: false });
+    setQuoteDocuments(data || []);
+  };
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !quoteId) return;
+    setUploadingDoc(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      for (const file of Array.from(files)) {
+        const filePath = `quote-documents/${quoteId}/${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('quote-documents')
+          .upload(filePath, file);
+        if (uploadError) throw uploadError;
+
+        const { error: insertError } = await supabase
+          .from('quote_documents')
+          .insert({
+            quote_id: quoteId,
+            file_name: file.name,
+            file_path: filePath,
+            file_size: file.size,
+            file_type: file.type,
+            created_by: user?.id,
+          });
+        if (insertError) throw insertError;
+      }
+      toast({ title: "Uploaded", description: "Document(s) attached to quote" });
+      fetchQuoteDocuments();
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploadingDoc(false);
+      if (docInputRef.current) docInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteDoc = async (docId: string, filePath: string) => {
+    try {
+      await supabase.storage.from('quote-documents').remove([filePath]);
+      await supabase.from('quote_documents').delete().eq('id', docId);
+      toast({ title: "Deleted", description: "Document removed" });
+      fetchQuoteDocuments();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const getDocDownloadUrl = async (filePath: string) => {
+    const { data } = await supabase.storage.from('quote-documents').createSignedUrl(filePath, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
 
   return (
     <div className="space-y-6">
