@@ -1615,6 +1615,40 @@ const Artwork = () => {
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
+                {/* Upload thumbnail button */}
+                {isVibeAdmin && (
+                  <label
+                    className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const ext = file.name.split('.').pop();
+                          const path = `template-thumbnails/${template.id}-${Date.now()}.${ext}`;
+                          const { error: upErr } = await supabase.storage.from('product-images').upload(path, file);
+                          if (upErr) throw upErr;
+                          const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(path);
+                          const { error: dbErr } = await supabase.from('product_templates').update({ thumbnail_url: publicUrl }).eq('id', template.id);
+                          if (dbErr) throw dbErr;
+                          toast({ title: "Thumbnail updated" });
+                          fetchTemplates();
+                        } catch (err) {
+                          console.error(err);
+                          toast({ title: "Failed to upload thumbnail", variant: "destructive" });
+                        }
+                      }}
+                    />
+                    <div className="bg-background/90 backdrop-blur-sm rounded-md p-1.5 hover:bg-background transition-colors">
+                      <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                  </label>
+                )}
                 {/* Artwork count badge */}
                 <div className="absolute top-2 left-2">
                   <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm">
