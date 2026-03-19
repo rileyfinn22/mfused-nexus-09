@@ -291,10 +291,9 @@ const Artwork = () => {
         } else {
           counts[art.sku].pending++;
         }
-        
-        // Track first thumbnail for each SKU (prefer preview_url, fall back to artwork_url for images)
+
         if (!skuThumbnails[art.sku]) {
-          if (art.preview_url) {
+          if (isUsableArtworkPreviewUrl(art.filename, art.preview_url)) {
             skuThumbnails[art.sku] = art.preview_url;
           } else if (art.filename && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(art.filename)) {
             skuThumbnails[art.sku] = art.artwork_url;
