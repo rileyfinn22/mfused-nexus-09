@@ -363,8 +363,19 @@ serve(async (req) => {
     const buildVariantLabelFromPoLine = (rawName: string): string => {
       const tokens = extractIdentifierTokens(rawName);
       if (!tokens.length) return '';
-      // Capitalize each token
-      return tokens.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' ');
+      
+      // Separate brand/line tokens from strain/variant tokens
+      const brandTokens = tokens.filter(t => IMPORTANT_PRODUCT_LINES.includes(t.toLowerCase()));
+      const strainTokens = tokens.filter(t => !IMPORTANT_PRODUCT_LINES.includes(t.toLowerCase()));
+      
+      const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+      
+      // Build: "Brand - Strain Name" (e.g., "Loud - Notorious THC" or "Fire - ATF")
+      const parts: string[] = [];
+      if (brandTokens.length > 0) parts.push(brandTokens.map(capitalize).join(' '));
+      if (strainTokens.length > 0) parts.push(strainTokens.map(capitalize).join(' '));
+      
+      return parts.join(' - ');
     };
 
     const canonicalizeItemNameFromHint = (rawLine: string, hint: string | undefined | null): string | null => {
