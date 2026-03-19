@@ -970,7 +970,8 @@ export function CustomerArtworkTab({
                 )}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 

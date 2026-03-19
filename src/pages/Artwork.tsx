@@ -1737,7 +1737,8 @@ const Artwork = () => {
                 )}
               </div>
             </Card>
-          ))}
+              );
+            })}
         </div>
       )}
 
