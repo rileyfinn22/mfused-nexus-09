@@ -337,10 +337,14 @@ const Artwork = () => {
       setTemplateStatus(templateStatusMap);
       setTemplateArtworkCounts(templateArtCountMap);
       
-      // Build derived thumbnails for templates without a dedicated thumbnail
+      // Build derived thumbnails for templates without a usable dedicated thumbnail
       const derivedThumbs: Record<string, string> = {};
       templatesData?.forEach(template => {
-        if (!template.thumbnail_url) {
+        const hasUsableTemplateThumbnail = Boolean(
+          template.thumbnail_url && !isLegacyGeneratedTemplateMockupUrl(template.thumbnail_url)
+        );
+
+        if (!hasUsableTemplateThumbnail) {
           const templateProducts = filteredProductsData.filter(p => p.template_id === template.id);
           const templateSkus = templateProducts.map(p => p.item_id).filter(Boolean) as string[];
           // Also check product image_url as fallback
