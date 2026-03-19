@@ -1883,7 +1883,7 @@ const CreateOrder = () => {
   // Calculate total from ALL listed items (matched + unmatched)
   const itemsSubtotal = selectedItems.reduce((sum, item) => {
     const product = products.find(p => p.id === item.productId);
-    const price = item.unit_price ?? product?.cost ?? 0;
+    const price = item.unit_price ?? 0;
     return sum + (price * item.quantity);
   }, 0);
   
