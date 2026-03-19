@@ -1599,7 +1599,7 @@ const CreateOrder = () => {
       let matchedSubtotal = 0;
       for (const item of selectedItems) {
         const product = products.find(p => p.id === item.productId);
-        const price = item.unit_price ?? product?.cost ?? 0;
+        const price = item.unit_price ?? 0;
         matchedSubtotal += price * item.quantity;
       }
       
