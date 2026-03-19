@@ -1059,6 +1059,66 @@ const QuoteDetail = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* Vendor Quote Documents (Vibe Admin only) */}
+          {isVibeAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Vendor Quote Documents
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <input
+                  ref={docInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleDocUpload}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => docInputRef.current?.click()}
+                  disabled={uploadingDoc}
+                >
+                  {uploadingDoc ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  {uploadingDoc ? 'Uploading...' : 'Attach Document'}
+                </Button>
+                {quoteDocuments.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    No vendor quote documents attached yet
+                  </p>
+                )}
+                {quoteDocuments.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between p-2 bg-muted rounded-lg gap-2">
+                    <button
+                      onClick={() => getDocDownloadUrl(doc.file_path)}
+                      className="flex items-center gap-2 min-w-0 flex-1 text-left hover:underline"
+                    >
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="text-sm font-medium truncate">{doc.file_name}</span>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => handleDeleteDoc(doc.id, doc.file_path)}
+                    >
+                      <X className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Sidebar */}
