@@ -21,6 +21,7 @@ const MANUAL_ARTWORK_PREVIEW_PREFIX = "manual-preview-";
 const getFileExtension = (filename: string) => filename.split(".").pop()?.toLowerCase() ?? "";
 
 const isPdfFile = (filename: string) => getFileExtension(filename) === "pdf";
+const IMAGE_PREVIEW_URL_PATTERN = /\.(png|jpe?g|webp|gif|svg)(?:[?#].*)?$/i;
 
 export function buildManualArtworkPreviewPath(sku: string, extension?: string): string {
   const normalizedExtension = extension?.replace(/^\./, "").toLowerCase() || "png";
@@ -31,7 +32,7 @@ export function isUsableArtworkPreviewUrl(
   filename: string,
   previewUrl: string | null | undefined,
 ): previewUrl is string {
-  if (!previewUrl) {
+  if (!previewUrl || !IMAGE_PREVIEW_URL_PATTERN.test(previewUrl)) {
     return false;
   }
 
@@ -41,7 +42,8 @@ export function isUsableArtworkPreviewUrl(
 
   return (
     previewUrl.includes(`/${FLAT_ARTWORK_PREVIEW_PREFIX}`) ||
-    previewUrl.includes(`/${MANUAL_ARTWORK_PREVIEW_PREFIX}`)
+    previewUrl.includes(`/${MANUAL_ARTWORK_PREVIEW_PREFIX}`) ||
+    (!isLegacyGeneratedTemplateMockupUrl(previewUrl) && previewUrl.includes("/artwork/"))
   );
 }
 
