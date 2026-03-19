@@ -919,6 +919,42 @@ const QuoteDetail = () => {
                       {items.map((item) => {
                         const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
                         
+                        if (hasPriceBreaks) {
+                          return (
+                            <React.Fragment key={item.id}>
+                              {/* Item header row spanning full width */}
+                              <TableRow className="bg-muted/30">
+                                <TableCell colSpan={5}>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-semibold">{item.name}</p>
+                                    <span className="text-muted-foreground font-mono text-xs">{item.sku}</span>
+                                    {item.state && (
+                                      <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                        {item.state}
+                                      </Badge>
+                                    )}
+                                    {item.description && (
+                                      <span className="text-sm text-muted-foreground ml-2">— {item.description}</span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                              {/* One row per price tier */}
+                              {item.price_breaks.map((pb, idx) => (
+                                <TableRow key={`${item.id}-tier-${idx}`}>
+                                  <TableCell colSpan={2} className="pl-8">
+                                    <span className="text-sm text-muted-foreground">Tier {idx + 1}:</span>
+                                    <span className="ml-2 font-medium">{pb.qty.toLocaleString()} units</span>
+                                  </TableCell>
+                                  <TableCell className="text-right">{pb.qty.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{formatUnitPrice(pb.unit_price)}</TableCell>
+                                  <TableCell className="text-right font-medium">{formatCurrency(pb.qty * pb.unit_price)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </React.Fragment>
+                          );
+                        }
+
                         return (
                           <TableRow key={item.id}>
                             <TableCell>
@@ -939,34 +975,9 @@ const QuoteDetail = () => {
                                 {item.description || '-'}
                               </p>
                             </TableCell>
-                            {hasPriceBreaks ? (
-                              <>
-                                <TableCell colSpan={3} className="p-0">
-                                  <Select defaultValue={item.selected_tier?.toString() ?? "0"}>
-                                    <SelectTrigger className="border-0 bg-transparent h-auto py-3 px-4 justify-end gap-3 font-medium">
-                                      <SelectValue placeholder="Select tier" />
-                                    </SelectTrigger>
-                                    <SelectContent align="end" className="w-[320px]">
-                                      {item.price_breaks.map((pb, idx) => (
-                                        <SelectItem key={idx} value={idx.toString()} className="py-2">
-                                          <div className="flex items-center justify-between w-full gap-4">
-                                            <span className="font-medium">{pb.qty.toLocaleString()} units</span>
-                                            <span className="text-muted-foreground">{formatUnitPrice(pb.unit_price)}/ea</span>
-                                            <span className="font-semibold">{formatCurrency(pb.qty * pb.unit_price)}</span>
-                                          </div>
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                              </>
-                            ) : (
-                              <>
-                                <TableCell className="text-right">{item.quantity.toLocaleString()}</TableCell>
-                                <TableCell className="text-right">{formatUnitPrice(item.unit_price)}</TableCell>
-                                <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
-                              </>
-                            )}
+                            <TableCell className="text-right">{item.quantity.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{formatUnitPrice(item.unit_price)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
                           </TableRow>
                         );
                       })}
