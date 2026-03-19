@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { generatePdfThumbnailFromArrayBuffer } from "@/lib/pdfThumbnail";
+import { createFlatArtworkPreviewFromArtwork } from "@/lib/artworkPreview";
 import { toast } from "sonner";
 
 interface BulkArtworkUploadDialogProps {

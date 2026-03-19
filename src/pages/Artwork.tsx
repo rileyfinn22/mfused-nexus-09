@@ -37,7 +37,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
-import { generatePdfThumbnailFromUrl } from "@/lib/pdfThumbnail";
+import { createFlatArtworkPreviewFromArtwork } from "@/lib/artworkPreview";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
 import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
 import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkViewerDialog";

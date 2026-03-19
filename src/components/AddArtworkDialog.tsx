@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Check, ChevronsUpDown, Plus, FileImage, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
+import { createFlatArtworkPreviewFromFile } from "@/lib/artworkPreview";
 import { toast } from "sonner";
 
 interface AddArtworkDialogProps {
