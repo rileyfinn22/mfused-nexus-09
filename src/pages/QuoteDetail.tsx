@@ -623,14 +623,6 @@ const QuoteDetail = () => {
   // Check if any items have price breaks
   const hasAnyPriceBreaks = items.some(item => item.price_breaks && item.price_breaks.length > 0);
 
-  const fetchQuoteDocuments = async () => {
-    const { data } = await supabase
-      .from('quote_documents')
-      .select('*')
-      .eq('quote_id', quoteId)
-      .order('created_at', { ascending: false });
-    setQuoteDocuments(data || []);
-  };
 
   const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
