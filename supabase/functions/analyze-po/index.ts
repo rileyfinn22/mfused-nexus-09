@@ -281,7 +281,7 @@ serve(async (req) => {
     
     // Common strain/flavor words that should be kept
     const STRAIN_WORDS = [
-      'twisted', 'wild', 'watermelon', 'watermellon', 'strawberry', 'lemon', 'grape',
+      'wild', 'watermelon', 'watermellon', 'strawberry', 'lemon', 'grape',
       'mango', 'blueberry', 'cherry', 'orange', 'apple', 'peach', 'melon', 'banana',
       'pineapple', 'raspberry', 'blackberry', 'mint', 'vanilla', 'chocolate', 'coffee',
       'og', 'kush', 'haze', 'diesel', 'cookies', 'gelato', 'runtz', 'zkittlez',
