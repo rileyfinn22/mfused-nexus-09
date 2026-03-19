@@ -131,6 +131,15 @@ const QuoteDetail = () => {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const docInputRef = useRef<HTMLInputElement>(null);
 
+  const fetchQuoteDocuments = async () => {
+    const { data } = await supabase
+      .from('quote_documents')
+      .select('*')
+      .eq('quote_id', quoteId)
+      .order('created_at', { ascending: false });
+    setQuoteDocuments(data || []);
+  };
+
   useEffect(() => {
     checkRole();
     fetchQuote();
