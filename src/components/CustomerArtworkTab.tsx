@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { createFlatArtworkPreviewFromArtwork } from "@/lib/artworkPreview";
+import { buildManualArtworkPreviewPath, createFlatArtworkPreviewFromArtwork, isLegacyGeneratedTemplateMockupUrl } from "@/lib/artworkPreview";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
 import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
 import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkViewerDialog";
@@ -344,7 +344,7 @@ export function CustomerArtworkTab({
 
       if (newThumbnailFile) {
         const fileExt = newThumbnailFile.name.split('.').pop();
-        const fileName = `${selectedFile.sku}/preview-${Date.now()}.${fileExt}`;
+        const fileName = buildManualArtworkPreviewPath(selectedFile.sku, fileExt);
         
         const { error: uploadError } = await supabase.storage
           .from('artwork')
@@ -449,6 +449,14 @@ export function CustomerArtworkTab({
       return productName.substring(prefix.length);
     }
     return productName;
+  };
+
+  const getTemplateDisplayThumbnail = (template: ProductTemplate) => {
+    if (template.thumbnail_url && !isLegacyGeneratedTemplateMockupUrl(template.thumbnail_url)) {
+      return template.thumbnail_url;
+    }
+
+    return null;
   };
 
   // Get all artwork stats
@@ -933,15 +941,18 @@ export function CustomerArtworkTab({
         </Card>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredTemplates.map((template) => (
+          {filteredTemplates.map((template) => {
+            const templateThumbnail = getTemplateDisplayThumbnail(template);
+
+            return (
             <Card
               key={template.id}
               className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
               onClick={() => setSelectedTemplate(template)}
             >
               <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                {template.thumbnail_url ? (
-                  <img src={template.thumbnail_url} alt={template.name} className="w-full h-full object-cover" />
+                {templateThumbnail ? (
+                  <img src={templateThumbnail} alt={template.name} className="w-full h-full object-cover" />
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
@@ -959,7 +970,8 @@ export function CustomerArtworkTab({
                 )}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 

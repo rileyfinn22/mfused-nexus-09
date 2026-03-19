@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, FileImage, FileText, FileCode, CheckCircle, Clock, ExternalLink } from "lucide-react";
 import { useState } from "react";
+import { isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
 
 interface ArtworkFile {
   id: string;
@@ -23,20 +24,19 @@ interface ArtworkViewerDialogProps {
   onDownload: (url: string, filename: string) => void;
 }
 
-// File type categories
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|svg)$/i;
 const PDF_EXTENSION = /\.pdf$/i;
 const DESIGN_EXTENSIONS = /\.(ai|eps|psd|tif|tiff|indd|cdr)$/i;
 
-const getFileType = (filename: string): 'image' | 'pdf' | 'design' | 'unknown' => {
-  if (IMAGE_EXTENSIONS.test(filename)) return 'image';
-  if (PDF_EXTENSION.test(filename)) return 'pdf';
-  if (DESIGN_EXTENSIONS.test(filename)) return 'design';
-  return 'unknown';
+const getFileType = (filename: string): "image" | "pdf" | "design" | "unknown" => {
+  if (IMAGE_EXTENSIONS.test(filename)) return "image";
+  if (PDF_EXTENSION.test(filename)) return "pdf";
+  if (DESIGN_EXTENSIONS.test(filename)) return "design";
+  return "unknown";
 };
 
 const getFileTypeLabel = (filename: string): string => {
-  const ext = filename.split('.').pop()?.toUpperCase() || 'FILE';
+  const ext = filename.split(".").pop()?.toUpperCase() || "FILE";
   return ext;
 };
 
@@ -52,9 +52,9 @@ const ArtworkViewerDialog = ({
 
   const fileType = getFileType(file.filename);
   const fileTypeLabel = getFileTypeLabel(file.filename);
+  const previewUrl = isUsableArtworkPreviewUrl(file.filename, file.preview_url) ? file.preview_url : null;
 
-  // Use Google Docs Viewer for PDFs as it works better across browsers
-  const googleDocsViewerUrl = fileType === 'pdf' 
+  const googleDocsViewerUrl = fileType === "pdf"
     ? `https://docs.google.com/viewer?url=${encodeURIComponent(file.artwork_url)}&embedded=true`
     : null;
 
@@ -94,34 +94,31 @@ const ArtworkViewerDialog = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-auto min-h-0">
-          {/* Has preview URL - show it */}
-          {file.preview_url ? (
+          {previewUrl ? (
             <div className="flex items-center justify-center bg-muted/30 rounded-lg p-4">
-              <img 
-                src={file.preview_url} 
-                alt={file.filename} 
+              <img
+                src={previewUrl}
+                alt={file.filename}
                 className="max-w-full max-h-[60vh] object-contain rounded"
                 onError={(e) => {
-                  console.log('Preview image failed to load:', file.preview_url);
-                  (e.target as HTMLImageElement).style.display = 'none';
+                  console.log("Preview image failed to load:", previewUrl);
+                  (e.target as HTMLImageElement).style.display = "none";
                 }}
               />
             </div>
-          ) : fileType === 'image' ? (
-            /* Image files - display directly */
+          ) : fileType === "image" ? (
             <div className="flex items-center justify-center bg-muted/30 rounded-lg p-4">
-              <img 
-                src={file.artwork_url} 
-                alt={file.filename} 
+              <img
+                src={file.artwork_url}
+                alt={file.filename}
                 className="max-w-full max-h-[60vh] object-contain rounded"
                 onError={(e) => {
-                  console.log('Artwork image failed to load:', file.artwork_url);
-                  (e.target as HTMLImageElement).style.display = 'none';
+                  console.log("Artwork image failed to load:", file.artwork_url);
+                  (e.target as HTMLImageElement).style.display = "none";
                 }}
               />
             </div>
-          ) : fileType === 'pdf' ? (
-            /* PDF files - use Google Docs Viewer for better compatibility */
+          ) : fileType === "pdf" ? (
             <div className="w-full h-[60vh] bg-muted/30 rounded-lg overflow-hidden">
               {!pdfLoadError ? (
                 <iframe
@@ -138,16 +135,14 @@ const ArtworkViewerDialog = ({
                     Unable to display PDF inline. Use the buttons below to view or download.
                   </p>
                   <div className="flex gap-3">
-                    <Button 
+                    <Button
                       variant="outline"
-                      onClick={() => window.open(file.artwork_url, '_blank')}
+                      onClick={() => window.open(file.artwork_url, "_blank")}
                     >
                       <ExternalLink className="h-5 w-5 mr-2" />
                       Open in New Tab
                     </Button>
-                    <Button 
-                      onClick={() => onDownload(file.artwork_url, file.filename)}
-                    >
+                    <Button onClick={() => onDownload(file.artwork_url, file.filename)}>
                       <Download className="h-5 w-5 mr-2" />
                       Download PDF
                     </Button>
@@ -156,25 +151,19 @@ const ArtworkViewerDialog = ({
               )}
             </div>
           ) : (
-            /* Design files (AI, EPS, PSD, etc.) - show placeholder */
             <div className="flex flex-col items-center justify-center py-16 bg-muted/30 rounded-lg">
               <div className="relative mb-6">
                 <FileCode className="h-24 w-24 text-muted-foreground" />
-                <Badge 
-                  className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground"
-                >
+                <Badge className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground">
                   {fileTypeLabel}
                 </Badge>
               </div>
               <h3 className="text-lg font-semibold mb-2">{fileTypeLabel} File</h3>
               <p className="text-muted-foreground text-center max-w-md mb-6">
-                This file type cannot be previewed in the browser. 
+                This file type cannot be previewed in the browser.
                 Please download to view in the appropriate application.
               </p>
-              <Button 
-                size="lg"
-                onClick={() => onDownload(file.artwork_url, file.filename)}
-              >
+              <Button size="lg" onClick={() => onDownload(file.artwork_url, file.filename)}>
                 <Download className="h-5 w-5 mr-2" />
                 Download {fileTypeLabel} File
               </Button>
@@ -182,7 +171,6 @@ const ArtworkViewerDialog = ({
           )}
         </div>
 
-        {/* Footer with download button (always visible for convenience) */}
         <div className="flex justify-between items-center pt-4 border-t">
           <div className="text-sm text-muted-foreground">
             {file.notes && (
@@ -192,19 +180,16 @@ const ArtworkViewerDialog = ({
             )}
           </div>
           <div className="flex gap-2">
-            {fileType === 'pdf' && (
-              <Button 
+            {fileType === "pdf" && (
+              <Button
                 variant="outline"
-                onClick={() => window.open(file.artwork_url, '_blank')}
+                onClick={() => window.open(file.artwork_url, "_blank")}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open in Tab
               </Button>
             )}
-            <Button 
-              variant="outline"
-              onClick={() => onDownload(file.artwork_url, file.filename)}
-            >
+            <Button variant="outline" onClick={() => onDownload(file.artwork_url, file.filename)}>
               <Download className="h-4 w-4 mr-2" />
               Download
             </Button>
@@ -220,28 +205,23 @@ const ArtworkViewerDialog = ({
 
 export default ArtworkViewerDialog;
 
-// Helper function to get thumbnail display for artwork cards
-export const getArtworkThumbnail = (file: { 
-  preview_url: string | null; 
-  artwork_url: string; 
-  filename: string 
-}): { type: 'image' | 'pdf' | 'placeholder'; src?: string; label?: string } => {
-  // Has preview URL
-  if (file.preview_url) {
-    return { type: 'image', src: file.preview_url };
+export const getArtworkThumbnail = (file: {
+  preview_url: string | null;
+  artwork_url: string;
+  filename: string;
+}): { type: "image" | "pdf" | "placeholder"; src?: string; label?: string } => {
+  if (isUsableArtworkPreviewUrl(file.filename, file.preview_url)) {
+    return { type: "image", src: file.preview_url };
   }
-  
-  // Is an image file
+
   if (IMAGE_EXTENSIONS.test(file.filename)) {
-    return { type: 'image', src: file.artwork_url };
+    return { type: "image", src: file.artwork_url };
   }
-  
-  // Is a PDF file - show PDF placeholder
+
   if (PDF_EXTENSION.test(file.filename)) {
-    return { type: 'pdf', label: 'PDF' };
+    return { type: "pdf", label: "PDF" };
   }
-  
-  // Is a design file - return placeholder with label
-  const ext = file.filename.split('.').pop()?.toUpperCase() || 'FILE';
-  return { type: 'placeholder', label: ext };
+
+  const ext = file.filename.split(".").pop()?.toUpperCase() || "FILE";
+  return { type: "placeholder", label: ext };
 };

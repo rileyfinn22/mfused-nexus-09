@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Check, ChevronsUpDown, Plus, FileImage, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { createFlatArtworkPreviewFromFile } from "@/lib/artworkPreview";
+import { buildManualArtworkPreviewPath, createFlatArtworkPreviewFromFile } from "@/lib/artworkPreview";
 import { toast } from "sonner";
 
 interface AddArtworkDialogProps {
@@ -209,7 +209,7 @@ const AddArtworkDialog = ({
       let previewUrl: string | null = null;
       if (formData.previewFile) {
         const previewExt = formData.previewFile.name.split('.').pop();
-        const previewName = `${formData.sku}/preview-${Date.now()}.${previewExt}`;
+        const previewName = buildManualArtworkPreviewPath(formData.sku, previewExt);
 
         const { error: previewError } = await supabase.storage
           .from('artwork')
