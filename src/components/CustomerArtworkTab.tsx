@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { createFlatArtworkPreviewFromArtwork } from "@/lib/artworkPreview";
+import { buildManualArtworkPreviewPath, createFlatArtworkPreviewFromArtwork, isLegacyGeneratedTemplateMockupUrl } from "@/lib/artworkPreview";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
 import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
 import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkViewerDialog";
