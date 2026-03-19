@@ -1209,7 +1209,9 @@ const Artwork = () => {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Edit Thumbnail</DialogTitle>
-              <DialogDescription>Upload a new thumbnail image for {selectedFile?.filename}</DialogDescription>
+              <DialogDescription>
+                Upload a replacement thumbnail, or auto-generate a clean flat proof preview from {selectedFile?.filename}.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               {selectedFile?.preview_url && (
@@ -1219,11 +1221,13 @@ const Artwork = () => {
                 </div>
               )}
               <div>
-                <Label htmlFor="newThumbnail">New Thumbnail Image *</Label>
+                <Label htmlFor="newThumbnail">Replacement Thumbnail Image</Label>
                 <Input id="newThumbnail" type="file" accept="image/*" onChange={(e) => setNewThumbnailFile(e.target.files?.[0] || null)} className="mt-2" />
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleEditThumbnail} className="flex-1" disabled={!newThumbnailFile}>Update Thumbnail</Button>
+                <Button onClick={handleEditThumbnail} className="flex-1" disabled={!selectedFile}>
+                  {newThumbnailFile ? 'Update Thumbnail' : 'Auto-Generate Flat Proof'}
+                </Button>
                 <Button variant="outline" onClick={() => { setEditThumbnailDialogOpen(false); setNewThumbnailFile(null); }} className="flex-1">Cancel</Button>
               </div>
             </div>
