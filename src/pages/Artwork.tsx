@@ -1662,16 +1662,18 @@ const Artwork = () => {
           {/* Template Cards */}
           {templates
             .filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
-            .map((template) => (
+            .map((template) => {
+              const templateThumbnail = getTemplateDisplayThumbnail(template);
+
+              return (
             <Card
               key={template.id}
               className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
               onClick={() => setSelectedTemplate(template)}
             >
               <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                {/* Show template thumbnail if available, fall back to derived artwork thumbnail, then package icon */}
-                {(template.thumbnail_url || templateDerivedThumbnails[template.id]) ? (
-                  <img src={template.thumbnail_url || templateDerivedThumbnails[template.id]} alt={template.name} className="w-full h-full object-cover" />
+                {templateThumbnail ? (
+                  <img src={templateThumbnail} alt={template.name} className="w-full h-full object-cover" />
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
