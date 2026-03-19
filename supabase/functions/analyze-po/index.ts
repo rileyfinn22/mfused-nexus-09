@@ -618,6 +618,7 @@ Return ONLY valid JSON:
       // STEP 2: Score each product based on State + Type + Token overlap + Brand
       let bestMatch: typeof products[0] | null = null;
       let bestScore = 0;
+      let bestMatchProductTokens: string[] = [];
 
       for (const p of products as any[]) {
         if (!p?.name) continue;
