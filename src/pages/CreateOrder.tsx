@@ -381,7 +381,7 @@ const CreateOrder = () => {
       let matchedSubtotal = 0;
       for (const item of selectedItems) {
         const product = products.find(p => p.id === item.productId);
-        const price = item.unit_price ?? product?.cost ?? 0;
+        const price = item.unit_price ?? 0;
         matchedSubtotal += price * item.quantity;
       }
       let unmatchedSubtotalCalc = 0;
@@ -477,7 +477,7 @@ const CreateOrder = () => {
           // Insert order items for the new draft
           const orderItems = selectedItems.map(item => {
             const product = products.find(p => p.id === item.productId);
-            const price = item.unit_price ?? product?.cost ?? 0;
+            const price = item.unit_price ?? 0;
             return {
               order_id: newOrder.id,
               product_id: item.productId,
@@ -1599,7 +1599,7 @@ const CreateOrder = () => {
       let matchedSubtotal = 0;
       for (const item of selectedItems) {
         const product = products.find(p => p.id === item.productId);
-        const price = item.unit_price ?? product?.cost ?? 0;
+        const price = item.unit_price ?? 0;
         matchedSubtotal += price * item.quantity;
       }
       
@@ -1725,7 +1725,7 @@ const CreateOrder = () => {
         // Update existing items and add new ones, preserving vendor assignments
         for (const item of selectedItems) {
           const product = products.find(p => p.id === item.productId);
-          const price = item.unit_price ?? product?.cost ?? 0;
+          const price = item.unit_price ?? 0;
           const itemTotal = price * item.quantity;
           
           const existingItem = existingItemsMap.get(item.productId);
@@ -1811,7 +1811,7 @@ const CreateOrder = () => {
         // New order - insert all items
         const orderItems = selectedItems.map(item => {
           const product = products.find(p => p.id === item.productId);
-          const price = item.unit_price ?? product?.cost ?? 0;
+          const price = item.unit_price ?? 0;
           const itemTotal = price * item.quantity;
           
           return {
@@ -1883,7 +1883,7 @@ const CreateOrder = () => {
   // Calculate total from ALL listed items (matched + unmatched)
   const itemsSubtotal = selectedItems.reduce((sum, item) => {
     const product = products.find(p => p.id === item.productId);
-    const price = item.unit_price ?? product?.cost ?? 0;
+    const price = item.unit_price ?? 0;
     return sum + (price * item.quantity);
   }, 0);
   
@@ -2648,7 +2648,7 @@ const CreateOrder = () => {
                   const product = products.find(p => p.id === item.productId);
                   // IMPORTANT: the total uses ALL selectedItems, so we must render rows even if the
                   // product isn't currently in the loaded product list (e.g. query limit).
-                  const price = Number(item.unit_price ?? product?.cost ?? 0);
+                  const price = Number(item.unit_price ?? 0);
                   const amount = price * item.quantity;
                   const itemKey = getItemKey(item);
 
