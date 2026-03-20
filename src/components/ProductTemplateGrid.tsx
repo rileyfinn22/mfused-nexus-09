@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy, Trash2, LayoutGrid, List, Building2 } from "lucide-react";
+import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy, Trash2, LayoutGrid, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -71,7 +71,7 @@ export function ProductTemplateGrid({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [duplicating, setDuplicating] = useState(false);
+  
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTemplate, setDeletingTemplate] = useState<ProductTemplate | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -219,33 +219,7 @@ export function ProductTemplateGrid({
     setImagePreview(null);
   };
 
-  const handleDuplicateTemplate = async (template: ProductTemplate, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDuplicating(true);
-
-    try {
-      const { error } = await supabase
-        .from('product_templates')
-        .insert({
-          name: `${template.name} (Copy)`,
-          description: template.description,
-          price: template.price,
-          cost: template.cost,
-          company_id: template.company_id,
-          thumbnail_url: template.thumbnail_url
-        });
-
-      if (error) throw error;
-
-      toast({ title: "Template duplicated", description: "A copy of the template has been created." });
-      fetchTemplates();
-    } catch (error) {
-      console.error('Error duplicating template:', error);
-      toast({ title: "Error", description: "Failed to duplicate template.", variant: "destructive" });
-    } finally {
-      setDuplicating(false);
-    }
-  };
+  // All duplication goes through the company picker dialog
 
   const openDupToCompanyDialog = async (template: ProductTemplate, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -257,7 +231,7 @@ export function ProductTemplateGrid({
       .select('id, name')
       .eq('is_active', true)
       .order('name');
-    setCompanies((data || []).filter(c => c.id !== template.company_id));
+    setCompanies(data || []);
     setDupToCompanyOpen(true);
   };
 
@@ -437,20 +411,10 @@ export function ProductTemplateGrid({
                   variant="secondary"
                   size="icon"
                   className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
-                  onClick={(e) => handleDuplicateTemplate(template, e)}
-                  disabled={duplicating}
-                  title="Duplicate template"
+                  onClick={(e) => openDupToCompanyDialog(template, e)}
+                  title="Duplicate to company"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
-                  onClick={(e) => openDupToCompanyDialog(template, e)}
-                  title="Duplicate to another company"
-                >
-                  <Building2 className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   variant="secondary"
@@ -554,11 +518,8 @@ export function ProductTemplateGrid({
                       <Button variant="ghost" size="sm" onClick={(e) => openEditDialog(template, e)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={(e) => handleDuplicateTemplate(template, e)}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
                       <Button variant="ghost" size="sm" onClick={(e) => openDupToCompanyDialog(template, e)} title="Duplicate to company">
-                        <Building2 className="h-4 w-4" />
+                        <Copy className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => openDeleteDialog(template, e)}>
                         <Trash2 className="h-4 w-4" />
