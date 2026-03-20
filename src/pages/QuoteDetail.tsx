@@ -1232,6 +1232,15 @@ const QuoteDetail = () => {
                   <p className="font-medium">{new Date(quote.valid_until).toLocaleDateString()}</p>
                 </div>
               )}
+              {(quote as any).shipping_method && (
+                <div>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Truck className="h-3 w-3" /> Shipping Method
+                  </p>
+                  <p className="font-medium">
+                    {(quote as any).shipping_method === 'domestic' ? 'Domestic' : (quote as any).shipping_method === 'air' ? 'Air Freight' : (quote as any).shipping_method === 'ocean' ? 'Ocean Freight' : (quote as any).shipping_method}
+                  </p>
+                </div>
               {quote.sent_at && (
                 <div>
                   <p className="text-sm text-muted-foreground">Sent</p>
