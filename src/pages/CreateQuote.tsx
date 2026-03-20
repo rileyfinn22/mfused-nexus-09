@@ -108,6 +108,7 @@ const CreateQuote = () => {
   const [terms, setTerms] = useState("Net 30");
   const [validUntil, setValidUntil] = useState("");
   const [shippingCost, setShippingCost] = useState(0);
+  const [shippingMethod, setShippingMethod] = useState("");
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
