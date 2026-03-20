@@ -247,6 +247,47 @@ export function ProductTemplateGrid({
     }
   };
 
+  const openDupToCompanyDialog = async (template: ProductTemplate, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDupToCompanyTemplate(template);
+    setDupTargetCompanyId("");
+    // Fetch companies
+    const { data } = await supabase
+      .from('companies')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name');
+    setCompanies((data || []).filter(c => c.id !== template.company_id));
+    setDupToCompanyOpen(true);
+  };
+
+  const handleDuplicateToCompany = async () => {
+    if (!dupToCompanyTemplate || !dupTargetCompanyId) return;
+    setDupToCompanyLoading(true);
+    try {
+      const { error } = await supabase
+        .from('product_templates')
+        .insert({
+          name: dupToCompanyTemplate.name,
+          description: dupToCompanyTemplate.description,
+          price: dupToCompanyTemplate.price,
+          cost: dupToCompanyTemplate.cost,
+          company_id: dupTargetCompanyId,
+          state: dupToCompanyTemplate.state,
+          thumbnail_url: dupToCompanyTemplate.thumbnail_url,
+        });
+      if (error) throw error;
+      toast({ title: "Template duplicated", description: "An independent copy has been created for the selected company." });
+      setDupToCompanyOpen(false);
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error duplicating to company:', error);
+      toast({ title: "Error", description: "Failed to duplicate template.", variant: "destructive" });
+    } finally {
+      setDupToCompanyLoading(false);
+    }
+  };
+
   const openDeleteDialog = (template: ProductTemplate, e: React.MouseEvent) => {
     e.stopPropagation();
     setDeletingTemplate(template);
