@@ -126,6 +126,12 @@ const Products = () => {
   const [newTemplateCompanyId, setNewTemplateCompanyId] = useState("");
   const [creatingTemplate, setCreatingTemplate] = useState(false);
 
+  // Duplicate template dialog
+  const [duplicateTemplateOpen, setDuplicateTemplateOpen] = useState(false);
+  const [templateToDuplicate, setTemplateToDuplicate] = useState<ProductTemplate | null>(null);
+  const [duplicateTargetCompanyId, setDuplicateTargetCompanyId] = useState("");
+  const [duplicateTemplateLoading, setDuplicateTemplateLoading] = useState(false);
+
   useEffect(() => {
     fetchProducts();
     fetchTemplates();
@@ -490,18 +496,28 @@ const Products = () => {
     }
   };
 
-  const handleDuplicateTemplate = async (template: ProductTemplate) => {
+  const handleDuplicateTemplate = (template: ProductTemplate) => {
+    setTemplateToDuplicate(template);
+    setDuplicateTargetCompanyId(template.company_id ?? "");
+    setDuplicateTemplateOpen(true);
+  };
+
+  const handleConfirmDuplicateTemplate = async () => {
+    if (!templateToDuplicate || !duplicateTargetCompanyId) return;
+
     try {
+      setDuplicateTemplateLoading(true);
+
       const { error } = await supabase
         .from('product_templates')
         .insert({
-          name: `${template.name} (Copy)`,
-          description: template.description,
-          price: template.price,
-          cost: template.cost,
-          company_id: template.company_id,
-          thumbnail_url: template.thumbnail_url,
-          state: template.state
+          name: `${templateToDuplicate.name} (Copy)`,
+          description: templateToDuplicate.description,
+          price: templateToDuplicate.price,
+          cost: templateToDuplicate.cost,
+          company_id: duplicateTargetCompanyId,
+          thumbnail_url: templateToDuplicate.thumbnail_url,
+          state: templateToDuplicate.state,
         });
 
       if (error) throw error;
@@ -511,6 +527,9 @@ const Products = () => {
         description: "Template has been duplicated successfully.",
       });
 
+      setDuplicateTemplateOpen(false);
+      setTemplateToDuplicate(null);
+      setDuplicateTargetCompanyId("");
       fetchTemplates();
     } catch (error) {
       console.error('Error duplicating template:', error);
@@ -519,6 +538,8 @@ const Products = () => {
         description: "Failed to duplicate template.",
         variant: "destructive",
       });
+    } finally {
+      setDuplicateTemplateLoading(false);
     }
   };
 
@@ -802,7 +823,7 @@ const Products = () => {
                             e.stopPropagation();
                             handleDuplicateTemplate(template);
                           }}
-                          title="Duplicate template"
+                          title="Duplicate to company"
                         >
                           <Copy className="h-3.5 w-3.5" />
                         </Button>
@@ -1351,6 +1372,52 @@ const Products = () => {
             </Button>
             <Button onClick={handleCreateTemplate} disabled={creatingTemplate || !newTemplateName.trim() || (companyFilter === 'all' && !newTemplateCompanyId)}>
               {creatingTemplate ? "Creating..." : "Create Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Duplicate Template Dialog */}
+      <Dialog
+        open={duplicateTemplateOpen}
+        onOpenChange={(open) => {
+          setDuplicateTemplateOpen(open);
+          if (!open) {
+            setTemplateToDuplicate(null);
+            setDuplicateTargetCompanyId("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Duplicate Template</DialogTitle>
+            <DialogDescription>
+              Choose which company should own the new template copy. Products linked to the original will not be copied.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label>Company</Label>
+            <Select value={duplicateTargetCompanyId} onValueChange={setDuplicateTargetCompanyId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select company" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDuplicateTemplateOpen(false)} disabled={duplicateTemplateLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmDuplicateTemplate} disabled={duplicateTemplateLoading || !duplicateTargetCompanyId}>
+              {duplicateTemplateLoading ? "Duplicating..." : "Duplicate"}
             </Button>
           </DialogFooter>
         </DialogContent>
