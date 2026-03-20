@@ -219,33 +219,7 @@ export function ProductTemplateGrid({
     setImagePreview(null);
   };
 
-  const handleDuplicateTemplate = async (template: ProductTemplate, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDuplicating(true);
-
-    try {
-      const { error } = await supabase
-        .from('product_templates')
-        .insert({
-          name: `${template.name} (Copy)`,
-          description: template.description,
-          price: template.price,
-          cost: template.cost,
-          company_id: template.company_id,
-          thumbnail_url: template.thumbnail_url
-        });
-
-      if (error) throw error;
-
-      toast({ title: "Template duplicated", description: "A copy of the template has been created." });
-      fetchTemplates();
-    } catch (error) {
-      console.error('Error duplicating template:', error);
-      toast({ title: "Error", description: "Failed to duplicate template.", variant: "destructive" });
-    } finally {
-      setDuplicating(false);
-    }
-  };
+  // All duplication goes through the company picker dialog
 
   const openDupToCompanyDialog = async (template: ProductTemplate, e: React.MouseEvent) => {
     e.stopPropagation();
