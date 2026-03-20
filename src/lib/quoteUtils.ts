@@ -67,6 +67,11 @@ export function generateQuotePDF(quote: Quote, items: QuoteItem[]): void {
     yPos += 5;
   }
   doc.text(`Terms: ${quote.terms || 'Net 30'}`, 14, yPos);
+  if (quote.shipping_method) {
+    yPos += 5;
+    const methodLabel = quote.shipping_method === 'domestic' ? 'Domestic' : quote.shipping_method === 'air' ? 'Air Freight' : quote.shipping_method === 'ocean' ? 'Ocean Freight' : quote.shipping_method;
+    doc.text(`Shipping: ${methodLabel}`, 14, yPos);
+  }
   
   // Customer Info
   let customerY = yPos - 12;
