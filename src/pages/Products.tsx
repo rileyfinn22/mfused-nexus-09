@@ -126,6 +126,12 @@ const Products = () => {
   const [newTemplateCompanyId, setNewTemplateCompanyId] = useState("");
   const [creatingTemplate, setCreatingTemplate] = useState(false);
 
+  // Duplicate template dialog
+  const [duplicateTemplateOpen, setDuplicateTemplateOpen] = useState(false);
+  const [templateToDuplicate, setTemplateToDuplicate] = useState<ProductTemplate | null>(null);
+  const [duplicateTargetCompanyId, setDuplicateTargetCompanyId] = useState("");
+  const [duplicateTemplateLoading, setDuplicateTemplateLoading] = useState(false);
+
   useEffect(() => {
     fetchProducts();
     fetchTemplates();
