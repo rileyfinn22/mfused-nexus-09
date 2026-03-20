@@ -496,18 +496,28 @@ const Products = () => {
     }
   };
 
-  const handleDuplicateTemplate = async (template: ProductTemplate) => {
+  const handleDuplicateTemplate = (template: ProductTemplate) => {
+    setTemplateToDuplicate(template);
+    setDuplicateTargetCompanyId(template.company_id ?? "");
+    setDuplicateTemplateOpen(true);
+  };
+
+  const handleConfirmDuplicateTemplate = async () => {
+    if (!templateToDuplicate || !duplicateTargetCompanyId) return;
+
     try {
+      setDuplicateTemplateLoading(true);
+
       const { error } = await supabase
         .from('product_templates')
         .insert({
-          name: `${template.name} (Copy)`,
-          description: template.description,
-          price: template.price,
-          cost: template.cost,
-          company_id: template.company_id,
-          thumbnail_url: template.thumbnail_url,
-          state: template.state
+          name: `${templateToDuplicate.name} (Copy)`,
+          description: templateToDuplicate.description,
+          price: templateToDuplicate.price,
+          cost: templateToDuplicate.cost,
+          company_id: duplicateTargetCompanyId,
+          thumbnail_url: templateToDuplicate.thumbnail_url,
+          state: templateToDuplicate.state,
         });
 
       if (error) throw error;
@@ -517,6 +527,9 @@ const Products = () => {
         description: "Template has been duplicated successfully.",
       });
 
+      setDuplicateTemplateOpen(false);
+      setTemplateToDuplicate(null);
+      setDuplicateTargetCompanyId("");
       fetchTemplates();
     } catch (error) {
       console.error('Error duplicating template:', error);
@@ -525,6 +538,8 @@ const Products = () => {
         description: "Failed to duplicate template.",
         variant: "destructive",
       });
+    } finally {
+      setDuplicateTemplateLoading(false);
     }
   };
 
