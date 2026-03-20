@@ -521,7 +521,6 @@ export function ProductTemplateGrid({
                       <Button variant="ghost" size="sm" onClick={(e) => openDupToCompanyDialog(template, e)} title="Duplicate to company">
                         <Copy className="h-4 w-4" />
                       </Button>
-                      </Button>
                       <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => openDeleteDialog(template, e)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
