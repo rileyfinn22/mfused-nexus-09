@@ -1083,7 +1083,8 @@ const CreateQuote = () => {
                                                   step="0.01"
                                                   value={priceBreak.unit_price}
                                                   onChange={(e) => updatePriceBreak(index, breakIndex, 'unit_price', parseFloat(e.target.value) || 0)}
-                                                  className="h-8 w-24 pl-5"
+                                                  onBlur={() => sortPriceBreaks(index)}
+                                                  className="h-8 w-28 pl-5"
                                                 />
                                               </div>
                                               <span className="text-xs text-muted-foreground">
