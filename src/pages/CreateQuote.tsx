@@ -531,8 +531,14 @@ const CreateQuote = () => {
   const updateCustomItemPriceBreak = (index: number, field: keyof PriceBreak, value: number) => {
     const newBreaks = [...customItem.price_breaks];
     newBreaks[index] = { ...newBreaks[index], [field]: value };
-    newBreaks.sort((a, b) => a.qty - b.qty);
     setCustomItem({ ...customItem, price_breaks: newBreaks });
+  };
+
+  const sortCustomItemPriceBreaks = () => {
+    setCustomItem(prev => ({
+      ...prev,
+      price_breaks: [...prev.price_breaks].sort((a, b) => a.qty - b.qty)
+    }));
   };
 
   const removeCustomItemPriceBreak = (index: number) => {
