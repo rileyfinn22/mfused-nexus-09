@@ -508,8 +508,11 @@ const CreateQuote = () => {
   const updateTempPriceBreak = (index: number, field: keyof PriceBreak, value: number) => {
     const newBreaks = [...tempPriceBreaks];
     newBreaks[index] = { ...newBreaks[index], [field]: value };
-    newBreaks.sort((a, b) => a.qty - b.qty);
     setTempPriceBreaks(newBreaks);
+  };
+
+  const sortTempPriceBreaks = () => {
+    setTempPriceBreaks(prev => [...prev].sort((a, b) => a.qty - b.qty));
   };
 
   const removeTempPriceBreak = (index: number) => {
