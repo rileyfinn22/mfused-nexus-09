@@ -231,7 +231,7 @@ export function ProductTemplateGrid({
       .select('id, name')
       .eq('is_active', true)
       .order('name');
-    setCompanies((data || []).filter(c => c.id !== template.company_id));
+    setCompanies(data || []);
     setDupToCompanyOpen(true);
   };
 
