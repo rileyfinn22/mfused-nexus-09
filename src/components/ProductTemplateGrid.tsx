@@ -446,6 +446,14 @@ export function ProductTemplateGrid({
                 <Button
                   variant="secondary"
                   size="icon"
+                  className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
+                  onClick={(e) => openDupToCompanyDialog(template, e)}
+                  title="Duplicate to another company"
+                >
+                  <Building2 className="h-3.5 w-3.5" />
+                <Button
+                  variant="secondary"
+                  size="icon"
                   className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm hover:bg-destructive hover:text-destructive-foreground"
                   onClick={(e) => openDeleteDialog(template, e)}
                   title="Delete template"
