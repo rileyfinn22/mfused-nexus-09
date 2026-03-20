@@ -1070,7 +1070,9 @@ const CreateQuote = () => {
                                                 min="1"
                                                 value={priceBreak.qty}
                                                 onChange={(e) => updatePriceBreak(index, breakIndex, 'qty', parseInt(e.target.value) || 1)}
-                                                className="h-8 w-28"
+                                                onBlur={() => sortPriceBreaks(index)}
+                                                className="h-8 w-32"
+                                              />
                                               />
                                               <Label className="text-xs w-10">Price</Label>
                                               <div className="relative">
