@@ -1538,7 +1538,20 @@ const CreateQuote = () => {
                       <span className="font-medium">{formatCurrency(calculateSubtotal())}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Shipping</span>
+                      <span className="text-muted-foreground">Shipping Method</span>
+                      <Select value={shippingMethod} onValueChange={setShippingMethod}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder="Select method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="domestic">Domestic</SelectItem>
+                          <SelectItem value="air">Air Freight</SelectItem>
+                          <SelectItem value="ocean">Ocean Freight</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Shipping Cost</span>
                       <Input
                         type="number"
                         min="0"
