@@ -411,20 +411,10 @@ export function ProductTemplateGrid({
                   variant="secondary"
                   size="icon"
                   className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
-                  onClick={(e) => handleDuplicateTemplate(template, e)}
-                  disabled={duplicating}
-                  title="Duplicate template"
+                  onClick={(e) => openDupToCompanyDialog(template, e)}
+                  title="Duplicate to company"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
-                  onClick={(e) => openDupToCompanyDialog(template, e)}
-                  title="Duplicate to another company"
-                >
-                  <Building2 className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   variant="secondary"
