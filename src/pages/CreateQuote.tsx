@@ -1073,7 +1073,6 @@ const CreateQuote = () => {
                                                 onBlur={() => sortPriceBreaks(index)}
                                                 className="h-8 w-32"
                                               />
-                                              />
                                               <Label className="text-xs w-10">Price</Label>
                                               <div className="relative">
                                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
