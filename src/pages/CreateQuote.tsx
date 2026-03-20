@@ -1469,7 +1469,8 @@ const CreateQuote = () => {
                                       min="1"
                                       value={priceBreak.qty}
                                       onChange={(e) => updateTempPriceBreak(index, 'qty', parseInt(e.target.value) || 1)}
-                                      className="h-8 w-28"
+                                      onBlur={sortTempPriceBreaks}
+                                      className="h-8 w-32"
                                     />
                                     <Label className="text-xs w-10">Price</Label>
                                     <div className="relative">
