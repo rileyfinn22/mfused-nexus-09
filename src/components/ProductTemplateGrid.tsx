@@ -21,8 +21,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy, Trash2, LayoutGrid, List } from "lucide-react";
+import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy, Trash2, LayoutGrid, List, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -76,6 +83,11 @@ export function ProductTemplateGrid({
   const [newTemplateState, setNewTemplateState] = useState("");
   const [creating, setCreating] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [dupToCompanyOpen, setDupToCompanyOpen] = useState(false);
+  const [dupToCompanyTemplate, setDupToCompanyTemplate] = useState<ProductTemplate | null>(null);
+  const [dupTargetCompanyId, setDupTargetCompanyId] = useState("");
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [dupToCompanyLoading, setDupToCompanyLoading] = useState(false);
 
   useEffect(() => {
     fetchTemplates();
@@ -232,6 +244,47 @@ export function ProductTemplateGrid({
       toast({ title: "Error", description: "Failed to duplicate template.", variant: "destructive" });
     } finally {
       setDuplicating(false);
+    }
+  };
+
+  const openDupToCompanyDialog = async (template: ProductTemplate, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDupToCompanyTemplate(template);
+    setDupTargetCompanyId("");
+    // Fetch companies
+    const { data } = await supabase
+      .from('companies')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name');
+    setCompanies((data || []).filter(c => c.id !== template.company_id));
+    setDupToCompanyOpen(true);
+  };
+
+  const handleDuplicateToCompany = async () => {
+    if (!dupToCompanyTemplate || !dupTargetCompanyId) return;
+    setDupToCompanyLoading(true);
+    try {
+      const { error } = await supabase
+        .from('product_templates')
+        .insert({
+          name: dupToCompanyTemplate.name,
+          description: dupToCompanyTemplate.description,
+          price: dupToCompanyTemplate.price,
+          cost: dupToCompanyTemplate.cost,
+          company_id: dupTargetCompanyId,
+          state: dupToCompanyTemplate.state,
+          thumbnail_url: dupToCompanyTemplate.thumbnail_url,
+        });
+      if (error) throw error;
+      toast({ title: "Template duplicated", description: "An independent copy has been created for the selected company." });
+      setDupToCompanyOpen(false);
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error duplicating to company:', error);
+      toast({ title: "Error", description: "Failed to duplicate template.", variant: "destructive" });
+    } finally {
+      setDupToCompanyLoading(false);
     }
   };
 
@@ -393,6 +446,15 @@ export function ProductTemplateGrid({
                 <Button
                   variant="secondary"
                   size="icon"
+                  className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
+                  onClick={(e) => openDupToCompanyDialog(template, e)}
+                  title="Duplicate to another company"
+                >
+                  <Building2 className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
                   className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm hover:bg-destructive hover:text-destructive-foreground"
                   onClick={(e) => openDeleteDialog(template, e)}
                   title="Delete template"
@@ -494,6 +556,9 @@ export function ProductTemplateGrid({
                       </Button>
                       <Button variant="ghost" size="sm" onClick={(e) => handleDuplicateTemplate(template, e)}>
                         <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={(e) => openDupToCompanyDialog(template, e)} title="Duplicate to company">
+                        <Building2 className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => openDeleteDialog(template, e)}>
                         <Trash2 className="h-4 w-4" />
@@ -736,6 +801,36 @@ export function ProductTemplateGrid({
                 {creating ? "Creating..." : "Create Template"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Duplicate to Company Dialog */}
+      <Dialog open={dupToCompanyOpen} onOpenChange={setDupToCompanyOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Duplicate to Company</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This creates an independent copy of <span className="font-medium">{dupToCompanyTemplate?.name}</span> under the selected company. No products will be copied.
+          </p>
+          <div className="space-y-2">
+            <Label>Target Company</Label>
+            <Select value={dupTargetCompanyId} onValueChange={setDupTargetCompanyId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a company" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setDupToCompanyOpen(false)}>Cancel</Button>
+            <Button onClick={handleDuplicateToCompany} disabled={dupToCompanyLoading || !dupTargetCompanyId}>
+              {dupToCompanyLoading ? "Duplicating..." : "Duplicate"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
