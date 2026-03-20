@@ -35,6 +35,7 @@ interface Quote {
   subtotal: number;
   tax: number;
   shipping_cost: number;
+  shipping_method: string | null;
   total: number;
   created_at: string;
 }
