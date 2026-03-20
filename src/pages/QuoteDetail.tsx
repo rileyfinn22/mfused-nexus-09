@@ -1234,6 +1234,7 @@ const QuoteDetail = () => {
                     {(quote as any).shipping_method === 'domestic' ? 'Domestic' : (quote as any).shipping_method === 'air' ? 'Air Freight' : (quote as any).shipping_method === 'ocean' ? 'Ocean Freight' : (quote as any).shipping_method}
                   </p>
                 </div>
+              )}
               {quote.sent_at && (
                 <div>
                   <p className="text-sm text-muted-foreground">Sent</p>
