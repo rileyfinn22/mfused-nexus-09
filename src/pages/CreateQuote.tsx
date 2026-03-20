@@ -1377,7 +1377,8 @@ const CreateQuote = () => {
                                     step="0.01"
                                     value={priceBreak.unit_price}
                                     onChange={(e) => updateCustomItemPriceBreak(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                                    className="h-8 w-20"
+                                    onBlur={sortCustomItemPriceBreaks}
+                                    className="h-8 w-24"
                                   />
                                   <Button
                                     type="button"
