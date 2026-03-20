@@ -989,7 +989,7 @@ const CreateQuote = () => {
                                       newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
                                       setItems(newItems);
                                     }}
-                                    className="h-7 w-14 text-center"
+                                    className="h-7 w-24 text-center"
                                   />
                                   <Button
                                     type="button"
