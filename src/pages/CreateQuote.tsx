@@ -651,6 +651,7 @@ const CreateQuote = () => {
         valid_until: validUntil ? new Date(validUntil).toISOString() : null,
         subtotal: calculateSubtotal(),
         shipping_cost: shippingCost,
+        shipping_method: shippingMethod || null,
         total: calculateTotal(),
         status: isVibeAdmin ? 'draft' : 'pending_review'
       };
