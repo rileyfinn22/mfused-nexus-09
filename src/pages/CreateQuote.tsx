@@ -1367,7 +1367,8 @@ const CreateQuote = () => {
                                     min="1"
                                     value={priceBreak.qty}
                                     onChange={(e) => updateCustomItemPriceBreak(index, 'qty', parseInt(e.target.value) || 1)}
-                                    className="h-8 w-24"
+                                    onBlur={sortCustomItemPriceBreaks}
+                                    className="h-8 w-28"
                                   />
                                   <Label className="text-xs w-8">Price</Label>
                                   <Input
