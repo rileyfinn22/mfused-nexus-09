@@ -803,6 +803,36 @@ export function ProductTemplateGrid({
           </div>
         </DialogContent>
       </Dialog>
+      {/* Duplicate to Company Dialog */}
+      <Dialog open={dupToCompanyOpen} onOpenChange={setDupToCompanyOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Duplicate to Company</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This creates an independent copy of <span className="font-medium">{dupToCompanyTemplate?.name}</span> under the selected company. No products will be copied.
+          </p>
+          <div className="space-y-2">
+            <Label>Target Company</Label>
+            <Select value={dupTargetCompanyId} onValueChange={setDupTargetCompanyId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a company" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setDupToCompanyOpen(false)}>Cancel</Button>
+            <Button onClick={handleDuplicateToCompany} disabled={dupToCompanyLoading || !dupTargetCompanyId}>
+              {dupToCompanyLoading ? "Duplicating..." : "Duplicate"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
