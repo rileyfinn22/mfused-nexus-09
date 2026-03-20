@@ -83,6 +83,11 @@ export function ProductTemplateGrid({
   const [newTemplateState, setNewTemplateState] = useState("");
   const [creating, setCreating] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [dupToCompanyOpen, setDupToCompanyOpen] = useState(false);
+  const [dupToCompanyTemplate, setDupToCompanyTemplate] = useState<ProductTemplate | null>(null);
+  const [dupTargetCompanyId, setDupTargetCompanyId] = useState("");
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [dupToCompanyLoading, setDupToCompanyLoading] = useState(false);
 
   useEffect(() => {
     fetchTemplates();
