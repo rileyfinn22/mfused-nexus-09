@@ -996,7 +996,14 @@ const QuoteDetail = () => {
                           </div>
                           {quote.shipping_cost > 0 && (
                             <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Shipping</span>
+                              <span className="text-muted-foreground">
+                                Shipping
+                                {(quote as any).shipping_method && (
+                                  <span className="ml-1 text-xs">
+                                    ({(quote as any).shipping_method === 'domestic' ? 'Domestic' : (quote as any).shipping_method === 'air' ? 'Air' : (quote as any).shipping_method === 'ocean' ? 'Ocean' : (quote as any).shipping_method})
+                                  </span>
+                                )}
+                              </span>
                               <span>{formatCurrency(quote.shipping_cost)}</span>
                             </div>
                           )}

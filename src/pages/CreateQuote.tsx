@@ -108,6 +108,7 @@ const CreateQuote = () => {
   const [terms, setTerms] = useState("Net 30");
   const [validUntil, setValidUntil] = useState("");
   const [shippingCost, setShippingCost] = useState(0);
+  const [shippingMethod, setShippingMethod] = useState("");
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
@@ -321,6 +322,7 @@ const CreateQuote = () => {
     setTerms(quote.terms || "Net 30");
     setValidUntil(quote.valid_until ? quote.valid_until.split('T')[0] : "");
     setShippingCost(quote.shipping_cost || 0);
+    setShippingMethod((quote as any).shipping_method || "");
     setExistingFileUrl(quote.uploaded_file_url);
     setExistingFilename(quote.uploaded_filename);
 
@@ -508,8 +510,11 @@ const CreateQuote = () => {
   const updateTempPriceBreak = (index: number, field: keyof PriceBreak, value: number) => {
     const newBreaks = [...tempPriceBreaks];
     newBreaks[index] = { ...newBreaks[index], [field]: value };
-    newBreaks.sort((a, b) => a.qty - b.qty);
     setTempPriceBreaks(newBreaks);
+  };
+
+  const sortTempPriceBreaks = () => {
+    setTempPriceBreaks(prev => [...prev].sort((a, b) => a.qty - b.qty));
   };
 
   const removeTempPriceBreak = (index: number) => {
@@ -528,8 +533,14 @@ const CreateQuote = () => {
   const updateCustomItemPriceBreak = (index: number, field: keyof PriceBreak, value: number) => {
     const newBreaks = [...customItem.price_breaks];
     newBreaks[index] = { ...newBreaks[index], [field]: value };
-    newBreaks.sort((a, b) => a.qty - b.qty);
     setCustomItem({ ...customItem, price_breaks: newBreaks });
+  };
+
+  const sortCustomItemPriceBreaks = () => {
+    setCustomItem(prev => ({
+      ...prev,
+      price_breaks: [...prev.price_breaks].sort((a, b) => a.qty - b.qty)
+    }));
   };
 
   const removeCustomItemPriceBreak = (index: number) => {
@@ -564,7 +575,11 @@ const CreateQuote = () => {
       ...newItems[itemIndex].price_breaks[breakIndex],
       [field]: value
     };
-    // Sort price breaks by qty
+    setItems(newItems);
+  };
+
+  const sortPriceBreaks = (itemIndex: number) => {
+    const newItems = [...items];
     newItems[itemIndex].price_breaks.sort((a, b) => a.qty - b.qty);
     setItems(newItems);
   };
@@ -636,6 +651,7 @@ const CreateQuote = () => {
         valid_until: validUntil ? new Date(validUntil).toISOString() : null,
         subtotal: calculateSubtotal(),
         shipping_cost: shippingCost,
+        shipping_method: shippingMethod || null,
         total: calculateTotal(),
         status: isVibeAdmin ? 'draft' : 'pending_review'
       };
@@ -973,7 +989,7 @@ const CreateQuote = () => {
                                       newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
                                       setItems(newItems);
                                     }}
-                                    className="h-7 w-14 text-center"
+                                    className="h-7 w-24 text-center"
                                   />
                                   <Button
                                     type="button"
@@ -1054,7 +1070,8 @@ const CreateQuote = () => {
                                                 min="1"
                                                 value={priceBreak.qty}
                                                 onChange={(e) => updatePriceBreak(index, breakIndex, 'qty', parseInt(e.target.value) || 1)}
-                                                className="h-8 w-28"
+                                                onBlur={() => sortPriceBreaks(index)}
+                                                className="h-8 w-32"
                                               />
                                               <Label className="text-xs w-10">Price</Label>
                                               <div className="relative">
@@ -1065,7 +1082,8 @@ const CreateQuote = () => {
                                                   step="0.01"
                                                   value={priceBreak.unit_price}
                                                   onChange={(e) => updatePriceBreak(index, breakIndex, 'unit_price', parseFloat(e.target.value) || 0)}
-                                                  className="h-8 w-24 pl-5"
+                                                  onBlur={() => sortPriceBreaks(index)}
+                                                  className="h-8 w-28 pl-5"
                                                 />
                                               </div>
                                               <span className="text-xs text-muted-foreground">
@@ -1348,7 +1366,8 @@ const CreateQuote = () => {
                                     min="1"
                                     value={priceBreak.qty}
                                     onChange={(e) => updateCustomItemPriceBreak(index, 'qty', parseInt(e.target.value) || 1)}
-                                    className="h-8 w-24"
+                                    onBlur={sortCustomItemPriceBreaks}
+                                    className="h-8 w-28"
                                   />
                                   <Label className="text-xs w-8">Price</Label>
                                   <Input
@@ -1357,7 +1376,8 @@ const CreateQuote = () => {
                                     step="0.01"
                                     value={priceBreak.unit_price}
                                     onChange={(e) => updateCustomItemPriceBreak(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                                    className="h-8 w-20"
+                                    onBlur={sortCustomItemPriceBreaks}
+                                    className="h-8 w-24"
                                   />
                                   <Button
                                     type="button"
@@ -1448,7 +1468,8 @@ const CreateQuote = () => {
                                       min="1"
                                       value={priceBreak.qty}
                                       onChange={(e) => updateTempPriceBreak(index, 'qty', parseInt(e.target.value) || 1)}
-                                      className="h-8 w-28"
+                                      onBlur={sortTempPriceBreaks}
+                                      className="h-8 w-32"
                                     />
                                     <Label className="text-xs w-10">Price</Label>
                                     <div className="relative">
@@ -1459,7 +1480,8 @@ const CreateQuote = () => {
                                         step="0.01"
                                         value={priceBreak.unit_price}
                                         onChange={(e) => updateTempPriceBreak(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                                        className="h-8 w-24 pl-5"
+                                        onBlur={sortTempPriceBreaks}
+                                        className="h-8 w-28 pl-5"
                                       />
                                     </div>
                                     <span className="text-sm text-muted-foreground">
@@ -1515,7 +1537,20 @@ const CreateQuote = () => {
                       <span className="font-medium">{formatCurrency(calculateSubtotal())}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Shipping</span>
+                      <span className="text-muted-foreground">Shipping Method</span>
+                      <Select value={shippingMethod} onValueChange={setShippingMethod}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder="Select method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="domestic">Domestic</SelectItem>
+                          <SelectItem value="air">Air Freight</SelectItem>
+                          <SelectItem value="ocean">Ocean Freight</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Shipping Cost</span>
                       <Input
                         type="number"
                         min="0"
