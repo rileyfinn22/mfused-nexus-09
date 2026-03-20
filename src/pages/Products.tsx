@@ -1377,6 +1377,52 @@ const Products = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Duplicate Template Dialog */}
+      <Dialog
+        open={duplicateTemplateOpen}
+        onOpenChange={(open) => {
+          setDuplicateTemplateOpen(open);
+          if (!open) {
+            setTemplateToDuplicate(null);
+            setDuplicateTargetCompanyId("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Duplicate Template</DialogTitle>
+            <DialogDescription>
+              Choose which company should own the new template copy. Products linked to the original will not be copied.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label>Company</Label>
+            <Select value={duplicateTargetCompanyId} onValueChange={setDuplicateTargetCompanyId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select company" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDuplicateTemplateOpen(false)} disabled={duplicateTemplateLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmDuplicateTemplate} disabled={duplicateTemplateLoading || !duplicateTargetCompanyId}>
+              {duplicateTemplateLoading ? "Duplicating..." : "Duplicate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
