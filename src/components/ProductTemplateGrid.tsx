@@ -71,7 +71,7 @@ export function ProductTemplateGrid({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [duplicating, setDuplicating] = useState(false);
+  
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTemplate, setDeletingTemplate] = useState<ProductTemplate | null>(null);
   const [deleting, setDeleting] = useState(false);
