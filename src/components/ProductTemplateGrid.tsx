@@ -451,6 +451,7 @@ export function ProductTemplateGrid({
                   title="Duplicate to another company"
                 >
                   <Building2 className="h-3.5 w-3.5" />
+                </Button>
                 <Button
                   variant="secondary"
                   size="icon"
