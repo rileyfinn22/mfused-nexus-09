@@ -823,7 +823,7 @@ const Products = () => {
                             e.stopPropagation();
                             handleDuplicateTemplate(template);
                           }}
-                          title="Duplicate template"
+                          title="Duplicate to company"
                         >
                           <Copy className="h-3.5 w-3.5" />
                         </Button>
