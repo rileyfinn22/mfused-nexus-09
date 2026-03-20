@@ -573,7 +573,11 @@ const CreateQuote = () => {
       ...newItems[itemIndex].price_breaks[breakIndex],
       [field]: value
     };
-    // Sort price breaks by qty
+    setItems(newItems);
+  };
+
+  const sortPriceBreaks = (itemIndex: number) => {
+    const newItems = [...items];
     newItems[itemIndex].price_breaks.sort((a, b) => a.qty - b.qty);
     setItems(newItems);
   };
