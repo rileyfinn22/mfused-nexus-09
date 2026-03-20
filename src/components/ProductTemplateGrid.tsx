@@ -21,8 +21,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy, Trash2, LayoutGrid, List } from "lucide-react";
+import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy, Trash2, LayoutGrid, List, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
