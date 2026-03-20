@@ -67,6 +67,11 @@ export function generateQuotePDF(quote: Quote, items: QuoteItem[]): void {
     yPos += 5;
   }
   doc.text(`Terms: ${quote.terms || 'Net 30'}`, 14, yPos);
+  if (quote.shipping_method) {
+    yPos += 5;
+    const methodLabel = quote.shipping_method === 'domestic' ? 'Domestic' : quote.shipping_method === 'air' ? 'Air Freight' : quote.shipping_method === 'ocean' ? 'Ocean Freight' : quote.shipping_method;
+    doc.text(`Shipping: ${methodLabel}`, 14, yPos);
+  }
   
   // Customer Info
   let customerY = yPos - 12;
@@ -168,10 +173,7 @@ export function generateQuotePDF(quote: Quote, items: QuoteItem[]): void {
     
     if (quote.shipping_cost > 0) {
       totalsY += 6;
-      const shippingLabel = quote.shipping_method 
-        ? `Shipping (${quote.shipping_method === 'domestic' ? 'Domestic' : quote.shipping_method === 'air' ? 'Air Freight' : quote.shipping_method === 'ocean' ? 'Ocean Freight' : quote.shipping_method}):`
-        : 'Shipping:';
-      doc.text(shippingLabel, totalsX, totalsY);
+      doc.text('Shipping:', totalsX, totalsY);
       doc.text(formatCurrency(quote.shipping_cost), pageWidth - 14, totalsY, { align: 'right' });
     }
     

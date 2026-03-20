@@ -996,14 +996,7 @@ const QuoteDetail = () => {
                           </div>
                           {quote.shipping_cost > 0 && (
                             <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Shipping
-                                {(quote as any).shipping_method && (
-                                  <span className="ml-1 text-xs">
-                                    ({(quote as any).shipping_method === 'domestic' ? 'Domestic' : (quote as any).shipping_method === 'air' ? 'Air' : (quote as any).shipping_method === 'ocean' ? 'Ocean' : (quote as any).shipping_method})
-                                  </span>
-                                )}
-                              </span>
+                              <span className="text-muted-foreground">Shipping</span>
                               <span>{formatCurrency(quote.shipping_cost)}</span>
                             </div>
                           )}
@@ -1230,6 +1223,16 @@ const QuoteDetail = () => {
                     <Calendar className="h-3 w-3" /> Valid Until
                   </p>
                   <p className="font-medium">{new Date(quote.valid_until).toLocaleDateString()}</p>
+                </div>
+              )}
+              {(quote as any).shipping_method && (
+                <div>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Truck className="h-3 w-3" /> Shipping Method
+                  </p>
+                  <p className="font-medium">
+                    {(quote as any).shipping_method === 'domestic' ? 'Domestic' : (quote as any).shipping_method === 'air' ? 'Air Freight' : (quote as any).shipping_method === 'ocean' ? 'Ocean Freight' : (quote as any).shipping_method}
+                  </p>
                 </div>
               )}
               {quote.sent_at && (
