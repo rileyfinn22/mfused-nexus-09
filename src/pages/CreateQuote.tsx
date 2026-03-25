@@ -94,6 +94,7 @@ const CreateQuote = () => {
 
   // Form state
   const [companyId, setCompanyId] = useState("");
+  const [companyNameManual, setCompanyNameManual] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
