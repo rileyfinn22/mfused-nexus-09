@@ -62,6 +62,7 @@ interface QuoteItem {
   price_breaks: PriceBreak[];
   selected_tier: number | null;
   isExpanded?: boolean;
+  pricing_mode: 'standard' | 'description';
 }
 
 interface Product {
