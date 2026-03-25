@@ -346,7 +346,8 @@ const CreateQuote = () => {
       total: item.total,
       price_breaks: Array.isArray(item.price_breaks) ? (item.price_breaks as unknown as PriceBreak[]) : [],
       selected_tier: item.selected_tier,
-      isExpanded: false
+      isExpanded: false,
+      pricing_mode: (item.quantity === 0 && item.description) ? 'description' as const : 'standard' as const,
     })) || []);
 
     // Fetch products for this company
