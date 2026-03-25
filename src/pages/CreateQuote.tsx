@@ -373,7 +373,7 @@ const CreateQuote = () => {
   };
 
   const calculateSubtotal = () => {
-    return items.reduce((sum, item) => sum + item.total, 0);
+    return items.filter(i => i.pricing_mode !== 'description').reduce((sum, item) => sum + item.total, 0);
   };
 
   const calculateTotal = () => {
