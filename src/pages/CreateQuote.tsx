@@ -608,10 +608,10 @@ const CreateQuote = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!companyId) {
+    if (!companyId && !companyNameManual && !customerName) {
       toast({
         title: "Error",
-        description: "Please select a company",
+        description: "Please select a company or enter a company/customer name",
         variant: "destructive",
       });
       return;
