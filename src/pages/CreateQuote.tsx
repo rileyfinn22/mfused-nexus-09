@@ -249,7 +249,8 @@ const CreateQuote = () => {
         total: 0,
         price_breaks: [],
         selected_tier: null,
-        isExpanded: false
+        isExpanded: false,
+        pricing_mode: (item.quantity === 0 && item.description) ? 'description' as const : 'standard' as const,
       })));
     }
 
