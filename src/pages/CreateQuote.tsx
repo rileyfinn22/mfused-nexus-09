@@ -468,7 +468,8 @@ const CreateQuote = () => {
       isCustom: true,
       price_breaks: customItem.price_breaks,
       selected_tier: null,
-      isExpanded: false
+      isExpanded: false,
+      pricing_mode: 'standard',
     };
     setItems([...items, newItem]);
     setCustomItem({ sku: "", name: "", description: "", state: "", quantity: 1, unit_price: 0, price_breaks: [] });
