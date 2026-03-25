@@ -1,37 +1,28 @@
-## Financing Workflow: 3-Stage Pipeline ✅ IMPLEMENTED
 
-### Workflow
+
+## Plan: Add Pricing Options/Variants to Quote Line Items
+
+### Problem
+Currently each quote line item is a single SKU + price. The user needs to quote multiple material/option variants under a single product line — e.g., ".018 SBS - $0.420 ea" and ".024 CNK - $0.535 ea" grouped under one product header.
+
+### Approach
+The `quote_items` table already has a `description` field (nullable text). The simplest and most flexible approach: **use the existing description field as a rich-text pricing note per line item**, and add a visible textarea in the Create/Edit Quote form for each item.
+
+This avoids schema changes entirely. The description field can hold the multi-line pricing breakdown exactly as the user typed it (e.g., the ".018 SBS - $0.420 ea" list). It renders on the detail page and in the PDF.
+
+### Changes
+
+**1. `src/pages/CreateQuote.tsx`** — Add a collapsible "Description / Pricing Notes" textarea under each line item row in the items table. Pre-populate from `item.description`. This is where the user types variant pricing like:
 ```
-Pending → Active/Financed → Completed
+.018 SBS - $0.420 ea
+.018 CNK - $0.476 ea
+.024 SBS - $0.486 ea
 ```
 
-- **Pending**: Vibe submits PO for financing, finance company reviews
-- **Active**: Finance accepts & processes, aging/fees begin
-- **Completed**: Fully repaid, auto-moves when balance = 0
+**2. `src/pages/QuoteDetail.tsx`** — Render item descriptions below each line item row in the items table (if present), preserving whitespace/line breaks.
 
-### Changes Made
-- Added `finance_status` column (`pending`, `active`, `completed`) to `financed_invoices`
-- Financing.tsx: 3 tabs with counts (Pending/Active/Completed)
-- AddFinancedInvoiceDialog: inserts as `pending`, no auto vendor PO payment
-- AcceptFinanceRequestDialog: finance user accepts pending → active, records vendor PO payment
-- RecordFinanceRepaymentDialog: auto-sets `completed` when fully repaid
-- Summary cards only count active entries
-- Shared view function updated to include `finance_status`
-- Finance users can ONLY activate from pending (no standalone "Add" button)
-- Detail page shows Accept banner for finance users viewing pending items
+**3. `src/lib/quoteUtils.ts`** — Include the description text below the item name/SKU in the PDF table rows so the pricing options appear on the exported PDF.
 
-## Repayment Ledger ✅ IMPLEMENTED
-- `finance_repayments` table tracks individual payments with date, method, reference, notes
-- DB trigger auto-updates `financed_invoices.paid_back_amount` and auto-completes when fully repaid
-- Detail page shows full repayment history table
-- Repayment dialog now captures payment date, method, and reference number
+### No database changes needed
+The `description` column already exists on `quote_items` and is already being saved. We just need to surface it in the UI and PDF.
 
-## Export & Filters ✅ IMPLEMENTED
-- Search across PO numbers, descriptions, customers, invoice numbers, notes
-- Date range filters (from/to)
-- CSV export per tab with all relevant columns
-- Clear filters button
-
-## Email Notifications 🔲 PENDING
-- Needs email domain setup first
-- Plan: notify finance company on new pending request, notify Vibe on acceptance
