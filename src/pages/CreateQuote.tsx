@@ -972,7 +972,9 @@ const CreateQuote = () => {
                                   </Button>
                                   <div>
                                     <p className="font-medium">{item.name}</p>
-                                    {item.description ? (
+                                    {item.pricing_mode === 'description' ? (
+                                      <p className="text-xs text-primary font-medium">Options/Description mode</p>
+                                    ) : item.description ? (
                                       <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
                                     ) : (
                                       <p className="text-xs text-muted-foreground/60 italic">Click to add description</p>
@@ -989,53 +991,61 @@ const CreateQuote = () => {
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="flex items-center justify-center gap-1">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 w-7 p-0"
-                                    onClick={() => updateItemQuantity(index, -1)}
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) => {
-                                      const newItems = [...items];
-                                      newItems[index].quantity = parseInt(e.target.value) || 1;
-                                      newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
-                                      setItems(newItems);
-                                    }}
-                                    className="h-7 w-24 text-center"
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 w-7 p-0"
-                                    onClick={() => updateItemQuantity(index, 1)}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={item.unit_price}
-                                  onChange={(e) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                  className="h-8 w-24 text-right ml-auto"
-                                />
-                              </TableCell>
-                              <TableCell className="text-right font-medium">
-                                {formatCurrency(item.total)}
-                              </TableCell>
+                              {item.pricing_mode === 'description' ? (
+                                <TableCell colSpan={3} className="text-center">
+                                  <span className="text-sm text-muted-foreground italic">See description below</span>
+                                </TableCell>
+                              ) : (
+                                <>
+                                  <TableCell>
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => updateItemQuantity(index, -1)}
+                                      >
+                                        <Minus className="h-3 w-3" />
+                                      </Button>
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        value={item.quantity}
+                                        onChange={(e) => {
+                                          const newItems = [...items];
+                                          newItems[index].quantity = parseInt(e.target.value) || 1;
+                                          newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
+                                          setItems(newItems);
+                                        }}
+                                        className="h-7 w-24 text-center"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => updateItemQuantity(index, 1)}
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={item.unit_price}
+                                      onChange={(e) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                      className="h-8 w-24 text-right ml-auto"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right font-medium">
+                                    {formatCurrency(item.total)}
+                                  </TableCell>
+                                </>
+                              )}
                             </TableRow>
                             {item.isExpanded && (
                               <TableRow className="bg-muted/30 hover:bg-muted/30">
