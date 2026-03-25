@@ -1207,6 +1207,7 @@ const CreateQuote = () => {
                                       </div>
                                     )}
                                     </div>
+                                    )}
                                   </div>
                                 </TableCell>
                               </TableRow>
