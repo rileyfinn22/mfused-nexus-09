@@ -498,7 +498,8 @@ const CreateQuote = () => {
       total: (firstTier?.qty || 1) * (firstTier?.unit_price || selectedProductForPriceBreaks.price || 0),
       price_breaks: tempPriceBreaks,
       selected_tier: 0,
-      isExpanded: false
+      isExpanded: false,
+      pricing_mode: 'standard',
     };
     
     setItems([...items, newItem]);
