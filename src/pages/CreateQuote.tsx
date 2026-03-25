@@ -636,8 +636,8 @@ const CreateQuote = () => {
       }
 
       const quoteData: any = {
-        company_id: companyId,
-        customer_name: customerName,
+        company_id: companyId || null,
+        customer_name: customerName || companyNameManual,
         customer_email: customerEmail || null,
         customer_phone: customerPhone || null,
         shipping_name: shippingName || null,
