@@ -972,7 +972,7 @@ const QuoteDetail = () => {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <p className="text-sm text-muted-foreground line-clamp-2">
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                                 {item.description || '-'}
                               </p>
                             </TableCell>
