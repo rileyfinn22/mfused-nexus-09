@@ -412,8 +412,8 @@ const QuoteDetail = () => {
     ? !['approved'].includes(quote.status) // Vibe can delete anything except approved
     : ['draft', 'pending_review', 'sent', 'rejected'].includes(quote.status); // Customer can delete their drafts, requests, and received/rejected quotes
 
-  const handleDownloadPDF = () => {
-    generateQuotePDF({ ...quote, shipping_method: (quote as any).shipping_method || null }, items);
+  const handleDownloadPDF = async () => {
+    await generateQuotePDF({ ...quote, shipping_method: (quote as any).shipping_method || null }, items);
   };
 
   const generateOrderNumber = async () => {

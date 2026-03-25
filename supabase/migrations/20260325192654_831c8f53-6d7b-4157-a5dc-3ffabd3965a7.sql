@@ -1,0 +1,1 @@
+ALTER TABLE public.quotes ALTER COLUMN company_id DROP NOT NULL;

@@ -94,6 +94,7 @@ const CreateQuote = () => {
 
   // Form state
   const [companyId, setCompanyId] = useState("");
+  const [companyNameManual, setCompanyNameManual] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -607,10 +608,10 @@ const CreateQuote = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!companyId) {
+    if (!companyId && !companyNameManual && !customerName) {
       toast({
         title: "Error",
-        description: "Please select a company",
+        description: "Please select a company or enter a company/customer name",
         variant: "destructive",
       });
       return;
@@ -635,8 +636,8 @@ const CreateQuote = () => {
       }
 
       const quoteData: any = {
-        company_id: companyId,
-        customer_name: customerName,
+        company_id: companyId || null,
+        customer_name: customerName || companyNameManual,
         customer_email: customerEmail || null,
         customer_phone: customerPhone || null,
         shipping_name: shippingName || null,
@@ -780,10 +781,10 @@ const CreateQuote = () => {
                 <CardHeader>
                   <CardTitle className="text-base">Company</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <Select value={companyId} onValueChange={setCompanyId} disabled={isResponding}>
+                <CardContent className="space-y-3">
+                  <Select value={companyId} onValueChange={(val) => { setCompanyId(val); setCompanyNameManual(""); }} disabled={isResponding}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a company" />
+                      <SelectValue placeholder="Select an existing company" />
                     </SelectTrigger>
                     <SelectContent>
                       {companies.map((company) => (
@@ -793,8 +794,22 @@ const CreateQuote = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  {!isResponding && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Separator className="flex-1" />
+                        <span className="text-xs text-muted-foreground">or type a name for non-customers</span>
+                        <Separator className="flex-1" />
+                      </div>
+                      <Input
+                        value={companyNameManual}
+                        onChange={(e) => { setCompanyNameManual(e.target.value); if (e.target.value) setCompanyId(""); }}
+                        placeholder="Type company name (non-customer)"
+                      />
+                    </>
+                  )}
                   {isResponding && (
-                    <p className="text-xs text-muted-foreground mt-2">
+                    <p className="text-xs text-muted-foreground">
                       Company is set from the original quote request
                     </p>
                   )}
