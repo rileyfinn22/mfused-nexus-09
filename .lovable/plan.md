@@ -1,28 +1,38 @@
 
 
-## Plan: Add Pricing Options/Variants to Quote Line Items
+## Plan: Dual-Mode Quote Line Items (Standard vs. Description-Only)
 
 ### Problem
-Currently each quote line item is a single SKU + price. The user needs to quote multiple material/option variants under a single product line — e.g., ".018 SBS - $0.420 ea" and ".024 CNK - $0.535 ea" grouped under one product header.
+Right now every line item forces a quantity + unit price. But sometimes you're quoting **multiple material/option variants** under one product (e.g., ".018 SBS - $0.420 ea") where there's no single qty/price — just a list of options for the customer to choose from.
 
-### Approach
-The `quote_items` table already has a `description` field (nullable text). The simplest and most flexible approach: **use the existing description field as a rich-text pricing note per line item**, and add a visible textarea in the Create/Edit Quote form for each item.
+### Solution
+Add a **per-item toggle** between two modes:
 
-This avoids schema changes entirely. The description field can hold the multi-line pricing breakdown exactly as the user typed it (e.g., the ".018 SBS - $0.420 ea" list). It renders on the detail page and in the PDF.
+- **Standard** — current behavior: qty, unit price, total columns visible
+- **Options/Description** — qty & unit price columns are hidden/greyed out; a larger description textarea is shown inline where you type the pricing options free-form
+
+### How it works
+- A new boolean field `pricing_mode` on each item in state (values: `"standard"` or `"description"`)
+- No database changes — we store the mode using the existing `description` field (if description-mode, the description IS the pricing content) and set `quantity = 0`, `unit_price = 0`, `total = 0` so it doesn't affect totals
+- A small toggle button (e.g., "Standard / Options") appears in the expanded section or inline next to the item name
 
 ### Changes
 
-**1. `src/pages/CreateQuote.tsx`** — Add a collapsible "Description / Pricing Notes" textarea under each line item row in the items table. Pre-populate from `item.description`. This is where the user types variant pricing like:
-```
-.018 SBS - $0.420 ea
-.018 CNK - $0.476 ea
-.024 SBS - $0.486 ea
-```
+**1. `src/pages/CreateQuote.tsx`**
+- Add `pricing_mode: 'standard' | 'description'` to the `QuoteItem` interface (client-side only, defaults to `'standard'`)
+- Add a toggle button per line item (next to the item name or in the expanded section) to switch modes
+- When mode is `'description'`: hide the qty/unit price/total inputs for that row, show a larger inline textarea instead
+- When saving: description-mode items save with `quantity: 0, unit_price: 0, total: 0` and the typed text in `description`
+- On load (edit mode): detect items where `quantity === 0 && description` is present → auto-set to description mode
 
-**2. `src/pages/QuoteDetail.tsx`** — Render item descriptions below each line item row in the items table (if present), preserving whitespace/line breaks.
+**2. `src/pages/QuoteDetail.tsx`**
+- For items where qty is 0 and description exists, render the description spanning the qty/price/total columns with `whitespace-pre-wrap`
+- Skip those items from the subtotal calculation display
 
-**3. `src/lib/quoteUtils.ts`** — Include the description text below the item name/SKU in the PDF table rows so the pricing options appear on the exported PDF.
+**3. `src/lib/quoteUtils.ts`**
+- In PDF generation: for description-mode items, render a full-width row with the item name + description text instead of the standard qty/price/total columns
+- Already partially handled by the `descLine` logic; just need to handle the case where qty=0 means "show description only"
 
-### No database changes needed
-The `description` column already exists on `quote_items` and is already being saved. We just need to surface it in the UI and PDF.
+### No database migration needed
+The existing `quote_items` columns (`description`, `quantity`, `unit_price`, `total`) accommodate both modes. Description-mode items simply have `quantity=0` and the pricing info lives in `description`.
 
