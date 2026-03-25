@@ -1051,18 +1051,68 @@ const CreateQuote = () => {
                               <TableRow className="bg-muted/30 hover:bg-muted/30">
                                 <TableCell colSpan={6} className="p-4">
                                   <div className="space-y-4">
-                                    {/* Description editing - available to all users */}
+                                    {/* Mode Toggle */}
+                                    <div className="flex items-center gap-3 pb-2 border-b border-border">
+                                      <Label className="text-sm font-medium">Pricing Mode:</Label>
+                                      <div className="flex rounded-lg border border-border overflow-hidden">
+                                        <button
+                                          type="button"
+                                          className={cn(
+                                            "px-3 py-1 text-xs font-medium transition-colors",
+                                            item.pricing_mode === 'standard'
+                                              ? "bg-primary text-primary-foreground"
+                                              : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                                          )}
+                                          onClick={() => {
+                                            const newItems = [...items];
+                                            newItems[index].pricing_mode = 'standard';
+                                            if (newItems[index].quantity === 0) newItems[index].quantity = 1;
+                                            setItems(newItems);
+                                          }}
+                                        >
+                                          Standard
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={cn(
+                                            "px-3 py-1 text-xs font-medium transition-colors",
+                                            item.pricing_mode === 'description'
+                                              ? "bg-primary text-primary-foreground"
+                                              : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                                          )}
+                                          onClick={() => {
+                                            const newItems = [...items];
+                                            newItems[index].pricing_mode = 'description';
+                                            newItems[index].quantity = 0;
+                                            newItems[index].unit_price = 0;
+                                            newItems[index].total = 0;
+                                            newItems[index].price_breaks = [];
+                                            newItems[index].selected_tier = null;
+                                            newItems[index].isExpanded = true;
+                                            setItems(newItems);
+                                          }}
+                                        >
+                                          Options / Description
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Description editing */}
                                     <div className="space-y-2">
-                                      <Label className="text-sm font-medium">Item Description</Label>
+                                      <Label className="text-sm font-medium">
+                                        {item.pricing_mode === 'description' ? 'Pricing Options & Description' : 'Item Description'}
+                                      </Label>
                                       <Textarea
-                                        placeholder="Add description for this item..."
+                                        placeholder={item.pricing_mode === 'description'
+                                          ? "Enter pricing options, e.g.:\n.018 SBS - $0.420 ea\n.018 CNK - $0.476 ea\n.024 SBS - $0.486 ea"
+                                          : "Add description for this item..."}
                                         value={item.description || ''}
                                         onChange={(e) => {
                                           const newItems = [...items];
                                           newItems[index].description = e.target.value;
                                           setItems(newItems);
                                         }}
-                                        className="min-h-[60px]"
+                                        className={item.pricing_mode === 'description' ? "min-h-[120px]" : "min-h-[60px]"}
                                       />
                                     </div>
                                     <div className="space-y-3">
