@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { addPdfBrandingSync, addPdfFooter } from './pdfBranding';
+import { addPdfBranding, addPdfFooter } from './pdfBranding';
 
 interface PriceBreak {
   qty: number;
@@ -40,12 +40,12 @@ interface Quote {
   created_at: string;
 }
 
-export function generateQuotePDF(quote: Quote, items: QuoteItem[]): void {
+export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promise<void> {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   
-  // Add branding header
-  let yPos = addPdfBrandingSync(doc, { documentTitle: 'QUOTE' });
+  // Add branding header with logo
+  let yPos = await addPdfBranding(doc, { documentTitle: 'QUOTE' });
   
   // Quote number
   doc.setFontSize(12);
