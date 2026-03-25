@@ -114,9 +114,15 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   
   items.forEach((item) => {
     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
+    const isDescriptionMode = item.quantity === 0 && item.description;
     const descLine = item.description ? `\n${item.description}` : '';
     
-    if (hasPriceBreaks) {
+    if (isDescriptionMode) {
+      // Description-only item: full-width row with item name + description
+      tableBody.push([
+        { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}\n\n${item.description}`, colSpan: 4, styles: { fontStyle: 'normal' } }
+      ]);
+    } else if (hasPriceBreaks) {
       // Add item header row
       tableBody.push([
         { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`, colSpan: 4, styles: { fontStyle: 'bold' } }
@@ -162,6 +168,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   
   // Check if any items have price breaks - if so, don't show totals
   const hasAnyPriceBreaks = items.some(item => item.price_breaks && item.price_breaks.length > 0);
+  const hasDescriptionOnlyItems = items.some(item => item.quantity === 0 && item.description);
   
   if (!hasAnyPriceBreaks) {
     // Totals section - only if no price breaks

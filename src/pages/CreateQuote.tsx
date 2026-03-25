@@ -42,6 +42,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface PriceBreak {
   qty: number;
@@ -62,6 +63,7 @@ interface QuoteItem {
   price_breaks: PriceBreak[];
   selected_tier: number | null;
   isExpanded?: boolean;
+  pricing_mode: 'standard' | 'description';
 }
 
 interface Product {
@@ -248,7 +250,8 @@ const CreateQuote = () => {
         total: 0,
         price_breaks: [],
         selected_tier: null,
-        isExpanded: false
+        isExpanded: false,
+        pricing_mode: (item.quantity === 0 && item.description) ? 'description' as const : 'standard' as const,
       })));
     }
 
@@ -344,7 +347,8 @@ const CreateQuote = () => {
       total: item.total,
       price_breaks: Array.isArray(item.price_breaks) ? (item.price_breaks as unknown as PriceBreak[]) : [],
       selected_tier: item.selected_tier,
-      isExpanded: false
+      isExpanded: false,
+      pricing_mode: (item.quantity === 0 && item.description) ? 'description' as const : 'standard' as const,
     })) || []);
 
     // Fetch products for this company
@@ -370,7 +374,7 @@ const CreateQuote = () => {
   };
 
   const calculateSubtotal = () => {
-    return items.reduce((sum, item) => sum + item.total, 0);
+    return items.filter(i => i.pricing_mode !== 'description').reduce((sum, item) => sum + item.total, 0);
   };
 
   const calculateTotal = () => {
@@ -443,7 +447,8 @@ const CreateQuote = () => {
         total: product?.price || 0,
         price_breaks: [],
         selected_tier: null,
-        isExpanded: false
+        isExpanded: false,
+        pricing_mode: 'standard' as const,
       };
     });
     setItems([...items, ...newItems]);
@@ -464,7 +469,8 @@ const CreateQuote = () => {
       isCustom: true,
       price_breaks: customItem.price_breaks,
       selected_tier: null,
-      isExpanded: false
+      isExpanded: false,
+      pricing_mode: 'standard',
     };
     setItems([...items, newItem]);
     setCustomItem({ sku: "", name: "", description: "", state: "", quantity: 1, unit_price: 0, price_breaks: [] });
@@ -493,7 +499,8 @@ const CreateQuote = () => {
       total: (firstTier?.qty || 1) * (firstTier?.unit_price || selectedProductForPriceBreaks.price || 0),
       price_breaks: tempPriceBreaks,
       selected_tier: 0,
-      isExpanded: false
+      isExpanded: false,
+      pricing_mode: 'standard',
     };
     
     setItems([...items, newItem]);
@@ -966,7 +973,9 @@ const CreateQuote = () => {
                                   </Button>
                                   <div>
                                     <p className="font-medium">{item.name}</p>
-                                    {item.description ? (
+                                    {item.pricing_mode === 'description' ? (
+                                      <p className="text-xs text-primary font-medium">Options/Description mode</p>
+                                    ) : item.description ? (
                                       <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
                                     ) : (
                                       <p className="text-xs text-muted-foreground/60 italic">Click to add description</p>
@@ -983,72 +992,131 @@ const CreateQuote = () => {
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="flex items-center justify-center gap-1">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 w-7 p-0"
-                                    onClick={() => updateItemQuantity(index, -1)}
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) => {
-                                      const newItems = [...items];
-                                      newItems[index].quantity = parseInt(e.target.value) || 1;
-                                      newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
-                                      setItems(newItems);
-                                    }}
-                                    className="h-7 w-24 text-center"
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 w-7 p-0"
-                                    onClick={() => updateItemQuantity(index, 1)}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={item.unit_price}
-                                  onChange={(e) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                  className="h-8 w-24 text-right ml-auto"
-                                />
-                              </TableCell>
-                              <TableCell className="text-right font-medium">
-                                {formatCurrency(item.total)}
-                              </TableCell>
+                              {item.pricing_mode === 'description' ? (
+                                <TableCell colSpan={3} className="text-center">
+                                  <span className="text-sm text-muted-foreground italic">See description below</span>
+                                </TableCell>
+                              ) : (
+                                <>
+                                  <TableCell>
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => updateItemQuantity(index, -1)}
+                                      >
+                                        <Minus className="h-3 w-3" />
+                                      </Button>
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        value={item.quantity}
+                                        onChange={(e) => {
+                                          const newItems = [...items];
+                                          newItems[index].quantity = parseInt(e.target.value) || 1;
+                                          newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
+                                          setItems(newItems);
+                                        }}
+                                        className="h-7 w-24 text-center"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => updateItemQuantity(index, 1)}
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={item.unit_price}
+                                      onChange={(e) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                      className="h-8 w-24 text-right ml-auto"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right font-medium">
+                                    {formatCurrency(item.total)}
+                                  </TableCell>
+                                </>
+                              )}
                             </TableRow>
                             {item.isExpanded && (
                               <TableRow className="bg-muted/30 hover:bg-muted/30">
                                 <TableCell colSpan={6} className="p-4">
                                   <div className="space-y-4">
-                                    {/* Description editing - available to all users */}
+                                    {/* Mode Toggle */}
+                                    <div className="flex items-center gap-3 pb-2 border-b border-border">
+                                      <Label className="text-sm font-medium">Pricing Mode:</Label>
+                                      <div className="flex rounded-lg border border-border overflow-hidden">
+                                        <button
+                                          type="button"
+                                          className={cn(
+                                            "px-3 py-1 text-xs font-medium transition-colors",
+                                            item.pricing_mode === 'standard'
+                                              ? "bg-primary text-primary-foreground"
+                                              : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                                          )}
+                                          onClick={() => {
+                                            const newItems = [...items];
+                                            newItems[index].pricing_mode = 'standard';
+                                            if (newItems[index].quantity === 0) newItems[index].quantity = 1;
+                                            setItems(newItems);
+                                          }}
+                                        >
+                                          Standard
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={cn(
+                                            "px-3 py-1 text-xs font-medium transition-colors",
+                                            item.pricing_mode === 'description'
+                                              ? "bg-primary text-primary-foreground"
+                                              : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                                          )}
+                                          onClick={() => {
+                                            const newItems = [...items];
+                                            newItems[index].pricing_mode = 'description';
+                                            newItems[index].quantity = 0;
+                                            newItems[index].unit_price = 0;
+                                            newItems[index].total = 0;
+                                            newItems[index].price_breaks = [];
+                                            newItems[index].selected_tier = null;
+                                            newItems[index].isExpanded = true;
+                                            setItems(newItems);
+                                          }}
+                                        >
+                                          Options / Description
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Description editing */}
                                     <div className="space-y-2">
-                                      <Label className="text-sm font-medium">Item Description</Label>
+                                      <Label className="text-sm font-medium">
+                                        {item.pricing_mode === 'description' ? 'Pricing Options & Description' : 'Item Description'}
+                                      </Label>
                                       <Textarea
-                                        placeholder="Add description for this item..."
+                                        placeholder={item.pricing_mode === 'description'
+                                          ? "Enter pricing options, e.g.:\n.018 SBS - $0.420 ea\n.018 CNK - $0.476 ea\n.024 SBS - $0.486 ea"
+                                          : "Add description for this item..."}
                                         value={item.description || ''}
                                         onChange={(e) => {
                                           const newItems = [...items];
                                           newItems[index].description = e.target.value;
                                           setItems(newItems);
                                         }}
-                                        className="min-h-[60px]"
+                                        className={item.pricing_mode === 'description' ? "min-h-[120px]" : "min-h-[60px]"}
                                       />
                                     </div>
+                                    {item.pricing_mode !== 'description' && (
                                     <div className="space-y-3">
                                       <div className="flex items-center justify-between">
                                         <h4 className="text-sm font-medium">Price Breaks</h4>
@@ -1140,6 +1208,7 @@ const CreateQuote = () => {
                                       </div>
                                     )}
                                     </div>
+                                    )}
                                   </div>
                                 </TableCell>
                               </TableRow>
