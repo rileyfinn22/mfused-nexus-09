@@ -446,7 +446,8 @@ const CreateQuote = () => {
         total: product?.price || 0,
         price_breaks: [],
         selected_tier: null,
-        isExpanded: false
+        isExpanded: false,
+        pricing_mode: 'standard' as const,
       };
     });
     setItems([...items, ...newItems]);
