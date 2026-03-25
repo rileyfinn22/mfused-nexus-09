@@ -2644,7 +2644,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
-          company_id: string
+          company_id: string | null
           created_at: string
           created_by: string | null
           customer_email: string | null
@@ -2682,7 +2682,7 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
-          company_id: string
+          company_id?: string | null
           created_at?: string
           created_by?: string | null
           customer_email?: string | null
@@ -2720,7 +2720,7 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
-          company_id?: string
+          company_id?: string | null
           created_at?: string
           created_by?: string | null
           customer_email?: string | null
