@@ -42,6 +42,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface PriceBreak {
   qty: number;
