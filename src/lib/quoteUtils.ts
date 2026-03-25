@@ -114,11 +114,12 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   
   items.forEach((item) => {
     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
+    const descLine = item.description ? `\n${item.description}` : '';
     
     if (hasPriceBreaks) {
       // Add item header row
       tableBody.push([
-        { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}`, colSpan: 4, styles: { fontStyle: 'bold' } }
+        { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`, colSpan: 4, styles: { fontStyle: 'bold' } }
       ]);
       
       // Add each price tier
@@ -133,7 +134,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     } else {
       // Regular item without tiers
       tableBody.push([
-        `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}`,
+        `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`,
         formatUnitPrice(item.unit_price),
         item.quantity.toString(),
         formatCurrency(item.total)
