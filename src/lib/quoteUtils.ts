@@ -168,6 +168,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   
   // Check if any items have price breaks - if so, don't show totals
   const hasAnyPriceBreaks = items.some(item => item.price_breaks && item.price_breaks.length > 0);
+  const hasDescriptionOnlyItems = items.some(item => item.quantity === 0 && item.description);
   
   if (!hasAnyPriceBreaks) {
     // Totals section - only if no price breaks

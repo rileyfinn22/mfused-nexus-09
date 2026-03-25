@@ -956,6 +956,33 @@ const QuoteDetail = () => {
                           );
                         }
 
+                        const isDescriptionMode = item.quantity === 0 && item.description;
+                        
+                        if (isDescriptionMode) {
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{item.name}</p>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-muted-foreground font-mono text-xs">{item.sku}</span>
+                                    {item.state && (
+                                      <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                        {item.state}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell colSpan={4}>
+                                <p className="text-sm whitespace-pre-wrap">
+                                  {item.description}
+                                </p>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+
                         return (
                           <TableRow key={item.id}>
                             <TableCell>
