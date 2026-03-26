@@ -783,29 +783,48 @@ serve(async (req) => {
 
     // 3. Blanket invoice with deposit recorded as payment(s) directly on the same invoice.
     // If there are no child deposit invoices, treat paid amount as deposit already received.
+    // IMPORTANT: Only deduct payments that are NOT already synced to QBO as Payment objects.
+    // Payments with a quickbooks_id are already tracked by QBO's payment system and will
+    // automatically show as paid on the invoice — deducting them here would double-count.
     if (!invoice.parent_invoice_id && billingPercentage === 100 && !hasDepositChildInvoices) {
       const { data: invoicePayments } = await supabase
         .from('payments')
-        .select('id, amount, payment_method, reference_number, payment_date')
+        .select('id, amount, payment_method, reference_number, payment_date, quickbooks_id, quickbooks_sync_status')
         .eq('invoice_id', invoice.id);
 
-      const totalPaidOnInvoice = (invoicePayments || []).reduce(
+      // Only deduct payments that are NOT synced to QBO (no quickbooks_id)
+      const unsyncedPayments = (invoicePayments || []).filter(
+        (p: any) => !p.quickbooks_id
+      );
+      const syncedPayments = (invoicePayments || []).filter(
+        (p: any) => !!p.quickbooks_id
+      );
+
+      const totalUnsyncedPaid = unsyncedPayments.reduce(
+        (sum: number, p: any) => sum + Number(p.amount || 0),
+        0
+      );
+      const totalSyncedPaid = syncedPayments.reduce(
         (sum: number, p: any) => sum + Number(p.amount || 0),
         0
       );
 
-      if (totalPaidOnInvoice > 0) {
-        console.log(`Blanket invoice has $${totalPaidOnInvoice} in direct payment deposit — deducting from QBO invoice`);
+      if (totalSyncedPaid > 0) {
+        console.log(`Skipping $${totalSyncedPaid} in payments already synced to QBO as Payment objects`);
+      }
+
+      if (totalUnsyncedPaid > 0) {
+        console.log(`Blanket invoice has $${totalUnsyncedPaid} in unsynced deposit payments — deducting from QBO invoice`);
 
         const depositItemId = await findOrCreateQBItem(
           'Deposit Applied',
           'Previously received deposit payment',
-          totalPaidOnInvoice
+          totalUnsyncedPaid
         );
 
         lineItems.push({
           DetailType: 'SalesItemLineDetail',
-          Amount: -totalPaidOnInvoice,
+          Amount: -totalUnsyncedPaid,
           Description: 'Less: Deposit Received',
           SalesItemLineDetail: {
             ItemRef: {
@@ -813,11 +832,11 @@ serve(async (req) => {
               name: 'Deposit Applied',
             },
             Qty: 1,
-            UnitPrice: -totalPaidOnInvoice,
+            UnitPrice: -totalUnsyncedPaid,
           },
         });
 
-        calculatedSubtotal -= totalPaidOnInvoice;
+        calculatedSubtotal -= totalUnsyncedPaid;
         console.log(`Adjusted subtotal after direct payment deduction: ${calculatedSubtotal}`);
       }
     }
