@@ -2419,8 +2419,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         </div>
       )}
 
-      <div className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center">
-        <div className="relative shadow-lg" style={{ width: cssWidth, height: cssHeight }}>
+      <div className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center max-w-full">
+        <div className="relative shadow-lg shrink-0" style={{ width: cssWidth, height: cssHeight }}>
           <canvas ref={canvasRef} />
 
           {/* Always-on-top bleed/trim guide (visual only) */}
