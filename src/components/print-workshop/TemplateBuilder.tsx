@@ -337,7 +337,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         </Card>
 
         {/* Canvas editor */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 min-w-0">
           <TemplateEditor
             canvasData={canvasData}
             width={widthInches}
