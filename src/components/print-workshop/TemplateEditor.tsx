@@ -12,6 +12,7 @@ import { AiCleanupDialog } from "./AiCleanupDialog";
 import { IconPickerDialog } from "./IconPickerDialog";
 import { CanvasObjectsPanel } from "./CanvasObjectsPanel";
 import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
+import { computePdfBoxPlacement, extractPdfPageBoxes, type ParsedPdfPageBoxes } from "@/lib/pdfPageBoxes";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
