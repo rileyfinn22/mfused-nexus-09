@@ -230,8 +230,17 @@ export const generateInvoicePDF = async (
   const totalsWidth = 85;
   const totalsX = pageWidth - totalsWidth - 14;
   
+  // Compute subtotal from line items for consistency with displayed rows
+  const computedSubtotal = items.reduce((sum, item) => {
+    const qty = Number(item.shipped_quantity) > 0
+      ? Number(item.shipped_quantity)
+      : Number(item.quantity || 0);
+    return sum + qty * Number(item.unit_price || 0);
+  }, 0);
+  const computedTotal = computedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
+
   const totalPaid = invoice.total_paid || 0;
-  const balance = (invoice.total || 0) - totalPaid;
+  const balance = computedTotal - totalPaid;
   const hasPayments = totalPaid > 0;
   const hasShipping = (invoice.shipping_cost || 0) > 0;
   
@@ -243,7 +252,7 @@ export const generateInvoicePDF = async (
   // Subtotal
   doc.setFont('helvetica', 'normal');
   doc.text('Subtotal', totalsX, totalsY);
-  doc.text(formatCurrency(invoice.subtotal || invoice.total || 0), totalsX + totalsWidth, totalsY, { align: 'right' });
+  doc.text(formatCurrency(computedSubtotal), totalsX + totalsWidth, totalsY, { align: 'right' });
   totalsY += 8;
   
   // Shipping (if applicable)
@@ -281,7 +290,7 @@ export const generateInvoicePDF = async (
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
   doc.text('BALANCE DUE', totalsX, totalsY);
-  doc.text(formatCurrency(hasPayments ? balance : (invoice.total || 0)), totalsX + totalsWidth, totalsY, { align: 'right' });
+  doc.text(formatCurrency(hasPayments ? balance : computedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
   
   // ============ TERMS/NOTES SECTION ============
   const termsY = totalsY + 20;

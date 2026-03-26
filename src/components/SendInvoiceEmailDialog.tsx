@@ -418,13 +418,27 @@ Thank you for your business.`;
     yPos += 40;
     
     // ============ ITEMS TABLE ============
-    const tableData = items.map((item) => [
-      item.sku || '',
-      item.name || '',
-      (item.quantity || item.shipped_quantity || 0).toLocaleString(),
-      formatUnitPrice(item.unit_price || 0),
-      formatCurrency((item.quantity || item.shipped_quantity || 0) * (item.unit_price || 0))
-    ]);
+    // Determine if this is a blanket invoice to use shipped_quantity
+    const isBlanketEmail = invoice.invoice_type === 'full' || (!invoice.invoice_type && !invoice.parent_invoice_id);
+    const tableData = items.map((item) => {
+      const qty = isBlanketEmail
+        ? (Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity || 0))
+        : Number(item.quantity || 0);
+      return [
+        item.sku || '',
+        item.name || '',
+        qty.toLocaleString(),
+        formatUnitPrice(item.unit_price || 0),
+        formatCurrency(qty * (item.unit_price || 0))
+      ];
+    });
+    // Compute subtotal from line items for consistency with displayed rows
+    const computedSubtotal = items.reduce((sum, item) => {
+      const qty = isBlanketEmail
+        ? (Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity || 0))
+        : Number(item.quantity || 0);
+      return sum + qty * Number(item.unit_price || 0);
+    }, 0);
     
     autoTable(doc, {
       startY: yPos,
@@ -466,8 +480,9 @@ Thank you for your business.`;
     const totalsWidth = 85;
     const totalsX = pageWidth - totalsWidth - 14;
     
+    const emailComputedTotal = computedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
     const totalPaid = invoice.total_paid || 0;
-    const balance = (invoice.total || 0) - totalPaid;
+    const balance = emailComputedTotal - totalPaid;
     const hasPayments = totalPaid > 0;
     const hasShipping = (invoice.shipping_cost || 0) > 0;
     
@@ -479,7 +494,7 @@ Thank you for your business.`;
     // Subtotal
     doc.setFont('helvetica', 'normal');
     doc.text('Subtotal', totalsX, totalsY);
-    doc.text(formatCurrency(invoice.subtotal || invoice.total || 0), totalsX + totalsWidth, totalsY, { align: 'right' });
+    doc.text(formatCurrency(computedSubtotal), totalsX + totalsWidth, totalsY, { align: 'right' });
     totalsY += 8;
     
     // Shipping (if applicable)
@@ -507,7 +522,7 @@ Thank you for your business.`;
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
     doc.text('BALANCE DUE', totalsX, totalsY);
-    doc.text(formatCurrency(hasPayments ? balance : (invoice.total || 0)), totalsX + totalsWidth, totalsY, { align: 'right' });
+    doc.text(formatCurrency(hasPayments ? balance : emailComputedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
     
     // ============ TERMS/NOTES SECTION ============
     const termsY = totalsY + 20;
