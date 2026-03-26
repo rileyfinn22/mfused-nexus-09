@@ -290,7 +290,7 @@ export const generateInvoicePDF = async (
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
   doc.text('BALANCE DUE', totalsX, totalsY);
-  doc.text(formatCurrency(hasPayments ? balance : (invoice.total || 0)), totalsX + totalsWidth, totalsY, { align: 'right' });
+  doc.text(formatCurrency(hasPayments ? balance : computedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
   
   // ============ TERMS/NOTES SECTION ============
   const termsY = totalsY + 20;
