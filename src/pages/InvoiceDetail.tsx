@@ -2740,8 +2740,22 @@ const InvoiceDetail = () => {
                     <TableCell className="text-right font-semibold text-success">
                       {formatCurrency(payment.amount)}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                      {payment.notes || '-'}
+                    <TableCell className="text-sm text-muted-foreground max-w-xs">
+                      {payment.notes ? (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className="text-left truncate max-w-[200px] block hover:text-foreground transition-colors cursor-pointer underline decoration-dotted underline-offset-2">
+                              {payment.notes}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80">
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground">Payment Notes</p>
+                              <p className="text-sm whitespace-pre-wrap">{payment.notes}</p>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ) : '-'}
                     </TableCell>
                     {isVibeAdmin && <TableCell>
                         <div className="flex items-center gap-2">
