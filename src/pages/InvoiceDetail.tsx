@@ -741,8 +741,17 @@ const InvoiceDetail = () => {
     const totalsWidth = 85;
     const totalsX = pageWidth - totalsWidth - 14;
     
+    // Compute subtotal from the same line items rendered in the table for consistency
+    const pdfComputedSubtotal = itemsToDisplay.reduce((sum: number, item: any) => {
+      const qty = isBlanket
+        ? (Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity || 0))
+        : Number(item.quantity || 0);
+      return sum + qty * Number(item.unit_price || 0);
+    }, 0);
+    const pdfComputedTotal = pdfComputedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
+    
     const totalPaid = invoice.total_paid || 0;
-    const balance = (invoice.total || 0) - totalPaid;
+    const balance = pdfComputedTotal - totalPaid;
     const hasPayments = totalPaid > 0;
     const hasShipping = (invoice.shipping_cost || 0) > 0;
     
@@ -762,7 +771,7 @@ const InvoiceDetail = () => {
     // Subtotal
     doc.setFont('helvetica', 'normal');
     doc.text('Subtotal', totalsX, totalsY);
-    doc.text(formatCurrency(invoice.subtotal || invoice.total || 0), totalsX + totalsWidth, totalsY, { align: 'right' });
+    doc.text(formatCurrency(pdfComputedSubtotal), totalsX + totalsWidth, totalsY, { align: 'right' });
     totalsY += 8;
     
     // Shipping (if applicable)
