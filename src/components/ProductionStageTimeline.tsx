@@ -71,15 +71,18 @@ const MATERIAL_SUBSTAGES: SubstageDefinition[] = [
   { key: 'material_secured', label: 'Material Secured', percent: 0 },
 ];
 
-const PRINT_SUBSTAGES: SubstageDefinition[] = [
-  { key: 'print_film', label: 'Print Film', percent: 0 },
-  { key: 'lamination_curing', label: 'Lamination + Curing', percent: 0 },
-  { key: 'converting', label: 'Converting', percent: 0 },
+const PREPRESS_SUBSTAGES: SubstageDefinition[] = [
+  { key: 'proofs_approved', label: 'Proofs Approved', percent: 0 },
 ];
 
-const QC_SUBSTAGES: SubstageDefinition[] = [
+const PRODUCTION_SUBSTAGES: SubstageDefinition[] = [
+  { key: 'print', label: 'Print', percent: 0 },
+  { key: 'laminate', label: 'Laminate', percent: 0 },
+  { key: 'cutting', label: 'Cutting', percent: 0 },
+  { key: 'glueing', label: 'Glueing', percent: 0 },
+  { key: 'converting', label: 'Converting', percent: 0 },
   { key: 'packing_sorting', label: 'Packing/Sorting', percent: 0 },
-  { key: 'qc_completed', label: 'QC Completed', percent: 0 },
+  { key: 'qc_completed', label: 'QC', percent: 0 },
 ];
 
 export function ProductionStageTimeline({
