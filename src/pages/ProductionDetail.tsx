@@ -39,6 +39,10 @@ interface ProductionStage {
   vendor_id: string | null;
   sequence_order: number;
   internal_notes: string | null;
+  published_status: string;
+  published_substages: any;
+  published_at: string | null;
+  published_notes: string | null;
   vendors: {
     name: string;
   } | null;
