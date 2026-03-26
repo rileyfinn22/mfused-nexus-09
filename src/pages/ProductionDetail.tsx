@@ -1007,7 +1007,6 @@ export default function ProductionDetail() {
       if (!orderId) return;
 
       const updateData: any = { production_progress: targetPercent };
-      // Clear delayed flag when production is complete
       if (targetPercent >= 100) {
         updateData.is_delayed = false;
         updateData.delay_reason = null;
@@ -1020,7 +1019,6 @@ export default function ProductionDetail() {
 
       if (error) throw error;
 
-      // Update local state so the slider reflects the new value
       setOrder(prev => prev ? { ...prev, production_progress: targetPercent } : prev);
 
       toast({
@@ -1034,6 +1032,100 @@ export default function ProductionDetail() {
         description: "Failed to update progress",
         variant: "destructive",
       });
+    }
+  };
+
+  const handlePublishStage = async (stageId: string, editedData: { status: string; notes: string; substages: any }) => {
+    try {
+      const stage = stages.find(s => s.id === stageId);
+      if (!stage) return;
+
+      // Update published fields on the stage
+      const { error: stageError } = await (supabase as any)
+        .from('production_stages')
+        .update({
+          published_status: editedData.status,
+          published_notes: editedData.notes || null,
+          published_at: new Date().toISOString(),
+        })
+        .eq('id', stageId);
+
+      if (stageError) throw stageError;
+
+      // Also publish all unpublished updates for this stage
+      const unpublishedUpdates = stage.production_stage_updates.filter(u => !u.is_published);
+      for (const update of unpublishedUpdates) {
+        await (supabase as any)
+          .from('production_stage_updates')
+          .update({
+            is_published: true,
+            published_at: new Date().toISOString(),
+          })
+          .eq('id', update.id);
+      }
+
+      await fetchOrderAndStages();
+      toast({ title: "Published", description: "Stage updates published to customer" });
+    } catch (error: any) {
+      console.error('Error publishing stage:', error);
+      toast({ title: "Error", description: "Failed to publish stage", variant: "destructive" });
+    }
+  };
+
+  const handlePublishUpdate = async (updateId: string, editedData: { note_text: string; image_url: string | null }) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('production_stage_updates')
+        .update({
+          is_published: true,
+          published_at: new Date().toISOString(),
+          published_note_text: editedData.note_text || null,
+          published_image_url: editedData.image_url || null,
+        })
+        .eq('id', updateId);
+
+      if (error) throw error;
+
+      await fetchOrderAndStages();
+      toast({ title: "Published", description: "Update published to customer" });
+    } catch (error: any) {
+      console.error('Error publishing update:', error);
+      toast({ title: "Error", description: "Failed to publish update", variant: "destructive" });
+    }
+  };
+
+  const handlePublishAll = async () => {
+    try {
+      // Publish all stages with unpublished changes
+      for (const stage of stages) {
+        if (stage.status !== stage.published_status) {
+          await (supabase as any)
+            .from('production_stages')
+            .update({
+              published_status: stage.status,
+              published_at: new Date().toISOString(),
+            })
+            .eq('id', stage.id);
+        }
+
+        // Publish all unpublished updates
+        const unpublished = stage.production_stage_updates.filter(u => !u.is_published);
+        for (const update of unpublished) {
+          await (supabase as any)
+            .from('production_stage_updates')
+            .update({
+              is_published: true,
+              published_at: new Date().toISOString(),
+            })
+            .eq('id', update.id);
+        }
+      }
+
+      await fetchOrderAndStages();
+      toast({ title: "Published", description: "All updates published to customer" });
+    } catch (error: any) {
+      console.error('Error publishing all:', error);
+      toast({ title: "Error", description: "Failed to publish all", variant: "destructive" });
     }
   };
 
