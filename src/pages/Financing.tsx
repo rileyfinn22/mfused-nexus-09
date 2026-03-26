@@ -246,7 +246,7 @@ export default function Financing() {
           </Badge>
         </td>
         <td className="px-2 py-1.5">
-          {isFinanceUser && (
+          {(isFinanceUser || isVibeAdmin) && (
             <Button size="sm" variant="default" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); setSelectedInvoice(inv); setAcceptOpen(true); }}>
               {t("accept")}
             </Button>
