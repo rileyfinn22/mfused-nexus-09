@@ -677,8 +677,8 @@ export default function FinancedInvoiceDetail() {
         </div>
       )}
 
-      {/* Accept dialog for finance users */}
-      {isFinanceUser && (
+      {/* Accept dialog for finance users and vibe admins */}
+      {(isFinanceUser || isVibeAdmin) && (
         <AcceptFinanceRequestDialog
           open={acceptOpen}
           onOpenChange={setAcceptOpen}

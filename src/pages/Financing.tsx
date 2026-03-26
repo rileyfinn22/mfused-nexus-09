@@ -504,7 +504,7 @@ export default function Financing() {
           <GenerateFinanceLinkDialog open={linkOpen} onOpenChange={setLinkOpen} />
         </>
       )}
-      {isFinanceUser && (
+      {(isFinanceUser || isVibeAdmin) && (
         <AcceptFinanceRequestDialog open={acceptOpen} onOpenChange={setAcceptOpen} onSuccess={fetchData} invoice={selectedInvoice} lang={lang} />
       )}
     </div>
