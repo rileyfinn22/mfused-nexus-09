@@ -1268,6 +1268,112 @@ serve(async (req) => {
     
     console.log('QuickBooks Invoice ID:', qbInvoiceId);
     console.log('QuickBooks Realm ID:', qbRealmId);
+
+    // Re-apply any existing synced QBO payments after invoice updates.
+    // QuickBooks can partially unapply payments when an invoice total changes,
+    // which leaves the payment existing but no longer fully attached to the invoice.
+    const { data: syncedInvoicePayments } = await supabase
+      .from('payments')
+      .select('id, amount, quickbooks_id')
+      .eq('invoice_id', invoice.id)
+      .not('quickbooks_id', 'is', null);
+
+    if (syncedInvoicePayments && syncedInvoicePayments.length > 0) {
+      console.log(`Rechecking ${syncedInvoicePayments.length} synced QBO payment(s) after invoice sync`);
+
+      for (const syncedPayment of syncedInvoicePayments) {
+        try {
+          if (!syncedPayment.quickbooks_id) continue;
+
+          const paymentResponse = await fetch(
+            `${qbApiUrl}/payment/${syncedPayment.quickbooks_id}?minorversion=73`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json',
+              },
+            }
+          );
+
+          if (!paymentResponse.ok) {
+            const paymentErrorText = await paymentResponse.text();
+            console.warn(`Could not load QBO payment ${syncedPayment.quickbooks_id}:`, paymentErrorText);
+            continue;
+          }
+
+          const paymentData = await paymentResponse.json();
+          const qbPayment = paymentData?.Payment;
+
+          if (!qbPayment?.Id || !qbPayment?.SyncToken) {
+            console.warn(`QBO payment ${syncedPayment.quickbooks_id} missing Id or SyncToken, skipping re-apply`);
+            continue;
+          }
+
+          const desiredAppliedAmount = Number(syncedPayment.amount || 0);
+          const currentlyAppliedAmount = (qbPayment.Line || [])
+            .filter((line: any) =>
+              Array.isArray(line?.LinkedTxn) &&
+              line.LinkedTxn.some(
+                (txn: any) => txn?.TxnType === 'Invoice' && String(txn?.TxnId) === String(qbInvoiceId)
+              )
+            )
+            .reduce((sum: number, line: any) => sum + Number(line.Amount || 0), 0);
+          const unappliedAmount = Number(qbPayment.UnappliedAmt || 0);
+
+          if (Math.abs(currentlyAppliedAmount - desiredAppliedAmount) < 0.01 && unappliedAmount < 0.01) {
+            console.log(`Payment ${qbPayment.Id} already fully applied to invoice ${qbInvoiceId}`);
+            continue;
+          }
+
+          console.log(
+            `Re-applying payment ${qbPayment.Id}: currently applied $${currentlyAppliedAmount}, desired $${desiredAppliedAmount}, unapplied $${unappliedAmount}`
+          );
+
+          const paymentUpdatePayload: any = {
+            Id: qbPayment.Id,
+            SyncToken: qbPayment.SyncToken,
+            CustomerRef: qbPayment.CustomerRef || { value: customerId },
+            TxnDate: qbPayment.TxnDate,
+            TotalAmt: Number(qbPayment.TotalAmt || desiredAppliedAmount),
+            ProcessPayment: qbPayment.ProcessPayment ?? true,
+            Line: [
+              {
+                Amount: desiredAppliedAmount,
+                LinkedTxn: [{ TxnId: qbInvoiceId, TxnType: 'Invoice' }],
+              },
+            ],
+          };
+
+          if (qbPayment.PaymentMethodRef) paymentUpdatePayload.PaymentMethodRef = qbPayment.PaymentMethodRef;
+          if (qbPayment.DepositToAccountRef) paymentUpdatePayload.DepositToAccountRef = qbPayment.DepositToAccountRef;
+          if (qbPayment.PrivateNote) paymentUpdatePayload.PrivateNote = qbPayment.PrivateNote;
+          if (qbPayment.CurrencyRef) paymentUpdatePayload.CurrencyRef = qbPayment.CurrencyRef;
+
+          const updatePaymentResponse = await fetch(`${qbApiUrl}/payment?minorversion=73`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(paymentUpdatePayload),
+          });
+
+          const updatedPaymentData = await updatePaymentResponse.json().catch(() => ({}));
+
+          if (!updatePaymentResponse.ok) {
+            console.error(`Failed to re-apply payment ${qbPayment.Id}:`, updatedPaymentData);
+            continue;
+          }
+
+          console.log(
+            `Successfully re-applied payment ${qbPayment.Id}. New unapplied amount: ${updatedPaymentData?.Payment?.UnappliedAmt ?? 'unknown'}`
+          );
+        } catch (paymentRelinkError) {
+          console.error(`Error re-applying synced payment ${syncedPayment.quickbooks_id}:`, paymentRelinkError);
+        }
+      }
+    }
     
     // QuickBooks payment link
     // Note: QuickBooks only returns InvoiceLink in certain scenarios (commonly after "send").
