@@ -886,7 +886,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         const arrayBuf = await file.arrayBuffer();
         let pdfWidthIn = 0;
         let pdfHeightIn = 0;
+        let pdfBoxes: ParsedPdfPageBoxes | undefined;
         try {
+          pdfBoxes = extractPdfPageBoxes(arrayBuf);
           const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
           const page = await pdf.getPage(1);
           const vp = page.getViewport({ scale: 1 });
@@ -938,7 +940,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         const capturedW = pdfWidthIn;
         const capturedH = pdfHeightIn;
         imgEl.onload = () => {
-          setCanvasBackground(imgEl, capturedW || undefined, capturedH || undefined);
+          setCanvasBackground(imgEl, capturedW || undefined, capturedH || undefined, pdfBoxes);
         };
         imgEl.src = url;
       } catch (err: any) {
