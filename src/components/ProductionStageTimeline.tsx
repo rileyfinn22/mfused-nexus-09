@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package, Trash2, StickyNote, Save, Plus, X, GripVertical } from "lucide-react";
+import { CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Upload, FileText, Download, Image as ImageIcon, MessageSquare, Loader2, Truck, Package, Trash2, StickyNote, Save, Plus, X, GripVertical, Eye, EyeOff, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,9 @@ interface StageUpdate {
   previous_status: string | null;
   new_status: string | null;
   created_at: string;
+  is_published: boolean;
+  published_note_text: string | null;
+  published_image_url: string | null;
 }
 
 interface ProductionStage {
@@ -28,6 +31,10 @@ interface ProductionStage {
   vendor_id: string | null;
   sequence_order: number;
   internal_notes: string | null;
+  published_status: string;
+  published_substages: any;
+  published_at: string | null;
+  published_notes: string | null;
   vendors: {
     name: string;
   } | null;
@@ -38,8 +45,8 @@ interface StageDefinition {
   value: string;
   label: string;
   order: number;
-  weight?: number; // Percentage weight for progress calculation (default: equal distribution)
-  adminOnly?: boolean; // Only visible/counted for Vibe Admins
+  weight?: number;
+  adminOnly?: boolean;
 }
 
 interface SubstageDefinition {
@@ -59,6 +66,9 @@ interface ProductionStageTimelineProps {
   onInternalNotesChange?: (stageId: string, notes: string) => Promise<void>;
   onVendorAssign?: (stageId: string, vendorId: string) => void;
   onProgressSliderChange?: (newProgress: number) => Promise<void>;
+  onPublishStage?: (stageId: string, editedData: { status: string; notes: string; substages: any }) => Promise<void>;
+  onPublishUpdate?: (updateId: string, editedData: { note_text: string; image_url: string | null }) => Promise<void>;
+  onPublishAll?: () => Promise<void>;
   savedProgress?: number;
   vendors?: { id: string; name: string }[];
   isVibeAdmin: boolean;
@@ -96,6 +106,9 @@ export function ProductionStageTimeline({
   onInternalNotesChange,
   onVendorAssign,
   onProgressSliderChange,
+  onPublishStage,
+  onPublishUpdate,
+  onPublishAll,
   savedProgress,
   vendors = [],
   isVibeAdmin,
@@ -114,6 +127,11 @@ export function ProductionStageTimeline({
   const [sliderValue, setSliderValue] = useState<number | null>(null);
   const [isSliding, setIsSliding] = useState(false);
   const [updatingProgress, setUpdatingProgress] = useState(false);
+  const [publishingStages, setPublishingStages] = useState<Set<string>>(new Set());
+  const [publishingUpdates, setPublishingUpdates] = useState<Set<string>>(new Set());
+  const [publishingAll, setPublishingAll] = useState(false);
+  const [editingPublishNotes, setEditingPublishNotes] = useState<Record<string, string>>({});
+  const [editingUpdateNotes, setEditingUpdateNotes] = useState<Record<string, string>>({});
 
   const handleAddCustomSubstage = async (stageId: string) => {
     if (!onCustomSubstageAdd) return;
@@ -140,7 +158,6 @@ export function ProductionStageTimeline({
     setSavingNotes(prev => new Set(prev).add(stageId));
     try {
       await onInternalNotesChange(stageId, internalNotesEdits[stageId] || '');
-      // Clear the edit state after successful save
       setInternalNotesEdits(prev => {
         const next = { ...prev };
         delete next[stageId];
@@ -213,7 +230,65 @@ export function ProductionStageTimeline({
     }
   };
 
-  // Check if a sub-stage is completed by looking for the auto-note marker
+  const handlePublishStage = async (stage: ProductionStage) => {
+    if (!onPublishStage) return;
+    
+    setPublishingStages(prev => new Set(prev).add(stage.id));
+    try {
+      const editedNotes = editingPublishNotes[stage.id];
+      await onPublishStage(stage.id, {
+        status: stage.status,
+        notes: editedNotes !== undefined ? editedNotes : (stage.published_notes || ''),
+        substages: null, // Will use current substage state
+      });
+      setEditingPublishNotes(prev => {
+        const next = { ...prev };
+        delete next[stage.id];
+        return next;
+      });
+    } finally {
+      setPublishingStages(prev => {
+        const next = new Set(prev);
+        next.delete(stage.id);
+        return next;
+      });
+    }
+  };
+
+  const handlePublishUpdate = async (update: StageUpdate) => {
+    if (!onPublishUpdate) return;
+    
+    setPublishingUpdates(prev => new Set(prev).add(update.id));
+    try {
+      const editedNote = editingUpdateNotes[update.id];
+      await onPublishUpdate(update.id, {
+        note_text: editedNote !== undefined ? editedNote : (update.note_text || ''),
+        image_url: update.image_url,
+      });
+      setEditingUpdateNotes(prev => {
+        const next = { ...prev };
+        delete next[update.id];
+        return next;
+      });
+    } finally {
+      setPublishingUpdates(prev => {
+        const next = new Set(prev);
+        next.delete(update.id);
+        return next;
+      });
+    }
+  };
+
+  const handlePublishAll = async () => {
+    if (!onPublishAll) return;
+    setPublishingAll(true);
+    try {
+      await onPublishAll();
+    } finally {
+      setPublishingAll(false);
+    }
+  };
+
   const isSubstageComplete = (stage: ProductionStage, substageKey: string) => {
     const noteMarker = `<!--${substageKey.toUpperCase()}-->`;
     return stage.production_stage_updates.some(u => u.note_text?.includes(noteMarker));
@@ -233,7 +308,10 @@ export function ProductionStageTimeline({
 
   const getStageStatus = (stageName: string) => {
     const stage = stages.find(s => s.stage_name === stageName);
-    return stage?.status || 'pending';
+    if (!stage) return 'pending';
+    // Customers see published_status
+    if (isCustomer) return stage.published_status || 'pending';
+    return stage.status || 'pending';
   };
 
   const getStageData = (stageName: string) => {
@@ -276,6 +354,20 @@ export function ProductionStageTimeline({
     );
   };
 
+  // Check if a stage has unpublished changes
+  const hasUnpublishedChanges = (stage: ProductionStage) => {
+    if (stage.status !== stage.published_status) return true;
+    const unpublishedUpdates = stage.production_stage_updates.filter(u => !u.is_published);
+    return unpublishedUpdates.length > 0;
+  };
+
+  const getUnpublishedCount = (stage: ProductionStage) => {
+    return stage.production_stage_updates.filter(u => !u.is_published).length;
+  };
+
+  // Check if any stage has unpublished changes
+  const hasAnyUnpublished = stages.some(s => hasUnpublishedChanges(s));
+
   // Filter stages based on admin-only visibility
   const visibleStageDefinitions = stageDefinitions.filter(def => 
     !def.adminOnly || isVibeAdmin
@@ -286,7 +378,6 @@ export function ProductionStageTimeline({
     let completedWeight = 0;
     let inProgressWeight = 0;
     
-    // Only count visible stages for progress
     visibleStageDefinitions.forEach(def => {
       const status = getStageStatus(def.value);
       const weight = def.weight ?? (100 / visibleStageDefinitions.length);
@@ -294,7 +385,6 @@ export function ProductionStageTimeline({
       if (status === 'completed') {
         completedWeight += weight;
       } else if (status === 'in_progress') {
-        // In-progress stages count as 50% of their weight
         inProgressWeight += weight * 0.5;
       }
     });
@@ -303,7 +393,6 @@ export function ProductionStageTimeline({
   };
 
   const progressPercent = calculateWeightedProgress();
-  // For admin slider: use savedProgress from DB if available, otherwise fall back to calculated
   const adminSliderPercent = savedProgress ?? progressPercent;
 
   const getProgressGradient = (percent: number) => {
@@ -313,7 +402,6 @@ export function ProductionStageTimeline({
     return "from-gray-300 to-gray-500";
   };
 
-  // Handle slider change - updates stages based on target percentage
   const handleSliderCommit = async (value: number[]) => {
     if (!onProgressSliderChange) return;
     
@@ -330,18 +418,41 @@ export function ProductionStageTimeline({
 
   const displayPercent = isSliding && sliderValue !== null ? sliderValue : adminSliderPercent;
 
+  // For customer view, get visible updates (published only)
+  const getVisibleUpdates = (stage: ProductionStage) => {
+    if (isCustomer) {
+      return stage.production_stage_updates.filter(u => u.is_published);
+    }
+    return stage.production_stage_updates;
+  };
+
+  // Get display text for an update (use published version for customers if available)
+  const getUpdateNoteText = (update: StageUpdate) => {
+    if (isCustomer && update.published_note_text) return update.published_note_text;
+    return update.note_text;
+  };
+
+  const getUpdateImageUrl = (update: StageUpdate) => {
+    if (isCustomer && update.published_image_url) return update.published_image_url;
+    return update.image_url;
+  };
+
   const renderStageCard = (stageDef: StageDefinition) => {
     const stage = getStageData(stageDef.value);
     if (!stage) return null;
     
+    const displayStatus = isCustomer ? (stage.published_status || 'pending') : stage.status;
+    const visibleUpdates = getVisibleUpdates(stage);
     const isExpanded = expandedStages.has(stage.id);
-    const hasUpdates = stage.production_stage_updates.length > 0;
-    const isActive = stage.status === 'in_progress';
-    const isComplete = stage.status === 'completed';
+    const hasUpdates = visibleUpdates.length > 0;
+    const isActive = displayStatus === 'in_progress';
+    const isComplete = displayStatus === 'completed';
     const isUpdating = updatingStages.has(stage.id);
+    const stageHasUnpublished = hasUnpublishedChanges(stage);
+    const unpublishedCount = getUnpublishedCount(stage);
     
-    const customSubstages = stage.production_stage_updates.filter(u => u.note_text?.includes('<!--CUSTOM_SUBSTAGE:'));
-    const recentAttachments = stage.production_stage_updates
+    const customSubstages = visibleUpdates.filter(u => u.note_text?.includes('<!--CUSTOM_SUBSTAGE:'));
+    const recentAttachments = visibleUpdates
       .filter(u => u.update_type === 'image' || u.update_type === 'file')
       .slice(-5);
 
@@ -374,14 +485,32 @@ export function ProductionStageTimeline({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-medium text-foreground">{stageDef.label}</h4>
-                      {getStatusBadge(stage.status)}
+                      {getStatusBadge(displayStatus)}
                       {isVibeAdmin && stageDef.adminOnly && (
                         <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 bg-amber-50/30 dark:bg-amber-500/5">
                           Internal
                         </Badge>
                       )}
+                      {/* Unpublished changes indicator for admin */}
+                      {isVibeAdmin && stageHasUnpublished && (
+                        <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-600 bg-amber-50/50 dark:bg-amber-500/10 gap-1">
+                          <EyeOff className="h-3 w-3" />
+                          {unpublishedCount > 0 ? `${unpublishedCount} unpublished` : 'Unpublished status'}
+                        </Badge>
+                      )}
+                      {/* Pending review badge for vendor */}
+                      {isVendor && stageHasUnpublished && (
+                        <Badge variant="outline" className="text-[10px] border-muted-foreground/30 text-muted-foreground gap-1">
+                          <Clock className="h-3 w-3" />
+                          Pending review
+                        </Badge>
+                      )}
                     </div>
-                    {stage.vendors?.name && (
+                    {/* Show published_notes for customers */}
+                    {isCustomer && stage.published_notes && (
+                      <p className="text-sm text-muted-foreground mt-1">{stage.published_notes}</p>
+                    )}
+                    {stage.vendors?.name && !isCustomer && (
                       <p className="text-sm text-muted-foreground mt-1">
                         Assigned to: <span className="font-medium text-foreground">{stage.vendors.name}</span>
                       </p>
@@ -390,11 +519,24 @@ export function ProductionStageTimeline({
                 </div>
                 
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {/* Publish button for admin */}
+                  {isVibeAdmin && stageHasUnpublished && onPublishStage && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="h-8 text-xs border-amber-500/50 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+                      disabled={publishingStages.has(stage.id)}
+                      onClick={(e) => { e.stopPropagation(); handlePublishStage(stage); }}
+                    >
+                      {publishingStages.has(stage.id) ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Eye className="h-3 w-3 mr-1" />}
+                      Publish
+                    </Button>
+                  )}
                   {hasUpdates && (
                     <CollapsibleTrigger asChild>
                       <Button variant="ghost" size="sm" className="px-2">
                         {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        <span className="ml-1 text-xs text-muted-foreground">{stage.production_stage_updates.length}</span>
+                        <span className="ml-1 text-xs text-muted-foreground">{visibleUpdates.length}</span>
                       </Button>
                     </CollapsibleTrigger>
                   )}
@@ -505,15 +647,19 @@ export function ProductionStageTimeline({
                 <div className="mt-3">
                   <Label className="text-xs text-muted-foreground mb-1.5 block">Recent Attachments</Label>
                   <div className="flex gap-1.5 flex-wrap">
-                    {recentAttachments.map((attachment) => (
-                      <a key={attachment.id} href={attachment.image_url || attachment.file_url || '#'} target="_blank" rel="noopener noreferrer"
-                        className={cn("inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors",
-                          attachment.update_type === 'image' ? "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-500/10 dark:text-purple-400" : "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/10 dark:text-amber-400"
-                        )}>
-                        {attachment.update_type === 'image' ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
-                        {attachment.file_name || 'Image'}
-                      </a>
-                    ))}
+                    {recentAttachments.map((attachment) => {
+                      const imgUrl = getUpdateImageUrl(attachment);
+                      const fileUrl = attachment.file_url;
+                      return (
+                        <a key={attachment.id} href={imgUrl || fileUrl || '#'} target="_blank" rel="noopener noreferrer"
+                          className={cn("inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors",
+                            attachment.update_type === 'image' ? "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-500/10 dark:text-purple-400" : "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/10 dark:text-amber-400"
+                          )}>
+                          {attachment.update_type === 'image' ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                          {attachment.file_name || 'Image'}
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -549,6 +695,21 @@ export function ProductionStageTimeline({
                 </div>
               )}
 
+              {/* Admin Publish Notes Editor */}
+              {isVibeAdmin && stageHasUnpublished && onPublishStage && (
+                <div className="mt-3 p-3 bg-amber-50/50 dark:bg-amber-500/5 rounded-lg border border-amber-500/20">
+                  <Label className="text-xs text-amber-600 mb-1.5 block flex items-center gap-1">
+                    <Pencil className="h-3 w-3" /> Edit customer-facing note before publishing
+                  </Label>
+                  <Textarea 
+                    value={editingPublishNotes[stage.id] !== undefined ? editingPublishNotes[stage.id] : (stage.published_notes || '')} 
+                    onChange={(e) => setEditingPublishNotes(prev => ({ ...prev, [stage.id]: e.target.value }))} 
+                    placeholder="Optional note visible to customers..." 
+                    className="text-xs min-h-[40px] resize-none bg-background" 
+                  />
+                </div>
+              )}
+
               {/* Internal Notes */}
               {isVibeAdmin && onInternalNotesChange && (
                 <div className="mt-3 p-3 bg-muted/30 rounded-lg border border-border/50">
@@ -570,12 +731,14 @@ export function ProductionStageTimeline({
               <div className="px-4 pb-4 border-t border-border pt-3">
                 <Label className="text-xs text-muted-foreground mb-2 block">Activity History</Label>
                 <div className="space-y-2">
-                  {stage.production_stage_updates
+                  {visibleUpdates
                     .filter(u => u.update_type !== 'status_change' || u.note_text || u.image_url || u.file_url)
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                     .map((update) => {
-                      const isCustomSub = update.note_text?.includes('<!--CUSTOM_SUBSTAGE:');
-                      const customLabel = update.note_text?.match(/<!--CUSTOM_SUBSTAGE:(.*?)-->/)?.[1];
+                      const noteText = getUpdateNoteText(update);
+                      const imageUrl = getUpdateImageUrl(update);
+                      const isCustomSub = noteText?.includes('<!--CUSTOM_SUBSTAGE:');
+                      const customLabel = noteText?.match(/<!--CUSTOM_SUBSTAGE:(.*?)-->/)?.[1];
                       return (
                         <div key={update.id} className={cn("flex items-start gap-2 p-2 rounded-lg transition-colors",
                           update.update_type === 'note' ? 'bg-slate-100/80 dark:bg-slate-800/30 border-2 border-primary/20' :
@@ -592,13 +755,48 @@ export function ProductionStageTimeline({
                           </div>
                           <div className="flex-1 min-w-0">
                             {update.update_type === 'status_change' && <p className="text-sm">Status changed to <span className="font-medium capitalize">{update.new_status?.replace('_', ' ')}</span></p>}
-                            {update.note_text && !isCustomSub && <p className="text-sm whitespace-pre-wrap">{update.note_text}</p>}
+                            {noteText && !isCustomSub && <p className="text-sm whitespace-pre-wrap">{noteText}</p>}
                             {isCustomSub && <p className="text-sm font-medium text-success">✓ {customLabel}</p>}
-                            {update.image_url && <a href={update.image_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1"><ImageIcon className="h-3 w-3" /> View Image</a>}
+                            {imageUrl && <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1"><ImageIcon className="h-3 w-3" /> View Image</a>}
                             {update.file_url && <a href={update.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1"><Download className="h-3 w-3" /> {update.file_name || 'Download File'}</a>}
-                            <p className="text-xs text-muted-foreground mt-1">{new Date(update.created_at).toLocaleDateString()} {new Date(update.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-muted-foreground">{new Date(update.created_at).toLocaleDateString()} {new Date(update.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                              {/* Published/unpublished indicator */}
+                              {(isVibeAdmin || isVendor) && (
+                                update.is_published ? (
+                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-green-500/30 text-green-600">
+                                    <Eye className="h-2.5 w-2.5 mr-0.5" /> Published
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-amber-500/30 text-amber-600">
+                                    <EyeOff className="h-2.5 w-2.5 mr-0.5" /> {isVendor ? 'Pending review' : 'Unpublished'}
+                                  </Badge>
+                                )
+                              )}
+                            </div>
+                            {/* Admin: inline publish for individual update */}
+                            {isVibeAdmin && !update.is_published && onPublishUpdate && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <Input
+                                  value={editingUpdateNotes[update.id] !== undefined ? editingUpdateNotes[update.id] : (update.note_text || '')}
+                                  onChange={(e) => setEditingUpdateNotes(prev => ({ ...prev, [update.id]: e.target.value }))}
+                                  placeholder="Edit note before publishing..."
+                                  className="h-7 text-xs flex-1"
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-[10px] border-amber-500/50 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+                                  disabled={publishingUpdates.has(update.id)}
+                                  onClick={() => handlePublishUpdate(update)}
+                                >
+                                  {publishingUpdates.has(update.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3 mr-1" />}
+                                  Publish
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                          {isVibeAdmin && onDeleteUpdate && (
+                          {(isVibeAdmin || isVendor) && onDeleteUpdate && (
                             <button type="button" disabled={deletingUpdates.has(update.id)} onClick={(e) => { e.stopPropagation(); handleDeleteUpdate(update.id); }}
                               className={cn("flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors", "hover:bg-destructive/20 text-muted-foreground hover:text-destructive")} title="Delete this update">
                               {deletingUpdates.has(update.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
@@ -607,7 +805,7 @@ export function ProductionStageTimeline({
                         </div>
                       );
                     })}
-                  {stage.production_stage_updates.filter(u => u.update_type !== 'status_change' || u.note_text || u.image_url || u.file_url).length === 0 && (
+                  {visibleUpdates.filter(u => u.update_type !== 'status_change' || u.note_text || u.image_url || u.file_url).length === 0 && (
                     <div className="flex items-center gap-2 text-muted-foreground py-2">
                       <Circle className="h-4 w-4 opacity-40" />
                       <span className="text-sm">No activity yet</span>
@@ -624,6 +822,22 @@ export function ProductionStageTimeline({
 
   return (
     <div className="space-y-6">
+      {/* Publish All button for admin */}
+      {isVibeAdmin && hasAnyUnpublished && onPublishAll && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-amber-500/50 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+            disabled={publishingAll}
+            onClick={handlePublishAll}
+          >
+            {publishingAll ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+            Publish All to Customer
+          </Button>
+        </div>
+      )}
+
       {/* Progress Overview */}
       <div className="bg-card border border-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
@@ -637,7 +851,6 @@ export function ProductionStageTimeline({
         {/* Progress Bar - Draggable slider for vibe_admin, Segmented for vendor, Smooth for customers */}
         {isVibeAdmin && onProgressSliderChange ? (
           <>
-            {/* Draggable slider for Vibe Admin */}
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -659,7 +872,6 @@ export function ProductionStageTimeline({
                 Drag to adjust progress. Stages will auto-update based on target percentage.
               </p>
               
-              {/* Segmented view below slider */}
               <div className="flex items-center gap-0.5">
                 {visibleStageDefinitions.map((def) => {
                   const status = getStageStatus(def.value);
@@ -680,7 +892,6 @@ export function ProductionStageTimeline({
                 })}
               </div>
               
-              {/* Stage weight labels */}
               <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
                 {visibleStageDefinitions.map((def) => {
                   const status = getStageStatus(def.value);
@@ -709,7 +920,6 @@ export function ProductionStageTimeline({
           </>
         ) : isVendor ? (
           <>
-            {/* Segmented progress bar for vendor */}
             <div className="flex items-center gap-0.5 mb-2">
               {visibleStageDefinitions.map((def) => {
                 const status = getStageStatus(def.value);
@@ -730,7 +940,6 @@ export function ProductionStageTimeline({
               })}
             </div>
             
-            {/* Stage weight labels for vendor */}
             <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
               {visibleStageDefinitions.map((def) => {
                 const status = getStageStatus(def.value);
@@ -758,7 +967,6 @@ export function ProductionStageTimeline({
           </>
         ) : (
           <>
-            {/* Simple continuous progress bar for customers/company users */}
             <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden mb-2">
               <div
                 className={cn(
@@ -779,7 +987,6 @@ export function ProductionStageTimeline({
       {/* Stage Cards */}
       {isVibeAdmin ? (
         <>
-          {/* Internal Stages Section */}
           {(() => {
             const internalDefs = visibleStageDefinitions.filter(d => d.adminOnly);
             if (internalDefs.length === 0) return null;
@@ -801,7 +1008,6 @@ export function ProductionStageTimeline({
             );
           })()}
 
-          {/* Customer-Facing Stages Section */}
           {(() => {
             const customerDefs = visibleStageDefinitions.filter(d => !d.adminOnly);
             if (customerDefs.length === 0) return null;

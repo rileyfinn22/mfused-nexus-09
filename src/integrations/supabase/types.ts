@@ -2177,9 +2177,13 @@ export type Database = {
           file_url: string | null
           id: string
           image_url: string | null
+          is_published: boolean
           new_status: string | null
           note_text: string | null
           previous_status: string | null
+          published_at: string | null
+          published_image_url: string | null
+          published_note_text: string | null
           stage_id: string
           update_type: string
           updated_by: string
@@ -2190,9 +2194,13 @@ export type Database = {
           file_url?: string | null
           id?: string
           image_url?: string | null
+          is_published?: boolean
           new_status?: string | null
           note_text?: string | null
           previous_status?: string | null
+          published_at?: string | null
+          published_image_url?: string | null
+          published_note_text?: string | null
           stage_id: string
           update_type: string
           updated_by: string
@@ -2203,9 +2211,13 @@ export type Database = {
           file_url?: string | null
           id?: string
           image_url?: string | null
+          is_published?: boolean
           new_status?: string | null
           note_text?: string | null
           previous_status?: string | null
+          published_at?: string | null
+          published_image_url?: string | null
+          published_note_text?: string | null
           stage_id?: string
           update_type?: string
           updated_by?: string
@@ -2226,6 +2238,10 @@ export type Database = {
           id: string
           internal_notes: string | null
           order_id: string
+          published_at: string | null
+          published_notes: string | null
+          published_status: string
+          published_substages: Json | null
           sequence_order: number
           stage_name: string
           status: string
@@ -2237,6 +2253,10 @@ export type Database = {
           id?: string
           internal_notes?: string | null
           order_id: string
+          published_at?: string | null
+          published_notes?: string | null
+          published_status?: string
+          published_substages?: Json | null
           sequence_order: number
           stage_name: string
           status?: string
@@ -2248,6 +2268,10 @@ export type Database = {
           id?: string
           internal_notes?: string | null
           order_id?: string
+          published_at?: string | null
+          published_notes?: string | null
+          published_status?: string
+          published_substages?: Json | null
           sequence_order?: number
           stage_name?: string
           status?: string
