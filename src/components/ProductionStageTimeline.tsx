@@ -434,7 +434,71 @@ export function ProductionStageTimeline({
                 </div>
               )}
 
+              {/* Sub-stages for Pre-Press */}
+              {(isVibeAdmin || isVendor) && stageDef.value === 'pre_press' && onSubstageComplete && (
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
+                  <Label className="text-xs text-muted-foreground mb-2 block">Pre-Press Sub-stages</Label>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    {PREPRESS_SUBSTAGES.map((substage) => {
+                      const completed = isSubstageComplete(stage, substage.key);
+                      const substageKey = `${stage.id}-${substage.key}`;
+                      const updating = updatingSubstages.has(substageKey);
+                      return (
+                        <Button key={substage.key} size="sm" variant={completed ? 'default' : 'outline'} className={cn("h-9", completed && "bg-success hover:bg-success/90 cursor-default")} disabled={updating || completed} onClick={() => handleSubstageClick(stage.id, substage)}>
+                          {completed ? <CheckCircle2 className="h-3 w-3 mr-1.5" /> : updating ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <Circle className="h-3 w-3 mr-1.5" />}
+                          {substage.label}
+                        </Button>
+                      );
+                    })}
+                    {showCustomInput[`prepress_${stage.id}`] ? (
+                      <div className="flex items-center gap-1">
+                        <Input placeholder="Custom note..." value={customSubstageInputs[`prepress_${stage.id}`] || ''} onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`prepress_${stage.id}`]: e.target.value }))} className="h-9 w-32 text-sm" onKeyDown={(e) => { if (e.key === 'Enter') handleAddCustomSubstage(stage.id); }} />
+                        <Button size="sm" className="h-9" disabled={addingCustomSubstage.has(stage.id)} onClick={() => handleAddCustomSubstage(stage.id)}>{addingCustomSubstage.has(stage.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}</Button>
+                        <Button size="sm" variant="ghost" className="h-9 px-2" onClick={() => setShowCustomInput(prev => ({ ...prev, [`prepress_${stage.id}`]: false }))}><X className="h-3 w-3" /></Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={() => setShowCustomInput(prev => ({ ...prev, [`prepress_${stage.id}`]: true }))}><Plus className="h-3 w-3 mr-1" /> Custom</Button>
+                    )}
+                    {customSubstages.map((update) => {
+                      const label = update.note_text?.match(/<!--CUSTOM_SUBSTAGE:(.*?)-->/)?.[1] || 'Custom';
+                      return <Badge key={update.id} variant="default" className="bg-success hover:bg-success/90 gap-1"><CheckCircle2 className="h-3 w-3" />{label}</Badge>;
+                    })}
+                  </div>
+                </div>
+              )}
 
+              {/* Sub-stages for Production Working */}
+              {(isVibeAdmin || isVendor) && stageDef.value === 'production_complete' && onSubstageComplete && (
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
+                  <Label className="text-xs text-muted-foreground mb-2 block">Production Sub-stages</Label>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    {PRODUCTION_SUBSTAGES.map((substage) => {
+                      const completed = isSubstageComplete(stage, substage.key);
+                      const substageKey = `${stage.id}-${substage.key}`;
+                      const updating = updatingSubstages.has(substageKey);
+                      return (
+                        <Button key={substage.key} size="sm" variant={completed ? 'default' : 'outline'} className={cn("h-9", completed && "bg-success hover:bg-success/90 cursor-default")} disabled={updating || completed} onClick={() => handleSubstageClick(stage.id, substage)}>
+                          {completed ? <CheckCircle2 className="h-3 w-3 mr-1.5" /> : updating ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <Circle className="h-3 w-3 mr-1.5" />}
+                          {substage.label}
+                        </Button>
+                      );
+                    })}
+                    {showCustomInput[`production_${stage.id}`] ? (
+                      <div className="flex items-center gap-1">
+                        <Input placeholder="Custom note..." value={customSubstageInputs[`production_${stage.id}`] || ''} onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`production_${stage.id}`]: e.target.value }))} className="h-9 w-32 text-sm" onKeyDown={(e) => { if (e.key === 'Enter') handleAddCustomSubstage(stage.id); }} />
+                        <Button size="sm" className="h-9" disabled={addingCustomSubstage.has(stage.id)} onClick={() => handleAddCustomSubstage(stage.id)}>{addingCustomSubstage.has(stage.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}</Button>
+                        <Button size="sm" variant="ghost" className="h-9 px-2" onClick={() => setShowCustomInput(prev => ({ ...prev, [`production_${stage.id}`]: false }))}><X className="h-3 w-3" /></Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={() => setShowCustomInput(prev => ({ ...prev, [`production_${stage.id}`]: true }))}><Plus className="h-3 w-3 mr-1" /> Custom</Button>
+                    )}
+                    {customSubstages.map((update) => {
+                      const label = update.note_text?.match(/<!--CUSTOM_SUBSTAGE:(.*?)-->/)?.[1] || 'Custom';
+                      return <Badge key={update.id} variant="default" className="bg-success hover:bg-success/90 gap-1"><CheckCircle2 className="h-3 w-3" />{label}</Badge>;
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Recent Attachments */}
               {recentAttachments.length > 0 && (
