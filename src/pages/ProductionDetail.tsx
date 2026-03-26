@@ -1193,7 +1193,7 @@ export default function ProductionDetail() {
           onQuickStatusChange={isVibeAdmin || isVendor ? handleQuickStatusChange : undefined}
           onSubstageComplete={isVibeAdmin || isVendor ? handleSubstageComplete : undefined}
           onCustomSubstageAdd={isVibeAdmin || isVendor ? handleCustomSubstageAdd : undefined}
-          onDeleteUpdate={isVibeAdmin ? handleDeleteUpdate : undefined}
+          onDeleteUpdate={isVibeAdmin || isVendor ? handleDeleteUpdate : undefined}
           onInternalNotesChange={isVibeAdmin ? handleInternalNotesChange : undefined}
           onVendorAssign={isVibeAdmin ? handleAssignVendor : undefined}
           onProgressSliderChange={isVibeAdmin ? handleProgressSliderChange : undefined}
