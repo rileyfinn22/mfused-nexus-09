@@ -920,22 +920,32 @@ serve(async (req) => {
     // Regardless of how deposits were recorded (child invoices, direct payments,
     // or any future pattern), the QBO invoice should never exceed the actual
     // balance due. This prevents overbilling if earlier deduction logic missed a case.
+    // IMPORTANT: Only consider payments NOT already synced to QBO as Payment objects.
     if (billingPercentage === 100) {
-      const totalPaidOnInvoice = Number(invoice.total_paid || 0);
+      // Fetch payments to check which ones are synced vs unsynced
+      const { data: allInvoicePayments } = await supabase
+        .from('payments')
+        .select('id, amount, quickbooks_id')
+        .eq('invoice_id', invoice.id);
+
+      const unsyncedPaymentTotal = (allInvoicePayments || [])
+        .filter((p: any) => !p.quickbooks_id)
+        .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+
       const hasNegativeLineAlready = lineItems.some((li: any) => li.Amount < 0);
 
-      if (totalPaidOnInvoice > 0 && !hasNegativeLineAlready) {
-        console.warn(`⚠️ SAFETY NET: Invoice has $${totalPaidOnInvoice} paid but no deposit deduction was added. Adding catch-all deduction.`);
+      if (unsyncedPaymentTotal > 0 && !hasNegativeLineAlready) {
+        console.warn(`⚠️ SAFETY NET: Invoice has $${unsyncedPaymentTotal} in unsynced payments but no deposit deduction was added. Adding catch-all deduction.`);
 
         const depositItemId = await findOrCreateQBItem(
           'Deposit Applied',
           'Previously received deposit',
-          totalPaidOnInvoice
+          unsyncedPaymentTotal
         );
 
         lineItems.push({
           DetailType: 'SalesItemLineDetail',
-          Amount: -totalPaidOnInvoice,
+          Amount: -unsyncedPaymentTotal,
           Description: 'Less: Deposit Previously Received',
           SalesItemLineDetail: {
             ItemRef: {
@@ -943,11 +953,11 @@ serve(async (req) => {
               name: 'Deposit Applied',
             },
             Qty: 1,
-            UnitPrice: -totalPaidOnInvoice,
+            UnitPrice: -unsyncedPaymentTotal,
           },
         });
 
-        calculatedSubtotal -= totalPaidOnInvoice;
+        calculatedSubtotal -= unsyncedPaymentTotal;
         console.log(`Safety net adjusted subtotal: ${calculatedSubtotal}`);
       }
     }
