@@ -696,7 +696,7 @@ export default function ProductionDetail() {
 
       let fileUrl = null;
       let uploadedFileName = null;
-      if ((isVibeAdmin || isCustomer) && updateFile) {
+      if ((isVibeAdmin || isVendor) && updateFile) {
         uploadedFileName = updateFile.name;
         const fileExt = updateFile.name.split('.').pop();
         const fileName = `${selectedStage.id}-${Date.now()}.${fileExt}`;
