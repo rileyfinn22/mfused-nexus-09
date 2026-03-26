@@ -1159,12 +1159,12 @@ export default function ProductionDetail() {
       <ShipmentTracker
         legs={shipmentLegs}
         isVibeAdmin={isVibeAdmin}
-        onStatusChange={isVibeAdmin ? handleLegStatusChange : undefined}
-        onActualArrivalChange={isVibeAdmin ? handleLegArrivalChange : undefined}
-        onAddLeg={isVibeAdmin ? () => setAddLegDialogOpen(true) : undefined}
-        onAttachmentUpload={isVibeAdmin ? handleLegAttachmentUpload : undefined}
+        onStatusChange={isVibeAdmin || isVendor ? handleLegStatusChange : undefined}
+        onActualArrivalChange={isVibeAdmin || isVendor ? handleLegArrivalChange : undefined}
+        onAddLeg={isVibeAdmin || isVendor ? () => setAddLegDialogOpen(true) : undefined}
+        onAttachmentUpload={isVibeAdmin || isVendor ? handleLegAttachmentUpload : undefined}
         onDeleteLeg={isVibeAdmin ? handleDeleteLeg : undefined}
-        onNotesChange={isVibeAdmin ? handleLegNotesChange : undefined}
+        onNotesChange={isVibeAdmin || isVendor ? handleLegNotesChange : undefined}
       />
 
       <AddShipmentLegDialog
