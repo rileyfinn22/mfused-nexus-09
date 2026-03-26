@@ -246,9 +246,19 @@ export default function Financing() {
           </Badge>
         </td>
         <td className="px-2 py-1.5">
-          {(isFinanceUser || isVibeAdmin) && (
+          {isFinanceUser && (
             <Button size="sm" variant="default" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); setSelectedInvoice(inv); setAcceptOpen(true); }}>
               {t("accept")}
+            </Button>
+          )}
+          {isVibeAdmin && (
+            <Button size="sm" variant="default" className="h-6 text-[10px] px-2" onClick={async (e) => {
+              e.stopPropagation();
+              const { error } = await supabase.from("financed_invoices").update({ finance_status: "active" }).eq("id", inv.id);
+              if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+              else { toast({ title: "Activated" }); fetchData(); }
+            }}>
+              Activate
             </Button>
           )}
         </td>

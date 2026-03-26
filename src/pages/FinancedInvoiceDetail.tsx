@@ -312,11 +312,15 @@ export default function FinancedInvoiceDetail() {
           <CardContent className="flex items-center justify-between py-4">
             <div>
               <p className="text-sm font-medium text-amber-600">Pending — awaiting finance company review</p>
-              <p className="text-xs text-muted-foreground">As admin, you can manually activate this request.</p>
+              <p className="text-xs text-muted-foreground">As admin, you can manually activate this request with the existing amounts.</p>
             </div>
-            <Button onClick={() => setAcceptOpen(true)} variant="outline" className="gap-2">
+            <Button onClick={async () => {
+              const { error } = await supabase.from("financed_invoices").update({ finance_status: "active" }).eq("id", record.id);
+              if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+              else { toast({ title: "Activated" }); fetchRecord(); fetchEditLogs(); }
+            }} variant="outline" className="gap-2">
               <CheckCircle2 className="h-4 w-4" />
-              Manually Activate
+              Activate
             </Button>
           </CardContent>
         </Card>
