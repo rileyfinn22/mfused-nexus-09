@@ -36,6 +36,7 @@ interface OrderItem {
   sku: string;
   name: string;
   quantity: number;
+  shipped_quantity?: number;
   unit_price: number;
 }
 
