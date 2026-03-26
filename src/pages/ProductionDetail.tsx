@@ -733,7 +733,7 @@ export default function ProductionDetail() {
         });
       }
 
-      if (fileUrl && (isVibeAdmin || isCustomer)) {
+      if (fileUrl && (isVibeAdmin || isVendor)) {
         updates.push({
           stage_id: selectedStage.id,
           updated_by: user.id,
