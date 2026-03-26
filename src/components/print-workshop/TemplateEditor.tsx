@@ -770,7 +770,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     syncCanvas();
   };
 
-  const setCanvasBackground = (imgEl: HTMLImageElement, pdfPageWidthIn?: number, pdfPageHeightIn?: number) => {
+  const setCanvasBackground = (
+    imgEl: HTMLImageElement,
+    pdfPageWidthIn?: number,
+    pdfPageHeightIn?: number,
+    pdfBoxes?: ParsedPdfPageBoxes,
+  ) => {
     const canvas = fabricRef.current;
     if (!canvas) return;
 
@@ -779,11 +784,81 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     const trimWidthPx = Math.round(width * DPI);
     const trimHeightPx = Math.round(height * DPI);
     const toleranceIn = 0.05;
+    const boxToleranceIn = 0.08;
+
+    const addLockedPdfBackground = (left: number, top: number, scaleX: number, scaleY: number) => {
+      const fabricImg = new FabricImage(imgEl, {
+        left,
+        top,
+        scaleX,
+        scaleY,
+        objectCaching: false,
+        selectable: false,
+        evented: false,
+        hasControls: false,
+        hasBorders: false,
+      } as any);
+      (fabricImg as any).name = "pdf_background";
+      canvas.add(fabricImg);
+      canvas.sendObjectToBack(fabricImg);
+      canvas.renderAll();
+      syncCanvas();
+    };
 
     // Remove any existing PDF background so we always keep a single locked background layer.
     canvas.getObjects().forEach((obj: any) => {
       if (obj.name === "pdf_background") canvas.remove(obj);
     });
+
+    const renderedPageBox = pdfBoxes?.cropBox ?? pdfBoxes?.mediaBox;
+    const bleedBox = pdfBoxes?.bleedBox;
+    const trimBox = pdfBoxes?.trimBox ?? pdfBoxes?.artBox;
+
+    if (
+      renderedPageBox &&
+      bleedBox &&
+      Math.abs(bleedBox.widthIn - templateTotalW) <= boxToleranceIn &&
+      Math.abs(bleedBox.heightIn - templateTotalH) <= boxToleranceIn
+    ) {
+      const placement = computePdfBoxPlacement({
+        imageWidth: imgEl.width,
+        imageHeight: imgEl.height,
+        mediaBox: renderedPageBox,
+        box: bleedBox,
+        targetLeft: 0,
+        targetTop: 0,
+        targetWidth: canvasWidth,
+        targetHeight: canvasHeight,
+      });
+
+      if (placement) {
+        addLockedPdfBackground(placement.left, placement.top, placement.scale, placement.scale);
+        return;
+      }
+    }
+
+    if (
+      renderedPageBox &&
+      trimBox &&
+      Math.abs(trimBox.widthIn - width) <= boxToleranceIn &&
+      Math.abs(trimBox.heightIn - height) <= boxToleranceIn
+    ) {
+      const placement = computePdfBoxPlacement({
+        imageWidth: imgEl.width,
+        imageHeight: imgEl.height,
+        mediaBox: renderedPageBox,
+        box: trimBox,
+        targetLeft: bleedPx,
+        targetTop: bleedPx,
+        targetWidth: trimWidthPx,
+        targetHeight: trimHeightPx,
+      });
+
+      if (placement) {
+        addLockedPdfBackground(placement.left, placement.top, placement.scale, placement.scale);
+        return;
+      }
+    }
 
     // If the PDF page is larger than the template (extra artboard around dieline),
     // crop to the centered template area.
@@ -799,22 +874,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const offsetXFraction = (pdfPageWidthIn - templateTotalW) / 2 / pdfPageWidthIn;
       const offsetYFraction = (pdfPageHeightIn - templateTotalH) / 2 / pdfPageHeightIn;
 
-      const fabricImg = new FabricImage(imgEl, {
-        left: -(offsetXFraction * imgEl.width * fillScale),
-        top: -(offsetYFraction * imgEl.height * fillScale),
-        scaleX: fillScale,
-        scaleY: fillScale,
-        objectCaching: false,
-        selectable: false,
-        evented: false,
-        hasControls: false,
-        hasBorders: false,
-      } as any);
-      (fabricImg as any).name = "pdf_background";
-      canvas.add(fabricImg);
-      canvas.sendObjectToBack(fabricImg);
-      canvas.renderAll();
-      syncCanvas();
+      addLockedPdfBackground(
+        -(offsetXFraction * imgEl.width * fillScale),
+        -(offsetYFraction * imgEl.height * fillScale),
+        fillScale,
+        fillScale,
+      );
       return;
     }
 
@@ -826,48 +891,23 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       Math.abs(pdfPageHeightIn - height) <= toleranceIn
     ) {
       const fitScale = Math.min(trimWidthPx / imgEl.width, trimHeightPx / imgEl.height);
-      const fabricImg = new FabricImage(imgEl, {
-        left: bleedPx + (trimWidthPx - imgEl.width * fitScale) / 2,
-        top: bleedPx + (trimHeightPx - imgEl.height * fitScale) / 2,
-        scaleX: fitScale,
-        scaleY: fitScale,
-        objectCaching: false,
-        selectable: false,
-        evented: false,
-        hasControls: false,
-        hasBorders: false,
-      } as any);
-      (fabricImg as any).name = "pdf_background";
-      canvas.add(fabricImg);
-      canvas.sendObjectToBack(fabricImg);
-      canvas.renderAll();
-      syncCanvas();
+      addLockedPdfBackground(
+        bleedPx + (trimWidthPx - imgEl.width * fitScale) / 2,
+        bleedPx + (trimHeightPx - imgEl.height * fitScale) / 2,
+        fitScale,
+        fitScale,
+      );
       return;
     }
 
     // Standard fit behavior for matching or smaller PDFs
-    const fabricImg = new FabricImage(imgEl, {
-      left: 0,
-      top: 0,
-      objectCaching: false,
-      selectable: false,
-      evented: false,
-      hasControls: false,
-      hasBorders: false,
-    } as any);
-
     const fitScale = Math.min(canvasWidth / imgEl.width, canvasHeight / imgEl.height);
-    fabricImg.set({
-      scaleX: fitScale,
-      scaleY: fitScale,
-      left: (canvasWidth - imgEl.width * fitScale) / 2,
-      top: (canvasHeight - imgEl.height * fitScale) / 2,
-    });
-    (fabricImg as any).name = "pdf_background";
-    canvas.add(fabricImg);
-    canvas.sendObjectToBack(fabricImg);
-    canvas.renderAll();
-    syncCanvas();
+    addLockedPdfBackground(
+      (canvasWidth - imgEl.width * fitScale) / 2,
+      (canvasHeight - imgEl.height * fitScale) / 2,
+      fitScale,
+      fitScale,
+    );
   };
 
   const addBackgroundImage = () => {
