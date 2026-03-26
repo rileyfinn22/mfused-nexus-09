@@ -59,6 +59,9 @@ interface StageUpdate {
   previous_status: string | null;
   new_status: string | null;
   created_at: string;
+  is_published: boolean;
+  published_note_text: string | null;
+  published_image_url: string | null;
 }
 
 interface Vendor {
