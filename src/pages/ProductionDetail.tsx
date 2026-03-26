@@ -1289,6 +1289,9 @@ export default function ProductionDetail() {
           onInternalNotesChange={isVibeAdmin ? handleInternalNotesChange : undefined}
           onVendorAssign={isVibeAdmin ? handleAssignVendor : undefined}
           onProgressSliderChange={isVibeAdmin ? handleProgressSliderChange : undefined}
+          onPublishStage={isVibeAdmin ? handlePublishStage : undefined}
+          onPublishUpdate={isVibeAdmin ? handlePublishUpdate : undefined}
+          onPublishAll={isVibeAdmin ? handlePublishAll : undefined}
           savedProgress={order?.production_progress ?? undefined}
           vendors={vendors}
           isVibeAdmin={isVibeAdmin}
