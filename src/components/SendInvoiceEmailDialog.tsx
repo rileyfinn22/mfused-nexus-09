@@ -418,13 +418,27 @@ Thank you for your business.`;
     yPos += 40;
     
     // ============ ITEMS TABLE ============
-    const tableData = items.map((item) => [
-      item.sku || '',
-      item.name || '',
-      (item.quantity || item.shipped_quantity || 0).toLocaleString(),
-      formatUnitPrice(item.unit_price || 0),
-      formatCurrency((item.quantity || item.shipped_quantity || 0) * (item.unit_price || 0))
-    ]);
+    // Determine if this is a blanket invoice to use shipped_quantity
+    const isBlanketEmail = invoice.invoice_type === 'full' || (!invoice.invoice_type && !invoice.parent_invoice_id);
+    const tableData = items.map((item) => {
+      const qty = isBlanketEmail
+        ? (Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity || 0))
+        : Number(item.quantity || 0);
+      return [
+        item.sku || '',
+        item.name || '',
+        qty.toLocaleString(),
+        formatUnitPrice(item.unit_price || 0),
+        formatCurrency(qty * (item.unit_price || 0))
+      ];
+    });
+    // Compute subtotal from line items for consistency with displayed rows
+    const computedSubtotal = items.reduce((sum, item) => {
+      const qty = isBlanketEmail
+        ? (Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity || 0))
+        : Number(item.quantity || 0);
+      return sum + qty * Number(item.unit_price || 0);
+    }, 0);
     
     autoTable(doc, {
       startY: yPos,
