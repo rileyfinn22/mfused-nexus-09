@@ -307,10 +307,17 @@ export default function FinancedInvoiceDetail() {
         </Card>
       )}
 
-      {record.finance_status === "pending" && isVibeAdmin && (
+      {record.finance_status === "pending" && isVibeAdmin && !isFinanceUser && (
         <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="py-4">
-            <p className="text-sm font-medium text-amber-600">Pending — awaiting finance company review</p>
+          <CardContent className="flex items-center justify-between py-4">
+            <div>
+              <p className="text-sm font-medium text-amber-600">Pending — awaiting finance company review</p>
+              <p className="text-xs text-muted-foreground">As admin, you can manually activate this request.</p>
+            </div>
+            <Button onClick={() => setAcceptOpen(true)} variant="outline" className="gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Manually Activate
+            </Button>
           </CardContent>
         </Card>
       )}
