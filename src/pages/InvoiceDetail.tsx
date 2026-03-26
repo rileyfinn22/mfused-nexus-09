@@ -687,13 +687,19 @@ const InvoiceDetail = () => {
     
     // ============ ITEMS TABLE ============
     const itemsToDisplay = editedItems.length > 0 ? editedItems : (order?.order_items || []);
-    const tableData = itemsToDisplay.map((item: any) => [
-      item.sku || '',
-      item.name || '',
-      (item.quantity || 0).toLocaleString(),
-      formatUnitPrice(item.unit_price || 0),
-      formatCurrency((item.quantity || 0) * (item.unit_price || 0))
-    ]);
+    const isBlanket = invoice.invoice_type === 'full' || (!invoice.invoice_type && !invoice.parent_invoice_id);
+    const tableData = itemsToDisplay.map((item: any) => {
+      const qty = isBlanket
+        ? (Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity || 0))
+        : Number(item.quantity || 0);
+      return [
+        item.sku || '',
+        item.name || '',
+        qty.toLocaleString(),
+        formatUnitPrice(item.unit_price || 0),
+        formatCurrency(qty * (item.unit_price || 0))
+      ];
+    });
     
     autoTable(doc, {
       startY: yPos,
