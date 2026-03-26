@@ -177,13 +177,18 @@ export const generateInvoicePDF = async (
   
   // ============ ITEMS TABLE ============
   const items = order.order_items || [];
-  const tableData = items.map((item) => [
-    item.sku || '',
-    item.name || '',
-    (item.quantity || 0).toLocaleString(),
-    formatUnitPrice(item.unit_price || 0),
-    formatCurrency((item.quantity || 0) * (item.unit_price || 0))
-  ]);
+  const tableData = items.map((item) => {
+    const qty = Number(item.shipped_quantity) > 0
+      ? Number(item.shipped_quantity)
+      : Number(item.quantity || 0);
+    return [
+      item.sku || '',
+      item.name || '',
+      qty.toLocaleString(),
+      formatUnitPrice(item.unit_price || 0),
+      formatCurrency(qty * (item.unit_price || 0))
+    ];
+  });
   
   autoTable(doc, {
     startY: yPos,
