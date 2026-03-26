@@ -493,7 +493,7 @@ Thank you for your business.`;
     // Subtotal
     doc.setFont('helvetica', 'normal');
     doc.text('Subtotal', totalsX, totalsY);
-    doc.text(formatCurrency(invoice.subtotal || invoice.total || 0), totalsX + totalsWidth, totalsY, { align: 'right' });
+    doc.text(formatCurrency(computedSubtotal), totalsX + totalsWidth, totalsY, { align: 'right' });
     totalsY += 8;
     
     // Shipping (if applicable)
