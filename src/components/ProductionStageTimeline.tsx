@@ -71,15 +71,18 @@ const MATERIAL_SUBSTAGES: SubstageDefinition[] = [
   { key: 'material_secured', label: 'Material Secured', percent: 0 },
 ];
 
-const PRINT_SUBSTAGES: SubstageDefinition[] = [
-  { key: 'print_film', label: 'Print Film', percent: 0 },
-  { key: 'lamination_curing', label: 'Lamination + Curing', percent: 0 },
-  { key: 'converting', label: 'Converting', percent: 0 },
+const PREPRESS_SUBSTAGES: SubstageDefinition[] = [
+  { key: 'proofs_approved', label: 'Proofs Approved', percent: 0 },
 ];
 
-const QC_SUBSTAGES: SubstageDefinition[] = [
+const PRODUCTION_SUBSTAGES: SubstageDefinition[] = [
+  { key: 'print', label: 'Print', percent: 0 },
+  { key: 'laminate', label: 'Laminate', percent: 0 },
+  { key: 'cutting', label: 'Cutting', percent: 0 },
+  { key: 'glueing', label: 'Glueing', percent: 0 },
+  { key: 'converting', label: 'Converting', percent: 0 },
   { key: 'packing_sorting', label: 'Packing/Sorting', percent: 0 },
-  { key: 'qc_completed', label: 'QC Completed', percent: 0 },
+  { key: 'qc_completed', label: 'QC', percent: 0 },
 ];
 
 export function ProductionStageTimeline({
@@ -431,71 +434,7 @@ export function ProductionStageTimeline({
                 </div>
               )}
 
-              {/* Sub-stages for Pre-Press */}
-              {(isVibeAdmin || isVendor) && stageDef.value === 'pre_press' && onSubstageComplete && (
-                <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
-                  <Label className="text-xs text-muted-foreground mb-2 block">Print Sub-stages</Label>
-                  <div className="flex gap-2 flex-wrap items-center">
-                    {PRINT_SUBSTAGES.map((substage) => {
-                      const completed = isSubstageComplete(stage, substage.key);
-                      const substageKey = `${stage.id}-${substage.key}`;
-                      const updating = updatingSubstages.has(substageKey);
-                      return (
-                        <Button key={substage.key} size="sm" variant={completed ? 'default' : 'outline'} className={cn("h-9", completed && "bg-success hover:bg-success/90 cursor-default")} disabled={updating || completed} onClick={() => handleSubstageClick(stage.id, substage)}>
-                          {completed ? <CheckCircle2 className="h-3 w-3 mr-1.5" /> : updating ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <Circle className="h-3 w-3 mr-1.5" />}
-                          {substage.label}
-                        </Button>
-                      );
-                    })}
-                    {showCustomInput[`print_${stage.id}`] ? (
-                      <div className="flex items-center gap-1">
-                        <Input placeholder="Custom note..." value={customSubstageInputs[`print_${stage.id}`] || ''} onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`print_${stage.id}`]: e.target.value }))} className="h-9 w-32 text-sm" onKeyDown={(e) => { if (e.key === 'Enter') handleAddCustomSubstage(stage.id); }} />
-                        <Button size="sm" className="h-9" disabled={addingCustomSubstage.has(stage.id)} onClick={() => handleAddCustomSubstage(stage.id)}>{addingCustomSubstage.has(stage.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}</Button>
-                        <Button size="sm" variant="ghost" className="h-9 px-2" onClick={() => setShowCustomInput(prev => ({ ...prev, [`print_${stage.id}`]: false }))}><X className="h-3 w-3" /></Button>
-                      </div>
-                    ) : (
-                      <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={() => setShowCustomInput(prev => ({ ...prev, [`print_${stage.id}`]: true }))}><Plus className="h-3 w-3 mr-1" /> Custom</Button>
-                    )}
-                    {customSubstages.map((update) => {
-                      const label = update.note_text?.match(/<!--CUSTOM_SUBSTAGE:(.*?)-->/)?.[1] || 'Custom';
-                      return <Badge key={update.id} variant="default" className="bg-success hover:bg-success/90 gap-1"><CheckCircle2 className="h-3 w-3" />{label}</Badge>;
-                    })}
-                  </div>
-                </div>
-              )}
 
-              {/* Sub-stages for Production Complete (QC) */}
-              {(isVibeAdmin || isVendor) && stageDef.value === 'production_complete' && onSubstageComplete && (
-                <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
-                  <Label className="text-xs text-muted-foreground mb-2 block">QC Sub-stages</Label>
-                  <div className="flex gap-2 flex-wrap items-center">
-                    {QC_SUBSTAGES.map((substage) => {
-                      const completed = isSubstageComplete(stage, substage.key);
-                      const substageKey = `${stage.id}-${substage.key}`;
-                      const updating = updatingSubstages.has(substageKey);
-                      return (
-                        <Button key={substage.key} size="sm" variant={completed ? 'default' : 'outline'} className={cn("h-9", completed && "bg-success hover:bg-success/90 cursor-default")} disabled={updating || completed} onClick={() => handleSubstageClick(stage.id, substage)}>
-                          {completed ? <CheckCircle2 className="h-3 w-3 mr-1.5" /> : updating ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <Circle className="h-3 w-3 mr-1.5" />}
-                          {substage.label}
-                        </Button>
-                      );
-                    })}
-                    {showCustomInput[`qc_${stage.id}`] ? (
-                      <div className="flex items-center gap-1">
-                        <Input placeholder="Custom note..." value={customSubstageInputs[`qc_${stage.id}`] || ''} onChange={(e) => setCustomSubstageInputs(prev => ({ ...prev, [`qc_${stage.id}`]: e.target.value }))} className="h-9 w-32 text-sm" onKeyDown={(e) => { if (e.key === 'Enter') handleAddCustomSubstage(stage.id); }} />
-                        <Button size="sm" className="h-9" disabled={addingCustomSubstage.has(stage.id)} onClick={() => handleAddCustomSubstage(stage.id)}>{addingCustomSubstage.has(stage.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}</Button>
-                        <Button size="sm" variant="ghost" className="h-9 px-2" onClick={() => setShowCustomInput(prev => ({ ...prev, [`qc_${stage.id}`]: false }))}><X className="h-3 w-3" /></Button>
-                      </div>
-                    ) : (
-                      <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={() => setShowCustomInput(prev => ({ ...prev, [`qc_${stage.id}`]: true }))}><Plus className="h-3 w-3 mr-1" /> Custom</Button>
-                    )}
-                    {customSubstages.map((update) => {
-                      const label = update.note_text?.match(/<!--CUSTOM_SUBSTAGE:(.*?)-->/)?.[1] || 'Custom';
-                      return <Badge key={update.id} variant="default" className="bg-success hover:bg-success/90 gap-1"><CheckCircle2 className="h-3 w-3" />{label}</Badge>;
-                    })}
-                  </div>
-                </div>
-              )}
 
               {/* Recent Attachments */}
               {recentAttachments.length > 0 && (
@@ -519,23 +458,20 @@ export function ProductionStageTimeline({
               {(isVibeAdmin || isVendor) && (
                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/50 flex-wrap">
                   {onQuickStatusChange && (
-                    <>
-                      {stage.status === 'pending' && (
-                        <Button size="sm" variant="outline" className="h-9 text-xs font-medium border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'in_progress')}>
-                          {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Clock className="h-3.5 w-3.5 mr-1.5" />} Mark In Progress
-                        </Button>
-                      )}
-                      {stage.status === 'in_progress' && (
-                        <Button size="sm" variant="outline" className="h-9 text-xs font-medium border-green-500/50 text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'completed')}>
-                          {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />} Mark Complete
-                        </Button>
-                      )}
-                      {stage.status === 'completed' && isVibeAdmin && (
-                        <Button size="sm" variant="ghost" className="h-9 text-xs text-muted-foreground" disabled={isUpdating} onClick={() => handleQuickStatus(stage.id, 'pending')}>
-                          {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null} Reset
-                        </Button>
-                      )}
-                    </>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline"
+                        className={cn("h-9 text-xs font-medium", stage.status === 'in_progress' ? "bg-blue-500 text-white hover:bg-blue-600 border-blue-500" : "border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10")}
+                        disabled={isUpdating}
+                        onClick={() => handleQuickStatus(stage.id, stage.status === 'in_progress' ? 'pending' : 'in_progress')}>
+                        {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Clock className="h-3.5 w-3.5 mr-1.5" />} In Progress
+                      </Button>
+                      <Button size="sm" variant="outline"
+                        className={cn("h-9 text-xs font-medium", stage.status === 'completed' ? "bg-green-500 text-white hover:bg-green-600 border-green-500" : "border-green-500/50 text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10")}
+                        disabled={isUpdating}
+                        onClick={() => handleQuickStatus(stage.id, stage.status === 'completed' ? 'pending' : 'completed')}>
+                        {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />} Complete
+                      </Button>
+                    </div>
                   )}
                   <Button size="sm" variant="default" className="h-9 text-xs font-medium" onClick={() => onUpdateClick(stage, stageDef)}>
                     <MessageSquare className="h-3.5 w-3.5 mr-1.5" /> Add Note
