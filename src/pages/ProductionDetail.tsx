@@ -576,6 +576,10 @@ export default function ProductionDetail() {
           vendor_id,
           sequence_order,
           internal_notes,
+          published_status,
+          published_substages,
+          published_at,
+          published_notes,
           vendors (
             name
           ),
@@ -588,7 +592,10 @@ export default function ProductionDetail() {
             file_name,
             previous_status,
             new_status,
-            created_at
+            created_at,
+            is_published,
+            published_note_text,
+            published_image_url
           )
         `)
         .eq('order_id', orderId)
