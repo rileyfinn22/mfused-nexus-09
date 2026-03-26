@@ -304,6 +304,7 @@ export default function Production() {
             .eq('status', 'in production')
             .neq('order_type', 'pull_ship')
             .is('parent_order_id', null)
+            .is('deleted_at', null)
             .order('order_date', { ascending: false });
 
           if (error) throw error;
