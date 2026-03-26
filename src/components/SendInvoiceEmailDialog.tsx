@@ -480,8 +480,9 @@ Thank you for your business.`;
     const totalsWidth = 85;
     const totalsX = pageWidth - totalsWidth - 14;
     
+    const emailComputedTotal = computedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
     const totalPaid = invoice.total_paid || 0;
-    const balance = (invoice.total || 0) - totalPaid;
+    const balance = emailComputedTotal - totalPaid;
     const hasPayments = totalPaid > 0;
     const hasShipping = (invoice.shipping_cost || 0) > 0;
     
