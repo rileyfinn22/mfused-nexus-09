@@ -2523,6 +2523,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             />
           </div>
         </div>
+        )}
       </div>
 
       {/* Objects panel + Dimensions info */}
