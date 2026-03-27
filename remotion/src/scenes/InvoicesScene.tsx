@@ -9,9 +9,9 @@ export const InvoicesScene = () => {
   const screenScale = interpolate(screenSpring, [0, 1], [0.92, 1]);
   const drift = interpolate(frame, [0, 220], [10, -10]);
   return (
-    <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 70 }}>
-        <div style={{ width: 420, flexShrink: 0 }}>
+    <AbsoluteFill style={{ justifyContent: "center", padding: "0 60px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 50 }}>
+        <div style={{ width: 380, flexShrink: 0 }}>
           <FeatureLabel text="Invoices & Payments" subtitle="View all invoices, track payment history, and see outstanding balances. Partial billing keeps cash flow transparent." delay={5} />
           <div style={{ marginTop: 30, display: "flex", gap: 24 }}>
             {[
@@ -30,7 +30,7 @@ export const InvoicesScene = () => {
           </div>
         </div>
         <div style={{ flex: 1, opacity: screenSpring, transform: `scale(${screenScale}) translateY(${drift}px)` }}>
-          <ScreenFrame src="images/real-invoices-list.png" width={1200} />
+          <ScreenFrame src="images/real-invoices-list.png" width={1400} />
         </div>
       </div>
     </AbsoluteFill>

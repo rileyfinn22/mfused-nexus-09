@@ -12,10 +12,10 @@ export const PullShipScene = () => {
   const drift = interpolate(frame, [0, 210], [5, -12]);
 
   return (
-    <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 60 }}>
+    <AbsoluteFill style={{ justifyContent: "center", padding: "0 60px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 50 }}>
         {/* Left label */}
-        <div style={{ width: 420, flexShrink: 0 }}>
+        <div style={{ width: 380, flexShrink: 0 }}>
           <FeatureLabel
             text="Pull & Ship + Inventory"
             subtitle="Pull inventory from warehouse, auto-generate partial invoices, track fulfillment vendors. Real-time stock levels with redline alerts."
@@ -53,7 +53,7 @@ export const PullShipScene = () => {
         </div>
 
         {/* Right screenshots */}
-        <div style={{ position: "relative", flex: 1, height: 650 }}>
+        <div style={{ position: "relative", flex: 1, height: 680 }}>
           <div
             style={{
               position: "absolute",
@@ -63,19 +63,19 @@ export const PullShipScene = () => {
               transform: `translateY(${drift}px)`,
             }}
           >
-            <ScreenFrame src="images/pull-ship-orders.png" width={1000} />
+            <ScreenFrame src="images/pull-ship-orders.png" width={1100} />
           </div>
           <div
             style={{
               position: "absolute",
-              top: 220,
-              left: 250,
+              top: 240,
+              left: 220,
               opacity: screen2Spring,
               transform: `translateY(${drift * 0.5}px)`,
               zIndex: 2,
             }}
           >
-            <ScreenFrame src="images/inventory.png" width={900} />
+            <ScreenFrame src="images/inventory.png" width={950} />
           </div>
         </div>
       </div>
