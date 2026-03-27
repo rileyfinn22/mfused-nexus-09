@@ -41,12 +41,12 @@ export const ProductionDeepDiveScene = () => {
             })}
           </div>
         </div>
-        <div style={{ position: "relative", flex: 1, height: 700 }}>
+        <div style={{ position: "relative", flex: 1, height: 650 }}>
           <div style={{ position: "absolute", top: 0, left: 0, opacity: screen1Spring, transform: `translateY(${drift}px)` }}>
-            <ScreenFrame src="images/real-production-detail-top.png" width={1100} />
+            <ScreenFrame src="images/real-production-detail-top.png" width={950} />
           </div>
-          <div style={{ position: "absolute", top: 220, left: 150, opacity: screen2Spring, transform: `translateY(${drift * 0.5}px)`, zIndex: 2 }}>
-            <ScreenFrame src="images/real-production-detail-bottom.png" width={900} />
+          <div style={{ position: "absolute", top: 200, left: 120, opacity: screen2Spring, transform: `translateY(${drift * 0.5}px)`, zIndex: 2 }}>
+            <ScreenFrame src="images/real-production-detail-bottom.png" width={800} />
           </div>
         </div>
       </div>

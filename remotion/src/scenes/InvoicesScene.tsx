@@ -14,7 +14,11 @@ export const InvoicesScene = () => {
         <div style={{ width: 420, flexShrink: 0 }}>
           <FeatureLabel text="Invoices & Payments" subtitle="View all invoices, track payment history, and see outstanding balances. Partial billing keeps cash flow transparent." delay={5} />
           <div style={{ marginTop: 30, display: "flex", gap: 24 }}>
-            {[{ label: "Open Orders", value: "$1.18M", color: "#3b82f6" }, { label: "Billed Due", value: "$325K", color: "#f59e0b" }, { label: "Due Amount", value: "$158K", color: "#ef4444" }].map((stat, i) => {
+            {[
+              { label: "Open Orders", value: "$54.4K", color: "#3b82f6" },
+              { label: "Total Invoices", value: "8", color: "#f59e0b" },
+              { label: "Paid", value: "$6.3K", color: "#22c55e" },
+            ].map((stat, i) => {
               const statSpring = spring({ frame: frame - 25 - i * 8, fps, config: { damping: 20 } });
               return (
                 <div key={stat.label} style={{ opacity: statSpring, transform: `translateY(${interpolate(statSpring, [0, 1], [20, 0])}px)` }}>
