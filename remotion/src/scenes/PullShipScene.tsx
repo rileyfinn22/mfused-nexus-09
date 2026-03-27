@@ -9,7 +9,7 @@ export const PullShipScene = () => {
   const screen1Spring = spring({ frame: frame - 8, fps, config: { damping: 20, stiffness: 150 } });
   const screen2Spring = spring({ frame: frame - 20, fps, config: { damping: 20, stiffness: 150 } });
 
-  const drift = interpolate(frame, [0, 110], [5, -10]);
+  const drift = interpolate(frame, [0, 210], [5, -12]);
 
   return (
     <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>
