@@ -303,14 +303,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
   // Responsive display: measure container width to fit canvas
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(900);
+  const [containerWidth, setContainerWidth] = useState<number | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        // Subtract padding (p-4 = 32px total)
         setContainerWidth(Math.max(200, Math.floor(entry.contentRect.width - 32)));
       }
     });
