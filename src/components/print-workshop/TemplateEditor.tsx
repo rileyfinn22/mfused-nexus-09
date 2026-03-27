@@ -1613,6 +1613,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
   };
 
+  // Reactively update canvas CSS dimensions when container resizes (without recreating)
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
+    canvas.setZoom(displayScale);
+    canvas.renderAll();
+  }, [displayScale, cssWidth, cssHeight]);
 
   // --- Draw Mask: click-and-drag to place a white cover-up rectangle ---
   const startDrawMask = () => {
