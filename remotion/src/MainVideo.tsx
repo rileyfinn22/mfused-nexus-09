@@ -17,7 +17,7 @@ const BG_COLOR = "#1a1f2a";
 export const MainVideo = () => {
   const frame = useCurrentFrame();
 
-  const gradientAngle = interpolate(frame, [0, 1800], [135, 225]);
+  const gradientAngle = interpolate(frame, [0, 2400], [135, 225]);
 
   return (
     <AbsoluteFill style={{ backgroundColor: BG_COLOR }}>
@@ -58,7 +58,7 @@ export const MainVideo = () => {
       </AbsoluteFill>
 
       <TransitionSeries>
-        <TransitionSeries.Sequence durationInFrames={200}>
+        <TransitionSeries.Sequence durationInFrames={250}>
           <IntroScene />
         </TransitionSeries.Sequence>
 
@@ -67,7 +67,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={210}>
+        <TransitionSeries.Sequence durationInFrames={270}>
           <OrdersScene />
         </TransitionSeries.Sequence>
 
@@ -76,7 +76,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={280}>
+        <TransitionSeries.Sequence durationInFrames={300}>
           <ProductionScene />
         </TransitionSeries.Sequence>
 
@@ -85,7 +85,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={280}>
+        <TransitionSeries.Sequence durationInFrames={300}>
           <ProductionDeepDiveScene />
         </TransitionSeries.Sequence>
 
@@ -94,7 +94,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={230}>
+        <TransitionSeries.Sequence durationInFrames={270}>
           <ArtworkScene />
         </TransitionSeries.Sequence>
 
@@ -103,7 +103,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={200}>
+        <TransitionSeries.Sequence durationInFrames={250}>
           <InvoicesScene />
         </TransitionSeries.Sequence>
 
@@ -112,7 +112,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={200}>
+        <TransitionSeries.Sequence durationInFrames={250}>
           <PrintWorkshopScene />
         </TransitionSeries.Sequence>
 
@@ -121,7 +121,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={210}>
+        <TransitionSeries.Sequence durationInFrames={270}>
           <ShipmentScene />
         </TransitionSeries.Sequence>
 
@@ -130,7 +130,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={200}>
+        <TransitionSeries.Sequence durationInFrames={250}>
           <OutroScene />
         </TransitionSeries.Sequence>
       </TransitionSeries>

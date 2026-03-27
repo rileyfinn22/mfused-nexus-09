@@ -8,6 +8,7 @@ export const OutroScene = () => {
   const titleSpring = spring({ frame: frame - 15, fps, config: { damping: 20, stiffness: 180 } });
   const subSpring = spring({ frame: frame - 28, fps, config: { damping: 20, stiffness: 180 } });
   const lineSpring = spring({ frame: frame - 20, fps, config: { damping: 200 } });
+  const urlSpring = spring({ frame: frame - 60, fps, config: { damping: 20, stiffness: 180 } });
 
   const features = [
     "Order Tracking",
@@ -90,13 +91,16 @@ export const OutroScene = () => {
       <div
         style={{
           marginTop: 50,
-          fontSize: 22,
-          color: "rgba(162,167,175,0.5)",
+          fontSize: 28,
+          fontWeight: 600,
+          color: "#b8cf68",
           fontFamily: "sans-serif",
-          opacity: subSpring,
+          opacity: urlSpring,
+          transform: `translateY(${interpolate(urlSpring, [0, 1], [15, 0])}px)`,
+          letterSpacing: 1,
         }}
       >
-        vibepkgportal.lovable.app
+        Vibepkg.com
       </div>
     </AbsoluteFill>
   );
