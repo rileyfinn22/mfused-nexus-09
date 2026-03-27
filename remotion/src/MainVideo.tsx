@@ -5,11 +5,11 @@ import { wipe } from "@remotion/transitions/wipe";
 import { IntroScene } from "./scenes/IntroScene";
 import { OrdersScene } from "./scenes/OrdersScene";
 import { ProductionScene } from "./scenes/ProductionScene";
-import { InvoicesScene } from "./scenes/InvoicesScene";
+import { ProductionDeepDiveScene } from "./scenes/ProductionDeepDiveScene";
 import { ArtworkScene } from "./scenes/ArtworkScene";
+import { InvoicesScene } from "./scenes/InvoicesScene";
 import { PrintWorkshopScene } from "./scenes/PrintWorkshopScene";
-import { InventoryScene } from "./scenes/InventoryScene";
-import { PullShipScene } from "./scenes/PullShipScene";
+import { ShipmentScene } from "./scenes/ShipmentScene";
 import { OutroScene } from "./scenes/OutroScene";
 
 const BG_COLOR = "#0a0e1a";
@@ -18,7 +18,7 @@ export const MainVideo = () => {
   const frame = useCurrentFrame();
 
   const gradientAngle = interpolate(frame, [0, 1800], [135, 225]);
-  
+
   return (
     <AbsoluteFill style={{ backgroundColor: BG_COLOR }}>
       {/* Persistent animated gradient background */}
@@ -68,7 +68,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={220}>
+        <TransitionSeries.Sequence durationInFrames={210}>
           <OrdersScene />
         </TransitionSeries.Sequence>
 
@@ -77,7 +77,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={250}>
+        <TransitionSeries.Sequence durationInFrames={280}>
           <ProductionScene />
         </TransitionSeries.Sequence>
 
@@ -86,8 +86,8 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={220}>
-          <InvoicesScene />
+        <TransitionSeries.Sequence durationInFrames={280}>
+          <ProductionDeepDiveScene />
         </TransitionSeries.Sequence>
 
         <TransitionSeries.Transition
@@ -95,7 +95,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={210}>
+        <TransitionSeries.Sequence durationInFrames={230}>
           <ArtworkScene />
         </TransitionSeries.Sequence>
 
@@ -104,8 +104,8 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={220}>
-          <PrintWorkshopScene />
+        <TransitionSeries.Sequence durationInFrames={200}>
+          <InvoicesScene />
         </TransitionSeries.Sequence>
 
         <TransitionSeries.Transition
@@ -114,7 +114,7 @@ export const MainVideo = () => {
         />
 
         <TransitionSeries.Sequence durationInFrames={200}>
-          <InventoryScene />
+          <PrintWorkshopScene />
         </TransitionSeries.Sequence>
 
         <TransitionSeries.Transition
@@ -123,7 +123,7 @@ export const MainVideo = () => {
         />
 
         <TransitionSeries.Sequence durationInFrames={210}>
-          <PullShipScene />
+          <ShipmentScene />
         </TransitionSeries.Sequence>
 
         <TransitionSeries.Transition

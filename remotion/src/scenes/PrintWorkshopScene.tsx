@@ -16,14 +16,14 @@ export const PrintWorkshopScene = () => {
         {/* Left label */}
         <div style={{ width: 420, flexShrink: 0 }}>
           <FeatureLabel
-            text="Print Workshop"
-            subtitle="Design custom packaging with our built-in editor. AI-powered image generation, template library, and direct-to-vendor ordering."
+            text="Design Your Packaging"
+            subtitle="Use our built-in Print Workshop to customize templates, place artwork, and submit designs — all from your browser."
             delay={5}
           />
 
           {/* Feature pills */}
           <div style={{ display: "flex", gap: 10, marginTop: 30, flexWrap: "wrap" }}>
-            {["Template Builder", "AI Image Gen", "Direct Order", "PDF Export"].map((pill, i) => {
+            {["Template Library", "Visual Editor", "Material Selection", "Instant Preview"].map((pill, i) => {
               const pillSpring = spring({ frame: frame - 30 - i * 6, fps, config: { damping: 20 } });
               return (
                 <div
@@ -56,7 +56,7 @@ export const PrintWorkshopScene = () => {
             transform: `scale(${screenScale}) translateY(${drift}px)`,
           }}
         >
-          <ScreenFrame src="images/print-workshop.png" width={1300} />
+          <ScreenFrame src="images/print-workshop-customer.jpg" width={1300} />
         </div>
       </div>
     </AbsoluteFill>

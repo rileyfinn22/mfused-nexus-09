@@ -1,4 +1,4 @@
-import { AbsoluteFill, useCurrentFrame, interpolate, spring, useVideoConfig, Sequence } from "remotion";
+import { AbsoluteFill, useCurrentFrame, interpolate, spring, useVideoConfig } from "remotion";
 import { ScreenFrame } from "../components/ScreenFrame";
 import { FeatureLabel } from "../components/FeatureLabel";
 
@@ -6,11 +6,9 @@ export const ProductionScene = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Two screenshots stacked with stagger
   const screen1Spring = spring({ frame: frame - 8, fps, config: { damping: 20, stiffness: 150 } });
-  const screen2Spring = spring({ frame: frame - 20, fps, config: { damping: 20, stiffness: 150 } });
-
-  const drift = interpolate(frame, [0, 250], [10, -15]);
+  const screen2Spring = spring({ frame: frame - 22, fps, config: { damping: 20, stiffness: 150 } });
+  const drift = interpolate(frame, [0, 280], [10, -15]);
 
   return (
     <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>
@@ -26,7 +24,7 @@ export const ProductionScene = () => {
               transform: `scale(${interpolate(screen1Spring, [0, 1], [0.95, 1])}) translateY(${drift}px)`,
             }}
           >
-            <ScreenFrame src="images/production-overview.png" width={850} />
+            <ScreenFrame src="images/production-overview-customer.jpg" width={850} />
           </div>
           <div
             style={{
@@ -38,21 +36,21 @@ export const ProductionScene = () => {
               zIndex: 2,
             }}
           >
-            <ScreenFrame src="images/production-stages.png" width={700} />
+            <ScreenFrame src="images/production-timeline.jpg" width={700} />
           </div>
         </div>
 
         {/* Right label */}
         <div style={{ flex: 1 }}>
           <FeatureLabel
-            text="Production Tracking"
-            subtitle="12-stage pipeline from estimate to delivery. Vendor updates, substage progress, admin-moderated publishing for customer visibility."
+            text="Production Visibility"
+            subtitle="Know exactly where your order is. Real-time progress from material prep through QC — no guesswork, no surprises."
             delay={5}
           />
 
           {/* Feature pills */}
           <div style={{ display: "flex", gap: 10, marginTop: 30, flexWrap: "wrap" }}>
-            {["Vendor Updates", "Admin Review", "Customer View", "Substages"].map((pill, i) => {
+            {["Live Progress", "Stage Details", "Timeline View", "Delivery ETA"].map((pill, i) => {
               const pillSpring = spring({ frame: frame - 30 - i * 6, fps, config: { damping: 20 } });
               return (
                 <div

@@ -4,23 +4,18 @@ export const IntroScene = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Logo / brand entrance
   const logoSpring = spring({ frame, fps, config: { damping: 15, stiffness: 120, mass: 1.5 } });
   const logoScale = interpolate(logoSpring, [0, 1], [0.5, 1]);
   const logoOpacity = interpolate(logoSpring, [0, 1], [0, 1]);
 
-  // Title
   const titleSpring = spring({ frame: frame - 20, fps, config: { damping: 20, stiffness: 180 } });
   const titleY = interpolate(titleSpring, [0, 1], [60, 0]);
 
-  // Subtitle
   const subSpring = spring({ frame: frame - 35, fps, config: { damping: 20, stiffness: 180 } });
   const subY = interpolate(subSpring, [0, 1], [40, 0]);
 
-  // Tagline
   const tagSpring = spring({ frame: frame - 50, fps, config: { damping: 20, stiffness: 180 } });
 
-  // Accent line
   const lineWidth = interpolate(frame, [25, 55], [0, 200], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   return (
@@ -84,7 +79,7 @@ export const IntroScene = () => {
           textTransform: "uppercase",
         }}
       >
-        Packaging Portal
+        Your Packaging Portal
       </div>
 
       {/* Tagline */}
@@ -95,9 +90,12 @@ export const IntroScene = () => {
           fontFamily: "sans-serif",
           marginTop: 40,
           opacity: tagSpring,
+          textAlign: "center",
+          maxWidth: 700,
+          lineHeight: 1.6,
         }}
       >
-        Order · Track · Ship · Invoice — All in One Place
+        Full visibility into every order — from artwork approval to production tracking to delivery
       </div>
     </AbsoluteFill>
   );

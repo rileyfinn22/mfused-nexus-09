@@ -9,13 +9,12 @@ export const OutroScene = () => {
   const subSpring = spring({ frame: frame - 28, fps, config: { damping: 20, stiffness: 180 } });
   const lineSpring = spring({ frame: frame - 20, fps, config: { damping: 200 } });
 
-  // Features list
   const features = [
-    "Order Management",
-    "Production Tracking",
-    "Invoice & Billing",
+    "Order Tracking",
+    "Production Visibility",
     "Artwork Proofs",
-    "Pull & Ship",
+    "Invoice & Payments",
+    "Shipment Tracking",
     "Print Workshop",
   ];
 
@@ -49,9 +48,10 @@ export const OutroScene = () => {
           letterSpacing: -2,
           opacity: titleSpring,
           transform: `translateY(${interpolate(titleSpring, [0, 1], [40, 0])}px)`,
+          textAlign: "center",
         }}
       >
-        Your Packaging, Simplified
+        Total Transparency, Zero Guesswork
       </div>
 
       <div
