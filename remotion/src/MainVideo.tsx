@@ -21,6 +21,7 @@ export const MainVideo = () => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: BG_COLOR }}>
+
       {/* Persistent animated gradient background */}
       <AbsoluteFill
         style={{
