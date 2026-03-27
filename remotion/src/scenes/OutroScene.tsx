@@ -26,14 +26,14 @@ export const OutroScene = () => {
           width: 80,
           height: 80,
           borderRadius: 20,
-          background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+          background: "linear-gradient(135deg, #b8cf68, #6a9b40)",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
           opacity: logoSpring,
           transform: `scale(${interpolate(logoSpring, [0, 1], [0.5, 1])})`,
           marginBottom: 24,
-          boxShadow: "0 0 80px rgba(59,130,246,0.4)",
+          boxShadow: "0 0 80px rgba(184,207,104,0.4)",
         }}
       >
         <span style={{ fontSize: 44, fontWeight: 900, color: "white", fontFamily: "sans-serif" }}>V</span>
@@ -58,7 +58,7 @@ export const OutroScene = () => {
         style={{
           width: interpolate(lineSpring, [0, 1], [0, 160]),
           height: 3,
-          background: "linear-gradient(90deg, #3b82f6, #8b5cf6)",
+          background: "linear-gradient(90deg, #b8cf68, #6a9b40)",
           borderRadius: 2,
           marginTop: 20,
           marginBottom: 30,
@@ -75,9 +75,9 @@ export const OutroScene = () => {
               style={{
                 padding: "10px 24px",
                 borderRadius: 24,
-                background: "rgba(59,130,246,0.1)",
-                border: "1px solid rgba(59,130,246,0.25)",
-                color: "#93c5fd",
+                background: "rgba(184,207,104,0.1)",
+                border: "1px solid rgba(184,207,104,0.25)",
+                color: "#b8cf68",
                 fontSize: 17,
                 fontWeight: 600,
                 fontFamily: "sans-serif",
@@ -96,7 +96,7 @@ export const OutroScene = () => {
         style={{
           marginTop: 50,
           fontSize: 22,
-          color: "rgba(148,163,184,0.5)",
+          color: "rgba(162,167,175,0.5)",
           fontFamily: "sans-serif",
           opacity: subSpring,
         }}

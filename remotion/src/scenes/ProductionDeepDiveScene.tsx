@@ -10,16 +10,16 @@ export const ProductionDeepDiveScene = () => {
   const drift = interpolate(frame, [0, 280], [8, -12]);
 
   const stages = [
-    { name: "Prepare Materials", status: "complete", color: "#22c55e" },
-    { name: "Pre-Press & Proofs", status: "complete", color: "#22c55e" },
-    { name: "Production Working", status: "active", color: "#3b82f6" },
+    { name: "Prepare Materials", status: "complete", color: "#6a9b40" },
+    { name: "Pre-Press & Proofs", status: "complete", color: "#6a9b40" },
+    { name: "Production Working", status: "active", color: "#b8cf68" },
     { name: "In Transit", status: "pending", color: "#475569" },
     { name: "Delivered", status: "pending", color: "#475569" },
   ];
 
   return (
-    <AbsoluteFill style={{ justifyContent: "center", padding: "0 60px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 50 }}>
+    <AbsoluteFill style={{ justifyContent: "center", padding: "0 50px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
         <div style={{ width: 420, flexShrink: 0 }}>
           <FeatureLabel text="Transparency That Plans" subtitle="Every stage is visible — plan your launch dates, coordinate marketing, and schedule deliveries with confidence." delay={5} />
           <div style={{ marginTop: 35 }}>
@@ -34,19 +34,20 @@ export const ProductionDeepDiveScene = () => {
                     <div style={{ fontSize: 18, fontWeight: isActive ? 700 : 500, color: stage.status === "pending" ? "rgba(148,163,184,0.4)" : "rgba(255,255,255,0.9)", fontFamily: "sans-serif" }}>
                       {stage.name}{stage.status === "complete" && " ✓"}
                     </div>
-                    {isActive && <div style={{ fontSize: 13, color: "#60a5fa", fontFamily: "sans-serif", marginTop: 2 }}>72% — Production stage</div>}
+                    {isActive && <div style={{ fontSize: 13, color: "#b8cf68", fontFamily: "sans-serif", marginTop: 2 }}>72% — Production stage</div>}
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
-        <div style={{ position: "relative", flex: 1, height: 680 }}>
+        {/* Right: larger stacked screenshots */}
+        <div style={{ position: "relative", flex: 1, height: 720 }}>
           <div style={{ position: "absolute", top: 0, left: 0, opacity: screen1Spring, transform: `translateY(${drift}px)` }}>
-            <ScreenFrame src="images/real-production-detail-top.png" width={1050} />
+            <ScreenFrame src="images/real-production-detail-top.png" width={1100} />
           </div>
-          <div style={{ position: "absolute", top: 220, left: 100, opacity: screen2Spring, transform: `translateY(${drift * 0.5}px)`, zIndex: 2 }}>
-            <ScreenFrame src="images/real-production-detail-bottom.png" width={900} />
+          <div style={{ position: "absolute", top: 250, left: 80, opacity: screen2Spring, transform: `translateY(${drift * 0.5}px)`, zIndex: 2 }}>
+            <ScreenFrame src="images/real-production-detail-bottom.png" width={950} />
           </div>
         </div>
       </div>

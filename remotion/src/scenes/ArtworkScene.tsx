@@ -21,7 +21,7 @@ export const ArtworkScene = () => {
               const sp = spring({ frame: frame - 25 - i * 6, fps, config: { damping: 20 } });
               return (
                 <div key={s.label} style={{ opacity: sp, transform: `translateY(${interpolate(sp, [0, 1], [15, 0])}px)` }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: "#22c55e", fontFamily: "sans-serif" }}>{s.n}</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: "#b8cf68", fontFamily: "sans-serif" }}>{s.n}</div>
                   <div style={{ fontSize: 13, color: "rgba(148,163,184,0.6)", fontFamily: "sans-serif" }}>{s.label}</div>
                 </div>
               );

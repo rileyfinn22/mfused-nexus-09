@@ -33,7 +33,7 @@ export const PullShipScene = () => {
                       width: 28,
                       height: 28,
                       borderRadius: "50%",
-                      background: i < 3 ? "linear-gradient(135deg, #3b82f6, #6366f1)" : "rgba(59,130,246,0.2)",
+                      background: i < 3 ? "linear-gradient(135deg, #b8cf68, #6a9b40)" : "rgba(184,207,104,0.2)",
                       display: "flex",
                       justifyContent: "center",
                       alignItems: "center",

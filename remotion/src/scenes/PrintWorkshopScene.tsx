@@ -31,9 +31,9 @@ export const PrintWorkshopScene = () => {
                   style={{
                     padding: "8px 18px",
                     borderRadius: 20,
-                    background: "rgba(139,92,246,0.15)",
-                    border: "1px solid rgba(139,92,246,0.3)",
-                    color: "#a78bfa",
+                    background: "rgba(184,207,104,0.15)",
+                    border: "1px solid rgba(184,207,104,0.3)",
+                    color: "#b8cf68",
                     fontSize: 15,
                     fontWeight: 600,
                     fontFamily: "sans-serif",
