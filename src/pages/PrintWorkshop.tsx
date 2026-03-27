@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { Navigate } from "react-router-dom";
 import { Canvas as FabricCanvas } from "fabric";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
