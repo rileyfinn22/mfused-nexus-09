@@ -1,4 +1,4 @@
-import { AbsoluteFill, useCurrentFrame, interpolate, spring, useVideoConfig } from "remotion";
+import { AbsoluteFill, Img, staticFile, useCurrentFrame, interpolate, spring, useVideoConfig } from "remotion";
 
 export const OutroScene = () => {
   const frame = useCurrentFrame();
@@ -23,20 +23,15 @@ export const OutroScene = () => {
       {/* Logo */}
       <div
         style={{
-          width: 80,
-          height: 80,
-          borderRadius: 20,
-          background: "linear-gradient(135deg, #b8cf68, #6a9b40)",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
           opacity: logoSpring,
           transform: `scale(${interpolate(logoSpring, [0, 1], [0.5, 1])})`,
           marginBottom: 24,
-          boxShadow: "0 0 80px rgba(184,207,104,0.4)",
         }}
       >
-        <span style={{ fontSize: 44, fontWeight: 900, color: "white", fontFamily: "sans-serif" }}>V</span>
+        <Img
+          src={staticFile("images/vibe-logo-dark.png")}
+          style={{ width: 350, height: "auto" }}
+        />
       </div>
 
       <div

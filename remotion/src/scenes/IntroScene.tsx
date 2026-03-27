@@ -1,4 +1,4 @@
-import { AbsoluteFill, useCurrentFrame, interpolate, spring, useVideoConfig } from "remotion";
+import { AbsoluteFill, Img, staticFile, useCurrentFrame, interpolate, spring, useVideoConfig } from "remotion";
 
 export const IntroScene = () => {
   const frame = useCurrentFrame();
@@ -8,50 +8,27 @@ export const IntroScene = () => {
   const logoScale = interpolate(logoSpring, [0, 1], [0.5, 1]);
   const logoOpacity = interpolate(logoSpring, [0, 1], [0, 1]);
 
-  const titleSpring = spring({ frame: frame - 20, fps, config: { damping: 20, stiffness: 180 } });
-  const titleY = interpolate(titleSpring, [0, 1], [60, 0]);
-
-  const subSpring = spring({ frame: frame - 35, fps, config: { damping: 20, stiffness: 180 } });
+  const subSpring = spring({ frame: frame - 25, fps, config: { damping: 20, stiffness: 180 } });
   const subY = interpolate(subSpring, [0, 1], [40, 0]);
 
-  const tagSpring = spring({ frame: frame - 50, fps, config: { damping: 20, stiffness: 180 } });
+  const tagSpring = spring({ frame: frame - 45, fps, config: { damping: 20, stiffness: 180 } });
 
-  const lineWidth = interpolate(frame, [25, 55], [0, 200], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const lineWidth = interpolate(frame, [20, 50], [0, 200], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
-      {/* Logo mark */}
+      {/* Vibe Packaging Logo */}
       <div
         style={{
-          width: 100,
-          height: 100,
-          borderRadius: 24,
-          background: "linear-gradient(135deg, #b8cf68, #6a9b40)",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
           opacity: logoOpacity,
           transform: `scale(${logoScale})`,
-          marginBottom: 30,
-          boxShadow: "0 0 60px rgba(184,207,104,0.3)",
+          marginBottom: 20,
         }}
       >
-        <span style={{ fontSize: 56, fontWeight: 900, color: "white", fontFamily: "sans-serif" }}>V</span>
-      </div>
-
-      {/* Title */}
-      <div
-        style={{
-          fontSize: 82,
-          fontWeight: 900,
-          color: "#ffffff",
-          fontFamily: "sans-serif",
-          letterSpacing: -3,
-          opacity: titleSpring,
-          transform: `translateY(${titleY}px)`,
-        }}
-      >
-        Vibe Packaging
+        <Img
+          src={staticFile("images/vibe-logo-dark.png")}
+          style={{ width: 500, height: "auto" }}
+        />
       </div>
 
       {/* Accent line */}
@@ -61,7 +38,7 @@ export const IntroScene = () => {
           height: 4,
           background: "linear-gradient(90deg, #b8cf68, #6a9b40)",
           borderRadius: 2,
-          marginTop: 16,
+          marginTop: 10,
           marginBottom: 16,
         }}
       />
