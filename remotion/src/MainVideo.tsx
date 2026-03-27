@@ -1,4 +1,4 @@
-import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
+import { AbsoluteFill, Audio, staticFile, useCurrentFrame, interpolate } from "remotion";
 import { TransitionSeries, springTiming } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import { wipe } from "@remotion/transitions/wipe";
@@ -21,6 +21,9 @@ export const MainVideo = () => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: BG_COLOR }}>
+      {/* Background music */}
+      <Audio src={staticFile("bg-music.mp3")} volume={0.35} />
+
       {/* Persistent animated gradient background */}
       <AbsoluteFill
         style={{
