@@ -15,9 +15,9 @@ export const InvoicesScene = () => {
           <FeatureLabel text="Invoices & Payments" subtitle="View all invoices, track payment history, and see outstanding balances. Partial billing keeps cash flow transparent." delay={5} />
           <div style={{ marginTop: 30, display: "flex", gap: 24 }}>
             {[
-              { label: "Total Billed", value: "$76.7K", color: "#3b82f6" },
-              { label: "Outstanding", value: "$54.4K", color: "#f59e0b" },
-              { label: "Paid", value: "$22.4K", color: "#22c55e" },
+              { label: "Open Orders", value: "$54.4K", color: "#3b82f6" },
+              { label: "Total Invoices", value: "8", color: "#f59e0b" },
+              { label: "Paid", value: "$6.3K", color: "#22c55e" },
             ].map((stat, i) => {
               const statSpring = spring({ frame: frame - 25 - i * 8, fps, config: { damping: 20 } });
               return (
