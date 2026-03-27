@@ -317,10 +317,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     return () => ro.disconnect();
   }, []);
 
+  const effectiveContainerWidth = containerWidth ?? 600;
   const TARGET_DISPLAY_HEIGHT = 750;
   // Oversample imported PDF backgrounds so rasterized text stays sharp in preview
   const PDF_BACKGROUND_OVERSAMPLE = 4;
-  const displayScale = Math.min(containerWidth / canvasWidth, TARGET_DISPLAY_HEIGHT / canvasHeight, 1.5);
+  const displayScale = Math.min(effectiveContainerWidth / canvasWidth, TARGET_DISPLAY_HEIGHT / canvasHeight, 1.5);
   const cssWidth = Math.round(canvasWidth * displayScale);
   const cssHeight = Math.round(canvasHeight * displayScale);
   const displayBleedPx = Math.max(1, Math.round(bleedPx * displayScale));
