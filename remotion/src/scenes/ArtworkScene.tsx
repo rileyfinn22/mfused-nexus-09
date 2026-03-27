@@ -17,7 +17,7 @@ export const ArtworkScene = () => {
         <div style={{ width: 420, flexShrink: 0 }}>
           <FeatureLabel text="Artwork & Proofs" subtitle="Browse your templates, review flat proofs, and approve artwork — all in one place. Version history keeps every revision tracked." delay={5} />
           <div style={{ display: "flex", gap: 30, marginTop: 30 }}>
-            {[{ n: "339", label: "Total Files" }, { n: "207", label: "Approved" }, { n: "54", label: "Templates" }].map((s, i) => {
+            {[{ n: "12", label: "Total Files" }, { n: "7", label: "Approved" }, { n: "10", label: "Products" }].map((s, i) => {
               const sp = spring({ frame: frame - 25 - i * 6, fps, config: { damping: 20 } });
               return (
                 <div key={s.label} style={{ opacity: sp, transform: `translateY(${interpolate(sp, [0, 1], [15, 0])}px)` }}>
