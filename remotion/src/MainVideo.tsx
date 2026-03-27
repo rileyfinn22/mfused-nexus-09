@@ -44,7 +44,7 @@ export const MainVideo = () => {
       </AbsoluteFill>
 
       <TransitionSeries>
-        <TransitionSeries.Sequence durationInFrames={300}>
+        <TransitionSeries.Sequence durationInFrames={220}>
           <IntroScene />
         </TransitionSeries.Sequence>
 
