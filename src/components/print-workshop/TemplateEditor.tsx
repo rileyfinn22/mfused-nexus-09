@@ -2489,9 +2489,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       )}
 
       <div ref={containerRef} className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center max-w-full">
-        {containerWidth === null ? (
-          <div style={{ height: 300 }} className="flex items-center justify-center text-muted-foreground text-sm">Loading editor…</div>
-        ) : (
         <div className="relative shadow-lg shrink-0" style={{ width: cssWidth, height: cssHeight }}>
           <canvas ref={canvasRef} />
 
@@ -2524,7 +2521,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
             />
           </div>
         </div>
-        )}
       </div>
 
       {/* Objects panel + Dimensions info */}
