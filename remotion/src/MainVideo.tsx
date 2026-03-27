@@ -21,8 +21,6 @@ export const MainVideo = () => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: BG_COLOR }}>
-      {/* Background music */}
-      <Audio src={staticFile("bg-music.mp3")} volume={0.35} />
 
       {/* Persistent animated gradient background */}
       <AbsoluteFill
