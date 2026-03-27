@@ -65,6 +65,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
           <Route path="/shipment-update" element={<ShipmentUpdate />} />
+          <Route path="/demo" element={<Demo />} />
           <Route path="/finance-view" element={<FinanceView />} />
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
