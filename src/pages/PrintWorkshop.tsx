@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { Navigate } from "react-router-dom";
 import { Canvas as FabricCanvas } from "fabric";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -141,6 +142,12 @@ export default function PrintWorkshop() {
       </div>
     );
   }
+
+  // Restrict Print Workshop to vibe_admin only until it's fully fixed
+  if (!isVibeAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
 
   const handleDeleteTemplate = async (id: string) => {
     if (!confirm("Delete this template?")) return;
