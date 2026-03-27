@@ -60,16 +60,18 @@ async function generateTTS(text, outFile) {
 }
 
 // Scene voiceover scripts with timing (frame offsets at 30fps)
+// Scenes: Intro(300) Orders(310) Production(340) ProdDeep(340) Artwork(310) Invoices(290) PrintWS(290) Shipment(310) Outro(290)
+// Cumulative starts (minus 20f transitions): 0, 280, 570, 890, 1210, 1500, 1770, 2040, 2330
 const VO_SCENES = [
-  { text: "Vibe Packaging — your complete packaging portal. Full visibility into every order, from artwork approval to production tracking to delivery.", startFrame: 30 },
-  { text: "Create and manage customer orders with real-time visibility across your entire supply chain. Every line item, every shipment, all in one place.", startFrame: 260 },
-  { text: "Track every production stage from start to finish. See exactly where each order stands with detailed stage-by-stage progress.", startFrame: 540 },
-  { text: "Drill into individual stages with photo updates, notes, and real-time progress tracking from your vendors.", startFrame: 850 },
-  { text: "Manage all your artwork files, approvals, and version history in one centralized hub. No more digging through emails.", startFrame: 1160 },
-  { text: "Generate professional invoices, track payments, and keep your accounts receivable organized and up to date.", startFrame: 1440 },
-  { text: "Design custom packaging labels and inserts right in your browser with the built-in Print Workshop.", startFrame: 1700 },
-  { text: "Follow your shipment from factory to doorstep. Live tracking with vessel info, customs status, and delivery ETAs.", startFrame: 1960 },
-  { text: "Vibe Packaging — total transparency, zero guesswork. Visit Vibepkg.com to learn more.", startFrame: 2200 },
+  { text: "Vibe Packaging... your complete packaging portal. Full visibility into every order, from artwork approval, to production tracking, to delivery.", startFrame: 40 },
+  { text: "Create and manage customer orders with real-time visibility across your entire supply chain. Every line item, every shipment, all in one place.", startFrame: 300 },
+  { text: "Track every production stage from start to finish. See exactly where each order stands, with detailed stage-by-stage progress.", startFrame: 600 },
+  { text: "Drill into individual stages with photo updates, notes, and real-time progress tracking from Vibe's production teams.", startFrame: 920 },
+  { text: "Manage all your artwork files, approvals, and version history in one centralized hub. No more digging through emails.", startFrame: 1240 },
+  { text: "Generate professional invoices, track payments, and keep your accounts receivable organized and up to date.", startFrame: 1530 },
+  { text: "Design custom packaging labels and inserts right in your browser with the built-in Print Workshop.", startFrame: 1800 },
+  { text: "Follow your shipment from factory to doorstep. Live tracking with vessel info, customs status, and delivery ETAs.", startFrame: 2070 },
+  { text: "Vibe Packaging... total transparency, zero guesswork. Visit Vibepkg.com to learn more.", startFrame: 2360 },
 ];
 
 async function generateAllVO() {

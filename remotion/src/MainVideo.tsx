@@ -16,49 +16,35 @@ const BG_COLOR = "#1a1f2a";
 
 export const MainVideo = () => {
   const frame = useCurrentFrame();
-
-  const gradientAngle = interpolate(frame, [0, 2400], [135, 225]);
+  const gradientAngle = interpolate(frame, [0, 2620], [135, 225]);
 
   return (
     <AbsoluteFill style={{ backgroundColor: BG_COLOR }}>
-
-      {/* Persistent animated gradient background */}
       <AbsoluteFill
         style={{
           background: `linear-gradient(${gradientAngle}deg, #1a1f2a 0%, #252d38 40%, #1e2530 70%, #1a1f2a 100%)`,
         }}
       />
 
-      {/* Persistent accent glow - VibePKG greens */}
       <AbsoluteFill style={{ opacity: 0.12 }}>
         <div
           style={{
-            position: "absolute",
-            width: 800,
-            height: 800,
-            borderRadius: "50%",
+            position: "absolute", width: 800, height: 800, borderRadius: "50%",
             background: "radial-gradient(circle, #b8cf68 0%, transparent 70%)",
-            top: -200,
-            right: -200,
-            filter: "blur(80px)",
+            top: -200, right: -200, filter: "blur(80px)",
           }}
         />
         <div
           style={{
-            position: "absolute",
-            width: 600,
-            height: 600,
-            borderRadius: "50%",
+            position: "absolute", width: 600, height: 600, borderRadius: "50%",
             background: "radial-gradient(circle, #6a9b40 0%, transparent 70%)",
-            bottom: -200,
-            left: -100,
-            filter: "blur(80px)",
+            bottom: -200, left: -100, filter: "blur(80px)",
           }}
         />
       </AbsoluteFill>
 
       <TransitionSeries>
-        <TransitionSeries.Sequence durationInFrames={250}>
+        <TransitionSeries.Sequence durationInFrames={300}>
           <IntroScene />
         </TransitionSeries.Sequence>
 
@@ -67,7 +53,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={270}>
+        <TransitionSeries.Sequence durationInFrames={310}>
           <OrdersScene />
         </TransitionSeries.Sequence>
 
@@ -76,7 +62,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={300}>
+        <TransitionSeries.Sequence durationInFrames={340}>
           <ProductionScene />
         </TransitionSeries.Sequence>
 
@@ -85,7 +71,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={300}>
+        <TransitionSeries.Sequence durationInFrames={340}>
           <ProductionDeepDiveScene />
         </TransitionSeries.Sequence>
 
@@ -94,7 +80,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={270}>
+        <TransitionSeries.Sequence durationInFrames={310}>
           <ArtworkScene />
         </TransitionSeries.Sequence>
 
@@ -103,7 +89,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={250}>
+        <TransitionSeries.Sequence durationInFrames={290}>
           <InvoicesScene />
         </TransitionSeries.Sequence>
 
@@ -112,7 +98,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={250}>
+        <TransitionSeries.Sequence durationInFrames={290}>
           <PrintWorkshopScene />
         </TransitionSeries.Sequence>
 
@@ -121,7 +107,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={270}>
+        <TransitionSeries.Sequence durationInFrames={310}>
           <ShipmentScene />
         </TransitionSeries.Sequence>
 
@@ -130,7 +116,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={250}>
+        <TransitionSeries.Sequence durationInFrames={290}>
           <OutroScene />
         </TransitionSeries.Sequence>
       </TransitionSeries>
