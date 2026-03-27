@@ -9,8 +9,6 @@ export const OrdersScene = () => {
   const screenSpring = spring({ frame: frame - 10, fps, config: { damping: 20, stiffness: 150 } });
   const screenScale = interpolate(screenSpring, [0, 1], [0.9, 1]);
   const screenX = interpolate(screenSpring, [0, 1], [100, 0]);
-
-  // Slow parallax drift
   const drift = interpolate(frame, [0, 220], [0, -20]);
 
   return (
@@ -19,8 +17,8 @@ export const OrdersScene = () => {
         {/* Left label */}
         <div style={{ width: 400, flexShrink: 0 }}>
           <FeatureLabel
-            text="Orders & Production"
-            subtitle="Track every order from quote to delivery. Real-time progress bars show exactly where each job stands."
+            text="Your Orders, One View"
+            subtitle="See every order at a glance — status, delivery dates, and progress bars. No more chasing emails for updates."
             delay={5}
           />
         </div>
@@ -33,7 +31,7 @@ export const OrdersScene = () => {
             opacity: screenSpring,
           }}
         >
-          <ScreenFrame src="images/orders-list.png" width={1300} />
+          <ScreenFrame src="images/customer-orders.jpg" width={1300} />
         </div>
       </div>
     </AbsoluteFill>
