@@ -8,7 +8,7 @@ export const ArtworkScene = () => {
 
   const screenSpring = spring({ frame: frame - 10, fps, config: { damping: 20, stiffness: 150 } });
   const screenScale = interpolate(screenSpring, [0, 1], [0.92, 1]);
-  const drift = interpolate(frame, [0, 110], [0, -12]);
+  const drift = interpolate(frame, [0, 210], [0, -15]);
 
   return (
     <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>

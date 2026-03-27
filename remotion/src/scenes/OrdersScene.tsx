@@ -11,7 +11,7 @@ export const OrdersScene = () => {
   const screenX = interpolate(screenSpring, [0, 1], [100, 0]);
 
   // Slow parallax drift
-  const drift = interpolate(frame, [0, 110], [0, -15]);
+  const drift = interpolate(frame, [0, 220], [0, -20]);
 
   return (
     <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>
