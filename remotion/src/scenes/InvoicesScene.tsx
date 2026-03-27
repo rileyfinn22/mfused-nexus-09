@@ -9,7 +9,7 @@ export const InvoicesScene = () => {
   const screen1Spring = spring({ frame: frame - 8, fps, config: { damping: 20, stiffness: 150 } });
   const screen2Spring = spring({ frame: frame - 22, fps, config: { damping: 20, stiffness: 150 } });
 
-  const drift = interpolate(frame, [0, 110], [8, -8]);
+  const drift = interpolate(frame, [0, 220], [10, -10]);
 
   return (
     <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>

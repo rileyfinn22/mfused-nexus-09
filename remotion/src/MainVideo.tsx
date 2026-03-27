@@ -1,4 +1,4 @@
-import { AbsoluteFill, Sequence, useCurrentFrame, interpolate } from "remotion";
+import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import { TransitionSeries, springTiming } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import { wipe } from "@remotion/transitions/wipe";
@@ -7,6 +7,8 @@ import { OrdersScene } from "./scenes/OrdersScene";
 import { ProductionScene } from "./scenes/ProductionScene";
 import { InvoicesScene } from "./scenes/InvoicesScene";
 import { ArtworkScene } from "./scenes/ArtworkScene";
+import { PrintWorkshopScene } from "./scenes/PrintWorkshopScene";
+import { InventoryScene } from "./scenes/InventoryScene";
 import { PullShipScene } from "./scenes/PullShipScene";
 import { OutroScene } from "./scenes/OutroScene";
 
@@ -15,8 +17,7 @@ const BG_COLOR = "#0a0e1a";
 export const MainVideo = () => {
   const frame = useCurrentFrame();
 
-  // Subtle animated gradient overlay
-  const gradientAngle = interpolate(frame, [0, 750], [135, 195]);
+  const gradientAngle = interpolate(frame, [0, 1800], [135, 225]);
   
   return (
     <AbsoluteFill style={{ backgroundColor: BG_COLOR }}>
@@ -55,8 +56,10 @@ export const MainVideo = () => {
         />
       </AbsoluteFill>
 
+      {/* 9 scenes, 8 transitions × 20 frames = 160 overlap */}
+      {/* Scene durations sum = 1960, total = 1960 - 160 = 1800 frames = 60s */}
       <TransitionSeries>
-        <TransitionSeries.Sequence durationInFrames={120}>
+        <TransitionSeries.Sequence durationInFrames={200}>
           <IntroScene />
         </TransitionSeries.Sequence>
 
@@ -65,7 +68,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={110}>
+        <TransitionSeries.Sequence durationInFrames={220}>
           <OrdersScene />
         </TransitionSeries.Sequence>
 
@@ -74,7 +77,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={120}>
+        <TransitionSeries.Sequence durationInFrames={250}>
           <ProductionScene />
         </TransitionSeries.Sequence>
 
@@ -83,7 +86,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={110}>
+        <TransitionSeries.Sequence durationInFrames={220}>
           <InvoicesScene />
         </TransitionSeries.Sequence>
 
@@ -92,7 +95,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={110}>
+        <TransitionSeries.Sequence durationInFrames={210}>
           <ArtworkScene />
         </TransitionSeries.Sequence>
 
@@ -101,7 +104,25 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={110}>
+        <TransitionSeries.Sequence durationInFrames={220}>
+          <PrintWorkshopScene />
+        </TransitionSeries.Sequence>
+
+        <TransitionSeries.Transition
+          presentation={wipe({ direction: "from-left" })}
+          timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
+        />
+
+        <TransitionSeries.Sequence durationInFrames={200}>
+          <InventoryScene />
+        </TransitionSeries.Sequence>
+
+        <TransitionSeries.Transition
+          presentation={fade()}
+          timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
+        />
+
+        <TransitionSeries.Sequence durationInFrames={210}>
           <PullShipScene />
         </TransitionSeries.Sequence>
 
@@ -110,7 +131,7 @@ export const MainVideo = () => {
           timing={springTiming({ config: { damping: 200 }, durationInFrames: 20 })}
         />
 
-        <TransitionSeries.Sequence durationInFrames={120}>
+        <TransitionSeries.Sequence durationInFrames={200}>
           <OutroScene />
         </TransitionSeries.Sequence>
       </TransitionSeries>
