@@ -70,7 +70,7 @@ const VO_SCENES = [
   { text: "Manage all your artwork files, approvals, and version history in one centralized hub. No more digging through emails.", startFrame: 1160 },
   { text: "View all invoices, track payments, and keep your accounts receivable organized and up to date.", startFrame: 1450 },
   { text: "Design custom packaging and order on demand, right in your browser with the built-in Print Workshop.", startFrame: 1720 },
-  { text: "Follow your shipment from Vibe's facility network to your doorstep. Live updates with vessel info, customs status, and delivery ETAs.", startFrame: 1990 },
+  { text: "Follow your shipment from Vibe's facility network to your doorstep. Real-time updates with vessel info, customs status, and delivery ETAs.", startFrame: 1990 },
   { text: "Total transparency, zero guesswork.", startFrame: 2280 },
 ];
 
