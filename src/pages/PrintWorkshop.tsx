@@ -48,6 +48,10 @@ export default function PrintWorkshop() {
   }, []);
   const useFabricCanvasRef = useRef<FabricCanvas | null>(null);
   
+  // Restrict Print Workshop to vibe_admin only until it's fully fixed
+  if (!roleLoading && !isVibeAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
   const [savedDesign, setSavedDesign] = useState<{ thumbnailUrl: string | null; templateName: string; savedAt: Date } | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
 
