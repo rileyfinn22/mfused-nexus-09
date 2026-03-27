@@ -11,9 +11,8 @@ export const InventoryScene = () => {
   const drift = interpolate(frame, [0, 200], [0, -10]);
 
   return (
-    <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 80 }}>
-        {/* Screenshot left */}
+    <AbsoluteFill style={{ justifyContent: "center", padding: "0 60px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 50 }}>
         <div
           style={{
             flex: 1,
@@ -21,18 +20,14 @@ export const InventoryScene = () => {
             transform: `scale(${screenScale}) translateY(${drift}px)`,
           }}
         >
-          <ScreenFrame src="images/inventory.png" width={1200} />
+          <ScreenFrame src="images/inventory.png" width={1400} />
         </div>
-
-        {/* Right label */}
-        <div style={{ width: 420, flexShrink: 0 }}>
+        <div style={{ width: 380, flexShrink: 0 }}>
           <FeatureLabel
             text="Inventory Management"
             subtitle="Track stock levels across warehouses. Automated redline alerts, upload bulk inventory data, and allocate to invoices seamlessly."
             delay={5}
           />
-
-          {/* Stats row */}
           <div style={{ display: "flex", gap: 30, marginTop: 30 }}>
             {[
               { n: "12K", label: "Units Tracked", color: "#3b82f6" },

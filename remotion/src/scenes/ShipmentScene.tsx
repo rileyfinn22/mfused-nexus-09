@@ -11,9 +11,9 @@ export const ShipmentScene = () => {
   const drift = interpolate(frame, [0, 210], [5, -12]);
 
   return (
-    <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 80 }}>
-        {/* Left screenshot */}
+    <AbsoluteFill style={{ justifyContent: "center", padding: "0 60px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 50 }}>
+        {/* Left screenshot - large */}
         <div
           style={{
             flex: 1,
@@ -21,11 +21,11 @@ export const ShipmentScene = () => {
             transform: `scale(${screenScale}) translateY(${drift}px)`,
           }}
         >
-          <ScreenFrame src="images/shipment-tracking.jpg" width={1200} />
+          <ScreenFrame src="images/shipment-tracking-world.jpg" width={1400} />
         </div>
 
         {/* Right label */}
-        <div style={{ width: 420, flexShrink: 0 }}>
+        <div style={{ width: 380, flexShrink: 0 }}>
           <FeatureLabel
             text="Shipment Tracking"
             subtitle="Track your shipment from factory to doorstep. Live updates with carrier info, customs status, and delivery ETAs."

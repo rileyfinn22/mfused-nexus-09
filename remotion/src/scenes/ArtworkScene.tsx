@@ -9,12 +9,12 @@ export const ArtworkScene = () => {
   const screenScale = interpolate(screenSpring, [0, 1], [0.92, 1]);
   const drift = interpolate(frame, [0, 230], [0, -15]);
   return (
-    <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 80 }}>
+    <AbsoluteFill style={{ justifyContent: "center", padding: "0 60px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 50 }}>
         <div style={{ flex: 1, opacity: screenSpring, transform: `scale(${screenScale}) translateY(${drift}px)` }}>
-          <ScreenFrame src="images/real-artwork-library.png" width={1200} />
+          <ScreenFrame src="images/real-artwork-library.png" width={1400} />
         </div>
-        <div style={{ width: 420, flexShrink: 0 }}>
+        <div style={{ width: 380, flexShrink: 0 }}>
           <FeatureLabel text="Artwork & Proofs" subtitle="Browse your templates, review flat proofs, and approve artwork — all in one place. Version history keeps every revision tracked." delay={5} />
           <div style={{ display: "flex", gap: 30, marginTop: 30 }}>
             {[{ n: "12", label: "Total Files" }, { n: "7", label: "Approved" }, { n: "10", label: "Products" }].map((s, i) => {

@@ -18,9 +18,9 @@ export const ProductionDeepDiveScene = () => {
   ];
 
   return (
-    <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 70 }}>
-        <div style={{ width: 460, flexShrink: 0 }}>
+    <AbsoluteFill style={{ justifyContent: "center", padding: "0 60px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 50 }}>
+        <div style={{ width: 420, flexShrink: 0 }}>
           <FeatureLabel text="Transparency That Plans" subtitle="Every stage is visible — plan your launch dates, coordinate marketing, and schedule deliveries with confidence." delay={5} />
           <div style={{ marginTop: 35 }}>
             {stages.map((stage, i) => {
@@ -41,12 +41,12 @@ export const ProductionDeepDiveScene = () => {
             })}
           </div>
         </div>
-        <div style={{ position: "relative", flex: 1, height: 650 }}>
+        <div style={{ position: "relative", flex: 1, height: 680 }}>
           <div style={{ position: "absolute", top: 0, left: 0, opacity: screen1Spring, transform: `translateY(${drift}px)` }}>
-            <ScreenFrame src="images/real-production-detail-top.png" width={950} />
+            <ScreenFrame src="images/real-production-detail-top.png" width={1050} />
           </div>
-          <div style={{ position: "absolute", top: 200, left: 120, opacity: screen2Spring, transform: `translateY(${drift * 0.5}px)`, zIndex: 2 }}>
-            <ScreenFrame src="images/real-production-detail-bottom.png" width={800} />
+          <div style={{ position: "absolute", top: 220, left: 100, opacity: screen2Spring, transform: `translateY(${drift * 0.5}px)`, zIndex: 2 }}>
+            <ScreenFrame src="images/real-production-detail-bottom.png" width={900} />
           </div>
         </div>
       </div>

@@ -9,17 +9,17 @@ export const ProductionScene = () => {
   const screen2Spring = spring({ frame: frame - 22, fps, config: { damping: 20, stiffness: 150 } });
   const drift = interpolate(frame, [0, 280], [10, -15]);
   return (
-    <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 60 }}>
-        <div style={{ position: "relative", width: 850, height: 650, flexShrink: 0 }}>
+    <AbsoluteFill style={{ justifyContent: "center", padding: "0 60px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 50 }}>
+        <div style={{ position: "relative", width: 950, height: 680, flexShrink: 0 }}>
           <div style={{ position: "absolute", top: 0, left: 0, opacity: screen1Spring, transform: `scale(${interpolate(screen1Spring, [0, 1], [0.95, 1])}) translateY(${drift}px)` }}>
-            <ScreenFrame src="images/real-production-overview.png" width={780} />
+            <ScreenFrame src="images/real-production-overview.png" width={880} />
           </div>
-          <div style={{ position: "absolute", top: 200, left: 250, opacity: screen2Spring, transform: `scale(${interpolate(screen2Spring, [0, 1], [0.95, 1])}) translateY(${drift * 0.6}px)`, zIndex: 2 }}>
-            <ScreenFrame src="images/real-production-stages.png" width={650} />
+          <div style={{ position: "absolute", top: 220, left: 280, opacity: screen2Spring, transform: `scale(${interpolate(screen2Spring, [0, 1], [0.95, 1])}) translateY(${drift * 0.6}px)`, zIndex: 2 }}>
+            <ScreenFrame src="images/real-production-stages.png" width={720} />
           </div>
         </div>
-        <div style={{ flex: 1, minWidth: 350 }}>
+        <div style={{ flex: 1, minWidth: 320 }}>
           <FeatureLabel text="Production Visibility" subtitle="Know exactly where your order is. Real-time progress from material prep through QC — no guesswork, no surprises." delay={5} />
           <div style={{ display: "flex", gap: 10, marginTop: 30, flexWrap: "wrap" }}>
             {["Live Progress", "Stage Details", "Timeline View", "Delivery ETA"].map((pill, i) => {

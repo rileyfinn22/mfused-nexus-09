@@ -11,10 +11,10 @@ export const PrintWorkshopScene = () => {
   const drift = interpolate(frame, [0, 230], [8, -12]);
 
   return (
-    <AbsoluteFill style={{ justifyContent: "center", padding: "0 80px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 70 }}>
+    <AbsoluteFill style={{ justifyContent: "center", padding: "0 60px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 50 }}>
         {/* Left label */}
-        <div style={{ width: 420, flexShrink: 0 }}>
+        <div style={{ width: 380, flexShrink: 0 }}>
           <FeatureLabel
             text="Design Your Packaging"
             subtitle="Use our built-in Print Workshop to customize templates, place artwork, and submit designs — all from your browser."
@@ -48,7 +48,7 @@ export const PrintWorkshopScene = () => {
           </div>
         </div>
 
-        {/* Right screenshot */}
+        {/* Right screenshot - large */}
         <div
           style={{
             flex: 1,
@@ -56,7 +56,7 @@ export const PrintWorkshopScene = () => {
             transform: `scale(${screenScale}) translateY(${drift}px)`,
           }}
         >
-          <ScreenFrame src="images/print-workshop-customer.jpg" width={1300} />
+          <ScreenFrame src="images/print-workshop-editor.jpg" width={1400} />
         </div>
       </div>
     </AbsoluteFill>
