@@ -30,9 +30,9 @@ export const InventoryScene = () => {
           />
           <div style={{ display: "flex", gap: 30, marginTop: 30 }}>
             {[
-              { n: "12K", label: "Units Tracked", color: "#3b82f6" },
-              { n: "48", label: "SKUs Active", color: "#22c55e" },
-              { n: "3", label: "Warehouses", color: "#f59e0b" },
+              { n: "12K", label: "Units Tracked", color: "#b8cf68" },
+              { n: "48", label: "SKUs Active", color: "#6a9b40" },
+              { n: "3", label: "Warehouses", color: "#d2d5d8" },
             ].map((s, i) => {
               const sp = spring({ frame: frame - 25 - i * 6, fps, config: { damping: 20 } });
               return (
