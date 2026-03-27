@@ -301,12 +301,27 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
   const canvasHeight = Math.round((height + bleed * 2) * DPI);
   const bleedPx = Math.round(bleed * DPI);
 
-  // Display: fit into ~900px wide, accounting for device pixel ratio for crisp rendering
-  const TARGET_DISPLAY_WIDTH = 900;
+  // Responsive display: measure container width to fit canvas
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(900);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        // Subtract padding (p-4 = 32px total)
+        setContainerWidth(Math.max(200, Math.floor(entry.contentRect.width - 32)));
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const TARGET_DISPLAY_HEIGHT = 750;
   // Oversample imported PDF backgrounds so rasterized text stays sharp in preview
   const PDF_BACKGROUND_OVERSAMPLE = 4;
-  const displayScale = Math.min(TARGET_DISPLAY_WIDTH / canvasWidth, TARGET_DISPLAY_HEIGHT / canvasHeight, 1.5);
+  const displayScale = Math.min(containerWidth / canvasWidth, TARGET_DISPLAY_HEIGHT / canvasHeight, 1.5);
   const cssWidth = Math.round(canvasWidth * displayScale);
   const cssHeight = Math.round(canvasHeight * displayScale);
   const displayBleedPx = Math.max(1, Math.round(bleedPx * displayScale));
