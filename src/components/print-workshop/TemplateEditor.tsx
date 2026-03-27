@@ -303,21 +303,22 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
   // Responsive display: measure container width to fit canvas
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(900);
+  const [containerWidth, setContainerWidth] = useState(600);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    // Set initial value synchronously
+    const initialWidth = Math.max(200, Math.floor(el.getBoundingClientRect().width - 32));
+    setContainerWidth(initialWidth);
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        // Subtract padding (p-4 = 32px total)
         setContainerWidth(Math.max(200, Math.floor(entry.contentRect.width - 32)));
       }
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-
   const TARGET_DISPLAY_HEIGHT = 750;
   // Oversample imported PDF backgrounds so rasterized text stays sharp in preview
   const PDF_BACKGROUND_OVERSAMPLE = 4;
@@ -751,7 +752,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       canvas.dispose();
       fabricRef.current = null;
     };
-  }, [canvasWidth, canvasHeight, bleedPx, mode, displayScale, cssWidth, cssHeight, getSelectionLockedState]);
+  }, [canvasWidth, canvasHeight, bleedPx, mode, getSelectionLockedState]);
 
   const addText = (editable: boolean) => {
     const canvas = fabricRef.current;
@@ -1613,6 +1614,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     canvas.renderAll();
   };
 
+  // Reactively update canvas CSS dimensions when container resizes (without recreating)
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
+    canvas.setZoom(displayScale);
+    canvas.renderAll();
+  }, [displayScale, cssWidth, cssHeight]);
 
   // --- Draw Mask: click-and-drag to place a white cover-up rectangle ---
   const startDrawMask = () => {
