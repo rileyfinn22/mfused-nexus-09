@@ -2479,7 +2479,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         </div>
       )}
 
-      <div className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center max-w-full">
+      <div ref={containerRef} className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center max-w-full">
         <div className="relative shadow-lg shrink-0" style={{ width: cssWidth, height: cssHeight }}>
           <canvas ref={canvasRef} />
 
