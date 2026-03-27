@@ -1,86 +1,75 @@
 
 
-# Admin-Moderated Vendor Updates for Customer Visibility
+## Plan: Fix Shipment Scene + Add ElevenLabs Music & Voiceover
 
-## Summary
-Vendors get the same production experience as admins (update stages, add images/notes/files, manage shipments). All vendor updates are "unpublished" by default. Admins review, optionally edit, then publish — only then do customers see the updates.
+### Problem
+1. The shipment tracking scene relies on a bad AI-generated map image. It looks fake.
+2. The background music is a single monotone sound, not real music.
+3. ElevenLabs is now connected and should be used.
 
-## Database Migration
+### Approach
 
-**`production_stages` — add columns:**
-- `published_status` (text, default 'pending') — what customers see
-- `published_substages` (jsonb, nullable) — published substage snapshot
-- `published_at` (timestamptz, nullable) — last publish time
-- `published_notes` (text, nullable) — admin-curated note for customers
+#### 1. Rebuild ShipmentScene as Pure Code (no image)
+Instead of relying on a generated map image, build the entire scene programmatically in React/Remotion:
 
-**`production_stage_updates` — add columns:**
-- `is_published` (boolean, default false) — customer visibility flag
-- `published_at` (timestamptz, nullable)
-- `published_note_text` (text, nullable) — admin-edited version of note
-- `published_image_url` (text, nullable) — admin can swap image
+- **SVG world map dots**: A subtle dotted world map background rendered as a grid of small circles (like a data visualization style map — not a realistic map)
+- **Animated route arc**: An SVG path from Shenzhen to Long Beach that draws itself using `strokeDashoffset` driven by `interpolate()` — a green glowing line curving across the Pacific
+- **Animated ship icon**: A small ship emoji/icon that moves along the route path, positioned at ~65% progress
+- **Tracking info card** (left side, glass-morphism style):
+  - "Shipment Tracking" header
+  - Leg 1: International Freight — COSCO — In Transit
+  - Leg 2: Customs Clearance — Pending
+  - Leg 3: Domestic Delivery — FedEx — Pending
+  - Progress bar showing 2/3 legs, 65% overall
+  - Origin: Shenzhen, China → Destination: Long Beach, CA
+  - ETA: Apr 14, 2026
+- **Animated progress bar** that fills to 65% with a spring animation
+- All coordinates simplified — just key points for visual storytelling
 
-RLS: only `vibe_admin` can UPDATE `published_*` / `is_published` columns (via trigger or policy).
+This approach eliminates the AI-generated image entirely and gives full control over the visual quality.
 
-## File Changes
+#### 2. Generate Real Music via ElevenLabs
+- Call the `elevenlabs-music` edge function with a prompt like: "Upbeat modern corporate technology background music, clean and professional, light electronic beats with subtle synths"
+- Duration: 65 seconds to cover the full video
+- Save the result as `remotion/public/bg-music.mp3`
 
-### 1. `src/pages/ProductionDetail.tsx`
+#### 3. Generate Voiceover via ElevenLabs TTS
+- Write narration scripts for each scene (short, punchy, ~3-5 seconds each)
+- Call `elevenlabs-tts` edge function for each scene's narration
+- Concatenate or layer the VO clips into the final render using ffmpeg
+- Use a professional voice (e.g. "George" or "Brian")
 
-**Vendor shipment access** — Change lines 1148-1153 to grant vendors shipment management (add/edit legs, upload attachments, update notes). Keep delete admin-only:
-```
-onStatusChange={isVibeAdmin || isVendor ? ... : undefined}
-onAddLeg={isVibeAdmin || isVendor ? ... : undefined}
-onAttachmentUpload={isVibeAdmin || isVendor ? ... : undefined}
-onNotesChange={isVibeAdmin || isVendor ? ... : undefined}
-onDeleteLeg={isVibeAdmin ? ... : undefined}
-```
+Scene scripts:
+- Intro: "VibePKG — your complete packaging portal."
+- Orders: "Create and manage orders with real-time visibility."
+- Production: "Track every production stage from start to finish."
+- Production Deep Dive: "Drill into stage details with photo updates."
+- Artwork: "Manage artwork files, approvals, and version history."
+- Invoices: "Generate invoices and track payments seamlessly."
+- Print Workshop: "Design custom packaging right in your browser."
+- Shipment: "Follow your shipment from factory to doorstep."
+- Outro: "VibePKG — packaging, simplified."
 
-**Vendor file uploads** — Fix line 685 condition from `isVibeAdmin || isCustomer` to `isVibeAdmin || isVendor` so vendors can attach files to stage updates.
+#### 4. Updated Render Pipeline
+- Render video muted as before
+- Use ffmpeg to mix: video + bg music (lower volume) + voiceover track
+- Output to `/mnt/documents/vibepkg-demo.mp4`
 
-**Vendor delete updates** — Allow vendors to delete their own updates (line 1182): pass `handleDeleteUpdate` for vendors too.
+### Technical Details
 
-**Admin publish controls** — Add a "Review & Publish" section:
-- Per-stage: amber indicator when `status !== published_status` or unpublished updates exist
-- "Publish" button per stage — syncs live status to `published_status`, marks selected updates as `is_published = true`
-- Inline edit fields so admin can rewrite note text or swap images before publishing
-- "Publish All" bulk button at top
+**ShipmentScene.tsx** — entirely code-driven:
+- SVG viewBox 1920x1080 for the background map dots
+- Simplified continent outlines as dot clusters (no image dependency)
+- `strokeDasharray` + `strokeDashoffset` animated via `interpolate(frame, ...)` for the route line
+- Glass card with tracking legs styled like the real `ShipmentTracker` component (Ship/ShieldCheck/Truck icons as SVG)
 
-**Fetch query** — Update the `production_stage_updates` select to include `is_published, published_note_text, published_image_url` and `production_stages` select to include `published_status, published_substages, published_at, published_notes`.
+**Audio pipeline** (in render script):
+- Call edge functions via `fetch()` to generate music and TTS
+- Write audio files to `remotion/public/`
+- ffmpeg mix: `ffmpeg -i video.mp4 -i music.mp3 -i voiceover.mp3 -filter_complex "[1]volume=0.3[m];[2]volume=1.0[v];[m][v]amix=inputs=2" -map 0:v -c:v copy output.mp4`
 
-### 2. `src/components/ProductionStageTimeline.tsx`
-
-**Customer view changes:**
-- Read `published_status` instead of `status` for stage progress indicators
-- Filter `production_stage_updates` to only show where `is_published = true`
-- Display `published_note_text` when available (fallback to `note_text`)
-- Display `published_image_url` when available (fallback to `image_url`)
-- Hide substage buttons (already read-only for customers)
-
-**Admin view additions:**
-- Show amber dot / "Unpublished" badge on stages with pending vendor changes
-- Show count of unpublished updates per stage
-- Inline "Publish" / "Edit & Publish" controls in the expanded stage view
-
-**Vendor view:**
-- Same as admin view for updating stages (status, substages, notes, images, files)
-- Show subtle "Pending review" badge on updates where `is_published = false`
-- Cannot modify `published_*` fields
-
-### 3. `src/components/ProductionStageTimeline.tsx` — Interfaces
-
-Update `ProductionStage` and `StageUpdate` interfaces to include new published fields. Add new props:
-- `onPublishStage?: (stageId: string, editedData: {...}) => Promise<void>`
-- `onPublishUpdate?: (updateId: string, editedData: {...}) => Promise<void>`
-- `onPublishAll?: () => Promise<void>`
-
-## Security
-- Only `vibe_admin` can write `published_*` and `is_published` columns
-- Customers never see live `status` — only `published_status`
-- Vendor names remain hidden from customer view
-- No financial data exposed in any view
-- Existing `isVibeAdmin` guards on internal notes, vendor assignment, progress slider remain unchanged
-
-## No changes to
-- Sidebar navigation (vendor "My Production" is sufficient)
-- Route guards
-- RLS on `production_stages` or `production_stage_updates` SELECT (both already allow vendor access for their assigned stages)
+### Files to Change
+- `remotion/src/scenes/ShipmentScene.tsx` — full rewrite, pure code, no image
+- `remotion/scripts/render-remotion.mjs` — add audio generation + mixing steps
+- `remotion/public/bg-music.mp3` — replaced with ElevenLabs-generated music
 
