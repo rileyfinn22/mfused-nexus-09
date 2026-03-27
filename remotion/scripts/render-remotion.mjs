@@ -2,6 +2,7 @@ import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition, openBrowser } from "@remotion/renderer";
 import path from "path";
 import { fileURLToPath } from "url";
+import { execSync } from "child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -32,11 +33,20 @@ await renderMedia({
   composition,
   serveUrl: bundled,
   codec: "h264",
-  outputLocation: "/mnt/documents/vibepkg-demo.mp4",
+  outputLocation: "/tmp/vibepkg-video-only.mp4",
   puppeteerInstance: browser,
-  muted: false,
+  muted: true,
   concurrency: 1,
 });
 
-console.log("Done! Output: /mnt/documents/vibepkg-demo.mp4");
 await browser.close({ silent: false });
+
+// Mux audio with system ffmpeg
+console.log("Muxing background music...");
+const videoDuration = composition.durationInFrames / composition.fps;
+execSync(
+  `ffmpeg -y -i /tmp/vibepkg-video-only.mp4 -i ${path.resolve(__dirname, "../public/bg-music.mp3")} -c:v copy -c:a aac -b:a 128k -t ${videoDuration} -shortest -map 0:v:0 -map 1:a:0 /mnt/documents/vibepkg-demo.mp4`,
+  { stdio: "inherit" }
+);
+
+console.log("Done! Output: /mnt/documents/vibepkg-demo.mp4");
