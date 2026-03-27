@@ -12,7 +12,7 @@ import { PrintWorkshopScene } from "./scenes/PrintWorkshopScene";
 import { ShipmentScene } from "./scenes/ShipmentScene";
 import { OutroScene } from "./scenes/OutroScene";
 
-const BG_COLOR = "#0a0e1a";
+const BG_COLOR = "#1a1f2a";
 
 export const MainVideo = () => {
   const frame = useCurrentFrame();
@@ -24,19 +24,19 @@ export const MainVideo = () => {
       {/* Persistent animated gradient background */}
       <AbsoluteFill
         style={{
-          background: `linear-gradient(${gradientAngle}deg, #0a0e1a 0%, #111827 40%, #0f172a 70%, #0a0e1a 100%)`,
+          background: `linear-gradient(${gradientAngle}deg, #1a1f2a 0%, #252d38 40%, #1e2530 70%, #1a1f2a 100%)`,
         }}
       />
 
-      {/* Persistent accent glow */}
-      <AbsoluteFill style={{ opacity: 0.15 }}>
+      {/* Persistent accent glow - VibePKG greens */}
+      <AbsoluteFill style={{ opacity: 0.12 }}>
         <div
           style={{
             position: "absolute",
             width: 800,
             height: 800,
             borderRadius: "50%",
-            background: "radial-gradient(circle, #3b82f6 0%, transparent 70%)",
+            background: "radial-gradient(circle, #b8cf68 0%, transparent 70%)",
             top: -200,
             right: -200,
             filter: "blur(80px)",
@@ -48,7 +48,7 @@ export const MainVideo = () => {
             width: 600,
             height: 600,
             borderRadius: "50%",
-            background: "radial-gradient(circle, #8b5cf6 0%, transparent 70%)",
+            background: "radial-gradient(circle, #6a9b40 0%, transparent 70%)",
             bottom: -200,
             left: -100,
             filter: "blur(80px)",
@@ -56,8 +56,6 @@ export const MainVideo = () => {
         />
       </AbsoluteFill>
 
-      {/* 9 scenes, 8 transitions × 20 frames = 160 overlap */}
-      {/* Scene durations sum = 1960, total = 1960 - 160 = 1800 frames = 60s */}
       <TransitionSeries>
         <TransitionSeries.Sequence durationInFrames={200}>
           <IntroScene />

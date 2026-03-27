@@ -20,20 +20,20 @@ export const IntroScene = () => {
 
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
-      {/* V Logo */}
+      {/* Logo mark */}
       <div
         style={{
           width: 100,
           height: 100,
           borderRadius: 24,
-          background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+          background: "linear-gradient(135deg, #b8cf68, #6a9b40)",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
           opacity: logoOpacity,
           transform: `scale(${logoScale})`,
           marginBottom: 30,
-          boxShadow: "0 0 60px rgba(59,130,246,0.3)",
+          boxShadow: "0 0 60px rgba(184,207,104,0.3)",
         }}
       >
         <span style={{ fontSize: 56, fontWeight: 900, color: "white", fontFamily: "sans-serif" }}>V</span>
@@ -51,7 +51,7 @@ export const IntroScene = () => {
           transform: `translateY(${titleY}px)`,
         }}
       >
-        VibePKG
+        Vibe Packaging
       </div>
 
       {/* Accent line */}
@@ -59,7 +59,7 @@ export const IntroScene = () => {
         style={{
           width: lineWidth,
           height: 4,
-          background: "linear-gradient(90deg, #3b82f6, #8b5cf6)",
+          background: "linear-gradient(90deg, #b8cf68, #6a9b40)",
           borderRadius: 2,
           marginTop: 16,
           marginBottom: 16,
@@ -71,7 +71,7 @@ export const IntroScene = () => {
         style={{
           fontSize: 32,
           fontWeight: 500,
-          color: "rgba(148,163,184,0.95)",
+          color: "rgba(210,213,216,0.95)",
           fontFamily: "sans-serif",
           opacity: subSpring,
           transform: `translateY(${subY}px)`,
@@ -86,7 +86,7 @@ export const IntroScene = () => {
       <div
         style={{
           fontSize: 22,
-          color: "rgba(148,163,184,0.6)",
+          color: "rgba(162,167,175,0.7)",
           fontFamily: "sans-serif",
           marginTop: 40,
           opacity: tagSpring,

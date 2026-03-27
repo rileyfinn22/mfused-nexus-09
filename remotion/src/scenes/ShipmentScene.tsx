@@ -53,7 +53,7 @@ export const ShipmentScene = () => {
                       width: 28,
                       height: 28,
                       borderRadius: "50%",
-                      background: i < 3 ? "#22c55e" : "rgba(59,130,246,0.3)",
+                      background: i < 3 ? "#6a9b40" : "rgba(184,207,104,0.3)",
                       display: "flex",
                       justifyContent: "center",
                       alignItems: "center",
