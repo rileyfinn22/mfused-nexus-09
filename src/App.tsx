@@ -51,6 +51,7 @@ import WorkshopOrderDetail from "./pages/WorkshopOrderDetail";
 import Financing from "./pages/Financing";
 import FinanceView from "./pages/FinanceView";
 import FinancedInvoiceDetail from "./pages/FinancedInvoiceDetail";
+import Demo from "./pages/Demo";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
           <Route path="/shipment-update" element={<ShipmentUpdate />} />
+          <Route path="/demo" element={<Demo />} />
           <Route path="/finance-view" element={<FinanceView />} />
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
