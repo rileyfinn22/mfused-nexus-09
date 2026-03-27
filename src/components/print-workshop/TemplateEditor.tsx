@@ -303,11 +303,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
   // Responsive display: measure container width to fit canvas
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState<number | null>(null);
+  const [containerWidth, setContainerWidth] = useState(600);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    // Set initial value synchronously
+    const initialWidth = Math.max(200, Math.floor(el.getBoundingClientRect().width - 32));
+    setContainerWidth(initialWidth);
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setContainerWidth(Math.max(200, Math.floor(entry.contentRect.width - 32)));
@@ -316,8 +319,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-
-  const effectiveContainerWidth = containerWidth ?? 600;
   const TARGET_DISPLAY_HEIGHT = 750;
   // Oversample imported PDF backgrounds so rasterized text stays sharp in preview
   const PDF_BACKGROUND_OVERSAMPLE = 4;
