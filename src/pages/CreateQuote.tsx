@@ -1036,7 +1036,7 @@ const CreateQuote = () => {
                                     <Input
                                       type="number"
                                       min="0"
-                                      step="0.01"
+                                      step="any"
                                       value={item.unit_price}
                                       onChange={(e) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
                                       className="h-8 w-24 text-right ml-auto"
@@ -1162,7 +1162,7 @@ const CreateQuote = () => {
                                                 <Input
                                                   type="number"
                                                   min="0"
-                                                  step="0.01"
+                                                  step="any"
                                                   value={priceBreak.unit_price}
                                                   onChange={(e) => updatePriceBreak(index, breakIndex, 'unit_price', parseFloat(e.target.value) || 0)}
                                                   onBlur={() => sortPriceBreaks(index)}
@@ -1415,7 +1415,7 @@ const CreateQuote = () => {
                             <Input
                               type="number"
                               min="0"
-                              step="0.01"
+                              step="any"
                               value={customItem.unit_price}
                               onChange={(e) => setCustomItem({ ...customItem, unit_price: parseFloat(e.target.value) || 0 })}
                             />
@@ -1457,7 +1457,7 @@ const CreateQuote = () => {
                                   <Input
                                     type="number"
                                     min="0"
-                                    step="0.01"
+                                    step="any"
                                     value={priceBreak.unit_price}
                                     onChange={(e) => updateCustomItemPriceBreak(index, 'unit_price', parseFloat(e.target.value) || 0)}
                                     onBlur={sortCustomItemPriceBreaks}
@@ -1561,7 +1561,7 @@ const CreateQuote = () => {
                                       <Input
                                         type="number"
                                         min="0"
-                                        step="0.01"
+                                        step="any"
                                         value={priceBreak.unit_price}
                                         onChange={(e) => updateTempPriceBreak(index, 'unit_price', parseFloat(e.target.value) || 0)}
                                         onBlur={sortTempPriceBreaks}
@@ -1638,7 +1638,7 @@ const CreateQuote = () => {
                       <Input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="any"
                         value={shippingCost}
                         onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
                         className="w-32 text-right"
