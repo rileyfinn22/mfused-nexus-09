@@ -351,7 +351,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
     if (Array.isArray(data.objects)) {
       data.objects = data.objects.filter((obj: any) => {
-        if (obj?.name === "_trimGuide" || obj?.name === "_snapGuide" || obj?.name === "_editHighlight") return false;
+        if (obj?.name === "_trimGuide" || obj?.name === "_snapGuide" || obj?.name === "_editHighlight" || obj?.name === "_dieline" || obj?.name === "_dielineLabel") return false;
         if (!includePdfBackground && obj?.name === "pdf_background") {
           const src = typeof obj?.src === "string" ? obj.src : "";
           if (sourcePdfPath || src.startsWith("blob:")) return false;
