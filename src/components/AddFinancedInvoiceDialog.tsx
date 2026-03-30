@@ -138,7 +138,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
       }
     }
 
-    toast({ title: "Vendor PO submitted for financing (pending approval)" });
+    toast({ title: isFinanceMode ? "Financed order added" : "Vendor PO submitted for financing (pending approval)" });
     onSuccess();
     onOpenChange(false);
     setSelectedPO(null);
@@ -146,6 +146,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     setFinancedAmount("");
     setRmbAmount("");
     setNotes("");
+    setDescription("");
     setLoading(false);
   };
 
