@@ -317,18 +317,22 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const bleedPx = Math.round(bleed * DPI);
 
   // Responsive display: measure container width to fit canvas
+  // Use a stable outer wrapper for ResizeObserver to prevent feedback loops.
+  // The measureRef div's width is determined by parent layout, not canvas content.
+  const measureRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(600);
 
   useEffect(() => {
-    const el = containerRef.current;
+    const el = measureRef.current;
     if (!el) return;
     // Set initial value synchronously
     const initialWidth = Math.max(200, Math.floor(el.getBoundingClientRect().width - 32));
     setContainerWidth(initialWidth);
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerWidth(Math.max(200, Math.floor(entry.contentRect.width - 32)));
+        const w = Math.max(200, Math.floor(entry.contentRect.width - 32));
+        setContainerWidth((prev) => (prev === w ? prev : w));
       }
     });
     ro.observe(el);
@@ -2595,7 +2599,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         </div>
       )}
 
-      <div ref={containerRef} className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center max-w-full">
+      <div ref={measureRef} className="max-w-full">
+        <div ref={containerRef} className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center max-w-full">
         <div className="relative shadow-lg shrink-0" style={{ width: cssWidth, height: cssHeight }}>
           <canvas ref={canvasRef} />
 
@@ -2628,6 +2633,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             />
           </div>
         </div>
+      </div>
       </div>
 
       {/* Objects panel + Dimensions info */}
