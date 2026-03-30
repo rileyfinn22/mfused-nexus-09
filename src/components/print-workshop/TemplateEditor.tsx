@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line } from "fabric";
+import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line, Polyline } from "fabric";
 import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
