@@ -2279,33 +2279,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
           <>
             <span className="text-xs text-muted-foreground px-2">Click a highlighted field to edit</span>
             <div className="w-px h-6 bg-border mx-1" />
-            <Button size="sm" variant="outline" onClick={() => {
-              pickImageFile((imgEl) => {
-                const canvas = fabricRef.current;
-                if (!canvas) return;
-                const canvasW = canvas.getWidth();
-                const canvasH = canvas.getHeight();
-                const maxW = canvasW * 0.6;
-                const maxH = canvasH * 0.6;
-                const scale = Math.min(maxW / imgEl.width, maxH / imgEl.height, 1);
-                const newImg = new FabricImage(imgEl, {
-                  left: canvasW / 2 - (imgEl.width * scale) / 2,
-                  top: canvasH / 2 - (imgEl.height * scale) / 2,
-                  scaleX: scale,
-                  scaleY: scale,
-                });
-                (newImg as any).locked = false;
-                (newImg as any).editable = true;
-                (newImg as any).name = "user_artwork";
-                newImg.set({ borderColor: "#3b82f6", cornerColor: "#3b82f6", cornerStyle: "circle", transparentCorners: false } as any);
-                canvas.add(newImg);
-                canvas.setActiveObject(newImg);
-                canvas.renderAll();
-                syncCanvas();
-              });
-            }} className="gap-1.5">
-              <Upload className="h-3.5 w-3.5" />
-              <span className="text-xs">Upload Artwork</span>
+            <Button size="sm" variant="outline" onClick={addPdfArtwork} className="gap-1.5">
+              <FileText className="h-3.5 w-3.5" />
+              <span className="text-xs">Upload Art (PDF)</span>
             </Button>
           </>
         )}
