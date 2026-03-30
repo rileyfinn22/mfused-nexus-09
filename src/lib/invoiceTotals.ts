@@ -37,9 +37,13 @@ export function calculateInvoiceTotals(
  * Uses shipped_quantity as the quantity basis.
  */
 export function blanketTotalItems(orderItems: any[]): InvoiceTotalItem[] {
+  const anyShipped = orderItems.some(
+    (item) => Number(item.shipped_quantity || 0) > 0
+  );
+
   return orderItems.map((item) => ({
-    quantity: Number(item.shipped_quantity || 0) > 0
-      ? Number(item.shipped_quantity)
+    quantity: anyShipped
+      ? (Number(item.shipped_quantity || 0) > 0 ? Number(item.shipped_quantity) : 0)
       : Number(item.quantity || 0),
     unit_price: Number(item.unit_price || 0),
   }));
