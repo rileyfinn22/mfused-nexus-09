@@ -14,6 +14,7 @@ import { SavedDesignIndicator } from "@/components/print-workshop/SavedDesignInd
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkshopOrders } from "@/components/print-workshop/WorkshopOrders";
+import { WorkshopStorefront } from "@/components/print-workshop/WorkshopStorefront";
 import { Plus, Printer, ArrowLeft, Pencil, Trash2, Copy, Package, ShoppingBag, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
