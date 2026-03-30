@@ -31,6 +31,10 @@ export default function PrintWorkshop() {
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [canvasData, setCanvasData] = useState<any>(null);
+  const [customConfig, setCustomConfig] = useState<{
+    productType: string; widthInches: number; heightInches: number;
+    depthInches: number; bleedInches: number; panelZones: any[];
+  } | null>(null);
   const [cartItems, setCartItemsRaw] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem("print_cart");
