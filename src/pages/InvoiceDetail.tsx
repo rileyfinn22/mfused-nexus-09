@@ -1194,14 +1194,9 @@ const InvoiceDetail = () => {
         editedShipping
       );
 
-      // For blanket invoices: only floor to order total if NOTHING has shipped yet
-      const anyShipped = editedItems.some((item: any) => Number(item.shipped_quantity || 0) > 0);
-      if (invoice.invoice_type === 'full' && invoice.shipment_number === 1 && order && !anyShipped) {
-        const orderSubtotal = Number(order.subtotal || 0);
-        const orderTotal = Number(order.total || 0);
-        if (newSubtotal < orderSubtotal) newSubtotal = orderSubtotal;
-        if (newTotal < orderTotal) newTotal = orderTotal;
-      }
+      // Placeholder behavior is now handled by blanketTotalItems:
+      // - If nothing shipped → uses ordered quantities (placeholder = order total)
+      // - If any item shipped → only sums shipped items (actual billed total)
 
       // NOTE: Do NOT update order totals from invoice edit - invoice scope only
       // Update invoice totals
