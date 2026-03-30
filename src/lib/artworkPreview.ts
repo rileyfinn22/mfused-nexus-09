@@ -1,7 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
 import { generatePdfThumbnailFromArrayBuffer, generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
-
-const FLAT_ARTWORK_PREVIEW_PROMPT = [
   "Extract a clean flat artwork preview from this packaging proof.",
   "Preserve the original artwork exactly: same colors, text, logos, layout, proportions, and art.",
   "Do not redesign, restyle, rewrite, sharpen into new art, add mockup lighting, or create a 3D package rendering.",
