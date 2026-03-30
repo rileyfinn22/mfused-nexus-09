@@ -629,7 +629,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             const text = new IText(obj.text, {
               left: bleedOffset + obj.x! * DPI,
               top: bleedOffset + obj.y! * DPI,
-              fontSize: 11 * (DPI / 72),
+              fontSize: 11 * (DPI / 72) * invScale,
               fill: "#9ca3af",
               fontFamily: "Arial",
               originX: "center",
