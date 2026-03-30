@@ -2028,12 +2028,14 @@ export type Database = {
           company_id: string | null
           created_at: string
           created_by: string | null
+          depth_inches: number | null
           description: string | null
           height_inches: number
           id: string
           is_global: boolean
           material_options: Json | null
           name: string
+          panel_zones: Json | null
           preset_price_per_unit: number | null
           product_type: string
           source_pdf_path: string | null
@@ -2047,12 +2049,14 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           created_by?: string | null
+          depth_inches?: number | null
           description?: string | null
           height_inches?: number
           id?: string
           is_global?: boolean
           material_options?: Json | null
           name: string
+          panel_zones?: Json | null
           preset_price_per_unit?: number | null
           product_type?: string
           source_pdf_path?: string | null
@@ -2066,12 +2070,14 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           created_by?: string | null
+          depth_inches?: number | null
           description?: string | null
           height_inches?: number
           id?: string
           is_global?: boolean
           material_options?: Json | null
           name?: string
+          panel_zones?: Json | null
           preset_price_per_unit?: number | null
           product_type?: string
           source_pdf_path?: string | null
