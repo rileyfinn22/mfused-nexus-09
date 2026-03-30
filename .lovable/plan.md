@@ -1,58 +1,31 @@
 
 
-## Fix Print Workshop: Flickering + Restructure for Custom Dieline Orders
+## Fix: Dieline Lines Too Thin to See
 
-### Problem 1: Infinite Resize Flickering
-The `ResizeObserver` watches `containerRef` — the same div whose dimensions change when `cssWidth`/`cssHeight` update. This creates a feedback loop: ResizeObserver fires → `containerWidth` updates → `displayScale`/`cssWidth` recalculates → div resizes → ResizeObserver fires again (alternating between 525px and 515px as seen in replay).
+### Root Cause
+The dieline stroke widths (1px and 1.5px) are in canvas-coordinate pixels. When the canvas is zoomed down via `displayScale` (~0.37 for a typical box), those lines render at **sub-pixel thickness** on screen (0.37–0.55px). The dash arrays also shrink to near-invisible dots.
 
-**Fix**: Add a stable outer wrapper div that the ResizeObserver watches, separate from the inner div whose size changes. The outer wrapper has no size dependency on canvas dimensions.
+### Fix
+Scale `strokeWidth` and `strokeDashArray` inversely with `displayScale` so lines appear at a consistent visual thickness regardless of zoom level.
 
-### Problem 2: Canvas Destroyed on Every Resize
-The main `useEffect` (line 459) that creates the Fabric canvas depends on `canvasWidth`, `canvasHeight`, and `cssWidth`/`cssHeight`. When the container resizes, these values change, the effect re-runs, and the entire canvas is destroyed and recreated — losing state, causing flicker, and re-fetching PDFs.
+### File: `src/components/print-workshop/TemplateEditor.tsx`
 
-**Fix**: Split into two effects:
-- **Init effect**: Creates the Fabric canvas once (keyed on `canvasWidth` + `canvasHeight` + `mode` only — the logical resolution, not display size)
-- **Resize effect**: When `displayScale` changes, call `canvas.setDimensions()` (CSS only) and `canvas.setZoom()` without recreating the canvas
+In the dieline rendering section (~line 589-643):
 
-### Problem 3: Custom Orders Need Full Editor Tools
-When a custom box/bag order opens, customers need artwork upload, text tools, and image placement — not just the restricted "use" mode text editing. Currently `isCustomOrder` sets `mode="edit"` which works but is semantically wrong (it's the admin template-authoring mode).
+1. **Compute inverse scale factor** to keep lines visually consistent:
+   ```
+   const invScale = 1 / displayScale;
+   ```
 
-**Fix**: No mode change needed — custom orders already use `mode="edit"`. But the toolbar needs an "Upload Artwork" button that works in both modes, and the dieline zones should show clickable "Add Art Here" overlays.
+2. **Apply to stroke widths**: Instead of `strokeW = 1` or `1.5`, use `strokeW * invScale` — so a 1.5px cut line at 0.37 zoom becomes ~4px in canvas coords, rendering as 1.5px on screen.
 
-### Files to Modify
+3. **Apply to dash arrays**: Scale `[6, 4]` to `[6 * invScale, 4 * invScale]` so dashes look correct at any zoom.
 
-1. **`src/components/print-workshop/TemplateEditor.tsx`**
-   - Add a stable `measureRef` wrapper div outside the canvas container for ResizeObserver
-   - Split the canvas init effect: separate creation (depends on logical dims + mode) from display scaling (depends on containerWidth)
-   - Add "Upload Artwork" button to toolbar (both modes) — lets users upload PNG/JPG/PDF and place on canvas
-   - Add artwork zone click-to-upload: when dieline zones exist, show semi-transparent zone overlays users can click to upload art into that panel
+4. **Apply to label font size**: The label `fontSize: 11 * (DPI / 72)` (~23px canvas) renders as ~8.5px on screen. Scale it up similarly so panel names are legible.
 
-2. **`src/pages/PrintWorkshop.tsx`**
-   - No structural changes needed, custom order flow already passes correct props
+This is a ~10-line change in the dieline rendering loop. The `displayScale` value is already available in scope (line 346). The `dielineResult` rendering block needs access to it — it's inside the init effect which currently captures it via closure, but since `displayScale` isn't in the effect's deps, we need to either:
+- Pass the current `displayScale` via a ref so the init effect reads the latest value, OR
+- Add `displayScale` to the effect deps (simpler, causes re-render of dieline on resize which is acceptable)
 
-### Implementation Details
-
-**Stable ResizeObserver pattern:**
-```text
-<div ref={measureRef}>          ← ResizeObserver watches this (stable size)
-  <div ref={containerRef}>      ← Contains canvas, size driven by cssWidth/cssHeight
-    <canvas ref={canvasRef} />
-  </div>
-</div>
-```
-
-**Split effects:**
-- Effect 1 (canvas init): deps = `[canvasWidth, canvasHeight, mode, dielineResult]` — destroys/recreates canvas only when logical dimensions or product type change
-- Effect 2 (display scaling): deps = `[containerWidth, canvasWidth, canvasHeight]` — calls `setDimensions({cssOnly:true})` + `setZoom()` on existing canvas instance
-
-**Artwork upload in toolbar:**
-- "Upload Image" button opens file picker (PNG, JPG, SVG, PDF)
-- Image is added as a Fabric.Image centered on canvas (or within clicked zone)
-- User can move/scale/rotate freely
-- For PDFs: render first page to image, then add as Fabric.Image
-
-### Implementation Order
-1. Fix the flickering (stable measure ref + split effects) — highest priority
-2. Add artwork upload button to toolbar for both modes
-3. Add clickable zone overlays for dieline panels ("Click to add art")
+**Recommended**: Add `displayScale` to the effect dependency array and use it directly in the stroke calculations.
 
