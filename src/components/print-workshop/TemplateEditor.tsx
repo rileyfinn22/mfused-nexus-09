@@ -1387,8 +1387,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         transparentCorners: false,
       } as any);
       canvas.add(fabricImg);
-      const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
-      if (trim) canvas.bringObjectToFront(trim);
+      fixZOrder(canvas);
       canvas.setActiveObject(fabricImg);
       canvas.renderAll();
       syncCanvas();
