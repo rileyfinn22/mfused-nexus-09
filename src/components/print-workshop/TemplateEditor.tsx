@@ -396,6 +396,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       bg.set({ selectable: false, evented: false, hasControls: false, hasBorders: false });
       canvas.sendObjectToBack(bg);
     }
+    // Bring dieline guides and labels to front (above all artwork)
+    const dielineObjs = canvas.getObjects().filter((o: any) => o.name === "_dieline" || o.name === "_dielineLabel");
+    dielineObjs.forEach((o: any) => canvas.bringObjectToFront(o));
+    // Trim guide on very top
     const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
     if (trim) canvas.bringObjectToFront(trim);
   }, []);
@@ -1229,13 +1233,77 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         transparentCorners: editable ? false : undefined,
       } as any);
       canvas.add(fabricImg);
-      // Keep trim guide on top
-      const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
-      if (trim) canvas.bringObjectToFront(trim);
+      fixZOrder(canvas);
       canvas.setActiveObject(fabricImg);
       canvas.renderAll();
       syncCanvas();
     });
+  };
+
+  /** Upload a PDF art file — stores the original for print, renders high-res preview on canvas */
+  const addPdfArtwork = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/pdf";
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const canvas = fabricRef.current;
+      if (!canvas) return;
+
+      try {
+        // 1. Upload original PDF to storage for print-ready use
+        const storagePath = `artwork/${crypto.randomUUID()}/art.pdf`;
+        const { error: uploadError } = await supabase.storage
+          .from("print-files")
+          .upload(storagePath, file, { contentType: "application/pdf", upsert: true });
+        if (uploadError) {
+          console.error("PDF artwork upload error:", uploadError);
+          toast.error("Failed to upload PDF artwork");
+          return;
+        }
+        toast.success("PDF artwork stored for print-quality export");
+
+        // 2. Render a high-res preview (4x) for on-screen placement
+        const blob = await generatePdfThumbnailFromFile(file, {
+          maxWidth: canvasWidth * PDF_BACKGROUND_OVERSAMPLE,
+          scale: 1,
+        });
+        const url = URL.createObjectURL(blob);
+        const imgEl = new window.Image();
+        imgEl.onload = () => {
+          const maxW = canvasWidth * 0.6;
+          const maxH = canvasHeight * 0.6;
+          const scale = Math.min(maxW / imgEl.width, maxH / imgEl.height, 1);
+          const fabricImg = new FabricImage(imgEl, {
+            left: canvasWidth / 2 - (imgEl.width * scale) / 2,
+            top: canvasHeight / 2 - (imgEl.height * scale) / 2,
+            scaleX: scale,
+            scaleY: scale,
+          });
+          (fabricImg as any).locked = false;
+          (fabricImg as any).editable = true;
+          (fabricImg as any).name = "user_artwork";
+          (fabricImg as any)._pdfStoragePath = storagePath;
+          fabricImg.set({
+            borderColor: "#3b82f6",
+            cornerColor: "#3b82f6",
+            cornerStyle: "circle",
+            transparentCorners: false,
+          } as any);
+          canvas.add(fabricImg);
+          fixZOrder(canvas);
+          canvas.setActiveObject(fabricImg);
+          canvas.renderAll();
+          syncCanvas();
+        };
+        imgEl.src = url;
+      } catch (err: any) {
+        console.error("PDF artwork error:", err);
+        toast.error("Failed to process PDF artwork");
+      }
+    };
+    input.click();
   };
 
   function pickImageFile(onLoad: (img: HTMLImageElement) => void) {
@@ -1319,8 +1387,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         transparentCorners: false,
       } as any);
       canvas.add(fabricImg);
-      const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
-      if (trim) canvas.bringObjectToFront(trim);
+      fixZOrder(canvas);
       canvas.setActiveObject(fabricImg);
       canvas.renderAll();
       syncCanvas();
@@ -2212,33 +2279,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
           <>
             <span className="text-xs text-muted-foreground px-2">Click a highlighted field to edit</span>
             <div className="w-px h-6 bg-border mx-1" />
-            <Button size="sm" variant="outline" onClick={() => {
-              pickImageFile((imgEl) => {
-                const canvas = fabricRef.current;
-                if (!canvas) return;
-                const canvasW = canvas.getWidth();
-                const canvasH = canvas.getHeight();
-                const maxW = canvasW * 0.6;
-                const maxH = canvasH * 0.6;
-                const scale = Math.min(maxW / imgEl.width, maxH / imgEl.height, 1);
-                const newImg = new FabricImage(imgEl, {
-                  left: canvasW / 2 - (imgEl.width * scale) / 2,
-                  top: canvasH / 2 - (imgEl.height * scale) / 2,
-                  scaleX: scale,
-                  scaleY: scale,
-                });
-                (newImg as any).locked = false;
-                (newImg as any).editable = true;
-                (newImg as any).name = "user_artwork";
-                newImg.set({ borderColor: "#3b82f6", cornerColor: "#3b82f6", cornerStyle: "circle", transparentCorners: false } as any);
-                canvas.add(newImg);
-                canvas.setActiveObject(newImg);
-                canvas.renderAll();
-                syncCanvas();
-              });
-            }} className="gap-1.5">
-              <Upload className="h-3.5 w-3.5" />
-              <span className="text-xs">Upload Artwork</span>
+            <Button size="sm" variant="outline" onClick={addPdfArtwork} className="gap-1.5">
+              <FileText className="h-3.5 w-3.5" />
+              <span className="text-xs">Upload Art (PDF)</span>
             </Button>
           </>
         )}
@@ -2291,6 +2334,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             <Button size="sm" variant="outline" onClick={() => addArtworkImage(true)} className="gap-1.5">
               <Upload className="h-3.5 w-3.5" />
               <span className="text-xs">Editable Image</span>
+            </Button>
+            <Button size="sm" variant="outline" onClick={addPdfArtwork} className="gap-1.5">
+              <FileText className="h-3.5 w-3.5" />
+              <span className="text-xs">PDF Art</span>
             </Button>
             <div className="w-px h-6 bg-border mx-1" />
             <AiImageDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
