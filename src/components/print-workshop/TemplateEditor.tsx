@@ -157,6 +157,8 @@ interface TemplateEditorProps {
   width: number;
   height: number;
   bleed: number;
+  depth?: number;
+  productType?: string;
   onCanvasChange?: (data: any) => void;
   onSourcePdfChange?: (path: string) => void;
   sourcePdfPath?: string;
@@ -164,7 +166,7 @@ interface TemplateEditorProps {
   fabricCanvasRef?: React.MutableRefObject<FabricCanvas | null>;
 }
 
-export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChange, onSourcePdfChange, sourcePdfPath, mode, fabricCanvasRef }: TemplateEditorProps) {
+export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, productType = "label", onCanvasChange, onSourcePdfChange, sourcePdfPath, mode, fabricCanvasRef }: TemplateEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
   const previewPdfUrlRef = useRef<string | null>(null);
