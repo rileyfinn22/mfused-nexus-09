@@ -1719,7 +1719,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     const canvas = fabricRef.current;
     if (!canvas) return;
     canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
-    canvas.setZoom(displayScale);
     canvas.renderAll();
   }, [displayScale, cssWidth, cssHeight]);
 
