@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,7 +62,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function WorkshopOrderDetail() {
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const { isVibeAdmin } = useActiveCompany();
+  const { isVibeAdmin, loading: roleLoading } = useActiveCompany();
   const [order, setOrder] = useState<any>(null);
   const [lineItems, setLineItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,6 +89,10 @@ export default function WorkshopOrderDetail() {
   useEffect(() => {
     if (orderId) fetchOrder();
   }, [orderId]);
+
+  // Restrict to vibe_admin only
+  if (roleLoading) return <div className="flex items-center justify-center py-20 text-muted-foreground">Loading...</div>;
+  if (!isVibeAdmin) return <Navigate to="/dashboard" replace />;
 
   const fetchOrder = async () => {
     setLoading(true);
