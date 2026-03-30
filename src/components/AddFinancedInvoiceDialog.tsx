@@ -15,6 +15,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   preselectedVendorPO?: { id: string; po_number: string; total: number; description: string | null } | null;
+  mode?: "admin" | "finance";
 }
 
 export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, preselectedVendorPO }: Props) {
