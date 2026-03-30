@@ -418,6 +418,9 @@ export default function PrintWorkshop() {
     );
   }
 
+  // Determine if this is a custom order (no saved template)
+  const isCustomOrder = selectedTemplate && !selectedTemplate.id;
+
   if (view === "build") {
     if (!isVibeAdmin) {
       setView("browse");
