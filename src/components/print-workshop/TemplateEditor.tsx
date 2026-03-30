@@ -1233,13 +1233,77 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         transparentCorners: editable ? false : undefined,
       } as any);
       canvas.add(fabricImg);
-      // Keep trim guide on top
-      const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
-      if (trim) canvas.bringObjectToFront(trim);
+      fixZOrder(canvas);
       canvas.setActiveObject(fabricImg);
       canvas.renderAll();
       syncCanvas();
     });
+  };
+
+  /** Upload a PDF art file — stores the original for print, renders high-res preview on canvas */
+  const addPdfArtwork = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/pdf";
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const canvas = fabricRef.current;
+      if (!canvas) return;
+
+      try {
+        // 1. Upload original PDF to storage for print-ready use
+        const storagePath = `artwork/${crypto.randomUUID()}/art.pdf`;
+        const { error: uploadError } = await supabase.storage
+          .from("print-files")
+          .upload(storagePath, file, { contentType: "application/pdf", upsert: true });
+        if (uploadError) {
+          console.error("PDF artwork upload error:", uploadError);
+          toast.error("Failed to upload PDF artwork");
+          return;
+        }
+        toast.success("PDF artwork stored for print-quality export");
+
+        // 2. Render a high-res preview (4x) for on-screen placement
+        const blob = await generatePdfThumbnailFromFile(file, {
+          maxWidth: canvasWidth * PDF_BACKGROUND_OVERSAMPLE,
+          scale: 1,
+        });
+        const url = URL.createObjectURL(blob);
+        const imgEl = new window.Image();
+        imgEl.onload = () => {
+          const maxW = canvasWidth * 0.6;
+          const maxH = canvasHeight * 0.6;
+          const scale = Math.min(maxW / imgEl.width, maxH / imgEl.height, 1);
+          const fabricImg = new FabricImage(imgEl, {
+            left: canvasWidth / 2 - (imgEl.width * scale) / 2,
+            top: canvasHeight / 2 - (imgEl.height * scale) / 2,
+            scaleX: scale,
+            scaleY: scale,
+          });
+          (fabricImg as any).locked = false;
+          (fabricImg as any).editable = true;
+          (fabricImg as any).name = "user_artwork";
+          (fabricImg as any)._pdfStoragePath = storagePath;
+          fabricImg.set({
+            borderColor: "#3b82f6",
+            cornerColor: "#3b82f6",
+            cornerStyle: "circle",
+            transparentCorners: false,
+          } as any);
+          canvas.add(fabricImg);
+          fixZOrder(canvas);
+          canvas.setActiveObject(fabricImg);
+          canvas.renderAll();
+          syncCanvas();
+        };
+        imgEl.src = url;
+      } catch (err: any) {
+        console.error("PDF artwork error:", err);
+        toast.error("Failed to process PDF artwork");
+      }
+    };
+    input.click();
   };
 
   function pickImageFile(onLoad: (img: HTMLImageElement) => void) {
