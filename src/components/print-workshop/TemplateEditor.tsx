@@ -2634,6 +2634,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
           </div>
         </div>
       </div>
+      </div>
 
       {/* Objects panel + Dimensions info */}
       <div className="flex items-start gap-4">
