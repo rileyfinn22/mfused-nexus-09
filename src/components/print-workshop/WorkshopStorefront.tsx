@@ -51,6 +51,7 @@ export function WorkshopStorefront({
   onDeleteTemplate,
   onDuplicateTemplate,
   onNewTemplate,
+  onStartCustomOrder,
 }: WorkshopStorefrontProps) {
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
   const [search, setSearch] = useState("");
