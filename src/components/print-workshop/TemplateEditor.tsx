@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line } from "fabric";
 import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
