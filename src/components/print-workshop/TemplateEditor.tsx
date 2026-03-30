@@ -299,8 +299,20 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
   // Internal resolution for print quality
   const DPI = 150;
-  const canvasWidth = Math.round((width + bleed * 2) * DPI);
-  const canvasHeight = Math.round((height + bleed * 2) * DPI);
+
+  // For boxes/bags, compute flat layout dimensions from dieline generator
+  const dielineResult = useMemo(() => {
+    if (productType === "box" || productType === "bag") {
+      return generateDieline(productType, width, height, depth);
+    }
+    return null;
+  }, [productType, width, height, depth]);
+
+  const effectiveWidth = dielineResult ? dielineResult.totalWidth : width;
+  const effectiveHeight = dielineResult ? dielineResult.totalHeight : height;
+
+  const canvasWidth = Math.round((effectiveWidth + bleed * 2) * DPI);
+  const canvasHeight = Math.round((effectiveHeight + bleed * 2) * DPI);
   const bleedPx = Math.round(bleed * DPI);
 
   // Responsive display: measure container width to fit canvas
