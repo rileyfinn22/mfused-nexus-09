@@ -93,20 +93,23 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
   };
 
   const handleSubmit = async () => {
-    if (!selectedPO || !financedAmount) return;
+    if (!isFinanceMode && !selectedPO) return;
+    if (!financedAmount) return;
     setLoading(true);
     const amt = parseFloat(financedAmount);
     const rate = parseFloat(exchangeRate);
 
     // 1. Add to financing tracker
     const { error } = await supabase.from("financed_invoices").insert({
-      vendor_po_id: selectedPO.id,
+      vendor_po_id: isFinanceMode ? null : selectedPO.id,
       financed_amount: amt,
       financed_amount_rmb: amt * rate,
       exchange_rate: rate,
       financed_date: financedDate,
       notes: notes || null,
-      finance_status: "pending",
+      description: isFinanceMode ? (description || null) : null,
+      finance_status: isFinanceMode ? "active" : "pending",
+      created_by_role: isFinanceMode ? "finance" : null,
     });
 
     if (error) {
