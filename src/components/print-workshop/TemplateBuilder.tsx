@@ -362,6 +362,8 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
             width={widthInches}
             height={heightInches}
             bleed={bleedInches}
+            depth={depthInches}
+            productType={productType}
             onCanvasChange={setCanvasData}
             onSourcePdfChange={setSourcePdfPath}
             sourcePdfPath={sourcePdfPath}
