@@ -2335,6 +2335,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
               <Upload className="h-3.5 w-3.5" />
               <span className="text-xs">Editable Image</span>
             </Button>
+            <Button size="sm" variant="outline" onClick={addPdfArtwork} className="gap-1.5">
+              <FileText className="h-3.5 w-3.5" />
+              <span className="text-xs">PDF Art</span>
+            </Button>
             <div className="w-px h-6 bg-border mx-1" />
             <AiImageDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
             <AiEditDialog getCanvasImage={getCanvasImage} onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
