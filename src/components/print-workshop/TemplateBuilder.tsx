@@ -168,6 +168,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         product_type: productType,
         width_inches: widthInches,
         height_inches: heightInches,
+        depth_inches: depthInches,
         bleed_inches: bleedInches,
         preset_price_per_unit: presetPrice ? Number(presetPrice) : null,
         material_options: materialOptions,
