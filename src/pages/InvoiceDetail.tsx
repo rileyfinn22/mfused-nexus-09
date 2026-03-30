@@ -1551,8 +1551,11 @@ const InvoiceDetail = () => {
   // Unified total calculation using shared calculator
   const computeDisplayTotals = () => {
     if (isEditMode) {
-      // Edit mode: always use shipped qty from edited items
-      const items = blanketTotalItems(editedItems);
+      // Edit mode: use shipped qty, respecting child invoice placeholder logic
+      const hasChildren = relatedInvoices.some(
+        (ri: any) => ri.parent_invoice_id === invoiceId
+      );
+      const items = blanketTotalItems(editedItems, hasChildren);
       return calculateInvoiceTotals(items, Number(invoice?.tax || 0), displayShipping);
     }
     if (isBlanketDisplay) {
