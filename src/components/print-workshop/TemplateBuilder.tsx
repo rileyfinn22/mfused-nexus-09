@@ -25,6 +25,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
   const [productType, setProductType] = useState(template?.product_type || "label");
   const [widthInches, setWidthInches] = useState(template?.width_inches || 4);
   const [heightInches, setHeightInches] = useState(template?.height_inches || 6);
+  const [depthInches, setDepthInches] = useState(template?.depth_inches || 0);
   const [bleedInches, setBleedInches] = useState(template?.bleed_inches || 0.125);
   const [presetPrice, setPresetPrice] = useState(template?.preset_price_per_unit || "");
   const [materialOptions, setMaterialOptions] = useState<string[]>(
