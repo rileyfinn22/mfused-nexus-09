@@ -258,7 +258,17 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
               </Select>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <SizePresetPicker
+              productType={productType}
+              onSelect={(preset: PrintPreset) => {
+                setWidthInches(preset.width_inches);
+                setHeightInches(preset.height_inches);
+                setDepthInches(preset.depth_inches);
+                setBleedInches(preset.bleed_inches);
+              }}
+            />
+
+            <div className={`grid gap-2 ${productType !== "label" ? "grid-cols-4" : "grid-cols-3"}`}>
               <div className="space-y-1">
                 <Label className="text-xs">Width (in)</Label>
                 <Input type="number" value={widthInches} onChange={(e) => setWidthInches(Number(e.target.value))} step={0.25} min={1} />
@@ -267,6 +277,12 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
                 <Label className="text-xs">Height (in)</Label>
                 <Input type="number" value={heightInches} onChange={(e) => setHeightInches(Number(e.target.value))} step={0.25} min={1} />
               </div>
+              {productType !== "label" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Depth (in)</Label>
+                  <Input type="number" value={depthInches} onChange={(e) => setDepthInches(Number(e.target.value))} step={0.25} min={0} />
+                </div>
+              )}
               <div className="space-y-1">
                 <Label className="text-xs">Bleed (in)</Label>
                 <Input type="number" value={bleedInches} onChange={(e) => setBleedInches(Number(e.target.value))} step={0.0625} min={0} />
