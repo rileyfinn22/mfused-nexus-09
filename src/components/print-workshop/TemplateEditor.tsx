@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line } from "fabric";
 import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
 import { computePdfBoxPlacement, extractPdfPageBoxes, type ParsedPdfPageBoxes } from "@/lib/pdfPageBoxes";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { generateDieline } from "@/lib/dielineGenerator";
 
 // Popular print-ready fonts (web-safe + Google Fonts)
 const FONT_OPTIONS = [
@@ -157,6 +158,8 @@ interface TemplateEditorProps {
   width: number;
   height: number;
   bleed: number;
+  depth?: number;
+  productType?: string;
   onCanvasChange?: (data: any) => void;
   onSourcePdfChange?: (path: string) => void;
   sourcePdfPath?: string;
@@ -164,7 +167,7 @@ interface TemplateEditorProps {
   fabricCanvasRef?: React.MutableRefObject<FabricCanvas | null>;
 }
 
-export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChange, onSourcePdfChange, sourcePdfPath, mode, fabricCanvasRef }: TemplateEditorProps) {
+export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, productType = "label", onCanvasChange, onSourcePdfChange, sourcePdfPath, mode, fabricCanvasRef }: TemplateEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
   const previewPdfUrlRef = useRef<string | null>(null);
@@ -297,8 +300,20 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
   // Internal resolution for print quality
   const DPI = 150;
-  const canvasWidth = Math.round((width + bleed * 2) * DPI);
-  const canvasHeight = Math.round((height + bleed * 2) * DPI);
+
+  // For boxes/bags, compute flat layout dimensions from dieline generator
+  const dielineResult = useMemo(() => {
+    if (productType === "box" || productType === "bag") {
+      return generateDieline(productType, width, height, depth);
+    }
+    return null;
+  }, [productType, width, height, depth]);
+
+  const effectiveWidth = dielineResult ? dielineResult.totalWidth : width;
+  const effectiveHeight = dielineResult ? dielineResult.totalHeight : height;
+
+  const canvasWidth = Math.round((effectiveWidth + bleed * 2) * DPI);
+  const canvasHeight = Math.round((effectiveHeight + bleed * 2) * DPI);
   const bleedPx = Math.round(bleed * DPI);
 
   // Responsive display: measure container width to fit canvas
@@ -336,7 +351,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
 
     if (Array.isArray(data.objects)) {
       data.objects = data.objects.filter((obj: any) => {
-        if (obj?.name === "_trimGuide" || obj?.name === "_snapGuide" || obj?.name === "_editHighlight") return false;
+        if (obj?.name === "_trimGuide" || obj?.name === "_snapGuide" || obj?.name === "_editHighlight" || obj?.name === "_dieline" || obj?.name === "_dielineLabel") return false;
         if (!includePdfBackground && obj?.name === "pdf_background") {
           const src = typeof obj?.src === "string" ? obj.src : "";
           if (sourcePdfPath || src.startsWith("blob:")) return false;
@@ -554,10 +569,71 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
         }
       });
 
+      // Remove any old dieline objects
+      canvas.getObjects().forEach((o: any) => {
+        if (o?.name === "_dieline" || o?.name === "_dielineLabel") canvas.remove(o);
+      });
+
+      // Render dieline guides for boxes/bags
+      if (dielineResult && dielineResult.objects.length > 0) {
+        const bleedOffset = bleedPx;
+        for (const obj of dielineResult.objects) {
+          if (obj.type === "line" && obj.x1 != null) {
+            const line = new Line([
+              bleedOffset + obj.x1 * DPI,
+              bleedOffset + obj.y1! * DPI,
+              bleedOffset + obj.x2! * DPI,
+              bleedOffset + obj.y2! * DPI,
+            ], {
+              stroke: obj.style === "fold" ? "#f59e0b" : "#ef4444",
+              strokeWidth: obj.style === "fold" ? 1.5 : 2,
+              strokeDashArray: obj.style === "fold" ? [8, 6] : [4, 2],
+              selectable: false,
+              evented: false,
+              objectCaching: false,
+            } as any);
+            (line as any).name = "_dieline";
+            canvas.add(line);
+          } else if (obj.type === "rect" && obj.x != null) {
+            const rect = new Rect({
+              left: bleedOffset + obj.x * DPI,
+              top: bleedOffset + obj.y! * DPI,
+              width: obj.w! * DPI,
+              height: obj.h! * DPI,
+              fill: "transparent",
+              stroke: obj.style === "fold" ? "#f59e0b" : "#ef4444",
+              strokeWidth: obj.style === "fold" ? 1 : 1.5,
+              strokeDashArray: obj.style === "fold" ? [6, 4] : [],
+              selectable: false,
+              evented: false,
+              objectCaching: false,
+            } as any);
+            (rect as any).name = "_dieline";
+            canvas.add(rect);
+          } else if (obj.type === "text" && obj.text) {
+            const text = new IText(obj.text, {
+              left: bleedOffset + obj.x! * DPI,
+              top: bleedOffset + obj.y! * DPI,
+              fontSize: 10 * (DPI / 72),
+              fill: "#6b7280",
+              fontFamily: "Arial",
+              originX: "center",
+              originY: "center",
+              selectable: false,
+              evented: false,
+              editable: false,
+            } as any);
+            (text as any).name = "_dielineLabel";
+            (text as any).locked = true;
+            canvas.add(text);
+          }
+        }
+      }
+
       if (mode === "use") {
         const editableObjects: any[] = [];
         canvas.getObjects().forEach((obj: any) => {
-          if (obj.name === "_trimGuide" || obj.name === "_ocrKnockout" || obj.name === "pdf_background" || obj.name === "mask_cover") {
+          if (obj.name === "_trimGuide" || obj.name === "_ocrKnockout" || obj.name === "pdf_background" || obj.name === "mask_cover" || obj.name === "_dieline" || obj.name === "_dielineLabel") {
             obj.set({ selectable: false, evented: false, hasControls: false });
             return;
           }
@@ -671,7 +747,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       const initialData = canvas.toObject(['locked', 'editable', 'name']) as any;
       delete initialData.backgroundImage;
       if (Array.isArray(initialData.objects)) {
-        initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide" && obj?.name !== "_editHighlight");
+        initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide" && obj?.name !== "_editHighlight" && obj?.name !== "_dieline" && obj?.name !== "_dielineLabel");
       }
       undoStack.current = [JSON.stringify(initialData)];
       redoStack.current = [];
@@ -752,7 +828,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, onCanvasChang
       canvas.dispose();
       fabricRef.current = null;
     };
-  }, [canvasWidth, canvasHeight, bleedPx, mode, getSelectionLockedState]);
+  }, [canvasWidth, canvasHeight, bleedPx, mode, getSelectionLockedState, dielineResult]);
 
   const addText = (editable: boolean) => {
     const canvas = fabricRef.current;

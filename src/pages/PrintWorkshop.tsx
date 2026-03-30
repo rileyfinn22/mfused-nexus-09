@@ -466,6 +466,8 @@ export default function PrintWorkshop() {
               width={selectedTemplate.width_inches}
               height={selectedTemplate.height_inches}
               bleed={selectedTemplate.bleed_inches}
+              depth={selectedTemplate.depth_inches || 0}
+              productType={selectedTemplate.product_type || "label"}
               onCanvasChange={setCanvasData}
               sourcePdfPath={selectedTemplate.source_pdf_path}
               mode="use"
