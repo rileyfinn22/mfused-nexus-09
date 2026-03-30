@@ -386,7 +386,38 @@ export default function PrintWorkshop() {
     );
   }
 
-  // Build mode - admin only
+  // Custom order flow
+  if (view === "custom") {
+    return (
+      <CustomOrderFlow
+        onBack={handleBack}
+        onStartEditor={(config) => {
+          // Create a virtual template from the custom config
+          const virtualTemplate = {
+            id: null,
+            name: `Custom ${config.productType.charAt(0).toUpperCase() + config.productType.slice(1)}`,
+            description: `${config.widthInches}" × ${config.heightInches}"${config.depthInches ? ` × ${config.depthInches}" deep` : ""}`,
+            product_type: config.productType,
+            width_inches: config.widthInches,
+            height_inches: config.heightInches,
+            depth_inches: config.depthInches,
+            bleed_inches: config.bleedInches,
+            panel_zones: config.panelZones,
+            canvas_data: null,
+            source_pdf_path: null,
+            preset_price_per_unit: null,
+            material_options: ["Matte", "Gloss"],
+          };
+          setSelectedTemplate(virtualTemplate);
+          setCanvasData(null);
+          setCustomConfig(config);
+          setSavedDesign(null);
+          setView("use");
+        }}
+      />
+    );
+  }
+
   if (view === "build") {
     if (!isVibeAdmin) {
       setView("browse");
