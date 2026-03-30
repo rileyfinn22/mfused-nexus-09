@@ -18,7 +18,8 @@ interface Props {
   mode?: "admin" | "finance";
 }
 
-export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, preselectedVendorPO }: Props) {
+export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, preselectedVendorPO, mode = "admin" }: Props) {
+  const isFinanceMode = mode === "finance";
   const [vendorPOs, setVendorPOs] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPO, setSelectedPO] = useState<any>(null);
@@ -27,6 +28,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
   const [exchangeRate, setExchangeRate] = useState("7.2");
   const [financedDate, setFinancedDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
+  const [description, setDescription] = useState("");
   const [sendNotification, setSendNotification] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingPOs, setLoadingPOs] = useState(false);
