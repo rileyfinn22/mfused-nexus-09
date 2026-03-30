@@ -30,6 +30,7 @@ interface WorkshopStorefrontProps {
   onDeleteTemplate: (id: string) => void;
   onDuplicateTemplate: (tmpl: any) => void;
   onNewTemplate: () => void;
+  onStartCustomOrder?: () => void;
 }
 
 const CATEGORY_ALL = "all";
@@ -50,6 +51,7 @@ export function WorkshopStorefront({
   onDeleteTemplate,
   onDuplicateTemplate,
   onNewTemplate,
+  onStartCustomOrder,
 }: WorkshopStorefrontProps) {
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
   const [search, setSearch] = useState("");
@@ -162,6 +164,24 @@ export function WorkshopStorefront({
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {/* Start Custom Order card */}
+          {onStartCustomOrder && (
+            <Card
+              className="group cursor-pointer border-dashed border-2 border-primary/30 hover:border-primary/60 hover:bg-primary/5 transition-all flex items-center justify-center min-h-[280px]"
+              onClick={onStartCustomOrder}
+            >
+              <CardContent className="flex flex-col items-center justify-center text-center p-6">
+                <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
+                  <Sparkles className="h-7 w-7 text-primary" />
+                </div>
+                <h3 className="font-semibold text-sm">Start Custom Order</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pick a size, upload artwork, and order
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Add new template card for admins */}
           {isVibeAdmin && (
             <Card

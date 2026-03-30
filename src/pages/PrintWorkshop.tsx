@@ -11,6 +11,7 @@ import { OrderPanel } from "@/components/print-workshop/OrderPanel";
 import { PrintCart, type CartItem } from "@/components/print-workshop/PrintCart";
 import { PrintCheckout } from "@/components/print-workshop/PrintCheckout";
 import { SavedDesignIndicator } from "@/components/print-workshop/SavedDesignIndicator";
+import { CustomOrderFlow } from "@/components/print-workshop/CustomOrderFlow";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkshopOrders } from "@/components/print-workshop/WorkshopOrders";
@@ -20,7 +21,7 @@ import { toast } from "sonner";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
 import { generatePdfThumbnailFromArrayBuffer } from "@/lib/pdfThumbnail";
 
-type View = "browse" | "build" | "use" | "checkout";
+type View = "browse" | "build" | "use" | "checkout" | "custom";
 
 export default function PrintWorkshop() {
   const { isVibeAdmin, activeCompanyId, loading: roleLoading } = useActiveCompany();
@@ -30,6 +31,10 @@ export default function PrintWorkshop() {
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [canvasData, setCanvasData] = useState<any>(null);
+  const [customConfig, setCustomConfig] = useState<{
+    productType: string; widthInches: number; heightInches: number;
+    depthInches: number; bleedInches: number; panelZones: any[];
+  } | null>(null);
   const [cartItems, setCartItemsRaw] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem("print_cart");
@@ -369,6 +374,7 @@ export default function PrintWorkshop() {
               onDeleteTemplate={handleDeleteTemplate}
               onDuplicateTemplate={handleDuplicateTemplate}
               onNewTemplate={handleNewTemplate}
+              onStartCustomOrder={() => setView("custom")}
             />
           </TabsContent>
 
@@ -380,7 +386,38 @@ export default function PrintWorkshop() {
     );
   }
 
-  // Build mode - admin only
+  // Custom order flow
+  if (view === "custom") {
+    return (
+      <CustomOrderFlow
+        onBack={handleBack}
+        onStartEditor={(config) => {
+          // Create a virtual template from the custom config
+          const virtualTemplate = {
+            id: null,
+            name: `Custom ${config.productType.charAt(0).toUpperCase() + config.productType.slice(1)}`,
+            description: `${config.widthInches}" × ${config.heightInches}"${config.depthInches ? ` × ${config.depthInches}" deep` : ""}`,
+            product_type: config.productType,
+            width_inches: config.widthInches,
+            height_inches: config.heightInches,
+            depth_inches: config.depthInches,
+            bleed_inches: config.bleedInches,
+            panel_zones: config.panelZones,
+            canvas_data: null,
+            source_pdf_path: null,
+            preset_price_per_unit: null,
+            material_options: ["Matte", "Gloss"],
+          };
+          setSelectedTemplate(virtualTemplate);
+          setCanvasData(null);
+          setCustomConfig(config);
+          setSavedDesign(null);
+          setView("use");
+        }}
+      />
+    );
+  }
+
   if (view === "build") {
     if (!isVibeAdmin) {
       setView("browse");

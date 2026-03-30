@@ -1904,6 +1904,51 @@ export type Database = {
           },
         ]
       }
+      print_presets: {
+        Row: {
+          bleed_inches: number | null
+          created_at: string | null
+          depth_inches: number | null
+          dieline_data: Json | null
+          height_inches: number
+          id: string
+          is_active: boolean | null
+          name: string
+          panel_zones: Json | null
+          product_type: string
+          sort_order: number | null
+          width_inches: number
+        }
+        Insert: {
+          bleed_inches?: number | null
+          created_at?: string | null
+          depth_inches?: number | null
+          dieline_data?: Json | null
+          height_inches: number
+          id?: string
+          is_active?: boolean | null
+          name: string
+          panel_zones?: Json | null
+          product_type?: string
+          sort_order?: number | null
+          width_inches: number
+        }
+        Update: {
+          bleed_inches?: number | null
+          created_at?: string | null
+          depth_inches?: number | null
+          dieline_data?: Json | null
+          height_inches?: number
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          panel_zones?: Json | null
+          product_type?: string
+          sort_order?: number | null
+          width_inches?: number
+        }
+        Relationships: []
+      }
       print_pricing_tiers: {
         Row: {
           created_at: string
@@ -1983,12 +2028,14 @@ export type Database = {
           company_id: string | null
           created_at: string
           created_by: string | null
+          depth_inches: number | null
           description: string | null
           height_inches: number
           id: string
           is_global: boolean
           material_options: Json | null
           name: string
+          panel_zones: Json | null
           preset_price_per_unit: number | null
           product_type: string
           source_pdf_path: string | null
@@ -2002,12 +2049,14 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           created_by?: string | null
+          depth_inches?: number | null
           description?: string | null
           height_inches?: number
           id?: string
           is_global?: boolean
           material_options?: Json | null
           name: string
+          panel_zones?: Json | null
           preset_price_per_unit?: number | null
           product_type?: string
           source_pdf_path?: string | null
@@ -2021,12 +2070,14 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           created_by?: string | null
+          depth_inches?: number | null
           description?: string | null
           height_inches?: number
           id?: string
           is_global?: boolean
           material_options?: Json | null
           name?: string
+          panel_zones?: Json | null
           preset_price_per_unit?: number | null
           product_type?: string
           source_pdf_path?: string | null

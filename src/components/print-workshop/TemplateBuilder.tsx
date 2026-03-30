@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TemplateEditor } from "./TemplateEditor";
+import { SizePresetPicker, type PrintPreset } from "./SizePresetPicker";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, Save } from "lucide-react";
@@ -24,6 +25,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
   const [productType, setProductType] = useState(template?.product_type || "label");
   const [widthInches, setWidthInches] = useState(template?.width_inches || 4);
   const [heightInches, setHeightInches] = useState(template?.height_inches || 6);
+  const [depthInches, setDepthInches] = useState(template?.depth_inches || 0);
   const [bleedInches, setBleedInches] = useState(template?.bleed_inches || 0.125);
   const [presetPrice, setPresetPrice] = useState(template?.preset_price_per_unit || "");
   const [materialOptions, setMaterialOptions] = useState<string[]>(
@@ -166,6 +168,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         product_type: productType,
         width_inches: widthInches,
         height_inches: heightInches,
+        depth_inches: depthInches,
         bleed_inches: bleedInches,
         preset_price_per_unit: presetPrice ? Number(presetPrice) : null,
         material_options: materialOptions,
@@ -256,7 +259,17 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
               </Select>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <SizePresetPicker
+              productType={productType}
+              onSelect={(preset: PrintPreset) => {
+                setWidthInches(preset.width_inches);
+                setHeightInches(preset.height_inches);
+                setDepthInches(preset.depth_inches);
+                setBleedInches(preset.bleed_inches);
+              }}
+            />
+
+            <div className={`grid gap-2 ${productType !== "label" ? "grid-cols-4" : "grid-cols-3"}`}>
               <div className="space-y-1">
                 <Label className="text-xs">Width (in)</Label>
                 <Input type="number" value={widthInches} onChange={(e) => setWidthInches(Number(e.target.value))} step={0.25} min={1} />
@@ -265,6 +278,12 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
                 <Label className="text-xs">Height (in)</Label>
                 <Input type="number" value={heightInches} onChange={(e) => setHeightInches(Number(e.target.value))} step={0.25} min={1} />
               </div>
+              {productType !== "label" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Depth (in)</Label>
+                  <Input type="number" value={depthInches} onChange={(e) => setDepthInches(Number(e.target.value))} step={0.25} min={0} />
+                </div>
+              )}
               <div className="space-y-1">
                 <Label className="text-xs">Bleed (in)</Label>
                 <Input type="number" value={bleedInches} onChange={(e) => setBleedInches(Number(e.target.value))} step={0.0625} min={0} />
