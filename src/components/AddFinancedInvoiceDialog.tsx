@@ -121,8 +121,8 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     // Note: vendor PO payment is NOT recorded at pending stage.
     // It will be recorded when the finance company accepts and activates the request.
 
-    // Optionally notify finance company
-    if (sendNotification) {
+    // Optionally notify finance company (admin mode only)
+    if (!isFinanceMode && sendNotification) {
       try {
         await supabase.functions.invoke("send-finance-notification", {
           body: {
