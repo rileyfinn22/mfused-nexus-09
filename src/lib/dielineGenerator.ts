@@ -1,16 +1,21 @@
 /**
- * Generates Fabric.js-compatible dieline objects (fold lines, cut lines, panel labels)
- * for boxes and bags based on dimensions.
+ * Generates Fabric.js-compatible dieline objects (fold/crease lines, cut/trim lines,
+ * panel labels, tuck flaps) for boxes and bags based on dimensions.
  *
  * All coordinates are in inches; the caller converts to canvas pixels via DPI.
+ *
+ * Visual convention (matching industry standard):
+ *   TRIM (cut) = blue solid lines
+ *   CREASE (fold) = red solid lines
  */
 
 export interface DielineObject {
-  type: "line" | "rect" | "text";
+  type: "line" | "rect" | "polyline" | "text";
   x1?: number; y1?: number; x2?: number; y2?: number; // for lines
   x?: number; y?: number; w?: number; h?: number;      // for rects
+  points?: { x: number; y: number }[];                  // for polylines
   text?: string;
-  style: "cut" | "fold" | "zone-label";
+  style: "trim" | "crease" | "zone-label";
 }
 
 export interface PanelZone {
@@ -33,60 +38,174 @@ export interface DielineResult {
   zones: PanelZone[];
 }
 
-const GLUE_TAB = 0.75; // inches
+const GLUE_TAB = 0.625; // inches
+const TUCK_FLAP_DEPTH_RATIO = 0.75; // tuck flap = 75% of depth
+const DUST_FLAP_RATIO = 0.5; // dust flap = 50% of depth
 
 /**
- * Generate a box dieline cross layout.
- * Standard cross: Top / Front-Left-Back-Right / Bottom, plus glue tab.
+ * Generate a tuck-end box dieline matching industry-standard layout.
+ *
+ * Layout (left to right main strip):
+ *   Glue Tab | Back | Side(Right) | Front | Side(Left)
+ *
+ * Top flaps: tuck on Front/Back, dust flaps on Sides
+ * Bottom flaps: tuck on Front/Back, dust flaps on Sides
+ *
+ * w = box width, h = box height, d = box depth
  */
 export function generateBoxDieline(
   w: number,
   h: number,
   d: number
 ): DielineResult {
-  // Cross layout: total width = Front + Left + Back + Right + glue tab
-  //               total height = Top + Front(height) + Bottom
-  const totalWidth = w + d + w + d + GLUE_TAB;
-  const totalHeight = d + h + d;
+  const tuck = Math.min(d * TUCK_FLAP_DEPTH_RATIO, d);
+  const dust = d * DUST_FLAP_RATIO;
+
+  // Main strip panels (y runs from tuck to tuck + h)
+  const topFlap = tuck;
+  const mainTop = topFlap; // y where main panels start
+  const mainBottom = mainTop + h;
+  const bottomFlap = tuck;
+
+  const totalHeight = topFlap + h + bottomFlap;
+
+  // X positions of panel left edges
+  const xGlue = 0;
+  const xBack = GLUE_TAB;
+  const xRightSide = xBack + w;
+  const xFront = xRightSide + d;
+  const xLeftSide = xFront + w;
+  const totalWidth = xLeftSide + d;
 
   const objects: DielineObject[] = [];
   const zones: PanelZone[] = [];
 
-  // Panel positions (x, y) — origin top-left
+  // ── CREASE (fold) lines ─────────────────────────────────────────
+  // Horizontal crease lines across full width (top and bottom of main strip)
+  objects.push({ type: "line", x1: GLUE_TAB, y1: mainTop, x2: totalWidth, y2: mainTop, style: "crease" });
+  objects.push({ type: "line", x1: GLUE_TAB, y1: mainBottom, x2: totalWidth, y2: mainBottom, style: "crease" });
+
+  // Vertical crease lines (panel boundaries) — full height including flaps
+  const panelBoundaries = [xBack, xRightSide, xFront, xLeftSide];
+  for (const px of panelBoundaries) {
+    objects.push({ type: "line", x1: px, y1: 0, x2: px, y2: totalHeight, style: "crease" });
+  }
+
+  // ── TRIM (cut) outlines ─────────────────────────────────────────
+
+  // Main body outer rectangle (the full strip without flaps)
+  // Left side of glue tab to right edge
+  objects.push({
+    type: "rect",
+    x: xGlue, y: mainTop,
+    w: totalWidth, h: h,
+    style: "trim"
+  });
+
+  // Glue tab (tapered shape — simplified as a rect)
+  objects.push({
+    type: "rect",
+    x: xGlue, y: mainTop,
+    w: GLUE_TAB, h: h,
+    style: "trim"
+  });
+
+  // ── TOP FLAPS ───────────────────────────────────────────────────
+
+  // Back top tuck flap (full width of back panel, with rounded top)
+  objects.push({
+    type: "rect",
+    x: xBack, y: 0,
+    w: w, h: tuck,
+    style: "trim"
+  });
+
+  // Right side dust flap (shorter)
+  objects.push({
+    type: "rect",
+    x: xRightSide, y: mainTop - dust,
+    w: d, h: dust,
+    style: "trim"
+  });
+
+  // Front top tuck flap
+  objects.push({
+    type: "rect",
+    x: xFront, y: 0,
+    w: w, h: tuck,
+    style: "trim"
+  });
+
+  // Left side dust flap
+  objects.push({
+    type: "rect",
+    x: xLeftSide, y: mainTop - dust,
+    w: d, h: dust,
+    style: "trim"
+  });
+
+  // ── BOTTOM FLAPS ────────────────────────────────────────────────
+
+  // Back bottom tuck flap
+  objects.push({
+    type: "rect",
+    x: xBack, y: mainBottom,
+    w: w, h: tuck,
+    style: "trim"
+  });
+
+  // Right side dust flap
+  objects.push({
+    type: "rect",
+    x: xRightSide, y: mainBottom,
+    w: d, h: dust,
+    style: "trim"
+  });
+
+  // Front bottom tuck flap
+  objects.push({
+    type: "rect",
+    x: xFront, y: mainBottom,
+    w: w, h: tuck,
+    style: "trim"
+  });
+
+  // Left side dust flap
+  objects.push({
+    type: "rect",
+    x: xLeftSide, y: mainBottom,
+    w: d, h: dust,
+    style: "trim"
+  });
+
+  // ── PANEL ZONES ─────────────────────────────────────────────────
   const panels = [
-    { name: "Top",    x: d,         y: 0,     pw: w, ph: d },
-    { name: "Front",  x: 0,         y: d,     pw: w, ph: h },
-    { name: "Left",   x: w,         y: d,     pw: d, ph: h },
-    { name: "Back",   x: w + d,     y: d,     pw: w, ph: h },
-    { name: "Right",  x: w + d + w, y: d,     pw: d, ph: h },
-    { name: "Bottom", x: d,         y: d + h, pw: w, ph: d },
+    { name: "Back",       x: xBack,      y: mainTop, pw: w, ph: h },
+    { name: "Right Side", x: xRightSide, y: mainTop, pw: d, ph: h },
+    { name: "Front",      x: xFront,     y: mainTop, pw: w, ph: h },
+    { name: "Left Side",  x: xLeftSide,  y: mainTop, pw: d, ph: h },
   ];
 
   for (const p of panels) {
-    // Cut lines (outer edges)
-    objects.push(
-      { type: "rect", x: p.x, y: p.y, w: p.pw, h: p.ph, style: "cut" }
-    );
-    // Zone label
-    objects.push(
-      { type: "text", x: p.x + p.pw / 2, y: p.y + p.ph / 2, text: p.name, style: "zone-label" }
-    );
-    zones.push({ name: p.name, x: p.x, y: p.y, w: p.pw, h: p.ph, required: p.name === "Front" });
+    objects.push({
+      type: "text",
+      x: p.x + p.pw / 2,
+      y: p.y + p.ph / 2,
+      text: p.name,
+      style: "zone-label"
+    });
+    zones.push({
+      name: p.name,
+      x: p.x,
+      y: p.y,
+      w: p.pw,
+      h: p.ph,
+      required: p.name === "Front"
+    });
   }
 
-  // Fold lines between adjacent panels in the horizontal strip
-  const foldXs = [w, w + d, w + d + w, w + d + w + d];
-  for (const fx of foldXs) {
-    objects.push({ type: "line", x1: fx, y1: d, x2: fx, y2: d + h, style: "fold" });
-  }
-  // Top/bottom fold lines
-  objects.push({ type: "line", x1: d, y1: d, x2: d + w, y2: d, style: "fold" });
-  objects.push({ type: "line", x1: d, y1: d + h, x2: d + w, y2: d + h, style: "fold" });
-
-  // Glue tab
-  const gx = w + d + w + d;
-  objects.push({ type: "rect", x: gx, y: d, w: GLUE_TAB, h: h, style: "fold" });
-  objects.push({ type: "text", x: gx + GLUE_TAB / 2, y: d + h / 2, text: "Glue", style: "zone-label" });
+  // Label flaps
+  objects.push({ type: "text", x: xGlue + GLUE_TAB / 2, y: mainTop + h / 2, text: "Glue", style: "zone-label" });
 
   return { totalWidth, totalHeight, objects, zones };
 }
@@ -116,7 +235,7 @@ export function generateBagDieline(
   ];
 
   for (const p of panels) {
-    objects.push({ type: "rect", x: p.x, y: p.y, w: p.pw, h: p.ph, style: "cut" });
+    objects.push({ type: "rect", x: p.x, y: p.y, w: p.pw, h: p.ph, style: "trim" });
     objects.push({ type: "text", x: p.x + p.pw / 2, y: p.y + p.ph / 2, text: p.name, style: "zone-label" });
     zones.push({ name: p.name, x: p.x, y: p.y, w: p.pw, h: p.ph, required: p.name === "Front" });
   }
@@ -124,12 +243,12 @@ export function generateBagDieline(
   // Fold lines between panels
   const foldXs = [w, w + gusset, w + gusset + w];
   for (const fx of foldXs) {
-    objects.push({ type: "line", x1: fx, y1: 0, x2: fx, y2: h, style: "fold" });
+    objects.push({ type: "line", x1: fx, y1: 0, x2: fx, y2: h, style: "crease" });
   }
 
   // Bottom fold area
-  objects.push({ type: "line", x1: 0, y1: h, x2: totalWidth, y2: h, style: "fold" });
-  objects.push({ type: "rect", x: 0, y: h, w: totalWidth, h: bottomFold, style: "fold" });
+  objects.push({ type: "line", x1: 0, y1: h, x2: totalWidth, y2: h, style: "crease" });
+  objects.push({ type: "rect", x: 0, y: h, w: totalWidth, h: bottomFold, style: "crease" });
   objects.push({ type: "text", x: totalWidth / 2, y: h + bottomFold / 2, text: "Bottom Fold", style: "zone-label" });
 
   return { totalWidth, totalHeight, objects, zones };
