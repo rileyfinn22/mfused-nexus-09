@@ -48,6 +48,7 @@ import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
 import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkViewerDialog";
 import { CustomerArtworkTab } from "@/components/CustomerArtworkTab";
 import { cn } from "@/lib/utils";
+import PdfThumbnail from "@/components/PdfThumbnail";
 import { FileArchive, FileCode } from "lucide-react";
 import JSZip from "jszip";
 
@@ -1011,13 +1012,11 @@ const Artwork = () => {
                       );
                     } else if (thumbnail.type === 'pdf') {
                       return (
-                        <div className="w-full h-full flex flex-col items-center justify-center bg-red-50 dark:bg-red-950/20">
-                          <FileImage className="h-12 w-12 text-red-500 mb-2" />
-                          <Badge variant="secondary" className="text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
-                            PDF
-                          </Badge>
-                          <span className="text-xs text-muted-foreground mt-1">Click to view</span>
-                        </div>
+                        <PdfThumbnail 
+                          pdfUrl={file.artwork_url} 
+                          alt={file.sku}
+                          className="w-full h-full object-cover"
+                        />
                       );
                     } else {
                       return (
