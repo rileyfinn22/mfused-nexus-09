@@ -586,11 +586,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         const CUT_COLOR = "#1976d2";   // blue solid for cut/trim
         const FOLD_COLOR = "#d32f2f";  // red dashed for fold/crease
 
+        const invScale = displayScale > 0 ? 1 / displayScale : 1;
+
         for (const obj of dielineResult.objects) {
           const isFold = obj.style === "fold";
           const strokeColor = isFold ? FOLD_COLOR : CUT_COLOR;
-          const strokeW = isFold ? 1 : 1.5;
-          const dashArray = isFold ? [6, 4] : [];
+          const strokeW = (isFold ? 1 : 1.5) * invScale;
+          const dashArray = isFold ? [6 * invScale, 4 * invScale] : [];
 
           if (obj.type === "line" && obj.x1 != null) {
             const x1 = bleedOffset + obj.x1 * DPI;
@@ -627,7 +629,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             const text = new IText(obj.text, {
               left: bleedOffset + obj.x! * DPI,
               top: bleedOffset + obj.y! * DPI,
-              fontSize: 11 * (DPI / 72),
+              fontSize: 11 * (DPI / 72) * invScale,
               fill: "#9ca3af",
               fontFamily: "Arial",
               originX: "center",
