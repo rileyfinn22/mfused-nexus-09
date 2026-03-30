@@ -633,7 +633,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       if (mode === "use") {
         const editableObjects: any[] = [];
         canvas.getObjects().forEach((obj: any) => {
-          if (obj.name === "_trimGuide" || obj.name === "_ocrKnockout" || obj.name === "pdf_background" || obj.name === "mask_cover") {
+          if (obj.name === "_trimGuide" || obj.name === "_ocrKnockout" || obj.name === "pdf_background" || obj.name === "mask_cover" || obj.name === "_dieline" || obj.name === "_dielineLabel") {
             obj.set({ selectable: false, evented: false, hasControls: false });
             return;
           }
