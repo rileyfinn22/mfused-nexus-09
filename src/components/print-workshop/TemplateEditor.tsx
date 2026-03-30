@@ -2671,11 +2671,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
           {dielineResult && (
             <>
               <span className="flex items-center gap-1">
-                <span className="w-3 h-0.5 inline-block" style={{ borderTop: "1.5px dashed #f59e0b" }} />
+                <span className="w-3 h-0.5 inline-block" style={{ borderTop: "1.5px dashed #d32f2f" }} />
                 Fold line
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-3 h-0.5 inline-block" style={{ borderTop: "2px solid #ef4444" }} />
+                <span className="w-3 h-0.5 inline-block" style={{ borderTop: "2px solid #1976d2" }} />
                 Cut line
               </span>
             </>
