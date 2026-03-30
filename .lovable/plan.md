@@ -1,31 +1,40 @@
 
 
-## Fix: Dieline Lines Too Thin to See
+## Fix: Blanket Invoice Total Logic + Invoice 10708 Data Correction
 
-### Root Cause
-The dieline stroke widths (1px and 1.5px) are in canvas-coordinate pixels. When the canvas is zoomed down via `displayScale` (~0.37 for a typical box), those lines render at **sub-pixel thickness** on screen (0.37–0.55px). The dash arrays also shrink to near-invisible dots.
+### Problem
+Invoice 10708 stores subtotal=$56,181.90 and total=$64,806.90, but the correct shipped-quantity calculation gives **subtotal=$54,361.60** and **total=$62,986.60** ($54,361.60 + $8,625 shipping).
 
-### Fix
-Scale `strokeWidth` and `strokeDashArray` inversely with `displayScale` so lines appear at a consistent visual thickness regardless of zoom level.
+The root cause: `blanketTotalItems()` falls back to ordered `quantity` for items with 0 shipped, inflating the subtotal. The DB trigger uses `GREATEST(ordered, shipped)` which can also inflate.
 
-### File: `src/components/print-workshop/TemplateEditor.tsx`
+### Design Rule
+- **Before any shipping**: blanket invoice total = order total (placeholder)  
+- **Once any item ships**: blanket subtotal = sum of ONLY shipped items (shipped_qty × unit_price); unshipped items contribute $0  
+- **Total** = subtotal + tax + shipping (as always)
 
-In the dieline rendering section (~line 589-643):
+### Changes
 
-1. **Compute inverse scale factor** to keep lines visually consistent:
-   ```
-   const invScale = 1 / displayScale;
-   ```
+**1. Data fix — Invoice 10708**  
+Update stored values: `subtotal = 54361.60`, `total = 62986.60`
 
-2. **Apply to stroke widths**: Instead of `strokeW = 1` or `1.5`, use `strokeW * invScale` — so a 1.5px cut line at 0.37 zoom becomes ~4px in canvas coords, rendering as 1.5px on screen.
+**2. `src/lib/invoiceTotals.ts` — Fix `blanketTotalItems()`**  
+If ANY item has `shipped_quantity > 0`, only include items that have shipped. Unshipped items get quantity=0. If NO items have shipped, fall back to ordered quantities (placeholder behavior).
 
-3. **Apply to dash arrays**: Scale `[6, 4]` to `[6 * invScale, 4 * invScale]` so dashes look correct at any zoom.
+```
+blanketTotalItems(orderItems):
+  anyShipped = orderItems.some(i => shipped_quantity > 0)
+  if anyShipped:
+    quantity = shipped_quantity > 0 ? shipped_quantity : 0  // exclude unshipped
+  else:
+    quantity = ordered quantity  // placeholder
+```
 
-4. **Apply to label font size**: The label `fontSize: 11 * (DPI / 72)` (~23px canvas) renders as ~8.5px on screen. Scale it up similarly so panel names are legible.
+**3. `src/pages/InvoiceDetail.tsx` (~lines 1197-1204) — Remove floor-to-order guard**  
+The placeholder behavior is now handled by `blanketTotalItems`. Remove the `!anyShipped` floor-to-order logic since the new `blanketTotalItems` already returns ordered quantities when nothing has shipped.
 
-This is a ~10-line change in the dieline rendering loop. The `displayScale` value is already available in scope (line 346). The `dielineResult` rendering block needs access to it — it's inside the init effect which currently captures it via closure, but since `displayScale` isn't in the effect's deps, we need to either:
-- Pass the current `displayScale` via a ref so the init effect reads the latest value, OR
-- Add `displayScale` to the effect deps (simpler, causes re-render of dieline on resize which is acceptable)
-
-**Recommended**: Add `displayScale` to the effect dependency array and use it directly in the stroke calculations.
+**4. DB trigger migration — `recalculate_order_totals()`**  
+Update the blanket invoice subtotal logic:
+- If any `shipped_quantity > 0` exists → blanket subtotal = `SUM(shipped_quantity * unit_price)` for shipped items only
+- If nothing shipped → keep ordered subtotal as placeholder (`SUM(quantity * unit_price)`)
+- Remove `GREATEST(ordered, shipped)` — it inflates totals when some items ship more than ordered while others haven't shipped
 
