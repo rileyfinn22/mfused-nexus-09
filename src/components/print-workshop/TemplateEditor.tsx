@@ -312,6 +312,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const effectiveWidth = dielineResult ? dielineResult.totalWidth : width;
   const effectiveHeight = dielineResult ? dielineResult.totalHeight : height;
 
+  console.log("[TemplateEditor] productType:", productType, "w:", width, "h:", height, "d:", depth, "effectiveW:", effectiveWidth, "effectiveH:", effectiveHeight, "dielineResult:", dielineResult ? `${dielineResult.objects.length} objects` : "null");
+
   const canvasWidth = Math.round((effectiveWidth + bleed * 2) * DPI);
   const canvasHeight = Math.round((effectiveHeight + bleed * 2) * DPI);
   const bleedPx = Math.round(bleed * DPI);
@@ -581,14 +583,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       // Render dieline guides for boxes/bags
       if (dielineResult && dielineResult.objects.length > 0) {
         const bleedOffset = bleedPx;
+        console.log("[Dieline] canvasW:", canvasWidth, "canvasH:", canvasHeight, "bleedPx:", bleedPx, "totalW:", dielineResult.totalWidth, "totalH:", dielineResult.totalHeight, "objects:", dielineResult.objects.length, "DPI:", DPI);
         for (const obj of dielineResult.objects) {
           if (obj.type === "line" && obj.x1 != null) {
-            const line = new Line([
-              bleedOffset + obj.x1 * DPI,
-              bleedOffset + obj.y1! * DPI,
-              bleedOffset + obj.x2! * DPI,
-              bleedOffset + obj.y2! * DPI,
-            ], {
+            const x1 = bleedOffset + obj.x1 * DPI;
+            const y1 = bleedOffset + obj.y1! * DPI;
+            const x2 = bleedOffset + obj.x2! * DPI;
+            const y2 = bleedOffset + obj.y2! * DPI;
+            const line = new Line([x1, y1, x2, y2], {
               stroke: obj.style === "crease" ? "#c0392b" : "#2c3e7a",
               strokeWidth: obj.style === "crease" ? 1.5 : 2,
               strokeDashArray: [],
