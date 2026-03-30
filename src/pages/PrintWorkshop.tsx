@@ -343,11 +343,6 @@ export default function PrintWorkshop() {
               onClearCart={handleClearCart}
               onCheckout={() => setView("checkout")}
             />
-            {isVibeAdmin && (
-              <Button onClick={handleNewTemplate} className="gap-2">
-                <Plus className="h-4 w-4" /> New Template
-              </Button>
-            )}
           </div>
         </div>
 
@@ -364,106 +359,17 @@ export default function PrintWorkshop() {
           </TabsList>
 
           <TabsContent value="templates">
-            {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardContent className="p-4">
-                      <div className="aspect-[4/3] bg-muted rounded-lg mb-3" />
-                      <div className="h-4 bg-muted rounded w-2/3 mb-2" />
-                      <div className="h-3 bg-muted rounded w-1/2" />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : templates.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                  <Printer className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-1">No templates yet</h3>
-                  <p className="text-muted-foreground text-sm mb-4">
-                    {isVibeAdmin
-                      ? "Create your first label template to get started"
-                      : "Check back soon for available products"}
-                  </p>
-                  {isVibeAdmin && (
-                    <Button onClick={handleNewTemplate} className="gap-2">
-                      <Plus className="h-4 w-4" /> Create Template
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {templates.map((tmpl) => {
-                  const inCart = cartItems.some((c) => c.templateId === tmpl.id);
-                  return (
-                  <Card
-                    key={tmpl.id}
-                    className="group cursor-pointer hover:border-primary/50 hover:shadow-md transition-all relative"
-                    onClick={() => handleSelectTemplate(tmpl)}
-                  >
-                    {inCart && (
-                      <div className="absolute top-2 right-2 z-10">
-                        <Badge className="text-[10px] px-1.5 py-0.5 bg-primary text-primary-foreground gap-1">
-                          <ShoppingCart className="h-2.5 w-2.5" />
-                          In Cart
-                        </Badge>
-                      </div>
-                    )}
-                    <CardContent className="p-0">
-                      {/* Thumbnail */}
-                      <div className="aspect-[4/3] bg-muted/30 rounded-t-lg flex items-center justify-center overflow-hidden border-b border-border">
-                        {tmpl.thumbnail_url ? (
-                          <img src={tmpl.thumbnail_url} alt={tmpl.name} className="w-full h-full object-contain p-3" />
-                        ) : (
-                          <Printer className="h-10 w-10 text-muted-foreground/30" />
-                        )}
-                      </div>
-                      {/* Details */}
-                      <div className="p-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <h3 className="font-semibold text-sm truncate">{tmpl.name}</h3>
-                            {tmpl.description && (
-                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{tmpl.description}</p>
-                            )}
-                          </div>
-                          {/* Admin controls */}
-                          {isVibeAdmin && (
-                            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDuplicateTemplate(tmpl)} title="Duplicate">
-                                <Copy className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditTemplate(tmpl)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDeleteTemplate(tmpl.id)}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-                          <Badge variant="secondary" className="text-xs">
-                            {tmpl.width_inches}" × {tmpl.height_inches}"
-                          </Badge>
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {tmpl.product_type}
-                          </Badge>
-                          {tmpl.preset_price_per_unit != null && (
-                            <Badge className="text-xs bg-primary/10 text-primary border-primary/20">
-                              ${Number(tmpl.preset_price_per_unit).toFixed(4)}/ea
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  );
-                })}
-              </div>
-            )}
+            <WorkshopStorefront
+              templates={templates}
+              loading={loading}
+              isVibeAdmin={isVibeAdmin}
+              cartItems={cartItems}
+              onSelectTemplate={handleSelectTemplate}
+              onEditTemplate={handleEditTemplate}
+              onDeleteTemplate={handleDeleteTemplate}
+              onDuplicateTemplate={handleDuplicateTemplate}
+              onNewTemplate={handleNewTemplate}
+            />
           </TabsContent>
 
           <TabsContent value="orders">
