@@ -258,109 +258,130 @@ export function generateBoxDieline(
   return { totalWidth, totalHeight, objects, zones };
 }
 
-// ─── Stand-Up Pouch / Bag with Gusset ────────────────────────────────
+// ─── Stand-Up Pouch / Bag ────────────────────────────────────────────
 //
-// Flat layout for a stand-up pouch:
+// Two layouts depending on whether a bottom gusset (depth) is specified:
 //
-//   ┌─────────────────────────────────┐  ← Seal area top (+ zipper zone)
-//   │  Front   │ Gusset │  Back  │ Gusset │
-//   │          │  (L)   │        │  (R)   │
-//   └─────────────────────────────────┘
-//   └──────── Bottom gusset fold ─────┘
+// WITH gusset (depth > 0) — Stand-up pouch:
+//
+//   ┌──────────┬──────────┐
+//   │ Top Seal │ Top Seal │
+//   ├──────────┼──────────┤  ← seal fold
+//   │ Zipper   │ Zipper   │
+//   ├──────────┼──────────┤  ← zipper fold
+//   │          │          │
+//   │  Front   │  Back    │
+//   │          │          │
+//   ├──────────┴──────────┤  ← bottom fold
+//   │   Bottom Gusset     │
+//   └─────────────────────┘
+//
+// WITHOUT gusset (depth = 0) — 3-side seal bag:
+//
+//   ┌──────────┬──────────┐
+//   │ Top Seal │ Top Seal │
+//   ├──────────┼──────────┤  ← seal fold
+//   │          │          │
+//   │  Front   │  Back    │
+//   │          │          │
+//   └──────────┴──────────┘  ← sealed bottom
 //
 // w = pouch width (front/back), h = pouch height, gusset = bottom gusset depth
 
 const SEAL_AREA = 0.375;     // top seal area in inches
 const ZIPPER_ZONE = 0.5;     // zipper zone height
-const BOTTOM_SEAL = 0.375;   // bottom seal area
+const BOTTOM_SEAL = 0.25;    // bottom seal line
 
 export function generateBagDieline(
   w: number,
   h: number,
   gusset: number
 ): DielineResult {
-  // Default gusset if not provided
-  if (gusset < 0.25) gusset = Math.max(1, w * 0.3);
-
-  const sideGusset = gusset / 2; // each side gusset is half the bottom gusset
-  const totalWidth = w + sideGusset + w + sideGusset;
-  const totalHeight = h + SEAL_AREA + ZIPPER_ZONE + BOTTOM_SEAL + gusset / 2;
-
-  // Panel x positions
-  const xFront = 0;
-  const xGussetL = w;
-  const xBack = w + sideGusset;
-  const xGussetR = w + sideGusset + w;
-
-  // Y positions
-  const yTop = 0;
-  const ySeal = SEAL_AREA;
-  const yZipper = ySeal + ZIPPER_ZONE;
-  const yPanelBottom = yZipper + h;
-  const yBottomSeal = yPanelBottom + BOTTOM_SEAL;
-  const yBottom = totalHeight;
-
+  const hasGusset = gusset >= 0.25;
   const objects: DielineObject[] = [];
   const zones: PanelZone[] = [];
 
-  // ── CUT LINES ────────────────────────────────────────────────────
+  // Horizontal: Front + Back side by side
+  const totalWidth = w * 2;
+  const xFold = w; // center fold between front and back
 
-  // Outer rectangle cut
-  objects.push(polyline([
-    { x: 0, y: yTop },
-    { x: totalWidth, y: yTop },
-    { x: totalWidth, y: yBottom },
-    { x: 0, y: yBottom },
-    { x: 0, y: yTop },
-  ], "cut"));
+  if (hasGusset) {
+    // ── Stand-up pouch with zipper + bottom gusset ──
+    const gussetH = gusset; // bottom gusset fold area
+    const totalHeight = SEAL_AREA + ZIPPER_ZONE + h + gussetH;
 
-  // ── FOLD LINES ───────────────────────────────────────────────────
+    const yTop = 0;
+    const ySeal = SEAL_AREA;
+    const yZipper = ySeal + ZIPPER_ZONE;
+    const yPanelBottom = yZipper + h;
+    const yBottom = totalHeight;
 
-  // Top seal fold
-  objects.push(line(0, ySeal, totalWidth, ySeal, "fold"));
+    // Outer cut
+    objects.push(polyline([
+      { x: 0, y: yTop },
+      { x: totalWidth, y: yTop },
+      { x: totalWidth, y: yBottom },
+      { x: 0, y: yBottom },
+      { x: 0, y: yTop },
+    ], "cut"));
 
-  // Zipper zone fold
-  objects.push(line(0, yZipper, totalWidth, yZipper, "fold"));
+    // Fold lines
+    objects.push(line(0, ySeal, totalWidth, ySeal, "fold"));           // top seal fold
+    objects.push(line(0, yZipper, totalWidth, yZipper, "fold"));       // zipper fold
+    objects.push(line(0, yPanelBottom, totalWidth, yPanelBottom, "fold")); // bottom panel fold
+    objects.push(line(xFold, yTop, xFold, yPanelBottom, "fold"));      // center fold (panels only)
 
-  // Bottom of panel area
-  objects.push(line(0, yPanelBottom, totalWidth, yPanelBottom, "fold"));
+    // Zipper indicator
+    const zipY = ySeal + ZIPPER_ZONE / 2;
+    objects.push(line(0, zipY, totalWidth, zipY, "fold"));
+    objects.push(label(totalWidth / 2, zipY, "⟵ Zipper ⟶"));
 
-  // Bottom seal fold
-  objects.push(line(0, yBottomSeal, totalWidth, yBottomSeal, "fold"));
+    // Labels
+    objects.push(label(totalWidth / 2, ySeal / 2, "Top Seal"));
+    objects.push(label(totalWidth / 2, yPanelBottom + gussetH / 2, "Bottom Gusset"));
 
-  // Vertical folds between panels
-  const foldXs = [xGussetL, xBack, xGussetR];
-  for (const fx of foldXs) {
-    objects.push(line(fx, yTop, fx, yBottom, "fold"));
+    // Panel zones
+    zones.push({ name: "Front", x: 0, y: yZipper, w, h, required: true });
+    zones.push({ name: "Back", x: xFold, y: yZipper, w, h, required: false });
+    objects.push(label(w / 2, yZipper + h / 2, "Front"));
+    objects.push(label(xFold + w / 2, yZipper + h / 2, "Back"));
+
+    return { totalWidth, totalHeight, objects, zones };
+  } else {
+    // ── 3-side seal bag (no gusset, no zipper) ──
+    const totalHeight = SEAL_AREA + h + BOTTOM_SEAL;
+
+    const yTop = 0;
+    const ySeal = SEAL_AREA;
+    const yPanelBottom = ySeal + h;
+    const yBottom = totalHeight;
+
+    // Outer cut
+    objects.push(polyline([
+      { x: 0, y: yTop },
+      { x: totalWidth, y: yTop },
+      { x: totalWidth, y: yBottom },
+      { x: 0, y: yBottom },
+      { x: 0, y: yTop },
+    ], "cut"));
+
+    // Fold lines
+    objects.push(line(0, ySeal, totalWidth, ySeal, "fold"));               // top seal fold
+    objects.push(line(0, yPanelBottom, totalWidth, yPanelBottom, "fold"));  // bottom seal fold
+    objects.push(line(xFold, yTop, xFold, yBottom, "fold"));               // center fold
+
+    // Labels
+    objects.push(label(totalWidth / 2, ySeal / 2, "Top Seal"));
+    objects.push(label(totalWidth / 2, yPanelBottom + BOTTOM_SEAL / 2, "Bottom Seal"));
+
+    // Panel zones
+    zones.push({ name: "Front", x: 0, y: ySeal, w, h, required: true });
+    zones.push({ name: "Back", x: xFold, y: ySeal, w, h, required: false });
+    objects.push(label(w / 2, ySeal + h / 2, "Front"));
+    objects.push(label(xFold + w / 2, ySeal + h / 2, "Back"));
+
+    return { totalWidth, totalHeight, objects, zones };
   }
-
-  // ── LABELS & ZONES ──────────────────────────────────────────────
-
-  // Zipper indicator line (dashed across zipper zone center)
-  const zipY = ySeal + ZIPPER_ZONE / 2;
-  objects.push(line(0, zipY, totalWidth, zipY, "fold"));
-  objects.push(label(totalWidth / 2, zipY, "⟵ Zipper ⟶"));
-
-  // Seal area labels
-  objects.push(label(totalWidth / 2, ySeal / 2, "Top Seal"));
-  objects.push(label(totalWidth / 2, yPanelBottom + BOTTOM_SEAL / 2, "Bottom Seal"));
-  objects.push(label(totalWidth / 2, yBottomSeal + (yBottom - yBottomSeal) / 2, "Bottom Gusset Fold"));
-
-  // Panel zones
-  const panels = [
-    { name: "Front",        x: xFront,   pw: w,          req: true },
-    { name: "Left Gusset",  x: xGussetL, pw: sideGusset, req: false },
-    { name: "Back",         x: xBack,    pw: w,          req: false },
-    { name: "Right Gusset", x: xGussetR, pw: sideGusset, req: false },
-  ];
-
-  for (const p of panels) {
-    const panelH = h;
-    zones.push({ name: p.name, x: p.x, y: yZipper, w: p.pw, h: panelH, required: p.req });
-    objects.push(label(p.x + p.pw / 2, yZipper + panelH / 2, p.name));
-  }
-
-  return { totalWidth, totalHeight, objects, zones };
 }
 
 // ─── Label (flat, no dieline) ──────────────────────────────────────
