@@ -316,11 +316,13 @@ export function generateBagDieline(
     const yPanelBottom = yZipper + h;
     const yBottom = totalHeight;
 
-    // Outer cut
+    // Outer cut — gusset only under left (Front) panel
     objects.push(polyline([
       { x: 0, y: yTop },
       { x: totalWidth, y: yTop },
-      { x: totalWidth, y: yBottom },
+      { x: totalWidth, y: yPanelBottom },   // back panel stops at panel bottom
+      { x: xFold, y: yPanelBottom },        // step in at center fold
+      { x: xFold, y: yBottom },             // gusset drops down under front only
       { x: 0, y: yBottom },
       { x: 0, y: yTop },
     ], "cut"));
@@ -328,7 +330,7 @@ export function generateBagDieline(
     // Fold lines
     objects.push(line(0, ySeal, totalWidth, ySeal, "fold"));           // top seal fold
     objects.push(line(0, yZipper, totalWidth, yZipper, "fold"));       // zipper fold
-    objects.push(line(0, yPanelBottom, totalWidth, yPanelBottom, "fold")); // bottom panel fold
+    objects.push(line(0, yPanelBottom, xFold, yPanelBottom, "fold"));  // bottom fold (front side only)
     objects.push(line(xFold, yTop, xFold, yPanelBottom, "fold"));      // center fold (panels only)
 
     // Zipper indicator
@@ -338,7 +340,7 @@ export function generateBagDieline(
 
     // Labels
     objects.push(label(totalWidth / 2, ySeal / 2, "Top Seal"));
-    objects.push(label(totalWidth / 2, yPanelBottom + gussetH / 2, "Bottom Gusset"));
+    objects.push(label(w / 2, yPanelBottom + gussetH / 2, "Bottom Gusset"));
 
     // Panel zones
     zones.push({ name: "Front", x: 0, y: yZipper, w, h, required: true });
