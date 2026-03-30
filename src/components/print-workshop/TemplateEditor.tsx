@@ -15,6 +15,7 @@ import { generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
 import { computePdfBoxPlacement, extractPdfPageBoxes, type ParsedPdfPageBoxes } from "@/lib/pdfPageBoxes";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { generateDieline } from "@/lib/dielineGenerator";
 
 // Popular print-ready fonts (web-safe + Google Fonts)
 const FONT_OPTIONS = [
