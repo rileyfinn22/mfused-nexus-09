@@ -747,7 +747,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       const initialData = canvas.toObject(['locked', 'editable', 'name']) as any;
       delete initialData.backgroundImage;
       if (Array.isArray(initialData.objects)) {
-        initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide" && obj?.name !== "_editHighlight");
+        initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide" && obj?.name !== "_editHighlight" && obj?.name !== "_dieline" && obj?.name !== "_dielineLabel");
       }
       undoStack.current = [JSON.stringify(initialData)];
       redoStack.current = [];
