@@ -569,7 +569,67 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         }
       });
 
-      if (mode === "use") {
+      // Remove any old dieline objects
+      canvas.getObjects().forEach((o: any) => {
+        if (o?.name === "_dieline" || o?.name === "_dielineLabel") canvas.remove(o);
+      });
+
+      // Render dieline guides for boxes/bags
+      if (dielineResult && dielineResult.objects.length > 0) {
+        const bleedOffset = bleedPx;
+        for (const obj of dielineResult.objects) {
+          if (obj.type === "line" && obj.x1 != null) {
+            const line = new Line([
+              bleedOffset + obj.x1 * DPI,
+              bleedOffset + obj.y1! * DPI,
+              bleedOffset + obj.x2! * DPI,
+              bleedOffset + obj.y2! * DPI,
+            ], {
+              stroke: obj.style === "fold" ? "#f59e0b" : "#ef4444",
+              strokeWidth: obj.style === "fold" ? 1.5 : 2,
+              strokeDashArray: obj.style === "fold" ? [8, 6] : [4, 2],
+              selectable: false,
+              evented: false,
+              objectCaching: false,
+            } as any);
+            (line as any).name = "_dieline";
+            canvas.add(line);
+          } else if (obj.type === "rect" && obj.x != null) {
+            const rect = new Rect({
+              left: bleedOffset + obj.x * DPI,
+              top: bleedOffset + obj.y! * DPI,
+              width: obj.w! * DPI,
+              height: obj.h! * DPI,
+              fill: "transparent",
+              stroke: obj.style === "fold" ? "#f59e0b" : "#ef4444",
+              strokeWidth: obj.style === "fold" ? 1 : 1.5,
+              strokeDashArray: obj.style === "fold" ? [6, 4] : [],
+              selectable: false,
+              evented: false,
+              objectCaching: false,
+            } as any);
+            (rect as any).name = "_dieline";
+            canvas.add(rect);
+          } else if (obj.type === "text" && obj.text) {
+            const text = new IText(obj.text, {
+              left: bleedOffset + obj.x! * DPI,
+              top: bleedOffset + obj.y! * DPI,
+              fontSize: 10 * (DPI / 72),
+              fill: "#6b7280",
+              fontFamily: "Arial",
+              originX: "center",
+              originY: "center",
+              selectable: false,
+              evented: false,
+              editable: false,
+            } as any);
+            (text as any).name = "_dielineLabel";
+            (text as any).locked = true;
+            canvas.add(text);
+          }
+        }
+      }
+
         const editableObjects: any[] = [];
         canvas.getObjects().forEach((obj: any) => {
           if (obj.name === "_trimGuide" || obj.name === "_ocrKnockout" || obj.name === "pdf_background" || obj.name === "mask_cover") {
