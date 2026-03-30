@@ -48,6 +48,7 @@ import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
 import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkViewerDialog";
 import { CustomerArtworkTab } from "@/components/CustomerArtworkTab";
 import { cn } from "@/lib/utils";
+import PdfThumbnail from "@/components/PdfThumbnail";
 import { FileArchive, FileCode } from "lucide-react";
 import JSZip from "jszip";
 
