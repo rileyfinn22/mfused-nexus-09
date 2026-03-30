@@ -418,6 +418,9 @@ export default function PrintWorkshop() {
     );
   }
 
+  // Determine if this is a custom order (no saved template)
+  const isCustomOrder = selectedTemplate && !selectedTemplate.id;
+
   if (view === "build") {
     if (!isVibeAdmin) {
       setView("browse");
@@ -470,7 +473,7 @@ export default function PrintWorkshop() {
               productType={selectedTemplate.product_type || "label"}
               onCanvasChange={setCanvasData}
               sourcePdfPath={selectedTemplate.source_pdf_path}
-              mode="use"
+              mode={isCustomOrder ? "edit" : "use"}
               fabricCanvasRef={useFabricCanvasRef}
             />
           </div>

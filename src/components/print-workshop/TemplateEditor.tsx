@@ -2637,13 +2637,25 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             <CanvasObjectsPanel canvas={fabricRef.current} onSync={syncCanvas} />
           </div>
         )}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
-          <span>{width}" × {height}" label</span>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 flex-wrap">
+          <span>{effectiveWidth}" × {effectiveHeight}" {productType}{depth > 0 ? ` (${width}×${height}×${depth})` : ""}</span>
           <span>{bleed}" bleed</span>
           <span className="flex items-center gap-1">
             <span className="w-3 h-0.5 border-t border-dashed border-destructive inline-block" />
             Trim line
           </span>
+          {dielineResult && (
+            <>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-0.5 inline-block" style={{ borderTop: "1.5px dashed #f59e0b" }} />
+                Fold line
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-0.5 inline-block" style={{ borderTop: "2px solid #ef4444" }} />
+                Cut line
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>
