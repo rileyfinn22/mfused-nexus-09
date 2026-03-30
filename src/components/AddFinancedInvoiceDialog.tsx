@@ -159,7 +159,8 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
           <DialogTitle>{isFinanceMode ? "Add Financed Order" : "Submit Vendor PO for Financing"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          {/* Vendor PO Search */}
+          {/* Vendor PO Search (admin mode only) */}
+          {!isFinanceMode && (
           <div>
             <Label>Vendor PO</Label>
             {selectedPO ? (
@@ -221,6 +222,19 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
               </div>
             )}
           </div>
+          )}
+
+          {/* Description (finance mode only) */}
+          {isFinanceMode && (
+          <div>
+            <Label>Description</Label>
+            <Input
+              placeholder="e.g. Order #1234 - Widget production"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          )}
 
           <div>
             <Label>Financed Amount (USD)</Label>
