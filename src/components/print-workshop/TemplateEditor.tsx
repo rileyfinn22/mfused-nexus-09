@@ -471,10 +471,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       height: canvasHeight,
     });
     // Set CSS display size separately from backstore to avoid cursor misalignment.
-    // Fabric's upper-canvas (event/cursor layer) must match CSS dims exactly.
+    // Fabric automatically maps mouse coords between CSS and backing-store dimensions.
     canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
-    // Zoom maps logical canvas coords (canvasWidth) → on-screen CSS pixels
-    canvas.setZoom(displayScale);
+    // Do NOT setZoom here — CSS scaling handles visual sizing.
+    // setZoom would double-scale: content shrinks within backing store, then CSS shrinks again.
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
 
@@ -588,25 +588,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
         const invScale = displayScale > 0 ? 1 / displayScale : 1;
 
-        // DEBUG: log coordinate mapping
-        const dbgMaxX = bleedOffset + dielineResult.totalWidth * DPI;
-        const dbgMaxY = bleedOffset + dielineResult.totalHeight * DPI;
-        console.log("[DIELINE DEBUG] bleedOffset:", bleedOffset, "DPI:", DPI, "totalW:", dielineResult.totalWidth, "totalH:", dielineResult.totalHeight, "maxX:", dbgMaxX, "maxY:", dbgMaxY, "canvasW:", canvasWidth, "canvasH:", canvasHeight, "invScale:", invScale);
-
-        // DEBUG: draw a bright green outline at the full dieline extent
-        const debugRect = new Rect({
-          left: bleedOffset,
-          top: bleedOffset,
-          width: dielineResult.totalWidth * DPI,
-          height: dielineResult.totalHeight * DPI,
-          fill: "transparent",
-          stroke: "#00ff00",
-          strokeWidth: 3 * invScale,
-          selectable: false,
-          evented: false,
-        } as any);
-        (debugRect as any).name = "_dieline";
-        canvas.add(debugRect);
 
         for (const obj of dielineResult.objects) {
           const isFold = obj.style === "fold";
@@ -776,9 +757,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         }
       }
 
-      // Re-apply CSS dimensions and zoom after loadFromJSON which resets viewport
+      // Re-apply CSS dimensions after loadFromJSON which resets viewport
       canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
-      canvas.setZoom(displayScale);
       canvas.renderAll();
 
       // Seed undo stack with initial state
@@ -1739,7 +1719,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     const canvas = fabricRef.current;
     if (!canvas) return;
     canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
-    canvas.setZoom(displayScale);
     canvas.renderAll();
   }, [displayScale, cssWidth, cssHeight]);
 
