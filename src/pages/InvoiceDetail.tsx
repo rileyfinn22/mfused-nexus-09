@@ -1186,17 +1186,17 @@ const InvoiceDetail = () => {
       }
 
       // Recalculate totals using shared calculator - shipped qty × price
-      const totalItems = blanketTotalItems(editedItems);
+      // Check if this blanket has child (partial) invoices — if so, keep placeholder
+      const hasChildren = relatedInvoices.some(
+        (ri: any) => ri.parent_invoice_id === invoiceId
+      );
+      const totalItems = blanketTotalItems(editedItems, hasChildren);
       const editedShipping = Number(editShippingCost || 0);
       let { subtotal: newSubtotal, total: newTotal } = calculateInvoiceTotals(
         totalItems,
         Number(invoice.tax || 0),
         editedShipping
       );
-
-      // Placeholder behavior is now handled by blanketTotalItems:
-      // - If nothing shipped → uses ordered quantities (placeholder = order total)
-      // - If any item shipped → only sums shipped items (actual billed total)
 
       // NOTE: Do NOT update order totals from invoice edit - invoice scope only
       // Update invoice totals
@@ -1551,8 +1551,11 @@ const InvoiceDetail = () => {
   // Unified total calculation using shared calculator
   const computeDisplayTotals = () => {
     if (isEditMode) {
-      // Edit mode: always use shipped qty from edited items
-      const items = blanketTotalItems(editedItems);
+      // Edit mode: use shipped qty, respecting child invoice placeholder logic
+      const hasChildren = relatedInvoices.some(
+        (ri: any) => ri.parent_invoice_id === invoiceId
+      );
+      const items = blanketTotalItems(editedItems, hasChildren);
       return calculateInvoiceTotals(items, Number(invoice?.tax || 0), displayShipping);
     }
     if (isBlanketDisplay) {

@@ -34,19 +34,38 @@ export function calculateInvoiceTotals(
 
 /**
  * Build InvoiceTotalItem[] from order items for a blanket invoice.
- * Uses shipped_quantity as the quantity basis.
+ *
+ * hasChildInvoices = true  → placeholder mode: per-item max(shipped, ordered)
+ * hasChildInvoices = false → direct-edit mode:
+ *   • any shipped → only shipped items count (unshipped = 0)
+ *   • none shipped → ordered quantities (placeholder)
  */
-export function blanketTotalItems(orderItems: any[]): InvoiceTotalItem[] {
+export function blanketTotalItems(
+  orderItems: any[],
+  hasChildInvoices = false
+): InvoiceTotalItem[] {
   const anyShipped = orderItems.some(
     (item) => Number(item.shipped_quantity || 0) > 0
   );
 
-  return orderItems.map((item) => ({
-    quantity: anyShipped
-      ? (Number(item.shipped_quantity || 0) > 0 ? Number(item.shipped_quantity) : 0)
-      : Number(item.quantity || 0),
-    unit_price: Number(item.unit_price || 0),
-  }));
+  return orderItems.map((item) => {
+    const shipped = Number(item.shipped_quantity || 0);
+    const ordered = Number(item.quantity || 0);
+
+    let quantity: number;
+    if (hasChildInvoices) {
+      // Placeholder: per-item max so total never drops below ordered
+      quantity = shipped > 0 ? Math.max(shipped, ordered) : ordered;
+    } else if (anyShipped) {
+      // Direct-edit: only count items that actually shipped
+      quantity = shipped > 0 ? shipped : 0;
+    } else {
+      // Nothing shipped yet: ordered as placeholder
+      quantity = ordered;
+    }
+
+    return { quantity, unit_price: Number(item.unit_price || 0) };
+  });
 }
 
 /**
