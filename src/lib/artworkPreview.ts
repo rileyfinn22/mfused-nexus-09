@@ -1,12 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
 import { generatePdfThumbnailFromArrayBuffer, generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
-  "Extract a clean flat artwork preview from this packaging proof.",
-  "Preserve the original artwork exactly: same colors, text, logos, layout, proportions, and art.",
-  "Do not redesign, restyle, rewrite, sharpen into new art, add mockup lighting, or create a 3D package rendering.",
-  "Remove only non-art technical proofing elements such as measurements, dimensions, dielines, cut lines, fold guides, registration marks, notes, white ink markers, varnish/gloss indicators, and surrounding page background.",
-  "If the proof contains multiple panels, isolate the main customer-facing art panel; for box and sleeve proofs this is usually the far-left panel, while merch packs usually use the full flat layout.",
-  "Return a centered, front-on, clean flat file on a plain light or transparent background.",
-].join(" ");
 
 const PDF_PREVIEW_OPTIONS = {
   maxWidth: 1400,
@@ -53,34 +46,6 @@ export function isLegacyGeneratedTemplateMockupUrl(url: string | null | undefine
   return /(?:-v3|-v4)\.(?:png|jpe?g|webp|gif)$/i.test(url) || /mockup/i.test(url);
 }
 
-async function blobToDataUrl(blob: Blob): Promise<string> {
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onloadend = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-        return;
-      }
-
-      reject(new Error("Failed to read preview image"));
-    };
-
-    reader.onerror = () => reject(reader.error ?? new Error("Failed to read preview image"));
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
-  const response = await fetch(dataUrl);
-
-  if (!response.ok) {
-    throw new Error("Failed to prepare generated preview");
-  }
-
-  return await response.blob();
-}
-
 async function uploadPreviewBlob(sku: string, blob: Blob): Promise<string> {
   const previewPath = `${sku}/${FLAT_ARTWORK_PREVIEW_PREFIX}${Date.now()}.png`;
 
@@ -99,85 +64,49 @@ async function uploadPreviewBlob(sku: string, blob: Blob): Promise<string> {
   return publicUrl;
 }
 
-async function requestFlatArtworkPreview(referenceImage: string, contextLabel?: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke("generate-design-image", {
-    body: {
-      prompt: FLAT_ARTWORK_PREVIEW_PROMPT,
-      reference_image: referenceImage,
-      generation_mode: "flat_artwork_preview",
-      context_label: contextLabel ?? null,
-    },
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  if (data?.error) {
-    throw new Error(data.error);
-  }
-
-  if (!data?.image_url || typeof data.image_url !== "string") {
-    throw new Error("No preview image returned");
-  }
-
-  return data.image_url;
-}
-
-async function getReferenceImageFromFile(file: File): Promise<string> {
-  if (isPdfFile(file.name)) {
-    const thumbnailBlob = await generatePdfThumbnailFromFile(file, PDF_PREVIEW_OPTIONS);
-    return await blobToDataUrl(thumbnailBlob);
-  }
-
-  return await blobToDataUrl(file);
-}
-
-async function getReferenceImageFromArtworkUrl(artworkUrl: string, filename: string): Promise<string> {
-  if (isPdfFile(filename)) {
-    const response = await fetch(artworkUrl, { cache: "no-store" });
-
-    if (!response.ok) {
-      throw new Error(`Failed to load proof (${response.status})`);
-    }
-
-    const thumbnailBlob = await generatePdfThumbnailFromArrayBuffer(
-      await response.arrayBuffer(),
-      PDF_PREVIEW_OPTIONS,
-    );
-
-    return await blobToDataUrl(thumbnailBlob);
-  }
-
-  return artworkUrl;
-}
-
+/**
+ * Generate a simple PDF screenshot thumbnail from a File and upload it.
+ * Keeps the same function signature for backward compat (contextLabel is ignored).
+ */
 export async function createFlatArtworkPreviewFromFile({
   file,
   sku,
-  contextLabel,
 }: {
   file: File;
   sku: string;
   contextLabel?: string;
 }): Promise<string> {
-  const referenceImage = await getReferenceImageFromFile(file);
-  const generatedPreview = await requestFlatArtworkPreview(referenceImage, contextLabel);
-  return await uploadPreviewBlob(sku, await dataUrlToBlob(generatedPreview));
+  const thumbnailBlob = await generatePdfThumbnailFromFile(file, PDF_PREVIEW_OPTIONS);
+  return await uploadPreviewBlob(sku, thumbnailBlob);
 }
 
+/**
+ * Generate a simple PDF screenshot thumbnail from an artwork URL and upload it.
+ * For non-PDF files, returns the artwork URL directly.
+ */
 export async function createFlatArtworkPreviewFromArtwork({
   artworkUrl,
   filename,
   sku,
-  contextLabel,
 }: {
   artworkUrl: string;
   filename: string;
   sku: string;
   contextLabel?: string;
 }): Promise<string> {
-  const referenceImage = await getReferenceImageFromArtworkUrl(artworkUrl, filename);
-  const generatedPreview = await requestFlatArtworkPreview(referenceImage, contextLabel);
-  return await uploadPreviewBlob(sku, await dataUrlToBlob(generatedPreview));
+  if (!isPdfFile(filename)) {
+    return artworkUrl;
+  }
+
+  const response = await fetch(artworkUrl, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Failed to load proof (${response.status})`);
+  }
+
+  const thumbnailBlob = await generatePdfThumbnailFromArrayBuffer(
+    await response.arrayBuffer(),
+    PDF_PREVIEW_OPTIONS,
+  );
+
+  return await uploadPreviewBlob(sku, thumbnailBlob);
 }
