@@ -776,9 +776,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         }
       }
 
-      // Re-apply CSS dimensions and zoom after loadFromJSON which resets viewport
+      // Re-apply CSS dimensions after loadFromJSON which resets viewport
       canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
-      canvas.setZoom(displayScale);
       canvas.renderAll();
 
       // Seed undo stack with initial state
