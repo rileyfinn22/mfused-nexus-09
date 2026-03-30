@@ -312,6 +312,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const effectiveWidth = dielineResult ? dielineResult.totalWidth : width;
   const effectiveHeight = dielineResult ? dielineResult.totalHeight : height;
 
+  console.log("[TemplateEditor] productType:", productType, "w:", width, "h:", height, "d:", depth, "effectiveW:", effectiveWidth, "effectiveH:", effectiveHeight, "dielineResult:", dielineResult ? `${dielineResult.objects.length} objects` : "null");
+
   const canvasWidth = Math.round((effectiveWidth + bleed * 2) * DPI);
   const canvasHeight = Math.round((effectiveHeight + bleed * 2) * DPI);
   const bleedPx = Math.round(bleed * DPI);
