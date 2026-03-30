@@ -212,6 +212,13 @@ export function WorkshopStorefront({
                         alt={tmpl.name}
                         className="w-full h-full object-contain p-6 group-hover:scale-105 transition-transform duration-300"
                       />
+                    ) : tmpl.source_pdf_path ? (
+                      <PdfThumbnail
+                        pdfUrl={supabase.storage.from("print-files").getPublicUrl(tmpl.source_pdf_path).data.publicUrl}
+                        alt={tmpl.name}
+                        className="w-full h-full object-contain p-6 group-hover:scale-105 transition-transform duration-300"
+                        maxWidth={400}
+                      />
                     ) : (
                       <div className="flex flex-col items-center gap-2">
                         <TypeIcon className="h-16 w-16 text-muted-foreground/20" />
