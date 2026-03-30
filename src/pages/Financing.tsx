@@ -316,6 +316,11 @@ export default function Financing() {
               </Button>
             </>
           )}
+          {isFinanceUser && !isVibeAdmin && (
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Financed Order
+            </Button>
+          )}
         </div>
       </div>
 
