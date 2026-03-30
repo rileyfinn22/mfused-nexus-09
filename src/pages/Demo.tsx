@@ -5,7 +5,7 @@ export default function Demo() {
         <img
           src="https://spxdyqdygsmzyngrqxni.supabase.co/storage/v1/object/public/print-files/demo/vibe-logo-dark.png"
           alt="Vibe Packaging"
-          className="h-16 mb-6"
+          className="h-28 md:h-36 w-auto mb-8"
         />
         <video
           controls
