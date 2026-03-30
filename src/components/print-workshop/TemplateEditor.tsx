@@ -471,10 +471,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       height: canvasHeight,
     });
     // Set CSS display size separately from backstore to avoid cursor misalignment.
-    // Fabric's upper-canvas (event/cursor layer) must match CSS dims exactly.
+    // Fabric automatically maps mouse coords between CSS and backing-store dimensions.
     canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
-    // Zoom maps logical canvas coords (canvasWidth) → on-screen CSS pixels
-    canvas.setZoom(displayScale);
+    // Do NOT setZoom here — CSS scaling handles visual sizing.
+    // setZoom would double-scale: content shrinks within backing store, then CSS shrinks again.
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
 
