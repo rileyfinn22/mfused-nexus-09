@@ -829,7 +829,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         URL.revokeObjectURL(previewPdfUrlRef.current);
         previewPdfUrlRef.current = null;
       }
-      canvas.dispose();
+      // Fabric's dispose() replaces/removes the canvas DOM node.
+      // Wrap in try-catch so React's unmount doesn't crash if the node is already gone.
+      try {
+        canvas.dispose();
+      } catch (e) {
+        // Silently ignore – the DOM node was already detached
+      }
       fabricRef.current = null;
     };
   }, [canvasWidth, canvasHeight, bleedPx, mode, getSelectionLockedState, dielineResult]);
