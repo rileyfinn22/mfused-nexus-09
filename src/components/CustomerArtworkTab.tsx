@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import PdfThumbnail from "@/components/PdfThumbnail";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
