@@ -15,9 +15,11 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   preselectedVendorPO?: { id: string; po_number: string; total: number; description: string | null } | null;
+  mode?: "admin" | "finance";
 }
 
-export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, preselectedVendorPO }: Props) {
+export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, preselectedVendorPO, mode = "admin" }: Props) {
+  const isFinanceMode = mode === "finance";
   const [vendorPOs, setVendorPOs] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPO, setSelectedPO] = useState<any>(null);
@@ -26,14 +28,15 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
   const [exchangeRate, setExchangeRate] = useState("7.2");
   const [financedDate, setFinancedDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
+  const [description, setDescription] = useState("");
   const [sendNotification, setSendNotification] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingPOs, setLoadingPOs] = useState(false);
 
   useEffect(() => {
     if (open) {
-      fetchVendorPOs();
-      if (preselectedVendorPO) {
+      if (!isFinanceMode) fetchVendorPOs();
+      if (preselectedVendorPO && !isFinanceMode) {
         setSelectedPO(preselectedVendorPO);
         const usd = preselectedVendorPO.total?.toString() || "";
         setFinancedAmount(usd);
@@ -44,9 +47,10 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
         setSearchQuery("");
         setFinancedAmount("");
         setRmbAmount("");
+        setDescription("");
       }
     }
-  }, [open, preselectedVendorPO]);
+  }, [open, preselectedVendorPO, isFinanceMode]);
 
   const fetchVendorPOs = async () => {
     setLoadingPOs(true);
@@ -89,20 +93,23 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
   };
 
   const handleSubmit = async () => {
-    if (!selectedPO || !financedAmount) return;
+    if (!isFinanceMode && !selectedPO) return;
+    if (!financedAmount) return;
     setLoading(true);
     const amt = parseFloat(financedAmount);
     const rate = parseFloat(exchangeRate);
 
     // 1. Add to financing tracker
     const { error } = await supabase.from("financed_invoices").insert({
-      vendor_po_id: selectedPO.id,
+      vendor_po_id: isFinanceMode ? null : selectedPO.id,
       financed_amount: amt,
       financed_amount_rmb: amt * rate,
       exchange_rate: rate,
       financed_date: financedDate,
       notes: notes || null,
-      finance_status: "pending",
+      description: isFinanceMode ? (description || null) : null,
+      finance_status: isFinanceMode ? "active" : "pending",
+      created_by_role: isFinanceMode ? "finance" : null,
     });
 
     if (error) {
@@ -114,8 +121,8 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     // Note: vendor PO payment is NOT recorded at pending stage.
     // It will be recorded when the finance company accepts and activates the request.
 
-    // Optionally notify finance company
-    if (sendNotification) {
+    // Optionally notify finance company (admin mode only)
+    if (!isFinanceMode && sendNotification) {
       try {
         await supabase.functions.invoke("send-finance-notification", {
           body: {
@@ -131,7 +138,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
       }
     }
 
-    toast({ title: "Vendor PO submitted for financing (pending approval)" });
+    toast({ title: isFinanceMode ? "Financed order added" : "Vendor PO submitted for financing (pending approval)" });
     onSuccess();
     onOpenChange(false);
     setSelectedPO(null);
@@ -139,6 +146,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     setFinancedAmount("");
     setRmbAmount("");
     setNotes("");
+    setDescription("");
     setLoading(false);
   };
 
@@ -148,10 +156,11 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Submit Vendor PO for Financing</DialogTitle>
+          <DialogTitle>{isFinanceMode ? "Add Financed Order" : "Submit Vendor PO for Financing"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          {/* Vendor PO Search */}
+          {/* Vendor PO Search (admin mode only) */}
+          {!isFinanceMode && (
           <div>
             <Label>Vendor PO</Label>
             {selectedPO ? (
@@ -213,6 +222,19 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
               </div>
             )}
           </div>
+          )}
+
+          {/* Description (finance mode only) */}
+          {isFinanceMode && (
+          <div>
+            <Label>Description</Label>
+            <Input
+              placeholder="e.g. Order #1234 - Widget production"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          )}
 
           <div>
             <Label>Financed Amount (USD)</Label>
@@ -248,13 +270,15 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
             <Label>Notes</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
+          {!isFinanceMode && (
           <div className="flex items-center gap-2">
             <Checkbox id="send-notif" checked={sendNotification} onCheckedChange={(v) => setSendNotification(!!v)} />
             <Label htmlFor="send-notif" className="text-sm font-normal cursor-pointer">Send email notification to finance company</Label>
           </div>
-          <Button onClick={handleSubmit} disabled={loading || !selectedPO || !financedAmount} className="w-full">
+          )}
+          <Button onClick={handleSubmit} disabled={loading || (!isFinanceMode && !selectedPO) || !financedAmount} className="w-full">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit for Financing
+            {isFinanceMode ? "Add Financed Order" : "Submit for Financing"}
           </Button>
         </div>
       </DialogContent>

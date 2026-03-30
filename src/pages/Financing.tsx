@@ -316,6 +316,11 @@ export default function Financing() {
               </Button>
             </>
           )}
+          {isFinanceUser && !isVibeAdmin && (
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Financed Order
+            </Button>
+          )}
         </div>
       </div>
 
@@ -509,11 +514,14 @@ export default function Financing() {
       {/* Dialogs */}
       {isVibeAdmin && (
         <>
-          <AddFinancedInvoiceDialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setPreselectedVendorPO(null); }} onSuccess={fetchData} preselectedVendorPO={preselectedVendorPO} />
+          <AddFinancedInvoiceDialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setPreselectedVendorPO(null); }} onSuccess={fetchData} preselectedVendorPO={preselectedVendorPO} mode="admin" />
           <RecordFinanceRepaymentDialog open={repayOpen} onOpenChange={setRepayOpen} onSuccess={fetchData} invoice={selectedInvoice} />
           <RecordFinanceDepositDialog open={depositOpen} onOpenChange={setDepositOpen} onSuccess={fetchData} />
           <GenerateFinanceLinkDialog open={linkOpen} onOpenChange={setLinkOpen} />
         </>
+      )}
+      {isFinanceUser && !isVibeAdmin && (
+        <AddFinancedInvoiceDialog open={addOpen} onOpenChange={setAddOpen} onSuccess={fetchData} mode="finance" />
       )}
       {(isFinanceUser || isVibeAdmin) && (
         <AcceptFinanceRequestDialog open={acceptOpen} onOpenChange={setAcceptOpen} onSuccess={fetchData} invoice={selectedInvoice} lang={lang} />
