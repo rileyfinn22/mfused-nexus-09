@@ -30,6 +30,7 @@ interface WorkshopStorefrontProps {
   onDeleteTemplate: (id: string) => void;
   onDuplicateTemplate: (tmpl: any) => void;
   onNewTemplate: () => void;
+  onStartCustomOrder?: () => void;
 }
 
 const CATEGORY_ALL = "all";
