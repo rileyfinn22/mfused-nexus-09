@@ -35,8 +35,8 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
 
   useEffect(() => {
     if (open) {
-      fetchVendorPOs();
-      if (preselectedVendorPO) {
+      if (!isFinanceMode) fetchVendorPOs();
+      if (preselectedVendorPO && !isFinanceMode) {
         setSelectedPO(preselectedVendorPO);
         const usd = preselectedVendorPO.total?.toString() || "";
         setFinancedAmount(usd);
@@ -47,9 +47,10 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
         setSearchQuery("");
         setFinancedAmount("");
         setRmbAmount("");
+        setDescription("");
       }
     }
-  }, [open, preselectedVendorPO]);
+  }, [open, preselectedVendorPO, isFinanceMode]);
 
   const fetchVendorPOs = async () => {
     setLoadingPOs(true);
