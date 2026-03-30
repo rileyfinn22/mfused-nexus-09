@@ -396,6 +396,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       bg.set({ selectable: false, evented: false, hasControls: false, hasBorders: false });
       canvas.sendObjectToBack(bg);
     }
+    // Bring dieline guides and labels to front (above all artwork)
+    const dielineObjs = canvas.getObjects().filter((o: any) => o.name === "_dieline" || o.name === "_dielineLabel");
+    dielineObjs.forEach((o: any) => canvas.bringObjectToFront(o));
+    // Trim guide on very top
     const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
     if (trim) canvas.bringObjectToFront(trim);
   }, []);
