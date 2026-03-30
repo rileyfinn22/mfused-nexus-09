@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line } from "fabric";
+import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line, Polyline } from "fabric";
 import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -583,45 +583,52 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       // Render dieline guides for boxes/bags
       if (dielineResult && dielineResult.objects.length > 0) {
         const bleedOffset = bleedPx;
-        console.log("[Dieline] canvasW:", canvasWidth, "canvasH:", canvasHeight, "bleedPx:", bleedPx, "totalW:", dielineResult.totalWidth, "totalH:", dielineResult.totalHeight, "objects:", dielineResult.objects.length, "DPI:", DPI);
+        const CUT_COLOR = "#1976d2";   // blue solid for cut/trim
+        const FOLD_COLOR = "#d32f2f";  // red dashed for fold/crease
+
         for (const obj of dielineResult.objects) {
+          const isFold = obj.style === "fold";
+          const strokeColor = isFold ? FOLD_COLOR : CUT_COLOR;
+          const strokeW = isFold ? 1 : 1.5;
+          const dashArray = isFold ? [6, 4] : [];
+
           if (obj.type === "line" && obj.x1 != null) {
             const x1 = bleedOffset + obj.x1 * DPI;
             const y1 = bleedOffset + obj.y1! * DPI;
             const x2 = bleedOffset + obj.x2! * DPI;
             const y2 = bleedOffset + obj.y2! * DPI;
-            const line = new Line([x1, y1, x2, y2], {
-              stroke: obj.style === "crease" ? "#c0392b" : "#2c3e7a",
-              strokeWidth: obj.style === "crease" ? 1.5 : 2,
-              strokeDashArray: [],
+            const fabricLine = new Line([x1, y1, x2, y2], {
+              stroke: strokeColor,
+              strokeWidth: strokeW,
+              strokeDashArray: dashArray,
               selectable: false,
               evented: false,
               objectCaching: false,
             } as any);
-            (line as any).name = "_dieline";
-            canvas.add(line);
-          } else if (obj.type === "rect" && obj.x != null) {
-            const rect = new Rect({
-              left: bleedOffset + obj.x * DPI,
-              top: bleedOffset + obj.y! * DPI,
-              width: obj.w! * DPI,
-              height: obj.h! * DPI,
+            (fabricLine as any).name = "_dieline";
+            canvas.add(fabricLine);
+          } else if (obj.type === "polyline" && obj.points) {
+            const pts = obj.points.map(p => ({
+              x: bleedOffset + p.x * DPI,
+              y: bleedOffset + p.y * DPI,
+            }));
+            const poly = new Polyline(pts, {
               fill: "transparent",
-              stroke: obj.style === "crease" ? "#c0392b" : "#2c3e7a",
-              strokeWidth: obj.style === "crease" ? 1 : 1.5,
-              strokeDashArray: [],
+              stroke: strokeColor,
+              strokeWidth: strokeW,
+              strokeDashArray: dashArray,
               selectable: false,
               evented: false,
               objectCaching: false,
             } as any);
-            (rect as any).name = "_dieline";
-            canvas.add(rect);
+            (poly as any).name = "_dieline";
+            canvas.add(poly);
           } else if (obj.type === "text" && obj.text) {
             const text = new IText(obj.text, {
               left: bleedOffset + obj.x! * DPI,
               top: bleedOffset + obj.y! * DPI,
-              fontSize: 10 * (DPI / 72),
-              fill: "#6b7280",
+              fontSize: 11 * (DPI / 72),
+              fill: "#9ca3af",
               fontFamily: "Arial",
               originX: "center",
               originY: "center",
@@ -2664,11 +2671,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
           {dielineResult && (
             <>
               <span className="flex items-center gap-1">
-                <span className="w-3 h-0.5 inline-block" style={{ borderTop: "1.5px dashed #f59e0b" }} />
+                <span className="w-3 h-0.5 inline-block" style={{ borderTop: "1.5px dashed #d32f2f" }} />
                 Fold line
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-3 h-0.5 inline-block" style={{ borderTop: "2px solid #ef4444" }} />
+                <span className="w-3 h-0.5 inline-block" style={{ borderTop: "2px solid #1976d2" }} />
                 Cut line
               </span>
             </>

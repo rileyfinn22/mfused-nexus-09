@@ -1,21 +1,30 @@
 /**
- * Generates Fabric.js-compatible dieline objects (fold/crease lines, cut/trim lines,
- * panel labels, tuck flaps) for boxes and bags based on dimensions.
+ * Generates Fabric.js-compatible dieline objects for folding cartons and pouches.
  *
  * All coordinates are in inches; the caller converts to canvas pixels via DPI.
  *
- * Visual convention (matching industry standard):
- *   TRIM (cut) = blue solid lines
- *   CREASE (fold) = red solid lines
+ * Industry-standard visual convention:
+ *   CUT (trim) = solid blue lines
+ *   FOLD (crease) = dashed red lines
+ *
+ * Box types supported:
+ *   - Reverse Tuck End (RTE) folding carton
+ *
+ * Bag types supported:
+ *   - Stand-up pouch with bottom gusset and optional zipper
  */
 
 export interface DielineObject {
-  type: "line" | "rect" | "polyline" | "text";
-  x1?: number; y1?: number; x2?: number; y2?: number; // for lines
-  x?: number; y?: number; w?: number; h?: number;      // for rects
-  points?: { x: number; y: number }[];                  // for polylines
+  type: "line" | "polyline" | "text";
+  /** For lines */
+  x1?: number; y1?: number; x2?: number; y2?: number;
+  /** For polylines (cut outlines, flap shapes) */
+  points?: { x: number; y: number }[];
+  /** For text labels */
   text?: string;
-  style: "trim" | "crease" | "zone-label";
+  x?: number; y?: number;
+  /** Visual style */
+  style: "cut" | "fold" | "zone-label";
 }
 
 export interface PanelZone {
@@ -28,235 +37,334 @@ export interface PanelZone {
 }
 
 export interface DielineResult {
-  /** Total flat layout width in inches */
   totalWidth: number;
-  /** Total flat layout height in inches */
   totalHeight: number;
-  /** Visual guide objects */
   objects: DielineObject[];
-  /** Artwork placement zones */
   zones: PanelZone[];
 }
 
-const GLUE_TAB = 0.625; // inches
-const TUCK_FLAP_DEPTH_RATIO = 0.75; // tuck flap = 75% of depth
-const DUST_FLAP_RATIO = 0.5; // dust flap = 50% of depth
+// ─── Helpers ─────────────────────────────────────────────────────────
 
-/**
- * Generate a tuck-end box dieline matching industry-standard layout.
- *
- * Layout (left to right main strip):
- *   Glue Tab | Back | Side(Right) | Front | Side(Left)
- *
- * Top flaps: tuck on Front/Back, dust flaps on Sides
- * Bottom flaps: tuck on Front/Back, dust flaps on Sides
- *
- * w = box width, h = box height, d = box depth
- */
+function line(x1: number, y1: number, x2: number, y2: number, style: "cut" | "fold"): DielineObject {
+  return { type: "line", x1, y1, x2, y2, style };
+}
+
+function polyline(pts: { x: number; y: number }[], style: "cut" | "fold"): DielineObject {
+  return { type: "polyline", points: pts, style };
+}
+
+function label(x: number, y: number, text: string): DielineObject {
+  return { type: "text", x, y, text, style: "zone-label" };
+}
+
+// ─── RTE (Reverse Tuck End) Folding Carton ───────────────────────────
+//
+// Industry-standard flat layout:
+//
+//                    ┌─ Top tuck (Front) ─┐
+//   ┌────┬──────┬────┬──────┬────┐
+//   │Glue│ Back │Side│Front │Side│   ← main strip
+//   │Tab │      │ R  │      │ L  │
+//   └────┴──────┴────┴──────┴────┘
+//                    └─ Bot tuck (Back) ──┘
+//
+// RTE = top tuck opens from front panel, bottom tuck opens from back panel.
+// Dust flaps on side panels (shorter than tuck flaps).
+// Tuck flaps have a slight rounded/tapered top edge.
+//
+// w = box width (front/back), h = box height, d = box depth (sides)
+
+const GLUE_TAB = 0.5;        // glue tab width in inches
+const TUCK_RATIO = 0.48;     // tuck flap depth ≈ 48% of box width (industry standard ~half width)
+const DUST_RATIO = 0.45;     // dust flap depth ≈ 45% of depth
+const TUCK_LOCK_TAB = 0.15;  // small locking tab on tuck flap tip
+const TUCK_TAPER = 0.15;     // inset on each side of tuck flap for tapered shape
+
 export function generateBoxDieline(
   w: number,
   h: number,
   d: number
 ): DielineResult {
-  const tuck = Math.min(d * TUCK_FLAP_DEPTH_RATIO, d);
-  const dust = d * DUST_FLAP_RATIO;
+  // If depth is 0 or too small, default to a reasonable value
+  if (d < 0.25) d = Math.max(1, w * 0.4);
 
-  // Main strip panels (y runs from tuck to tuck + h)
-  const topFlap = tuck;
-  const mainTop = topFlap; // y where main panels start
-  const mainBottom = mainTop + h;
-  const bottomFlap = tuck;
+  const tuck = w * TUCK_RATIO;
+  const dust = d * DUST_RATIO;
+  const lockTab = TUCK_LOCK_TAB;
 
+  // Vertical layout: lockTab + tuck + mainH + tuck + lockTab
+  const topFlap = tuck + lockTab;
+  const bottomFlap = tuck + lockTab;
   const totalHeight = topFlap + h + bottomFlap;
 
-  // X positions of panel left edges
+  // Horizontal layout: glueTab + back(w) + sideR(d) + front(w) + sideL(d)
   const xGlue = 0;
   const xBack = GLUE_TAB;
-  const xRightSide = xBack + w;
-  const xFront = xRightSide + d;
-  const xLeftSide = xFront + w;
-  const totalWidth = xLeftSide + d;
+  const xSideR = xBack + w;
+  const xFront = xSideR + d;
+  const xSideL = xFront + w;
+  const totalWidth = xSideL + d;
+
+  // Y positions
+  const yTopLock = 0;
+  const yTopTuck = lockTab;
+  const yMain = topFlap;           // top of main panels
+  const yMainBot = yMain + h;      // bottom of main panels
+  const yBotTuck = yMainBot;
+  const yBotLock = yMainBot + tuck;
+  const yBottom = totalHeight;
 
   const objects: DielineObject[] = [];
   const zones: PanelZone[] = [];
 
-  // ── CREASE (fold) lines ─────────────────────────────────────────
-  // Horizontal crease lines across full width (top and bottom of main strip)
-  objects.push({ type: "line", x1: GLUE_TAB, y1: mainTop, x2: totalWidth, y2: mainTop, style: "crease" });
-  objects.push({ type: "line", x1: GLUE_TAB, y1: mainBottom, x2: totalWidth, y2: mainBottom, style: "crease" });
+  // ── FOLD LINES (dashed red) ─────────────────────────────────────
 
-  // Vertical crease lines (panel boundaries) — full height including flaps
-  const panelBoundaries = [xBack, xRightSide, xFront, xLeftSide];
-  for (const px of panelBoundaries) {
-    objects.push({ type: "line", x1: px, y1: 0, x2: px, y2: totalHeight, style: "crease" });
+  // Horizontal folds at top and bottom of main strip
+  objects.push(line(xGlue, yMain, totalWidth, yMain, "fold"));
+  objects.push(line(xGlue, yMainBot, totalWidth, yMainBot, "fold"));
+
+  // Vertical folds between panels (full height of main strip + into flaps)
+  const panelXs = [xBack, xSideR, xFront, xSideL];
+  for (const px of panelXs) {
+    objects.push(line(px, yMain, px, yMainBot, "fold"));
   }
 
-  // ── TRIM (cut) outlines ─────────────────────────────────────────
+  // Vertical folds extending into top flap area (for tuck/dust boundaries)
+  objects.push(line(xBack, yTopTuck, xBack, yMain, "fold"));
+  objects.push(line(xSideR, yMain - dust, xSideR, yMain, "fold"));
+  objects.push(line(xFront, yTopTuck, xFront, yMain, "fold"));
+  objects.push(line(xSideL, yMain - dust, xSideL, yMain, "fold"));
 
-  // Main body outer rectangle (the full strip without flaps)
-  // Left side of glue tab to right edge
-  objects.push({
-    type: "rect",
-    x: xGlue, y: mainTop,
-    w: totalWidth, h: h,
-    style: "trim"
-  });
+  // Vertical folds extending into bottom flap area
+  objects.push(line(xBack, yMainBot, xBack, yMainBot + dust, "fold"));
+  objects.push(line(xSideR, yMainBot, xSideR, yBotTuck, "fold"));
+  objects.push(line(xFront, yMainBot, xFront, yMainBot + dust, "fold"));
+  objects.push(line(xSideL, yMainBot, xSideL, yBotTuck, "fold"));
 
-  // Glue tab (tapered shape — simplified as a rect)
-  objects.push({
-    type: "rect",
-    x: xGlue, y: mainTop,
-    w: GLUE_TAB, h: h,
-    style: "trim"
-  });
+  // ── CUT LINES (solid blue) ──────────────────────────────────────
 
-  // ── TOP FLAPS ───────────────────────────────────────────────────
+  // Glue tab — tapered trapezoid on left side of Back panel
+  const glueTaper = 0.15;
+  objects.push(polyline([
+    { x: xBack, y: yMain },
+    { x: xGlue, y: yMain + glueTaper },
+    { x: xGlue, y: yMainBot - glueTaper },
+    { x: xBack, y: yMainBot },
+  ], "cut"));
 
-  // Back top tuck flap (full width of back panel, with rounded top)
-  objects.push({
-    type: "rect",
-    x: xBack, y: 0,
-    w: w, h: tuck,
-    style: "trim"
-  });
+  // Main strip outer cut — top edge from Back left to SideL right
+  objects.push(line(xBack, yMain, totalWidth, yMain, "cut"));
+  // Main strip outer cut — bottom edge
+  objects.push(line(xBack, yMainBot, totalWidth, yMainBot, "cut"));
+  // Right edge of SideL
+  objects.push(line(totalWidth, yMain, totalWidth, yMainBot, "cut"));
 
-  // Right side dust flap (shorter)
-  objects.push({
-    type: "rect",
-    x: xRightSide, y: mainTop - dust,
-    w: d, h: dust,
-    style: "trim"
-  });
+  // ── TOP FLAPS ────────────────────────────────────────────────────
 
-  // Front top tuck flap
-  objects.push({
-    type: "rect",
-    x: xFront, y: 0,
-    w: w, h: tuck,
-    style: "trim"
-  });
+  // Front panel TOP tuck flap (RTE: top tuck on front)
+  // Tapered shape with lock tab
+  const ftLeft = xFront + TUCK_TAPER;
+  const ftRight = xFront + w - TUCK_TAPER;
+  objects.push(polyline([
+    { x: xFront, y: yMain },
+    { x: ftLeft, y: yTopTuck },
+    { x: ftLeft + 0.1, y: yTopLock },       // lock tab left
+    { x: ftRight - 0.1, y: yTopLock },      // lock tab right
+    { x: ftRight, y: yTopTuck },
+    { x: xFront + w, y: yMain },
+  ], "cut"));
 
-  // Left side dust flap
-  objects.push({
-    type: "rect",
-    x: xLeftSide, y: mainTop - dust,
-    w: d, h: dust,
-    style: "trim"
-  });
+  // Right side TOP dust flap (shorter)
+  objects.push(polyline([
+    { x: xSideR, y: yMain },
+    { x: xSideR + 0.1, y: yMain - dust },
+    { x: xSideR + d - 0.1, y: yMain - dust },
+    { x: xSideR + d, y: yMain },
+  ], "cut"));
 
-  // ── BOTTOM FLAPS ────────────────────────────────────────────────
+  // Left side TOP dust flap
+  objects.push(polyline([
+    { x: xSideL, y: yMain },
+    { x: xSideL + 0.1, y: yMain - dust },
+    { x: xSideL + d - 0.1, y: yMain - dust },
+    { x: xSideL + d, y: yMain },
+  ], "cut"));
 
-  // Back bottom tuck flap
-  objects.push({
-    type: "rect",
-    x: xBack, y: mainBottom,
-    w: w, h: tuck,
-    style: "trim"
-  });
+  // Back panel TOP dust flap (on RTE the back has a dust flap on top, not a tuck)
+  objects.push(polyline([
+    { x: xBack, y: yMain },
+    { x: xBack + 0.1, y: yMain - dust },
+    { x: xBack + w - 0.1, y: yMain - dust },
+    { x: xBack + w, y: yMain },
+  ], "cut"));
 
-  // Right side dust flap
-  objects.push({
-    type: "rect",
-    x: xRightSide, y: mainBottom,
-    w: d, h: dust,
-    style: "trim"
-  });
+  // ── BOTTOM FLAPS ─────────────────────────────────────────────────
 
-  // Front bottom tuck flap
-  objects.push({
-    type: "rect",
-    x: xFront, y: mainBottom,
-    w: w, h: tuck,
-    style: "trim"
-  });
+  // Back panel BOTTOM tuck flap (RTE: bottom tuck on back)
+  const btLeft = xBack + TUCK_TAPER;
+  const btRight = xBack + w - TUCK_TAPER;
+  objects.push(polyline([
+    { x: xBack, y: yMainBot },
+    { x: btLeft, y: yBotTuck },
+    { x: btLeft + 0.1, y: yBotLock + lockTab },
+    { x: btRight - 0.1, y: yBotLock + lockTab },
+    { x: btRight, y: yBotTuck },
+    { x: xBack + w, y: yMainBot },
+  ], "cut"));
 
-  // Left side dust flap
-  objects.push({
-    type: "rect",
-    x: xLeftSide, y: mainBottom,
-    w: d, h: dust,
-    style: "trim"
-  });
+  // Right side BOTTOM dust flap
+  objects.push(polyline([
+    { x: xSideR, y: yMainBot },
+    { x: xSideR + 0.1, y: yMainBot + dust },
+    { x: xSideR + d - 0.1, y: yMainBot + dust },
+    { x: xSideR + d, y: yMainBot },
+  ], "cut"));
 
-  // ── PANEL ZONES ─────────────────────────────────────────────────
+  // Front panel BOTTOM dust flap (on RTE the front has dust flap on bottom)
+  objects.push(polyline([
+    { x: xFront, y: yMainBot },
+    { x: xFront + 0.1, y: yMainBot + dust },
+    { x: xFront + w - 0.1, y: yMainBot + dust },
+    { x: xFront + w, y: yMainBot },
+  ], "cut"));
+
+  // Left side BOTTOM dust flap
+  objects.push(polyline([
+    { x: xSideL, y: yMainBot },
+    { x: xSideL + 0.1, y: yMainBot + dust },
+    { x: xSideL + d - 0.1, y: yMainBot + dust },
+    { x: xSideL + d, y: yMainBot },
+  ], "cut"));
+
+  // ── PANEL ZONES & LABELS ─────────────────────────────────────────
+
   const panels = [
-    { name: "Back",       x: xBack,      y: mainTop, pw: w, ph: h },
-    { name: "Right Side", x: xRightSide, y: mainTop, pw: d, ph: h },
-    { name: "Front",      x: xFront,     y: mainTop, pw: w, ph: h },
-    { name: "Left Side",  x: xLeftSide,  y: mainTop, pw: d, ph: h },
+    { name: "Back",       x: xBack,  y: yMain, pw: w, ph: h, req: false },
+    { name: "Right Side",  x: xSideR, y: yMain, pw: d, ph: h, req: false },
+    { name: "Front",      x: xFront, y: yMain, pw: w, ph: h, req: true },
+    { name: "Left Side",   x: xSideL, y: yMain, pw: d, ph: h, req: false },
   ];
 
   for (const p of panels) {
-    objects.push({
-      type: "text",
-      x: p.x + p.pw / 2,
-      y: p.y + p.ph / 2,
-      text: p.name,
-      style: "zone-label"
-    });
-    zones.push({
-      name: p.name,
-      x: p.x,
-      y: p.y,
-      w: p.pw,
-      h: p.ph,
-      required: p.name === "Front"
-    });
+    zones.push({ name: p.name, x: p.x, y: p.y, w: p.pw, h: p.ph, required: p.req });
+    objects.push(label(p.x + p.pw / 2, p.y + p.ph / 2, p.name));
   }
 
-  // Label flaps
-  objects.push({ type: "text", x: xGlue + GLUE_TAB / 2, y: mainTop + h / 2, text: "Glue", style: "zone-label" });
+  // Label the glue tab and flaps
+  objects.push(label(xGlue + GLUE_TAB / 2, yMain + h / 2, "Glue"));
+  objects.push(label(xFront + w / 2, yTopTuck + tuck / 2, "Top Tuck"));
+  objects.push(label(xBack + w / 2, yBotTuck + tuck / 2, "Bottom Tuck"));
 
   return { totalWidth, totalHeight, objects, zones };
 }
 
-/**
- * Generate a bag dieline flat layout.
- * Layout: Front | Left Gusset | Back | Right Gusset
- * With optional bottom fold.
- */
+// ─── Stand-Up Pouch / Bag with Gusset ────────────────────────────────
+//
+// Flat layout for a stand-up pouch:
+//
+//   ┌─────────────────────────────────┐  ← Seal area top (+ zipper zone)
+//   │  Front   │ Gusset │  Back  │ Gusset │
+//   │          │  (L)   │        │  (R)   │
+//   └─────────────────────────────────┘
+//   └──────── Bottom gusset fold ─────┘
+//
+// w = pouch width (front/back), h = pouch height, gusset = bottom gusset depth
+
+const SEAL_AREA = 0.375;     // top seal area in inches
+const ZIPPER_ZONE = 0.5;     // zipper zone height
+const BOTTOM_SEAL = 0.375;   // bottom seal area
+
 export function generateBagDieline(
   w: number,
   h: number,
   gusset: number
 ): DielineResult {
-  const totalWidth = w + gusset + w + gusset;
-  const bottomFold = gusset / 2;
-  const totalHeight = h + bottomFold;
+  // Default gusset if not provided
+  if (gusset < 0.25) gusset = Math.max(1, w * 0.3);
+
+  const sideGusset = gusset / 2; // each side gusset is half the bottom gusset
+  const totalWidth = w + sideGusset + w + sideGusset;
+  const totalHeight = h + SEAL_AREA + ZIPPER_ZONE + BOTTOM_SEAL + gusset / 2;
+
+  // Panel x positions
+  const xFront = 0;
+  const xGussetL = w;
+  const xBack = w + sideGusset;
+  const xGussetR = w + sideGusset + w;
+
+  // Y positions
+  const yTop = 0;
+  const ySeal = SEAL_AREA;
+  const yZipper = ySeal + ZIPPER_ZONE;
+  const yPanelBottom = yZipper + h;
+  const yBottomSeal = yPanelBottom + BOTTOM_SEAL;
+  const yBottom = totalHeight;
 
   const objects: DielineObject[] = [];
   const zones: PanelZone[] = [];
 
+  // ── CUT LINES ────────────────────────────────────────────────────
+
+  // Outer rectangle cut
+  objects.push(polyline([
+    { x: 0, y: yTop },
+    { x: totalWidth, y: yTop },
+    { x: totalWidth, y: yBottom },
+    { x: 0, y: yBottom },
+    { x: 0, y: yTop },
+  ], "cut"));
+
+  // ── FOLD LINES ───────────────────────────────────────────────────
+
+  // Top seal fold
+  objects.push(line(0, ySeal, totalWidth, ySeal, "fold"));
+
+  // Zipper zone fold
+  objects.push(line(0, yZipper, totalWidth, yZipper, "fold"));
+
+  // Bottom of panel area
+  objects.push(line(0, yPanelBottom, totalWidth, yPanelBottom, "fold"));
+
+  // Bottom seal fold
+  objects.push(line(0, yBottomSeal, totalWidth, yBottomSeal, "fold"));
+
+  // Vertical folds between panels
+  const foldXs = [xGussetL, xBack, xGussetR];
+  for (const fx of foldXs) {
+    objects.push(line(fx, yTop, fx, yBottom, "fold"));
+  }
+
+  // ── LABELS & ZONES ──────────────────────────────────────────────
+
+  // Zipper indicator line (dashed across zipper zone center)
+  const zipY = ySeal + ZIPPER_ZONE / 2;
+  objects.push(line(0, zipY, totalWidth, zipY, "fold"));
+  objects.push(label(totalWidth / 2, zipY, "⟵ Zipper ⟶"));
+
+  // Seal area labels
+  objects.push(label(totalWidth / 2, ySeal / 2, "Top Seal"));
+  objects.push(label(totalWidth / 2, yPanelBottom + BOTTOM_SEAL / 2, "Bottom Seal"));
+  objects.push(label(totalWidth / 2, yBottomSeal + (yBottom - yBottomSeal) / 2, "Bottom Gusset Fold"));
+
+  // Panel zones
   const panels = [
-    { name: "Front",        x: 0,                 y: 0, pw: w,      ph: h },
-    { name: "Left Gusset",  x: w,                 y: 0, pw: gusset, ph: h },
-    { name: "Back",         x: w + gusset,         y: 0, pw: w,      ph: h },
-    { name: "Right Gusset", x: w + gusset + w,     y: 0, pw: gusset, ph: h },
+    { name: "Front",        x: xFront,   pw: w,          req: true },
+    { name: "Left Gusset",  x: xGussetL, pw: sideGusset, req: false },
+    { name: "Back",         x: xBack,    pw: w,          req: false },
+    { name: "Right Gusset", x: xGussetR, pw: sideGusset, req: false },
   ];
 
   for (const p of panels) {
-    objects.push({ type: "rect", x: p.x, y: p.y, w: p.pw, h: p.ph, style: "trim" });
-    objects.push({ type: "text", x: p.x + p.pw / 2, y: p.y + p.ph / 2, text: p.name, style: "zone-label" });
-    zones.push({ name: p.name, x: p.x, y: p.y, w: p.pw, h: p.ph, required: p.name === "Front" });
+    const panelH = h;
+    zones.push({ name: p.name, x: p.x, y: yZipper, w: p.pw, h: panelH, required: p.req });
+    objects.push(label(p.x + p.pw / 2, yZipper + panelH / 2, p.name));
   }
-
-  // Fold lines between panels
-  const foldXs = [w, w + gusset, w + gusset + w];
-  for (const fx of foldXs) {
-    objects.push({ type: "line", x1: fx, y1: 0, x2: fx, y2: h, style: "crease" });
-  }
-
-  // Bottom fold area
-  objects.push({ type: "line", x1: 0, y1: h, x2: totalWidth, y2: h, style: "crease" });
-  objects.push({ type: "rect", x: 0, y: h, w: totalWidth, h: bottomFold, style: "crease" });
-  objects.push({ type: "text", x: totalWidth / 2, y: h + bottomFold / 2, text: "Bottom Fold", style: "zone-label" });
 
   return { totalWidth, totalHeight, objects, zones };
 }
 
-/**
- * For labels, no dieline is needed — just return the single panel as a zone.
- */
+// ─── Label (flat, no dieline) ──────────────────────────────────────
+
 export function generateLabelDieline(
   w: number,
   h: number
@@ -269,9 +377,8 @@ export function generateLabelDieline(
   };
 }
 
-/**
- * Auto-select the right generator based on product type.
- */
+// ─── Auto-select ───────────────────────────────────────────────────
+
 export function generateDieline(
   productType: string,
   width: number,
