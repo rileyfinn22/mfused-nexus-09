@@ -11,6 +11,7 @@ import { OrderPanel } from "@/components/print-workshop/OrderPanel";
 import { PrintCart, type CartItem } from "@/components/print-workshop/PrintCart";
 import { PrintCheckout } from "@/components/print-workshop/PrintCheckout";
 import { SavedDesignIndicator } from "@/components/print-workshop/SavedDesignIndicator";
+import { CustomOrderFlow } from "@/components/print-workshop/CustomOrderFlow";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkshopOrders } from "@/components/print-workshop/WorkshopOrders";
@@ -20,7 +21,7 @@ import { toast } from "sonner";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
 import { generatePdfThumbnailFromArrayBuffer } from "@/lib/pdfThumbnail";
 
-type View = "browse" | "build" | "use" | "checkout";
+type View = "browse" | "build" | "use" | "checkout" | "custom";
 
 export default function PrintWorkshop() {
   const { isVibeAdmin, activeCompanyId, loading: roleLoading } = useActiveCompany();
