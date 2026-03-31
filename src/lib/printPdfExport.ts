@@ -323,12 +323,8 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
       }
     } else if (objectType === "image") {
       if (obj.src) {
-        const scaleX = obj.scaleX || 1;
-        const scaleY = obj.scaleY || 1;
-        const wIn = ((obj.width || 100) * scaleX) / CANVAS_DPI;
-        const hIn = ((obj.height || 100) * scaleY) / CANVAS_DPI;
         try {
-          doc.addImage(obj.src, "PNG", xIn, yIn, wIn, hIn, undefined, "NONE");
+          renderImageObjectToPdf(doc, obj, CANVAS_DPI, EXPORT_DPI);
         } catch {
           console.warn("Could not embed image in PDF export", obj.name);
         }
