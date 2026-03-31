@@ -790,7 +790,7 @@ const ProjectDetail = () => {
                       <TableRow 
                         key={po.id}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => navigate(`/vendor-pos/${po.id}`)}
+                        onClick={() => navigate(`/vendor-pos/${po.id}?returnTo=/projects/${projectId}`)}
                       >
                         <TableCell className="font-medium">{po.po_number}</TableCell>
                         <TableCell>{new Date(po.order_date).toLocaleDateString()}</TableCell>
