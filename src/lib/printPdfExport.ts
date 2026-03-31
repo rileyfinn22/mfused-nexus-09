@@ -558,7 +558,10 @@ function addCropMarks(doc: jsPDF, totalW: number, totalH: number, bleed: number)
 
 /**
  * Generate a print-ready PDF from canvas data only (no source PDF).
- * Rasterizes the Fabric.js canvas at high DPI.
+ *
+ * Strategy: rasterise the entire Fabric.js canvas as a single high-DPI image
+ * so that every object keeps its exact on-screen position (WYSIWYG).
+ * Then overlay crop marks and trim masking on top.
  */
 export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "sourcePdfPath">): Promise<Blob> {
   const { canvasData, widthInches, heightInches, bleedInches } = options;
@@ -573,91 +576,107 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
     format: [totalW, totalH],
   });
 
-  // Clip all rendering to the page bounds
   clipToPageBounds(doc, totalW, totalH);
 
   const CANVAS_DPI = 150;
 
-  // Overlay Fabric.js objects
-  const objects: any[] = canvasData?.objects || [];
-  for (const obj of objects) {
-    if (obj?.visible === false) continue;
-    const objectType = String(obj?.type || "").toLowerCase();
-    const objName = String(obj?.name || "");
-    if (shouldSkipExportObject(objName)) continue;
+  // ---------- Full-canvas rasterisation ----------
+  // We rebuild a temporary Fabric canvas at export DPI, render it, and embed the
+  // resulting bitmap. This guarantees positions, fonts, and line-heights match
+  // the preview exactly – eliminating per-object drift.
 
-    if (objName === "_ocrKnockout" && objectType === "rect") {
-      drawRectObject(doc, obj, CANVAS_DPI);
-      continue;
+  const { Canvas: FabricCanvas } = await import("fabric");
+
+  const canvasPxW = Math.round(totalW * CANVAS_DPI);
+  const canvasPxH = Math.round(totalH * CANVAS_DPI);
+
+  const tmpHtmlCanvas = document.createElement("canvas");
+  // Use higher resolution for export
+  const exportScale = Math.min(EXPORT_DPI / CANVAS_DPI, 4); // cap at 4× to stay within browser limits
+  tmpHtmlCanvas.width = Math.round(canvasPxW * exportScale);
+  tmpHtmlCanvas.height = Math.round(canvasPxH * exportScale);
+
+  const tmpFabric = new FabricCanvas(tmpHtmlCanvas, {
+    width: canvasPxW,
+    height: canvasPxH,
+    renderOnAddRemove: false,
+  });
+
+  // Load the same JSON the editor uses
+  if (canvasData) {
+    const safeData = JSON.parse(JSON.stringify(canvasData));
+    // Strip out helper objects that shouldn't export
+    if (Array.isArray(safeData.objects)) {
+      safeData.objects = safeData.objects.filter((obj: any) => {
+        const n = String(obj?.name || "");
+        if (n === "_trimGuide" || n === "_snapGuide" || n === "_editHighlight" || n === "_dieline" || n === "_dielineLabel") return false;
+        if (obj?.src && typeof obj.src === "string" && obj.src.startsWith("blob:")) return false;
+        return true;
+      });
+    }
+    if (safeData?.backgroundImage?.src?.startsWith("blob:")) {
+      delete safeData.backgroundImage;
     }
 
-    const xIn = (obj.left ?? 0) / CANVAS_DPI;
-    const yIn = (obj.top ?? 0) / CANVAS_DPI;
-
-    if (objectType === "itext" || objectType === "textbox" || objectType === "text") {
-      const fontSizePx = obj.fontSize || 24;
-      const scaleX = obj.scaleX || 1;
-      const scaleY = obj.scaleY || 1;
-      const fontSizePt = ((fontSizePx * scaleY) * 72) / CANVAS_DPI;
-
-      const jspdfFont = JSPDF_FONT_MAP[obj.fontFamily];
-      if (jspdfFont) {
-        const style =
-          obj.fontWeight === "bold" && obj.fontStyle === "italic"
-            ? "bolditalic"
-            : obj.fontWeight === "bold"
-              ? "bold"
-              : obj.fontStyle === "italic"
-                ? "italic"
-                : "normal";
-        doc.setFont(jspdfFont, style);
-        doc.setFontSize(fontSizePt);
-        const { r, g, b } = parseColor(obj.fill);
-        doc.setTextColor(r, g, b);
-        const textLines = String(obj.text || "").split("\n");
-        const lineHeightFactor = obj.lineHeight || 1.16;
-        const lineHeightIn = (fontSizePt / 72) * lineHeightFactor;
-        const baselineY = yIn + (fontSizePt / 72) * 0.82;
-
-        if (Math.abs(scaleX - 1) > 0.001) {
-          const k = (doc as any).internal.scaleFactor;
-          for (let i = 0; i < textLines.length; i++) {
-            const lineY = baselineY + i * lineHeightIn;
-            (doc as any).internal.write("q");
-            const tx = xIn * k;
-            const ty = ((doc as any).internal.pageSize.getHeight() - lineY) * k;
-            (doc as any).internal.write(
-              `${scaleX.toFixed(4)} 0 0 1 ${tx.toFixed(4)} ${ty.toFixed(4)} cm`
-            );
-            doc.text(textLines[i], 0, 0);
-            (doc as any).internal.write("Q");
-          }
-        } else {
-          for (let i = 0; i < textLines.length; i++) {
-            doc.text(textLines[i], xIn, baselineY + i * lineHeightIn);
-          }
-        }
-      } else {
-        const textCanvas = renderTextToCanvas(obj, CANVAS_DPI, EXPORT_DPI);
-        const textDataUrl = textCanvas.toDataURL("image/png");
-        const wIn = textCanvas.width / EXPORT_DPI;
-        const hIn = textCanvas.height / EXPORT_DPI;
-        doc.addImage(textDataUrl, "PNG", xIn, yIn, wIn, hIn, undefined, "NONE");
+    // Pre-load Google fonts so rasterisation uses correct glyphs
+    if (Array.isArray(safeData.objects)) {
+      const families = new Set<string>();
+      for (const obj of safeData.objects) {
+        if (obj?.fontFamily && typeof obj.fontFamily === "string") families.add(obj.fontFamily);
       }
-    } else if (objectType === "image") {
-      if (obj.src) {
-        try {
-          renderImageObjectToPdf(doc, obj, CANVAS_DPI, EXPORT_DPI);
-        } catch {
-          console.warn("Could not embed image in PDF export", obj.name);
-        }
+      const WEB_SAFE = new Set(["Arial","Verdana","Georgia","Times New Roman","Courier New","Impact","Trebuchet MS","Tahoma"]);
+      const toLoad = Array.from(families).filter(f => !WEB_SAFE.has(f));
+      if (toLoad.length > 0) {
+        await Promise.all(toLoad.map(f => {
+          const encoded = f.replace(/ /g, "+");
+          return new Promise<void>(resolve => {
+            // Skip if already loaded
+            if (document.fonts.check(`12px "${f}"`)) { resolve(); return; }
+            const link = document.createElement("link");
+            link.href = `https://fonts.googleapis.com/css2?family=${encoded}:wght@100;200;300;400;500;600;700;800;900&display=swap`;
+            link.rel = "stylesheet";
+            link.onload = () => document.fonts.ready.then(() => resolve());
+            link.onerror = () => resolve();
+            document.head.appendChild(link);
+          });
+        }));
+        await document.fonts.ready;
       }
-    } else if (objectType === "rect") {
-      drawRectObject(doc, obj, CANVAS_DPI);
     }
+
+    await tmpFabric.loadFromJSON(safeData);
+    await document.fonts.ready;
+
+    // Force re-measure all text objects
+    tmpFabric.getObjects().forEach((obj: any) => {
+      if (obj.type === 'i-text' || obj.type === 'textbox' || obj.type === 'text') {
+        const savedLeft = obj.left;
+        const savedTop = obj.top;
+        obj.set({ dirty: true });
+        obj.initDimensions?.();
+        obj.set({ left: savedLeft, top: savedTop });
+        obj.setCoords?.();
+      }
+    });
   }
 
+  // Render at export scale
+  const ctx = tmpHtmlCanvas.getContext("2d")!;
+  ctx.resetTransform();
+  ctx.scale(exportScale, exportScale);
+  tmpFabric.renderAll();
+
+  const rasterDataUrl = tmpHtmlCanvas.toDataURL("image/png");
+
+  // Place the full raster on the PDF page
+  doc.addImage(rasterDataUrl, "PNG", 0, 0, totalW, totalH, undefined, "NONE");
+
+  // Clean up
+  tmpFabric.dispose();
+
+  // Mask & crop marks
   maskOutsideTrimArea(doc, totalW, totalH, bleedInches);
   addCropMarks(doc, totalW, totalH, bleedInches);
+
   return doc.output("blob");
 }
