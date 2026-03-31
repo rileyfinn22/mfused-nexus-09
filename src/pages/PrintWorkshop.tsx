@@ -418,6 +418,27 @@ export default function PrintWorkshop() {
     );
   }
 
+  // New template guided flow (same steps as custom order, then opens template builder)
+  if (view === "new-template") {
+    return (
+      <CustomOrderFlow
+        onBack={handleBack}
+        title="New Template"
+        subtitle="Set up the template dimensions"
+        onStartEditor={(config) => {
+          setEditingTemplate({
+            product_type: config.productType,
+            width_inches: config.widthInches,
+            height_inches: config.heightInches,
+            depth_inches: config.depthInches,
+            bleed_inches: config.bleedInches,
+          });
+          setView("build");
+        }}
+      />
+    );
+  }
+
   // Determine if this is a custom order (no saved template)
   const isCustomOrder = selectedTemplate && !selectedTemplate.id;
 
