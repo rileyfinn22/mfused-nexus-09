@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
 import { generatePdfThumbnailFromArrayBuffer } from "@/lib/pdfThumbnail";
 
-type View = "browse" | "build" | "use" | "checkout" | "custom";
+type View = "browse" | "build" | "use" | "checkout" | "custom" | "new-template";
 
 export default function PrintWorkshop() {
   const { isVibeAdmin, activeCompanyId, loading: roleLoading } = useActiveCompany();
@@ -205,7 +205,7 @@ export default function PrintWorkshop() {
 
   const handleNewTemplate = () => {
     setEditingTemplate(null);
-    setView("build");
+    setView("new-template");
   };
 
   const handleBack = () => {
@@ -413,6 +413,27 @@ export default function PrintWorkshop() {
           setCustomConfig(config);
           setSavedDesign(null);
           setView("use");
+        }}
+      />
+    );
+  }
+
+  // New template guided flow (same steps as custom order, then opens template builder)
+  if (view === "new-template") {
+    return (
+      <CustomOrderFlow
+        onBack={handleBack}
+        title="New Template"
+        subtitle="Set up the template dimensions"
+        onStartEditor={(config) => {
+          setEditingTemplate({
+            product_type: config.productType,
+            width_inches: config.widthInches,
+            height_inches: config.heightInches,
+            depth_inches: config.depthInches,
+            bleed_inches: config.bleedInches,
+          });
+          setView("build");
         }}
       />
     );

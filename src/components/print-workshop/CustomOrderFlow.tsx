@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 interface CustomOrderFlowProps {
   onBack: () => void;
+  title?: string;
+  subtitle?: string;
   onStartEditor: (config: {
     productType: string;
     widthInches: number;
@@ -26,7 +28,7 @@ const PRODUCT_TYPES = [
   { key: "bag", label: "Bag", icon: ShoppingBag, desc: "Printed bags & pouches" },
 ] as const;
 
-export function CustomOrderFlow({ onBack, onStartEditor }: CustomOrderFlowProps) {
+export function CustomOrderFlow({ onBack, onStartEditor, title = "Start Custom Order", subtitle }: CustomOrderFlowProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [productType, setProductType] = useState<string>("");
   const [widthInches, setWidthInches] = useState(4);
@@ -54,9 +56,9 @@ export function CustomOrderFlow({ onBack, onStartEditor }: CustomOrderFlowProps)
           <ArrowLeft className="h-4 w-4" /> {step === 1 ? "Back" : "Product Type"}
         </Button>
         <div>
-          <h2 className="text-xl font-semibold">Start Custom Order</h2>
+          <h2 className="text-xl font-semibold">{title}</h2>
           <p className="text-sm text-muted-foreground">
-            Step {step} of 2: {step === 1 ? "Choose product type" : "Select size"}
+            {subtitle || `Step ${step} of 2: ${step === 1 ? "Choose product type" : "Select size"}`}
           </p>
         </div>
       </div>
