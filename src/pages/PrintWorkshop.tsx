@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
 import { generatePdfThumbnailFromArrayBuffer } from "@/lib/pdfThumbnail";
 
-type View = "browse" | "build" | "use" | "checkout" | "custom";
+type View = "browse" | "build" | "use" | "checkout" | "custom" | "new-template";
 
 export default function PrintWorkshop() {
   const { isVibeAdmin, activeCompanyId, loading: roleLoading } = useActiveCompany();
