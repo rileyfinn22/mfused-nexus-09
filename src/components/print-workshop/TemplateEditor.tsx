@@ -493,8 +493,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         const safeCanvasData = JSON.parse(JSON.stringify(canvasData));
         if (Array.isArray(safeCanvasData.objects)) {
           safeCanvasData.objects = safeCanvasData.objects.filter((obj: any) => {
-            if (obj?.name !== "pdf_background") return true;
+            // Remove blob URLs — they are ephemeral and won't load across sessions
             const src = typeof obj?.src === "string" ? obj.src : "";
+            if (src.startsWith("blob:")) return false;
+            if (obj?.name !== "pdf_background") return true;
             return !sourcePdfPath && !src.startsWith("blob:");
           });
         }
