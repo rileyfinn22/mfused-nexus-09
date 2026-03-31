@@ -605,35 +605,41 @@ serve(async (req) => {
 
       // Also include order items that have shipped_quantity but NO allocation for this invoice
       // This handles cases where some items were shipped directly (not via Pull & Ship)
-      const nonAllocatedShippedItems = (invoice.orders?.order_items || [])
-        .filter((item: any) => item.shipped_quantity > 0 && !allocatedOrderItemIds.has(item.id));
+      // ONLY for full/blanket invoices — partial/child invoices should only include their allocations
+      const isFullInvoice = !invoice.invoice_type || invoice.invoice_type === 'full';
+      if (isFullInvoice) {
+        const nonAllocatedShippedItems = (invoice.orders?.order_items || [])
+          .filter((item: any) => item.shipped_quantity > 0 && !allocatedOrderItemIds.has(item.id));
 
-      if (nonAllocatedShippedItems.length > 0) {
-        console.log(`Including ${nonAllocatedShippedItems.length} non-allocated shipped items`);
-        for (const item of nonAllocatedShippedItems) {
-          const qty = item.shipped_quantity;
-          const unitPrice = item.unit_price;
-          const fullAmount = qty * unitPrice;
-          calculatedSubtotal += fullAmount;
+        if (nonAllocatedShippedItems.length > 0) {
+          console.log(`Including ${nonAllocatedShippedItems.length} non-allocated shipped items (blanket invoice)`);
+          for (const item of nonAllocatedShippedItems) {
+            const qty = item.shipped_quantity;
+            const unitPrice = item.unit_price;
+            const fullAmount = qty * unitPrice;
+            calculatedSubtotal += fullAmount;
 
-          const qbItemId = await findOrCreateQBItem(item.name, item.description || item.name, unitPrice);
+            const qbItemId = await findOrCreateQBItem(item.name, item.description || item.name, unitPrice);
 
-          console.log(`Non-allocated item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, QB Item ID: ${qbItemId}`);
+            console.log(`Non-allocated item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, QB Item ID: ${qbItemId}`);
 
-          lineItems.push({
-            DetailType: 'SalesItemLineDetail',
-            Amount: fullAmount,
-            SalesItemLineDetail: {
-              ItemRef: {
-                value: qbItemId,
-                name: item.name,
+            lineItems.push({
+              DetailType: 'SalesItemLineDetail',
+              Amount: fullAmount,
+              SalesItemLineDetail: {
+                ItemRef: {
+                  value: qbItemId,
+                  name: item.name,
+                },
+                Qty: qty,
+                UnitPrice: unitPrice,
               },
-              Qty: qty,
-              UnitPrice: unitPrice,
-            },
-            Description: item.description || item.name,
-          });
+              Description: item.description || item.name,
+            });
+          }
         }
+      } else {
+        console.log('Skipping non-allocated shipped items for partial/child invoice');
       }
     } else {
       // Fallback: Use order items with shipped_quantity or all items
