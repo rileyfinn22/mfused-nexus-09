@@ -742,15 +742,24 @@ const InvoiceDetail = () => {
     const totalsX = pageWidth - totalsWidth - 14;
     
     // Compute subtotal from the same line items rendered in the table for consistency
+    const pdfHasChildren = relatedInvoices.some((ri: any) => ri.parent_invoice_id === invoiceId);
     const pdfComputedSubtotal = itemsToDisplay.reduce((sum: number, item: any) => {
-      const qty = isBlanket
-        ? (Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity || 0))
-        : Number(item.quantity || 0);
+      const shipped = Number(item.shipped_quantity || 0);
+      const ordered = Number(item.quantity || 0);
+      let qty: number;
+      if (isBlanket) {
+        qty = pdfHasChildren ? (shipped > 0 ? Math.max(shipped, ordered) : ordered) : (shipped > 0 ? shipped : ordered);
+      } else {
+        qty = ordered;
+      }
       return sum + qty * Number(item.unit_price || 0);
     }, 0);
     const pdfComputedTotal = pdfComputedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
     
-    const totalPaid = invoice.total_paid || 0;
+    const pdfChildPayments = isBlanket
+      ? relatedInvoices.filter((ri: any) => ri.parent_invoice_id === invoiceId).reduce((s: number, ri: any) => s + Number(ri.total_paid || 0), 0)
+      : 0;
+    const totalPaid = (invoice.total_paid || 0) + pdfChildPayments;
     const balance = pdfComputedTotal - totalPaid;
     const hasPayments = totalPaid > 0;
     const hasShipping = (invoice.shipping_cost || 0) > 0;
