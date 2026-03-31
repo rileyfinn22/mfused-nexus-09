@@ -1559,33 +1559,22 @@ const InvoiceDetail = () => {
       return calculateInvoiceTotals(items, Number(invoice?.tax || 0), displayShipping);
     }
     if (isBlanketDisplay) {
-      // Check if any shipped quantities have been entered
-      const hasAnyShipped = displayItems.some((item: any) => {
-        const orderItem = order?.order_items?.find((oi: any) => oi.id === item.id);
-        return Number(orderItem?.shipped_quantity || item.shipped_quantity || 0) > 0;
-      });
-      
-      const shippedItems = displayItems.map((item: any) => {
+      // Use blanketTotalItems which respects child invoice placeholder logic:
+      // hasChildren → max(shipped, ordered) per item to keep blanket at full order total
+      // no children, any shipped → shipped-only
+      // no children, nothing shipped → ordered (placeholder)
+      const hasChildren = relatedInvoices.some(
+        (ri: any) => ri.parent_invoice_id === invoiceId
+      );
+      const itemsWithShipped = displayItems.map((item: any) => {
         const orderItem = order?.order_items?.find((oi: any) => oi.id === item.id);
         return {
-          quantity: Number(orderItem?.shipped_quantity || item.shipped_quantity || 0),
-          unit_price: Number(item.unit_price || 0),
+          ...item,
+          shipped_quantity: Number(orderItem?.shipped_quantity || item.shipped_quantity || 0),
         };
       });
-      const shippedTotals = calculateInvoiceTotals(shippedItems, Number(invoice?.tax || 0), displayShipping);
-      
-      if (hasAnyShipped) {
-        // Shipped quantities exist — use actual shipped total (no MAX floor)
-        return shippedTotals;
-      }
-      
-      // Nothing shipped yet — show original order total as baseline
-      const originalItems = displayItems.map((item: any) => ({
-        quantity: Number(item.quantity || 0),
-        unit_price: Number(item.unit_price || 0),
-      }));
-      const originalTotals = calculateInvoiceTotals(originalItems, Number(invoice?.tax || 0), displayShipping);
-      return originalTotals;
+      const totalItems = blanketTotalItems(itemsWithShipped, hasChildren);
+      return calculateInvoiceTotals(totalItems, Number(invoice?.tax || 0), displayShipping);
     }
     // Partial invoices or non-blanket: use stored DB values
     return { subtotal: Number(invoice?.subtotal || 0), total: Number(invoice?.subtotal || 0) + Number(invoice?.tax || 0) + displayShipping };
