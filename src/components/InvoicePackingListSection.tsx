@@ -654,21 +654,7 @@ export const InvoicePackingListSection = ({
         const shippedQty = match.shipped_quantity || 0;
         if (shippedQty <= 0) continue;
 
-        // Update order_item shipped_quantity
-        const { data: currentItem } = await supabase
-          .from('order_items')
-          .select('shipped_quantity')
-          .eq('id', match.order_item_id)
-          .single();
-
-        if (currentItem) {
-          await supabase
-            .from('order_items')
-            .update({ shipped_quantity: shippedQty })
-            .eq('id', match.order_item_id);
-        }
-
-        // Upsert inventory allocation for this invoice
+        // Upsert inventory allocation for this invoice FIRST
         const { data: existingAlloc } = await supabase
           .from('inventory_allocations')
           .select('id')
@@ -692,6 +678,32 @@ export const InvoicePackingListSection = ({
               status: 'allocated'
             });
         }
+
+        // Recalculate shipped_quantity as SUM of ALL allocations for this order item
+        // This prevents overwriting shipped qty from other invoices
+        const { data: allItemAllocations } = await supabase
+          .from('inventory_allocations')
+          .select('quantity_allocated')
+          .eq('order_item_id', match.order_item_id);
+
+        const totalAllocated = (allItemAllocations || []).reduce(
+          (sum: number, a: any) => sum + Number(a.quantity_allocated || 0), 0
+        );
+
+        // Use the greater of current shipped_quantity or total allocated
+        // (preserves manual additions that aren't tracked as allocations)
+        const { data: currentItem } = await supabase
+          .from('order_items')
+          .select('shipped_quantity')
+          .eq('id', match.order_item_id)
+          .single();
+
+        const newShipped = Math.max(totalAllocated, Number(currentItem?.shipped_quantity || 0));
+        
+        await supabase
+          .from('order_items')
+          .update({ shipped_quantity: newShipped })
+          .eq('id', match.order_item_id);
       }
 
       // Fetch all current allocations for this invoice
