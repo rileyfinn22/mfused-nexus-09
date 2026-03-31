@@ -56,9 +56,9 @@ export function CustomOrderFlow({ onBack, onStartEditor, title = "Start Custom O
           <ArrowLeft className="h-4 w-4" /> {step === 1 ? "Back" : "Product Type"}
         </Button>
         <div>
-          <h2 className="text-xl font-semibold">Start Custom Order</h2>
+          <h2 className="text-xl font-semibold">{title}</h2>
           <p className="text-sm text-muted-foreground">
-            Step {step} of 2: {step === 1 ? "Choose product type" : "Select size"}
+            {subtitle || `Step ${step} of 2: ${step === 1 ? "Choose product type" : "Select size"}`}
           </p>
         </div>
       </div>
