@@ -452,7 +452,7 @@ const ProjectDetail = () => {
                       status: inv.status,
                       amount: inv.total || 0,
                       isOrder: false,
-                      onClick: () => navigate(`/invoices/${inv.id}`)
+                      onClick: () => navigate(`/invoices/${inv.id}?returnTo=/projects/${projectId}`)
                     })),
                     ...payments.map(pay => {
                       const invoice = invoices.find(inv => inv.id === pay.invoice_id);
