@@ -323,12 +323,8 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
       }
     } else if (objectType === "image") {
       if (obj.src) {
-        const scaleX = obj.scaleX || 1;
-        const scaleY = obj.scaleY || 1;
-        const wIn = ((obj.width || 100) * scaleX) / CANVAS_DPI;
-        const hIn = ((obj.height || 100) * scaleY) / CANVAS_DPI;
         try {
-          doc.addImage(obj.src, "PNG", xIn, yIn, wIn, hIn, undefined, "NONE");
+          renderImageObjectToPdf(doc, obj, CANVAS_DPI, EXPORT_DPI);
         } catch {
           console.warn("Could not embed image in PDF export", obj.name);
         }
@@ -426,6 +422,93 @@ function renderTextToCanvas(obj: any, canvasDpi: number, exportDpi: number): HTM
   }
 
   return canvas;
+}
+
+/**
+ * Render an image object to the PDF, handling rotation, flipping, and cropPath.
+ * Rasterizes through a temp canvas to ensure WYSIWYG fidelity.
+ */
+function renderImageObjectToPdf(doc: jsPDF, obj: any, canvasDpi: number, exportDpi: number) {
+  const scaleX = obj.scaleX || 1;
+  const scaleY = obj.scaleY || 1;
+  const angle = obj.angle || 0;
+  const flipX = obj.flipX || false;
+  const flipY = obj.flipY || false;
+  const imgW = obj.width || 100;
+  const imgH = obj.height || 100;
+  const cropX = obj.cropX || 0;
+  const cropY = obj.cropY || 0;
+
+  const hasTransform = Math.abs(angle) > 0.01 || flipX || flipY || cropX > 0 || cropY > 0;
+
+  if (!hasTransform) {
+    // Simple case: no rotation/flip/crop — place directly
+    const xIn = (obj.left ?? 0) / canvasDpi;
+    const yIn = (obj.top ?? 0) / canvasDpi;
+    const wIn = (imgW * Math.abs(scaleX)) / canvasDpi;
+    const hIn = (imgH * Math.abs(scaleY)) / canvasDpi;
+    doc.addImage(obj.src, "PNG", xIn, yIn, wIn, hIn, undefined, "NONE");
+    return;
+  }
+
+  // Complex case: rasterize through a canvas to handle all transforms
+  const dpiScale = exportDpi / canvasDpi;
+  const renderW = Math.ceil(imgW * Math.abs(scaleX) * dpiScale);
+  const renderH = Math.ceil(imgH * Math.abs(scaleY) * dpiScale);
+
+  // Calculate bounding box for rotated image
+  const radians = (angle * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(radians));
+  const sin = Math.abs(Math.sin(radians));
+  const boundW = Math.ceil(renderW * cos + renderH * sin);
+  const boundH = Math.ceil(renderW * sin + renderH * cos);
+
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = boundW;
+  tempCanvas.height = boundH;
+  const ctx = tempCanvas.getContext("2d")!;
+
+  // Load source image
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+
+  // Use synchronous draw since src is already a data URL or loaded
+  ctx.save();
+  ctx.translate(boundW / 2, boundH / 2);
+  ctx.rotate(radians);
+  if (flipX) ctx.scale(-1, 1);
+  if (flipY) ctx.scale(1, -1);
+
+  // Draw from the source, applying crop if needed
+  const srcImg = document.createElement("img");
+  srcImg.src = obj.src;
+
+  if (cropX > 0 || cropY > 0) {
+    ctx.drawImage(
+      srcImg,
+      cropX, cropY,
+      imgW, imgH,
+      -renderW / 2, -renderH / 2,
+      renderW, renderH
+    );
+  } else {
+    ctx.drawImage(srcImg, -renderW / 2, -renderH / 2, renderW, renderH);
+  }
+  ctx.restore();
+
+  const dataUrl = tempCanvas.toDataURL("image/png");
+  const wIn = boundW / exportDpi;
+  const hIn = boundH / exportDpi;
+
+  // Calculate position: Fabric uses originX/originY (default "left"/"top")
+  // but the center of the rotated bounding box needs to align with the
+  // original center of the unrotated object
+  const origCenterXIn = ((obj.left ?? 0) + (imgW * Math.abs(scaleX)) / 2) / canvasDpi;
+  const origCenterYIn = ((obj.top ?? 0) + (imgH * Math.abs(scaleY)) / 2) / canvasDpi;
+  const xIn = origCenterXIn - wIn / 2;
+  const yIn = origCenterYIn - hIn / 2;
+
+  doc.addImage(dataUrl, "PNG", xIn, yIn, wIn, hIn, undefined, "NONE");
 }
 
 /**
@@ -563,12 +646,8 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
       }
     } else if (objectType === "image") {
       if (obj.src) {
-        const scaleX = obj.scaleX || 1;
-        const scaleY = obj.scaleY || 1;
-        const wIn = ((obj.width || 100) * scaleX) / CANVAS_DPI;
-        const hIn = ((obj.height || 100) * scaleY) / CANVAS_DPI;
         try {
-          doc.addImage(obj.src, "PNG", xIn, yIn, wIn, hIn, undefined, "NONE");
+          renderImageObjectToPdf(doc, obj, CANVAS_DPI, EXPORT_DPI);
         } catch {
           console.warn("Could not embed image in PDF export", obj.name);
         }
