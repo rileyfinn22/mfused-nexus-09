@@ -142,22 +142,60 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const sanitizedCanvasData = canvasData
-        ? (() => {
-            const data = JSON.parse(JSON.stringify(canvasData));
-            if (Array.isArray(data.objects)) {
-              data.objects = data.objects.filter((obj: any) => {
-                if (obj?.name !== "pdf_background") return true;
-                const src = typeof obj?.src === "string" ? obj.src : "";
-                return !sourcePdfPath && !src.startsWith("blob:");
-              });
-            }
-            if (data?.backgroundImage?.src?.startsWith("blob:")) {
-              delete data.backgroundImage;
-            }
-            return data;
-          })()
+
+      // Helper: upload a blob URL to storage and return the public URL
+      const uploadBlobImage = async (blobUrl: string, index: number): Promise<string | null> => {
+        try {
+          const res = await fetch(blobUrl);
+          const blob = await res.blob();
+          const ext = blob.type?.includes("png") ? "png" : "jpg";
+          const path = `template-images/${crypto.randomUUID()}-${index}.${ext}`;
+          const { error } = await supabase.storage
+            .from("print-files")
+            .upload(path, blob, { upsert: true, contentType: blob.type || "image/png" });
+          if (error) {
+            console.warn("Failed to upload blob image:", error);
+            return null;
+          }
+          const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(path);
+          return urlData.publicUrl;
+        } catch (err) {
+          console.warn("Failed to fetch/upload blob image:", err);
+          return null;
+        }
+      };
+
+      let sanitizedCanvasData = canvasData
+        ? JSON.parse(JSON.stringify(canvasData))
         : null;
+
+      if (sanitizedCanvasData) {
+        if (Array.isArray(sanitizedCanvasData.objects)) {
+          sanitizedCanvasData.objects = sanitizedCanvasData.objects.filter((obj: any) => {
+            if (obj?.name !== "pdf_background") return true;
+            const src = typeof obj?.src === "string" ? obj.src : "";
+            return !sourcePdfPath && !src.startsWith("blob:");
+          });
+
+          // Upload any blob URL images to storage
+          for (let i = 0; i < sanitizedCanvasData.objects.length; i++) {
+            const obj = sanitizedCanvasData.objects[i];
+            if (obj?.type === "Image" && typeof obj?.src === "string" && obj.src.startsWith("blob:")) {
+              const publicUrl = await uploadBlobImage(obj.src, i);
+              if (publicUrl) {
+                obj.src = publicUrl;
+              } else {
+                // Remove the object if we can't upload it
+                sanitizedCanvasData.objects.splice(i, 1);
+                i--;
+              }
+            }
+          }
+        }
+        if (sanitizedCanvasData?.backgroundImage?.src?.startsWith("blob:")) {
+          delete sanitizedCanvasData.backgroundImage;
+        }
+      }
 
       // Generate thumbnail from current canvas
       const thumbnailUrl = await generateThumbnail();
