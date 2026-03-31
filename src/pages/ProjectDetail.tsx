@@ -586,7 +586,7 @@ const ProjectDetail = () => {
                       <TableRow 
                         key={invoice.id} 
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => navigate(`/invoices/${invoice.id}`)}
+                        onClick={() => navigate(`/invoices/${invoice.id}?returnTo=/projects/${projectId}`)}
                       >
                         <TableCell className="font-medium">
                           {invoice.invoice_number}
