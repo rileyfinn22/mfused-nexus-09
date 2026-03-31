@@ -490,7 +490,7 @@ const ProjectDetail = () => {
                         status: 'paid',
                         amount: vp.amount,
                         isOrder: false,
-                        onClick: () => navigate(`/vendor-pos/${vp.vendor_po_id}`)
+                        onClick: () => navigate(`/vendor-pos/${vp.vendor_po_id}?returnTo=/projects/${projectId}`)
                       };
                     })
                   ]
