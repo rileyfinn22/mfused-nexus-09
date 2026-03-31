@@ -590,11 +590,8 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
   const canvasPxW = Math.round(totalW * CANVAS_DPI);
   const canvasPxH = Math.round(totalH * CANVAS_DPI);
 
+  // Create an off-screen HTML canvas for Fabric — Fabric manages its own pixel buffer
   const tmpHtmlCanvas = document.createElement("canvas");
-  // Use higher resolution for export
-  const exportScale = Math.min(EXPORT_DPI / CANVAS_DPI, 4); // cap at 4× to stay within browser limits
-  tmpHtmlCanvas.width = Math.round(canvasPxW * exportScale);
-  tmpHtmlCanvas.height = Math.round(canvasPxH * exportScale);
 
   const tmpFabric = new FabricCanvas(tmpHtmlCanvas, {
     width: canvasPxW,
@@ -630,7 +627,6 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
         await Promise.all(toLoad.map(f => {
           const encoded = f.replace(/ /g, "+");
           return new Promise<void>(resolve => {
-            // Skip if already loaded
             if (document.fonts.check(`12px "${f}"`)) { resolve(); return; }
             const link = document.createElement("link");
             link.href = `https://fonts.googleapis.com/css2?family=${encoded}:wght@100;200;300;400;500;600;700;800;900&display=swap`;
@@ -660,13 +656,13 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
     });
   }
 
-  // Render at export scale
-  const ctx = tmpHtmlCanvas.getContext("2d")!;
-  ctx.resetTransform();
-  ctx.scale(exportScale, exportScale);
-  tmpFabric.renderAll();
-
-  const rasterDataUrl = tmpHtmlCanvas.toDataURL("image/png");
+  // Use Fabric's native toDataURL with a multiplier for high-res export.
+  // This lets Fabric handle its own transforms/scaling correctly.
+  const exportMultiplier = Math.min(EXPORT_DPI / CANVAS_DPI, 4); // cap at 4× for browser limits
+  const rasterDataUrl = tmpFabric.toDataURL({
+    format: "png",
+    multiplier: exportMultiplier,
+  });
 
   // Place the full raster on the PDF page
   doc.addImage(rasterDataUrl, "PNG", 0, 0, totalW, totalH, undefined, "NONE");
