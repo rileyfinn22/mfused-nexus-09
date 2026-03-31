@@ -205,7 +205,7 @@ export default function PrintWorkshop() {
 
   const handleNewTemplate = () => {
     setEditingTemplate(null);
-    setView("build");
+    setView("new-template");
   };
 
   const handleBack = () => {
