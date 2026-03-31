@@ -1,9 +1,7 @@
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { ImagePlus, Loader2, X, Wand2, Camera } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { ImagePlus, X, Camera } from "lucide-react";
 import { toast } from "sonner";
 
 interface AiCleanupDialogProps {
@@ -12,10 +10,7 @@ interface AiCleanupDialogProps {
 
 export function AiCleanupDialog({ onImageGenerated }: AiCleanupDialogProps) {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
   const [sourceImage, setSourceImage] = useState<string | null>(null);
-  const [instructions, setInstructions] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,7 +27,6 @@ export function AiCleanupDialog({ onImageGenerated }: AiCleanupDialogProps) {
     const reader = new FileReader();
     reader.onload = (ev) => {
       setSourceImage(ev.target?.result as string);
-      setPreview(null);
     };
     reader.readAsDataURL(file);
   };
@@ -48,7 +42,6 @@ export function AiCleanupDialog({ onImageGenerated }: AiCleanupDialogProps) {
         const reader = new FileReader();
         reader.onload = (ev) => {
           setSourceImage(ev.target?.result as string);
-          setPreview(null);
         };
         reader.readAsDataURL(file);
         break;
@@ -56,45 +49,17 @@ export function AiCleanupDialog({ onImageGenerated }: AiCleanupDialogProps) {
     }
   };
 
-  const cleanup = async () => {
-    if (!sourceImage) return;
-    setLoading(true);
-    setPreview(null);
-    try {
-      const defaultPrompt = "Convert this image into a clean, high-quality, print-ready graphic asset. Remove any background and make it suitable for placing on product packaging labels. Keep the main subject crisp and sharp with clean edges. Output on a transparent or white background.";
-      const finalPrompt = instructions.trim()
-        ? `${defaultPrompt} Additional instructions: ${instructions.trim()}`
-        : defaultPrompt;
-
-      const { data, error } = await supabase.functions.invoke("generate-design-image", {
-        body: {
-          prompt: finalPrompt,
-          reference_image: sourceImage,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (!data?.image_url) throw new Error("No image returned");
-      setPreview(data.image_url);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to process image");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const useImage = () => {
-    if (preview) {
-      onImageGenerated(preview);
+    if (sourceImage) {
+      onImageGenerated(sourceImage);
       setOpen(false);
       reset();
+      toast.success("Image placed on canvas");
     }
   };
 
   const reset = () => {
     setSourceImage(null);
-    setPreview(null);
-    setInstructions("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -109,20 +74,20 @@ export function AiCleanupDialog({ onImageGenerated }: AiCleanupDialogProps) {
       <DialogContent className="sm:max-w-lg" onPaste={handlePaste}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Wand2 className="h-5 w-5 text-primary" />
-            Screenshot / Image → Print-Ready Asset
+            <ImagePlus className="h-5 w-5 text-primary" />
+            Place Screenshot / Image on Canvas
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            Upload a screenshot, photo, or any image — AI will clean it up into a sharp, print-ready graphic you can place on your canvas. You can also <strong>paste from clipboard</strong> (Ctrl+V / ⌘+V).
+            Upload a screenshot, photo, or any image to place directly on your canvas as a print-ready asset. You can also <strong>paste from clipboard</strong> (Ctrl+V / ⌘+V).
           </p>
 
           {sourceImage ? (
             <div className="space-y-3">
               <div className="relative">
-                <div className="border border-border rounded-lg overflow-hidden bg-muted/30 flex justify-center p-2">
-                  <img src={sourceImage} alt="Source" className="max-h-40 object-contain rounded" />
+                <div className="border border-border rounded-lg overflow-hidden bg-[repeating-conic-gradient(hsl(var(--muted))_0%_25%,transparent_0%_50%)] bg-[length:16px_16px] flex justify-center p-2">
+                  <img src={sourceImage} alt="Source" className="max-h-64 object-contain rounded" />
                 </div>
                 <button
                   onClick={reset}
@@ -132,17 +97,9 @@ export function AiCleanupDialog({ onImageGenerated }: AiCleanupDialogProps) {
                 </button>
               </div>
 
-              <Textarea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                placeholder="Optional: Add specific instructions... e.g. 'Remove the text and keep only the logo', 'Make the colors more vibrant', 'Convert to a simple outline style'"
-                rows={2}
-                className="resize-none text-sm"
-              />
-
-              <Button onClick={cleanup} disabled={loading} className="w-full gap-2">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                {loading ? "Processing..." : "Convert to Print Asset"}
+              <Button onClick={useImage} className="w-full gap-2">
+                <ImagePlus className="h-4 w-4" />
+                Add to Canvas
               </Button>
             </div>
           ) : (
@@ -165,23 +122,6 @@ export function AiCleanupDialog({ onImageGenerated }: AiCleanupDialogProps) {
             onChange={handleFileUpload}
             className="hidden"
           />
-
-          {preview && (
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">AI-cleaned result:</p>
-              <div className="border border-border rounded-lg overflow-hidden bg-[repeating-conic-gradient(hsl(var(--muted))_0%_25%,transparent_0%_50%)] bg-[length:16px_16px] flex justify-center p-2">
-                <img src={preview} alt="Cleaned asset" className="max-h-64 object-contain rounded" />
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={cleanup} variant="outline" disabled={loading} className="flex-1">
-                  Retry
-                </Button>
-                <Button onClick={useImage} className="flex-1">
-                  Add to Canvas
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>
