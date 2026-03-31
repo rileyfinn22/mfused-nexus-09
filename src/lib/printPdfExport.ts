@@ -267,6 +267,7 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
 
     if (objectType === "itext" || objectType === "textbox" || objectType === "text") {
       const fontSizePx = obj.fontSize || 24;
+      const scaleX = obj.scaleX || 1;
       const scaleY = obj.scaleY || 1;
       const fontSizePt = ((fontSizePx * scaleY) * 72) / CANVAS_DPI;
 
@@ -288,8 +289,30 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
         doc.setTextColor(r, g, b);
 
         const textLines = String(obj.text || "").split("\n");
+        const lineHeightFactor = obj.lineHeight || 1.16;
+        const lineHeightIn = (fontSizePt / 72) * lineHeightFactor;
         const baselineY = yIn + (fontSizePt / 72) * 0.82;
-        doc.text(textLines, xIn, baselineY);
+
+        // Apply horizontal scaling if scaleX !== 1
+        if (Math.abs(scaleX - 1) > 0.001) {
+          const k = (doc as any).internal.scaleFactor;
+          for (let i = 0; i < textLines.length; i++) {
+            const lineY = baselineY + i * lineHeightIn;
+            // Save graphics state, apply horizontal scale transform
+            (doc as any).internal.write("q");
+            const tx = xIn * k;
+            const ty = ((doc as any).internal.pageSize.getHeight() - lineY) * k;
+            (doc as any).internal.write(
+              `${scaleX.toFixed(4)} 0 0 1 ${tx.toFixed(4)} ${ty.toFixed(4)} cm`
+            );
+            doc.text(textLines[i], 0, 0);
+            (doc as any).internal.write("Q");
+          }
+        } else {
+          for (let i = 0; i < textLines.length; i++) {
+            doc.text(textLines[i], xIn, baselineY + i * lineHeightIn);
+          }
+        }
       } else {
         // Non-standard font: rasterize at high DPI to preserve appearance
         const textCanvas = renderTextToCanvas(obj, CANVAS_DPI, EXPORT_DPI);
@@ -359,8 +382,14 @@ function parseColor(fill: string | undefined): { r: number; g: number; b: number
  */
 function renderTextToCanvas(obj: any, canvasDpi: number, exportDpi: number): HTMLCanvasElement {
   const scale = exportDpi / canvasDpi;
-  const fontSizePx = (obj.fontSize || 24) * scale;
+  const scaleX = obj.scaleX || 1;
+  const scaleY = obj.scaleY || 1;
+  const fontSizePx = (obj.fontSize || 24) * scaleY * scale;
+
   const text: string = obj.text || "";
+  const lines = text.split("\n");
+  const lineHeightFactor = obj.lineHeight || 1.16;
+  const lineHeightPx = fontSizePx * lineHeightFactor;
 
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d")!;
@@ -370,9 +399,15 @@ function renderTextToCanvas(obj: any, canvasDpi: number, exportDpi: number): HTM
   const font = `${style} ${weight} ${fontSizePx}px "${obj.fontFamily || "Arial"}"`;
   ctx.font = font;
 
-  const metrics = ctx.measureText(text);
-  const width = Math.ceil(metrics.width) + 4;
-  const height = Math.ceil(fontSizePx * 1.3) + 4;
+  // Measure max line width
+  let maxWidth = 0;
+  for (const line of lines) {
+    const m = ctx.measureText(line);
+    if (m.width > maxWidth) maxWidth = m.width;
+  }
+
+  const width = Math.ceil(maxWidth * scaleX) + 8;
+  const height = Math.ceil(lineHeightPx * lines.length) + 8;
 
   canvas.width = width;
   canvas.height = height;
@@ -380,7 +415,15 @@ function renderTextToCanvas(obj: any, canvasDpi: number, exportDpi: number): HTM
   ctx.font = font;
   ctx.fillStyle = obj.fill || "#000000";
   ctx.textBaseline = "top";
-  ctx.fillText(text, 2, 2);
+
+  // Apply horizontal scaling
+  if (Math.abs(scaleX - 1) > 0.001) {
+    ctx.scale(scaleX, 1);
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], 4 / scaleX, 4 + i * lineHeightPx);
+  }
 
   return canvas;
 }
@@ -470,6 +513,7 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
 
     if (objectType === "itext" || objectType === "textbox" || objectType === "text") {
       const fontSizePx = obj.fontSize || 24;
+      const scaleX = obj.scaleX || 1;
       const scaleY = obj.scaleY || 1;
       const fontSizePt = ((fontSizePx * scaleY) * 72) / CANVAS_DPI;
 
@@ -488,8 +532,28 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
         const { r, g, b } = parseColor(obj.fill);
         doc.setTextColor(r, g, b);
         const textLines = String(obj.text || "").split("\n");
+        const lineHeightFactor = obj.lineHeight || 1.16;
+        const lineHeightIn = (fontSizePt / 72) * lineHeightFactor;
         const baselineY = yIn + (fontSizePt / 72) * 0.82;
-        doc.text(textLines, xIn, baselineY);
+
+        if (Math.abs(scaleX - 1) > 0.001) {
+          const k = (doc as any).internal.scaleFactor;
+          for (let i = 0; i < textLines.length; i++) {
+            const lineY = baselineY + i * lineHeightIn;
+            (doc as any).internal.write("q");
+            const tx = xIn * k;
+            const ty = ((doc as any).internal.pageSize.getHeight() - lineY) * k;
+            (doc as any).internal.write(
+              `${scaleX.toFixed(4)} 0 0 1 ${tx.toFixed(4)} ${ty.toFixed(4)} cm`
+            );
+            doc.text(textLines[i], 0, 0);
+            (doc as any).internal.write("Q");
+          }
+        } else {
+          for (let i = 0; i < textLines.length; i++) {
+            doc.text(textLines[i], xIn, baselineY + i * lineHeightIn);
+          }
+        }
       } else {
         const textCanvas = renderTextToCanvas(obj, CANVAS_DPI, EXPORT_DPI);
         const textDataUrl = textCanvas.toDataURL("image/png");
