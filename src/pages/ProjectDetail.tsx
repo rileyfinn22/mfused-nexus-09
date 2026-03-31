@@ -477,7 +477,7 @@ const ProjectDetail = () => {
                       status: po.status,
                       amount: po.total || 0,
                       isOrder: false,
-                      onClick: () => navigate(`/vendor-pos/${po.id}`)
+                      onClick: () => navigate(`/vendor-pos/${po.id}?returnTo=/projects/${projectId}`)
                     })),
                     ...vendorPayments.map(vp => {
                       const po = vp.vendor_pos;
