@@ -452,7 +452,7 @@ const ProjectDetail = () => {
                       status: inv.status,
                       amount: inv.total || 0,
                       isOrder: false,
-                      onClick: () => navigate(`/invoices/${inv.id}`)
+                      onClick: () => navigate(`/invoices/${inv.id}?returnTo=/projects/${projectId}`)
                     })),
                     ...payments.map(pay => {
                       const invoice = invoices.find(inv => inv.id === pay.invoice_id);
@@ -477,7 +477,7 @@ const ProjectDetail = () => {
                       status: po.status,
                       amount: po.total || 0,
                       isOrder: false,
-                      onClick: () => navigate(`/vendor-pos/${po.id}`)
+                      onClick: () => navigate(`/vendor-pos/${po.id}?returnTo=/projects/${projectId}`)
                     })),
                     ...vendorPayments.map(vp => {
                       const po = vp.vendor_pos;
@@ -490,7 +490,7 @@ const ProjectDetail = () => {
                         status: 'paid',
                         amount: vp.amount,
                         isOrder: false,
-                        onClick: () => navigate(`/vendor-pos/${vp.vendor_po_id}`)
+                        onClick: () => navigate(`/vendor-pos/${vp.vendor_po_id}?returnTo=/projects/${projectId}`)
                       };
                     })
                   ]
@@ -586,7 +586,7 @@ const ProjectDetail = () => {
                       <TableRow 
                         key={invoice.id} 
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => navigate(`/invoices/${invoice.id}`)}
+                        onClick={() => navigate(`/invoices/${invoice.id}?returnTo=/projects/${projectId}`)}
                       >
                         <TableCell className="font-medium">
                           {invoice.invoice_number}
@@ -790,7 +790,7 @@ const ProjectDetail = () => {
                       <TableRow 
                         key={po.id}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => navigate(`/vendor-pos/${po.id}`)}
+                        onClick={() => navigate(`/vendor-pos/${po.id}?returnTo=/projects/${projectId}`)}
                       >
                         <TableCell className="font-medium">{po.po_number}</TableCell>
                         <TableCell>{new Date(po.order_date).toLocaleDateString()}</TableCell>

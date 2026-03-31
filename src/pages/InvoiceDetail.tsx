@@ -1623,9 +1623,13 @@ const InvoiceDetail = () => {
   return <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/invoices")}>
+        <Button variant="ghost" size="sm" onClick={() => {
+          const params = new URLSearchParams(window.location.search);
+          const returnTo = params.get('returnTo');
+          navigate(returnTo || "/invoices");
+        }}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Invoices
+          {new URLSearchParams(window.location.search).get('returnTo') ? 'Back to Project' : 'Back to Invoices'}
         </Button>
         <div className="flex gap-3">
           {isVibeAdmin && <>
