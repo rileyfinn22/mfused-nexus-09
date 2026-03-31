@@ -28,7 +28,7 @@ const PRODUCT_TYPES = [
   { key: "bag", label: "Bag", icon: ShoppingBag, desc: "Printed bags & pouches" },
 ] as const;
 
-export function CustomOrderFlow({ onBack, onStartEditor }: CustomOrderFlowProps) {
+export function CustomOrderFlow({ onBack, onStartEditor, title = "Start Custom Order", subtitle }: CustomOrderFlowProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [productType, setProductType] = useState<string>("");
   const [widthInches, setWidthInches] = useState(4);
