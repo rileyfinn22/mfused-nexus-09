@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 interface CustomOrderFlowProps {
   onBack: () => void;
+  title?: string;
+  subtitle?: string;
   onStartEditor: (config: {
     productType: string;
     widthInches: number;
