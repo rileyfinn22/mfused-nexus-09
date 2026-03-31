@@ -973,7 +973,7 @@ Thank you for your business.`;
       <div className="mb-6 flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => navigate(returnTo)}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          {returnTo.startsWith('/projects/') ? 'Back to Project' : 'Back'}
         </Button>
         <div className="flex gap-3">
           {isAdmin && (
