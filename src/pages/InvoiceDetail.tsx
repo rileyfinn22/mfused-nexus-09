@@ -1581,7 +1581,13 @@ const InvoiceDetail = () => {
   };
   
   const { subtotal: displaySubtotal, total: displayTotal } = computeDisplayTotals();
-  const displayTotalPaid = Number(invoice?.total_paid || 0);
+  // For blanket invoices with children, include child invoice payments in total paid
+  const childPaymentsTotal = isBlanketDisplay
+    ? relatedInvoices
+        .filter((ri: any) => ri.parent_invoice_id === invoiceId)
+        .reduce((sum: number, ri: any) => sum + Number(ri.total_paid || 0), 0)
+    : 0;
+  const displayTotalPaid = Number(invoice?.total_paid || 0) + childPaymentsTotal;
   const displayBalance = displayTotal - displayTotalPaid;
 
   // Calculate shipped percentage from actual quantities
