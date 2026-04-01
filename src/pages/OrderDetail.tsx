@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
+import { SendOrderConfirmationDialog } from "@/components/SendOrderConfirmationDialog";
 
 
 const STAGE_DEFINITIONS = [
