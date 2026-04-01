@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { CARRIERS, getTrackingUrl } from "@/lib/trackingUtils";
 
 interface OrderDetail {
