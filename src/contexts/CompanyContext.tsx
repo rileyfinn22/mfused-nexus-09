@@ -15,7 +15,9 @@ interface CompanyContextType {
   isMultiCompany: boolean;
   hasFinanceRole: boolean;
   hasVibeAdminRole: boolean;
+  hasForwarderRole: boolean;
   isFinancePortalUser: boolean;
+  isForwarderPortalUser: boolean;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
