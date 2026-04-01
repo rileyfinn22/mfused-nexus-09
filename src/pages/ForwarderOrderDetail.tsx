@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { CARRIERS, getTrackingUrl } from "@/lib/trackingUtils";
 
 interface OrderDetail {
@@ -21,6 +22,7 @@ interface OrderDetail {
   description: string | null;
   customer_name: string;
   status: string;
+  company_id: string;
   shipping_name: string;
   shipping_street: string;
   shipping_city: string;
@@ -80,7 +82,7 @@ export default function ForwarderOrderDetail() {
   const fetchAll = async () => {
     try {
       const [orderRes, itemsRes, legsRes] = await Promise.all([
-        supabase.from("orders").select("id, order_number, po_number, description, customer_name, status, shipping_name, shipping_street, shipping_city, shipping_state, shipping_zip").eq("id", orderId!).single(),
+        supabase.from("orders").select("id, order_number, po_number, description, customer_name, status, company_id, shipping_name, shipping_street, shipping_city, shipping_state, shipping_zip").eq("id", orderId!).single(),
         supabase.from("order_items").select("id, name, sku, quantity, shipped_quantity, description").eq("order_id", orderId!),
         (supabase as any).from("shipment_legs").select("*").eq("order_id", orderId!).order("leg_number"),
       ]);
@@ -98,14 +100,14 @@ export default function ForwarderOrderDetail() {
   };
 
   const addLeg = async () => {
-    if (!order || !activeCompany) return;
+    if (!order) return;
     const nextNum = legs.length + 1;
     try {
       const { data, error } = await (supabase as any)
         .from("shipment_legs")
         .insert({
           order_id: order.id,
-          company_id: activeCompany.id,
+          company_id: order.company_id,
           leg_number: nextNum,
           leg_type: "international",
           label: "International Freight",
