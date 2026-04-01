@@ -246,8 +246,10 @@ export type Database = {
         Row: {
           billing_city: string | null
           billing_email: string | null
+          billing_name: string | null
           billing_state: string | null
           billing_street: string | null
+          billing_street2: string | null
           billing_zip: string | null
           created_at: string
           email: string | null
@@ -260,14 +262,17 @@ export type Database = {
           shipping_city: string | null
           shipping_state: string | null
           shipping_street: string | null
+          shipping_street2: string | null
           shipping_zip: string | null
           updated_at: string
         }
         Insert: {
           billing_city?: string | null
           billing_email?: string | null
+          billing_name?: string | null
           billing_state?: string | null
           billing_street?: string | null
+          billing_street2?: string | null
           billing_zip?: string | null
           created_at?: string
           email?: string | null
@@ -280,14 +285,17 @@ export type Database = {
           shipping_city?: string | null
           shipping_state?: string | null
           shipping_street?: string | null
+          shipping_street2?: string | null
           shipping_zip?: string | null
           updated_at?: string
         }
         Update: {
           billing_city?: string | null
           billing_email?: string | null
+          billing_name?: string | null
           billing_state?: string | null
           billing_street?: string | null
+          billing_street2?: string | null
           billing_zip?: string | null
           created_at?: string
           email?: string | null
@@ -300,6 +308,7 @@ export type Database = {
           shipping_city?: string | null
           shipping_state?: string | null
           shipping_street?: string | null
+          shipping_street2?: string | null
           shipping_zip?: string | null
           updated_at?: string
         }

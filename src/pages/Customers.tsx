@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit, Trash2, Building2, UserPlus, Mail } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Building2, UserPlus, Mail, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { InviteCompanyUserDialog } from "@/components/InviteCompanyUserDialog";
@@ -35,11 +36,15 @@ const customerSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name too long"),
   email: z.string().trim().email("Invalid email").max(255, "Email too long").optional().or(z.literal("")),
   phone: z.string().trim().max(50, "Phone too long").optional().or(z.literal("")),
+  billing_name: z.string().trim().max(200, "Name/Attn too long").optional().or(z.literal("")),
   billing_street: z.string().trim().max(500, "Address too long").optional().or(z.literal("")),
+  billing_street2: z.string().trim().max(500, "Address too long").optional().or(z.literal("")),
   billing_city: z.string().trim().max(100, "City too long").optional().or(z.literal("")),
   billing_state: z.string().trim().max(50, "State too long").optional().or(z.literal("")),
   billing_zip: z.string().trim().max(20, "ZIP too long").optional().or(z.literal("")),
+  shipping_name: z.string().trim().max(200, "Name/Attn too long").optional().or(z.literal("")),
   shipping_street: z.string().trim().max(500, "Address too long").optional().or(z.literal("")),
+  shipping_street2: z.string().trim().max(500, "Address too long").optional().or(z.literal("")),
   shipping_city: z.string().trim().max(100, "City too long").optional().or(z.literal("")),
   shipping_state: z.string().trim().max(50, "State too long").optional().or(z.literal("")),
   shipping_zip: z.string().trim().max(20, "ZIP too long").optional().or(z.literal("")),
@@ -58,15 +63,20 @@ const Customers = () => {
   const [selectedCompanyForInvite, setSelectedCompanyForInvite] = useState<string | undefined>();
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<any>(null);
+  const [inlineEmails, setInlineEmails] = useState<{ email: string; label: string }[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
+    billing_name: "",
     billing_street: "",
+    billing_street2: "",
     billing_city: "",
     billing_state: "",
     billing_zip: "",
+    shipping_name: "",
     shipping_street: "",
+    shipping_street2: "",
     shipping_city: "",
     shipping_state: "",
     shipping_zip: "",
@@ -112,11 +122,15 @@ const Customers = () => {
         name: customer.name || "",
         email: customer.email || "",
         phone: customer.phone || "",
+        billing_name: customer.billing_name || "",
         billing_street: customer.billing_street || "",
+        billing_street2: customer.billing_street2 || "",
         billing_city: customer.billing_city || "",
         billing_state: customer.billing_state || "",
         billing_zip: customer.billing_zip || "",
+        shipping_name: customer.shipping_name || "",
         shipping_street: customer.shipping_street || "",
+        shipping_street2: customer.shipping_street2 || "",
         shipping_city: customer.shipping_city || "",
         shipping_state: customer.shipping_state || "",
         shipping_zip: customer.shipping_zip || "",
@@ -128,17 +142,22 @@ const Customers = () => {
         name: "",
         email: "",
         phone: "",
+        billing_name: "",
         billing_street: "",
+        billing_street2: "",
         billing_city: "",
         billing_state: "",
         billing_zip: "",
+        shipping_name: "",
         shipping_street: "",
+        shipping_street2: "",
         shipping_city: "",
         shipping_state: "",
         shipping_zip: "",
         notes: "",
       });
     }
+    setInlineEmails([]);
     setFormErrors({});
     setShowDialog(true);
   };
@@ -155,11 +174,15 @@ const Customers = () => {
         name: validated.name,
         email: validated.email || null,
         phone: validated.phone || null,
+        billing_name: validated.billing_name || null,
         billing_street: validated.billing_street || null,
+        billing_street2: validated.billing_street2 || null,
         billing_city: validated.billing_city || null,
         billing_state: validated.billing_state || null,
         billing_zip: validated.billing_zip || null,
+        shipping_name: validated.shipping_name || null,
         shipping_street: validated.shipping_street || null,
+        shipping_street2: validated.shipping_street2 || null,
         shipping_city: validated.shipping_city || null,
         shipping_state: validated.shipping_state || null,
         shipping_zip: validated.shipping_zip || null,
@@ -179,11 +202,23 @@ const Customers = () => {
           description: "Company information has been updated successfully.",
         });
       } else {
-        const { error } = await supabase
+        const { data: newCompany, error } = await supabase
           .from('companies')
-          .insert([customerData]);
+          .insert([customerData])
+          .select('id')
+          .single();
 
         if (error) throw error;
+
+        // Save inline emails for new company
+        if (newCompany && inlineEmails.length > 0) {
+          const emailRows = inlineEmails
+            .filter(e => e.email.trim())
+            .map(e => ({ company_id: newCompany.id, email: e.email.trim(), label: e.label }));
+          if (emailRows.length > 0) {
+            await supabase.from('company_emails').insert(emailRows);
+          }
+        }
 
         toast({
           title: "Company created",
@@ -432,14 +467,50 @@ const Customers = () => {
               </div>
             </div>
 
-            {/* Additional Emails - Only show when editing existing company */}
-            {editingCustomer && (
+            {/* Additional Emails */}
+            {editingCustomer ? (
               <div className="space-y-4">
                 <h3 className="font-semibold flex items-center gap-2">
                   <Mail className="h-4 w-4" />
                   Additional Emails
                 </h3>
                 <CompanyEmailsManager companyId={editingCustomer.id} />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Additional Emails
+                  </h3>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setInlineEmails(prev => [...prev, { email: "", label: "general" }])}>
+                    <Plus className="h-3 w-3 mr-1" /> Add Email
+                  </Button>
+                </div>
+                {inlineEmails.map((entry, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Select value={entry.label} onValueChange={(v) => setInlineEmails(prev => prev.map((e, i) => i === idx ? { ...e, label: v } : e))}>
+                      <SelectTrigger className="w-[120px] h-9 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">General</SelectItem>
+                        <SelectItem value="billing">Billing</SelectItem>
+                        <SelectItem value="orders">Orders</SelectItem>
+                        <SelectItem value="shipping">Shipping</SelectItem>
+                        <SelectItem value="support">Support</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      className="flex-1"
+                      type="email"
+                      value={entry.email}
+                      onChange={(e) => setInlineEmails(prev => prev.map((em, i) => i === idx ? { ...em, email: e.target.value } : em))}
+                      placeholder="email@example.com"
+                    />
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setInlineEmails(prev => prev.filter((_, i) => i !== idx))}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -448,12 +519,30 @@ const Customers = () => {
               <h3 className="font-semibold">Billing Address</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
+                  <Label htmlFor="billing_name">Name / Attn</Label>
+                  <Input
+                    id="billing_name"
+                    value={formData.billing_name}
+                    onChange={(e) => setFormData({ ...formData, billing_name: e.target.value })}
+                    placeholder="Attn: John Smith"
+                  />
+                </div>
+                <div className="col-span-2">
                   <Label htmlFor="billing_street">Street Address</Label>
                   <Input
                     id="billing_street"
                     value={formData.billing_street}
                     onChange={(e) => setFormData({ ...formData, billing_street: e.target.value })}
                     placeholder="123 Main St"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="billing_street2">Address Line 2</Label>
+                  <Input
+                    id="billing_street2"
+                    value={formData.billing_street2}
+                    onChange={(e) => setFormData({ ...formData, billing_street2: e.target.value })}
+                    placeholder="Suite 100, Floor 2, etc."
                   />
                 </div>
                 <div>
@@ -491,12 +580,30 @@ const Customers = () => {
               <h3 className="font-semibold">Shipping Address</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
+                  <Label htmlFor="shipping_name">Name / Attn</Label>
+                  <Input
+                    id="shipping_name"
+                    value={formData.shipping_name}
+                    onChange={(e) => setFormData({ ...formData, shipping_name: e.target.value })}
+                    placeholder="Attn: Warehouse Manager"
+                  />
+                </div>
+                <div className="col-span-2">
                   <Label htmlFor="shipping_street">Street Address</Label>
                   <Input
                     id="shipping_street"
                     value={formData.shipping_street}
                     onChange={(e) => setFormData({ ...formData, shipping_street: e.target.value })}
                     placeholder="123 Main St"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="shipping_street2">Address Line 2</Label>
+                  <Input
+                    id="shipping_street2"
+                    value={formData.shipping_street2}
+                    onChange={(e) => setFormData({ ...formData, shipping_street2: e.target.value })}
+                    placeholder="Suite 100, Floor 2, etc."
                   />
                 </div>
                 <div>
