@@ -9,9 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X, History, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
+import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X, History, CheckCircle2, AlertTriangle, Clock, Link2, Search } from "lucide-react";
 import { calculateFinanceFee, formatUSD } from "@/lib/financeUtils";
 import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function FinancedInvoiceDetail() {
   const { id } = useParams<{ id: string }>();
@@ -28,7 +29,10 @@ export default function FinancedInvoiceDetail() {
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [repayments, setRepayments] = useState<any[]>([]);
-
+  const [linkPOOpen, setLinkPOOpen] = useState(false);
+  const [poSearchQuery, setPOSearchQuery] = useState("");
+  const [poSearchResults, setPOSearchResults] = useState<any[]>([]);
+  const [poSearching, setPOSearching] = useState(false);
   // Editable fields
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [notes, setNotes] = useState("");
@@ -223,6 +227,49 @@ export default function FinancedInvoiceDetail() {
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
 
+  const searchVendorPOs = async (query: string) => {
+    setPOSearchQuery(query);
+    if (query.length < 1) { setPOSearchResults([]); return; }
+    setPOSearching(true);
+    const { data } = await supabase
+      .from("vendor_pos")
+      .select("id, po_number, description, total, vendors(name)")
+      .or(`po_number.ilike.%${query}%,description.ilike.%${query}%`)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    setPOSearchResults(data || []);
+    setPOSearching(false);
+  };
+
+  const handleLinkPO = async (vendorPOId: string) => {
+    const { error } = await supabase
+      .from("financed_invoices")
+      .update({ vendor_po_id: vendorPOId })
+      .eq("id", id!);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Vendor PO linked" });
+      setLinkPOOpen(false);
+      setPOSearchQuery("");
+      setPOSearchResults([]);
+      fetchRecord();
+    }
+  };
+
+  const handleUnlinkPO = async () => {
+    const { error } = await supabase
+      .from("financed_invoices")
+      .update({ vendor_po_id: null })
+      .eq("id", id!);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Vendor PO unlinked" });
+      fetchRecord();
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -322,6 +369,37 @@ export default function FinancedInvoiceDetail() {
               <CheckCircle2 className="h-4 w-4" />
               Activate
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Linked PO section - admin only */}
+      {isVibeAdmin && (
+        <Card>
+          <CardContent className="flex items-center justify-between py-3">
+            <div className="flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Linked Vendor PO:</span>
+              {vendorPO ? (
+                <span className="text-sm">
+                  PO #{vendorPO.po_number} — {vendorPO.description || "No description"} ({formatUSD(vendorPO.total || 0)})
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">None</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setLinkPOOpen(true); setPOSearchQuery(""); setPOSearchResults([]); }}>
+                <Link2 className="mr-1 h-3 w-3" />
+                {vendorPO ? "Change PO" : "Link PO"}
+              </Button>
+              {vendorPO && (
+                <Button size="sm" variant="ghost" onClick={handleUnlinkPO}>
+                  <X className="mr-1 h-3 w-3" />
+                  Unlink
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -690,6 +768,48 @@ export default function FinancedInvoiceDetail() {
           invoice={record}
         />
       )}
+
+      {/* Link PO Dialog */}
+      <Dialog open={linkPOOpen} onOpenChange={setLinkPOOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link Vendor PO</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by PO number or description..."
+                value={poSearchQuery}
+                onChange={(e) => searchVendorPOs(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-1">
+              {poSearching && <p className="text-sm text-muted-foreground text-center py-4">Searching...</p>}
+              {!poSearching && poSearchQuery && poSearchResults.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No POs found</p>
+              )}
+              {poSearchResults.map((po: any) => (
+                <button
+                  key={po.id}
+                  onClick={() => handleLinkPO(po.id)}
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">PO #{po.po_number}</span>
+                    <span className="text-xs text-muted-foreground">{formatUSD(po.total || 0)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {po.description || "No description"}
+                    {po.vendors?.name && ` • ${po.vendors.name}`}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
