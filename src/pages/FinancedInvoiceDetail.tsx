@@ -139,6 +139,7 @@ export default function FinancedInvoiceDetail() {
     }
 
     const newValues: Record<string, any> = {
+      description: description || null,
       invoice_number: invoiceNumber || null,
       notes: notes || null,
       carrier: carrier || null,
