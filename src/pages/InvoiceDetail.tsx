@@ -1503,7 +1503,7 @@ const InvoiceDetail = () => {
       const {
         error
       } = await supabase.from('invoices').update({
-        status: 'pending'
+        status: 'open'
       }).eq('id', invoiceId);
       if (error) throw error;
       toast({
