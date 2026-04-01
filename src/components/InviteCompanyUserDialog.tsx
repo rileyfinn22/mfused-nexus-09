@@ -41,7 +41,7 @@ export function InviteCompanyUserDialog({
 }: InviteCompanyUserDialogProps) {
   const [email, setEmail] = useState("");
   const [companyId, setCompanyId] = useState(preselectedCompanyId || "");
-  const [role, setRole] = useState<"company" | "admin">("company");
+  const [role, setRole] = useState<"company" | "admin" | "forwarder">("company");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
