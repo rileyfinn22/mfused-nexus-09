@@ -410,7 +410,7 @@ export default function FinancedInvoiceDetail() {
               )}
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => { setLinkPOOpen(true); setPOSearchQuery(""); setPOSearchResults([]); }}>
+              <Button size="sm" variant="outline" onClick={() => { setLinkPOOpen(true); setPOSearchQuery(""); searchVendorPOs(""); }}>
                 <Link2 className="mr-1 h-3 w-3" />
                 {vendorPO ? "Change PO" : "Link PO"}
               </Button>
