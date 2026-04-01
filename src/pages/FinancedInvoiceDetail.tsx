@@ -227,7 +227,49 @@ export default function FinancedInvoiceDetail() {
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
 
-  if (loading) {
+  const searchVendorPOs = async (query: string) => {
+    setPOSearchQuery(query);
+    if (query.length < 1) { setPOSearchResults([]); return; }
+    setPOSearching(true);
+    const { data } = await supabase
+      .from("vendor_pos")
+      .select("id, po_number, description, total, vendors(name)")
+      .or(`po_number.ilike.%${query}%,description.ilike.%${query}%`)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    setPOSearchResults(data || []);
+    setPOSearching(false);
+  };
+
+  const handleLinkPO = async (vendorPOId: string) => {
+    const { error } = await supabase
+      .from("financed_invoices")
+      .update({ vendor_po_id: vendorPOId })
+      .eq("id", id!);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Vendor PO linked" });
+      setLinkPOOpen(false);
+      setPOSearchQuery("");
+      setPOSearchResults([]);
+      fetchRecord();
+    }
+  };
+
+  const handleUnlinkPO = async () => {
+    const { error } = await supabase
+      .from("financed_invoices")
+      .update({ vendor_po_id: null })
+      .eq("id", id!);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Vendor PO unlinked" });
+      fetchRecord();
+    }
+  };
+
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48" />
