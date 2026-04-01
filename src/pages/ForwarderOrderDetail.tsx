@@ -264,45 +264,12 @@ export default function ForwarderOrderDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Description</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm">
-              <p>{order.description}</p>
+            <CardContent className="text-sm whitespace-pre-wrap">
+              {order.description}
             </CardContent>
           </Card>
         )}
       </div>
-
-      {/* Order Items */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Order Items</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead>Qty Ordered</TableHead>
-                <TableHead>Qty Shipped</TableHead>
-                <TableHead>Description</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell className="font-mono text-sm">{item.sku}</TableCell>
-                  <TableCell>{item.quantity}</TableCell>
-                  <TableCell>{item.shipped_quantity}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
-                    {item.description || "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
 
       {/* Shipping Legs */}
       <Card>
@@ -495,6 +462,39 @@ export default function ForwarderOrderDetail() {
               </div>
             ))
           )}
+        </CardContent>
+      </Card>
+
+      {/* Order Items - compact at bottom */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-muted-foreground">Order Items</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="text-xs">
+                <TableHead className="text-xs py-2">Product</TableHead>
+                <TableHead className="text-xs py-2">SKU</TableHead>
+                <TableHead className="text-xs py-2">Qty</TableHead>
+                <TableHead className="text-xs py-2">Shipped</TableHead>
+                <TableHead className="text-xs py-2">Description</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.id} className="text-xs">
+                  <TableCell className="font-medium py-1.5 text-xs">{item.name}</TableCell>
+                  <TableCell className="font-mono py-1.5 text-xs">{item.sku}</TableCell>
+                  <TableCell className="py-1.5 text-xs">{item.quantity}</TableCell>
+                  <TableCell className="py-1.5 text-xs">{item.shipped_quantity}</TableCell>
+                  <TableCell className="text-muted-foreground py-1.5 text-xs">
+                    {item.description || "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>
