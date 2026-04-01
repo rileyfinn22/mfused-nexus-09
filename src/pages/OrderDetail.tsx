@@ -112,6 +112,7 @@ const OrderDetail = () => {
   // Artwork files state
   const [orderArtwork, setOrderArtwork] = useState<any[]>([]);
   const [showCustomPODialog, setShowCustomPODialog] = useState(false);
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
