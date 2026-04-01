@@ -1496,19 +1496,19 @@ const InvoiceDetail = () => {
   };
 
   const handleReopenInvoice = async () => {
-    if (!confirm('Reopen this invoice? This will set the status back to pending.')) {
+    if (!confirm('Reopen this invoice? This will set the status back to open.')) {
       return;
     }
     try {
       const {
         error
       } = await supabase.from('invoices').update({
-        status: 'pending'
+        status: 'open'
       }).eq('id', invoiceId);
       if (error) throw error;
       toast({
         title: "Invoice Reopened",
-        description: "Invoice has been reopened and set to pending"
+        description: "Invoice has been reopened and set to open"
       });
       fetchInvoiceDetails();
     } catch (error: any) {
