@@ -155,20 +155,6 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
     }
   };
 
-  const getLabelColor = (label: string) => {
-    switch (label) {
-      case 'billing':
-        return 'bg-green-500/10 text-green-700 border-green-500/20';
-      case 'orders':
-        return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
-      case 'shipping':
-        return 'bg-orange-500/10 text-orange-700 border-orange-500/20';
-      case 'support':
-        return 'bg-purple-500/10 text-purple-700 border-purple-500/20';
-      default:
-        return 'bg-muted text-muted-foreground';
-    }
-  };
 
   if (loading) {
     return (
