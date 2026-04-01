@@ -1172,8 +1172,11 @@ export default function ProductionDetail() {
 
   const handlePublishAll = async () => {
     try {
-      // Publish all stages with unpublished changes
+      // Publish all non-internal stages with unpublished changes
       for (const stage of stages) {
+        const stageDef = STAGE_DEFINITIONS.find(d => d.value === stage.stage_name);
+        if (stageDef?.adminOnly) continue; // Skip internal stages
+
         if (stage.status !== stage.published_status) {
           await (supabase as any)
             .from('production_stages')
