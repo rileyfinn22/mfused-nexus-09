@@ -229,15 +229,36 @@ export default function FinancedInvoiceDetail() {
 
   const searchVendorPOs = async (query: string) => {
     setPOSearchQuery(query);
-    if (query.length < 1) { setPOSearchResults([]); return; }
     setPOSearching(true);
-    const { data } = await supabase
+    let q = supabase
       .from("vendor_pos")
-      .select("id, po_number, description, total, vendors(name)")
-      .or(`po_number.ilike.%${query}%,description.ilike.%${query}%`)
+      .select("id, po_number, description, total, vendors(name), orders(customer_name)")
       .order("created_at", { ascending: false })
-      .limit(10);
-    setPOSearchResults(data || []);
+      .limit(20);
+    if (query.trim()) {
+      q = q.or(`po_number.ilike.%${query}%,description.ilike.%${query}%`);
+    }
+    const { data } = await q;
+    // Also client-side filter by vendor name / customer name if query provided
+    let results = data || [];
+    if (query.trim()) {
+      const lower = query.toLowerCase();
+      const idsFromDb = new Set(results.map((r: any) => r.id));
+      // Fetch more broadly and filter client-side for vendor/customer name
+      const { data: allData } = await supabase
+        .from("vendor_pos")
+        .select("id, po_number, description, total, vendors(name), orders(customer_name)")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      const extra = (allData || []).filter((po: any) => {
+        if (idsFromDb.has(po.id)) return false;
+        const vendorName = (po.vendors?.name || "").toLowerCase();
+        const customerName = (po.orders?.customer_name || "").toLowerCase();
+        return vendorName.includes(lower) || customerName.includes(lower);
+      });
+      results = [...results, ...extra].slice(0, 20);
+    }
+    setPOSearchResults(results);
     setPOSearching(false);
   };
 
