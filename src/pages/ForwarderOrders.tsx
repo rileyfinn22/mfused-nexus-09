@@ -167,7 +167,7 @@ export default function ForwarderOrders() {
                 onClick={() => navigate(`/forwarder/orders/${order.id}`)}
               >
                 <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
-                <TableCell className="max-w-[200px] truncate">{order.description || "—"}</TableCell>
+                <TableCell className="whitespace-pre-wrap">{order.description || "—"}</TableCell>
                 <TableCell>{order.customer_name}</TableCell>
                 <TableCell>
                   {order.financed_invoice_number ? (
