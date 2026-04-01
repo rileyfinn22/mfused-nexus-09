@@ -52,6 +52,8 @@ import Financing from "./pages/Financing";
 import FinanceView from "./pages/FinanceView";
 import FinancedInvoiceDetail from "./pages/FinancedInvoiceDetail";
 import Demo from "./pages/Demo";
+import ForwarderOrders from "./pages/ForwarderOrders";
+import ForwarderOrderDetail from "./pages/ForwarderOrderDetail";
 
 const queryClient = new QueryClient();
 
@@ -111,7 +113,9 @@ const App = () => (
           <Route path="/quotes/create" element={<DashboardLayout><CreateQuote /></DashboardLayout>} />
           <Route path="/quotes/edit/:quoteId" element={<DashboardLayout><CreateQuote /></DashboardLayout>} />
           <Route path="/quotes/respond/:parentQuoteId" element={<DashboardLayout><CreateQuote /></DashboardLayout>} />
-          <Route path="/quotes/:quoteId" element={<DashboardLayout><QuoteDetail /></DashboardLayout>} />
+           <Route path="/quotes/:quoteId" element={<DashboardLayout><QuoteDetail /></DashboardLayout>} />
+           <Route path="/forwarder/orders" element={<DashboardLayout><ForwarderOrders /></DashboardLayout>} />
+           <Route path="/forwarder/orders/:orderId" element={<DashboardLayout><ForwarderOrderDetail /></DashboardLayout>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

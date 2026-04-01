@@ -18,7 +18,7 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { activeCompany, loading: companyLoading, isFinancePortalUser } = useCompany();
+  const { activeCompany, loading: companyLoading, isFinancePortalUser, isForwarderPortalUser } = useCompany();
   const [loading, setLoading] = useState(true);
 
   // Finance portal users should only ever see /financing routes
@@ -30,6 +30,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     }
   }, [isFinancePortalUser, companyLoading, navigate]);
+
+  // Forwarder portal users should only ever see /forwarder routes
+  useEffect(() => {
+    if (!companyLoading && isForwarderPortalUser) {
+      const path = window.location.pathname;
+      if (!path.startsWith('/forwarder')) {
+        navigate('/forwarder/orders', { replace: true });
+      }
+    }
+  }, [isForwarderPortalUser, companyLoading, navigate]);
 
   useEffect(() => {
     checkAuth();

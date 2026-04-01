@@ -6,6 +6,7 @@ import {
   FileText, 
   Image, 
   Truck,
+  Ship,
   FolderOpen,
   Building2,
   Factory,
@@ -78,14 +79,19 @@ const financeNavigationItems = [
   { title: "Financing", url: "/financing", icon: Landmark },
 ];
 
+const forwarderNavigationItems = [
+  { title: "Shipment Orders", url: "/forwarder/orders", icon: Ship },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
-  const { activeCompany, hasFinanceRole, hasVibeAdminRole, isFinancePortalUser } = useCompany();
+  const { activeCompany, hasFinanceRole, hasVibeAdminRole, isFinancePortalUser, isForwarderPortalUser } = useCompany();
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
   const [isFinance, setIsFinance] = useState(false);
+  const [isForwarder, setIsForwarder] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   useEffect(() => {
@@ -176,10 +182,19 @@ export function AppSidebar() {
   }, [currentPath]);
 
   const checkRole = async () => {
+    if (isForwarderPortalUser) {
+      setIsVibeAdmin(false);
+      setIsVendor(false);
+      setIsFinance(false);
+      setIsForwarder(true);
+      return;
+    }
+
     if (isFinancePortalUser) {
       setIsVibeAdmin(false);
       setIsVendor(false);
       setIsFinance(true);
+      setIsForwarder(false);
       return;
     }
 
@@ -187,6 +202,7 @@ export function AppSidebar() {
       setIsVibeAdmin(true);
       setIsVendor(false);
       setIsFinance(false);
+      setIsForwarder(false);
       return;
     }
 
@@ -195,6 +211,7 @@ export function AppSidebar() {
       setIsVibeAdmin(activeCompany.role === 'vibe_admin');
       setIsVendor(activeCompany.role === 'vendor');
       setIsFinance(activeCompany.role === 'finance' || hasFinanceRole);
+      setIsForwarder(activeCompany.role === 'forwarder');
       return;
     }
 
@@ -209,14 +226,17 @@ export function AppSidebar() {
       setIsVibeAdmin(roles.includes('vibe_admin'));
       setIsVendor(roles.includes('vendor'));
       setIsFinance(roles.includes('finance') && !roles.includes('vibe_admin'));
+      setIsForwarder(roles.includes('forwarder') && !roles.includes('vibe_admin'));
     }
   };
 
-  const navigationItems = isFinance
-    ? financeNavigationItems
-    : isVendor 
-      ? vendorNavigationItems 
-      : (isVibeAdmin ? vibeAdminNavigationItems : companyNavigationItems);
+  const navigationItems = isForwarder
+    ? forwarderNavigationItems
+    : isFinance
+      ? financeNavigationItems
+      : isVendor 
+        ? vendorNavigationItems 
+        : (isVibeAdmin ? vibeAdminNavigationItems : companyNavigationItems);
 
   const isActive = (path: string) => currentPath === path;
   const isCollapsed = state === "collapsed";

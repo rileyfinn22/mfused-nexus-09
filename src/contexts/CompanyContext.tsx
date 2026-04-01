@@ -15,7 +15,9 @@ interface CompanyContextType {
   isMultiCompany: boolean;
   hasFinanceRole: boolean;
   hasVibeAdminRole: boolean;
+  hasForwarderRole: boolean;
   isFinancePortalUser: boolean;
+  isForwarderPortalUser: boolean;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -28,12 +30,14 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [hasFinanceRole, setHasFinanceRole] = useState(false);
   const [hasVibeAdminRole, setHasVibeAdminRole] = useState(false);
+  const [hasForwarderRole, setHasForwarderRole] = useState(false);
 
   // Highest privilege first. If a user has multiple role rows for the same company,
   // we pick the most privileged one to keep UI + permissions stable.
   const ROLE_PRECEDENCE = [
     "vibe_admin",
     "finance",
+    "forwarder",
     "company",
     "vendor",
   ];
@@ -49,6 +53,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setActiveCompanyState(null);
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
+        setHasForwarderRole(false);
         localStorage.removeItem(ACTIVE_COMPANY_KEY);
       }
     });
@@ -64,6 +69,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setActiveCompanyState(null);
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
+        setHasForwarderRole(false);
         setLoading(false);
         return;
       }
@@ -87,6 +93,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setActiveCompanyState(null);
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
+        setHasForwarderRole(false);
         setLoading(false);
         return;
       }
@@ -94,6 +101,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       const roleSet = new Set((userRoles || []).map((ur: any) => String(ur.role)));
       setHasFinanceRole(roleSet.has("finance"));
       setHasVibeAdminRole(roleSet.has("vibe_admin"));
+      setHasForwarderRole(roleSet.has("forwarder"));
 
       // De-dupe by company_id and choose the highest-privilege role per company.
       const byCompanyId = new Map<string, Company>();
@@ -145,6 +153,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       setActiveCompanyState(null);
       setHasFinanceRole(false);
       setHasVibeAdminRole(false);
+      setHasForwarderRole(false);
     } finally {
       setLoading(false);
     }
@@ -165,7 +174,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         isMultiCompany: companies.length > 1,
         hasFinanceRole,
         hasVibeAdminRole,
+        hasForwarderRole,
         isFinancePortalUser: hasFinanceRole && !hasVibeAdminRole,
+        isForwarderPortalUser: hasForwarderRole && !hasVibeAdminRole && !hasFinanceRole,
       }}
     >
       {children}
