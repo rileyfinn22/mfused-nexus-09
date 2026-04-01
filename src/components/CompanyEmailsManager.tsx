@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Mail, Plus, Trash2, Star, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -20,19 +20,11 @@ interface CompanyEmailsManagerProps {
   readOnly?: boolean;
 }
 
-const EMAIL_LABELS = [
-  { value: "general", label: "General" },
-  { value: "billing", label: "Billing" },
-  { value: "orders", label: "Orders" },
-  { value: "shipping", label: "Shipping" },
-  { value: "support", label: "Support" },
-];
-
 export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEmailsManagerProps) {
   const [emails, setEmails] = useState<CompanyEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [newEmail, setNewEmail] = useState("");
-  const [newLabel, setNewLabel] = useState("general");
+  const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
@@ -86,8 +78,8 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
         .insert({
           company_id: companyId,
           email: newEmail.trim().toLowerCase(),
-          label: newLabel,
-          is_primary: emails.length === 0, // First email is primary
+          label: newName.trim() || null,
+          is_primary: emails.length === 0,
         });
 
       if (error) {
@@ -103,7 +95,7 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
       } else {
         toast({ title: "Email added" });
         setNewEmail("");
-        setNewLabel("general");
+        setNewName("");
         fetchEmails();
       }
     } catch (error: any) {
@@ -164,20 +156,6 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
     }
   };
 
-  const getLabelColor = (label: string) => {
-    switch (label) {
-      case 'billing':
-        return 'bg-green-500/10 text-green-700 border-green-500/20';
-      case 'orders':
-        return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
-      case 'shipping':
-        return 'bg-orange-500/10 text-orange-700 border-orange-500/20';
-      case 'support':
-        return 'bg-purple-500/10 text-purple-700 border-purple-500/20';
-      default:
-        return 'bg-muted text-muted-foreground';
-    }
-  };
 
   if (loading) {
     return (
@@ -208,9 +186,11 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm truncate">{email.email}</span>
-                <Badge variant="outline" className={`text-xs ${getLabelColor(email.label)}`}>
-                  {email.label}
-                </Badge>
+                {email.label && (
+                  <Badge variant="outline" className="text-xs bg-muted text-muted-foreground">
+                    {email.label}
+                  </Badge>
+                )}
                 {email.is_primary && (
                   <Badge variant="default" className="text-xs bg-primary/10 text-primary border-primary/20">
                     <Star className="h-3 w-3 mr-1 fill-current" />
@@ -263,18 +243,18 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
             }}
             className="flex-1"
           />
-          <Select value={newLabel} onValueChange={setNewLabel}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {EMAIL_LABELS.map((label) => (
-                <SelectItem key={label.value} value={label.value}>
-                  {label.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            placeholder="Name (optional)"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddEmail();
+              }
+            }}
+            className="w-[140px]"
+          />
           <Button
             variant="outline"
             size="icon"
