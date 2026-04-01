@@ -173,7 +173,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         isMultiCompany: companies.length > 1,
         hasFinanceRole,
         hasVibeAdminRole,
+        hasForwarderRole,
         isFinancePortalUser: hasFinanceRole && !hasVibeAdminRole,
+        isForwarderPortalUser: hasForwarderRole && !hasVibeAdminRole && !hasFinanceRole,
       }}
     >
       {children}
