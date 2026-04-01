@@ -187,7 +187,20 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 export function useCompany() {
   const context = useContext(CompanyContext);
   if (context === undefined) {
-    throw new Error("useCompany must be used within a CompanyProvider");
+    // During HMR, context can temporarily be undefined — return safe defaults
+    // to avoid blank-screen crashes while modules re-link.
+    return {
+      companies: [],
+      activeCompany: null,
+      setActiveCompany: () => {},
+      loading: true,
+      isMultiCompany: false,
+      hasFinanceRole: false,
+      hasVibeAdminRole: false,
+      hasForwarderRole: false,
+      isFinancePortalUser: false,
+      isForwarderPortalUser: false,
+    } as CompanyContextType;
   }
   return context;
 }
