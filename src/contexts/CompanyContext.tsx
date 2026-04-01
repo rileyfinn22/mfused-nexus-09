@@ -100,6 +100,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       const roleSet = new Set((userRoles || []).map((ur: any) => String(ur.role)));
       setHasFinanceRole(roleSet.has("finance"));
       setHasVibeAdminRole(roleSet.has("vibe_admin"));
+      setHasForwarderRole(roleSet.has("forwarder"));
 
       // De-dupe by company_id and choose the highest-privilege role per company.
       const byCompanyId = new Map<string, Company>();
