@@ -242,18 +242,18 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
             }}
             className="flex-1"
           />
-          <Select value={newLabel} onValueChange={setNewLabel}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {EMAIL_LABELS.map((label) => (
-                <SelectItem key={label.value} value={label.value}>
-                  {label.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            placeholder="Name (optional)"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddEmail();
+              }
+            }}
+            className="w-[140px]"
+          />
           <Button
             variant="outline"
             size="icon"
