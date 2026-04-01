@@ -22,6 +22,7 @@ interface OrderDetail {
   description: string | null;
   customer_name: string;
   status: string;
+  company_id: string;
   shipping_name: string;
   shipping_street: string;
   shipping_city: string;
