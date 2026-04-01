@@ -9,9 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X, History, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
+import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X, History, CheckCircle2, AlertTriangle, Clock, Link2, Search } from "lucide-react";
 import { calculateFinanceFee, formatUSD } from "@/lib/financeUtils";
 import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function FinancedInvoiceDetail() {
   const { id } = useParams<{ id: string }>();
