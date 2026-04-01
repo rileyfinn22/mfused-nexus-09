@@ -182,10 +182,19 @@ export function AppSidebar() {
   }, [currentPath]);
 
   const checkRole = async () => {
+    if (isForwarderPortalUser) {
+      setIsVibeAdmin(false);
+      setIsVendor(false);
+      setIsFinance(false);
+      setIsForwarder(true);
+      return;
+    }
+
     if (isFinancePortalUser) {
       setIsVibeAdmin(false);
       setIsVendor(false);
       setIsFinance(true);
+      setIsForwarder(false);
       return;
     }
 
@@ -193,6 +202,7 @@ export function AppSidebar() {
       setIsVibeAdmin(true);
       setIsVendor(false);
       setIsFinance(false);
+      setIsForwarder(false);
       return;
     }
 
@@ -201,6 +211,7 @@ export function AppSidebar() {
       setIsVibeAdmin(activeCompany.role === 'vibe_admin');
       setIsVendor(activeCompany.role === 'vendor');
       setIsFinance(activeCompany.role === 'finance' || hasFinanceRole);
+      setIsForwarder(activeCompany.role === 'forwarder');
       return;
     }
 
@@ -215,6 +226,7 @@ export function AppSidebar() {
       setIsVibeAdmin(roles.includes('vibe_admin'));
       setIsVendor(roles.includes('vendor'));
       setIsFinance(roles.includes('finance') && !roles.includes('vibe_admin'));
+      setIsForwarder(roles.includes('forwarder') && !roles.includes('vibe_admin'));
     }
   };
 
