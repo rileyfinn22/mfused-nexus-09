@@ -1003,7 +1003,7 @@ export default function ProductionDetail() {
           ...(shouldAutoPublish ? {
             is_published: true,
             published_at: new Date().toISOString(),
-            published_note_text: noteText,
+            published_note_text: label,
           } : {}),
         });
 
