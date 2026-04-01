@@ -2942,12 +2942,16 @@ export type Database = {
           actual_arrival: string | null
           attachment_name: string | null
           attachment_url: string | null
+          bl_number: string | null
           carrier: string | null
           company_id: string
           created_at: string
           created_by: string | null
+          ctns: number | null
+          ddp_method: string | null
           destination: string | null
           estimated_arrival: string | null
+          etd: string | null
           id: string
           label: string | null
           leg_number: number
@@ -2955,21 +2959,28 @@ export type Database = {
           notes: string | null
           order_id: string
           origin: string | null
+          pcs_per_ctn: number | null
+          qty_pcs: number | null
           shipped_date: string | null
           status: string
           tracking_number: string | null
           tracking_url: string | null
+          vessel_voyage: string | null
         }
         Insert: {
           actual_arrival?: string | null
           attachment_name?: string | null
           attachment_url?: string | null
+          bl_number?: string | null
           carrier?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
+          ctns?: number | null
+          ddp_method?: string | null
           destination?: string | null
           estimated_arrival?: string | null
+          etd?: string | null
           id?: string
           label?: string | null
           leg_number?: number
@@ -2977,21 +2988,28 @@ export type Database = {
           notes?: string | null
           order_id: string
           origin?: string | null
+          pcs_per_ctn?: number | null
+          qty_pcs?: number | null
           shipped_date?: string | null
           status?: string
           tracking_number?: string | null
           tracking_url?: string | null
+          vessel_voyage?: string | null
         }
         Update: {
           actual_arrival?: string | null
           attachment_name?: string | null
           attachment_url?: string | null
+          bl_number?: string | null
           carrier?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
+          ctns?: number | null
+          ddp_method?: string | null
           destination?: string | null
           estimated_arrival?: string | null
+          etd?: string | null
           id?: string
           label?: string | null
           leg_number?: number
@@ -2999,10 +3017,13 @@ export type Database = {
           notes?: string | null
           order_id?: string
           origin?: string | null
+          pcs_per_ctn?: number | null
+          qty_pcs?: number | null
           shipped_date?: string | null
           status?: string
           tracking_number?: string | null
           tracking_url?: string | null
+          vessel_voyage?: string | null
         }
         Relationships: [
           {
@@ -3837,6 +3858,7 @@ export type Database = {
         | "vendor"
         | "company"
         | "finance"
+        | "forwarder"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3971,6 +3993,7 @@ export const Constants = {
         "vendor",
         "company",
         "finance",
+        "forwarder",
       ],
     },
   },
