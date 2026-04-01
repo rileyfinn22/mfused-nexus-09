@@ -1116,6 +1116,10 @@ export default function ProductionDetail() {
       const stage = stages.find(s => s.id === stageId);
       if (!stage) return;
 
+      // Don't publish internal stages
+      const stageDef = STAGE_DEFINITIONS.find(d => d.value === stage.stage_name);
+      if (stageDef?.adminOnly) return;
+
       // Update published fields on the stage
       const { error: stageError } = await (supabase as any)
         .from('production_stages')
