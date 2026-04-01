@@ -34,6 +34,7 @@ export default function FinancedInvoiceDetail() {
   const [poSearchResults, setPOSearchResults] = useState<any[]>([]);
   const [poSearching, setPOSearching] = useState(false);
   // Editable fields
+  const [description, setDescription] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [carrier, setCarrier] = useState("");
