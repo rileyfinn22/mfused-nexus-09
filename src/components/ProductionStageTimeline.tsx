@@ -437,10 +437,16 @@ export function ProductionStageTimeline({
     return stage.production_stage_updates;
   };
 
+  // Strip HTML comment markers from note text for display
+  const stripNoteMarkers = (text: string | null): string | null => {
+    if (!text) return text;
+    return text.replace(/<!--[A-Z_]+(?::[^>]*)?-->/g, '').trim() || null;
+  };
+
   // Get display text for an update (use published version for customers if available)
   const getUpdateNoteText = (update: StageUpdate) => {
-    if (isCustomer && update.published_note_text) return update.published_note_text;
-    return update.note_text;
+    if (isCustomer && update.published_note_text) return stripNoteMarkers(update.published_note_text);
+    return stripNoteMarkers(update.note_text);
   };
 
   const getUpdateImageUrl = (update: StageUpdate) => {
