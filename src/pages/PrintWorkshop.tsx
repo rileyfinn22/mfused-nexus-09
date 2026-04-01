@@ -149,10 +149,6 @@ export default function PrintWorkshop() {
     );
   }
 
-  // Restrict Print Workshop to vibe_admin only until it's fully fixed
-  if (!isVibeAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
 
 
   const handleDeleteTemplate = async (id: string) => {
