@@ -824,6 +824,7 @@ export default function FinancedInvoiceDetail() {
                   <p className="text-xs text-muted-foreground truncate">
                     {po.description || "No description"}
                     {po.vendors?.name && ` • ${po.vendors.name}`}
+                    {po.orders?.customer_name && ` • ${po.orders.customer_name}`}
                   </p>
                 </button>
               ))}
