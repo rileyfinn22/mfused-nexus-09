@@ -68,6 +68,7 @@ const vibeAdminNavigationItems = [
   { title: "Message Hub", url: "/chat", icon: MessageSquare },
   { title: "Print Workshop", url: "/print-workshop", icon: Printer },
   { title: "Financing", url: "/financing", icon: Landmark },
+  { title: "Shipment Orders", url: "/forwarder/orders", icon: Ship },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
