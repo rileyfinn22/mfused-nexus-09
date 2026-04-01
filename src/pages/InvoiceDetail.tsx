@@ -1496,7 +1496,7 @@ const InvoiceDetail = () => {
   };
 
   const handleReopenInvoice = async () => {
-    if (!confirm('Reopen this invoice? This will set the status back to pending.')) {
+    if (!confirm('Reopen this invoice? This will set the status back to open.')) {
       return;
     }
     try {

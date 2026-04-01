@@ -1032,7 +1032,7 @@ const OrderDetail = () => {
             company_id: order.company_id,
             order_id: orderId,
             invoice_number: invoiceNumber,
-            status: 'final_review',
+            status: 'open',
             subtotal: order.subtotal,
             tax: order.tax,
             total: order.total,
