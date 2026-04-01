@@ -527,6 +527,19 @@ export default function FinancedInvoiceDetail() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
+              <Label className="text-xs">Description</Label>
+              {editing ? (
+                <Input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Enter description..."
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="text-sm font-medium py-1">{description || "—"}</p>
+              )}
+            </div>
+            <div>
               <Label className="text-xs">Invoice Number</Label>
               {editing ? (
                 <Input
