@@ -1508,7 +1508,7 @@ const InvoiceDetail = () => {
       if (error) throw error;
       toast({
         title: "Invoice Reopened",
-        description: "Invoice has been reopened and set to pending"
+        description: "Invoice has been reopened and set to open"
       });
       fetchInvoiceDetails();
     } catch (error: any) {
