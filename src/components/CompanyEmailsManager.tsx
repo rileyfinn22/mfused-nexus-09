@@ -185,9 +185,11 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm truncate">{email.email}</span>
-                <Badge variant="outline" className={`text-xs ${getLabelColor(email.label)}`}>
-                  {email.label}
-                </Badge>
+                {email.label && (
+                  <Badge variant="outline" className="text-xs bg-muted text-muted-foreground">
+                    {email.label}
+                  </Badge>
+                )}
                 {email.is_primary && (
                   <Badge variant="default" className="text-xs bg-primary/10 text-primary border-primary/20">
                     <Star className="h-3 w-3 mr-1 fill-current" />
