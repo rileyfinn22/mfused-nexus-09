@@ -3276,8 +3276,8 @@ const OrderDetail = () => {
           onOpenChange={setShowConfirmationDialog}
           order={order}
           items={order.order_items || []}
-          senderName={senderName}
-          senderEmail={senderEmail}
+          senderName="VibePKG"
+          senderEmail="noreply@vibepkgportal.com"
         />
       )}
     </div>;
