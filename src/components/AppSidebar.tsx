@@ -78,6 +78,10 @@ const financeNavigationItems = [
   { title: "Financing", url: "/financing", icon: Landmark },
 ];
 
+const forwarderNavigationItems = [
+  { title: "Shipment Orders", url: "/forwarder/orders", icon: Ship },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
