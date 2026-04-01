@@ -77,8 +77,8 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
         .insert({
           company_id: companyId,
           email: newEmail.trim().toLowerCase(),
-          label: newLabel,
-          is_primary: emails.length === 0, // First email is primary
+          label: newName.trim() || null,
+          is_primary: emails.length === 0,
         });
 
       if (error) {
