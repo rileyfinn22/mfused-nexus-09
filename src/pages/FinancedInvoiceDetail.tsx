@@ -767,6 +767,48 @@ export default function FinancedInvoiceDetail() {
           invoice={record}
         />
       )}
+
+      {/* Link PO Dialog */}
+      <Dialog open={linkPOOpen} onOpenChange={setLinkPOOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link Vendor PO</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by PO number or description..."
+                value={poSearchQuery}
+                onChange={(e) => searchVendorPOs(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-1">
+              {poSearching && <p className="text-sm text-muted-foreground text-center py-4">Searching...</p>}
+              {!poSearching && poSearchQuery && poSearchResults.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No POs found</p>
+              )}
+              {poSearchResults.map((po: any) => (
+                <button
+                  key={po.id}
+                  onClick={() => handleLinkPO(po.id)}
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">PO #{po.po_number}</span>
+                    <span className="text-xs text-muted-foreground">{formatUSD(po.total || 0)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {po.description || "No description"}
+                    {po.vendors?.name && ` • ${po.vendors.name}`}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
