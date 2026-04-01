@@ -186,17 +186,18 @@ export function InviteCompanyUserDialog({
 
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as "company" | "admin")}>
+              <Select value={role} onValueChange={(v) => setRole(v as "company" | "admin" | "forwarder")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="company">Company User</SelectItem>
                   <SelectItem value="admin">Company Admin</SelectItem>
+                  <SelectItem value="forwarder">Forwarder</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Admins can manage products, orders, and invoices. Regular users have view-only access.
+                Forwarders can view orders and manage shipping/tracking info only.
               </p>
             </div>
           </div>
