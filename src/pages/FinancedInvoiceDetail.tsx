@@ -81,6 +81,7 @@ export default function FinancedInvoiceDetail() {
       return;
     }
     setRecord(data);
+    setDescription(data.description || "");
     setInvoiceNumber(data.invoice_number || "");
     setNotes(data.notes || "");
     setCarrier(data.carrier || "");
