@@ -298,78 +298,65 @@ export default function ForwarderOrderDetail() {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">#</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Label</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">QTY PCS</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">B/L NO</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vessel & Voyage</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">ETD</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">ETA</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Carrier</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Tracking #</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Status</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap"></th>
-                  </tr>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">#</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Label</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">B/L NO / Tracking</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vessel & Voyage</th>
+                     <th className="px-1 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">ETD</th>
+                     <th className="px-1 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">ETA</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Carrier</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap"></th>
+                   </tr>
                 </thead>
                 <tbody>
                   {legs.map((leg) => (
                     <tr key={leg.id} className="border-b hover:bg-muted/30 transition-colors">
                       <td className="px-2 py-1.5 text-muted-foreground font-mono">{leg.leg_number}</td>
-                      <td className="px-1 py-1">
-                        <Input className="h-7 text-xs min-w-[100px]" value={leg.label || ""} onChange={(e) => updateLeg(leg.id, "label", e.target.value)} placeholder="Ocean Freight" />
-                      </td>
-                      <td className="px-1 py-1">
-                        <Input className="h-7 text-xs w-[75px]" type="number" value={leg.qty_pcs ?? ""} onChange={(e) => updateLeg(leg.id, "qty_pcs", e.target.value ? parseInt(e.target.value) : null)} placeholder="40080" />
-                      </td>
-                      <td className="px-1 py-1">
-                        <Input className="h-7 text-xs min-w-[120px] font-mono" value={leg.bl_number || ""} onChange={(e) => updateLeg(leg.id, "bl_number", e.target.value)} placeholder="MATS7211514000" />
-                      </td>
-                      <td className="px-1 py-1">
-                        <Input className="h-7 text-xs min-w-[140px]" value={leg.vessel_voyage || ""} onChange={(e) => updateLeg(leg.id, "vessel_voyage", e.target.value)} placeholder="MATSON OAHU/130E" />
-                      </td>
-                      <td className="px-1 py-1">
-                        <Input className="h-7 text-xs w-[110px]" type="date" value={leg.etd ? leg.etd.split("T")[0] : (leg.shipped_date ? leg.shipped_date.split("T")[0] : "")} onChange={(e) => { updateLeg(leg.id, "etd", e.target.value || null); updateLeg(leg.id, "shipped_date", e.target.value || null); }} />
-                      </td>
-                      <td className="px-1 py-1">
-                        <Input className="h-7 text-xs w-[110px]" type="date" value={leg.estimated_arrival ? leg.estimated_arrival.split("T")[0] : ""} onChange={(e) => updateLeg(leg.id, "estimated_arrival", e.target.value || null)} />
-                      </td>
-                      <td className="px-1 py-1">
-                        <Input className="h-7 text-xs min-w-[80px]" value={leg.carrier || ""} onChange={(e) => updateLeg(leg.id, "carrier", e.target.value)} placeholder="Matson" list={`carrier-${leg.id}`} />
-                        <datalist id={`carrier-${leg.id}`}>
-                          {CARRIERS.map((c) => <option key={c.value} value={c.label} />)}
-                        </datalist>
-                      </td>
-                      <td className="px-1 py-1">
-                        <div className="flex items-center gap-1">
-                          <Input className="h-7 text-xs min-w-[100px] font-mono" value={leg.tracking_number || ""} onChange={(e) => updateLeg(leg.id, "tracking_number", e.target.value)} placeholder="Tracking #" />
-                          {leg.carrier && leg.tracking_number && (
-                            <a href={getTrackingUrl(leg.carrier, leg.tracking_number)} target="_blank" rel="noopener noreferrer" className="text-primary shrink-0">
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-1 py-1">
-                        <Select value={leg.status} onValueChange={(v) => updateLeg(leg.id, "status", v)}>
-                          <SelectTrigger className="h-7 text-xs min-w-[90px]"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="in_transit">In Transit</SelectItem>
-                            <SelectItem value="delivered">Delivered</SelectItem>
-                            <SelectItem value="cleared">Cleared</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-1 py-1">
-                        <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => saveLeg(leg)} disabled={saving}>
-                            <Save className="h-3 w-3" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => deleteLeg(leg.id)}>
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </td>
+                       <td className="px-1 py-1">
+                         <Input className="h-7 text-xs min-w-[100px]" value={leg.label || ""} onChange={(e) => updateLeg(leg.id, "label", e.target.value)} placeholder="Ocean Freight" />
+                       </td>
+                       <td className="px-1 py-1">
+                         <div className="flex items-center gap-1">
+                           <Input className="h-7 text-xs min-w-[130px] font-mono" value={leg.bl_number || ""} onChange={(e) => { updateLeg(leg.id, "bl_number", e.target.value); updateLeg(leg.id, "tracking_number", e.target.value); }} placeholder="MATS7211514000" />
+                           {leg.carrier && leg.bl_number && (
+                             <a href={getTrackingUrl(leg.carrier, leg.bl_number)} target="_blank" rel="noopener noreferrer" className="text-primary shrink-0">
+                               <ExternalLink className="h-3 w-3" />
+                             </a>
+                           )}
+                         </div>
+                       </td>
+                       <td className="px-1 py-1">
+                         <Input className="h-7 text-xs min-w-[140px]" value={leg.vessel_voyage || ""} onChange={(e) => updateLeg(leg.id, "vessel_voyage", e.target.value)} placeholder="MATSON OAHU/130E" />
+                       </td>
+                       <td className="px-0.5 py-1">
+                         <Input className="h-7 text-xs w-[95px]" type="date" value={leg.etd ? leg.etd.split("T")[0] : (leg.shipped_date ? leg.shipped_date.split("T")[0] : "")} onChange={(e) => { updateLeg(leg.id, "etd", e.target.value || null); updateLeg(leg.id, "shipped_date", e.target.value || null); }} />
+                       </td>
+                       <td className="px-0.5 py-1">
+                         <Input className="h-7 text-xs w-[95px]" type="date" value={leg.estimated_arrival ? leg.estimated_arrival.split("T")[0] : ""} onChange={(e) => updateLeg(leg.id, "estimated_arrival", e.target.value || null)} />
+                       </td>
+                       <td className="px-1 py-1">
+                         <Input className="h-7 text-xs min-w-[80px]" value={leg.carrier || ""} onChange={(e) => updateLeg(leg.id, "carrier", e.target.value)} placeholder="Matson" list={`carrier-${leg.id}`} />
+                         <datalist id={`carrier-${leg.id}`}>
+                           {CARRIERS.map((c) => <option key={c.value} value={c.label} />)}
+                         </datalist>
+                       </td>
+                       <td className="px-1 py-1">
+                         <Select value={leg.status} onValueChange={(v) => updateLeg(leg.id, "status", v)}>
+                           <SelectTrigger className="h-7 text-xs min-w-[90px]"><SelectValue /></SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="pending">Pending</SelectItem>
+                             <SelectItem value="in_transit">In Transit</SelectItem>
+                             <SelectItem value="delivered">Delivered</SelectItem>
+                             <SelectItem value="cleared">Cleared</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </td>
+                       <td className="px-1 py-1">
+                         <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => deleteLeg(leg.id)}>
+                           <Trash2 className="h-3 w-3" />
+                         </Button>
+                       </td>
                     </tr>
                   ))}
                 </tbody>
@@ -378,38 +365,38 @@ export default function ForwarderOrderDetail() {
           )}
           {/* Attachments & Notes below table */}
           {legs.length > 0 && (
-            <div className="p-4 space-y-3 border-t">
-              {legs.map((leg) => (
-                <div key={`extra-${leg.id}`} className="flex items-start gap-3">
-                  <span className="text-xs text-muted-foreground font-mono shrink-0 pt-2 w-6">#{leg.leg_number}</span>
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-3">
-                      <label className="cursor-pointer shrink-0">
-                        <Input type="file" className="hidden" accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.png,.jpg,.jpeg" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAttachment(leg.id, f); }} />
-                        <div className="flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer">
-                          <Upload className="h-3 w-3" />
-                          Attach file
-                        </div>
-                      </label>
-                      {leg.attachment_name && (
-                        <button onClick={() => leg.attachment_url && viewAttachment(leg.attachment_url)} className="text-xs text-primary hover:underline flex items-center gap-1">
-                          <Paperclip className="h-3 w-3 shrink-0" />
-                          {leg.attachment_name}
-                        </button>
-                      )}
-                    </div>
-                    <Textarea
-                      className="text-xs min-h-[32px]"
-                      value={leg.notes || ""}
-                      onChange={(e) => updateLeg(leg.id, "notes", e.target.value)}
-                      placeholder="Notes for this leg..."
-                      rows={1}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+             <div className="p-4 space-y-3 border-t">
+               {legs.map((leg) => (
+                 <div key={`extra-${leg.id}`} className="flex items-start gap-3">
+                   <span className="text-xs text-muted-foreground font-mono shrink-0 pt-2 w-6">#{leg.leg_number}</span>
+                   <div className="flex-1 space-y-2">
+                     <div className="flex items-center gap-3">
+                       <label className="cursor-pointer shrink-0">
+                         <Input type="file" className="hidden" accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.png,.jpg,.jpeg" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAttachment(leg.id, f); }} />
+                         <div className="flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer">
+                           <Upload className="h-3 w-3" />
+                           Attach file
+                         </div>
+                       </label>
+                       {leg.attachment_name && (
+                         <button onClick={() => leg.attachment_url && viewAttachment(leg.attachment_url)} className="text-xs text-primary hover:underline flex items-center gap-1">
+                           <Paperclip className="h-3 w-3 shrink-0" />
+                           {leg.attachment_name}
+                         </button>
+                       )}
+                     </div>
+                     <Textarea
+                       className="text-xs min-h-[32px]"
+                       value={leg.notes || ""}
+                       onChange={(e) => updateLeg(leg.id, "notes", e.target.value)}
+                       placeholder="Notes for this leg..."
+                       rows={1}
+                     />
+                   </div>
+                 </div>
+               ))}
+             </div>
+           )}
         </CardContent>
       </Card>
 
