@@ -233,7 +233,7 @@ export default function FinancedInvoiceDetail() {
     // Fetch all POs, then filter client-side for maximum searchability
     const { data } = await supabase
       .from("vendor_pos")
-      .select("id, po_number, description, total, vendors(name), orders(customer_name)")
+      .select("id, po_number, description, total, vendors(name), orders(customer_name, description)")
       .order("created_at", { ascending: false });
     let results = data || [];
     if (query.trim()) {
@@ -243,7 +243,8 @@ export default function FinancedInvoiceDetail() {
         const desc = (po.description || "").toLowerCase();
         const vendor = (po.vendors?.name || "").toLowerCase();
         const customer = (po.orders?.customer_name || "").toLowerCase();
-        return poNum.includes(lower) || desc.includes(lower) || vendor.includes(lower) || customer.includes(lower);
+        const orderDesc = (po.orders?.description || "").toLowerCase();
+        return poNum.includes(lower) || desc.includes(lower) || vendor.includes(lower) || customer.includes(lower) || orderDesc.includes(lower);
       });
     }
     setPOSearchResults(results);
