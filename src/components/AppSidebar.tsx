@@ -87,10 +87,11 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
-  const { activeCompany, hasFinanceRole, hasVibeAdminRole, isFinancePortalUser } = useCompany();
+  const { activeCompany, hasFinanceRole, hasVibeAdminRole, isFinancePortalUser, isForwarderPortalUser } = useCompany();
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
   const [isFinance, setIsFinance] = useState(false);
+  const [isForwarder, setIsForwarder] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   useEffect(() => {
