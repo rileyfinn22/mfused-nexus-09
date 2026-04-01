@@ -25,6 +25,7 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
   const [loading, setLoading] = useState(true);
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     if (companyId) {
