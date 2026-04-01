@@ -44,6 +44,7 @@ const companyNavigationItems = [
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Pull & Ship", url: "/pull-ship", icon: Truck },
   { title: "My POs", url: "/my-pos", icon: FolderOpen },
+  { title: "Print Workshop", url: "/print-workshop", icon: Printer },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
