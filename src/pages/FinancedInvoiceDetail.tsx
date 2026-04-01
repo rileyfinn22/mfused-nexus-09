@@ -403,7 +403,10 @@ export default function FinancedInvoiceDetail() {
         </Card>
       )}
 
-
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Financial Details</CardTitle>
+        </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <div>
