@@ -20,14 +20,6 @@ interface CompanyEmailsManagerProps {
   readOnly?: boolean;
 }
 
-const EMAIL_LABELS = [
-  { value: "general", label: "General" },
-  { value: "billing", label: "Billing" },
-  { value: "orders", label: "Orders" },
-  { value: "shipping", label: "Shipping" },
-  { value: "support", label: "Support" },
-];
-
 export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEmailsManagerProps) {
   const [emails, setEmails] = useState<CompanyEmail[]>([]);
   const [loading, setLoading] = useState(true);
