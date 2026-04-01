@@ -228,7 +228,7 @@ export default function Financing() {
   const renderPendingRow = (inv: any, idx: number) => {
     const vendorPO = inv.vendor_pos as any;
     const poOrder = vendorPO?.orders as any;
-    const desc = isFinanceUser ? (inv.description || vendorPO?.description || "—") : (vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—");
+    const desc = isFinanceUser ? (inv.description || vendorPO?.description || "—") : (poOrder?.description || poOrder?.customer_name || vendorPO?.description || "—");
     const rate = inv.exchange_rate || 7.2;
 
     return (
