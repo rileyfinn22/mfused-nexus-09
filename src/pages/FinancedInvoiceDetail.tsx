@@ -229,15 +229,36 @@ export default function FinancedInvoiceDetail() {
 
   const searchVendorPOs = async (query: string) => {
     setPOSearchQuery(query);
-    if (query.length < 1) { setPOSearchResults([]); return; }
     setPOSearching(true);
-    const { data } = await supabase
+    let q = supabase
       .from("vendor_pos")
-      .select("id, po_number, description, total, vendors(name)")
-      .or(`po_number.ilike.%${query}%,description.ilike.%${query}%`)
+      .select("id, po_number, description, total, vendors(name), orders(customer_name)")
       .order("created_at", { ascending: false })
-      .limit(10);
-    setPOSearchResults(data || []);
+      .limit(20);
+    if (query.trim()) {
+      q = q.or(`po_number.ilike.%${query}%,description.ilike.%${query}%`);
+    }
+    const { data } = await q;
+    // Also client-side filter by vendor name / customer name if query provided
+    let results = data || [];
+    if (query.trim()) {
+      const lower = query.toLowerCase();
+      const idsFromDb = new Set(results.map((r: any) => r.id));
+      // Fetch more broadly and filter client-side for vendor/customer name
+      const { data: allData } = await supabase
+        .from("vendor_pos")
+        .select("id, po_number, description, total, vendors(name), orders(customer_name)")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      const extra = (allData || []).filter((po: any) => {
+        if (idsFromDb.has(po.id)) return false;
+        const vendorName = (po.vendors?.name || "").toLowerCase();
+        const customerName = (po.orders?.customer_name || "").toLowerCase();
+        return vendorName.includes(lower) || customerName.includes(lower);
+      });
+      results = [...results, ...extra].slice(0, 20);
+    }
+    setPOSearchResults(results);
     setPOSearching(false);
   };
 
@@ -389,7 +410,7 @@ export default function FinancedInvoiceDetail() {
               )}
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => { setLinkPOOpen(true); setPOSearchQuery(""); setPOSearchResults([]); }}>
+              <Button size="sm" variant="outline" onClick={() => { setLinkPOOpen(true); setPOSearchQuery(""); searchVendorPOs(""); }}>
                 <Link2 className="mr-1 h-3 w-3" />
                 {vendorPO ? "Change PO" : "Link PO"}
               </Button>
@@ -779,7 +800,7 @@ export default function FinancedInvoiceDetail() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by PO number or description..."
+                placeholder="Search by PO #, description, vendor, or customer..."
                 value={poSearchQuery}
                 onChange={(e) => searchVendorPOs(e.target.value)}
                 className="pl-9"
@@ -787,7 +808,7 @@ export default function FinancedInvoiceDetail() {
             </div>
             <div className="max-h-64 overflow-y-auto space-y-1">
               {poSearching && <p className="text-sm text-muted-foreground text-center py-4">Searching...</p>}
-              {!poSearching && poSearchQuery && poSearchResults.length === 0 && (
+              {!poSearching && poSearchResults.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">No POs found</p>
               )}
               {poSearchResults.map((po: any) => (
@@ -803,6 +824,7 @@ export default function FinancedInvoiceDetail() {
                   <p className="text-xs text-muted-foreground truncate">
                     {po.description || "No description"}
                     {po.vendors?.name && ` • ${po.vendors.name}`}
+                    {po.orders?.customer_name && ` • ${po.orders.customer_name}`}
                   </p>
                 </button>
               ))}
