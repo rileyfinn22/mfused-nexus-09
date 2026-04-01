@@ -354,19 +354,26 @@ export function ProductionStageTimeline({
     );
   };
 
+  // Check if an unpublished update is meaningful (has content worth publishing)
+  const isMeaningfulUnpublished = (u: StageUpdate) => {
+    if (u.is_published) return false;
+    // Bare status_change updates with no note/image/file are not meaningful to publish individually
+    if (u.update_type === 'status_change' && !u.note_text && !u.image_url && !u.file_url) return false;
+    return true;
+  };
+
   // Check if a stage has unpublished changes (excluding internal/adminOnly stages)
   const hasUnpublishedChanges = (stage: ProductionStage) => {
     const def = stageDefinitions.find(d => d.value === stage.stage_name);
     if (def?.adminOnly) return false; // Internal stages never need publishing
     if (stage.status !== stage.published_status) return true;
-    const unpublishedUpdates = stage.production_stage_updates.filter(u => !u.is_published);
-    return unpublishedUpdates.length > 0;
+    return stage.production_stage_updates.some(u => isMeaningfulUnpublished(u));
   };
 
   const getUnpublishedCount = (stage: ProductionStage) => {
     const def = stageDefinitions.find(d => d.value === stage.stage_name);
     if (def?.adminOnly) return 0;
-    return stage.production_stage_updates.filter(u => !u.is_published).length;
+    return stage.production_stage_updates.filter(u => isMeaningfulUnpublished(u)).length;
   };
 
   // Check if any stage has unpublished changes (excluding internal stages)
