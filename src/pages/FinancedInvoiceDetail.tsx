@@ -29,7 +29,10 @@ export default function FinancedInvoiceDetail() {
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [repayments, setRepayments] = useState<any[]>([]);
-
+  const [linkPOOpen, setLinkPOOpen] = useState(false);
+  const [poSearchQuery, setPOSearchQuery] = useState("");
+  const [poSearchResults, setPOSearchResults] = useState<any[]>([]);
+  const [poSearching, setPOSearching] = useState(false);
   // Editable fields
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [notes, setNotes] = useState("");
