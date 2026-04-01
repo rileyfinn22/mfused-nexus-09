@@ -467,14 +467,50 @@ const Customers = () => {
               </div>
             </div>
 
-            {/* Additional Emails - Only show when editing existing company */}
-            {editingCustomer && (
+            {/* Additional Emails */}
+            {editingCustomer ? (
               <div className="space-y-4">
                 <h3 className="font-semibold flex items-center gap-2">
                   <Mail className="h-4 w-4" />
                   Additional Emails
                 </h3>
                 <CompanyEmailsManager companyId={editingCustomer.id} />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Additional Emails
+                  </h3>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setInlineEmails(prev => [...prev, { email: "", label: "general" }])}>
+                    <Plus className="h-3 w-3 mr-1" /> Add Email
+                  </Button>
+                </div>
+                {inlineEmails.map((entry, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Select value={entry.label} onValueChange={(v) => setInlineEmails(prev => prev.map((e, i) => i === idx ? { ...e, label: v } : e))}>
+                      <SelectTrigger className="w-[120px] h-9 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">General</SelectItem>
+                        <SelectItem value="billing">Billing</SelectItem>
+                        <SelectItem value="orders">Orders</SelectItem>
+                        <SelectItem value="shipping">Shipping</SelectItem>
+                        <SelectItem value="support">Support</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      className="flex-1"
+                      type="email"
+                      value={entry.email}
+                      onChange={(e) => setInlineEmails(prev => prev.map((em, i) => i === idx ? { ...em, email: e.target.value } : em))}
+                      placeholder="email@example.com"
+                    />
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setInlineEmails(prev => prev.filter((_, i) => i !== idx))}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -483,12 +519,30 @@ const Customers = () => {
               <h3 className="font-semibold">Billing Address</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
+                  <Label htmlFor="billing_name">Name / Attn</Label>
+                  <Input
+                    id="billing_name"
+                    value={formData.billing_name}
+                    onChange={(e) => setFormData({ ...formData, billing_name: e.target.value })}
+                    placeholder="Attn: John Smith"
+                  />
+                </div>
+                <div className="col-span-2">
                   <Label htmlFor="billing_street">Street Address</Label>
                   <Input
                     id="billing_street"
                     value={formData.billing_street}
                     onChange={(e) => setFormData({ ...formData, billing_street: e.target.value })}
                     placeholder="123 Main St"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="billing_street2">Address Line 2</Label>
+                  <Input
+                    id="billing_street2"
+                    value={formData.billing_street2}
+                    onChange={(e) => setFormData({ ...formData, billing_street2: e.target.value })}
+                    placeholder="Suite 100, Floor 2, etc."
                   />
                 </div>
                 <div>
@@ -526,12 +580,30 @@ const Customers = () => {
               <h3 className="font-semibold">Shipping Address</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
+                  <Label htmlFor="shipping_name">Name / Attn</Label>
+                  <Input
+                    id="shipping_name"
+                    value={formData.shipping_name}
+                    onChange={(e) => setFormData({ ...formData, shipping_name: e.target.value })}
+                    placeholder="Attn: Warehouse Manager"
+                  />
+                </div>
+                <div className="col-span-2">
                   <Label htmlFor="shipping_street">Street Address</Label>
                   <Input
                     id="shipping_street"
                     value={formData.shipping_street}
                     onChange={(e) => setFormData({ ...formData, shipping_street: e.target.value })}
                     placeholder="123 Main St"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="shipping_street2">Address Line 2</Label>
+                  <Input
+                    id="shipping_street2"
+                    value={formData.shipping_street2}
+                    onChange={(e) => setFormData({ ...formData, shipping_street2: e.target.value })}
+                    placeholder="Suite 100, Floor 2, etc."
                   />
                 </div>
                 <div>
