@@ -715,12 +715,23 @@ export default function ProductionDetail() {
 
       const updates = [];
 
+      // Determine if this stage is internal (adminOnly)
+      const stageDef = STAGE_DEFINITIONS.find(d => d.value === selectedStage.stage_name);
+      const isInternalStage = !!stageDef?.adminOnly;
+      // Vibe admin updates on non-internal stages are auto-published
+      const shouldAutoPublish = isVibeAdmin && !isInternalStage;
+
       if (updateNote) {
         updates.push({
           stage_id: selectedStage.id,
           updated_by: user.id,
           update_type: 'note',
           note_text: updateNote,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+            published_note_text: updateNote,
+          } : {}),
         });
       }
 
@@ -730,6 +741,11 @@ export default function ProductionDetail() {
           updated_by: user.id,
           update_type: 'image',
           image_url: imageUrl,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+            published_image_url: imageUrl,
+          } : {}),
         });
       }
 
@@ -740,6 +756,10 @@ export default function ProductionDetail() {
           update_type: 'file',
           file_url: fileUrl,
           file_name: uploadedFileName,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+          } : {}),
         });
       }
 
@@ -750,11 +770,22 @@ export default function ProductionDetail() {
           update_type: 'status_change',
           previous_status: selectedStage.status,
           new_status: newStatus,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+          } : {}),
         });
+
+        const statusUpdate: any = { status: newStatus };
+        // Auto-sync published_status for non-internal stages when admin changes status
+        if (shouldAutoPublish) {
+          statusUpdate.published_status = newStatus;
+          statusUpdate.published_at = new Date().toISOString();
+        }
 
         const { error: statusError } = await (supabase as any)
           .from('production_stages')
-          .update({ status: newStatus })
+          .update(statusUpdate)
           .eq('id', selectedStage.id);
 
         if (statusError) throw statusError;
