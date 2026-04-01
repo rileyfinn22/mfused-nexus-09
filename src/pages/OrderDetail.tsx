@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, Paperclip, Trash2, Lock, Sparkles, ChevronsUpDown, Check, Image, ExternalLink } from "lucide-react";
+import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, Paperclip, Trash2, Lock, Sparkles, ChevronsUpDown, Check, Image, ExternalLink, Mail } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
+import { SendOrderConfirmationDialog } from "@/components/SendOrderConfirmationDialog";
 
 
 const STAGE_DEFINITIONS = [
@@ -111,6 +112,7 @@ const OrderDetail = () => {
   // Artwork files state
   const [orderArtwork, setOrderArtwork] = useState<any[]>([]);
   const [showCustomPODialog, setShowCustomPODialog] = useState(false);
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -1780,6 +1782,12 @@ const OrderDetail = () => {
             <Download className="h-4 w-4 mr-2" />
             Invoice
           </Button>
+          {isVibeAdmin && (
+            <Button variant="outline" onClick={() => setShowConfirmationDialog(true)}>
+              <Mail className="h-4 w-4 mr-2" />
+              Send Confirmation
+            </Button>
+          )}
         </div>
       </div>
 
@@ -3261,6 +3269,17 @@ const OrderDetail = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Send Order Confirmation Dialog */}
+      {order && (
+        <SendOrderConfirmationDialog
+          open={showConfirmationDialog}
+          onOpenChange={setShowConfirmationDialog}
+          order={order}
+          items={order.order_items || []}
+          senderName="VibePKG"
+          senderEmail="noreply@vibepkgportal.com"
+        />
+      )}
     </div>;
 };
 export default OrderDetail;
