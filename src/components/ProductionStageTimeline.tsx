@@ -354,18 +354,22 @@ export function ProductionStageTimeline({
     );
   };
 
-  // Check if a stage has unpublished changes
+  // Check if a stage has unpublished changes (excluding internal/adminOnly stages)
   const hasUnpublishedChanges = (stage: ProductionStage) => {
+    const def = stageDefinitions.find(d => d.value === stage.stage_name);
+    if (def?.adminOnly) return false; // Internal stages never need publishing
     if (stage.status !== stage.published_status) return true;
     const unpublishedUpdates = stage.production_stage_updates.filter(u => !u.is_published);
     return unpublishedUpdates.length > 0;
   };
 
   const getUnpublishedCount = (stage: ProductionStage) => {
+    const def = stageDefinitions.find(d => d.value === stage.stage_name);
+    if (def?.adminOnly) return 0;
     return stage.production_stage_updates.filter(u => !u.is_published).length;
   };
 
-  // Check if any stage has unpublished changes
+  // Check if any stage has unpublished changes (excluding internal stages)
   const hasAnyUnpublished = stages.some(s => hasUnpublishedChanges(s));
 
   // Filter stages based on admin-only visibility

@@ -715,12 +715,23 @@ export default function ProductionDetail() {
 
       const updates = [];
 
+      // Determine if this stage is internal (adminOnly)
+      const stageDef = STAGE_DEFINITIONS.find(d => d.value === selectedStage.stage_name);
+      const isInternalStage = !!stageDef?.adminOnly;
+      // Vibe admin updates on non-internal stages are auto-published
+      const shouldAutoPublish = isVibeAdmin && !isInternalStage;
+
       if (updateNote) {
         updates.push({
           stage_id: selectedStage.id,
           updated_by: user.id,
           update_type: 'note',
           note_text: updateNote,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+            published_note_text: updateNote,
+          } : {}),
         });
       }
 
@@ -730,6 +741,11 @@ export default function ProductionDetail() {
           updated_by: user.id,
           update_type: 'image',
           image_url: imageUrl,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+            published_image_url: imageUrl,
+          } : {}),
         });
       }
 
@@ -740,6 +756,10 @@ export default function ProductionDetail() {
           update_type: 'file',
           file_url: fileUrl,
           file_name: uploadedFileName,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+          } : {}),
         });
       }
 
@@ -750,11 +770,22 @@ export default function ProductionDetail() {
           update_type: 'status_change',
           previous_status: selectedStage.status,
           new_status: newStatus,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+          } : {}),
         });
+
+        const statusUpdate: any = { status: newStatus };
+        // Auto-sync published_status for non-internal stages when admin changes status
+        if (shouldAutoPublish) {
+          statusUpdate.published_status = newStatus;
+          statusUpdate.published_at = new Date().toISOString();
+        }
 
         const { error: statusError } = await (supabase as any)
           .from('production_stages')
-          .update({ status: newStatus })
+          .update(statusUpdate)
           .eq('id', selectedStage.id);
 
         if (statusError) throw statusError;
@@ -807,10 +838,21 @@ export default function ProductionDetail() {
       const stage = stages.find(s => s.id === stageId);
       if (!stage) throw new Error("Stage not found");
 
-      // Update stage status
+      // Determine if internal stage
+      const stageDef = STAGE_DEFINITIONS.find(d => d.value === stage.stage_name);
+      const isInternalStage = !!stageDef?.adminOnly;
+      const shouldAutoPublish = isVibeAdmin && !isInternalStage;
+
+      // Update stage status (+ published_status if admin on non-internal)
+      const statusUpdate: any = { status: newStatus };
+      if (shouldAutoPublish) {
+        statusUpdate.published_status = newStatus;
+        statusUpdate.published_at = new Date().toISOString();
+      }
+
       const { error: statusError } = await (supabase as any)
         .from('production_stages')
-        .update({ status: newStatus })
+        .update(statusUpdate)
         .eq('id', stageId);
 
       if (statusError) throw statusError;
@@ -824,6 +866,10 @@ export default function ProductionDetail() {
           update_type: 'status_change',
           previous_status: stage.status,
           new_status: newStatus,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+          } : {}),
         });
 
       if (updateError) throw updateError;
@@ -863,11 +909,21 @@ export default function ProductionDetail() {
         return;
       }
 
+      // Determine if internal stage
+      const stageDef = STAGE_DEFINITIONS.find(d => d.value === stage.stage_name);
+      const isInternalStage = !!stageDef?.adminOnly;
+      const shouldAutoPublish = isVibeAdmin && !isInternalStage;
+
       // Ensure stage is at least in_progress
       if (stage.status === 'pending') {
+        const statusUpdate: any = { status: 'in_progress' };
+        if (shouldAutoPublish) {
+          statusUpdate.published_status = 'in_progress';
+          statusUpdate.published_at = new Date().toISOString();
+        }
         await (supabase as any)
           .from('production_stages')
-          .update({ status: 'in_progress' })
+          .update(statusUpdate)
           .eq('id', stageId);
       }
 
@@ -881,6 +937,11 @@ export default function ProductionDetail() {
           updated_by: user.id,
           update_type: 'note',
           note_text: noteText,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+            published_note_text: noteText,
+          } : {}),
         });
 
       if (error) throw error;
@@ -909,11 +970,21 @@ export default function ProductionDetail() {
       const stage = stages.find(s => s.id === stageId);
       if (!stage) throw new Error("Stage not found");
 
+      // Determine if internal stage
+      const stageDef = STAGE_DEFINITIONS.find(d => d.value === stage.stage_name);
+      const isInternalStage = !!stageDef?.adminOnly;
+      const shouldAutoPublish = isVibeAdmin && !isInternalStage;
+
       // Ensure stage is at least in_progress
       if (stage.status === 'pending') {
+        const statusUpdate: any = { status: 'in_progress' };
+        if (shouldAutoPublish) {
+          statusUpdate.published_status = 'in_progress';
+          statusUpdate.published_at = new Date().toISOString();
+        }
         await (supabase as any)
           .from('production_stages')
-          .update({ status: 'in_progress' })
+          .update(statusUpdate)
           .eq('id', stageId);
       }
 
@@ -928,6 +999,11 @@ export default function ProductionDetail() {
           updated_by: user.id,
           update_type: 'note',
           note_text: noteText,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+            published_note_text: noteText,
+          } : {}),
         });
 
       if (error) throw error;
@@ -1040,6 +1116,10 @@ export default function ProductionDetail() {
       const stage = stages.find(s => s.id === stageId);
       if (!stage) return;
 
+      // Don't publish internal stages
+      const stageDef = STAGE_DEFINITIONS.find(d => d.value === stage.stage_name);
+      if (stageDef?.adminOnly) return;
+
       // Update published fields on the stage
       const { error: stageError } = await (supabase as any)
         .from('production_stages')
@@ -1096,8 +1176,11 @@ export default function ProductionDetail() {
 
   const handlePublishAll = async () => {
     try {
-      // Publish all stages with unpublished changes
+      // Publish all non-internal stages with unpublished changes
       for (const stage of stages) {
+        const stageDef = STAGE_DEFINITIONS.find(d => d.value === stage.stage_name);
+        if (stageDef?.adminOnly) continue; // Skip internal stages
+
         if (stage.status !== stage.published_status) {
           await (supabase as any)
             .from('production_stages')
