@@ -3269,6 +3269,17 @@ const OrderDetail = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Send Order Confirmation Dialog */}
+      {order && (
+        <SendOrderConfirmationDialog
+          open={showConfirmationDialog}
+          onOpenChange={setShowConfirmationDialog}
+          order={order}
+          items={order.order_items || []}
+          senderName={senderName}
+          senderEmail={senderEmail}
+        />
+      )}
     </div>;
 };
 export default OrderDetail;
