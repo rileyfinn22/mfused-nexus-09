@@ -970,11 +970,21 @@ export default function ProductionDetail() {
       const stage = stages.find(s => s.id === stageId);
       if (!stage) throw new Error("Stage not found");
 
+      // Determine if internal stage
+      const stageDef = STAGE_DEFINITIONS.find(d => d.value === stage.stage_name);
+      const isInternalStage = !!stageDef?.adminOnly;
+      const shouldAutoPublish = isVibeAdmin && !isInternalStage;
+
       // Ensure stage is at least in_progress
       if (stage.status === 'pending') {
+        const statusUpdate: any = { status: 'in_progress' };
+        if (shouldAutoPublish) {
+          statusUpdate.published_status = 'in_progress';
+          statusUpdate.published_at = new Date().toISOString();
+        }
         await (supabase as any)
           .from('production_stages')
-          .update({ status: 'in_progress' })
+          .update(statusUpdate)
           .eq('id', stageId);
       }
 
@@ -989,6 +999,11 @@ export default function ProductionDetail() {
           updated_by: user.id,
           update_type: 'note',
           note_text: noteText,
+          ...(shouldAutoPublish ? {
+            is_published: true,
+            published_at: new Date().toISOString(),
+            published_note_text: noteText,
+          } : {}),
         });
 
       if (error) throw error;
