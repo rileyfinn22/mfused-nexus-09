@@ -1,40 +1,39 @@
 
+## Forwarder Portal Plan
 
-## Fix: Blanket Invoice Total Logic + Invoice 10708 Data Correction
+### 1. Database Changes (Migration)
+- **Add `forwarder` to `app_role` enum** — new role type
+- **Add ocean freight fields to `shipment_legs`** table:
+  - `bl_number` (text) — Bill of Lading number
+  - `vessel_voyage` (text) — Vessel & Voyage info
+  - `etd` (timestamptz) — Estimated Time of Departure
+  - `ctns` (integer) — number of cartons
+  - `pcs_per_ctn` (integer) — pieces per carton
+  - `qty_pcs` (integer) — total quantity pieces
+  - `ddp_method` (text) — delivery method (sea freight, air, etc.)
+- **RLS policies** for forwarder role to read orders/items and manage shipment legs
+- **Forwarder invitation table** or reuse `company_invitations` with forwarder role
 
-### Problem
-Invoice 10708 stores subtotal=$56,181.90 and total=$64,806.90, but the correct shipped-quantity calculation gives **subtotal=$54,361.60** and **total=$62,986.60** ($54,361.60 + $8,625 shipping).
+### 2. Forwarder Invite (Vibe Admin)
+- Add "Invite Forwarder" option in Settings or a new management area
+- Reuse existing `company_invitations` flow with `role = 'forwarder'`
 
-The root cause: `blanketTotalItems()` falls back to ordered `quantity` for items with 0 shipped, inflating the subtotal. The DB trigger uses `GREATEST(ordered, shipped)` which can also inflate.
+### 3. Forwarder Pages
+- **`/forwarder/orders`** — Table view showing:
+  - Order number, PO number, description, customer name, financed invoice # (if linked)
+  - Click into each order
+- **`/forwarder/orders/:id`** — Detail view showing:
+  - Order items (product name, qty, SKU — no pricing)
+  - Ship-to address
+  - Shipping details table (like screenshot): Batch, Product name, CTNS, PCS/CTN, QTY PCS, DDP, B/L NO, Vessel & Voyage, ETA, ETD
+  - Ability to add/edit shipping legs with these fields
+  - Upload packing lists and shipping documents
 
-### Design Rule
-- **Before any shipping**: blanket invoice total = order total (placeholder)  
-- **Once any item ships**: blanket subtotal = sum of ONLY shipped items (shipped_qty × unit_price); unshipped items contribute $0  
-- **Total** = subtotal + tax + shipping (as always)
+### 4. Routing & Auth
+- Add forwarder routes in `App.tsx`
+- Update `DashboardLayout` to handle forwarder role (redirect to forwarder portal)
+- Forwarder sidebar with minimal navigation (just Orders)
 
-### Changes
-
-**1. Data fix — Invoice 10708**  
-Update stored values: `subtotal = 54361.60`, `total = 62986.60`
-
-**2. `src/lib/invoiceTotals.ts` — Fix `blanketTotalItems()`**  
-If ANY item has `shipped_quantity > 0`, only include items that have shipped. Unshipped items get quantity=0. If NO items have shipped, fall back to ordered quantities (placeholder behavior).
-
-```
-blanketTotalItems(orderItems):
-  anyShipped = orderItems.some(i => shipped_quantity > 0)
-  if anyShipped:
-    quantity = shipped_quantity > 0 ? shipped_quantity : 0  // exclude unshipped
-  else:
-    quantity = ordered quantity  // placeholder
-```
-
-**3. `src/pages/InvoiceDetail.tsx` (~lines 1197-1204) — Remove floor-to-order guard**  
-The placeholder behavior is now handled by `blanketTotalItems`. Remove the `!anyShipped` floor-to-order logic since the new `blanketTotalItems` already returns ordered quantities when nothing has shipped.
-
-**4. DB trigger migration — `recalculate_order_totals()`**  
-Update the blanket invoice subtotal logic:
-- If any `shipped_quantity > 0` exists → blanket subtotal = `SUM(shipped_quantity * unit_price)` for shipped items only
-- If nothing shipped → keep ordered subtotal as placeholder (`SUM(quantity * unit_price)`)
-- Remove `GREATEST(ordered, shipped)` — it inflates totals when some items ship more than ordered while others haven't shipped
-
+### 5. Customer View Updates
+- Display the new ocean freight fields (B/L NO, Vessel & Voyage, ETD) on existing shipment tracker when available
+- No breaking changes to existing shipment leg flow
