@@ -30,6 +30,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [hasFinanceRole, setHasFinanceRole] = useState(false);
   const [hasVibeAdminRole, setHasVibeAdminRole] = useState(false);
+  const [hasForwarderRole, setHasForwarderRole] = useState(false);
 
   // Highest privilege first. If a user has multiple role rows for the same company,
   // we pick the most privileged one to keep UI + permissions stable.
