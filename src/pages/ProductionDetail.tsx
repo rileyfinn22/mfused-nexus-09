@@ -929,6 +929,7 @@ export default function ProductionDetail() {
 
       // Create auto-note with hidden marker for detection + clean display text
       const noteText = `<!--${substage.key.toUpperCase()}-->${substage.label} Complete`;
+      const cleanDisplayText = `${substage.label} Complete`;
       
       const { error } = await (supabase as any)
         .from('production_stage_updates')
@@ -940,7 +941,7 @@ export default function ProductionDetail() {
           ...(shouldAutoPublish ? {
             is_published: true,
             published_at: new Date().toISOString(),
-            published_note_text: noteText,
+            published_note_text: cleanDisplayText,
           } : {}),
         });
 
@@ -1002,7 +1003,7 @@ export default function ProductionDetail() {
           ...(shouldAutoPublish ? {
             is_published: true,
             published_at: new Date().toISOString(),
-            published_note_text: noteText,
+            published_note_text: label,
           } : {}),
         });
 

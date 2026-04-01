@@ -354,19 +354,26 @@ export function ProductionStageTimeline({
     );
   };
 
+  // Check if an unpublished update is meaningful (has content worth publishing)
+  const isMeaningfulUnpublished = (u: StageUpdate) => {
+    if (u.is_published) return false;
+    // Bare status_change updates with no note/image/file are not meaningful to publish individually
+    if (u.update_type === 'status_change' && !u.note_text && !u.image_url && !u.file_url) return false;
+    return true;
+  };
+
   // Check if a stage has unpublished changes (excluding internal/adminOnly stages)
   const hasUnpublishedChanges = (stage: ProductionStage) => {
     const def = stageDefinitions.find(d => d.value === stage.stage_name);
     if (def?.adminOnly) return false; // Internal stages never need publishing
     if (stage.status !== stage.published_status) return true;
-    const unpublishedUpdates = stage.production_stage_updates.filter(u => !u.is_published);
-    return unpublishedUpdates.length > 0;
+    return stage.production_stage_updates.some(u => isMeaningfulUnpublished(u));
   };
 
   const getUnpublishedCount = (stage: ProductionStage) => {
     const def = stageDefinitions.find(d => d.value === stage.stage_name);
     if (def?.adminOnly) return 0;
-    return stage.production_stage_updates.filter(u => !u.is_published).length;
+    return stage.production_stage_updates.filter(u => isMeaningfulUnpublished(u)).length;
   };
 
   // Check if any stage has unpublished changes (excluding internal stages)
@@ -430,10 +437,16 @@ export function ProductionStageTimeline({
     return stage.production_stage_updates;
   };
 
+  // Strip HTML comment markers from note text for display
+  const stripNoteMarkers = (text: string | null): string | null => {
+    if (!text) return text;
+    return text.replace(/<!--[A-Z_]+(?::[^>]*)?-->/g, '').trim() || null;
+  };
+
   // Get display text for an update (use published version for customers if available)
   const getUpdateNoteText = (update: StageUpdate) => {
-    if (isCustomer && update.published_note_text) return update.published_note_text;
-    return update.note_text;
+    if (isCustomer && update.published_note_text) return stripNoteMarkers(update.published_note_text);
+    return stripNoteMarkers(update.note_text);
   };
 
   const getUpdateImageUrl = (update: StageUpdate) => {
@@ -667,8 +680,34 @@ export function ProductionStageTimeline({
                   </div>
                 </div>
               )}
+              {/* Inline Notes Display - show recent notes directly on the tile */}
+              {(() => {
+                const recentNotes = visibleUpdates
+                  .filter(u => u.update_type === 'note' && !u.note_text?.includes('<!--CUSTOM_SUBSTAGE:'))
+                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                  .slice(0, 3);
+                if (recentNotes.length === 0) return null;
+                return (
+                  <div className="mt-3 space-y-1.5">
+                    <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" /> Notes
+                    </Label>
+                    {recentNotes.map((note) => {
+                      const text = getUpdateNoteText(note);
+                      if (!text) return null;
+                      return (
+                        <div key={note.id} className="p-2 bg-muted/40 rounded-lg border border-border/50">
+                          <p className="text-sm whitespace-pre-wrap">{text}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {new Date(note.created_at).toLocaleDateString()} {new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
-              {/* Action Buttons */}
               {(isVibeAdmin || isVendor) && (
                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/50 flex-wrap">
                   {onQuickStatusChange && (
