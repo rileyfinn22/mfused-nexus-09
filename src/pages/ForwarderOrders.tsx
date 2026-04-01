@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 interface ForwarderOrder {
   id: string;
@@ -30,32 +31,36 @@ export default function ForwarderOrders() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const { activeCompany } = useCompany();
+  const { isVibeAdmin } = useActiveCompany();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (activeCompany) fetchOrders();
-  }, [activeCompany]);
+    if (activeCompany || isVibeAdmin) fetchOrders();
+  }, [activeCompany, isVibeAdmin]);
 
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("orders")
         .select(`
           id, order_number, po_number, description, customer_name, status,
           created_at, shipping_name, shipping_street, shipping_city, shipping_state, shipping_zip,
           order_items(id)
         `)
-        .eq("company_id", activeCompany!.id)
         .is("deleted_at", null)
         .neq("status", "draft")
         .order("created_at", { ascending: false });
 
+      // Vibe admins see ALL orders; forwarders see only their company's
+      if (!isVibeAdmin && activeCompany) {
+        query = query.eq("company_id", activeCompany.id);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
 
       // Fetch financed invoice numbers linked to these orders via vendor POs
-      const orderIds = (data || []).map((o: any) => o.id);
-      
-      // Get financed invoices that link to invoices for these orders
       const { data: financedData } = await supabase
         .from("financed_invoices")
         .select("invoice_number, invoice_id, invoices:invoice_id(order_id)")
