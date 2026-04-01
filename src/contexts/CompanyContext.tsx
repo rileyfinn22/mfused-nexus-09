@@ -92,6 +92,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setActiveCompanyState(null);
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
+        setHasForwarderRole(false);
         setLoading(false);
         return;
       }
