@@ -372,10 +372,38 @@ export default function FinancedInvoiceDetail() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Financial Details</CardTitle>
-        </CardHeader>
+      {/* Linked PO section - admin only */}
+      {isVibeAdmin && (
+        <Card>
+          <CardContent className="flex items-center justify-between py-3">
+            <div className="flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Linked Vendor PO:</span>
+              {vendorPO ? (
+                <span className="text-sm">
+                  PO #{vendorPO.po_number} — {vendorPO.description || "No description"} ({formatUSD(vendorPO.total || 0)})
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">None</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setLinkPOOpen(true); setPOSearchQuery(""); setPOSearchResults([]); }}>
+                <Link2 className="mr-1 h-3 w-3" />
+                {vendorPO ? "Change PO" : "Link PO"}
+              </Button>
+              {vendorPO && (
+                <Button size="sm" variant="ghost" onClick={handleUnlinkPO}>
+                  <X className="mr-1 h-3 w-3" />
+                  Unlink
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <div>
