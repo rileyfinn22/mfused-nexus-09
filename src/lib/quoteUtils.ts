@@ -1,6 +1,5 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { addPdfBranding, addPdfFooter } from './pdfBranding';
 
 interface PriceBreak {
   qty: number;
@@ -40,95 +39,166 @@ interface Quote {
   created_at: string;
 }
 
+// Vibe Packaging brand colors
+const COLORS = {
+  primaryGreen: [76, 175, 80] as [number, number, number],
+  darkGray: [51, 51, 51] as [number, number, number],
+  mediumGray: [100, 100, 100] as [number, number, number],
+  lightGray: [248, 248, 248] as [number, number, number],
+  white: [255, 255, 255] as [number, number, number],
+};
+
 export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promise<void> {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
-  
-  // Add branding header with logo
-  let yPos = await addPdfBranding(doc, { documentTitle: 'QUOTE' });
-  
-  // Quote number
-  doc.setFontSize(12);
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // ============ HEADER ============
+  let yPos = 15;
+
+  // Company name + address on left
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...COLORS.primaryGreen);
+  doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
+
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(quote.quote_number, pageWidth / 2, yPos, { align: 'center' });
-  
-  // Quote Info
+  doc.setTextColor(...COLORS.mediumGray);
+  doc.text('1415 S 700 W', 14, yPos + 7);
+  doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
+  doc.text('www.vibepkg.com', 14, yPos + 17);
+
+  // Logo on right
+  try {
+    const logoResponse = await fetch('/images/vibe-logo.png');
+    const logoBlob = await logoResponse.blob();
+    const logoBase64 = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(logoBlob);
+    });
+    doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
+  } catch {
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...COLORS.primaryGreen);
+    doc.text('VIBE', pageWidth - 14, yPos + 8, { align: 'right' });
+  }
+
+  yPos += 28;
+
+  // Green divider
+  doc.setDrawColor(...COLORS.primaryGreen);
+  doc.setLineWidth(0.5);
+  doc.line(14, yPos, pageWidth - 14, yPos);
+
+  yPos += 12;
+
+  // ============ QUOTE TITLE ============
+  doc.setFontSize(24);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...COLORS.darkGray);
+  doc.text('Quote', 14, yPos);
+
   yPos += 15;
+
+  // ============ CUSTOMER & DETAILS SECTION ============
+  const leftColX = 14;
+  const rightColX = pageWidth / 2 + 10;
+
+  // Customer info on left
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('Quote Details', 14, yPos);
-  
-  doc.setFont('helvetica', 'normal');
-  yPos += 7;
-  doc.text(`Date: ${new Date(quote.created_at).toLocaleDateString()}`, 14, yPos);
-  yPos += 5;
-  if (quote.valid_until) {
-    doc.text(`Valid Until: ${new Date(quote.valid_until).toLocaleDateString()}`, 14, yPos);
-    yPos += 5;
-  }
-  doc.text(`Terms: ${quote.terms || 'Net 30'}`, 14, yPos);
-  if (quote.shipping_method) {
-    yPos += 5;
-    const methodLabel = quote.shipping_method === 'domestic' ? 'Domestic' : quote.shipping_method === 'air' ? 'Air Freight' : quote.shipping_method === 'ocean' ? 'Ocean Freight' : quote.shipping_method;
-    doc.text(`Shipping: ${methodLabel}`, 14, yPos);
-  }
-  
-  // Customer Info
-  let customerY = yPos - 12;
+  doc.setTextColor(...COLORS.mediumGray);
+  doc.text('Prepared for', leftColX, yPos);
+
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('Customer', pageWidth / 2, customerY);
-  
+  doc.setTextColor(...COLORS.darkGray);
+  doc.text(quote.customer_name, leftColX, yPos + 8);
+
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  customerY += 7;
-  doc.text(quote.customer_name, pageWidth / 2, customerY);
+  doc.setTextColor(...COLORS.mediumGray);
+
+  let custY = yPos + 14;
   if (quote.customer_email) {
-    customerY += 5;
-    doc.text(quote.customer_email, pageWidth / 2, customerY);
+    doc.text(quote.customer_email, leftColX, custY);
+    custY += 5;
   }
   if (quote.customer_phone) {
-    customerY += 5;
-    doc.text(quote.customer_phone, pageWidth / 2, customerY);
+    doc.text(quote.customer_phone, leftColX, custY);
+    custY += 5;
   }
-  
-  // Shipping Address
+
+  // Ship-to under customer info
   if (quote.shipping_street) {
-    customerY += 10;
+    custY += 3;
     doc.setFont('helvetica', 'bold');
-    doc.text('Ship To', pageWidth / 2, customerY);
+    doc.setTextColor(...COLORS.mediumGray);
+    doc.text('Ship to', leftColX, custY);
     doc.setFont('helvetica', 'normal');
-    customerY += 7;
+    custY += 6;
     if (quote.shipping_name) {
-      doc.text(quote.shipping_name, pageWidth / 2, customerY);
-      customerY += 5;
+      doc.text(quote.shipping_name, leftColX, custY);
+      custY += 5;
     }
-    doc.text(quote.shipping_street, pageWidth / 2, customerY);
-    customerY += 5;
-    doc.text(`${quote.shipping_city}, ${quote.shipping_state} ${quote.shipping_zip}`, pageWidth / 2, customerY);
+    doc.text(quote.shipping_street, leftColX, custY);
+    custY += 5;
+    doc.text(`${quote.shipping_city || ''}, ${quote.shipping_state || ''} ${quote.shipping_zip || ''}`, leftColX, custY);
   }
-  
-  // Items Table
-  const tableStartY = Math.max(customerY + 15, yPos + 15, 100);
-  
-  // Prepare table data - handle price tiers
+
+  // Quote details on right
+  const detailsStartY = yPos;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...COLORS.mediumGray);
+
+  const detailRows: [string, string][] = [
+    ['Quote #:', quote.quote_number],
+    ['Date:', new Date(quote.created_at).toLocaleDateString()],
+  ];
+  if (quote.valid_until) {
+    detailRows.push(['Valid Until:', new Date(quote.valid_until).toLocaleDateString()]);
+  }
+  detailRows.push(['Terms:', quote.terms || 'Net 30']);
+  if (quote.shipping_method) {
+    const methodLabel = quote.shipping_method === 'domestic' ? 'Domestic'
+      : quote.shipping_method === 'air' ? 'Air Freight'
+      : quote.shipping_method === 'ocean' ? 'Ocean Freight'
+      : quote.shipping_method;
+    detailRows.push(['Shipping:', methodLabel]);
+  }
+
+  detailRows.forEach(([label, value], i) => {
+    const rowY = detailsStartY + i * 7;
+    doc.setTextColor(...COLORS.mediumGray);
+    doc.setFont('helvetica', 'normal');
+    doc.text(label, rightColX, rowY);
+    doc.setTextColor(...COLORS.darkGray);
+    doc.setFont('helvetica', 'bold');
+    doc.text(value, rightColX + 45, rowY);
+  });
+
+  yPos = Math.max(custY + 10, detailsStartY + detailRows.length * 7 + 10, yPos + 40);
+
+  // ============ ITEMS TABLE ============
   const tableBody: (string | { content: string; colSpan?: number; styles?: any })[][] = [];
-  
+
   items.forEach((item) => {
     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
     const isDescriptionMode = item.quantity === 0 && item.description;
     const descLine = item.description ? `\n${item.description}` : '';
-    
+
     if (isDescriptionMode) {
-      // Description-only item: full-width row with item name + description
       tableBody.push([
         { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}\n\n${item.description}`, colSpan: 4, styles: { fontStyle: 'normal' } }
       ]);
     } else if (hasPriceBreaks) {
-      // Add item header row
       tableBody.push([
-        { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`, colSpan: 4, styles: { fontStyle: 'bold' } }
+        { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`, colSpan: 4, styles: { fontStyle: 'bold', fillColor: COLORS.lightGray } }
       ]);
-      
-      // Add each price tier
       item.price_breaks.forEach((pb) => {
         tableBody.push([
           `  Tier: ${pb.qty.toLocaleString()} units`,
@@ -138,84 +208,115 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         ]);
       });
     } else {
-      // Regular item without tiers
       tableBody.push([
         `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`,
         formatUnitPrice(item.unit_price),
-        item.quantity.toString(),
+        item.quantity.toLocaleString(),
         formatCurrency(item.total)
       ]);
     }
   });
-  
+
   autoTable(doc, {
-    startY: tableStartY,
-    head: [['Item', 'Unit Price', 'Qty', 'Total']],
+    startY: yPos,
+    head: [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']],
     body: tableBody,
-    theme: 'striped',
-    headStyles: { fillColor: [51, 51, 51] },
+    theme: 'plain',
+    headStyles: {
+      fillColor: COLORS.primaryGreen,
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 9,
+      cellPadding: 4
+    },
+    bodyStyles: {
+      fontSize: 9,
+      cellPadding: 4,
+      textColor: COLORS.darkGray,
+      lineWidth: 0
+    },
+    alternateRowStyles: {
+      fillColor: COLORS.lightGray
+    },
     columnStyles: {
       0: { cellWidth: 80 },
       1: { halign: 'right', cellWidth: 35 },
-      2: { halign: 'right', cellWidth: 30 },
-      3: { halign: 'right', cellWidth: 35 }
+      2: { halign: 'center', cellWidth: 30 },
+      3: { halign: 'right', cellWidth: 35, fontStyle: 'bold' }
     },
-    styles: { fontSize: 9 }
+    margin: { left: 14, right: 14 },
+    showHead: 'firstPage',
+    tableLineWidth: 0
   });
-  
-  // Get final Y position after table
+
   const finalY = (doc as any).lastAutoTable.finalY + 10;
-  
-  // Check if any items have price breaks - if so, don't show totals
   const hasAnyPriceBreaks = items.some(item => item.price_breaks && item.price_breaks.length > 0);
-  const hasDescriptionOnlyItems = items.some(item => item.quantity === 0 && item.description);
-  
+
+  // ============ TOTALS SECTION ============
   if (!hasAnyPriceBreaks) {
-    // Totals section - only if no price breaks
-    const totalsX = pageWidth - 70;
-    let totalsY = finalY;
-    
-    doc.setFontSize(10);
-    doc.text('Subtotal:', totalsX, totalsY);
-    doc.text(formatCurrency(quote.subtotal), pageWidth - 14, totalsY, { align: 'right' });
-    
-    if (quote.shipping_cost > 0) {
-      totalsY += 6;
-      doc.text('Shipping:', totalsX, totalsY);
-      doc.text(formatCurrency(quote.shipping_cost), pageWidth - 14, totalsY, { align: 'right' });
-    }
-    
-    if (quote.tax > 0) {
-      totalsY += 6;
-      doc.text('Tax:', totalsX, totalsY);
-      doc.text(formatCurrency(quote.tax), pageWidth - 14, totalsY, { align: 'right' });
-    }
-    
+    const totalsWidth = 85;
+    const totalsX = pageWidth - totalsWidth - 14;
+    let totalsY = finalY + 5;
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...COLORS.darkGray);
+
+    doc.text('Subtotal', totalsX, totalsY);
+    doc.text(formatCurrency(quote.subtotal), totalsX + totalsWidth, totalsY, { align: 'right' });
     totalsY += 8;
+
+    if (quote.shipping_cost > 0) {
+      doc.text('Shipping', totalsX, totalsY);
+      doc.text(formatCurrency(quote.shipping_cost), totalsX + totalsWidth, totalsY, { align: 'right' });
+      totalsY += 8;
+    }
+
+    if (quote.tax > 0) {
+      doc.text('Tax', totalsX, totalsY);
+      doc.text(formatCurrency(quote.tax), totalsX + totalsWidth, totalsY, { align: 'right' });
+      totalsY += 8;
+    }
+
+    // Divider
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(totalsX, totalsY, totalsX + totalsWidth, totalsY);
+    totalsY += 6;
+
+    // Total - emphasized
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('Total:', totalsX, totalsY);
-    doc.text(formatCurrency(quote.total), pageWidth - 14, totalsY, { align: 'right' });
+    doc.setTextColor(...COLORS.primaryGreen);
+    doc.text('TOTAL', totalsX, totalsY);
+    doc.text(formatCurrency(quote.total), totalsX + totalsWidth, totalsY, { align: 'right' });
   } else {
     // Note about pricing tiers
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...COLORS.mediumGray);
     doc.text('* Pricing shown per tier. Final total depends on quantity selected.', 14, finalY);
   }
-  
-  // Description/Notes
+
+  // ============ NOTES ============
   if (quote.description) {
-    const notesY = hasAnyPriceBreaks ? finalY + 15 : finalY + 30;
-    doc.setFontSize(10);
+    const notesY = hasAnyPriceBreaks ? finalY + 15 : finalY + 35;
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...COLORS.darkGray);
     doc.text('Notes:', 14, notesY);
     doc.setFont('helvetica', 'normal');
-    doc.text(quote.description, 14, notesY + 6, { maxWidth: pageWidth - 28 });
+    doc.setTextColor(...COLORS.mediumGray);
+    const notesLines = doc.splitTextToSize(quote.description, pageWidth - 28);
+    doc.text(notesLines, 14, notesY + 6);
   }
-  
-  // Footer with branding
-  addPdfFooter(doc);
-  
-  // Download
+
+  // ============ FOOTER ============
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...COLORS.primaryGreen);
+  doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+
   doc.save(`${quote.quote_number}.pdf`);
 }
 
