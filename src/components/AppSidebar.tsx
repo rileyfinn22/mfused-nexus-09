@@ -6,6 +6,7 @@ import {
   FileText, 
   Image, 
   Truck,
+  Ship,
   FolderOpen,
   Building2,
   Factory,
