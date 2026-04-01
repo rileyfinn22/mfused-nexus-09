@@ -63,15 +63,20 @@ const Customers = () => {
   const [selectedCompanyForInvite, setSelectedCompanyForInvite] = useState<string | undefined>();
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<any>(null);
+  const [inlineEmails, setInlineEmails] = useState<{ email: string; label: string }[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
+    billing_name: "",
     billing_street: "",
+    billing_street2: "",
     billing_city: "",
     billing_state: "",
     billing_zip: "",
+    shipping_name: "",
     shipping_street: "",
+    shipping_street2: "",
     shipping_city: "",
     shipping_state: "",
     shipping_zip: "",
