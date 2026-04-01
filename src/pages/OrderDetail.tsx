@@ -1782,6 +1782,12 @@ const OrderDetail = () => {
             <Download className="h-4 w-4 mr-2" />
             Invoice
           </Button>
+          {isVibeAdmin && (
+            <Button variant="outline" onClick={() => setShowConfirmationDialog(true)}>
+              <Mail className="h-4 w-4 mr-2" />
+              Send Confirmation
+            </Button>
+          )}
         </div>
       </div>
 
