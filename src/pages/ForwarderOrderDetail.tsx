@@ -100,14 +100,14 @@ export default function ForwarderOrderDetail() {
   };
 
   const addLeg = async () => {
-    if (!order || !activeCompany) return;
+    if (!order) return;
     const nextNum = legs.length + 1;
     try {
       const { data, error } = await (supabase as any)
         .from("shipment_legs")
         .insert({
           order_id: order.id,
-          company_id: activeCompany.id,
+          company_id: order.company_id,
           leg_number: nextNum,
           leg_type: "international",
           label: "International Freight",
