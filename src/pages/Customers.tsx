@@ -122,11 +122,15 @@ const Customers = () => {
         name: customer.name || "",
         email: customer.email || "",
         phone: customer.phone || "",
+        billing_name: customer.billing_name || "",
         billing_street: customer.billing_street || "",
+        billing_street2: customer.billing_street2 || "",
         billing_city: customer.billing_city || "",
         billing_state: customer.billing_state || "",
         billing_zip: customer.billing_zip || "",
+        shipping_name: customer.shipping_name || "",
         shipping_street: customer.shipping_street || "",
+        shipping_street2: customer.shipping_street2 || "",
         shipping_city: customer.shipping_city || "",
         shipping_state: customer.shipping_state || "",
         shipping_zip: customer.shipping_zip || "",
@@ -138,17 +142,22 @@ const Customers = () => {
         name: "",
         email: "",
         phone: "",
+        billing_name: "",
         billing_street: "",
+        billing_street2: "",
         billing_city: "",
         billing_state: "",
         billing_zip: "",
+        shipping_name: "",
         shipping_street: "",
+        shipping_street2: "",
         shipping_city: "",
         shipping_state: "",
         shipping_zip: "",
         notes: "",
       });
     }
+    setInlineEmails([]);
     setFormErrors({});
     setShowDialog(true);
   };
@@ -165,11 +174,15 @@ const Customers = () => {
         name: validated.name,
         email: validated.email || null,
         phone: validated.phone || null,
+        billing_name: validated.billing_name || null,
         billing_street: validated.billing_street || null,
+        billing_street2: validated.billing_street2 || null,
         billing_city: validated.billing_city || null,
         billing_state: validated.billing_state || null,
         billing_zip: validated.billing_zip || null,
+        shipping_name: validated.shipping_name || null,
         shipping_street: validated.shipping_street || null,
+        shipping_street2: validated.shipping_street2 || null,
         shipping_city: validated.shipping_city || null,
         shipping_state: validated.shipping_state || null,
         shipping_zip: validated.shipping_zip || null,
@@ -189,11 +202,23 @@ const Customers = () => {
           description: "Company information has been updated successfully.",
         });
       } else {
-        const { error } = await supabase
+        const { data: newCompany, error } = await supabase
           .from('companies')
-          .insert([customerData]);
+          .insert([customerData])
+          .select('id')
+          .single();
 
         if (error) throw error;
+
+        // Save inline emails for new company
+        if (newCompany && inlineEmails.length > 0) {
+          const emailRows = inlineEmails
+            .filter(e => e.email.trim())
+            .map(e => ({ company_id: newCompany.id, email: e.email.trim(), label: e.label }));
+          if (emailRows.length > 0) {
+            await supabase.from('company_emails').insert(emailRows);
+          }
+        }
 
         toast({
           title: "Company created",
