@@ -365,38 +365,38 @@ export default function ForwarderOrderDetail() {
           )}
           {/* Attachments & Notes below table */}
           {legs.length > 0 && (
-            <div className="p-4 space-y-3 border-t">
-              {legs.map((leg) => (
-                <div key={`extra-${leg.id}`} className="flex items-start gap-3">
-                  <span className="text-xs text-muted-foreground font-mono shrink-0 pt-2 w-6">#{leg.leg_number}</span>
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-3">
-                      <label className="cursor-pointer shrink-0">
-                        <Input type="file" className="hidden" accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.png,.jpg,.jpeg" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAttachment(leg.id, f); }} />
-                        <div className="flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer">
-                          <Upload className="h-3 w-3" />
-                          Attach file
-                        </div>
-                      </label>
-                      {leg.attachment_name && (
-                        <button onClick={() => leg.attachment_url && viewAttachment(leg.attachment_url)} className="text-xs text-primary hover:underline flex items-center gap-1">
-                          <Paperclip className="h-3 w-3 shrink-0" />
-                          {leg.attachment_name}
-                        </button>
-                      )}
-                    </div>
-                    <Textarea
-                      className="text-xs min-h-[32px]"
-                      value={leg.notes || ""}
-                      onChange={(e) => updateLeg(leg.id, "notes", e.target.value)}
-                      placeholder="Notes for this leg..."
-                      rows={1}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+             <div className="p-4 space-y-3 border-t">
+               {legs.map((leg) => (
+                 <div key={`extra-${leg.id}`} className="flex items-start gap-3">
+                   <span className="text-xs text-muted-foreground font-mono shrink-0 pt-2 w-6">#{leg.leg_number}</span>
+                   <div className="flex-1 space-y-2">
+                     <div className="flex items-center gap-3">
+                       <label className="cursor-pointer shrink-0">
+                         <Input type="file" className="hidden" accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.png,.jpg,.jpeg" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAttachment(leg.id, f); }} />
+                         <div className="flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer">
+                           <Upload className="h-3 w-3" />
+                           Attach file
+                         </div>
+                       </label>
+                       {leg.attachment_name && (
+                         <button onClick={() => leg.attachment_url && viewAttachment(leg.attachment_url)} className="text-xs text-primary hover:underline flex items-center gap-1">
+                           <Paperclip className="h-3 w-3 shrink-0" />
+                           {leg.attachment_name}
+                         </button>
+                       )}
+                     </div>
+                     <Textarea
+                       className="text-xs min-h-[32px]"
+                       value={leg.notes || ""}
+                       onChange={(e) => updateLeg(leg.id, "notes", e.target.value)}
+                       placeholder="Notes for this leg..."
+                       rows={1}
+                     />
+                   </div>
+                 </div>
+               ))}
+             </div>
+           )}
         </CardContent>
       </Card>
 
