@@ -152,12 +152,10 @@ export default function ForwarderOrders() {
           <TableHeader>
             <TableRow>
               <TableHead>Order #</TableHead>
-              <TableHead>PO #</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Finance Invoice</TableHead>
               <TableHead>Ship To</TableHead>
-              <TableHead>Items</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -169,7 +167,6 @@ export default function ForwarderOrders() {
                 onClick={() => navigate(`/forwarder/orders/${order.id}`)}
               >
                 <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
-                <TableCell>{order.po_number || "—"}</TableCell>
                 <TableCell className="max-w-[200px] truncate">{order.description || "—"}</TableCell>
                 <TableCell>{order.customer_name}</TableCell>
                 <TableCell>
@@ -180,7 +177,6 @@ export default function ForwarderOrders() {
                 <TableCell className="text-sm text-muted-foreground">
                   {order.shipping_city}, {order.shipping_state}
                 </TableCell>
-                <TableCell>{order.item_count}</TableCell>
                 <TableCell>
                   <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
                 </TableCell>
