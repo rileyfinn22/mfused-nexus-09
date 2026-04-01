@@ -52,6 +52,8 @@ import Financing from "./pages/Financing";
 import FinanceView from "./pages/FinanceView";
 import FinancedInvoiceDetail from "./pages/FinancedInvoiceDetail";
 import Demo from "./pages/Demo";
+import ForwarderOrders from "./pages/ForwarderOrders";
+import ForwarderOrderDetail from "./pages/ForwarderOrderDetail";
 
 const queryClient = new QueryClient();
 
