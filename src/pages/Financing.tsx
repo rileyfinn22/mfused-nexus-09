@@ -193,7 +193,7 @@ export default function Financing() {
     const vendorPO = inv.vendor_pos as any;
     const poOrder = vendorPO?.orders as any;
     const adminDesc = vendorPO?.description || poOrder?.description || poOrder?.customer_name || order?.description || order?.customer_name || "—";
-    const displayDesc = isFinanceUser ? (inv.description || "—") : (inv.description || adminDesc);
+    const displayDesc = isFinanceUser ? (inv.description || "—") : (order?.description || order?.customer_name || adminDesc);
     const needsPOLink = isVibeAdmin && !inv.vendor_po_id && inv.created_by_role === "finance";
     const rate = inv.exchange_rate || 7.2;
 
@@ -228,7 +228,7 @@ export default function Financing() {
   const renderPendingRow = (inv: any, idx: number) => {
     const vendorPO = inv.vendor_pos as any;
     const poOrder = vendorPO?.orders as any;
-    const desc = isFinanceUser ? (inv.description || vendorPO?.description || "—") : (vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—");
+    const desc = isFinanceUser ? (inv.description || vendorPO?.description || "—") : (poOrder?.description || poOrder?.customer_name || vendorPO?.description || "—");
     const rate = inv.exchange_rate || 7.2;
 
     return (
@@ -271,7 +271,7 @@ export default function Financing() {
     const invoice = inv.invoices as any;
     const vendorPO = inv.vendor_pos as any;
     const poOrder = vendorPO?.orders as any;
-    const desc = isFinanceUser ? (inv.description || "—") : (vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—");
+    const desc = isFinanceUser ? (inv.description || "—") : (poOrder?.description || poOrder?.customer_name || vendorPO?.description || "—");
     const rate = inv.exchange_rate || 7.2;
 
     return (

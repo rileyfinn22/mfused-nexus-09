@@ -34,6 +34,7 @@ export default function FinancedInvoiceDetail() {
   const [poSearchResults, setPOSearchResults] = useState<any[]>([]);
   const [poSearching, setPOSearching] = useState(false);
   // Editable fields
+  const [description, setDescription] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [carrier, setCarrier] = useState("");
@@ -80,6 +81,7 @@ export default function FinancedInvoiceDetail() {
       return;
     }
     setRecord(data);
+    setDescription(data.description || "");
     setInvoiceNumber(data.invoice_number || "");
     setNotes(data.notes || "");
     setCarrier(data.carrier || "");
@@ -137,6 +139,7 @@ export default function FinancedInvoiceDetail() {
     }
 
     const newValues: Record<string, any> = {
+      description: description || null,
       invoice_number: invoiceNumber || null,
       notes: notes || null,
       carrier: carrier || null,
@@ -523,6 +526,19 @@ export default function FinancedInvoiceDetail() {
             <CardTitle className="text-sm">Invoice & Notes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div>
+              <Label className="text-xs">Description</Label>
+              {editing ? (
+                <Input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Enter description..."
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="text-sm font-medium py-1">{description || "—"}</p>
+              )}
+            </div>
             <div>
               <Label className="text-xs">Invoice Number</Label>
               {editing ? (
