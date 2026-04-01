@@ -800,7 +800,7 @@ export default function FinancedInvoiceDetail() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by PO number or description..."
+                placeholder="Search by PO #, description, vendor, or customer..."
                 value={poSearchQuery}
                 onChange={(e) => searchVendorPOs(e.target.value)}
                 className="pl-9"
@@ -808,7 +808,7 @@ export default function FinancedInvoiceDetail() {
             </div>
             <div className="max-h-64 overflow-y-auto space-y-1">
               {poSearching && <p className="text-sm text-muted-foreground text-center py-4">Searching...</p>}
-              {!poSearching && poSearchQuery && poSearchResults.length === 0 && (
+              {!poSearching && poSearchResults.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">No POs found</p>
               )}
               {poSearchResults.map((po: any) => (
