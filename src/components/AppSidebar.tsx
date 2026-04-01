@@ -230,11 +230,13 @@ export function AppSidebar() {
     }
   };
 
-  const navigationItems = isFinance
-    ? financeNavigationItems
-    : isVendor 
-      ? vendorNavigationItems 
-      : (isVibeAdmin ? vibeAdminNavigationItems : companyNavigationItems);
+  const navigationItems = isForwarder
+    ? forwarderNavigationItems
+    : isFinance
+      ? financeNavigationItems
+      : isVendor 
+        ? vendorNavigationItems 
+        : (isVibeAdmin ? vibeAdminNavigationItems : companyNavigationItems);
 
   const isActive = (path: string) => currentPath === path;
   const isCollapsed = state === "collapsed";
