@@ -52,6 +52,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setActiveCompanyState(null);
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
+        setHasForwarderRole(false);
         localStorage.removeItem(ACTIVE_COMPANY_KEY);
       }
     });
