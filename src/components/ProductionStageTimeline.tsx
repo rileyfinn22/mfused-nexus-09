@@ -680,8 +680,34 @@ export function ProductionStageTimeline({
                   </div>
                 </div>
               )}
+              {/* Inline Notes Display - show recent notes directly on the tile */}
+              {(() => {
+                const recentNotes = visibleUpdates
+                  .filter(u => u.update_type === 'note' && !u.note_text?.includes('<!--CUSTOM_SUBSTAGE:'))
+                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                  .slice(0, 3);
+                if (recentNotes.length === 0) return null;
+                return (
+                  <div className="mt-3 space-y-1.5">
+                    <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" /> Notes
+                    </Label>
+                    {recentNotes.map((note) => {
+                      const text = getUpdateNoteText(note);
+                      if (!text) return null;
+                      return (
+                        <div key={note.id} className="p-2 bg-muted/40 rounded-lg border border-border/50">
+                          <p className="text-sm whitespace-pre-wrap">{text}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {new Date(note.created_at).toLocaleDateString()} {new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
-              {/* Action Buttons */}
               {(isVibeAdmin || isVendor) && (
                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/50 flex-wrap">
                   {onQuickStatusChange && (
