@@ -94,7 +94,7 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
       } else {
         toast({ title: "Email added" });
         setNewEmail("");
-        setNewLabel("general");
+        setNewName("");
         fetchEmails();
       }
     } catch (error: any) {
