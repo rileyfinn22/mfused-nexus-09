@@ -298,18 +298,16 @@ export default function ForwarderOrderDetail() {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">#</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Label</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">QTY PCS</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">B/L NO</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vessel & Voyage</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">ETD</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">ETA</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Carrier</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Tracking #</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Status</th>
-                    <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap"></th>
-                  </tr>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">#</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Label</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">B/L NO / Tracking</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Vessel & Voyage</th>
+                     <th className="px-1 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">ETD</th>
+                     <th className="px-1 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">ETA</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Carrier</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                     <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap"></th>
+                   </tr>
                 </thead>
                 <tbody>
                   {legs.map((leg) => (
