@@ -283,6 +283,7 @@ const Artwork = () => {
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
       // Also track first available thumbnail per SKU
       const skuThumbnails: Record<string, string | null> = {};
+      const skuPdfUrls: Record<string, string> = {};
       
       artworkData?.forEach(art => {
         if (!counts[art.sku]) {
@@ -309,6 +310,7 @@ const Artwork = () => {
       });
       setArtworkCounts(counts);
       setSkuArtworkThumbnails(skuThumbnails);
+      setSkuPdfArtworkUrls(skuPdfUrls);
       
       // Calculate template status and total artwork count based on product artwork
       const templateStatusMap: Record<string, ArtworkStatus> = {};
