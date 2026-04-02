@@ -47,11 +47,15 @@ const customerSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
   email: z.string().trim().email("Invalid email").max(255).optional().or(z.literal("")),
   phone: z.string().trim().max(50).optional().or(z.literal("")),
+  billing_name: z.string().trim().max(200).optional().or(z.literal("")),
   billing_street: z.string().trim().max(500).optional().or(z.literal("")),
+  billing_street2: z.string().trim().max(500).optional().or(z.literal("")),
   billing_city: z.string().trim().max(100).optional().or(z.literal("")),
   billing_state: z.string().trim().max(50).optional().or(z.literal("")),
   billing_zip: z.string().trim().max(20).optional().or(z.literal("")),
+  shipping_name: z.string().trim().max(200).optional().or(z.literal("")),
   shipping_street: z.string().trim().max(500).optional().or(z.literal("")),
+  shipping_street2: z.string().trim().max(500).optional().or(z.literal("")),
   shipping_city: z.string().trim().max(100).optional().or(z.literal("")),
   shipping_state: z.string().trim().max(50).optional().or(z.literal("")),
   shipping_zip: z.string().trim().max(20).optional().or(z.literal("")),
@@ -126,11 +130,15 @@ const CustomerDetail = () => {
     name: "",
     email: "",
     phone: "",
+    billing_name: "",
     billing_street: "",
+    billing_street2: "",
     billing_city: "",
     billing_state: "",
     billing_zip: "",
+    shipping_name: "",
     shipping_street: "",
+    shipping_street2: "",
     shipping_city: "",
     shipping_state: "",
     shipping_zip: "",
@@ -289,11 +297,15 @@ const CustomerDetail = () => {
         name: data.name || "",
         email: data.email || "",
         phone: data.phone || "",
+        billing_name: data.billing_name || "",
         billing_street: data.billing_street || "",
+        billing_street2: data.billing_street2 || "",
         billing_city: data.billing_city || "",
         billing_state: data.billing_state || "",
         billing_zip: data.billing_zip || "",
+        shipping_name: data.shipping_name || "",
         shipping_street: data.shipping_street || "",
+        shipping_street2: data.shipping_street2 || "",
         shipping_city: data.shipping_city || "",
         shipping_state: data.shipping_state || "",
         shipping_zip: data.shipping_zip || "",
@@ -1083,11 +1095,29 @@ const CustomerDetail = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
+                  <Label htmlFor="billing_name">Name / Attn</Label>
+                  <Input
+                    id="billing_name"
+                    value={formData.billing_name}
+                    onChange={(e) => setFormData({ ...formData, billing_name: e.target.value })}
+                    placeholder="Name or attention line"
+                  />
+                </div>
+                <div className="col-span-2">
                   <Label htmlFor="billing_street">Street Address</Label>
                   <Input
                     id="billing_street"
                     value={formData.billing_street}
                     onChange={(e) => setFormData({ ...formData, billing_street: e.target.value })}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="billing_street2">Address Line 2</Label>
+                  <Input
+                    id="billing_street2"
+                    value={formData.billing_street2}
+                    onChange={(e) => setFormData({ ...formData, billing_street2: e.target.value })}
+                    placeholder="Suite, unit, floor, etc."
                   />
                 </div>
                 <div>
@@ -1128,11 +1158,29 @@ const CustomerDetail = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
+                  <Label htmlFor="shipping_name">Name / Attn</Label>
+                  <Input
+                    id="shipping_name"
+                    value={formData.shipping_name}
+                    onChange={(e) => setFormData({ ...formData, shipping_name: e.target.value })}
+                    placeholder="Name or attention line"
+                  />
+                </div>
+                <div className="col-span-2">
                   <Label htmlFor="shipping_street">Street Address</Label>
                   <Input
                     id="shipping_street"
                     value={formData.shipping_street}
                     onChange={(e) => setFormData({ ...formData, shipping_street: e.target.value })}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="shipping_street2">Address Line 2</Label>
+                  <Input
+                    id="shipping_street2"
+                    value={formData.shipping_street2}
+                    onChange={(e) => setFormData({ ...formData, shipping_street2: e.target.value })}
+                    placeholder="Suite, unit, floor, etc."
                   />
                 </div>
                 <div>

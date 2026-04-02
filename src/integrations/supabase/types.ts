@@ -260,6 +260,7 @@ export type Database = {
           phone: string | null
           quickbooks_id: string | null
           shipping_city: string | null
+          shipping_name: string | null
           shipping_state: string | null
           shipping_street: string | null
           shipping_street2: string | null
@@ -283,6 +284,7 @@ export type Database = {
           phone?: string | null
           quickbooks_id?: string | null
           shipping_city?: string | null
+          shipping_name?: string | null
           shipping_state?: string | null
           shipping_street?: string | null
           shipping_street2?: string | null
@@ -306,6 +308,7 @@ export type Database = {
           phone?: string | null
           quickbooks_id?: string | null
           shipping_city?: string | null
+          shipping_name?: string | null
           shipping_state?: string | null
           shipping_street?: string | null
           shipping_street2?: string | null
