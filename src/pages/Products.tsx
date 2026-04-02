@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,6 +131,22 @@ const Products = () => {
   const [templateToDuplicate, setTemplateToDuplicate] = useState<ProductTemplate | null>(null);
   const [duplicateTargetCompanyId, setDuplicateTargetCompanyId] = useState("");
   const [duplicateTemplateLoading, setDuplicateTemplateLoading] = useState(false);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Open template from URL param (e.g. after editing a product)
+  useEffect(() => {
+    const templateParam = searchParams.get('template');
+    if (templateParam && templates.length > 0 && !selectedTemplate) {
+      const found = templates.find(t => t.id === templateParam);
+      if (found) {
+        setSelectedTemplate(found);
+        // Clear the param so it doesn't re-trigger
+        searchParams.delete('template');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [templates, searchParams]);
 
   useEffect(() => {
     fetchProducts();
