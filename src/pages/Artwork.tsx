@@ -120,6 +120,8 @@ const Artwork = () => {
   
   // Artwork thumbnails per SKU (for product tiles)
   const [skuArtworkThumbnails, setSkuArtworkThumbnails] = useState<Record<string, string | null>>({});
+  // PDF artwork URLs per SKU (fallback when no image thumbnail exists)
+  const [skuPdfArtworkUrls, setSkuPdfArtworkUrls] = useState<Record<string, string>>({});
   
   // Template total artwork file counts
   const [templateArtworkCounts, setTemplateArtworkCounts] = useState<Record<string, number>>({});
