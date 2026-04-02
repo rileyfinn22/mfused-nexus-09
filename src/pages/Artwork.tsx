@@ -120,6 +120,8 @@ const Artwork = () => {
   
   // Artwork thumbnails per SKU (for product tiles)
   const [skuArtworkThumbnails, setSkuArtworkThumbnails] = useState<Record<string, string | null>>({});
+  // PDF artwork URLs per SKU (fallback when no image thumbnail exists)
+  const [skuPdfArtworkUrls, setSkuPdfArtworkUrls] = useState<Record<string, string>>({});
   
   // Template total artwork file counts
   const [templateArtworkCounts, setTemplateArtworkCounts] = useState<Record<string, number>>({});
@@ -281,6 +283,7 @@ const Artwork = () => {
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
       // Also track first available thumbnail per SKU
       const skuThumbnails: Record<string, string | null> = {};
+      const skuPdfUrls: Record<string, string> = {};
       
       artworkData?.forEach(art => {
         if (!counts[art.sku]) {
@@ -300,9 +303,14 @@ const Artwork = () => {
             skuThumbnails[art.sku] = art.artwork_url;
           }
         }
+        // Track first PDF URL per SKU as fallback for thumbnail rendering
+        if (!skuPdfUrls[art.sku] && art.filename && /\.pdf$/i.test(art.filename)) {
+          skuPdfUrls[art.sku] = art.artwork_url;
+        }
       });
       setArtworkCounts(counts);
       setSkuArtworkThumbnails(skuThumbnails);
+      setSkuPdfArtworkUrls(skuPdfUrls);
       
       // Calculate template status and total artwork count based on product artwork
       const templateStatusMap: Record<string, ArtworkStatus> = {};
@@ -1404,7 +1412,7 @@ const Artwork = () => {
                   onClick={() => setSelectedProduct(product)}
                 >
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
-                    {/* Priority: artwork thumbnail > product image > package icon */}
+                    {/* Priority: artwork thumbnail > PDF thumbnail > product image > package icon */}
                     {skuArtworkThumbnails[product.item_id || ''] ? (
                       <img 
                         src={skuArtworkThumbnails[product.item_id || '']!} 
@@ -1413,6 +1421,12 @@ const Artwork = () => {
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
+                      />
+                    ) : skuPdfArtworkUrls[product.item_id || ''] ? (
+                      <PdfThumbnail 
+                        pdfUrl={skuPdfArtworkUrls[product.item_id || '']} 
+                        alt={product.name}
+                        className="w-full h-full object-cover"
                       />
                     ) : product.image_url ? (
                       <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
@@ -1464,7 +1478,7 @@ const Artwork = () => {
                     onClick={() => setSelectedProduct(product)}
                   >
                     <div className="col-span-1">
-                      {/* Priority: artwork thumbnail > product image > package icon */}
+                      {/* Priority: artwork thumbnail > PDF thumbnail > product image > package icon */}
                       {skuArtworkThumbnails[product.item_id || ''] ? (
                         <img 
                           src={skuArtworkThumbnails[product.item_id || '']!} 
@@ -1473,6 +1487,13 @@ const Artwork = () => {
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display = 'none';
                           }}
+                        />
+                      ) : skuPdfArtworkUrls[product.item_id || ''] ? (
+                        <PdfThumbnail 
+                          pdfUrl={skuPdfArtworkUrls[product.item_id || '']} 
+                          alt={product.name}
+                          className="w-10 h-10 rounded object-cover"
+                          maxWidth={80}
                         />
                       ) : product.image_url ? (
                         <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
