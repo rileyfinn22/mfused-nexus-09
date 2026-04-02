@@ -22,6 +22,7 @@ const EditProduct = () => {
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [addArtworkOpen, setAddArtworkOpen] = useState(false);
   const [productCompanyId, setProductCompanyId] = useState<string | null>(null);
+  const [productTemplateId, setProductTemplateId] = useState<string | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   
   const [formData, setFormData] = useState({
@@ -90,6 +91,7 @@ const EditProduct = () => {
       if (error) throw error;
 
       setProductCompanyId(data.company_id);
+      setProductTemplateId(data.template_id || null);
       setFormData({
         item_id: data.item_id || "",
         product_type: data.product_type || "",
@@ -219,7 +221,11 @@ const EditProduct = () => {
       if (error) throw error;
 
       toast.success("Product updated successfully");
-      navigate(-1);
+      if (productTemplateId) {
+        navigate(`/products?template=${productTemplateId}`);
+      } else {
+        navigate('/products');
+      }
     } catch (error) {
       console.error('Error updating product:', error);
       toast.error("Failed to update product");
@@ -561,7 +567,7 @@ const EditProduct = () => {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate('/products')}
+            onClick={() => productTemplateId ? navigate(`/products?template=${productTemplateId}`) : navigate('/products')}
           >
             {isVibeAdmin ? "Cancel" : "Back"}
           </Button>
