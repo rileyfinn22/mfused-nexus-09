@@ -1095,11 +1095,29 @@ const CustomerDetail = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
+                  <Label htmlFor="billing_name">Name / Attn</Label>
+                  <Input
+                    id="billing_name"
+                    value={formData.billing_name}
+                    onChange={(e) => setFormData({ ...formData, billing_name: e.target.value })}
+                    placeholder="Name or attention line"
+                  />
+                </div>
+                <div className="col-span-2">
                   <Label htmlFor="billing_street">Street Address</Label>
                   <Input
                     id="billing_street"
                     value={formData.billing_street}
                     onChange={(e) => setFormData({ ...formData, billing_street: e.target.value })}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="billing_street2">Address Line 2</Label>
+                  <Input
+                    id="billing_street2"
+                    value={formData.billing_street2}
+                    onChange={(e) => setFormData({ ...formData, billing_street2: e.target.value })}
+                    placeholder="Suite, unit, floor, etc."
                   />
                 </div>
                 <div>
@@ -1140,11 +1158,29 @@ const CustomerDetail = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
+                  <Label htmlFor="shipping_name">Name / Attn</Label>
+                  <Input
+                    id="shipping_name"
+                    value={formData.shipping_name}
+                    onChange={(e) => setFormData({ ...formData, shipping_name: e.target.value })}
+                    placeholder="Name or attention line"
+                  />
+                </div>
+                <div className="col-span-2">
                   <Label htmlFor="shipping_street">Street Address</Label>
                   <Input
                     id="shipping_street"
                     value={formData.shipping_street}
                     onChange={(e) => setFormData({ ...formData, shipping_street: e.target.value })}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="shipping_street2">Address Line 2</Label>
+                  <Input
+                    id="shipping_street2"
+                    value={formData.shipping_street2}
+                    onChange={(e) => setFormData({ ...formData, shipping_street2: e.target.value })}
+                    placeholder="Suite, unit, floor, etc."
                   />
                 </div>
                 <div>
