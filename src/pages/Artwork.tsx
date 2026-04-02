@@ -1478,7 +1478,7 @@ const Artwork = () => {
                     onClick={() => setSelectedProduct(product)}
                   >
                     <div className="col-span-1">
-                      {/* Priority: artwork thumbnail > product image > package icon */}
+                      {/* Priority: artwork thumbnail > PDF thumbnail > product image > package icon */}
                       {skuArtworkThumbnails[product.item_id || ''] ? (
                         <img 
                           src={skuArtworkThumbnails[product.item_id || '']!} 
@@ -1487,6 +1487,13 @@ const Artwork = () => {
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display = 'none';
                           }}
+                        />
+                      ) : skuPdfArtworkUrls[product.item_id || ''] ? (
+                        <PdfThumbnail 
+                          pdfUrl={skuPdfArtworkUrls[product.item_id || '']} 
+                          alt={product.name}
+                          className="w-10 h-10 rounded object-cover"
+                          maxWidth={80}
                         />
                       ) : product.image_url ? (
                         <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
