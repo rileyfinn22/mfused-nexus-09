@@ -302,6 +302,10 @@ const Artwork = () => {
             skuThumbnails[art.sku] = art.artwork_url;
           }
         }
+        // Track first PDF URL per SKU as fallback for thumbnail rendering
+        if (!skuPdfUrls[art.sku] && art.filename && /\.pdf$/i.test(art.filename)) {
+          skuPdfUrls[art.sku] = art.artwork_url;
+        }
       });
       setArtworkCounts(counts);
       setSkuArtworkThumbnails(skuThumbnails);
