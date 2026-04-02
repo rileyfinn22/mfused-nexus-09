@@ -61,7 +61,7 @@ export function CompanyEmailsManager({ companyId, readOnly = false }: CompanyEma
     }
 
     // Basic email validation
-    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newEmail.trim())) {
       toast({
         title: "Invalid email",
