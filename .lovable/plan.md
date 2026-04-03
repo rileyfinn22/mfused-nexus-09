@@ -1,28 +1,43 @@
-## Order Confirmation Feature
 
-### What it does
-A "Send Order Confirmation" button on the Order Detail page opens a dialog where you can:
-- Preview the confirmation content (order #, ship-to, itemized products with SKU & qty — **no pricing**)
-- Add recipients manually or pick from the company's saved emails
-- Optionally attach a branded PDF version
-- Send the email
 
-### Implementation Steps
+# Rebrand Vendor Packing List PDF
 
-1. **Create Order Confirmation PDF utility** (`src/lib/orderConfirmationPdf.ts`)
-   - Vibe-branded PDF with logo, order details, ship-to address, itemized product list (name, SKU, qty — no prices)
-   - Reuses existing `pdfBranding.ts` helpers
+## Problem
+When you upload a vendor Excel/CSV, the system parses it and rebuilds a completely new PDF using jsPDF -- losing the original formatting, layout, and detail. You want to attach the vendor's actual packing list but with Vibe branding instead of the vendor's name/logo.
 
-2. **Create Send Order Confirmation Dialog** (`src/components/SendOrderConfirmationDialog.tsx`)
-   - Email recipient input with add/remove
-   - Auto-suggest company emails from `company_emails` table
-   - Preview of order items
-   - Option to attach the PDF
-   - Sends via the existing `send-invoice-email` edge function (or a lightweight new one)
+## Solution
+Add a **"Upload & Rebrand PDF"** option that takes the vendor's original PDF, whites out the top header area (where vendor branding lives), and stamps Vibe Packaging branding on top. The rest of the document stays untouched.
 
-3. **Add button to Order Detail page** (`src/pages/OrderDetail.tsx`)
-   - "Send Confirmation" button in the header actions area
+## How It Works
 
-### What's NOT included
-- No auto-send on order creation
-- No pricing/totals — this is a confirmation of items ordered, not an invoice
+1. **New button** in the packing list section: "Upload & Rebrand" (alongside existing Upload and Excel Import options)
+2. User uploads the vendor's PDF directly
+3. Client-side processing using `pdf-lib`:
+   - Load the vendor PDF
+   - On each page, draw a white rectangle over the top ~60px (configurable) to cover vendor name/logo
+   - Embed Vibe Packaging text + logo in that same area
+   - Optionally let the admin preview/adjust the cover height before saving
+4. Save the rebranded PDF to storage with source = `rebranded`
+
+## Technical Details
+
+### Files to modify
+- **`src/components/InvoicePackingListSection.tsx`** -- Add "Upload & Rebrand" button and dialog with:
+  - PDF file picker (vendor PDF)
+  - Slider or input for "header cover height" (default ~70pt) so admin can adjust how much of the top to white-out
+  - Preview of page 1 before/after
+  - Process using `pdf-lib` (already available in the project via npm) to overlay white rect + Vibe branding
+  - Upload result to `packing-lists` bucket
+
+### Processing flow (all client-side, no edge function needed)
+```text
+Vendor PDF  →  pdf-lib loads it
+            →  For each page: draw white rect at top
+            →  Embed Vibe logo + "ArmorPak Inc. DBA Vibe Packaging" text
+            →  Save modified PDF bytes
+            →  Upload to storage + create DB record
+```
+
+### Key advantage
+The original table data, formatting, measurements, weights -- everything stays exactly as the vendor produced it. Only the header branding changes.
+
