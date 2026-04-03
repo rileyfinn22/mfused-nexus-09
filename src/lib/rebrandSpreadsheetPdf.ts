@@ -6,8 +6,8 @@ const BRAND_GREEN: [number, number, number] = [76, 175, 80];
 const DARK_GRAY: [number, number, number] = [51, 51, 51];
 const MEDIUM_GRAY: [number, number, number] = [100, 100, 100];
 const LIGHT_GRAY: [number, number, number] = [248, 248, 248];
-const PAGE_MARGIN = 40;
-const TABLE_TOP = 108;
+const PAGE_MARGIN = 24;
+const TABLE_TOP = 48;
 const MAX_COLUMNS_PER_PAGE = 8;
 
 interface SpreadsheetPdfOptions {
@@ -82,6 +82,68 @@ const getSheetMatrix = (sheet: XLSX.WorkSheet) => {
   return nonEmptyRows.map((row) => populatedColumns.map((colIndex) => row[colIndex] || ""));
 };
 
+const normalizeText = (value: string) => value.toLowerCase().replace(/\s+/g, " ").trim();
+
+const countNonEmptyCells = (row: string[]) => row.filter((cell) => cell.trim() !== "").length;
+
+const sliceColumns = (matrix: string[][]) => {
+  const usedColumns = matrix[0]
+    .map((_, colIndex) => colIndex)
+    .filter((colIndex) => matrix.some((row) => (row[colIndex] || "").trim() !== ""));
+
+  return matrix.map((row) => usedColumns.map((colIndex) => row[colIndex] || ""));
+};
+
+const extractRelevantSection = (matrix: string[][]) => {
+  if (matrix.length === 0) return matrix;
+
+  const tableHeaderRowIndex = matrix.findIndex((row) => {
+    const normalizedRow = row.map(normalizeText);
+    return normalizedRow.includes("s/n")
+      && normalizedRow.includes("items")
+      && normalizedRow.some((cell) => cell.includes("qty"))
+      && normalizedRow.includes("cartons");
+  });
+
+  if (tableHeaderRowIndex === -1) {
+    return sliceColumns(matrix);
+  }
+
+  const startSearchIndex = Math.max(0, tableHeaderRowIndex - 8);
+  const sectionStartCandidates: number[] = [];
+
+  for (let index = startSearchIndex; index <= tableHeaderRowIndex; index += 1) {
+    const normalizedRow = matrix[index].map(normalizeText);
+    if (normalizedRow.includes("packing list") || normalizedRow.some((cell) => cell.includes("ship to"))) {
+      sectionStartCandidates.push(index);
+    }
+  }
+
+  const startRow = sectionStartCandidates[0] ?? Math.max(0, tableHeaderRowIndex - 5);
+
+  let lastMeaningfulRow = tableHeaderRowIndex;
+  let hasSeenDataRow = false;
+  let blankStreak = 0;
+
+  for (let index = tableHeaderRowIndex + 1; index < matrix.length; index += 1) {
+    const nonEmptyCount = countNonEmptyCells(matrix[index]);
+
+    if (nonEmptyCount >= 2) {
+      hasSeenDataRow = true;
+      lastMeaningfulRow = index;
+      blankStreak = 0;
+      continue;
+    }
+
+    if (hasSeenDataRow) {
+      blankStreak += 1;
+      if (blankStreak >= 2) break;
+    }
+  }
+
+  return sliceColumns(matrix.slice(startRow, lastMeaningfulRow + 1));
+};
+
 const splitColumnGroups = (columnCount: number) => {
   const groups: number[][] = [];
   for (let start = 0; start < columnCount; start += MAX_COLUMNS_PER_PAGE) {
@@ -111,54 +173,23 @@ const loadLogoDataUrl = async (logoPath: string) => {
 const drawPageChrome = (
   doc: jsPDF,
   options: SpreadsheetPdfOptions,
-  sectionTitle: string,
   logoDataUrl: string | null,
 ) => {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(...BRAND_GREEN);
-  doc.text("ArmorPak Inc. DBA Vibe Packaging", PAGE_MARGIN, 30);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...MEDIUM_GRAY);
-  doc.text("1415 S 700 W", PAGE_MARGIN, 43);
-  doc.text("Salt Lake City, UT 84104", PAGE_MARGIN, 54);
-  doc.text("www.vibepkg.com", PAGE_MARGIN, 65);
-
   if (logoDataUrl) {
-    doc.addImage(logoDataUrl, "PNG", pageWidth - PAGE_MARGIN - 58, 18, 58, 30);
+    doc.addImage(logoDataUrl, "PNG", pageWidth - PAGE_MARGIN - 54, 10, 54, 24);
   } else {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setTextColor(...BRAND_GREEN);
-    doc.text("VIBE", pageWidth - PAGE_MARGIN, 38, { align: "right" });
-  }
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...DARK_GRAY);
-  doc.text(`Source file: ${options.sourceFileName}`, pageWidth - PAGE_MARGIN, 58, { align: "right" });
-
-  if (options.invoiceNumber) {
-    doc.text(`Invoice #: ${options.invoiceNumber}`, pageWidth - PAGE_MARGIN, 70, { align: "right" });
-  }
-
-  if (options.orderNumber) {
-    doc.text(`Order #: ${options.orderNumber}`, pageWidth - PAGE_MARGIN, 82, { align: "right" });
+    doc.text("Vibe Packaging", pageWidth - PAGE_MARGIN, 24, { align: "right" });
   }
 
   doc.setDrawColor(...BRAND_GREEN);
   doc.setLineWidth(0.5);
-  doc.line(PAGE_MARGIN, 90, pageWidth - PAGE_MARGIN, 90);
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(...DARK_GRAY);
-  doc.text(sectionTitle, PAGE_MARGIN, TABLE_TOP - 12);
+  doc.line(PAGE_MARGIN, 38, pageWidth - PAGE_MARGIN, 38);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
@@ -180,7 +211,7 @@ export const rebrandSpreadsheetToPdf = async (
 
   workbook.SheetNames.forEach((sheetName) => {
     const sheet = workbook.Sheets[sheetName];
-    const matrix = getSheetMatrix(sheet);
+    const matrix = extractRelevantSection(getSheetMatrix(sheet));
     if (matrix.length === 0) return;
 
     const columnGroups = splitColumnGroups(matrix[0].length || 1);
@@ -192,10 +223,6 @@ export const rebrandSpreadsheetToPdf = async (
       hasPages = true;
 
       const body = matrix.map((row) => group.map((columnIndex) => row[columnIndex] || ""));
-      const sectionTitle =
-        columnGroups.length > 1
-          ? `${sheetName} — columns ${group[0] + 1}-${group[group.length - 1] + 1}`
-          : sheetName;
 
       autoTable(doc, {
         startY: TABLE_TOP,
@@ -204,20 +231,17 @@ export const rebrandSpreadsheetToPdf = async (
         margin: { top: TABLE_TOP, left: PAGE_MARGIN, right: PAGE_MARGIN, bottom: 24 },
         styles: {
           font: "helvetica",
-          fontSize: 7,
-          cellPadding: 4,
+          fontSize: 8,
+          cellPadding: 3,
           overflow: "linebreak",
           textColor: DARK_GRAY,
           lineColor: [210, 210, 210],
           lineWidth: 0.25,
           valign: "middle",
         },
-        alternateRowStyles: {
-          fillColor: LIGHT_GRAY,
-        },
         columnStyles: Object.fromEntries(group.map((_, index) => [index, { cellWidth: "auto" }])),
         didDrawPage: () => {
-          drawPageChrome(doc, options, sectionTitle, logoDataUrl);
+          drawPageChrome(doc, options, logoDataUrl);
         },
       });
     });
