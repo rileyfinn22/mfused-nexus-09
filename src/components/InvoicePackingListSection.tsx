@@ -34,6 +34,7 @@ import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { RebrandPreviewDialog } from "@/components/RebrandPreviewDialog";
 
 interface PackingListFile {
   id: string;
