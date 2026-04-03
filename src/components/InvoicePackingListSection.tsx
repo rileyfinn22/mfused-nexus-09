@@ -1173,7 +1173,7 @@ export const InvoicePackingListSection = ({
       }
 
       const modifiedBytes = await pdfDoc.save();
-      const pdfBlob = new Blob([modifiedBytes], { type: 'application/pdf' });
+      const pdfBlob = new Blob([modifiedBytes as unknown as ArrayBuffer], { type: 'application/pdf' });
       const fileName = `${invoiceId}/${Date.now()}-rebranded-${selectedRebrandFile.name}`;
 
       const { error: uploadError } = await supabase.storage
@@ -1209,7 +1209,7 @@ export const InvoicePackingListSection = ({
     }
   };
 
-
+  const handleView = async (packingList: PackingListFile) => {
     // Open the blank tab synchronously to avoid popup blockers
     const newTab = window.open('', '_blank');
     
