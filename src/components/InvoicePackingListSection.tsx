@@ -1145,6 +1145,15 @@ export const InvoicePackingListSection = ({
 
   const handleRebrand = async () => {
     if (!selectedRebrandFile) return;
+
+    // For Excel/CSV files, route through the existing Excel import flow
+    if (isExcelFile(selectedRebrandFile)) {
+      setSelectedExcelFile(selectedRebrandFile);
+      setShowRebrandDialog(false);
+      await handleExcelUpload();
+      return;
+    }
+
     setRebranding(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
