@@ -49,7 +49,7 @@ import { ProductTemplateGrid } from "@/components/ProductTemplateGrid";
 import { TemplateProductsView } from "@/components/TemplateProductsView";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
 import { useToast } from "@/hooks/use-toast";
-import { isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
+import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 
