@@ -1077,7 +1077,7 @@ export const InvoicePackingListSection = ({
   };
 
   const handleView = async (packingList: PackingListFile) => {
-    const newTab = window.open('', '_blank');
+    const newTab = window.open("", "_blank", "noopener,noreferrer");
 
     const normalizedFilePath = normalizeStorageObjectPath(packingList.file_path);
 
@@ -1095,10 +1095,19 @@ export const InvoicePackingListSection = ({
       return;
     }
 
-    if (data?.signedUrl && newTab) {
-      newTab.location.href = resolveStorageSignedUrl(data.signedUrl);
+    if (data?.signedUrl) {
+      const resolvedUrl = resolveStorageSignedUrl(data.signedUrl);
+
+      if (newTab) {
+        newTab.location.href = resolvedUrl;
+        return;
+      }
+
+      const popup = window.open(resolvedUrl, "_blank", "noopener,noreferrer");
+      if (!popup) {
+        window.location.href = resolvedUrl;
+      }
     } else {
-      newTab?.close();
       toast({
         title: "Error",
         description: "Failed to open file",
