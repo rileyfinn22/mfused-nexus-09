@@ -196,86 +196,7 @@ export const RebrandPreviewDialog = ({
     return generateBrandedPdf(parseResult);
   };
 
-  const detectHeaderHeight = async (file: File): Promise<number> => {
-    try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-      const arrayBuf = await file.arrayBuffer();
-      const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
-      const page = await pdfDoc.getPage(1);
-      const viewport = page.getViewport({ scale: 1.5 });
-      const canvas = document.createElement("canvas");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext("2d")!;
-      await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
-
-      const imageBase64 = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
-      const pdfPageHeight = page.getViewport({ scale: 1 }).height;
-
-      const { data: aiResult } = await supabase.functions.invoke("analyze-header-height", {
-        body: { imageBase64, pdfPageHeight },
-      });
-
-      if (aiResult?.headerHeight && typeof aiResult.headerHeight === "number") {
-        return Math.round(Math.min(Math.max(aiResult.headerHeight, 30), 150));
-      }
-    } catch (err) {
-      console.warn("AI header detection failed, using default:", err);
-    }
-    return 70;
-  };
-
-  const rebrandPdf = async (file: File, coverH: number): Promise<Blob> => {
-    const fileBytes = await file.arrayBuffer();
-    const pdfDoc = await PDFDocument.load(fileBytes);
-    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
-    let logoImage: any = null;
-    try {
-      const logoResponse = await fetch("/images/vibe-logo.png");
-      const logoBytes = await logoResponse.arrayBuffer();
-      logoImage = await pdfDoc.embedPng(new Uint8Array(logoBytes));
-    } catch (e) {
-      console.warn("Could not embed logo");
-    }
-
-    const pages = pdfDoc.getPages();
-    for (const page of pages) {
-      const { width, height } = page.getSize();
-      page.drawRectangle({ x: 0, y: height - coverH, width, height: coverH, color: rgb(1, 1, 1) });
-
-      const brandY = height - 25;
-      page.drawText("ArmorPak Inc. DBA Vibe Packaging", {
-        x: 20, y: brandY, size: 12, font: helveticaBold,
-        color: rgb(0.298, 0.686, 0.314),
-      });
-      page.drawText("1415 S 700 W, Salt Lake City, UT 84104", {
-        x: 20, y: brandY - 14, size: 8, font: helvetica,
-        color: rgb(0.39, 0.39, 0.39),
-      });
-      page.drawText("www.vibepkg.com", {
-        x: 20, y: brandY - 23, size: 8, font: helvetica,
-        color: rgb(0.39, 0.39, 0.39),
-      });
-
-      if (logoImage) {
-        const logoW = 50;
-        const logoH = (logoImage.height / logoImage.width) * logoW;
-        page.drawImage(logoImage, {
-          x: width - logoW - 20, y: height - logoH - 10,
-          width: logoW, height: logoH,
-        });
-      }
-    }
-
-    const modifiedBytes = await pdfDoc.save();
-    return new Blob([modifiedBytes as unknown as ArrayBuffer], { type: "application/pdf" });
-  };
-
   const processExcelFile = async (file: File): Promise<Blob> => {
-    // Read file as base64
     const fileContent = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve((reader.result as string).split(",")[1]);
@@ -298,8 +219,10 @@ export const RebrandPreviewDialog = ({
     if (parseResult?.error) throw new Error(parseResult.error);
 
     setStatusText("Generating branded PDF…");
+    return generateBrandedPdf(parseResult);
+  };
 
-    // Generate PDF using jsPDF (same logic as existing Excel import)
+  const generateBrandedPdf = async (parseResult: any): Promise<Blob> => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -410,8 +333,6 @@ export const RebrandPreviewDialog = ({
 
     let tableData: (string | number)[][] = [];
     let usedUnmatched = false;
-    let hasCartonInfo = unmatchedItems.some((item: any) => item.carton_numbers || item.num_cartons);
-    let hasWeightInfo = unmatchedItems.some((item: any) => item.gross_weight_kg || item.net_weight_kg);
 
     if (matchedItems.length > 0) {
       tableData = matchedItems.map((match: any, index: number) => {
