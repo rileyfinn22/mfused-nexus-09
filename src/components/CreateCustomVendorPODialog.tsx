@@ -170,34 +170,66 @@ export function CreateCustomVendorPODialog({
 
     setLoading(true);
     try {
-      const poNumber = await generatePONumber();
-
-      // Create the custom vendor PO linked to the order
-      const { data: newPO, error: poError } = await supabase
+      // Check if a vendor PO already exists for this vendor + order
+      const { data: existingPO } = await supabase
         .from("vendor_pos")
-        .insert({
-          po_number: poNumber,
-          vendor_id: selectedVendorId,
-          company_id: companyId,
-          order_id: orderId,
-          po_type: "custom",
-          description: description || `Custom PO for Order ${orderNumber}`,
-          order_date: new Date().toISOString(),
-          expected_delivery_date: expectedDeliveryDate ? new Date(expectedDeliveryDate).toISOString() : null,
-          total: calculateTotal(),
-          status: "created"
-        })
-        .select()
-        .single();
+        .select("*")
+        .eq("order_id", orderId)
+        .eq("vendor_id", selectedVendorId)
+        .maybeSingle();
 
-      if (poError) throw poError;
+      let targetPO: any;
 
-      // Create the custom line items
-      // Note: order_item_id is nullable for custom items
+      if (existingPO) {
+        // Add items to existing PO
+        targetPO = existingPO;
+
+        // Update description/notes if provided
+        if (description) {
+          const updatedDesc = existingPO.description
+            ? `${existingPO.description}\n${description}`
+            : description;
+          await supabase
+            .from("vendor_pos")
+            .update({ description: updatedDesc })
+            .eq("id", existingPO.id);
+        }
+
+        if (expectedDeliveryDate && !existingPO.expected_delivery_date) {
+          await supabase
+            .from("vendor_pos")
+            .update({ expected_delivery_date: new Date(expectedDeliveryDate).toISOString() })
+            .eq("id", existingPO.id);
+        }
+      } else {
+        // Create a new vendor PO
+        const poNumber = await generatePONumber();
+        const { data: newPO, error: poError } = await supabase
+          .from("vendor_pos")
+          .insert({
+            po_number: poNumber,
+            vendor_id: selectedVendorId,
+            company_id: companyId,
+            order_id: orderId,
+            po_type: "custom",
+            description: description || `Custom PO for Order ${orderNumber}`,
+            order_date: new Date().toISOString(),
+            expected_delivery_date: expectedDeliveryDate ? new Date(expectedDeliveryDate).toISOString() : null,
+            total: 0,
+            status: "created"
+          })
+          .select()
+          .single();
+
+        if (poError) throw poError;
+        targetPO = newPO;
+      }
+
+      // Create the custom line items on the target PO
       const itemsToInsert = validItems.map((item, idx) => ({
-        vendor_po_id: newPO.id,
-        order_item_id: null, // Custom items don't link to specific order items
-        sku: `CUSTOM-${idx + 1}`,
+        vendor_po_id: targetPO.id,
+        order_item_id: null,
+        sku: `CUSTOM-${Date.now()}-${idx + 1}`,
         name: item.description,
         description: item.description,
         quantity: item.quantity,
@@ -212,12 +244,21 @@ export function CreateCustomVendorPODialog({
 
       if (itemsError) throw itemsError;
 
-      setCreatedPOId(newPO.id);
-      setCreatedPONumber(poNumber);
+      // Update PO total (existing total + new items)
+      const addedTotal = calculateTotal();
+      const newTotal = Number(targetPO.total || 0) + addedTotal;
+      await supabase
+        .from("vendor_pos")
+        .update({ total: newTotal })
+        .eq("id", targetPO.id);
 
+      setCreatedPOId(targetPO.id);
+      setCreatedPONumber(targetPO.po_number || existingPO?.po_number);
+
+      const action = existingPO ? "updated" : "created";
       toast({
         title: "Success",
-        description: `Custom Vendor PO ${poNumber} created and linked to Order ${orderNumber}`,
+        description: `Vendor PO ${targetPO.po_number} ${action} — ${validItems.length} line item(s) added for Order ${orderNumber}`,
       });
 
       onCreated();
