@@ -384,6 +384,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
           price: selectedTemplate?.price || null,
           product_type: productType || null,
           template_id: p.template_id || null,
+          item_id: (p.editItemId && p.editItemId.trim()) ? p.editItemId.trim() : null,
         };
       });
 
