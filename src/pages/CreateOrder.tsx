@@ -50,6 +50,15 @@ interface Company {
   name: string;
 }
 
+interface ProductTemplateOption {
+  id: string;
+  name: string;
+  state: string | null;
+  description: string | null;
+  price: number | null;
+  cost: number | null;
+}
+
 interface OrderItem {
   productId: string;
   quantity: number;
@@ -60,6 +69,19 @@ interface OrderItem {
   description?: string | null;
   poLineName?: string; // Original PO line name for match verification
   poLineQty?: number; // Original PO line quantity for match verification
+}
+
+interface UnmatchedPoItem {
+  id?: string;
+  clientKey: string;
+  sku?: string | null;
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unit_price: number;
+  item_id?: string | null;
+  catalogItemId: string;
+  catalogTemplateId: string | null;
 }
 
 const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[] => {
@@ -84,6 +106,40 @@ const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[]
   }
 
   return Array.from(merged.values());
+};
+
+const buildUnmatchedPoItem = (item: any): UnmatchedPoItem => ({
+  ...item,
+  clientKey: item.id || crypto.randomUUID(),
+  catalogItemId: item.item_id || item.sku || "",
+  catalogTemplateId: item.template_id || null,
+});
+
+const getUnmatchedPoItemKey = (item: UnmatchedPoItem) => item.id || item.clientKey;
+
+const stripTemplatePrefix = (
+  name: string,
+  templates: ProductTemplateOption[],
+  keepTemplateId?: string | null,
+) => {
+  let normalizedName = String(name || "").trim();
+  if (!normalizedName) return normalizedName;
+
+  for (const template of templates) {
+    if (keepTemplateId && template.id === keepTemplateId) continue;
+
+    const prefix = `${template.name} - `;
+    if (normalizedName.startsWith(prefix)) {
+      return normalizedName.slice(prefix.length).trim();
+    }
+
+    const singularPrefix = `${template.name.replace(/s$/i, "")} - `;
+    if (normalizedName.toLowerCase().startsWith(singularPrefix.toLowerCase())) {
+      return normalizedName.slice(singularPrefix.length).trim();
+    }
+  }
+
+  return normalizedName;
 };
 
 interface SavedAddress {
@@ -126,11 +182,12 @@ const CreateOrder = () => {
   const [tempSelectedProducts, setTempSelectedProducts] = useState<string[]>([]);
   const [existingOrderNumber, setExistingOrderNumber] = useState<string | null>(null);
   
-  const [unmatchedPoItems, setUnmatchedPoItems] = useState<any[]>([]);
+  const [unmatchedPoItems, setUnmatchedPoItems] = useState<UnmatchedPoItem[]>([]);
   const [poDocumentTotal, setPoDocumentTotal] = useState<number | null>(null);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [productTemplates, setProductTemplates] = useState<ProductTemplateOption[]>([]);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -337,6 +394,37 @@ const CreateOrder = () => {
       }
     }
   };
+
+
+  useEffect(() => {
+    const fetchProductTemplates = async () => {
+      let query = supabase
+        .from('product_templates')
+        .select('id, name, state, description, price, cost')
+        .order('name');
+
+      if (isVibeAdmin) {
+        if (!selectedCompanyId) {
+          setProductTemplates([]);
+          return;
+        }
+        query = query.or(`company_id.eq.${selectedCompanyId},company_id.is.null`);
+      }
+
+      const { data, error } = await query;
+      if (!error) {
+        setProductTemplates(data || []);
+      }
+    };
+
+    if (!roleChecked) return;
+    if (isVibeAdmin && !selectedCompanyId) {
+      setProductTemplates([]);
+      return;
+    }
+
+    fetchProductTemplates();
+  }, [isVibeAdmin, roleChecked, selectedCompanyId]);
 
   // Only load company addresses when admin manually selects a company (not during initial load of existing order)
   useEffect(() => {
@@ -824,7 +912,7 @@ const CreateOrder = () => {
         // Add extracted products to order
         if (functionData?.items && Array.isArray(functionData.items)) {
           const additions: OrderItem[] = [];
-          const newUnmatched: any[] = [];
+          const newUnmatched: UnmatchedPoItem[] = [];
 
           for (const item of functionData.items) {
             if (item.product_id) {
@@ -839,7 +927,7 @@ const CreateOrder = () => {
                 poLineQty: item.quantity || null,
               });
             } else {
-              newUnmatched.push(item);
+              newUnmatched.push(buildUnmatchedPoItem(item));
             }
           }
 
@@ -988,7 +1076,7 @@ const CreateOrder = () => {
       // Add extracted products to order
       if (functionData?.items && Array.isArray(functionData.items)) {
         const additions: OrderItem[] = [];
-        const newUnmatched: any[] = [];
+        const newUnmatched: UnmatchedPoItem[] = [];
         
         for (const item of functionData.items) {
           if (item.product_id) {
@@ -1003,8 +1091,7 @@ const CreateOrder = () => {
               poLineQty: item.quantity || null,
             });
           } else {
-            // Unmatched item
-            newUnmatched.push(item);
+            newUnmatched.push(buildUnmatchedPoItem(item));
           }
         }
         
@@ -1184,7 +1271,9 @@ const CreateOrder = () => {
       setSelectedItems(mergeOrderItems([], items));
       
       // Store unmatched items from PO for display
-      const unmatchedItems = order.order_items.filter((item: any) => item.product_id === null);
+      const unmatchedItems = order.order_items
+        .filter((item: any) => item.product_id === null)
+        .map((item: any) => buildUnmatchedPoItem(item));
       setUnmatchedPoItems(unmatchedItems);
       
       if (unmatchedItems.length > 0) {
@@ -1334,8 +1423,17 @@ const CreateOrder = () => {
     }
   };
 
-  const handleAddUnmatchedAsProduct = async (unmatchedItem: any) => {
-    if (!selectedCompanyId) {
+  const updateUnmatchedPoItem = (itemKey: string, updates: Partial<UnmatchedPoItem>) => {
+    setUnmatchedPoItems(prev =>
+      prev.map(item =>
+        getUnmatchedPoItemKey(item) === itemKey ? { ...item, ...updates } : item
+      )
+    );
+  };
+
+  const handleAddUnmatchedAsProduct = async (unmatchedItem: UnmatchedPoItem) => {
+    const companyId = isVibeAdmin ? selectedCompanyId : await getUserCompanyId();
+    if (!companyId) {
       toast({
         title: "Error",
         description: "Please select a company first",
@@ -1345,24 +1443,32 @@ const CreateOrder = () => {
     }
 
     try {
+      const selectedTemplate = unmatchedItem.catalogTemplateId
+        ? productTemplates.find(template => template.id === unmatchedItem.catalogTemplateId)
+        : null;
+
+      const baseName = stripTemplatePrefix(unmatchedItem.name, productTemplates, selectedTemplate?.id);
+      const finalName = selectedTemplate ? `${selectedTemplate.name} - ${baseName}` : unmatchedItem.name;
+      const finalItemId = unmatchedItem.catalogItemId.trim() || unmatchedItem.sku || null;
+
       const { data: newProduct, error } = await supabase
         .from('products')
         .insert({
-          name: unmatchedItem.name,
-          item_id: unmatchedItem.sku,
-          description: unmatchedItem.description,
-          cost: unmatchedItem.unit_price,
-          company_id: selectedCompanyId,
+          name: finalName,
+          item_id: finalItemId,
+          description: selectedTemplate?.description || unmatchedItem.description || null,
+          cost: unmatchedItem.unit_price || selectedTemplate?.cost || null,
+          price: selectedTemplate?.price || null,
+          state: selectedTemplate?.state || null,
+          company_id: companyId,
+          template_id: selectedTemplate?.id || null,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // Add to products list
-      setProducts([...products, newProduct]);
-
-      // Add to selected items with PO price (using callback to prevent race conditions)
+      setProducts(prev => [...prev, newProduct]);
       setSelectedItems(prev => {
         const exists = prev.find(item => item.productId === newProduct.id);
         if (exists) return prev;
@@ -1373,10 +1479,9 @@ const CreateOrder = () => {
         }];
       });
 
-      // Remove from unmatched state
-      setUnmatchedPoItems(unmatchedPoItems.filter(item => item.id !== unmatchedItem.id));
-      
-      // Delete the unmatched item from database immediately
+      const itemKey = getUnmatchedPoItemKey(unmatchedItem);
+      setUnmatchedPoItems(prev => prev.filter(item => getUnmatchedPoItemKey(item) !== itemKey));
+
       if (unmatchedItem.id) {
         await supabase
           .from('order_items')
@@ -1398,24 +1503,22 @@ const CreateOrder = () => {
     }
   };
 
-  const handleMatchUnmatchedItem = async (unmatchedItem: any, productId: string) => {
+  const handleMatchUnmatchedItem = async (unmatchedItem: UnmatchedPoItem, productId: string) => {
     if (!productId) return;
 
-    // Add to selected items with PO price (using callback to prevent race conditions)
     setSelectedItems(prev => {
       const exists = prev.find(item => item.productId === productId);
       if (exists) return prev;
       return [...prev, {
-        productId: productId,
+        productId,
         quantity: unmatchedItem.quantity,
         unit_price: unmatchedItem.unit_price,
       }];
     });
 
-    // Remove from unmatched state
-    setUnmatchedPoItems(unmatchedPoItems.filter(item => item.id !== unmatchedItem.id));
+    const itemKey = getUnmatchedPoItemKey(unmatchedItem);
+    setUnmatchedPoItems(prev => prev.filter(item => getUnmatchedPoItemKey(item) !== itemKey));
 
-    // Delete the unmatched item from database immediately
     if (unmatchedItem.id) {
       await supabase
         .from('order_items')
@@ -1423,9 +1526,8 @@ const CreateOrder = () => {
         .eq('id', unmatchedItem.id);
     }
 
-    // Clear selection and close popover
-    setMatchingProductId({ ...matchingProductId, [unmatchedItem.id]: "" });
-    setOpenCombobox({ ...openCombobox, [unmatchedItem.id]: false });
+    setMatchingProductId(prev => ({ ...prev, [itemKey]: "" }));
+    setOpenCombobox(prev => ({ ...prev, [itemKey]: false }));
 
     toast({
       title: "Item Matched",
@@ -1783,15 +1885,15 @@ const CreateOrder = () => {
           .is('product_id', null);
 
         if (unmatchedPoItems.length > 0) {
-          const unmatchedOrderItems = unmatchedPoItems.map((item: any) => {
+          const unmatchedOrderItems = unmatchedPoItems.map((item) => {
             const qty = Number(item.quantity) || 0;
             const unit = Number(item.unit_price) || 0;
 
             return {
               order_id: order.id,
               product_id: null,
-              sku: item.sku || 'UNKNOWN',
-              item_id: item.item_id || null,
+              sku: item.sku || item.catalogItemId || 'UNKNOWN',
+              item_id: item.catalogItemId || item.item_id || null,
               name: item.name || item.description || 'Unmatched Item',
               description: item.description || null,
               quantity: qty,
@@ -1828,15 +1930,15 @@ const CreateOrder = () => {
           };
         });
 
-        const unmatchedOrderItems = unmatchedPoItems.map((item: any) => {
+        const unmatchedOrderItems = unmatchedPoItems.map((item) => {
           const qty = Number(item.quantity) || 0;
           const unit = Number(item.unit_price) || 0;
 
           return {
             order_id: order.id,
             product_id: null,
-            sku: item.sku || 'UNKNOWN',
-            item_id: item.item_id || null,
+            sku: item.sku || item.catalogItemId || 'UNKNOWN',
+            item_id: item.catalogItemId || item.item_id || null,
             name: item.name || item.description || 'Unmatched Item',
             description: item.description || null,
             quantity: qty,
@@ -2537,14 +2639,13 @@ const CreateOrder = () => {
                   </TableHeader>
                   <TableBody>
                     {unmatchedPoItems.map((item) => {
-                      // Only show products from the selected company
+                      const itemKey = getUnmatchedPoItemKey(item);
                       const companyFilteredProducts = availableProducts;
-
-                      const selectedProduct = companyFilteredProducts.find(p => p.id === matchingProductId[item.id]);
+                      const selectedProduct = companyFilteredProducts.find(p => p.id === matchingProductId[itemKey]);
 
                       return (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                        <TableRow key={itemKey}>
+                          <TableCell className="font-mono text-xs">{item.sku || item.catalogItemId || '-'}</TableCell>
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">${Number(item.unit_price).toFixed(3)}</TableCell>
@@ -2552,29 +2653,54 @@ const CreateOrder = () => {
                             ${((Number(item.quantity) || 0) * (Number(item.unit_price) || 0)).toFixed(2)}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAddUnmatchedAsProduct(item)}
-                                className="whitespace-nowrap"
-                              >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add to Catalog
-                              </Button>
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                                <Input
+                                  value={item.catalogItemId}
+                                  onChange={(e) => updateUnmatchedPoItem(itemKey, { catalogItemId: e.target.value })}
+                                  placeholder="Item ID / SKU"
+                                  className="h-8"
+                                />
+                                <Select
+                                  value={item.catalogTemplateId || 'none'}
+                                  onValueChange={(value) => updateUnmatchedPoItem(itemKey, { catalogTemplateId: value === 'none' ? null : value })}
+                                >
+                                  <SelectTrigger className="h-8">
+                                    <SelectValue placeholder="Add to template" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Catalog only</SelectItem>
+                                    {productTemplates.map((template) => (
+                                      <SelectItem key={template.id} value={template.id}>
+                                        {template.name}{template.state ? ` (${template.state})` : ''}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleAddUnmatchedAsProduct(item)}
+                                  className="whitespace-nowrap"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add to Catalog
+                                </Button>
+                              </div>
+
                               <Popover 
-                                open={openCombobox[item.id]} 
-                                onOpenChange={(open) => setOpenCombobox({ ...openCombobox, [item.id]: open })}
+                                open={openCombobox[itemKey]} 
+                                onOpenChange={(open) => setOpenCombobox({ ...openCombobox, [itemKey]: open })}
                               >
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
                                     role="combobox"
-                                    aria-expanded={openCombobox[item.id]}
-                                    className="w-[200px] justify-between h-8"
+                                    aria-expanded={openCombobox[itemKey]}
+                                    className="w-full justify-between h-8"
                                   >
-                                    {selectedProduct ? (selectedProduct.item_id || selectedProduct.name) : "Match to product..."}
+                                    {selectedProduct ? (selectedProduct.item_id || selectedProduct.name) : "Add existing catalog product to order..."}
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                   </Button>
                                 </PopoverTrigger>
@@ -2589,7 +2715,7 @@ const CreateOrder = () => {
                                             key={product.id}
                                             value={`${product.item_id || ''} ${product.state ? product.state + ' ' : ''}${product.name}`}
                                             onSelect={() => {
-                                              setMatchingProductId({ ...matchingProductId, [item.id]: product.id });
+                                              setMatchingProductId({ ...matchingProductId, [itemKey]: product.id });
                                               handleMatchUnmatchedItem(item, product.id);
                                             }}
                                             className="cursor-pointer"
@@ -2597,7 +2723,7 @@ const CreateOrder = () => {
                                             <Check
                                               className={cn(
                                                 "mr-2 h-4 w-4",
-                                                matchingProductId[item.id] === product.id ? "opacity-100" : "opacity-0"
+                                                matchingProductId[itemKey] === product.id ? "opacity-100" : "opacity-0"
                                               )}
                                             />
                                             <div className="flex flex-col">
