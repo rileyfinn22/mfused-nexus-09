@@ -281,6 +281,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
               product_type: productType,
               description: description.trim() || null,
             } as any).eq("id", existingProduct.id);
+
           }
         }
       }
