@@ -399,7 +399,15 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
       });
 
       onProductsAdded();
-      handleClose();
+      
+      // Remove imported products from the list, keep the rest
+      const remainingProducts = extractedProducts.filter(p => !p.selected);
+      if (remainingProducts.length === 0) {
+        handleClose();
+      } else {
+        // Mark previously-imported products as existing
+        setExtractedProducts(remainingProducts);
+      }
     } catch (error) {
       console.error('Error importing products:', error);
       toast({
