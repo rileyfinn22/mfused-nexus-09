@@ -30,6 +30,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateInvoiceTotals } from "@/lib/invoiceTotals";
+import { resolveStorageSignedUrl, triggerSignedFileDownload } from "@/lib/storageUrl";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -1076,15 +1077,24 @@ export const InvoicePackingListSection = ({
   };
 
   const handleView = async (packingList: PackingListFile) => {
-    // Open the blank tab synchronously to avoid popup blockers
     const newTab = window.open('', '_blank');
-    
-    const { data } = await supabase.storage
+
+    const { data, error } = await supabase.storage
       .from('packing-lists')
       .createSignedUrl(packingList.file_path, 3600);
 
+    if (error) {
+      newTab?.close();
+      toast({
+        title: "Error",
+        description: "Failed to open file",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (data?.signedUrl && newTab) {
-      newTab.location.href = data.signedUrl;
+      newTab.location.href = resolveStorageSignedUrl(data.signedUrl);
     } else {
       newTab?.close();
       toast({
@@ -1096,12 +1106,21 @@ export const InvoicePackingListSection = ({
   };
 
   const handleDownload = async (packingList: PackingListFile) => {
-    const { data } = await supabase.storage
+    const { data, error } = await supabase.storage
       .from('packing-lists')
       .createSignedUrl(packingList.file_path, 3600, { download: packingList.file_name });
 
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download file",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (data?.signedUrl) {
-      window.location.href = data.signedUrl;
+      await triggerSignedFileDownload(data.signedUrl, packingList.file_name);
     } else {
       toast({
         title: "Error",
