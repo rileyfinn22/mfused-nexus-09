@@ -1209,7 +1209,7 @@ export const InvoicePackingListSection = ({
     }
   };
 
-
+  const handleView = async (packingList: PackingListFile) => {
     // Open the blank tab synchronously to avoid popup blockers
     const newTab = window.open('', '_blank');
     
