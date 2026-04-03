@@ -84,6 +84,7 @@ export const InvoicePackingListSection = ({
   const [rebrandCoverHeight, setRebrandCoverHeight] = useState(70);
   const [rebrandPreviewUrl, setRebrandPreviewUrl] = useState<string | null>(null);
   const [rebranding, setRebranding] = useState(false);
+  const [detectingHeader, setDetectingHeader] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
   const rebrandFileInputRef = useRef<HTMLInputElement>(null);
@@ -1081,21 +1082,51 @@ export const InvoicePackingListSection = ({
     setShowRebrandDialog(true);
   };
 
-  const handleRebrandFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRebrandFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== 'application/pdf') {
-        toast({ title: "Invalid File Type", description: "Please upload a PDF file", variant: "destructive" });
-        return;
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      toast({ title: "Invalid File Type", description: "Please upload a PDF file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File Too Large", description: "Maximum file size is 10MB", variant: "destructive" });
+      return;
+    }
+    setSelectedRebrandFile(file);
+    const url = URL.createObjectURL(file);
+    setRebrandPreviewUrl(url);
+
+    // Auto-detect header height using AI
+    setDetectingHeader(true);
+    try {
+      const pdfjsLib = await import('pdfjs-dist');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+      const arrayBuf = await file.arrayBuffer();
+      const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
+      const page = await pdfDoc.getPage(1);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d')!;
+      await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
+
+      // Convert to base64 for AI analysis
+      const imageBase64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+      const pdfPageHeight = page.getViewport({ scale: 1 }).height; // PDF points
+
+      const { data: aiResult } = await supabase.functions.invoke('analyze-header-height', {
+        body: { imageBase64, pdfPageHeight }
+      });
+
+      if (aiResult?.headerHeight && typeof aiResult.headerHeight === 'number') {
+        setRebrandCoverHeight(Math.round(Math.min(Math.max(aiResult.headerHeight, 30), 150)));
       }
-      if (file.size > 10 * 1024 * 1024) {
-        toast({ title: "File Too Large", description: "Maximum file size is 10MB", variant: "destructive" });
-        return;
-      }
-      setSelectedRebrandFile(file);
-      // Generate preview
-      const url = URL.createObjectURL(file);
-      setRebrandPreviewUrl(url);
+    } catch (err) {
+      console.warn('AI header detection failed, using default:', err);
+    } finally {
+      setDetectingHeader(false);
     }
   };
 
@@ -1680,9 +1711,17 @@ export const InvoicePackingListSection = ({
             </div>
 
             <div>
-              <Label>Header Cover Height: {rebrandCoverHeight}pt</Label>
+              <div className="flex items-center gap-2">
+                <Label>Header Cover Height: {rebrandCoverHeight}pt</Label>
+                {detectingHeader && (
+                  <span className="flex items-center gap-1 text-xs text-primary">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    AI detecting...
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mb-2">
-                Adjust how much of the top of each page to white-out and replace with Vibe branding
+                AI auto-detects the header size. Adjust manually if needed.
               </p>
               <Slider
                 value={[rebrandCoverHeight]}
