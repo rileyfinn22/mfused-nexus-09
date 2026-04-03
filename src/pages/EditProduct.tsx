@@ -284,6 +284,9 @@ const EditProduct = () => {
                 <SelectValue placeholder="Select product type" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="label">Label</SelectItem>
+                <SelectItem value="box">Box</SelectItem>
+                <SelectItem value="bag">Bag</SelectItem>
                 <SelectItem value="paperboard">Paperboard Cartons/Boxes/Displays/Inserts</SelectItem>
                 <SelectItem value="pouches">Pouches</SelectItem>
                 <SelectItem value="labels">Labels</SelectItem>
