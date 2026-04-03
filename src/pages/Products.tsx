@@ -246,13 +246,19 @@ const Products = () => {
   };
 
   const fetchTemplates = async () => {
+    if (!isVibeAdmin && !activeCompanyId) return;
+
     try {
       let templatesQuery = supabase
         .from('product_templates')
         .select('*');
 
-      if (companyFilter !== 'all') {
-        templatesQuery = templatesQuery.or(`company_id.eq.${companyFilter},company_id.is.null`);
+      if (isVibeAdmin) {
+        if (companyFilter !== 'all') {
+          templatesQuery = templatesQuery.or(`company_id.eq.${companyFilter},company_id.is.null`);
+        }
+      } else if (activeCompanyId) {
+        templatesQuery = templatesQuery.or(`company_id.eq.${activeCompanyId},company_id.is.null`);
       }
 
       const { data: templatesData, error: templatesError } = await templatesQuery.order('name');
