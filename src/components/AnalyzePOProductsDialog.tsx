@@ -43,6 +43,7 @@ interface ExtractedProduct {
   editCost?: number | null;
   editDescription?: string;
   editProductType?: string;
+  editItemId?: string;
   expanded?: boolean;
 }
 
@@ -264,6 +265,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
             editCost: p.cost ?? null,
             editDescription: p.description || '',
             editProductType: p.product_type || '',
+            editItemId: '',
             expanded: false,
           };
         });
@@ -382,6 +384,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
           price: selectedTemplate?.price || null,
           product_type: productType || null,
           template_id: p.template_id || null,
+          item_id: (p.editItemId && p.editItemId.trim()) ? p.editItemId.trim() : null,
         };
       });
 
@@ -396,7 +399,15 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
       });
 
       onProductsAdded();
-      handleClose();
+      
+      // Remove imported products from the list, keep the rest
+      const remainingProducts = extractedProducts.filter(p => !p.selected);
+      if (remainingProducts.length === 0) {
+        handleClose();
+      } else {
+        // Mark previously-imported products as existing
+        setExtractedProducts(remainingProducts);
+      }
     } catch (error) {
       console.error('Error importing products:', error);
       toast({
@@ -678,6 +689,15 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                                     value={product.editName || ''}
                                     onChange={(e) => updateEditField(index, 'editName', e.target.value)}
                                     className="h-7 text-xs"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Item ID / SKU</Label>
+                                  <Input
+                                    value={product.editItemId || ''}
+                                    onChange={(e) => updateEditField(index, 'editItemId', e.target.value)}
+                                    className="h-7 text-xs"
+                                    placeholder="e.g., VB-12345"
                                   />
                                 </div>
                                 <div className="space-y-1">
