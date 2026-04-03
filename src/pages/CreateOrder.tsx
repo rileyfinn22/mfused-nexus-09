@@ -1930,15 +1930,15 @@ const CreateOrder = () => {
           };
         });
 
-        const unmatchedOrderItems = unmatchedPoItems.map((item: any) => {
+        const unmatchedOrderItems = unmatchedPoItems.map((item) => {
           const qty = Number(item.quantity) || 0;
           const unit = Number(item.unit_price) || 0;
 
           return {
             order_id: order.id,
             product_id: null,
-            sku: item.sku || 'UNKNOWN',
-            item_id: item.item_id || null,
+            sku: item.sku || item.catalogItemId || 'UNKNOWN',
+            item_id: item.catalogItemId || item.item_id || null,
             name: item.name || item.description || 'Unmatched Item',
             description: item.description || null,
             quantity: qty,
