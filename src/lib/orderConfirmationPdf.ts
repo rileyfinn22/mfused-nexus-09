@@ -18,6 +18,7 @@ interface ConfirmationItem {
   name: string;
   sku: string;
   quantity: number;
+  unit_price?: number;
   description?: string | null;
 }
 
