@@ -1256,7 +1256,9 @@ export const InvoicePackingListSection = ({
                     <FileCheck className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium">{pl.file_name}</p>
+                    <p className="font-medium">
+                      {isVibeAdmin ? pl.file_name : `Packing List - ${invoice?.invoice_number || 'Invoice'}`}
+                    </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{formatFileSize(pl.file_size)}</span>
                       <span>•</span>

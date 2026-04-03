@@ -232,7 +232,7 @@ export const RebrandPreviewDialog = ({
       const { data: { user } } = await supabase.auth.getUser();
       const isExcel = isExcelFile(selectedFile);
       const source = isExcel ? "excel-import" : "rebranded";
-      const fileName = `${invoiceId}/${Date.now()}-rebranded-${selectedFile.name.replace(/\.\w+$/, ".pdf")}`;
+      const fileName = `${invoiceId}/${Date.now()}-packing-list-${invoice?.invoice_number || "document"}.pdf`;
 
       const { error: uploadError } = await supabase.storage
         .from("packing-lists")
@@ -244,7 +244,7 @@ export const RebrandPreviewDialog = ({
         .from("invoice_packing_lists")
         .insert({
           invoice_id: invoiceId,
-          file_name: `rebranded-${selectedFile.name.replace(/\.\w+$/, ".pdf")}`,
+          file_name: `Packing List - ${invoice?.invoice_number || "Invoice"}.pdf`,
           file_path: fileName,
           file_size: pdfBlob.size,
           file_type: "application/pdf",
