@@ -1308,6 +1308,14 @@ export const InvoicePackingListSection = ({
               <Button 
                 variant="outline" 
                 size="sm"
+                onClick={handleRebrandClick}
+              >
+                <Stamp className="h-4 w-4 mr-2" />
+                Rebrand PDF
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
                 onClick={handleUploadClick}
               >
                 <Upload className="h-4 w-4 mr-2" />
