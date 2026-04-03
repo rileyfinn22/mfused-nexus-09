@@ -1647,6 +1647,101 @@ export const InvoicePackingListSection = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rebrand PDF Dialog */}
+      <Dialog open={showRebrandDialog} onOpenChange={(open) => {
+        setShowRebrandDialog(open);
+        if (!open && rebrandPreviewUrl) URL.revokeObjectURL(rebrandPreviewUrl);
+      }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Upload & Rebrand PDF</DialogTitle>
+            <DialogDescription>
+              Upload a vendor packing list PDF. The vendor's header branding will be replaced with Vibe Packaging branding while keeping all other content intact.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="rebrandFile">Vendor PDF</Label>
+              <Input
+                id="rebrandFile"
+                type="file"
+                accept=".pdf"
+                ref={rebrandFileInputRef}
+                onChange={handleRebrandFileSelect}
+                className="mt-1"
+              />
+              {selectedRebrandFile && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Selected: {selectedRebrandFile.name} ({formatFileSize(selectedRebrandFile.size)})
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label>Header Cover Height: {rebrandCoverHeight}pt</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Adjust how much of the top of each page to white-out and replace with Vibe branding
+              </p>
+              <Slider
+                value={[rebrandCoverHeight]}
+                onValueChange={([val]) => setRebrandCoverHeight(val)}
+                min={30}
+                max={150}
+                step={5}
+                className="mt-1"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>30pt (small)</span>
+                <span>150pt (large)</span>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="rebrandNotes">Notes (optional)</Label>
+              <Input
+                id="rebrandNotes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add any notes about this packing list"
+                className="mt-1"
+              />
+            </div>
+
+            <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+              <p className="font-medium mb-1">How it works:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>The vendor's header/logo area is covered with a white rectangle</li>
+                <li>Vibe Packaging branding and logo are stamped on top</li>
+                <li>All table data, formatting, and content stays untouched</li>
+              </ul>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRebrandDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRebrand} 
+              disabled={!selectedRebrandFile || rebranding}
+            >
+              {rebranding ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Rebranding...
+                </>
+              ) : (
+                <>
+                  <Stamp className="h-4 w-4 mr-2" />
+                  Rebrand & Upload
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
