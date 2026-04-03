@@ -692,6 +692,15 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                                   />
                                 </div>
                                 <div className="space-y-1">
+                                  <Label className="text-xs">Item ID / SKU</Label>
+                                  <Input
+                                    value={product.editItemId || ''}
+                                    onChange={(e) => updateEditField(index, 'editItemId', e.target.value)}
+                                    className="h-7 text-xs"
+                                    placeholder="e.g., VB-12345"
+                                  />
+                                </div>
+                                <div className="space-y-1">
                                   <Label className="text-xs">State</Label>
                                   <Input
                                     value={product.editState || ''}
