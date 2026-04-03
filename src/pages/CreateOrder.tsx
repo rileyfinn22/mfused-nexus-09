@@ -395,6 +395,63 @@ const CreateOrder = () => {
     }
   };
 
+  const loadCompanyAddresses = async () => {
+    if (!selectedCompanyId) return;
+
+    const { data: addressData } = await supabase
+      .from('customer_addresses')
+      .select('*')
+      .eq('company_id', selectedCompanyId)
+      .order('is_default', { ascending: false });
+
+    if (addressData) {
+      setSavedAddresses(addressData);
+    }
+
+    const { data: companyData } = await supabase
+      .from('companies')
+      .select('name')
+      .eq('id', selectedCompanyId)
+      .single();
+
+    if (companyData) {
+      setFormData(prev => ({
+        ...prev,
+        customerName: companyData.name,
+      }));
+    }
+  };
+
+  useEffect(() => {
+    const fetchProductTemplates = async () => {
+      let query = supabase
+        .from('product_templates')
+        .select('id, name, state, description, price, cost')
+        .order('name');
+
+      if (isVibeAdmin) {
+        if (!selectedCompanyId) {
+          setProductTemplates([]);
+          return;
+        }
+        query = query.or(`company_id.eq.${selectedCompanyId},company_id.is.null`);
+      }
+
+      const { data, error } = await query;
+      if (!error) {
+        setProductTemplates(data || []);
+      }
+    };
+
+    if (!roleChecked) return;
+    if (isVibeAdmin && !selectedCompanyId) {
+      setProductTemplates([]);
+      return;
+    }
+
+    fetchProductTemplates();
+  }, [isVibeAdmin, roleChecked, selectedCompanyId]);
+
   // Only load company addresses when admin manually selects a company (not during initial load of existing order)
   useEffect(() => {
     if (selectedCompanyId && roleChecked && !initialLoading) {
