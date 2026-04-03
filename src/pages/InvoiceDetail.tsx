@@ -2515,8 +2515,12 @@ const InvoiceDetail = () => {
                         {isEditMode ? <Input type="number" step="0.001" min="0" value={item.unit_price} onChange={e => handlePriceChange(item.id, parseFloat(e.target.value) || 0)} className="w-28 text-right" /> : formatUnitPrice(Number(item.unit_price))}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {/* Line total = shipped qty × price for all invoice types */}
-                        {formatCurrency(shippedQty * Number(item.unit_price))}
+                        {/* Line total: for blanket invoices use ordered qty as placeholder when nothing shipped */}
+                        {formatCurrency(
+                          invoice?.invoice_type === 'full'
+                            ? (shippedQty > 0 ? shippedQty : orderedQty) * Number(item.unit_price)
+                            : shippedQty * Number(item.unit_price)
+                        )}
                       </TableCell>
                     </TableRow>;
               })}
