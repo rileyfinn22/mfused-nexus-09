@@ -1710,32 +1710,12 @@ export const InvoicePackingListSection = ({
               )}
             </div>
 
-            <div>
-              <div className="flex items-center gap-2">
-                <Label>Header Cover Height: {rebrandCoverHeight}pt</Label>
-                {detectingHeader && (
-                  <span className="flex items-center gap-1 text-xs text-primary">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    AI detecting...
-                  </span>
-                )}
+            {detectingHeader && (
+              <div className="flex items-center gap-2 text-sm text-primary">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                AI is detecting the vendor header area…
               </div>
-              <p className="text-xs text-muted-foreground mb-2">
-                AI auto-detects the header size. Adjust manually if needed.
-              </p>
-              <Slider
-                value={[rebrandCoverHeight]}
-                onValueChange={([val]) => setRebrandCoverHeight(val)}
-                min={30}
-                max={150}
-                step={5}
-                className="mt-1"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>30pt (small)</span>
-                <span>150pt (large)</span>
-              </div>
-            </div>
+            )}
 
             <div>
               <Label htmlFor="rebrandNotes">Notes (optional)</Label>
