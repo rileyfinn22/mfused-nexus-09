@@ -13,16 +13,18 @@ serve(async (req) => {
 
   try {
     console.log("Parsing packing list...");
-    const { fileContent, orderItems, fileName, isBase64 } = await req.json();
-    console.log(`Processing file: ${fileName}, order has ${orderItems?.length || 0} items, isBase64: ${isBase64}`);
-    
+    const { fileContent, orderItems, fileName, isBase64, inputType } = await req.json();
+    console.log(
+      `Processing file: ${fileName}, order has ${orderItems?.length || 0} items, isBase64: ${isBase64}, inputType: ${inputType || "text"}`,
+    );
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
+
     if (!LOVABLE_API_KEY) {
       console.error("LOVABLE_API_KEY is not configured");
       throw new Error("LOVABLE_API_KEY is not configured");
     }
-    
+
     if (!fileContent) {
       console.error("No file content provided");
       throw new Error("No file content provided");
@@ -33,41 +35,41 @@ serve(async (req) => {
       throw new Error("No order items provided");
     }
 
+    const fileNameLower = (fileName || "").toLowerCase();
+    const isImageInput = inputType === "image";
+
     // Parse file content based on type
     let parsedContent = "";
-    const fileNameLower = fileName.toLowerCase();
-    
-    if (fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls')) {
-      // Parse Excel file
+
+    if (fileNameLower.endsWith(".xlsx") || fileNameLower.endsWith(".xls")) {
       console.log("Parsing Excel file...");
       try {
-        // Decode base64 to binary
         const binaryString = atob(fileContent);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);
         }
-        
-        const workbook = XLSX.read(bytes, { type: 'array' });
+
+        const workbook = XLSX.read(bytes, { type: "array" });
         console.log("Sheet names:", workbook.SheetNames);
-        
+
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        
-        // Convert to CSV for AI parsing
         parsedContent = XLSX.utils.sheet_to_csv(worksheet);
         console.log("Parsed Excel to CSV, preview:", parsedContent.substring(0, 500));
       } catch (xlsxError) {
         console.error("XLSX parsing error:", xlsxError);
-        throw new Error(`Failed to parse Excel file: ${xlsxError instanceof Error ? xlsxError.message : 'Unknown error'}. Please ensure the file is a valid Excel file.`);
+        throw new Error(
+          `Failed to parse Excel file: ${xlsxError instanceof Error ? xlsxError.message : "Unknown error"}. Please ensure the file is a valid Excel file.`,
+        );
       }
-    } else {
-      // Text file (CSV/TXT) - use content directly
+    } else if (!isImageInput) {
       parsedContent = fileContent;
       console.log("Using text content directly, preview:", parsedContent.substring(0, 500));
+    } else {
+      console.log("Using image input for visual packing list extraction");
     }
 
-    // Format order items for deterministic matching
     const normalizeSku = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
     const normalizeText = (s: string) =>
       (s || "")
@@ -112,10 +114,9 @@ serve(async (req) => {
       JSON.stringify(orderItemsList.map((i: any) => ({ id: i.id.substring(0, 8), name: i.name, sku: i.sku })), null, 2),
     );
 
-    // Step 1: Use AI to extract packing list line items AND shipping summary from the document.
-    // Step 2: Match extracted lines to order items deterministically (SKU first, then strict fuzzy name match).
-
     const systemPrompt = `You extract shipped line items and shipping summary from a packing list.
+
+The input may be spreadsheet text, CSV text, plain text, or an image of a packing list PDF. Read only what is actually visible in the document.
 
 Return ONLY items that appear in the packing list content. Do NOT guess, do NOT invent items, and do NOT try to match against an order.
 
@@ -141,22 +142,34 @@ Rules for shipping summary (extract from totals/summary section):
 - total_cbm (number) - total cubic meters/volume
 - total_quantity (number) - total pieces/units`;
 
-    const userPrompt = `Extract the shipped line items and shipping summary from this packing list:
-
-${parsedContent}`;
+    const userContent = isImageInput
+      ? [
+          {
+            type: "text",
+            text:
+              "Extract the shipped line items and shipping summary from this packing list image. Read the visible table and summary exactly as shown.",
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: fileContent.startsWith("data:") ? fileContent : `data:image/jpeg;base64,${fileContent}`,
+            },
+          },
+        ]
+      : `Extract the shipped line items and shipping summary from this packing list:\n\n${parsedContent}`;
 
     console.log("Calling AI Gateway (extract items)...");
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { role: "user", content: userContent },
         ],
         tools: [
           {
@@ -213,16 +226,16 @@ ${parsedContent}`;
       const errorText = await response.text();
       console.error(`AI Gateway error response: ${errorText}`);
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
       if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
       throw new Error(`AI Gateway error: ${response.status}`);
     }
@@ -238,9 +251,9 @@ ${parsedContent}`;
     }
 
     const extracted = JSON.parse(toolCall.function.arguments) as {
-      packing_list_items: Array<{ 
-        name: string; 
-        sku?: string; 
+      packing_list_items: Array<{
+        name: string;
+        sku?: string;
         quantity: number;
         carton_numbers?: string;
         pieces_per_carton?: number;
@@ -277,21 +290,26 @@ ${parsedContent}`;
 
     console.log(`Extracted ${lines.length} line items from packing list`);
 
-    // Deterministic matching (SKU first, then strict fuzzy name match)
     const confidenceRankToStr = (r: number): "high" | "medium" | "low" => (r >= 3 ? "high" : r === 2 ? "medium" : "low");
 
-    const matchedAgg = new Map<
-      string,
-      { qty: number; names: Set<string>; confidenceRank: number }
-    >();
+    const matchedAgg = new Map<string, { qty: number; names: Set<string>; confidenceRank: number }>();
 
-    const unmatched: Array<{ name: string; quantity: number }> = [];
+    const unmatched: Array<{
+      name: string;
+      quantity: number;
+      carton_numbers?: string;
+      pieces_per_carton?: number;
+      num_cartons?: number;
+      gross_weight_kg?: number;
+      net_weight_kg?: number;
+      dimensions?: string;
+      cbm?: number;
+    }> = [];
 
     for (const line of lines) {
       const skuNorm = normalizeSku(line.sku || "");
       const nameNorm = normalizeText(line.name);
 
-      // 1) SKU exact match
       if (skuNorm && orderBySku.has(skuNorm)) {
         const orderItem = orderBySku.get(skuNorm);
         const prev = matchedAgg.get(orderItem.id) || { qty: 0, names: new Set<string>(), confidenceRank: 3 };
@@ -302,11 +320,10 @@ ${parsedContent}`;
         continue;
       }
 
-      // 2) Name fuzzy match with threshold
       const lineTokens = tokenize(line.name);
       if (!nameNorm || lineTokens.length === 0) {
-        unmatched.push({ 
-          name: line.name || "(unknown)", 
+        unmatched.push({
+          name: line.name || "(unknown)",
           quantity: line.quantity,
           carton_numbers: line.carton_numbers,
           pieces_per_carton: line.pieces_per_carton,
@@ -329,9 +346,8 @@ ${parsedContent}`;
 
       const bestScore = best?.score ?? 0;
       if (!best || bestScore < 0.55) {
-        // Below threshold = don't match
-        unmatched.push({ 
-          name: line.name, 
+        unmatched.push({
+          name: line.name,
           quantity: line.quantity,
           carton_numbers: line.carton_numbers,
           pieces_per_carton: line.pieces_per_carton,
@@ -374,13 +390,13 @@ ${parsedContent}`;
   } catch (error) {
     console.error("Error parsing packing list:", error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error instanceof Error ? error.message : "Failed to parse packing list",
         matched_items: [],
         unmatched_items: [],
-        parsing_notes: "Failed to parse packing list"
+        parsing_notes: "Failed to parse packing list",
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
