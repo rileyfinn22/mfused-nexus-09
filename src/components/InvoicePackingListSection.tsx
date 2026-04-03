@@ -624,7 +624,7 @@ export const InvoicePackingListSection = ({
           file_type: 'application/pdf',
           source: 'excel-import',
           created_by: user?.id,
-          notes: notes || `Generated from: ${selectedExcelFile.name}`
+          notes: notes || `Generated from: ${excelFile.name}`
         });
 
       if (dbError) throw dbError;
