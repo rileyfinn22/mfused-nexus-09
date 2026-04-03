@@ -1082,11 +1082,18 @@ export const InvoicePackingListSection = ({
     setShowRebrandDialog(true);
   };
 
+  const isExcelFile = (file: File) => {
+    const name = file.name.toLowerCase();
+    return name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv');
+  };
+
   const handleRebrandFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.type !== 'application/pdf') {
-      toast({ title: "Invalid File Type", description: "Please upload a PDF file", variant: "destructive" });
+    const isPdf = file.type === 'application/pdf';
+    const isExcel = isExcelFile(file);
+    if (!isPdf && !isExcel) {
+      toast({ title: "Invalid File Type", description: "Please upload a PDF, Excel, or CSV file", variant: "destructive" });
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
@@ -1094,10 +1101,17 @@ export const InvoicePackingListSection = ({
       return;
     }
     setSelectedRebrandFile(file);
+
+    // For Excel files, skip PDF header detection — we'll generate a branded PDF from scratch
+    if (isExcel) {
+      setRebrandPreviewUrl(null);
+      return;
+    }
+
     const url = URL.createObjectURL(file);
     setRebrandPreviewUrl(url);
 
-    // Auto-detect header height using AI
+    // Auto-detect header height using AI (PDF only)
     setDetectingHeader(true);
     try {
       const pdfjsLib = await import('pdfjs-dist');
@@ -1112,9 +1126,8 @@ export const InvoicePackingListSection = ({
       const ctx = canvas.getContext('2d')!;
       await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
 
-      // Convert to base64 for AI analysis
       const imageBase64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-      const pdfPageHeight = page.getViewport({ scale: 1 }).height; // PDF points
+      const pdfPageHeight = page.getViewport({ scale: 1 }).height;
 
       const { data: aiResult } = await supabase.functions.invoke('analyze-header-height', {
         body: { imageBase64, pdfPageHeight }
