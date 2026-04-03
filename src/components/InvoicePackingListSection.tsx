@@ -1611,7 +1611,7 @@ export const InvoicePackingListSection = ({
               Cancel
             </Button>
             <Button 
-              onClick={handleExcelUpload} 
+              onClick={() => handleExcelUpload()} 
               disabled={!selectedExcelFile || processingExcel}
             >
               {processingExcel ? (
