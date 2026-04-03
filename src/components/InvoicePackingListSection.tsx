@@ -1065,13 +1065,17 @@ export const InvoicePackingListSection = ({
   };
 
   const handleView = async (packingList: PackingListFile) => {
+    // Open the blank tab synchronously to avoid popup blockers
+    const newTab = window.open('', '_blank');
+    
     const { data } = await supabase.storage
       .from('packing-lists')
       .createSignedUrl(packingList.file_path, 3600);
 
-    if (data?.signedUrl) {
-      window.open(data.signedUrl, '_blank');
+    if (data?.signedUrl && newTab) {
+      newTab.location.href = data.signedUrl;
     } else {
+      newTab?.close();
       toast({
         title: "Error",
         description: "Failed to open file",
