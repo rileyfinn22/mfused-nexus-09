@@ -43,6 +43,7 @@ interface ExtractedProduct {
   editCost?: number | null;
   editDescription?: string;
   editProductType?: string;
+  editItemId?: string;
   expanded?: boolean;
 }
 
