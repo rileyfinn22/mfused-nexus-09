@@ -1,43 +1,34 @@
 
-
-# Rebrand Vendor Packing List PDF
+# Rebrand Upload with Preview & Approval
 
 ## Problem
-When you upload a vendor Excel/CSV, the system parses it and rebuilds a completely new PDF using jsPDF -- losing the original formatting, layout, and detail. You want to attach the vendor's actual packing list but with Vibe branding instead of the vendor's name/logo.
+Currently the rebrand flow for Excel files just routes through the old Excel import (loses formatting, no preview). User wants to see the result before committing.
 
 ## Solution
-Add a **"Upload & Rebrand PDF"** option that takes the vendor's original PDF, whites out the top header area (where vendor branding lives), and stamps Vibe Packaging branding on top. The rest of the document stays untouched.
 
-## How It Works
+### Flow
+1. User picks file (PDF or Excel) in rebrand dialog
+2. Clicks "Process" → file is rebranded/converted client-side
+3. Dialog expands to show a **live PDF preview** (embedded `<iframe>` with blob URL)
+4. User sees 3 options:
+   - ✅ **Approve & Upload** — saves to storage + creates DB record
+   - ❌ **Reject** — discards and goes back to file picker
+   - 🤖 **Edit with AI** — opens a prompt input, sends the PDF + prompt to AI to adjust (e.g. "remove the second row", "fix the date format")
 
-1. **New button** in the packing list section: "Upload & Rebrand" (alongside existing Upload and Excel Import options)
-2. User uploads the vendor's PDF directly
-3. Client-side processing using `pdf-lib`:
-   - Load the vendor PDF
-   - On each page, draw a white rectangle over the top ~60px (configurable) to cover vendor name/logo
-   - Embed Vibe Packaging text + logo in that same area
-   - Optionally let the admin preview/adjust the cover height before saving
-4. Save the rebranded PDF to storage with source = `rebranded`
+### For PDF files (existing flow)
+- White-out header with AI-detected height + stamp Vibe branding
+- Show result in preview before upload
 
-## Technical Details
+### For Excel/CSV files  
+- Parse via `parse-vendor-packing-list` edge function (already exists)
+- Generate a branded PDF client-side using jsPDF+autoTable with all extracted data
+- Show result in preview before upload
 
 ### Files to modify
-- **`src/components/InvoicePackingListSection.tsx`** -- Add "Upload & Rebrand" button and dialog with:
-  - PDF file picker (vendor PDF)
-  - Slider or input for "header cover height" (default ~70pt) so admin can adjust how much of the top to white-out
-  - Preview of page 1 before/after
-  - Process using `pdf-lib` (already available in the project via npm) to overlay white rect + Vibe branding
-  - Upload result to `packing-lists` bucket
+- `src/components/InvoicePackingListSection.tsx` — refactor rebrand dialog into a multi-step flow (pick file → preview → approve)
+- Potentially a new `RebrandPreviewDialog.tsx` component to keep file size manageable
 
-### Processing flow (all client-side, no edge function needed)
-```text
-Vendor PDF  →  pdf-lib loads it
-            →  For each page: draw white rect at top
-            →  Embed Vibe logo + "ArmorPak Inc. DBA Vibe Packaging" text
-            →  Save modified PDF bytes
-            →  Upload to storage + create DB record
-```
-
-### Key advantage
-The original table data, formatting, measurements, weights -- everything stays exactly as the vendor produced it. Only the header branding changes.
-
+### Key UX details
+- Preview renders inline in the dialog (not a new window — more reliable cross-browser)
+- Dialog grows to `max-w-4xl` during preview step
+- Loading spinner with status text during processing
