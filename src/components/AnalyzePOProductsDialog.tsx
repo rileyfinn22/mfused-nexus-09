@@ -265,6 +265,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
             editCost: p.cost ?? null,
             editDescription: p.description || '',
             editProductType: p.product_type || '',
+            editItemId: '',
             expanded: false,
           };
         });
