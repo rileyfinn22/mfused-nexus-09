@@ -84,6 +84,7 @@ export const InvoicePackingListSection = ({
   const [rebrandCoverHeight, setRebrandCoverHeight] = useState(70);
   const [rebrandPreviewUrl, setRebrandPreviewUrl] = useState<string | null>(null);
   const [rebranding, setRebranding] = useState(false);
+  const [detectingHeader, setDetectingHeader] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
   const rebrandFileInputRef = useRef<HTMLInputElement>(null);
