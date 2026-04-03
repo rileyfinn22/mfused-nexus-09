@@ -1711,9 +1711,17 @@ export const InvoicePackingListSection = ({
             </div>
 
             <div>
-              <Label>Header Cover Height: {rebrandCoverHeight}pt</Label>
+              <div className="flex items-center gap-2">
+                <Label>Header Cover Height: {rebrandCoverHeight}pt</Label>
+                {detectingHeader && (
+                  <span className="flex items-center gap-1 text-xs text-primary">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    AI detecting...
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mb-2">
-                Adjust how much of the top of each page to white-out and replace with Vibe branding
+                AI auto-detects the header size. Adjust manually if needed.
               </p>
               <Slider
                 value={[rebrandCoverHeight]}
