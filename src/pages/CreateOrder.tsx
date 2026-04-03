@@ -1240,7 +1240,9 @@ const CreateOrder = () => {
       setSelectedItems(mergeOrderItems([], items));
       
       // Store unmatched items from PO for display
-      const unmatchedItems = order.order_items.filter((item: any) => item.product_id === null);
+      const unmatchedItems = order.order_items
+        .filter((item: any) => item.product_id === null)
+        .map((item: any) => buildUnmatchedPoItem(item));
       setUnmatchedPoItems(unmatchedItems);
       
       if (unmatchedItems.length > 0) {
