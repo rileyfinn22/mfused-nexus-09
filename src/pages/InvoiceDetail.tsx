@@ -1624,10 +1624,14 @@ const InvoiceDetail = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => {
-          const params = new URLSearchParams(window.location.search);
-          const returnTo = params.get('returnTo');
-          navigate(returnTo || "/invoices");
-        }}>
+           const params = new URLSearchParams(window.location.search);
+           const returnTo = params.get('returnTo');
+           if (returnTo) {
+             navigate(returnTo);
+           } else {
+             navigate(-1);
+           }
+         }}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           {new URLSearchParams(window.location.search).get('returnTo') ? 'Back to Project' : 'Back to Invoices'}
         </Button>
