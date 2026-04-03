@@ -1423,8 +1423,17 @@ const CreateOrder = () => {
     }
   };
 
-  const handleAddUnmatchedAsProduct = async (unmatchedItem: any) => {
-    if (!selectedCompanyId) {
+  const updateUnmatchedPoItem = (itemKey: string, updates: Partial<UnmatchedPoItem>) => {
+    setUnmatchedPoItems(prev =>
+      prev.map(item =>
+        getUnmatchedPoItemKey(item) === itemKey ? { ...item, ...updates } : item
+      )
+    );
+  };
+
+  const handleAddUnmatchedAsProduct = async (unmatchedItem: UnmatchedPoItem) => {
+    const companyId = isVibeAdmin ? selectedCompanyId : await getUserCompanyId();
+    if (!companyId) {
       toast({
         title: "Error",
         description: "Please select a company first",
@@ -1434,24 +1443,32 @@ const CreateOrder = () => {
     }
 
     try {
+      const selectedTemplate = unmatchedItem.catalogTemplateId
+        ? productTemplates.find(template => template.id === unmatchedItem.catalogTemplateId)
+        : null;
+
+      const baseName = stripTemplatePrefix(unmatchedItem.name, productTemplates, selectedTemplate?.id);
+      const finalName = selectedTemplate ? `${selectedTemplate.name} - ${baseName}` : unmatchedItem.name;
+      const finalItemId = unmatchedItem.catalogItemId.trim() || unmatchedItem.sku || null;
+
       const { data: newProduct, error } = await supabase
         .from('products')
         .insert({
-          name: unmatchedItem.name,
-          item_id: unmatchedItem.sku,
-          description: unmatchedItem.description,
-          cost: unmatchedItem.unit_price,
-          company_id: selectedCompanyId,
+          name: finalName,
+          item_id: finalItemId,
+          description: selectedTemplate?.description || unmatchedItem.description || null,
+          cost: unmatchedItem.unit_price || selectedTemplate?.cost || null,
+          price: selectedTemplate?.price || null,
+          state: selectedTemplate?.state || null,
+          company_id: companyId,
+          template_id: selectedTemplate?.id || null,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // Add to products list
-      setProducts([...products, newProduct]);
-
-      // Add to selected items with PO price (using callback to prevent race conditions)
+      setProducts(prev => [...prev, newProduct]);
       setSelectedItems(prev => {
         const exists = prev.find(item => item.productId === newProduct.id);
         if (exists) return prev;
@@ -1462,10 +1479,9 @@ const CreateOrder = () => {
         }];
       });
 
-      // Remove from unmatched state
-      setUnmatchedPoItems(unmatchedPoItems.filter(item => item.id !== unmatchedItem.id));
-      
-      // Delete the unmatched item from database immediately
+      const itemKey = getUnmatchedPoItemKey(unmatchedItem);
+      setUnmatchedPoItems(prev => prev.filter(item => getUnmatchedPoItemKey(item) !== itemKey));
+
       if (unmatchedItem.id) {
         await supabase
           .from('order_items')
@@ -1487,24 +1503,22 @@ const CreateOrder = () => {
     }
   };
 
-  const handleMatchUnmatchedItem = async (unmatchedItem: any, productId: string) => {
+  const handleMatchUnmatchedItem = async (unmatchedItem: UnmatchedPoItem, productId: string) => {
     if (!productId) return;
 
-    // Add to selected items with PO price (using callback to prevent race conditions)
     setSelectedItems(prev => {
       const exists = prev.find(item => item.productId === productId);
       if (exists) return prev;
       return [...prev, {
-        productId: productId,
+        productId,
         quantity: unmatchedItem.quantity,
         unit_price: unmatchedItem.unit_price,
       }];
     });
 
-    // Remove from unmatched state
-    setUnmatchedPoItems(unmatchedPoItems.filter(item => item.id !== unmatchedItem.id));
+    const itemKey = getUnmatchedPoItemKey(unmatchedItem);
+    setUnmatchedPoItems(prev => prev.filter(item => getUnmatchedPoItemKey(item) !== itemKey));
 
-    // Delete the unmatched item from database immediately
     if (unmatchedItem.id) {
       await supabase
         .from('order_items')
@@ -1512,9 +1526,8 @@ const CreateOrder = () => {
         .eq('id', unmatchedItem.id);
     }
 
-    // Clear selection and close popover
-    setMatchingProductId({ ...matchingProductId, [unmatchedItem.id]: "" });
-    setOpenCombobox({ ...openCombobox, [unmatchedItem.id]: false });
+    setMatchingProductId(prev => ({ ...prev, [itemKey]: "" }));
+    setOpenCombobox(prev => ({ ...prev, [itemKey]: false }));
 
     toast({
       title: "Item Matched",
