@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+// pdf-lib no longer needed for rebrand - using AI extraction + jsPDF
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
