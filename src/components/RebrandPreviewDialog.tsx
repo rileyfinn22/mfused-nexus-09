@@ -679,6 +679,18 @@ export const RebrandPreviewDialog = ({
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Start Over
               </Button>
+              <Button variant="outline" onClick={() => {
+                if (!pdfBlob) return;
+                const url = URL.createObjectURL(pdfBlob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `rebranded-packing-list-${invoice?.invoice_number || "draft"}.pdf`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}>
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
               <Button variant="outline" onClick={() => setStep("ai-edit")}>
                 <Sparkles className="h-4 w-4 mr-2" />
                 Edit with AI
