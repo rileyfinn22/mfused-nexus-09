@@ -50,6 +50,15 @@ interface Company {
   name: string;
 }
 
+interface ProductTemplateOption {
+  id: string;
+  name: string;
+  state: string | null;
+  description: string | null;
+  price: number | null;
+  cost: number | null;
+}
+
 interface OrderItem {
   productId: string;
   quantity: number;
@@ -60,6 +69,19 @@ interface OrderItem {
   description?: string | null;
   poLineName?: string; // Original PO line name for match verification
   poLineQty?: number; // Original PO line quantity for match verification
+}
+
+interface UnmatchedPoItem {
+  id?: string;
+  clientKey: string;
+  sku?: string | null;
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unit_price: number;
+  item_id?: string | null;
+  catalogItemId: string;
+  catalogTemplateId: string | null;
 }
 
 const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[] => {
@@ -84,6 +106,40 @@ const mergeOrderItems = (base: OrderItem[], additions: OrderItem[]): OrderItem[]
   }
 
   return Array.from(merged.values());
+};
+
+const buildUnmatchedPoItem = (item: any): UnmatchedPoItem => ({
+  ...item,
+  clientKey: item.id || crypto.randomUUID(),
+  catalogItemId: item.item_id || item.sku || "",
+  catalogTemplateId: item.template_id || null,
+});
+
+const getUnmatchedPoItemKey = (item: UnmatchedPoItem) => item.id || item.clientKey;
+
+const stripTemplatePrefix = (
+  name: string,
+  templates: ProductTemplateOption[],
+  keepTemplateId?: string | null,
+) => {
+  let normalizedName = String(name || "").trim();
+  if (!normalizedName) return normalizedName;
+
+  for (const template of templates) {
+    if (keepTemplateId && template.id === keepTemplateId) continue;
+
+    const prefix = `${template.name} - `;
+    if (normalizedName.startsWith(prefix)) {
+      return normalizedName.slice(prefix.length).trim();
+    }
+
+    const singularPrefix = `${template.name.replace(/s$/i, "")} - `;
+    if (normalizedName.toLowerCase().startsWith(singularPrefix.toLowerCase())) {
+      return normalizedName.slice(singularPrefix.length).trim();
+    }
+  }
+
+  return normalizedName;
 };
 
 interface SavedAddress {
