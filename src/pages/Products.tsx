@@ -49,7 +49,7 @@ import { ProductTemplateGrid } from "@/components/ProductTemplateGrid";
 import { TemplateProductsView } from "@/components/TemplateProductsView";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
 import { useToast } from "@/hooks/use-toast";
-import { isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
+import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 
@@ -688,6 +688,26 @@ const Products = () => {
     (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const getTemplateDisplayThumbnail = (template: ProductTemplate) => {
+    const templateProducts = products.filter((product) => product.template_id === template.id);
+
+    for (const product of templateProducts) {
+      const artworkThumbnail =
+        (product.item_id && artworkThumbnails[product.item_id]) ||
+        (product.sku && artworkThumbnails[product.sku]);
+
+      if (artworkThumbnail) {
+        return artworkThumbnail;
+      }
+    }
+
+    if (template.thumbnail_url && !isLegacyGeneratedTemplateMockupUrl(template.thumbnail_url)) {
+      return template.thumbnail_url;
+    }
+
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -881,9 +901,9 @@ const Products = () => {
 
                     {/* Template Image/Icon Area */}
                     <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                      {template.thumbnail_url ? (
+                      {getTemplateDisplayThumbnail(template) ? (
                         <img 
-                          src={template.thumbnail_url} 
+                          src={getTemplateDisplayThumbnail(template) || undefined}
                           alt={template.name}
                           className="w-full h-full object-cover"
                         />
