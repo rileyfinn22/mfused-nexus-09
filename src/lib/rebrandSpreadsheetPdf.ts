@@ -86,6 +86,22 @@ const normalizeText = (value: string) => value.toLowerCase().replace(/\s+/g, " "
 
 const countNonEmptyCells = (row: string[]) => row.filter((cell) => cell.trim() !== "").length;
 
+const isRepeatedValueRow = (row: string[]) => {
+  const nonEmpty = row.filter((cell) => cell.trim() !== "");
+  if (nonEmpty.length < 3) return false;
+  const first = normalizeText(nonEmpty[0]);
+  return nonEmpty.every((cell) => normalizeText(cell) === first);
+};
+
+const isVendorInfoRow = (row: string[]) => {
+  const joined = row.map(normalizeText).join(" ");
+  return (
+    isRepeatedValueRow(row) ||
+    /\b(co\.?,?\s*ltd|inc\b|corp\b|llc\b|gmbh\b|technology\b.*co)/i.test(joined) &&
+      isRepeatedValueRow(row)
+  );
+};
+
 const sliceColumns = (matrix: string[][]) => {
   const usedColumns = matrix[0]
     .map((_, colIndex) => colIndex)
@@ -97,7 +113,11 @@ const sliceColumns = (matrix: string[][]) => {
 const extractRelevantSection = (matrix: string[][]) => {
   if (matrix.length === 0) return matrix;
 
-  const tableHeaderRowIndex = matrix.findIndex((row) => {
+  // Strip rows where the same vendor company info is repeated across all columns
+  const cleaned = matrix.filter((row) => !isRepeatedValueRow(row));
+  if (cleaned.length === 0) return matrix;
+
+  const tableHeaderRowIndex = cleaned.findIndex((row) => {
     const normalizedRow = row.map(normalizeText);
     return normalizedRow.includes("s/n")
       && normalizedRow.includes("items")
@@ -106,14 +126,14 @@ const extractRelevantSection = (matrix: string[][]) => {
   });
 
   if (tableHeaderRowIndex === -1) {
-    return sliceColumns(matrix);
+    return sliceColumns(cleaned);
   }
 
   const startSearchIndex = Math.max(0, tableHeaderRowIndex - 8);
   const sectionStartCandidates: number[] = [];
 
   for (let index = startSearchIndex; index <= tableHeaderRowIndex; index += 1) {
-    const normalizedRow = matrix[index].map(normalizeText);
+    const normalizedRow = cleaned[index].map(normalizeText);
     if (normalizedRow.includes("packing list") || normalizedRow.some((cell) => cell.includes("ship to"))) {
       sectionStartCandidates.push(index);
     }
@@ -125,8 +145,8 @@ const extractRelevantSection = (matrix: string[][]) => {
   let hasSeenDataRow = false;
   let blankStreak = 0;
 
-  for (let index = tableHeaderRowIndex + 1; index < matrix.length; index += 1) {
-    const nonEmptyCount = countNonEmptyCells(matrix[index]);
+  for (let index = tableHeaderRowIndex + 1; index < cleaned.length; index += 1) {
+    const nonEmptyCount = countNonEmptyCells(cleaned[index]);
 
     if (nonEmptyCount >= 2) {
       hasSeenDataRow = true;
@@ -141,7 +161,7 @@ const extractRelevantSection = (matrix: string[][]) => {
     }
   }
 
-  return sliceColumns(matrix.slice(startRow, lastMeaningfulRow + 1));
+  return sliceColumns(cleaned.slice(startRow, lastMeaningfulRow + 1));
 };
 
 const splitColumnGroups = (columnCount: number) => {
