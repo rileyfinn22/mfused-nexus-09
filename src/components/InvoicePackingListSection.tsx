@@ -239,8 +239,9 @@ export const InvoicePackingListSection = ({
     }
   };
 
-  const handleExcelUpload = async () => {
-    if (!selectedExcelFile) return;
+  const handleExcelUpload = async (overrideFile?: File) => {
+    const excelFile = overrideFile || selectedExcelFile;
+    if (!excelFile) return;
 
     setProcessingExcel(true);
     try {
@@ -254,7 +255,7 @@ export const InvoicePackingListSection = ({
           resolve(base64);
         };
         reader.onerror = reject;
-        reader.readAsDataURL(selectedExcelFile);
+        reader.readAsDataURL(excelFile);
       });
 
       // Get order items for matching
@@ -271,7 +272,7 @@ export const InvoicePackingListSection = ({
         body: {
           fileContent,
           orderItems,
-          fileName: selectedExcelFile.name,
+          fileName: excelFile.name,
           isBase64: true
         }
       });
@@ -623,7 +624,7 @@ export const InvoicePackingListSection = ({
           file_type: 'application/pdf',
           source: 'excel-import',
           created_by: user?.id,
-          notes: notes || `Generated from: ${selectedExcelFile.name}`
+          notes: notes || `Generated from: ${excelFile.name}`
         });
 
       if (dbError) throw dbError;
@@ -1082,11 +1083,18 @@ export const InvoicePackingListSection = ({
     setShowRebrandDialog(true);
   };
 
+  const isExcelFile = (file: File) => {
+    const name = file.name.toLowerCase();
+    return name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv');
+  };
+
   const handleRebrandFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.type !== 'application/pdf') {
-      toast({ title: "Invalid File Type", description: "Please upload a PDF file", variant: "destructive" });
+    const isPdf = file.type === 'application/pdf';
+    const isExcel = isExcelFile(file);
+    if (!isPdf && !isExcel) {
+      toast({ title: "Invalid File Type", description: "Please upload a PDF, Excel, or CSV file", variant: "destructive" });
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
@@ -1094,10 +1102,17 @@ export const InvoicePackingListSection = ({
       return;
     }
     setSelectedRebrandFile(file);
+
+    // For Excel files, skip PDF header detection — we'll generate a branded PDF from scratch
+    if (isExcel) {
+      setRebrandPreviewUrl(null);
+      return;
+    }
+
     const url = URL.createObjectURL(file);
     setRebrandPreviewUrl(url);
 
-    // Auto-detect header height using AI
+    // Auto-detect header height using AI (PDF only)
     setDetectingHeader(true);
     try {
       const pdfjsLib = await import('pdfjs-dist');
@@ -1112,9 +1127,8 @@ export const InvoicePackingListSection = ({
       const ctx = canvas.getContext('2d')!;
       await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
 
-      // Convert to base64 for AI analysis
       const imageBase64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-      const pdfPageHeight = page.getViewport({ scale: 1 }).height; // PDF points
+      const pdfPageHeight = page.getViewport({ scale: 1 }).height;
 
       const { data: aiResult } = await supabase.functions.invoke('analyze-header-height', {
         body: { imageBase64, pdfPageHeight }
@@ -1132,6 +1146,14 @@ export const InvoicePackingListSection = ({
 
   const handleRebrand = async () => {
     if (!selectedRebrandFile) return;
+
+    // For Excel/CSV files, route through the existing Excel import flow
+    if (isExcelFile(selectedRebrandFile)) {
+      setShowRebrandDialog(false);
+      await handleExcelUpload(selectedRebrandFile);
+      return;
+    }
+
     setRebranding(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1583,7 +1605,7 @@ export const InvoicePackingListSection = ({
               Cancel
             </Button>
             <Button 
-              onClick={handleExcelUpload} 
+              onClick={() => handleExcelUpload()} 
               disabled={!selectedExcelFile || processingExcel}
             >
               {processingExcel ? (
@@ -1686,19 +1708,19 @@ export const InvoicePackingListSection = ({
       }}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Upload & Rebrand PDF</DialogTitle>
+            <DialogTitle>Upload & Rebrand Packing List</DialogTitle>
             <DialogDescription>
-              Upload a vendor packing list PDF. The vendor's header branding will be replaced with Vibe Packaging branding while keeping all other content intact.
+              Upload a vendor packing list (PDF or Excel). For PDFs, the vendor's header branding will be replaced with Vibe branding. For Excel files, a branded PDF will be generated from the data.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             <div>
-              <Label htmlFor="rebrandFile">Vendor PDF</Label>
+              <Label htmlFor="rebrandFile">Vendor File</Label>
               <Input
                 id="rebrandFile"
                 type="file"
-                accept=".pdf"
+                accept=".pdf,.xlsx,.xls,.csv"
                 ref={rebrandFileInputRef}
                 onChange={handleRebrandFileSelect}
                 className="mt-1"
@@ -1731,9 +1753,9 @@ export const InvoicePackingListSection = ({
             <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
               <p className="font-medium mb-1">How it works:</p>
               <ul className="list-disc list-inside space-y-1">
-                <li>The vendor's header/logo area is covered with a white rectangle</li>
-                <li>Vibe Packaging branding and logo are stamped on top</li>
-                <li>All table data, formatting, and content stays untouched</li>
+                <li><strong>PDF files:</strong> The vendor's header/logo area is auto-detected and replaced with Vibe branding</li>
+                <li><strong>Excel/CSV files:</strong> Data is extracted and a branded PDF is generated</li>
+                <li>All table data and content is preserved</li>
               </ul>
             </div>
           </div>
