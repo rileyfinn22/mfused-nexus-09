@@ -901,9 +901,9 @@ const Products = () => {
 
                     {/* Template Image/Icon Area */}
                     <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                      {template.thumbnail_url ? (
+                      {getTemplateDisplayThumbnail(template) ? (
                         <img 
-                          src={template.thumbnail_url} 
+                          src={getTemplateDisplayThumbnail(template) || undefined}
                           alt={template.name}
                           className="w-full h-full object-cover"
                         />
