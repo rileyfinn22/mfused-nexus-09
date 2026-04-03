@@ -1708,9 +1708,9 @@ export const InvoicePackingListSection = ({
       }}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Upload & Rebrand PDF</DialogTitle>
+            <DialogTitle>Upload & Rebrand Packing List</DialogTitle>
             <DialogDescription>
-              Upload a vendor packing list PDF. The vendor's header branding will be replaced with Vibe Packaging branding while keeping all other content intact.
+              Upload a vendor packing list (PDF or Excel). For PDFs, the vendor's header branding will be replaced with Vibe branding. For Excel files, a branded PDF will be generated from the data.
             </DialogDescription>
           </DialogHeader>
           
