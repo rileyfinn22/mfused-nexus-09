@@ -166,16 +166,38 @@ export async function generateOrderConfirmationPdf(
   }
 
   // ============ ITEMS TABLE ============
-  autoTable(doc, {
-    startY: yPos,
-    head: [["#", "Product", "SKU", "Qty", "Description"]],
-    body: items.map((item, i) => [
+  const hasAnyPrice = items.some(i => (i.unit_price || 0) > 0);
+
+  const tableHead = hasAnyPrice
+    ? [["#", "Product", "SKU", "Qty", "Unit Price", "Total"]]
+    : [["#", "Product", "SKU", "Qty", "Description"]];
+
+  const tableBody = items.map((item, i) => {
+    if (hasAnyPrice) {
+      const price = item.unit_price || 0;
+      const lineTotal = item.quantity * price;
+      return [
+        (i + 1).toString(),
+        item.name,
+        item.sku,
+        item.quantity.toString(),
+        `$${price.toFixed(3)}`,
+        `$${lineTotal.toFixed(2)}`,
+      ];
+    }
+    return [
       (i + 1).toString(),
       item.name,
       item.sku,
       item.quantity.toString(),
       item.description || "",
-    ]),
+    ];
+  });
+
+  autoTable(doc, {
+    startY: yPos,
+    head: tableHead,
+    body: tableBody,
     styles: {
       fontSize: 9,
       cellPadding: 4,
@@ -190,15 +212,23 @@ export async function generateOrderConfirmationPdf(
     alternateRowStyles: {
       fillColor: [248, 248, 248],
     },
-    columnStyles: {
-      0: { cellWidth: 12 },
-      2: { fontStyle: "bold", cellWidth: 35 },
-      3: { halign: "center", cellWidth: 18 },
-    },
+    columnStyles: hasAnyPrice
+      ? {
+          0: { cellWidth: 12 },
+          2: { fontStyle: "bold", cellWidth: 35 },
+          3: { halign: "center", cellWidth: 18 },
+          4: { halign: "right", cellWidth: 28 },
+          5: { halign: "right", cellWidth: 28 },
+        }
+      : {
+          0: { cellWidth: 12 },
+          2: { fontStyle: "bold", cellWidth: 35 },
+          3: { halign: "center", cellWidth: 18 },
+        },
     margin: { left: 14, right: 14 },
   });
 
-  // ============ TOTAL QTY ============
+  // ============ TOTAL QTY & GRAND TOTAL ============
   const finalY = (doc as any).lastAutoTable?.finalY || yPos + 40;
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
@@ -209,6 +239,16 @@ export async function generateOrderConfirmationPdf(
     14,
     finalY + 10
   );
+
+  if (hasAnyPrice) {
+    const grandTotal = items.reduce((sum, i) => sum + i.quantity * (i.unit_price || 0), 0);
+    doc.text(
+      `Grand Total: $${grandTotal.toFixed(2)}`,
+      pageWidth - 14,
+      finalY + 10,
+      { align: "right" }
+    );
+  }
 
   // ============ FOOTER ============
   doc.setFontSize(9);
