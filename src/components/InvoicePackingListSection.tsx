@@ -30,7 +30,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateInvoiceTotals } from "@/lib/invoiceTotals";
-import { resolveStorageSignedUrl, triggerSignedFileDownload } from "@/lib/storageUrl";
+import { normalizeStorageObjectPath, resolveStorageSignedUrl, sanitizeStorageFileName, triggerSignedFileDownload } from "@/lib/storageUrl";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -182,7 +182,7 @@ export const InvoicePackingListSection = ({
       const { data: { user } } = await supabase.auth.getUser();
       
       // Upload to storage
-      const fileName = `${invoiceId}/${Date.now()}-${selectedFile.name}`;
+      const fileName = `${invoiceId}/${Date.now()}-${sanitizeStorageFileName(selectedFile.name)}`;
       const { error: uploadError } = await supabase.storage
         .from('packing-lists')
         .upload(fileName, selectedFile);
@@ -1079,9 +1079,11 @@ export const InvoicePackingListSection = ({
   const handleView = async (packingList: PackingListFile) => {
     const newTab = window.open('', '_blank');
 
+    const normalizedFilePath = normalizeStorageObjectPath(packingList.file_path);
+
     const { data, error } = await supabase.storage
       .from('packing-lists')
-      .createSignedUrl(packingList.file_path, 3600);
+      .createSignedUrl(normalizedFilePath, 3600);
 
     if (error) {
       newTab?.close();
@@ -1106,9 +1108,11 @@ export const InvoicePackingListSection = ({
   };
 
   const handleDownload = async (packingList: PackingListFile) => {
+    const normalizedFilePath = normalizeStorageObjectPath(packingList.file_path);
+
     const { data, error } = await supabase.storage
       .from('packing-lists')
-      .createSignedUrl(packingList.file_path, 3600, { download: packingList.file_name });
+      .createSignedUrl(normalizedFilePath, 3600, { download: packingList.file_name });
 
     if (error) {
       toast({
@@ -1137,7 +1141,7 @@ export const InvoicePackingListSection = ({
       // Delete from storage
       await supabase.storage
         .from('packing-lists')
-        .remove([packingList.file_path]);
+        .remove([normalizeStorageObjectPath(packingList.file_path)]);
 
       // Delete from database
       const { error } = await supabase
