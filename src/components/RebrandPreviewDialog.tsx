@@ -19,6 +19,7 @@ import {
   Sparkles,
   FileText,
   RotateCcw,
+  Download,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -626,11 +627,16 @@ export const RebrandPreviewDialog = ({
         {step === "preview" && previewBlobUrl && (
           <div className="space-y-4">
             <div className="border rounded-lg overflow-hidden bg-muted/30" style={{ height: "50vh" }}>
-              <iframe
-                src={previewBlobUrl}
+              <object
+                data={previewBlobUrl}
+                type="application/pdf"
                 className="w-full h-full"
-                title="PDF Preview"
-              />
+              >
+                <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-center">
+                  <FileText className="h-12 w-12 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">PDF preview is blocked by your browser. Use the Download button below to view the file.</p>
+                </div>
+              </object>
             </div>
           </div>
         )}
@@ -672,6 +678,18 @@ export const RebrandPreviewDialog = ({
               <Button variant="outline" onClick={() => { setStep("pick"); setPdfBlob(null); if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl); setPreviewBlobUrl(null); }}>
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Start Over
+              </Button>
+              <Button variant="outline" onClick={() => {
+                if (!pdfBlob) return;
+                const url = URL.createObjectURL(pdfBlob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `rebranded-packing-list-${invoice?.invoice_number || "draft"}.pdf`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}>
+                <Download className="h-4 w-4 mr-2" />
+                Download
               </Button>
               <Button variant="outline" onClick={() => setStep("ai-edit")}>
                 <Sparkles className="h-4 w-4 mr-2" />
