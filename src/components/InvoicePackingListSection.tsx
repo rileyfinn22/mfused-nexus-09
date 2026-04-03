@@ -239,8 +239,9 @@ export const InvoicePackingListSection = ({
     }
   };
 
-  const handleExcelUpload = async () => {
-    if (!selectedExcelFile) return;
+  const handleExcelUpload = async (overrideFile?: File) => {
+    const excelFile = overrideFile || selectedExcelFile;
+    if (!excelFile) return;
 
     setProcessingExcel(true);
     try {
@@ -254,7 +255,7 @@ export const InvoicePackingListSection = ({
           resolve(base64);
         };
         reader.onerror = reject;
-        reader.readAsDataURL(selectedExcelFile);
+        reader.readAsDataURL(excelFile);
       });
 
       // Get order items for matching
