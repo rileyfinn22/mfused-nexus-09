@@ -2371,6 +2371,7 @@ export type Database = {
           name: string
           preferred_vendor_id: string | null
           price: number | null
+          print_template_id: string | null
           product_type: string | null
           quickbooks_id: string | null
           quickbooks_sync_status: string | null
@@ -2394,6 +2395,7 @@ export type Database = {
           name: string
           preferred_vendor_id?: string | null
           price?: number | null
+          print_template_id?: string | null
           product_type?: string | null
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
@@ -2417,6 +2419,7 @@ export type Database = {
           name?: string
           preferred_vendor_id?: string | null
           price?: number | null
+          print_template_id?: string | null
           product_type?: string | null
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
@@ -2441,6 +2444,13 @@ export type Database = {
             columns: ["preferred_vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_print_template_id_fkey"
+            columns: ["print_template_id"]
+            isOneToOne: false
+            referencedRelation: "print_templates"
             referencedColumns: ["id"]
           },
           {
