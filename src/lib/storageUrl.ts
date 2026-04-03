@@ -2,6 +2,10 @@ export const resolveStorageSignedUrl = (signedUrl: string) => {
   if (!signedUrl) return signedUrl;
   if (signedUrl.startsWith("http")) return signedUrl;
 
+   if (signedUrl.startsWith("/storage/v1/")) {
+    return `${import.meta.env.VITE_SUPABASE_URL}${signedUrl}`;
+  }
+
   const normalizedPath = signedUrl.startsWith("/") ? signedUrl : `/${signedUrl}`;
   return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1${normalizedPath}`;
 };
