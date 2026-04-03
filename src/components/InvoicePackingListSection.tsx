@@ -1716,11 +1716,11 @@ export const InvoicePackingListSection = ({
           
           <div className="space-y-4">
             <div>
-              <Label htmlFor="rebrandFile">Vendor PDF</Label>
+              <Label htmlFor="rebrandFile">Vendor File</Label>
               <Input
                 id="rebrandFile"
                 type="file"
-                accept=".pdf"
+                accept=".pdf,.xlsx,.xls,.csv"
                 ref={rebrandFileInputRef}
                 onChange={handleRebrandFileSelect}
                 className="mt-1"
