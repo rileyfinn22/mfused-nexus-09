@@ -1073,7 +1073,143 @@ export const InvoicePackingListSection = ({
     }
   };
 
-  const handleView = async (packingList: PackingListFile) => {
+  const handleRebrandClick = () => {
+    setSelectedRebrandFile(null);
+    setRebrandCoverHeight(70);
+    setRebrandPreviewUrl(null);
+    setNotes("");
+    setShowRebrandDialog(true);
+  };
+
+  const handleRebrandFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        toast({ title: "Invalid File Type", description: "Please upload a PDF file", variant: "destructive" });
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: "File Too Large", description: "Maximum file size is 10MB", variant: "destructive" });
+        return;
+      }
+      setSelectedRebrandFile(file);
+      // Generate preview
+      const url = URL.createObjectURL(file);
+      setRebrandPreviewUrl(url);
+    }
+  };
+
+  const handleRebrand = async () => {
+    if (!selectedRebrandFile) return;
+    setRebranding(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const fileBytes = await selectedRebrandFile.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(fileBytes);
+      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+      // Try to embed the logo
+      let logoImage: any = null;
+      try {
+        const logoResponse = await fetch('/images/vibe-logo.png');
+        const logoBytes = await logoResponse.arrayBuffer();
+        logoImage = await pdfDoc.embedPng(new Uint8Array(logoBytes));
+      } catch (e) {
+        console.warn('Could not embed logo, using text fallback');
+      }
+
+      const pages = pdfDoc.getPages();
+      for (const page of pages) {
+        const { width, height } = page.getSize();
+        const coverH = rebrandCoverHeight;
+        
+        // White out the top area
+        page.drawRectangle({
+          x: 0,
+          y: height - coverH,
+          width: width,
+          height: coverH,
+          color: rgb(1, 1, 1),
+        });
+
+        // Add Vibe branding
+        const brandY = height - 25;
+        page.drawText('ArmorPak Inc. DBA Vibe Packaging', {
+          x: 20,
+          y: brandY,
+          size: 12,
+          font: helveticaBold,
+          color: rgb(0.298, 0.686, 0.314), // #4CAF50
+        });
+
+        page.drawText('1415 S 700 W, Salt Lake City, UT 84104', {
+          x: 20,
+          y: brandY - 14,
+          size: 8,
+          font: helvetica,
+          color: rgb(0.39, 0.39, 0.39),
+        });
+
+        page.drawText('www.vibepkg.com', {
+          x: 20,
+          y: brandY - 23,
+          size: 8,
+          font: helvetica,
+          color: rgb(0.39, 0.39, 0.39),
+        });
+
+        // Logo on the right side
+        if (logoImage) {
+          const logoW = 50;
+          const logoH = (logoImage.height / logoImage.width) * logoW;
+          page.drawImage(logoImage, {
+            x: width - logoW - 20,
+            y: height - logoH - 10,
+            width: logoW,
+            height: logoH,
+          });
+        }
+      }
+
+      const modifiedBytes = await pdfDoc.save();
+      const pdfBlob = new Blob([modifiedBytes], { type: 'application/pdf' });
+      const fileName = `${invoiceId}/${Date.now()}-rebranded-${selectedRebrandFile.name}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('packing-lists')
+        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+
+      if (uploadError) throw uploadError;
+
+      const { error: dbError } = await supabase
+        .from('invoice_packing_lists')
+        .insert({
+          invoice_id: invoiceId,
+          file_name: `rebranded-${selectedRebrandFile.name}`,
+          file_path: fileName,
+          file_size: pdfBlob.size,
+          file_type: 'application/pdf',
+          source: 'rebranded',
+          created_by: user?.id,
+          notes: notes || `Rebranded from: ${selectedRebrandFile.name}`
+        });
+
+      if (dbError) throw dbError;
+
+      toast({ title: "Packing List Rebranded", description: "Vendor branding replaced with Vibe branding successfully" });
+      setShowRebrandDialog(false);
+      if (rebrandPreviewUrl) URL.revokeObjectURL(rebrandPreviewUrl);
+      fetchPackingLists();
+    } catch (error: any) {
+      console.error('Rebrand error:', error);
+      toast({ title: "Rebrand Failed", description: error.message || "Failed to rebrand PDF", variant: "destructive" });
+    } finally {
+      setRebranding(false);
+    }
+  };
+
+
     // Open the blank tab synchronously to avoid popup blockers
     const newTab = window.open('', '_blank');
     
