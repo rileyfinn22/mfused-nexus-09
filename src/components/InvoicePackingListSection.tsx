@@ -33,7 +33,8 @@ import { calculateInvoiceTotals } from "@/lib/invoiceTotals";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+
+import { RebrandPreviewDialog } from "@/components/RebrandPreviewDialog";
 
 interface PackingListFile {
   id: string;
@@ -80,14 +81,8 @@ export const InvoicePackingListSection = ({
   const [selectedExcelFile, setSelectedExcelFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
   const [showRebrandDialog, setShowRebrandDialog] = useState(false);
-  const [selectedRebrandFile, setSelectedRebrandFile] = useState<File | null>(null);
-  const [rebrandCoverHeight, setRebrandCoverHeight] = useState(70);
-  const [rebrandPreviewUrl, setRebrandPreviewUrl] = useState<string | null>(null);
-  const [rebranding, setRebranding] = useState(false);
-  const [detectingHeader, setDetectingHeader] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
-  const rebrandFileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch packing lists on mount
   useEffect(() => {
@@ -1076,190 +1071,8 @@ export const InvoicePackingListSection = ({
   };
 
   const handleRebrandClick = () => {
-    setSelectedRebrandFile(null);
-    setRebrandCoverHeight(70);
-    setRebrandPreviewUrl(null);
     setNotes("");
     setShowRebrandDialog(true);
-  };
-
-  const isExcelFile = (file: File) => {
-    const name = file.name.toLowerCase();
-    return name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv');
-  };
-
-  const handleRebrandFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const isPdf = file.type === 'application/pdf';
-    const isExcel = isExcelFile(file);
-    if (!isPdf && !isExcel) {
-      toast({ title: "Invalid File Type", description: "Please upload a PDF, Excel, or CSV file", variant: "destructive" });
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "File Too Large", description: "Maximum file size is 10MB", variant: "destructive" });
-      return;
-    }
-    setSelectedRebrandFile(file);
-
-    // For Excel files, skip PDF header detection — we'll generate a branded PDF from scratch
-    if (isExcel) {
-      setRebrandPreviewUrl(null);
-      return;
-    }
-
-    const url = URL.createObjectURL(file);
-    setRebrandPreviewUrl(url);
-
-    // Auto-detect header height using AI (PDF only)
-    setDetectingHeader(true);
-    try {
-      const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-      const arrayBuf = await file.arrayBuffer();
-      const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
-      const page = await pdfDoc.getPage(1);
-      const viewport = page.getViewport({ scale: 1.5 });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext('2d')!;
-      await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
-
-      const imageBase64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-      const pdfPageHeight = page.getViewport({ scale: 1 }).height;
-
-      const { data: aiResult } = await supabase.functions.invoke('analyze-header-height', {
-        body: { imageBase64, pdfPageHeight }
-      });
-
-      if (aiResult?.headerHeight && typeof aiResult.headerHeight === 'number') {
-        setRebrandCoverHeight(Math.round(Math.min(Math.max(aiResult.headerHeight, 30), 150)));
-      }
-    } catch (err) {
-      console.warn('AI header detection failed, using default:', err);
-    } finally {
-      setDetectingHeader(false);
-    }
-  };
-
-  const handleRebrand = async () => {
-    if (!selectedRebrandFile) return;
-
-    // For Excel/CSV files, route through the existing Excel import flow
-    if (isExcelFile(selectedRebrandFile)) {
-      setShowRebrandDialog(false);
-      await handleExcelUpload(selectedRebrandFile);
-      return;
-    }
-
-    setRebranding(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const fileBytes = await selectedRebrandFile.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(fileBytes);
-      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
-      // Try to embed the logo
-      let logoImage: any = null;
-      try {
-        const logoResponse = await fetch('/images/vibe-logo.png');
-        const logoBytes = await logoResponse.arrayBuffer();
-        logoImage = await pdfDoc.embedPng(new Uint8Array(logoBytes));
-      } catch (e) {
-        console.warn('Could not embed logo, using text fallback');
-      }
-
-      const pages = pdfDoc.getPages();
-      for (const page of pages) {
-        const { width, height } = page.getSize();
-        const coverH = rebrandCoverHeight;
-        
-        // White out the top area
-        page.drawRectangle({
-          x: 0,
-          y: height - coverH,
-          width: width,
-          height: coverH,
-          color: rgb(1, 1, 1),
-        });
-
-        // Add Vibe branding
-        const brandY = height - 25;
-        page.drawText('ArmorPak Inc. DBA Vibe Packaging', {
-          x: 20,
-          y: brandY,
-          size: 12,
-          font: helveticaBold,
-          color: rgb(0.298, 0.686, 0.314), // #4CAF50
-        });
-
-        page.drawText('1415 S 700 W, Salt Lake City, UT 84104', {
-          x: 20,
-          y: brandY - 14,
-          size: 8,
-          font: helvetica,
-          color: rgb(0.39, 0.39, 0.39),
-        });
-
-        page.drawText('www.vibepkg.com', {
-          x: 20,
-          y: brandY - 23,
-          size: 8,
-          font: helvetica,
-          color: rgb(0.39, 0.39, 0.39),
-        });
-
-        // Logo on the right side
-        if (logoImage) {
-          const logoW = 50;
-          const logoH = (logoImage.height / logoImage.width) * logoW;
-          page.drawImage(logoImage, {
-            x: width - logoW - 20,
-            y: height - logoH - 10,
-            width: logoW,
-            height: logoH,
-          });
-        }
-      }
-
-      const modifiedBytes = await pdfDoc.save();
-      const pdfBlob = new Blob([modifiedBytes as unknown as ArrayBuffer], { type: 'application/pdf' });
-      const fileName = `${invoiceId}/${Date.now()}-rebranded-${selectedRebrandFile.name}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('packing-lists')
-        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
-
-      if (uploadError) throw uploadError;
-
-      const { error: dbError } = await supabase
-        .from('invoice_packing_lists')
-        .insert({
-          invoice_id: invoiceId,
-          file_name: `rebranded-${selectedRebrandFile.name}`,
-          file_path: fileName,
-          file_size: pdfBlob.size,
-          file_type: 'application/pdf',
-          source: 'rebranded',
-          created_by: user?.id,
-          notes: notes || `Rebranded from: ${selectedRebrandFile.name}`
-        });
-
-      if (dbError) throw dbError;
-
-      toast({ title: "Packing List Rebranded", description: "Vendor branding replaced with Vibe branding successfully" });
-      setShowRebrandDialog(false);
-      if (rebrandPreviewUrl) URL.revokeObjectURL(rebrandPreviewUrl);
-      fetchPackingLists();
-    } catch (error: any) {
-      console.error('Rebrand error:', error);
-      toast({ title: "Rebrand Failed", description: error.message || "Failed to rebrand PDF", variant: "destructive" });
-    } finally {
-      setRebranding(false);
-    }
   };
 
   const handleView = async (packingList: PackingListFile) => {
@@ -1701,88 +1514,16 @@ export const InvoicePackingListSection = ({
         </DialogContent>
       </Dialog>
 
-      {/* Rebrand PDF Dialog */}
-      <Dialog open={showRebrandDialog} onOpenChange={(open) => {
-        setShowRebrandDialog(open);
-        if (!open && rebrandPreviewUrl) URL.revokeObjectURL(rebrandPreviewUrl);
-      }}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Upload & Rebrand Packing List</DialogTitle>
-            <DialogDescription>
-              Upload a vendor packing list (PDF or Excel). For PDFs, the vendor's header branding will be replaced with Vibe branding. For Excel files, a branded PDF will be generated from the data.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="rebrandFile">Vendor File</Label>
-              <Input
-                id="rebrandFile"
-                type="file"
-                accept=".pdf,.xlsx,.xls,.csv"
-                ref={rebrandFileInputRef}
-                onChange={handleRebrandFileSelect}
-                className="mt-1"
-              />
-              {selectedRebrandFile && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  Selected: {selectedRebrandFile.name} ({formatFileSize(selectedRebrandFile.size)})
-                </p>
-              )}
-            </div>
-
-            {detectingHeader && (
-              <div className="flex items-center gap-2 text-sm text-primary">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                AI is detecting the vendor header area…
-              </div>
-            )}
-
-            <div>
-              <Label htmlFor="rebrandNotes">Notes (optional)</Label>
-              <Input
-                id="rebrandNotes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add any notes about this packing list"
-                className="mt-1"
-              />
-            </div>
-
-            <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-              <p className="font-medium mb-1">How it works:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li><strong>PDF files:</strong> The vendor's header/logo area is auto-detected and replaced with Vibe branding</li>
-                <li><strong>Excel/CSV files:</strong> Data is extracted and a branded PDF is generated</li>
-                <li>All table data and content is preserved</li>
-              </ul>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRebrandDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleRebrand} 
-              disabled={!selectedRebrandFile || rebranding}
-            >
-              {rebranding ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Rebranding...
-                </>
-              ) : (
-                <>
-                  <Stamp className="h-4 w-4 mr-2" />
-                  Rebrand & Upload
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Rebrand Preview Dialog */}
+      <RebrandPreviewDialog
+        open={showRebrandDialog}
+        onOpenChange={setShowRebrandDialog}
+        invoiceId={invoiceId}
+        invoice={invoice}
+        order={order}
+        editedItems={editedItems}
+        onSuccess={fetchPackingLists}
+      />
     </Card>
   );
 };
