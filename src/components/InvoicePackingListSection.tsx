@@ -1378,7 +1378,7 @@ export const InvoicePackingListSection = ({
                       <span>{format(new Date(pl.created_at), 'MMM d, yyyy h:mm a')}</span>
                       {isVibeAdmin && (
                         <Badge variant="outline" className="text-xs">
-                          {pl.source === 'generated' ? 'Generated' : pl.source === 'excel-import' ? 'From Vendor File' : 'Uploaded'}
+                          {pl.source === 'generated' ? 'Generated' : pl.source === 'excel-import' ? 'From Vendor File' : pl.source === 'rebranded' ? 'Rebranded' : 'Uploaded'}
                         </Badge>
                       )}
                     </div>
