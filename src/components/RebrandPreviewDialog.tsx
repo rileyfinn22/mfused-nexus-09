@@ -185,7 +185,7 @@ export const RebrandPreviewDialog = ({
     }));
 
     const { data: parseResult, error: parseError } = await supabase.functions.invoke("parse-packing-list", {
-      body: { fileContent: imageBase64, orderItems, fileName: file.name, isBase64: true },
+      body: { fileContent: `data:image/jpeg;base64,${imageBase64}`, orderItems, fileName: file.name, isBase64: true, inputType: "image" },
     });
 
     if (parseError) throw parseError;
