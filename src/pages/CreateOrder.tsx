@@ -395,32 +395,6 @@ const CreateOrder = () => {
     }
   };
 
-  const loadCompanyAddresses = async () => {
-    if (!selectedCompanyId) return;
-
-    const { data: addressData } = await supabase
-      .from('customer_addresses')
-      .select('*')
-      .eq('company_id', selectedCompanyId)
-      .order('is_default', { ascending: false });
-
-    if (addressData) {
-      setSavedAddresses(addressData);
-    }
-
-    const { data: companyData } = await supabase
-      .from('companies')
-      .select('name')
-      .eq('id', selectedCompanyId)
-      .single();
-
-    if (companyData) {
-      setFormData(prev => ({
-        ...prev,
-        customerName: companyData.name,
-      }));
-    }
-  };
 
   useEffect(() => {
     const fetchProductTemplates = async () => {
