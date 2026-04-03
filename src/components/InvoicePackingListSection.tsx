@@ -1701,88 +1701,16 @@ export const InvoicePackingListSection = ({
         </DialogContent>
       </Dialog>
 
-      {/* Rebrand PDF Dialog */}
-      <Dialog open={showRebrandDialog} onOpenChange={(open) => {
-        setShowRebrandDialog(open);
-        if (!open && rebrandPreviewUrl) URL.revokeObjectURL(rebrandPreviewUrl);
-      }}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Upload & Rebrand Packing List</DialogTitle>
-            <DialogDescription>
-              Upload a vendor packing list (PDF or Excel). For PDFs, the vendor's header branding will be replaced with Vibe branding. For Excel files, a branded PDF will be generated from the data.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="rebrandFile">Vendor File</Label>
-              <Input
-                id="rebrandFile"
-                type="file"
-                accept=".pdf,.xlsx,.xls,.csv"
-                ref={rebrandFileInputRef}
-                onChange={handleRebrandFileSelect}
-                className="mt-1"
-              />
-              {selectedRebrandFile && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  Selected: {selectedRebrandFile.name} ({formatFileSize(selectedRebrandFile.size)})
-                </p>
-              )}
-            </div>
-
-            {detectingHeader && (
-              <div className="flex items-center gap-2 text-sm text-primary">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                AI is detecting the vendor header area…
-              </div>
-            )}
-
-            <div>
-              <Label htmlFor="rebrandNotes">Notes (optional)</Label>
-              <Input
-                id="rebrandNotes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add any notes about this packing list"
-                className="mt-1"
-              />
-            </div>
-
-            <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-              <p className="font-medium mb-1">How it works:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li><strong>PDF files:</strong> The vendor's header/logo area is auto-detected and replaced with Vibe branding</li>
-                <li><strong>Excel/CSV files:</strong> Data is extracted and a branded PDF is generated</li>
-                <li>All table data and content is preserved</li>
-              </ul>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRebrandDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleRebrand} 
-              disabled={!selectedRebrandFile || rebranding}
-            >
-              {rebranding ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Rebranding...
-                </>
-              ) : (
-                <>
-                  <Stamp className="h-4 w-4 mr-2" />
-                  Rebrand & Upload
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Rebrand Preview Dialog */}
+      <RebrandPreviewDialog
+        open={showRebrandDialog}
+        onOpenChange={setShowRebrandDialog}
+        invoiceId={invoiceId}
+        invoice={invoice}
+        order={order}
+        editedItems={editedItems}
+        onSuccess={fetchPackingLists}
+      />
     </Card>
   );
 };
