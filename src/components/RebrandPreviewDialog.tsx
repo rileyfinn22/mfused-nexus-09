@@ -120,11 +120,10 @@ export const RebrandPreviewDialog = ({
         setStatusText("Parsing vendor file…");
         resultBlob = await processExcelFile(selectedFile);
       } else {
-        // For PDFs: render to image, extract data with AI, then generate branded PDF
-        setStatusText("Rendering vendor PDF…");
-        const imageBase64 = await renderPdfToImage(selectedFile);
-        setStatusText("AI is extracting packing list data…");
-        resultBlob = await processPdfViaAI(selectedFile, imageBase64);
+        setStatusText("Detecting vendor header…");
+        const coverH = await detectHeaderHeight(selectedFile);
+        setStatusText("Rebranding PDF…");
+        resultBlob = await rebrandPdf(selectedFile, coverH);
       }
 
       const url = URL.createObjectURL(resultBlob);
@@ -138,61 +137,86 @@ export const RebrandPreviewDialog = ({
     }
   };
 
-  const renderPdfToImage = async (file: File): Promise<string> => {
-    const pdfjsLib = await import("pdfjs-dist");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-    const arrayBuf = await file.arrayBuffer();
-    const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
-    
-    // Render all pages into one tall image for better extraction
-    const canvases: HTMLCanvasElement[] = [];
-    for (let i = 1; i <= pdfDoc.numPages; i++) {
-      const page = await pdfDoc.getPage(i);
-      const viewport = page.getViewport({ scale: 2 });
+  const detectHeaderHeight = async (file: File): Promise<number> => {
+    try {
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+      const arrayBuf = await file.arrayBuffer();
+      const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
+      const page = await pdfDoc.getPage(1);
+      const viewport = page.getViewport({ scale: 1.5 });
       const canvas = document.createElement("canvas");
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       const ctx = canvas.getContext("2d")!;
       await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
-      canvases.push(canvas);
-    }
 
-    // If single page, just return it
-    if (canvases.length === 1) {
-      return canvases[0].toDataURL("image/jpeg", 0.8).split(",")[1];
-    }
+      const imageBase64 = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
+      const pdfPageHeight = page.getViewport({ scale: 1 }).height;
 
-    // Stitch multiple pages vertically
-    const totalH = canvases.reduce((s, c) => s + c.height, 0);
-    const maxW = Math.max(...canvases.map(c => c.width));
-    const stitched = document.createElement("canvas");
-    stitched.width = maxW;
-    stitched.height = totalH;
-    const sCtx = stitched.getContext("2d")!;
-    let yOff = 0;
-    for (const c of canvases) {
-      sCtx.drawImage(c, 0, yOff);
-      yOff += c.height;
+      const { data: aiResult } = await supabase.functions.invoke("analyze-header-height", {
+        body: { imageBase64, pdfPageHeight },
+      });
+
+      if (aiResult?.headerHeight && typeof aiResult.headerHeight === "number") {
+        return Math.round(Math.min(Math.max(aiResult.headerHeight, 30), 150));
+      }
+    } catch (err) {
+      console.warn("AI header detection failed, using default:", err);
     }
-    return stitched.toDataURL("image/jpeg", 0.7).split(",")[1];
+    return 70;
   };
 
-  const processPdfViaAI = async (file: File, imageBase64: string): Promise<Blob> => {
-    // Send the rendered image to parse-packing-list for extraction
-    const orderItems = (order?.order_items || editedItems).map((item: any) => ({
-      id: item.id, name: item.name, sku: item.sku,
-      quantity: item.quantity, shipped_quantity: item.shipped_quantity || 0,
-    }));
+  const rebrandPdf = async (file: File, coverH: number): Promise<Blob> => {
+    const fileBytes = await file.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(fileBytes);
+    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    const { data: parseResult, error: parseError } = await supabase.functions.invoke("parse-packing-list", {
-      body: { fileContent: `data:image/jpeg;base64,${imageBase64}`, orderItems, fileName: file.name, isBase64: true, inputType: "image" },
-    });
+    let logoImage: any = null;
+    try {
+      const logoResponse = await fetch("/images/vibe-logo.png");
+      const logoBytes = await logoResponse.arrayBuffer();
+      logoImage = await pdfDoc.embedPng(new Uint8Array(logoBytes));
+    } catch {
+      console.warn("Could not embed logo");
+    }
 
-    if (parseError) throw parseError;
-    if (parseResult?.error) throw new Error(parseResult.error);
+    const pages = pdfDoc.getPages();
+    for (const page of pages) {
+      const { width, height } = page.getSize();
+      page.drawRectangle({ x: 0, y: height - coverH, width, height: coverH, color: rgb(1, 1, 1) });
 
-    setStatusText("Generating branded PDF…");
-    return generateBrandedPdf(parseResult);
+      const brandY = height - 25;
+      page.drawText("ArmorPak Inc. DBA Vibe Packaging", {
+        x: 20, y: brandY, size: 12, font: helveticaBold,
+        color: rgb(0.298, 0.686, 0.314),
+      });
+      page.drawText("1415 S 700 W", {
+        x: 20, y: brandY - 14, size: 8, font: helvetica,
+        color: rgb(0.39, 0.39, 0.39),
+      });
+      page.drawText("Salt Lake City, UT 84104", {
+        x: 20, y: brandY - 23, size: 8, font: helvetica,
+        color: rgb(0.39, 0.39, 0.39),
+      });
+      page.drawText("www.vibepkg.com", {
+        x: 20, y: brandY - 32, size: 8, font: helvetica,
+        color: rgb(0.39, 0.39, 0.39),
+      });
+
+      if (logoImage) {
+        const logoW = 50;
+        const logoH = (logoImage.height / logoImage.width) * logoW;
+        page.drawImage(logoImage, {
+          x: width - logoW - 20, y: height - logoH - 10,
+          width: logoW, height: logoH,
+        });
+      }
+    }
+
+    const modifiedBytes = await pdfDoc.save();
+    return new Blob([modifiedBytes as unknown as ArrayBuffer], { type: "application/pdf" });
   };
 
   const processExcelFile = async (file: File): Promise<Blob> => {
