@@ -321,15 +321,22 @@ const Products = () => {
     try {
       const { data, error } = await supabase
         .from('artwork_files')
-        .select('sku, preview_url, artwork_url')
+        .select('sku, filename, preview_url, artwork_url')
         .eq('is_approved', true);
 
       if (error) throw error;
 
       const thumbnailMap: Record<string, string> = {};
-      data?.forEach(artwork => {
-        if (!thumbnailMap[artwork.sku]) {
-          thumbnailMap[artwork.sku] = artwork.preview_url || artwork.artwork_url;
+      data?.forEach((artwork) => {
+        if (thumbnailMap[artwork.sku]) return;
+
+        if (isUsableArtworkPreviewUrl(artwork.filename, artwork.preview_url)) {
+          thumbnailMap[artwork.sku] = artwork.preview_url;
+          return;
+        }
+
+        if (artwork.artwork_url) {
+          thumbnailMap[artwork.sku] = artwork.artwork_url;
         }
       });
       setArtworkThumbnails(thumbnailMap);
