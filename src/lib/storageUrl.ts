@@ -6,6 +6,27 @@ export const resolveStorageSignedUrl = (signedUrl: string) => {
   return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1${normalizedPath}`;
 };
 
+export const normalizeStorageObjectPath = (filePath: string) => {
+  if (!filePath) return filePath;
+  return filePath.split("#")[0];
+};
+
+export const sanitizeStorageFileName = (name: string) => {
+  const trimmedName = name.trim();
+  const lastDot = trimmedName.lastIndexOf(".");
+  const ext = lastDot > 0 ? trimmedName.slice(lastDot).toLowerCase() : "";
+  const baseName = lastDot > 0 ? trimmedName.slice(0, lastDot) : trimmedName;
+
+  const sanitizedBaseName = baseName
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 100);
+
+  return `${sanitizedBaseName || "file"}${ext}`;
+};
+
 export const triggerSignedFileDownload = async (signedUrl: string, fileName: string) => {
   const resolvedUrl = resolveStorageSignedUrl(signedUrl);
 
