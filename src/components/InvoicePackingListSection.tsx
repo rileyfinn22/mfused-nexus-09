@@ -30,7 +30,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateInvoiceTotals } from "@/lib/invoiceTotals";
-import { normalizeStorageObjectPath, resolveStorageSignedUrl, sanitizeStorageFileName, triggerSignedFileDownload } from "@/lib/storageUrl";
+import { normalizeStorageObjectPath, openSignedFileInNewTab, sanitizeStorageFileName, triggerSignedFileDownload } from "@/lib/storageUrl";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -1077,8 +1077,6 @@ export const InvoicePackingListSection = ({
   };
 
   const handleView = async (packingList: PackingListFile) => {
-    const newTab = window.open("", "_blank", "noopener,noreferrer");
-
     const normalizedFilePath = normalizeStorageObjectPath(packingList.file_path);
 
     const { data, error } = await supabase.storage
@@ -1086,7 +1084,6 @@ export const InvoicePackingListSection = ({
       .createSignedUrl(normalizedFilePath, 3600);
 
     if (error) {
-      newTab?.close();
       toast({
         title: "Error",
         description: `Failed to open file: ${error.message}`,
@@ -1097,16 +1094,15 @@ export const InvoicePackingListSection = ({
     }
 
     if (data?.signedUrl) {
-      const resolvedUrl = resolveStorageSignedUrl(data.signedUrl);
-
-      if (newTab) {
-        newTab.location.href = resolvedUrl;
-        return;
-      }
-
-      const popup = window.open(resolvedUrl, "_blank", "noopener,noreferrer");
-      if (!popup) {
-        window.location.href = resolvedUrl;
+      try {
+        await openSignedFileInNewTab(data.signedUrl);
+      } catch (fetchError: any) {
+        console.error("handleView fetch/open error:", fetchError, "path:", normalizedFilePath);
+        toast({
+          title: "Error",
+          description: fetchError?.message || "Failed to open file",
+          variant: "destructive"
+        });
       }
     } else {
       toast({
@@ -1135,7 +1131,16 @@ export const InvoicePackingListSection = ({
     }
 
     if (data?.signedUrl) {
-      await triggerSignedFileDownload(data.signedUrl, packingList.file_name);
+      try {
+        await triggerSignedFileDownload(data.signedUrl, packingList.file_name);
+      } catch (downloadError: any) {
+        console.error("handleDownload fetch/download error:", downloadError, "path:", normalizedFilePath);
+        toast({
+          title: "Error",
+          description: downloadError?.message || "Failed to download file",
+          variant: "destructive"
+        });
+      }
     } else {
       toast({
         title: "Error",

@@ -48,7 +48,7 @@ export const triggerSignedFileDownload = async (signedUrl: string, fileName: str
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(objectUrl);
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
   } catch {
     const fallbackLink = document.createElement("a");
     fallbackLink.href = resolvedUrl;
@@ -58,4 +58,29 @@ export const triggerSignedFileDownload = async (signedUrl: string, fileName: str
     fallbackLink.click();
     document.body.removeChild(fallbackLink);
   }
+};
+
+export const openSignedFileInNewTab = async (signedUrl: string) => {
+  const resolvedUrl = resolveStorageSignedUrl(signedUrl);
+  const response = await fetch(resolvedUrl);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch file: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const popup = window.open(objectUrl, "_blank");
+
+  if (!popup) {
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 };
