@@ -881,7 +881,7 @@ const CreateOrder = () => {
         // Add extracted products to order
         if (functionData?.items && Array.isArray(functionData.items)) {
           const additions: OrderItem[] = [];
-          const newUnmatched: any[] = [];
+          const newUnmatched: UnmatchedPoItem[] = [];
 
           for (const item of functionData.items) {
             if (item.product_id) {
@@ -896,7 +896,7 @@ const CreateOrder = () => {
                 poLineQty: item.quantity || null,
               });
             } else {
-              newUnmatched.push(item);
+              newUnmatched.push(buildUnmatchedPoItem(item));
             }
           }
 
