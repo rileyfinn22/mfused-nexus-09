@@ -236,7 +236,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         templateId = inserted.id;
       }
 
-      // Sync company assignments
+      // Sync company assignments & auto-create products
       if (templateId) {
         // Delete existing assignments
         await supabase.from("print_template_companies").delete().eq("template_id", templateId);
@@ -247,6 +247,41 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
             company_id: cid,
           }));
           await supabase.from("print_template_companies").insert(rows as any);
+        }
+
+        // Auto-create products for each assigned company (if not already linked)
+        const companyIdsToSync = isGlobal ? companies.map((c: any) => c.id) : assignedCompanyIds;
+        for (const companyId of companyIdsToSync) {
+          // Check if a product already exists for this template + company
+          const { data: existingProduct } = await supabase
+            .from("products")
+            .select("id")
+            .eq("print_template_id", templateId as any)
+            .eq("company_id", companyId)
+            .maybeSingle();
+
+          if (!existingProduct) {
+            const itemId = `PT-${name.trim().replace(/\s+/g, "-").toUpperCase().slice(0, 20)}`;
+            await supabase.from("products").insert({
+              name: name.trim(),
+              company_id: companyId,
+              print_template_id: templateId,
+              product_type: productType,
+              price: presetPrice ? Number(presetPrice) : 0,
+              image_url: thumbnailUrl || template?.thumbnail_url || null,
+              item_id: itemId,
+              description: description.trim() || null,
+            } as any);
+          } else {
+            // Update existing product to stay in sync
+            await supabase.from("products").update({
+              name: name.trim(),
+              price: presetPrice ? Number(presetPrice) : 0,
+              image_url: thumbnailUrl || template?.thumbnail_url || null,
+              product_type: productType,
+              description: description.trim() || null,
+            } as any).eq("id", existingProduct.id);
+          }
         }
       }
 
