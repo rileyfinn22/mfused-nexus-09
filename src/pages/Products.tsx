@@ -170,6 +170,9 @@ const Products = () => {
   };
 
   const fetchProducts = async () => {
+    // Don't fetch until we have an active company (prevents showing all companies' data)
+    if (!isVibeAdmin && !activeCompanyId) return;
+
     try {
       let query = supabase
         .from('products')
@@ -182,7 +185,7 @@ const Products = () => {
         if (companyFilter !== 'all') {
           query = query.eq('company_id', companyFilter);
         }
-      } else if (activeCompanyId) {
+      } else {
         query = query.eq('company_id', activeCompanyId);
       }
 
