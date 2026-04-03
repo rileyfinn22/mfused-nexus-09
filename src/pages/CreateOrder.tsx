@@ -2639,14 +2639,13 @@ const CreateOrder = () => {
                   </TableHeader>
                   <TableBody>
                     {unmatchedPoItems.map((item) => {
-                      // Only show products from the selected company
+                      const itemKey = getUnmatchedPoItemKey(item);
                       const companyFilteredProducts = availableProducts;
-
-                      const selectedProduct = companyFilteredProducts.find(p => p.id === matchingProductId[item.id]);
+                      const selectedProduct = companyFilteredProducts.find(p => p.id === matchingProductId[itemKey]);
 
                       return (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                        <TableRow key={itemKey}>
+                          <TableCell className="font-mono text-xs">{item.sku || item.catalogItemId || '-'}</TableCell>
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">${Number(item.unit_price).toFixed(3)}</TableCell>
@@ -2654,29 +2653,54 @@ const CreateOrder = () => {
                             ${((Number(item.quantity) || 0) * (Number(item.unit_price) || 0)).toFixed(2)}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAddUnmatchedAsProduct(item)}
-                                className="whitespace-nowrap"
-                              >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add to Catalog
-                              </Button>
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                                <Input
+                                  value={item.catalogItemId}
+                                  onChange={(e) => updateUnmatchedPoItem(itemKey, { catalogItemId: e.target.value })}
+                                  placeholder="Item ID / SKU"
+                                  className="h-8"
+                                />
+                                <Select
+                                  value={item.catalogTemplateId || 'none'}
+                                  onValueChange={(value) => updateUnmatchedPoItem(itemKey, { catalogTemplateId: value === 'none' ? null : value })}
+                                >
+                                  <SelectTrigger className="h-8">
+                                    <SelectValue placeholder="Add to template" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Catalog only</SelectItem>
+                                    {productTemplates.map((template) => (
+                                      <SelectItem key={template.id} value={template.id}>
+                                        {template.name}{template.state ? ` (${template.state})` : ''}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleAddUnmatchedAsProduct(item)}
+                                  className="whitespace-nowrap"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add to Catalog
+                                </Button>
+                              </div>
+
                               <Popover 
-                                open={openCombobox[item.id]} 
-                                onOpenChange={(open) => setOpenCombobox({ ...openCombobox, [item.id]: open })}
+                                open={openCombobox[itemKey]} 
+                                onOpenChange={(open) => setOpenCombobox({ ...openCombobox, [itemKey]: open })}
                               >
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
                                     role="combobox"
-                                    aria-expanded={openCombobox[item.id]}
-                                    className="w-[200px] justify-between h-8"
+                                    aria-expanded={openCombobox[itemKey]}
+                                    className="w-full justify-between h-8"
                                   >
-                                    {selectedProduct ? (selectedProduct.item_id || selectedProduct.name) : "Match to product..."}
+                                    {selectedProduct ? (selectedProduct.item_id || selectedProduct.name) : "Add existing catalog product to order..."}
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                   </Button>
                                 </PopoverTrigger>
@@ -2691,7 +2715,7 @@ const CreateOrder = () => {
                                             key={product.id}
                                             value={`${product.item_id || ''} ${product.state ? product.state + ' ' : ''}${product.name}`}
                                             onSelect={() => {
-                                              setMatchingProductId({ ...matchingProductId, [item.id]: product.id });
+                                              setMatchingProductId({ ...matchingProductId, [itemKey]: product.id });
                                               handleMatchUnmatchedItem(item, product.id);
                                             }}
                                             className="cursor-pointer"
@@ -2699,7 +2723,7 @@ const CreateOrder = () => {
                                             <Check
                                               className={cn(
                                                 "mr-2 h-4 w-4",
-                                                matchingProductId[item.id] === product.id ? "opacity-100" : "opacity-0"
+                                                matchingProductId[itemKey] === product.id ? "opacity-100" : "opacity-0"
                                               )}
                                             />
                                             <div className="flex flex-col">
