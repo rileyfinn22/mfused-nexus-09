@@ -273,8 +273,12 @@ const Products = () => {
             .select('id', { count: 'exact', head: true })
             .eq('template_id', template.id);
 
-          if (companyFilter !== 'all') {
-            query = query.eq('company_id', companyFilter);
+          if (isVibeAdmin) {
+            if (companyFilter !== 'all') {
+              query = query.eq('company_id', companyFilter);
+            }
+          } else if (activeCompanyId) {
+            query = query.eq('company_id', activeCompanyId);
           }
 
           const { count } = await query;
