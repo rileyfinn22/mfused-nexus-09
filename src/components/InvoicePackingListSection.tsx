@@ -81,14 +81,8 @@ export const InvoicePackingListSection = ({
   const [selectedExcelFile, setSelectedExcelFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
   const [showRebrandDialog, setShowRebrandDialog] = useState(false);
-  const [selectedRebrandFile, setSelectedRebrandFile] = useState<File | null>(null);
-  const [rebrandCoverHeight, setRebrandCoverHeight] = useState(70);
-  const [rebrandPreviewUrl, setRebrandPreviewUrl] = useState<string | null>(null);
-  const [rebranding, setRebranding] = useState(false);
-  const [detectingHeader, setDetectingHeader] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
-  const rebrandFileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch packing lists on mount
   useEffect(() => {
