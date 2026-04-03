@@ -121,11 +121,11 @@ export const RebrandPreviewDialog = ({
         setStatusText("Parsing vendor file…");
         resultBlob = await processExcelFile(selectedFile);
       } else {
-        setStatusText("Detecting vendor header…");
-        const coverH = await detectHeaderHeight(selectedFile);
-        setRebrandCoverHeight(coverH);
-        setStatusText("Rebranding PDF…");
-        resultBlob = await rebrandPdf(selectedFile, coverH);
+        // For PDFs: render to image, extract data with AI, then generate branded PDF
+        setStatusText("Rendering vendor PDF…");
+        const imageBase64 = await renderPdfToImage(selectedFile);
+        setStatusText("AI is extracting packing list data…");
+        resultBlob = await processPdfViaAI(selectedFile, imageBase64);
       }
 
       const url = URL.createObjectURL(resultBlob);
@@ -137,6 +137,63 @@ export const RebrandPreviewDialog = ({
       toast({ title: "Processing Failed", description: error.message || "Failed to process file", variant: "destructive" });
       setStep("pick");
     }
+  };
+
+  const renderPdfToImage = async (file: File): Promise<string> => {
+    const pdfjsLib = await import("pdfjs-dist");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    const arrayBuf = await file.arrayBuffer();
+    const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
+    
+    // Render all pages into one tall image for better extraction
+    const canvases: HTMLCanvasElement[] = [];
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const page = await pdfDoc.getPage(i);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d")!;
+      await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
+      canvases.push(canvas);
+    }
+
+    // If single page, just return it
+    if (canvases.length === 1) {
+      return canvases[0].toDataURL("image/jpeg", 0.8).split(",")[1];
+    }
+
+    // Stitch multiple pages vertically
+    const totalH = canvases.reduce((s, c) => s + c.height, 0);
+    const maxW = Math.max(...canvases.map(c => c.width));
+    const stitched = document.createElement("canvas");
+    stitched.width = maxW;
+    stitched.height = totalH;
+    const sCtx = stitched.getContext("2d")!;
+    let yOff = 0;
+    for (const c of canvases) {
+      sCtx.drawImage(c, 0, yOff);
+      yOff += c.height;
+    }
+    return stitched.toDataURL("image/jpeg", 0.7).split(",")[1];
+  };
+
+  const processPdfViaAI = async (file: File, imageBase64: string): Promise<Blob> => {
+    // Send the rendered image to parse-packing-list for extraction
+    const orderItems = (order?.order_items || editedItems).map((item: any) => ({
+      id: item.id, name: item.name, sku: item.sku,
+      quantity: item.quantity, shipped_quantity: item.shipped_quantity || 0,
+    }));
+
+    const { data: parseResult, error: parseError } = await supabase.functions.invoke("parse-packing-list", {
+      body: { fileContent: imageBase64, orderItems, fileName: file.name, isBase64: true },
+    });
+
+    if (parseError) throw parseError;
+    if (parseResult?.error) throw new Error(parseResult.error);
+
+    setStatusText("Generating branded PDF…");
+    return generateBrandedPdf(parseResult);
   };
 
   const detectHeaderHeight = async (file: File): Promise<number> => {
