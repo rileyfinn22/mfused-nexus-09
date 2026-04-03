@@ -182,11 +182,12 @@ const CreateOrder = () => {
   const [tempSelectedProducts, setTempSelectedProducts] = useState<string[]>([]);
   const [existingOrderNumber, setExistingOrderNumber] = useState<string | null>(null);
   
-  const [unmatchedPoItems, setUnmatchedPoItems] = useState<any[]>([]);
+  const [unmatchedPoItems, setUnmatchedPoItems] = useState<UnmatchedPoItem[]>([]);
   const [poDocumentTotal, setPoDocumentTotal] = useState<number | null>(null);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [productTemplates, setProductTemplates] = useState<ProductTemplateOption[]>([]);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
