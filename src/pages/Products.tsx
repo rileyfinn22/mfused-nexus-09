@@ -688,6 +688,26 @@ const Products = () => {
     (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const getTemplateDisplayThumbnail = (template: ProductTemplate) => {
+    const templateProducts = products.filter((product) => product.template_id === template.id);
+
+    for (const product of templateProducts) {
+      const artworkThumbnail =
+        (product.item_id && artworkThumbnails[product.item_id]) ||
+        (product.sku && artworkThumbnails[product.sku]);
+
+      if (artworkThumbnail) {
+        return artworkThumbnail;
+      }
+    }
+
+    if (template.thumbnail_url && !isLegacyGeneratedTemplateMockupUrl(template.thumbnail_url)) {
+      return template.thumbnail_url;
+    }
+
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
