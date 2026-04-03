@@ -170,6 +170,9 @@ const Products = () => {
   };
 
   const fetchProducts = async () => {
+    // Don't fetch until we have an active company (prevents showing all companies' data)
+    if (!isVibeAdmin && !activeCompanyId) return;
+
     try {
       let query = supabase
         .from('products')
@@ -182,7 +185,7 @@ const Products = () => {
         if (companyFilter !== 'all') {
           query = query.eq('company_id', companyFilter);
         }
-      } else if (activeCompanyId) {
+      } else {
         query = query.eq('company_id', activeCompanyId);
       }
 
@@ -243,13 +246,19 @@ const Products = () => {
   };
 
   const fetchTemplates = async () => {
+    if (!isVibeAdmin && !activeCompanyId) return;
+
     try {
       let templatesQuery = supabase
         .from('product_templates')
         .select('*');
 
-      if (companyFilter !== 'all') {
-        templatesQuery = templatesQuery.or(`company_id.eq.${companyFilter},company_id.is.null`);
+      if (isVibeAdmin) {
+        if (companyFilter !== 'all') {
+          templatesQuery = templatesQuery.or(`company_id.eq.${companyFilter},company_id.is.null`);
+        }
+      } else if (activeCompanyId) {
+        templatesQuery = templatesQuery.or(`company_id.eq.${activeCompanyId},company_id.is.null`);
       }
 
       const { data: templatesData, error: templatesError } = await templatesQuery.order('name');
@@ -264,8 +273,12 @@ const Products = () => {
             .select('id', { count: 'exact', head: true })
             .eq('template_id', template.id);
 
-          if (companyFilter !== 'all') {
-            query = query.eq('company_id', companyFilter);
+          if (isVibeAdmin) {
+            if (companyFilter !== 'all') {
+              query = query.eq('company_id', companyFilter);
+            }
+          } else if (activeCompanyId) {
+            query = query.eq('company_id', activeCompanyId);
           }
 
           const { count } = await query;
