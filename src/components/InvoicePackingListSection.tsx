@@ -1089,9 +1089,10 @@ export const InvoicePackingListSection = ({
       newTab?.close();
       toast({
         title: "Error",
-        description: "Failed to open file",
+        description: `Failed to open file: ${error.message}`,
         variant: "destructive"
       });
+      console.error("handleView createSignedUrl error:", error, "path:", normalizedFilePath);
       return;
     }
 
@@ -1124,9 +1125,10 @@ export const InvoicePackingListSection = ({
       .createSignedUrl(normalizedFilePath, 3600, { download: packingList.file_name });
 
     if (error) {
+      console.error("handleDownload createSignedUrl error:", error, "path:", normalizedFilePath);
       toast({
         title: "Error",
-        description: "Failed to download file",
+        description: `Failed to download file: ${error.message}`,
         variant: "destructive"
       });
       return;
