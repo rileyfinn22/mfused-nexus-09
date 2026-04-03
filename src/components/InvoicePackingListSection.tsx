@@ -272,7 +272,7 @@ export const InvoicePackingListSection = ({
         body: {
           fileContent,
           orderItems,
-          fileName: selectedExcelFile.name,
+          fileName: excelFile.name,
           isBase64: true
         }
       });
