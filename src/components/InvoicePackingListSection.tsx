@@ -1149,14 +1149,8 @@ export const InvoicePackingListSection = ({
 
     // For Excel/CSV files, route through the existing Excel import flow
     if (isExcelFile(selectedRebrandFile)) {
-      // Set the excel file state and close rebrand dialog, then open excel dialog to process
-      setSelectedExcelFile(selectedRebrandFile);
       setShowRebrandDialog(false);
-      setShowExcelUploadDialog(true);
-      // Trigger upload after state updates via a timeout
-      setTimeout(() => {
-        handleExcelUpload();
-      }, 100);
+      await handleExcelUpload(selectedRebrandFile);
       return;
     }
 
