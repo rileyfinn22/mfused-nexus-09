@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
 import { 
   Dialog, 
   DialogContent, 
@@ -23,7 +24,8 @@ import {
   FileCheck,
   Loader2,
   FileSpreadsheet,
-  Package
+  Package,
+  Stamp
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +33,7 @@ import { calculateInvoiceTotals } from "@/lib/invoiceTotals";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 interface PackingListFile {
   id: string;
@@ -76,8 +79,14 @@ export const InvoicePackingListSection = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedExcelFile, setSelectedExcelFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
+  const [showRebrandDialog, setShowRebrandDialog] = useState(false);
+  const [selectedRebrandFile, setSelectedRebrandFile] = useState<File | null>(null);
+  const [rebrandCoverHeight, setRebrandCoverHeight] = useState(70);
+  const [rebrandPreviewUrl, setRebrandPreviewUrl] = useState<string | null>(null);
+  const [rebranding, setRebranding] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
+  const rebrandFileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch packing lists on mount
   useEffect(() => {
@@ -1064,7 +1073,143 @@ export const InvoicePackingListSection = ({
     }
   };
 
-  const handleView = async (packingList: PackingListFile) => {
+  const handleRebrandClick = () => {
+    setSelectedRebrandFile(null);
+    setRebrandCoverHeight(70);
+    setRebrandPreviewUrl(null);
+    setNotes("");
+    setShowRebrandDialog(true);
+  };
+
+  const handleRebrandFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        toast({ title: "Invalid File Type", description: "Please upload a PDF file", variant: "destructive" });
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: "File Too Large", description: "Maximum file size is 10MB", variant: "destructive" });
+        return;
+      }
+      setSelectedRebrandFile(file);
+      // Generate preview
+      const url = URL.createObjectURL(file);
+      setRebrandPreviewUrl(url);
+    }
+  };
+
+  const handleRebrand = async () => {
+    if (!selectedRebrandFile) return;
+    setRebranding(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const fileBytes = await selectedRebrandFile.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(fileBytes);
+      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+      // Try to embed the logo
+      let logoImage: any = null;
+      try {
+        const logoResponse = await fetch('/images/vibe-logo.png');
+        const logoBytes = await logoResponse.arrayBuffer();
+        logoImage = await pdfDoc.embedPng(new Uint8Array(logoBytes));
+      } catch (e) {
+        console.warn('Could not embed logo, using text fallback');
+      }
+
+      const pages = pdfDoc.getPages();
+      for (const page of pages) {
+        const { width, height } = page.getSize();
+        const coverH = rebrandCoverHeight;
+        
+        // White out the top area
+        page.drawRectangle({
+          x: 0,
+          y: height - coverH,
+          width: width,
+          height: coverH,
+          color: rgb(1, 1, 1),
+        });
+
+        // Add Vibe branding
+        const brandY = height - 25;
+        page.drawText('ArmorPak Inc. DBA Vibe Packaging', {
+          x: 20,
+          y: brandY,
+          size: 12,
+          font: helveticaBold,
+          color: rgb(0.298, 0.686, 0.314), // #4CAF50
+        });
+
+        page.drawText('1415 S 700 W, Salt Lake City, UT 84104', {
+          x: 20,
+          y: brandY - 14,
+          size: 8,
+          font: helvetica,
+          color: rgb(0.39, 0.39, 0.39),
+        });
+
+        page.drawText('www.vibepkg.com', {
+          x: 20,
+          y: brandY - 23,
+          size: 8,
+          font: helvetica,
+          color: rgb(0.39, 0.39, 0.39),
+        });
+
+        // Logo on the right side
+        if (logoImage) {
+          const logoW = 50;
+          const logoH = (logoImage.height / logoImage.width) * logoW;
+          page.drawImage(logoImage, {
+            x: width - logoW - 20,
+            y: height - logoH - 10,
+            width: logoW,
+            height: logoH,
+          });
+        }
+      }
+
+      const modifiedBytes = await pdfDoc.save();
+      const pdfBlob = new Blob([modifiedBytes], { type: 'application/pdf' });
+      const fileName = `${invoiceId}/${Date.now()}-rebranded-${selectedRebrandFile.name}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('packing-lists')
+        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+
+      if (uploadError) throw uploadError;
+
+      const { error: dbError } = await supabase
+        .from('invoice_packing_lists')
+        .insert({
+          invoice_id: invoiceId,
+          file_name: `rebranded-${selectedRebrandFile.name}`,
+          file_path: fileName,
+          file_size: pdfBlob.size,
+          file_type: 'application/pdf',
+          source: 'rebranded',
+          created_by: user?.id,
+          notes: notes || `Rebranded from: ${selectedRebrandFile.name}`
+        });
+
+      if (dbError) throw dbError;
+
+      toast({ title: "Packing List Rebranded", description: "Vendor branding replaced with Vibe branding successfully" });
+      setShowRebrandDialog(false);
+      if (rebrandPreviewUrl) URL.revokeObjectURL(rebrandPreviewUrl);
+      fetchPackingLists();
+    } catch (error: any) {
+      console.error('Rebrand error:', error);
+      toast({ title: "Rebrand Failed", description: error.message || "Failed to rebrand PDF", variant: "destructive" });
+    } finally {
+      setRebranding(false);
+    }
+  };
+
+
     // Open the blank tab synchronously to avoid popup blockers
     const newTab = window.open('', '_blank');
     
@@ -1163,6 +1308,14 @@ export const InvoicePackingListSection = ({
               <Button 
                 variant="outline" 
                 size="sm"
+                onClick={handleRebrandClick}
+              >
+                <Stamp className="h-4 w-4 mr-2" />
+                Rebrand PDF
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
                 onClick={handleUploadClick}
               >
                 <Upload className="h-4 w-4 mr-2" />
@@ -1225,7 +1378,7 @@ export const InvoicePackingListSection = ({
                       <span>{format(new Date(pl.created_at), 'MMM d, yyyy h:mm a')}</span>
                       {isVibeAdmin && (
                         <Badge variant="outline" className="text-xs">
-                          {pl.source === 'generated' ? 'Generated' : pl.source === 'excel-import' ? 'From Vendor File' : 'Uploaded'}
+                          {pl.source === 'generated' ? 'Generated' : pl.source === 'excel-import' ? 'From Vendor File' : pl.source === 'rebranded' ? 'Rebranded' : 'Uploaded'}
                         </Badge>
                       )}
                     </div>
@@ -1488,6 +1641,101 @@ export const InvoicePackingListSection = ({
                 <>
                   <Package className="h-4 w-4 mr-2" />
                   Save Shipped Quantities
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rebrand PDF Dialog */}
+      <Dialog open={showRebrandDialog} onOpenChange={(open) => {
+        setShowRebrandDialog(open);
+        if (!open && rebrandPreviewUrl) URL.revokeObjectURL(rebrandPreviewUrl);
+      }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Upload & Rebrand PDF</DialogTitle>
+            <DialogDescription>
+              Upload a vendor packing list PDF. The vendor's header branding will be replaced with Vibe Packaging branding while keeping all other content intact.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="rebrandFile">Vendor PDF</Label>
+              <Input
+                id="rebrandFile"
+                type="file"
+                accept=".pdf"
+                ref={rebrandFileInputRef}
+                onChange={handleRebrandFileSelect}
+                className="mt-1"
+              />
+              {selectedRebrandFile && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Selected: {selectedRebrandFile.name} ({formatFileSize(selectedRebrandFile.size)})
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label>Header Cover Height: {rebrandCoverHeight}pt</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Adjust how much of the top of each page to white-out and replace with Vibe branding
+              </p>
+              <Slider
+                value={[rebrandCoverHeight]}
+                onValueChange={([val]) => setRebrandCoverHeight(val)}
+                min={30}
+                max={150}
+                step={5}
+                className="mt-1"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>30pt (small)</span>
+                <span>150pt (large)</span>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="rebrandNotes">Notes (optional)</Label>
+              <Input
+                id="rebrandNotes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add any notes about this packing list"
+                className="mt-1"
+              />
+            </div>
+
+            <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+              <p className="font-medium mb-1">How it works:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>The vendor's header/logo area is covered with a white rectangle</li>
+                <li>Vibe Packaging branding and logo are stamped on top</li>
+                <li>All table data, formatting, and content stays untouched</li>
+              </ul>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRebrandDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRebrand} 
+              disabled={!selectedRebrandFile || rebranding}
+            >
+              {rebranding ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Rebranding...
+                </>
+              ) : (
+                <>
+                  <Stamp className="h-4 w-4 mr-2" />
+                  Rebrand & Upload
                 </>
               )}
             </Button>
