@@ -1173,7 +1173,7 @@ export const InvoicePackingListSection = ({
       }
 
       const modifiedBytes = await pdfDoc.save();
-      const pdfBlob = new Blob([modifiedBytes], { type: 'application/pdf' });
+      const pdfBlob = new Blob([modifiedBytes.buffer], { type: 'application/pdf' });
       const fileName = `${invoiceId}/${Date.now()}-rebranded-${selectedRebrandFile.name}`;
 
       const { error: uploadError } = await supabase.storage
