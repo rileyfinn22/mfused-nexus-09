@@ -1753,9 +1753,9 @@ export const InvoicePackingListSection = ({
             <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
               <p className="font-medium mb-1">How it works:</p>
               <ul className="list-disc list-inside space-y-1">
-                <li>The vendor's header/logo area is covered with a white rectangle</li>
-                <li>Vibe Packaging branding and logo are stamped on top</li>
-                <li>All table data, formatting, and content stays untouched</li>
+                <li><strong>PDF files:</strong> The vendor's header/logo area is auto-detected and replaced with Vibe branding</li>
+                <li><strong>Excel/CSV files:</strong> Data is extracted and a branded PDF is generated</li>
+                <li>All table data and content is preserved</li>
               </ul>
             </div>
           </div>
