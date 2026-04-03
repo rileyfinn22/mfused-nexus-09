@@ -591,7 +591,7 @@ export const InvoicePackingListSection = ({
       
       // Convert to blob and upload
       const pdfBlob = doc.output('blob');
-      const fileName = `${invoiceId}/${Date.now()}-packing-list-${invoice.invoice_number}.pdf`;
+      const fileName = `${invoiceId}/${Date.now()}-${sanitizeStorageFileName(`packing-list-${invoice.invoice_number}.pdf`)}`;
       
       const { error: uploadError } = await supabase.storage
         .from('packing-lists')
@@ -1019,7 +1019,7 @@ export const InvoicePackingListSection = ({
       
       // Convert to blob and upload
       const pdfBlob = doc.output('blob');
-      const fileName = `${invoiceId}/${Date.now()}-packing-list-${invoice.invoice_number}.pdf`;
+      const fileName = `${invoiceId}/${Date.now()}-${sanitizeStorageFileName(`packing-list-${invoice.invoice_number}.pdf`)}`;
       
       const { error: uploadError } = await supabase.storage
         .from('packing-lists')
