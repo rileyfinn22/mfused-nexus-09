@@ -25,6 +25,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { rebrandSpreadsheetToPdf } from "@/lib/rebrandSpreadsheetPdf";
+import { sanitizeStorageFileName } from "@/lib/storageUrl";
 
 type Step = "pick" | "processing" | "preview" | "ai-edit";
 
@@ -232,7 +233,8 @@ export const RebrandPreviewDialog = ({
       const { data: { user } } = await supabase.auth.getUser();
       const isExcel = isExcelFile(selectedFile);
       const source = isExcel ? "excel-import" : "rebranded";
-      const fileName = `${invoiceId}/${Date.now()}-packing-list-${invoice?.invoice_number || "document"}.pdf`;
+      const storageFileName = sanitizeStorageFileName(`packing-list-${invoice?.invoice_number || "document"}.pdf`);
+      const fileName = `${invoiceId}/${Date.now()}-${storageFileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from("packing-lists")
