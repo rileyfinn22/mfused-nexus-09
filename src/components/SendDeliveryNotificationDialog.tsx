@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Send, X, Plus, Truck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { generateInvoicePDFBase64 } from "@/lib/invoicePdfUtils";
 
 interface LegInfo {
   carrier: string | null;
@@ -27,6 +28,7 @@ interface SendDeliveryNotificationDialogProps {
   customerName: string;
   customerEmail: string | null;
   companyId: string;
+  orderId: string;
   leg: LegInfo;
 }
 
@@ -38,6 +40,7 @@ export function SendDeliveryNotificationDialog({
   customerName,
   customerEmail,
   companyId,
+  orderId,
   leg,
 }: SendDeliveryNotificationDialogProps) {
   const [recipients, setRecipients] = useState<string[]>([]);
@@ -45,9 +48,15 @@ export function SendDeliveryNotificationDialog({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState("accounting@vibepkg.com");
 
   useEffect(() => {
     if (!open) return;
+
+    // Get the current user's email
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setCurrentUserEmail(user.email);
+    });
 
     // Pre-populate defaults
     const descPart = orderDescription ? ` — ${orderDescription}` : "";
@@ -115,13 +124,55 @@ export function SendDeliveryNotificationDialog({
 
     setSending(true);
     try {
+      // Try to find the latest invoice for this order and generate PDF
+      let invoicePdfBase64: string | null = null;
+      let invoiceFileName: string | null = null;
+
+      try {
+        const { data: invoices } = await supabase
+          .from("invoices")
+          .select("*, companies(name)")
+          .eq("order_id", orderId)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (invoices && invoices.length > 0) {
+          const inv = invoices[0];
+
+          // Get order items for the PDF
+          const { data: orderItems } = await supabase
+            .from("order_items")
+            .select("*")
+            .eq("order_id", orderId);
+
+          const { data: orderData } = await supabase
+            .from("orders")
+            .select("order_number, customer_name, po_number, billing_street, billing_city, billing_state, billing_zip, shipping_street, shipping_city, shipping_state, shipping_zip")
+            .eq("id", orderId)
+            .single();
+
+          if (orderData) {
+            invoicePdfBase64 = await generateInvoicePDFBase64(
+              inv,
+              { ...orderData, order_items: orderItems || [] }
+            );
+            invoiceFileName = `Invoice_${inv.invoice_number}.pdf`;
+          }
+        }
+      } catch (pdfErr) {
+        console.warn("Could not generate invoice PDF for attachment:", pdfErr);
+        // Continue without attachment
+      }
+
       const { data, error } = await supabase.functions.invoke(
         "send-delivery-notification",
         {
           body: {
             recipientEmails: recipients,
-            senderEmail: "accounting@vibepkg.com",
+            senderEmail: currentUserEmail,
             orderNumber,
+            orderDescription,
             customerName,
             carrier: leg.carrier,
             trackingNumber: leg.tracking_number,
@@ -132,6 +183,9 @@ export function SendDeliveryNotificationDialog({
             arrivalDate: leg.actual_arrival,
             customSubject: subject,
             customBody: body,
+            orderId,
+            invoicePdfBase64,
+            invoiceFileName,
           },
         }
       );
@@ -191,6 +245,11 @@ export function SendDeliveryNotificationDialog({
             </div>
           </div>
 
+          {/* Sender info */}
+          <div className="rounded-lg border border-muted bg-muted/30 p-3 text-sm text-muted-foreground">
+            Sent from: <strong>{currentUserEmail}</strong>
+          </div>
+
           {/* Tracking info summary */}
           {(leg.carrier || leg.tracking_number) && (
             <div className="rounded-lg border border-green-200 bg-green-50/50 dark:bg-green-950/20 p-3 space-y-1 text-sm">
@@ -221,6 +280,11 @@ export function SendDeliveryNotificationDialog({
               className="resize-y"
             />
           </div>
+
+          {/* Auto-attach note */}
+          <p className="text-xs text-muted-foreground">
+            📎 Invoice PDF will be attached automatically if available for this order.
+          </p>
         </div>
 
         <DialogFooter>
