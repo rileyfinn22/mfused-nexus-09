@@ -36,6 +36,7 @@ const handler = async (req: Request): Promise<Response> => {
       recipientEmails,
       senderEmail,
       orderNumber,
+      orderDescription,
       customerName,
       carrier,
       trackingNumber,
