@@ -626,7 +626,13 @@ Thank you for your business.`;
           pdfFilename: `Invoice-${invoice.invoice_number}.pdf`,
           invoiceNumber: invoice.invoice_number,
           dueDate: invoice.due_date,
-          totalAmount: invoice.total,
+          totalAmount: (() => {
+            const pct = invoice.billed_percentage;
+            const isDep = pct != null && pct > 0 && pct < 100;
+            const effTotal = isDep ? (invoice.total || 0) * (pct / 100) : (invoice.total || 0);
+            const paid = invoice.total_paid || 0;
+            return effTotal - paid;
+          })(),
           customerName: order?.shipping_name || order?.customer_name,
           additionalAttachments: additionalAttachmentsData.length > 0 ? additionalAttachmentsData : undefined,
         },
