@@ -240,8 +240,12 @@ const renderInvoiceToDoc = async (
   }, 0);
   const computedTotal = computedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
 
+  const billedPct = invoice.billed_percentage;
+  const isDeposit = billedPct != null && billedPct > 0 && billedPct < 100;
+  const billedTotal = isDeposit ? computedTotal * (billedPct / 100) : computedTotal;
+
   const totalPaid = invoice.total_paid || 0;
-  const balance = computedTotal - totalPaid;
+  const balance = billedTotal - totalPaid;
   const hasPayments = totalPaid > 0;
   const hasShipping = (invoice.shipping_cost || 0) > 0;
   
@@ -272,10 +276,19 @@ const renderInvoiceToDoc = async (
     }
     totalsY += 3;
   }
+
+  // Deposit line (when billed_percentage < 100)
+  if (isDeposit) {
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Deposit (${billedPct}%)`, totalsX, totalsY);
+    doc.text(formatCurrency(billedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
+    totalsY += 8;
+    doc.setFont('helvetica', 'normal');
+  }
   
   // Less Deposit / Payments
   if (hasPayments) {
-    doc.text('Less Deposit', totalsX, totalsY);
+    doc.text('Less Payments', totalsX, totalsY);
     doc.text(`(${formatCurrency(totalPaid)})`, totalsX + totalsWidth, totalsY, { align: 'right' });
     totalsY += 8;
   }
@@ -291,7 +304,7 @@ const renderInvoiceToDoc = async (
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
   doc.text('BALANCE DUE', totalsX, totalsY);
-  doc.text(formatCurrency(hasPayments ? balance : computedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
+  doc.text(formatCurrency(hasPayments ? balance : billedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
   
   // ============ TERMS / NOTES / FOOTER ============
   // Keep all follow-up content below totals and avoid bottom-of-page overlap.

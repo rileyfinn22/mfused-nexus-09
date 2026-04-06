@@ -481,8 +481,13 @@ Thank you for your business.`;
     const totalsX = pageWidth - totalsWidth - 14;
     
     const emailComputedTotal = computedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
+
+    const billedPct = invoice.billed_percentage;
+    const isDeposit = billedPct != null && billedPct > 0 && billedPct < 100;
+    const billedTotal = isDeposit ? emailComputedTotal * (billedPct / 100) : emailComputedTotal;
+
     const totalPaid = invoice.total_paid || 0;
-    const balance = emailComputedTotal - totalPaid;
+    const balance = billedTotal - totalPaid;
     const hasPayments = totalPaid > 0;
     const hasShipping = (invoice.shipping_cost || 0) > 0;
     
@@ -503,10 +508,19 @@ Thank you for your business.`;
       doc.text(formatCurrency(invoice.shipping_cost || 0), totalsX + totalsWidth, totalsY, { align: 'right' });
       totalsY += 8;
     }
+
+    // Deposit line (when billed_percentage < 100)
+    if (isDeposit) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Deposit (${billedPct}%)`, totalsX, totalsY);
+      doc.text(formatCurrency(billedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
+      totalsY += 8;
+      doc.setFont('helvetica', 'normal');
+    }
     
-    // Less Deposit / Payments
+    // Less Payments
     if (hasPayments) {
-      doc.text('Less Deposit', totalsX, totalsY);
+      doc.text('Less Payments', totalsX, totalsY);
       doc.text(`(${formatCurrency(totalPaid)})`, totalsX + totalsWidth, totalsY, { align: 'right' });
       totalsY += 8;
     }
@@ -522,7 +536,7 @@ Thank you for your business.`;
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
     doc.text('BALANCE DUE', totalsX, totalsY);
-    doc.text(formatCurrency(hasPayments ? balance : emailComputedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
+    doc.text(formatCurrency(hasPayments ? balance : billedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
     
     // ============ TERMS/NOTES SECTION ============
     const termsY = totalsY + 20;
