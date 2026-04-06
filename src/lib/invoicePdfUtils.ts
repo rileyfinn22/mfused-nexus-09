@@ -292,26 +292,29 @@ const renderInvoiceToDoc = async (
   doc.text('BALANCE DUE', totalsX, totalsY);
   doc.text(formatCurrency(hasPayments ? balance : computedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
   
-  // ============ TERMS/NOTES SECTION ============
-  const termsY = totalsY + 20;
-  
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-  doc.text('All remaining amounts are due on the agreed upon terms. Thank you for your business!', 14, termsY);
-  
+  // ============ THANK YOU / NOTES SECTION ============
+  // Position below the balance due line with clear spacing
+  let footerY = totalsY + 16;
+
   // Additional notes if present
   if (invoice.notes) {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text('Notes:', 14, termsY + 10);
+    doc.text('Notes:', 14, footerY);
     
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
     const notesLines = doc.splitTextToSize(invoice.notes, pageWidth - 28);
-    doc.text(notesLines, 14, termsY + 16);
+    doc.text(notesLines, 14, footerY + 6);
+    footerY += 6 + notesLines.length * 5 + 6;
   }
+
+  // Terms line
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+  doc.text('All remaining amounts are due on the agreed upon terms.', 14, footerY);
   
   // ============ FOOTER ============
   doc.setFontSize(9);
