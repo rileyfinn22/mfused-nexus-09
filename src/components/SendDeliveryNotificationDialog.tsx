@@ -34,6 +34,7 @@ export function SendDeliveryNotificationDialog({
   open,
   onOpenChange,
   orderNumber,
+  orderDescription,
   customerName,
   customerEmail,
   companyId,
