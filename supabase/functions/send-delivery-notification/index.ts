@@ -13,6 +13,7 @@ interface DeliveryNotificationRequest {
   recipientEmails: string[];
   senderEmail: string;
   orderNumber: string;
+  orderDescription: string | null;
   customerName: string;
   carrier: string | null;
   trackingNumber: string | null;

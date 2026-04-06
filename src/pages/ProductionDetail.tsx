@@ -1362,6 +1362,7 @@ export default function ProductionDetail() {
           open={!!deliveryNotifLeg}
           onOpenChange={(open) => { if (!open) setDeliveryNotifLeg(null); }}
           orderNumber={order.order_number}
+          orderDescription={order.description}
           customerName={order.customer_name}
           customerEmail={order.customer_email}
           companyId={order.company_id}
