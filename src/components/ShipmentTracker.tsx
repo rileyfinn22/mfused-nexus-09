@@ -69,7 +69,7 @@ const getDateInputValue = (dateStr: string | null) => {
   return dateStr.split('T')[0];
 };
 
-export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArrivalChange, onAddLeg, onAttachmentUpload, onDeleteLeg, onNotesChange }: ShipmentTrackerProps) {
+export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArrivalChange, onAddLeg, onAttachmentUpload, onDeleteLeg, onNotesChange, onSendDeliveryNotification }: ShipmentTrackerProps) {
   const [updatingLeg, setUpdatingLeg] = useState<string | null>(null);
   const [editingNotesLeg, setEditingNotesLeg] = useState<string | null>(null);
   const [notesText, setNotesText] = useState('');
