@@ -50,15 +50,20 @@ export function SendDeliveryNotificationDialog({
     if (!open) return;
 
     // Pre-populate defaults
-    setSubject(`✅ Order ${orderNumber} — Shipment Delivered`);
+    const descPart = orderDescription ? ` — ${orderDescription}` : "";
+    setSubject(`Order ${orderNumber}${descPart} — Shipment Delivered`);
 
-    const arrivalStr = leg.actual_arrival
-      ? new Date(leg.actual_arrival).toLocaleDateString("en-US", {
-          month: "long",
-          day: "numeric",
-          year: "numeric",
-        })
-      : "recently";
+    // Fix timezone: parse date parts to avoid UTC shift
+    let arrivalStr = "recently";
+    if (leg.actual_arrival) {
+      const parts = leg.actual_arrival.split("T")[0].split("-").map(Number);
+      const localDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      arrivalStr = localDate.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
 
     setBody(
       `Dear ${customerName},\n\nGreat news! Your shipment for order ${orderNumber} has been delivered${leg.actual_arrival ? ` on ${arrivalStr}` : ""}.\n\nIf you have any questions about your delivery, please don't hesitate to reach out.`
