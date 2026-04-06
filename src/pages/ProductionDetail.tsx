@@ -21,6 +21,8 @@ interface Order {
   id: string;
   order_number: string;
   customer_name: string;
+  customer_email: string | null;
+  company_id: string;
   status: string;
   description: string | null;
   estimated_delivery_date: string | null;
