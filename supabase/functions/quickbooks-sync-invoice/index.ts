@@ -898,7 +898,7 @@ serve(async (req) => {
         .map((item: any) => `${item.name} (${item.quantity} units)`)
         .join(', ');
       
-      const depositDescription = `${billingPercentage}% Deposit for Order #${orderNumber}${itemDescriptions ? ': ' + itemDescriptions : ''}`;
+      const depositDescription = `${billingPercentage}% Deposit for Order #${invoice.orders?.order_number || invoice.invoice_number}${itemDescriptions ? ': ' + itemDescriptions : ''}`;
       
       // Find or create a Deposit item in QuickBooks
       const depositItemId = await findOrCreateQBItem('Deposit', 'Customer deposit payment', depositAmount);
