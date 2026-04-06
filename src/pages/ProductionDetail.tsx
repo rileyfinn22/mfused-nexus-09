@@ -16,10 +16,13 @@ import { ShipmentTracker, type ShipmentLeg } from "@/components/ShipmentTracker"
 import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipmentLegDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
 import { cn } from "@/lib/utils";
+import { SendDeliveryNotificationDialog } from "@/components/SendDeliveryNotificationDialog";
 interface Order {
   id: string;
   order_number: string;
   customer_name: string;
+  customer_email: string | null;
+  company_id: string;
   status: string;
   description: string | null;
   estimated_delivery_date: string | null;
@@ -313,6 +316,7 @@ export default function ProductionDetail() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [shipmentLegs, setShipmentLegs] = useState<ShipmentLeg[]>([]);
   const [addLegDialogOpen, setAddLegDialogOpen] = useState(false);
+  const [deliveryNotifLeg, setDeliveryNotifLeg] = useState<ShipmentLeg | null>(null);
 
   useEffect(() => {
     checkRole();
@@ -550,6 +554,8 @@ export default function ProductionDetail() {
           id,
           order_number,
           customer_name,
+          customer_email,
+          company_id,
           status,
           description,
           estimated_delivery_date,
@@ -1341,6 +1347,7 @@ export default function ProductionDetail() {
         onAttachmentUpload={isVibeAdmin || isVendor ? handleLegAttachmentUpload : undefined}
         onDeleteLeg={isVibeAdmin ? handleDeleteLeg : undefined}
         onNotesChange={isVibeAdmin || isVendor ? handleLegNotesChange : undefined}
+        onSendDeliveryNotification={isVibeAdmin ? (leg) => setDeliveryNotifLeg(leg) : undefined}
       />
 
       <AddShipmentLegDialog
@@ -1349,6 +1356,18 @@ export default function ProductionDetail() {
         onSubmit={handleAddShipmentLeg}
         nextLegNumber={shipmentLegs.length + 1}
       />
+
+      {order && deliveryNotifLeg && (
+        <SendDeliveryNotificationDialog
+          open={!!deliveryNotifLeg}
+          onOpenChange={(open) => { if (!open) setDeliveryNotifLeg(null); }}
+          orderNumber={order.order_number}
+          customerName={order.customer_name}
+          customerEmail={order.customer_email}
+          companyId={order.company_id}
+          leg={deliveryNotifLeg}
+        />
+      )}
 
       {/* Production Stages Section */}
       {stages.length === 0 ? (

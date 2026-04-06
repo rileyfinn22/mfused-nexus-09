@@ -1,4 +1,4 @@
-import { Ship, ShieldCheck, Truck, ExternalLink, MapPin, Calendar, Clock, Package, Paperclip, Upload, Trash2, MessageSquare } from "lucide-react";
+import { Ship, ShieldCheck, Truck, ExternalLink, MapPin, Calendar, Clock, Package, Paperclip, Upload, Trash2, MessageSquare, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -41,6 +41,7 @@ interface ShipmentTrackerProps {
   onAttachmentUpload?: (legId: string, file: File) => Promise<void>;
   onDeleteLeg?: (legId: string) => Promise<void>;
   onNotesChange?: (legId: string, notes: string) => Promise<void>;
+  onSendDeliveryNotification?: (leg: ShipmentLeg) => void;
 }
 
 const getLegIcon = (legType: string) => {
@@ -68,7 +69,7 @@ const getDateInputValue = (dateStr: string | null) => {
   return dateStr.split('T')[0];
 };
 
-export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArrivalChange, onAddLeg, onAttachmentUpload, onDeleteLeg, onNotesChange }: ShipmentTrackerProps) {
+export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArrivalChange, onAddLeg, onAttachmentUpload, onDeleteLeg, onNotesChange, onSendDeliveryNotification }: ShipmentTrackerProps) {
   const [updatingLeg, setUpdatingLeg] = useState<string | null>(null);
   const [editingNotesLeg, setEditingNotesLeg] = useState<string | null>(null);
   const [notesText, setNotesText] = useState('');
@@ -398,6 +399,18 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                               {leg.attachment_url ? 'Replace' : 'Attach'}
                             </Button>
                           </>
+                        )}
+
+                        {isCompleted && onSendDeliveryNotification && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs text-green-600 border-green-300 hover:bg-green-50"
+                            onClick={() => onSendDeliveryNotification(leg)}
+                          >
+                            <Send className="h-3 w-3 mr-1" />
+                            Send Delivered Notice
+                          </Button>
                         )}
                       </div>
                     )}
