@@ -554,6 +554,8 @@ export default function ProductionDetail() {
           id,
           order_number,
           customer_name,
+          customer_email,
+          company_id,
           status,
           description,
           estimated_delivery_date,
