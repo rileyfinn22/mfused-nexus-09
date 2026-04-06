@@ -1347,6 +1347,7 @@ export default function ProductionDetail() {
         onAttachmentUpload={isVibeAdmin || isVendor ? handleLegAttachmentUpload : undefined}
         onDeleteLeg={isVibeAdmin ? handleDeleteLeg : undefined}
         onNotesChange={isVibeAdmin || isVendor ? handleLegNotesChange : undefined}
+        onSendDeliveryNotification={isVibeAdmin ? (leg) => setDeliveryNotifLeg(leg) : undefined}
       />
 
       <AddShipmentLegDialog
@@ -1355,6 +1356,18 @@ export default function ProductionDetail() {
         onSubmit={handleAddShipmentLeg}
         nextLegNumber={shipmentLegs.length + 1}
       />
+
+      {order && deliveryNotifLeg && (
+        <SendDeliveryNotificationDialog
+          open={!!deliveryNotifLeg}
+          onOpenChange={(open) => { if (!open) setDeliveryNotifLeg(null); }}
+          orderNumber={order.order_number}
+          customerName={order.customer_name}
+          customerEmail={order.customer_email}
+          companyId={order.company_id}
+          leg={deliveryNotifLeg}
+        />
+      )}
 
       {/* Production Stages Section */}
       {stages.length === 0 ? (

@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.generate-design-image]
 verify_jwt = true
+
+[functions.send-delivery-notification]
+verify_jwt = true
