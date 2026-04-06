@@ -40,10 +40,10 @@ interface OrderItem {
   unit_price: number;
 }
 
-export const generateInvoicePDF = async (
+const renderInvoiceToDoc = async (
   invoice: InvoiceData,
   order: OrderData
-): Promise<void> => {
+): Promise<jsPDF> => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -319,6 +319,24 @@ export const generateInvoicePDF = async (
   doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
   doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
   
-  // Download the PDF
+  return doc;
+};
+
+export const generateInvoicePDF = async (
+  invoice: InvoiceData,
+  order: OrderData
+): Promise<void> => {
+  const doc = await renderInvoiceToDoc(invoice, order);
   doc.save(`Invoice_${invoice.invoice_number}.pdf`);
+};
+
+/**
+ * Generate invoice PDF and return as base64 string (for email attachment).
+ */
+export const generateInvoicePDFBase64 = async (
+  invoice: InvoiceData,
+  order: OrderData
+): Promise<string> => {
+  const doc = await renderInvoiceToDoc(invoice, order);
+  return doc.output('datauristring').split(',')[1];
 };

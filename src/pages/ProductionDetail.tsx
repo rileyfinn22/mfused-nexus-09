@@ -1366,6 +1366,7 @@ export default function ProductionDetail() {
           customerName={order.customer_name}
           customerEmail={order.customer_email}
           companyId={order.company_id}
+          orderId={order.id}
           leg={deliveryNotifLeg}
         />
       )}

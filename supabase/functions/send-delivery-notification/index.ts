@@ -24,9 +24,13 @@ interface DeliveryNotificationRequest {
   arrivalDate: string | null;
   customSubject?: string;
   customBody?: string;
+  orderId?: string;
+  invoicePdfBase64?: string | null;
+  invoiceFileName?: string | null;
 }
 
 const LOGO_URL = "https://spxdyqdygsmzyngrqxni.supabase.co/storage/v1/object/public/print-files/demo/vibe-logo-dark.png";
+const PORTAL_URL = "https://vibepkgportal.lovable.app";
 
 // Brand colors
 const CHARCOAL = "#353d47";
@@ -56,6 +60,9 @@ const handler = async (req: Request): Promise<Response> => {
       arrivalDate,
       customSubject,
       customBody,
+      orderId,
+      invoicePdfBase64,
+      invoiceFileName,
     }: DeliveryNotificationRequest = await req.json();
 
     if (!recipientEmails || recipientEmails.length === 0) {
@@ -164,20 +171,40 @@ const handler = async (req: Request): Promise<Response> => {
       `;
     }
 
-    // Build CTA button
-    const ctaButton = trackingUrl
-      ? `
+    // Build CTA buttons — tracking + view order
+    let ctaButtons = "";
+    const buttons: string[] = [];
+
+    if (trackingUrl) {
+      buttons.push(`
+        <td align="center" style="padding: 8px 6px;">
+          <a href="${trackingUrl}" style="display: inline-block; background-color: ${FOREST}; color: #ffffff; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; letter-spacing: 0.3px;">
+            View Tracking Details
+          </a>
+        </td>
+      `);
+    }
+
+    if (orderId) {
+      const orderUrl = `${PORTAL_URL}/orders/${orderId}`;
+      buttons.push(`
+        <td align="center" style="padding: 8px 6px;">
+          <a href="${orderUrl}" style="display: inline-block; background-color: ${CHARCOAL}; color: #ffffff; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; letter-spacing: 0.3px;">
+            View Order in Portal
+          </a>
+        </td>
+      `);
+    }
+
+    if (buttons.length > 0) {
+      ctaButtons = `
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
           <tr>
-            <td align="center" style="padding: 16px 0;">
-              <a href="${trackingUrl}" style="display: inline-block; background-color: ${FOREST}; color: #ffffff; padding: 14px 36px; border-radius: 6px; text-decoration: none; font-size: 15px; font-weight: 600; letter-spacing: 0.3px;">
-                View Tracking Details
-              </a>
-            </td>
+            ${buttons.join("")}
           </tr>
         </table>
-      `
-      : "";
+      `;
+    }
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -208,7 +235,7 @@ const handler = async (req: Request): Promise<Response> => {
                   <td style="padding: 36px 40px;">
                     ${bodyMessage}
                     ${trackingSection}
-                    ${ctaButton}
+                    ${ctaButtons}
                   </td>
                 </tr>
                 
@@ -258,14 +285,35 @@ const handler = async (req: Request): Promise<Response> => {
       "Carrie@vibepkg.com",
     ];
 
-    const emailResponse = await resend.emails.send({
+    // Build attachments array
+    const attachments: { filename: string; content: any }[] = [];
+    if (invoicePdfBase64 && invoiceFileName) {
+      // Decode base64 to Uint8Array for Resend
+      const binaryStr = atob(invoicePdfBase64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      attachments.push({
+        filename: invoiceFileName,
+        content: bytes,
+      });
+    }
+
+    const emailPayload: any = {
       from: "Vibe Packaging <invoices@vibepkgportal.com>",
       replyTo: senderEmail,
       to: recipientEmails,
       bcc: internalBccRecipients,
       subject,
       html: emailHtml,
-    });
+    };
+
+    if (attachments.length > 0) {
+      emailPayload.attachments = attachments;
+    }
+
+    const emailResponse = await resend.emails.send(emailPayload);
 
     if (emailResponse.error) {
       throw new Error(`Resend error: ${JSON.stringify(emailResponse.error)}`);
