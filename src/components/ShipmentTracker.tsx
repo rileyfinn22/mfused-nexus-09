@@ -41,6 +41,7 @@ interface ShipmentTrackerProps {
   onAttachmentUpload?: (legId: string, file: File) => Promise<void>;
   onDeleteLeg?: (legId: string) => Promise<void>;
   onNotesChange?: (legId: string, notes: string) => Promise<void>;
+  onSendDeliveryNotification?: (leg: ShipmentLeg) => void;
 }
 
 const getLegIcon = (legType: string) => {
