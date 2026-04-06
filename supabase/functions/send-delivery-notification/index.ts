@@ -286,17 +286,11 @@ const handler = async (req: Request): Promise<Response> => {
     ];
 
     // Build attachments array
-    const attachments: { filename: string; content: any }[] = [];
+    const attachments: { filename: string; content: string }[] = [];
     if (invoicePdfBase64 && invoiceFileName) {
-      // Decode base64 to Uint8Array for Resend
-      const binaryStr = atob(invoicePdfBase64);
-      const bytes = new Uint8Array(binaryStr.length);
-      for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i);
-      }
       attachments.push({
         filename: invoiceFileName,
-        content: bytes,
+        content: invoicePdfBase64,
       });
     }
 
