@@ -1,4 +1,4 @@
-import { Ship, ShieldCheck, Truck, ExternalLink, MapPin, Calendar, Clock, Package, Paperclip, Upload, Trash2, MessageSquare } from "lucide-react";
+import { Ship, ShieldCheck, Truck, ExternalLink, MapPin, Calendar, Clock, Package, Paperclip, Upload, Trash2, MessageSquare, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
