@@ -15,6 +15,7 @@ interface InvoiceData {
   shipping_note?: string | null;
   notes?: string | null;
   companies?: { name: string } | null;
+  billed_percentage?: number | null;
 }
 
 interface OrderData {
