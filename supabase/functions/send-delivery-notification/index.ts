@@ -13,6 +13,7 @@ interface DeliveryNotificationRequest {
   recipientEmails: string[];
   senderEmail: string;
   orderNumber: string;
+  orderDescription: string | null;
   customerName: string;
   carrier: string | null;
   trackingNumber: string | null;
@@ -35,6 +36,7 @@ const handler = async (req: Request): Promise<Response> => {
       recipientEmails,
       senderEmail,
       orderNumber,
+      orderDescription,
       customerName,
       carrier,
       trackingNumber,
@@ -51,17 +53,22 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("No recipient emails provided");
     }
 
-    const formattedArrival = arrivalDate
-      ? new Date(arrivalDate).toLocaleDateString("en-US", {
-          month: "long",
-          day: "numeric",
-          year: "numeric",
-        })
-      : "Recently";
+    // Parse date without timezone shift
+    let formattedArrival = "Recently";
+    if (arrivalDate) {
+      const parts = arrivalDate.split("T")[0].split("-").map(Number);
+      const localDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      formattedArrival = localDate.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
 
+    const descPart = orderDescription ? ` — ${orderDescription}` : "";
     const subject =
       customSubject ||
-      `✅ Order ${orderNumber} — Shipment Delivered`;
+      `Order ${orderNumber}${descPart} — Shipment Delivered`;
 
     const bodyMessage = customBody
       ? customBody
