@@ -60,6 +60,21 @@ export const triggerSignedFileDownload = async (signedUrl: string, fileName: str
   }
 };
 
+export const triggerBlobFileDownload = (blob: Blob, fileName: string) => {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = objectUrl;
+  link.download = fileName;
+  link.rel = "noopener noreferrer";
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+};
+
 export const openSignedFileInNewTab = async (signedUrl: string) => {
   const resolvedUrl = resolveStorageSignedUrl(signedUrl);
   const response = await fetch(resolvedUrl);
