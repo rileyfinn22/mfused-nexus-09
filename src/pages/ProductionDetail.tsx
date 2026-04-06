@@ -316,6 +316,7 @@ export default function ProductionDetail() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [shipmentLegs, setShipmentLegs] = useState<ShipmentLeg[]>([]);
   const [addLegDialogOpen, setAddLegDialogOpen] = useState(false);
+  const [deliveryNotifLeg, setDeliveryNotifLeg] = useState<ShipmentLeg | null>(null);
 
   useEffect(() => {
     checkRole();
