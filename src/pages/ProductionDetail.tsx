@@ -16,6 +16,7 @@ import { ShipmentTracker, type ShipmentLeg } from "@/components/ShipmentTracker"
 import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipmentLegDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
 import { cn } from "@/lib/utils";
+import { SendDeliveryNotificationDialog } from "@/components/SendDeliveryNotificationDialog";
 interface Order {
   id: string;
   order_number: string;
