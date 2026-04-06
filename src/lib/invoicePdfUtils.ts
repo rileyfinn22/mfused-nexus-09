@@ -40,10 +40,10 @@ interface OrderItem {
   unit_price: number;
 }
 
-export const generateInvoicePDF = async (
+const renderInvoiceToDoc = async (
   invoice: InvoiceData,
   order: OrderData
-): Promise<void> => {
+): Promise<jsPDF> => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
