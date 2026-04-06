@@ -2587,16 +2587,22 @@ const InvoiceDetail = () => {
                     + Add Shipping Line
                   </button>
                 ) : null}
+                {isDepositBilling && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground font-medium">Deposit ({billedPct}%)</span>
+                    <span className="font-semibold">{formatCurrency(displayBilledTotal)}</span>
+                  </div>
+                )}
                 {displayTotalPaid > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Less Deposit</span>
+                    <span className="text-muted-foreground">Less Payments</span>
                     <span className="font-semibold text-green-600">({formatCurrency(displayTotalPaid)})</span>
                   </div>
                 )}
                 <div className="h-px bg-border my-2"></div>
                 <div className="flex justify-between">
-                  <span className="text-lg font-semibold">{displayTotalPaid > 0 ? 'Balance Due' : 'Total'}</span>
-                  <span className="text-2xl font-bold">{formatCurrency(displayTotalPaid > 0 ? displayBalance : displayTotal)}</span>
+                  <span className="text-lg font-semibold">{displayTotalPaid > 0 ? 'Balance Due' : (isDepositBilling ? 'Deposit Due' : 'Total')}</span>
+                  <span className="text-2xl font-bold">{formatCurrency(displayTotalPaid > 0 ? displayBalance : displayBilledTotal)}</span>
                 </div>
                 {isEditMode && <p className="text-xs text-muted-foreground italic mt-2">
                     Totals will be saved when you click "Save Changes"
