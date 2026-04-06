@@ -400,6 +400,18 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                             </Button>
                           </>
                         )}
+
+                        {isCompleted && onSendDeliveryNotification && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs text-green-600 border-green-300 hover:bg-green-50"
+                            onClick={() => onSendDeliveryNotification(leg)}
+                          >
+                            <Send className="h-3 w-3 mr-1" />
+                            Send Delivered Notice
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
