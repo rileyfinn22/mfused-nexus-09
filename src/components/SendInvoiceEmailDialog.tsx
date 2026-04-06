@@ -110,6 +110,14 @@ export function SendInvoiceEmailDialog({
   // Reset state when dialog opens
   useEffect(() => {
     if (open && invoice) {
+      // Calculate the effective amount due (deposit-aware)
+      const billedPct = invoice.billed_percentage;
+      const isDeposit = billedPct != null && billedPct > 0 && billedPct < 100;
+      const effectiveTotal = isDeposit ? (invoice.total || 0) * (billedPct / 100) : (invoice.total || 0);
+      const totalPaid = invoice.total_paid || 0;
+      const amountDue = effectiveTotal - totalPaid;
+      const depositLabel = isDeposit ? ` (${billedPct}% Deposit)` : '';
+
       const defaultSubject = `Invoice ${invoice.invoice_number} from ${VIBE_COMPANY.name}`;
       const defaultMessage = `Dear ${order?.shipping_name || order?.customer_name || 'Customer'},
 
@@ -117,7 +125,7 @@ Please find attached invoice ${invoice.invoice_number} from ${VIBE_COMPANY.name}
 
 Invoice Number: ${invoice.invoice_number}
 Invoice Date: ${new Date(invoice.invoice_date).toLocaleDateString()}
-Amount Due: ${formatCurrency(invoice.total || 0)}
+Amount Due${depositLabel}: ${formatCurrency(amountDue)}
 Due Date: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'Upon Receipt'}
 
 Please remit payment at your earliest convenience.
