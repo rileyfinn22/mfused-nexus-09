@@ -1603,7 +1603,10 @@ const InvoiceDetail = () => {
         .reduce((sum: number, ri: any) => sum + Number(ri.total_paid || 0), 0)
     : 0;
   const displayTotalPaid = Number(invoice?.total_paid || 0) + childPaymentsTotal;
-  const displayBalance = displayTotal - displayTotalPaid;
+  const billedPct = invoice?.billed_percentage;
+  const isDepositBilling = billedPct != null && billedPct > 0 && billedPct < 100;
+  const displayBilledTotal = isDepositBilling ? displayTotal * (billedPct / 100) : displayTotal;
+  const displayBalance = displayBilledTotal - displayTotalPaid;
 
   // Calculate shipped percentage from actual quantities
   const calculateShippedPercentage = () => {
