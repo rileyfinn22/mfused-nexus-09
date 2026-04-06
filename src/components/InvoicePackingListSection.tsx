@@ -50,6 +50,34 @@ interface PackingListFile {
   notes: string | null;
 }
 
+const getDownloadErrorMessage = (error: unknown) => {
+  if (!error) return "Failed to download file";
+
+  if (typeof error === "string") return error;
+
+  if (error instanceof Error) {
+    return error.message || "Failed to download file";
+  }
+
+  if (typeof error === "object") {
+    const maybeMessage = "message" in error ? (error as { message?: unknown }).message : undefined;
+    if (typeof maybeMessage === "string" && maybeMessage.trim()) return maybeMessage;
+    if (maybeMessage && typeof maybeMessage === "object") return JSON.stringify(maybeMessage);
+
+    const maybeError = "error" in error ? (error as { error?: unknown }).error : undefined;
+    if (typeof maybeError === "string" && maybeError.trim()) return maybeError;
+    if (maybeError && typeof maybeError === "object") return JSON.stringify(maybeError);
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return "Failed to download file";
+    }
+  }
+
+  return "Failed to download file";
+};
+
 interface InvoicePackingListSectionProps {
   invoiceId: string;
   invoice: any;
@@ -1117,29 +1145,46 @@ export const InvoicePackingListSection = ({
     const normalizedFilePath = normalizeStorageObjectPath(packingList.file_path);
 
     try {
-      // Use direct download instead of signed URL to avoid URL resolution issues
       const { data, error } = await supabase.storage
         .from('packing-lists')
         .download(normalizedFilePath);
 
-      if (error) {
-        console.error("handleDownload error:", error, "path:", normalizedFilePath);
+      if (data) {
+        triggerBlobFileDownload(data, packingList.file_name);
+        return;
+      }
+
+      console.error("handleDownload direct download error:", error, "path:", normalizedFilePath);
+
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from('packing-lists')
+        .createSignedUrl(normalizedFilePath, 3600, { download: packingList.file_name });
+
+      if (signedError) {
+        console.error("handleDownload signed url error:", signedError, "path:", normalizedFilePath);
         toast({
           title: "Error",
-          description: `Failed to download file: ${error.message}`,
+          description: `Failed to download file: ${getDownloadErrorMessage(signedError)}`,
           variant: "destructive"
         });
         return;
       }
 
-      if (data) {
-        triggerBlobFileDownload(data, packingList.file_name);
+      if (signedData?.signedUrl) {
+        await triggerSignedFileDownload(signedData.signedUrl, packingList.file_name);
+        return;
       }
+
+      toast({
+        title: "Error",
+        description: "Failed to download file",
+        variant: "destructive"
+      });
     } catch (downloadError: any) {
       console.error("handleDownload catch:", downloadError, "path:", normalizedFilePath);
       toast({
         title: "Error",
-        description: downloadError?.message || "Failed to download file",
+        description: getDownloadErrorMessage(downloadError),
         variant: "destructive"
       });
     }
