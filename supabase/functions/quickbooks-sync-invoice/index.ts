@@ -882,44 +882,39 @@ serve(async (req) => {
 
     console.log(`Total line items: ${lineItems.length}`);
 
-    // For partial billing (deposits), QuickBooks requires Amount = Qty × UnitPrice
-    // Instead of adjusting each line item (which breaks validation), we'll replace
-    // all line items with a single deposit line item
+    // For partial billing (deposits), keep all line items at full amounts
+    // and add a negative line to show the unbilled portion — matching the portal view.
     if (billingPercentage < 100) {
-      console.log(`Deposit billing at ${billingPercentage}% - creating single deposit line item`);
+      console.log(`Deposit billing at ${billingPercentage}% - keeping full line items, adding unbilled deduction`);
       
-      // For direct-on-parent deposit flows, calculate from order total when invoice is full-value.
-      const depositAmount = orderTotal > 0 && invoiceTotal >= orderTotal
-        ? Number(((orderTotal * billingPercentage) / 100).toFixed(2))
-        : Number(invoice.total);
+      // calculatedSubtotal already has the full item totals (+ shipping if any)
+      const fullTotal = calculatedSubtotal;
+      const depositAmount = Number(((fullTotal * billingPercentage) / 100).toFixed(2));
+      const unbilledAmount = Number((fullTotal - depositAmount).toFixed(2));
       
-      // Build description listing all items in the deposit
-      const itemDescriptions = (invoice.orders?.order_items || [])
-        .map((item: any) => `${item.name} (${item.quantity} units)`)
-        .join(', ');
+      // Add negative line for unbilled portion
+      const unbilledItemId = await findOrCreateQBItem(
+        'Unbilled Portion',
+        'Portion not yet billed (deposit billing)',
+        unbilledAmount
+      );
       
-      const depositDescription = `${billingPercentage}% Deposit for Order #${invoice.orders?.order_number || invoice.invoice_number}${itemDescriptions ? ': ' + itemDescriptions : ''}`;
-      
-      // Find or create a Deposit item in QuickBooks
-      const depositItemId = await findOrCreateQBItem('Deposit', 'Customer deposit payment', depositAmount);
-      
-      // Replace all line items with a single deposit line
-      lineItems = [{
+      lineItems.push({
         DetailType: 'SalesItemLineDetail',
-        Amount: depositAmount,
-        Description: depositDescription.substring(0, 4000), // QB max description length
+        Amount: -unbilledAmount,
+        Description: `Less: Unbilled portion (${100 - billingPercentage}% due later)`,
         SalesItemLineDetail: {
           ItemRef: {
-            value: depositItemId,
-            name: 'Deposit',
+            value: unbilledItemId,
+            name: 'Unbilled Portion',
           },
           Qty: 1,
-          UnitPrice: depositAmount,
+          UnitPrice: -unbilledAmount,
         },
-      }];
+      });
       
       calculatedSubtotal = depositAmount;
-      console.log(`Created deposit line item: $${depositAmount} - ${depositDescription.substring(0, 100)}...`);
+      console.log(`Full total: $${fullTotal}, Deposit (${billingPercentage}%): $${depositAmount}, Unbilled: $${unbilledAmount}`);
     }
 
     // ═══ SAFETY NET: Catch-all deposit guard ═══
