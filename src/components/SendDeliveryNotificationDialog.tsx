@@ -23,6 +23,7 @@ interface SendDeliveryNotificationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orderNumber: string;
+  orderDescription: string | null;
   customerName: string;
   customerEmail: string | null;
   companyId: string;
