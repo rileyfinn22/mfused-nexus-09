@@ -292,17 +292,16 @@ const renderInvoiceToDoc = async (
   doc.text('BALANCE DUE', totalsX, totalsY);
   doc.text(formatCurrency(hasPayments ? balance : computedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
   
-  // ============ THANK YOU / NOTES SECTION ============
-  // Position below the balance due line with clear spacing
+  // ============ TERMS / NOTES / FOOTER ============
+  // Keep all follow-up content below totals and avoid bottom-of-page overlap.
   let footerY = totalsY + 16;
 
-  // Additional notes if present
   if (invoice.notes) {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
     doc.text('Notes:', 14, footerY);
-    
+
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
     const notesLines = doc.splitTextToSize(invoice.notes, pageWidth - 28);
@@ -310,18 +309,22 @@ const renderInvoiceToDoc = async (
     footerY += 6 + notesLines.length * 5 + 6;
   }
 
-  // Terms line
   doc.setFontSize(8);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
   doc.text('All remaining amounts are due on the agreed upon terms.', 14, footerY);
-  
-  // ============ FOOTER ============
+
+  let thankYouY = footerY + 12;
+  if (thankYouY > pageHeight - 14) {
+    doc.addPage();
+    thankYouY = 20;
+  }
+
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-  doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
-  
+  doc.text('Thank you for your business!', pageWidth / 2, thankYouY, { align: 'center' });
+
   return doc;
 };
 
