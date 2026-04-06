@@ -757,11 +757,15 @@ const InvoiceDetail = () => {
     }, 0);
     const pdfComputedTotal = pdfComputedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
     
+    const pdfBilledPct = invoice.billed_percentage;
+    const pdfIsDeposit = pdfBilledPct != null && pdfBilledPct > 0 && pdfBilledPct < 100;
+    const pdfBilledTotal = pdfIsDeposit ? pdfComputedTotal * (pdfBilledPct / 100) : pdfComputedTotal;
+
     const pdfChildPayments = isBlanket
       ? relatedInvoices.filter((ri: any) => ri.parent_invoice_id === invoiceId).reduce((s: number, ri: any) => s + Number(ri.total_paid || 0), 0)
       : 0;
     const totalPaid = (invoice.total_paid || 0) + pdfChildPayments;
-    const balance = pdfComputedTotal - totalPaid;
+    const balance = pdfBilledTotal - totalPaid;
     const hasPayments = totalPaid > 0;
     const hasShipping = (invoice.shipping_cost || 0) > 0;
     
@@ -800,10 +804,19 @@ const InvoiceDetail = () => {
       }
       totalsY += 3;
     }
+
+    // Deposit line
+    if (pdfIsDeposit) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Deposit (${pdfBilledPct}%)`, totalsX, totalsY);
+      doc.text(formatCurrency(pdfBilledTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
+      totalsY += 8;
+      doc.setFont('helvetica', 'normal');
+    }
     
-    // Less Deposit / Payments
+    // Less Payments
     if (hasPayments) {
-      doc.text('Less Deposit', totalsX, totalsY);
+      doc.text('Less Payments', totalsX, totalsY);
       doc.text(`(${formatCurrency(totalPaid)})`, totalsX + totalsWidth, totalsY, { align: 'right' });
       totalsY += 8;
     }
@@ -819,7 +832,7 @@ const InvoiceDetail = () => {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
     doc.text('BALANCE DUE', totalsX, totalsY);
-    doc.text(formatCurrency(hasPayments ? balance : pdfComputedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
+    doc.text(formatCurrency(hasPayments ? balance : pdfBilledTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
     
     // ============ TERMS/NOTES SECTION ============
     const termsY = totalsY + 20;
@@ -1603,7 +1616,10 @@ const InvoiceDetail = () => {
         .reduce((sum: number, ri: any) => sum + Number(ri.total_paid || 0), 0)
     : 0;
   const displayTotalPaid = Number(invoice?.total_paid || 0) + childPaymentsTotal;
-  const displayBalance = displayTotal - displayTotalPaid;
+  const billedPct = invoice?.billed_percentage;
+  const isDepositBilling = billedPct != null && billedPct > 0 && billedPct < 100;
+  const displayBilledTotal = isDepositBilling ? displayTotal * (billedPct / 100) : displayTotal;
+  const displayBalance = displayBilledTotal - displayTotalPaid;
 
   // Calculate shipped percentage from actual quantities
   const calculateShippedPercentage = () => {
@@ -2584,16 +2600,22 @@ const InvoiceDetail = () => {
                     + Add Shipping Line
                   </button>
                 ) : null}
+                {isDepositBilling && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground font-medium">Deposit ({billedPct}%)</span>
+                    <span className="font-semibold">{formatCurrency(displayBilledTotal)}</span>
+                  </div>
+                )}
                 {displayTotalPaid > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Less Deposit</span>
+                    <span className="text-muted-foreground">Less Payments</span>
                     <span className="font-semibold text-green-600">({formatCurrency(displayTotalPaid)})</span>
                   </div>
                 )}
                 <div className="h-px bg-border my-2"></div>
                 <div className="flex justify-between">
-                  <span className="text-lg font-semibold">{displayTotalPaid > 0 ? 'Balance Due' : 'Total'}</span>
-                  <span className="text-2xl font-bold">{formatCurrency(displayTotalPaid > 0 ? displayBalance : displayTotal)}</span>
+                  <span className="text-lg font-semibold">{displayTotalPaid > 0 ? 'Balance Due' : (isDepositBilling ? 'Deposit Due' : 'Total')}</span>
+                  <span className="text-2xl font-bold">{formatCurrency(displayTotalPaid > 0 ? displayBalance : displayBilledTotal)}</span>
                 </div>
                 {isEditMode && <p className="text-xs text-muted-foreground italic mt-2">
                     Totals will be saved when you click "Save Changes"
