@@ -566,14 +566,24 @@ const CreateQuote = () => {
 
   const addPriceBreak = (index: number) => {
     const newItems = [...items];
+    
+    // If no price breaks yet, seed tier 1 from the item's current qty & price
+    if (newItems[index].price_breaks.length === 0) {
+      newItems[index].price_breaks.push({
+        qty: newItems[index].quantity || 1,
+        unit_price: newItems[index].unit_price
+      });
+    }
+    
     const lastBreak = newItems[index].price_breaks[newItems[index].price_breaks.length - 1];
-    const newQty = lastBreak ? lastBreak.qty * 2 : 10000;
+    const newQty = lastBreak.qty * 2;
     
     newItems[index].price_breaks.push({
       qty: newQty,
       unit_price: newItems[index].unit_price
     });
     newItems[index].isExpanded = true;
+    newItems[index].selected_tier = 0;
     setItems(newItems);
   };
 
