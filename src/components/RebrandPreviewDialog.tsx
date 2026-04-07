@@ -252,12 +252,12 @@ export const RebrandPreviewDialog = ({
           file_type: "application/pdf",
           source,
           created_by: user?.id,
-          notes: notes || `Rebranded from: ${selectedFile.name}`,
+          notes: notes || `Branded from: ${selectedFile.name}`,
         });
 
       if (dbError) throw dbError;
 
-      toast({ title: "Packing List Uploaded", description: "Rebranded packing list saved successfully" });
+      toast({ title: "Packing List Uploaded", description: "Branded packing list saved successfully" });
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
@@ -446,7 +446,7 @@ export const RebrandPreviewDialog = ({
                 const url = URL.createObjectURL(pdfBlob);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = `rebranded-packing-list-${invoice?.invoice_number || "draft"}.pdf`;
+                a.download = `packing-list-${invoice?.invoice_number || "draft"}.pdf`;
                 a.click();
                 URL.revokeObjectURL(url);
               }}>
