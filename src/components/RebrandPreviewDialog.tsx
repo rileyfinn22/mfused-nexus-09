@@ -273,47 +273,52 @@ export const RebrandPreviewDialog = ({
   };
 
   const handleAiEdit = async () => {
-    if (!pdfBlob || !aiPrompt.trim()) return;
+    if (!aiPrompt.trim()) return;
     setAiProcessing(true);
     setStep("processing");
     setStatusText("AI is editing the document…");
 
     try {
-      // Convert PDF to image for AI analysis
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-      const arrayBuf = await pdfBlob.arrayBuffer();
-      const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
-      const page = await pdfDoc.getPage(1);
-      const viewport = page.getViewport({ scale: 2 });
-      const canvas = document.createElement("canvas");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext("2d")!;
-      await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
-      const imageBase64 = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+      if (!parsedMatrix || parsedMatrix.length === 0) {
+        throw new Error("AI editing is only available for spreadsheet-based packing lists. For PDFs, please reject and re-upload a corrected file.");
+      }
 
-      // Call AI to get edit instructions
       const { data: aiResult, error: aiError } = await supabase.functions.invoke("ai-edit-packing-list", {
-        body: { imageBase64, prompt: aiPrompt, currentPdfBase64: btoa(String.fromCharCode(...new Uint8Array(arrayBuf))) },
+        body: { matrix: parsedMatrix, prompt: aiPrompt.trim() },
       });
 
       if (aiError) throw aiError;
+      if (aiResult?.error) throw new Error(aiResult.error);
+      if (!aiResult?.rows || !Array.isArray(aiResult.rows)) throw new Error("AI did not return valid data");
 
-      // For now, show a message that AI editing is processing
-      // The AI would need to return instructions about what to change
-      toast({
-        title: "AI Edit",
-        description: aiResult?.message || "AI editing is not yet fully implemented for PDFs. Try uploading a different file or adjusting manually.",
+      // Regenerate PDF from AI-edited data
+      setStatusText("Regenerating PDF…");
+      const newMatrix = aiResult.rows as string[][];
+      setParsedMatrix(newMatrix);
+
+      const newBlob = await matrixToBrandedPdf(newMatrix, {
+        sourceFileName: selectedFile?.name || "packing-list",
+        invoiceNumber: invoice?.invoice_number,
+        orderNumber: order?.order_number,
       });
 
-      // Go back to preview
+      if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+      const url = URL.createObjectURL(newBlob);
+      setPdfBlob(newBlob);
+      setPreviewBlobUrl(url);
+
+      toast({
+        title: "AI Edit Applied",
+        description: aiResult.summary || "Changes applied successfully",
+      });
+      setAiPrompt("");
       setStep("preview");
     } catch (error: any) {
       console.error("AI edit error:", error);
       toast({
-        title: "AI Edit Note",
-        description: "AI PDF editing is coming soon. For now, you can reject and re-upload a corrected file.",
+        title: "AI Edit Failed",
+        description: error.message || "Failed to apply AI edit",
+        variant: "destructive",
       });
       setStep("preview");
     } finally {
