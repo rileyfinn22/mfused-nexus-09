@@ -24,7 +24,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { rebrandSpreadsheetToPdf } from "@/lib/rebrandSpreadsheetPdf";
+import { rebrandSpreadsheetToPdf, parseSpreadsheetToMatrix, matrixToBrandedPdf } from "@/lib/rebrandSpreadsheetPdf";
 import { sanitizeStorageFileName } from "@/lib/storageUrl";
 
 type Step = "pick" | "processing" | "preview" | "ai-edit";
