@@ -313,7 +313,7 @@ serve(async (req) => {
           // Try fuzzy LIKE search by name (not email)
           console.log('Trying fuzzy LIKE search by name...');
           const likeSearch = await fetch(
-            `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName LIKE '%${customerName.replace(/'/g, "\\'")}%' MAXRESULTS 10&minorversion=65`,
+            `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName LIKE '%${escapeQBSql(customerName)}%' MAXRESULTS 10&minorversion=65`,
             {
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
