@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -146,6 +147,8 @@ const Artwork = () => {
   const [editThumbnailDialogOpen, setEditThumbnailDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<ArtworkFile | null>(null);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [newThumbnailFile, setNewThumbnailFile] = useState<File | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -651,7 +654,6 @@ const Artwork = () => {
   };
 
   const handleArchive = async (file: ArtworkFile) => {
-    if (!confirm("Archive this artwork? It will be moved to Previous Versions.")) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -1204,7 +1206,10 @@ const Artwork = () => {
                       variant="outline" 
                       size="sm"
                       className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                      onClick={() => handleArchive(file)}
+                      onClick={() => {
+                        setArchiveTarget(file);
+                        setArchiveDialogOpen(true);
+                      }}
                     >
                       <FileArchive className="h-4 w-4 mr-1" />
                       Archive
@@ -1871,6 +1876,33 @@ const Artwork = () => {
           />
         </TabsContent>
       </Tabs>
+
+      {/* Archive Confirmation Dialog */}
+      <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this artwork?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will move the artwork to Previous Versions. You can then upload a newer version for this SKU.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setArchiveTarget(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700"
+              onClick={() => {
+                if (archiveTarget) {
+                  handleArchive(archiveTarget);
+                }
+                setArchiveDialogOpen(false);
+                setArchiveTarget(null);
+              }}
+            >
+              Archive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
