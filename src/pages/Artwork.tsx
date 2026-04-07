@@ -1876,6 +1876,33 @@ const Artwork = () => {
           />
         </TabsContent>
       </Tabs>
+
+      {/* Archive Confirmation Dialog */}
+      <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this artwork?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will move the artwork to Previous Versions. You can then upload a newer version for this SKU.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setArchiveTarget(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700"
+              onClick={() => {
+                if (archiveTarget) {
+                  handleArchive(archiveTarget);
+                }
+                setArchiveDialogOpen(false);
+                setArchiveTarget(null);
+              }}
+            >
+              Archive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
