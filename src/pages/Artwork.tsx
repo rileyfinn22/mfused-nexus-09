@@ -650,6 +650,55 @@ const Artwork = () => {
     }
   };
 
+  const handleArchive = async (file: ArtworkFile) => {
+    if (!confirm("Archive this artwork? It will be moved to Previous Versions.")) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error: archiveError } = await supabase
+        .from('rejected_artwork_files')
+        .insert({
+          original_artwork_id: file.id,
+          company_id: file.company_id,
+          sku: file.sku,
+          filename: file.filename,
+          artwork_url: file.artwork_url,
+          preview_url: file.preview_url,
+          notes: file.notes,
+          rejection_reason: 'Archived (replaced by newer version)',
+          rejected_by: user.id,
+          original_created_at: file.created_at
+        });
+
+      if (archiveError) throw archiveError;
+
+      const { error: deleteError } = await supabase
+        .from('artwork_files')
+        .delete()
+        .eq('id', file.id);
+
+      if (deleteError) throw deleteError;
+
+      toast({
+        title: "Artwork archived",
+        description: "Moved to Previous Versions. You can now upload a new version.",
+      });
+
+      fetchArtworkForProduct();
+      fetchAllArtwork();
+      fetchRejectedArtwork();
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error archiving artwork:', error);
+      toast({
+        title: "Error",
+        description: "Failed to archive artwork",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleReject = async () => {
     if (!rejectionReason.trim()) {
       toast({
@@ -1147,6 +1196,19 @@ const Artwork = () => {
                         Reject
                       </Button>
                     </div>
+                  )}
+
+                  {/* Archive button for approved artwork */}
+                  {file.is_approved && isVibeAdmin && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                      onClick={() => handleArchive(file)}
+                    >
+                      <FileArchive className="h-4 w-4 mr-1" />
+                      Archive
+                    </Button>
                   )}
 
                   {/* Only vibe admins can delete */}
