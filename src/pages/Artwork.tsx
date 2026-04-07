@@ -1206,7 +1206,9 @@ const Artwork = () => {
                       variant="outline" 
                       size="sm"
                       className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('Archive button clicked, file:', file.id);
                         setArchiveTarget(file);
                         setArchiveDialogOpen(true);
                       }}
