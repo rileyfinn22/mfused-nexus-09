@@ -1206,7 +1206,10 @@ const Artwork = () => {
                       variant="outline" 
                       size="sm"
                       className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                      onClick={() => handleArchive(file)}
+                      onClick={() => {
+                        setArchiveTarget(file);
+                        setArchiveDialogOpen(true);
+                      }}
                     >
                       <FileArchive className="h-4 w-4 mr-1" />
                       Archive
