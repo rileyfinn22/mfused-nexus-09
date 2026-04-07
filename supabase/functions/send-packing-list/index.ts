@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "npm:resend@4.0.0";
 
 const corsHeaders = {
@@ -6,10 +7,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Simple rate limiting map (in production, use Redis or similar)
+// Simple rate limiting map
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT = 10; // 10 emails per minute
-const RATE_WINDOW = 60000; // 1 minute
+const RATE_LIMIT = 10;
+const RATE_WINDOW = 60000;
 
 function checkRateLimit(identifier: string): boolean {
   const now = Date.now();
@@ -34,6 +35,31 @@ serve(async (req) => {
   }
 
   try {
+    // === Authentication ===
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const userId = claimsData.claims.sub;
+
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     
     if (!resendApiKey) {
@@ -66,7 +92,7 @@ serve(async (req) => {
     
     // Validate PDF size (base64 data URL)
     const pdfData = packingListPdf.split(',')[1] || packingListPdf;
-    const pdfSizeBytes = (pdfData.length * 3) / 4; // Approximate decoded size
+    const pdfSizeBytes = (pdfData.length * 3) / 4;
     const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB
     
     if (pdfSizeBytes > MAX_PDF_SIZE) {
@@ -76,8 +102,8 @@ serve(async (req) => {
       );
     }
     
-    // Rate limiting by email
-    if (!checkRateLimit(fulfillmentEmail)) {
+    // Rate limiting by user ID
+    if (!checkRateLimit(userId)) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded. Maximum 10 emails per minute.' }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -113,7 +139,7 @@ serve(async (req) => {
       attachments: [
         {
           filename: `packing-list-${invoiceData.invoiceNumber}.pdf`,
-          content: packingListPdf.split(',')[1], // Remove data:application/pdf;base64, prefix
+          content: packingListPdf.split(',')[1],
         },
       ],
     });
@@ -133,7 +159,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in send-packing-list function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'An error occurred while sending the email' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
