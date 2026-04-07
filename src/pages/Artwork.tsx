@@ -1356,6 +1356,43 @@ const Artwork = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Archive Confirmation Dialog */}
+        <Dialog
+          open={archiveDialogOpen}
+          onOpenChange={(open) => {
+            setArchiveDialogOpen(open);
+            if (!open) {
+              setArchiveTarget(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Archive this artwork?</DialogTitle>
+              <DialogDescription>
+                This will move the artwork to Previous Versions. You can then upload a newer version for this SKU.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setArchiveDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                onClick={() => {
+                  if (archiveTarget) {
+                    handleArchive(archiveTarget);
+                  }
+                  setArchiveDialogOpen(false);
+                  setArchiveTarget(null);
+                }}
+              >
+                Archive
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -1599,42 +1636,6 @@ const Artwork = () => {
           defaultArtworkType="vibe_proof"
         />
 
-        {/* Archive Confirmation Dialog (product detail) */}
-        <Dialog
-          open={archiveDialogOpen}
-          onOpenChange={(open) => {
-            setArchiveDialogOpen(open);
-            if (!open) {
-              setArchiveTarget(null);
-            }
-          }}
-        >
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Archive this artwork?</DialogTitle>
-              <DialogDescription>
-                This will move the artwork to Previous Versions. You can then upload a newer version for this SKU.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button variant="outline" onClick={() => setArchiveDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="default"
-                onClick={() => {
-                  if (archiveTarget) {
-                    handleArchive(archiveTarget);
-                  }
-                  setArchiveDialogOpen(false);
-                  setArchiveTarget(null);
-                }}
-              >
-                Archive
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     );
   }
