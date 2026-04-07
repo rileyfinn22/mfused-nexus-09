@@ -3875,6 +3875,11 @@ export type Database = {
         Args: { invitation_token_param: string }
         Returns: Json
       }
+      validate_shipment_share_token: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      validate_vendor_invitation: { Args: { p_token: string }; Returns: Json }
     }
     Enums: {
       app_role:

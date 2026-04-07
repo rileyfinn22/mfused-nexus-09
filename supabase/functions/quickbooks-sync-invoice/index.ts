@@ -240,6 +240,15 @@ serve(async (req) => {
       }
     }
 
+    // Escape a value for QuickBooks SQL queries
+    function escapeQBSql(value: string): string {
+      if (!value) return '';
+      return value
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"');
+    }
+
     // Find or create customer in QuickBooks using company name ONLY
     // We intentionally do NOT search by email to avoid matching the wrong customer
     const customerName = (invoice.companies as any)?.name || 'Unknown Customer';
@@ -253,7 +262,7 @@ serve(async (req) => {
     // Search by company name only (not email - to avoid matching wrong customers like personal accounts)
     console.log('Searching by company name...');
     const nameSearchResponse = await fetch(
-      `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName='${customerName.replace(/'/g, "\\'")}' MAXRESULTS 1&minorversion=65`,
+      `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName='${escapeQBSql(customerName)}' MAXRESULTS 1&minorversion=65`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -304,7 +313,7 @@ serve(async (req) => {
           // Try fuzzy LIKE search by name (not email)
           console.log('Trying fuzzy LIKE search by name...');
           const likeSearch = await fetch(
-            `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName LIKE '%${customerName.replace(/'/g, "\\'")}%' MAXRESULTS 10&minorversion=65`,
+            `${qbApiUrl}/query?query=SELECT * FROM Customer WHERE DisplayName LIKE '%${escapeQBSql(customerName)}%' MAXRESULTS 10&minorversion=65`,
             {
               headers: {
                 'Authorization': `Bearer ${accessToken}`,

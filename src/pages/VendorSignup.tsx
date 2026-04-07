@@ -44,26 +44,18 @@ export default function VendorSignup() {
 
     try {
       const { data, error } = await supabase
-        .from("vendor_invitations")
-        .select(`
-          *,
-          vendors!inner(name)
-        `)
-        .eq("invitation_token", token)
-        .eq("status", "pending")
-        .gt("expires_at", new Date().toISOString())
-        .single();
+        .rpc("validate_vendor_invitation", { p_token: token });
 
-      if (error || !data) {
+      if (error || !data || !(data as any).valid) {
         toast({
           title: "Invalid or Expired",
-          description: "This invitation link is invalid or has expired",
+          description: (data as any)?.error || "This invitation link is invalid or has expired",
           variant: "destructive",
         });
         setInvitationValid(false);
       } else {
-        setEmail(data.email);
-        setVendorName(data.vendors.name);
+        setEmail((data as any).email);
+        setVendorName((data as any).vendor_name);
         setInvitationValid(true);
       }
     } catch (error) {

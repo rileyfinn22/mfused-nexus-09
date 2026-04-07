@@ -197,10 +197,19 @@ serve(async (req) => {
       }
     }
 
+    // Escape a value for QuickBooks SQL queries
+    function escapeQBSql(value: string): string {
+      if (!value) return '';
+      return value
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"');
+    }
+
     // Find or create vendor in QuickBooks
     const vendorName = vendorPo.vendors?.name || 'Unknown Vendor';
     const vendorSearchResponse = await fetch(
-      `${qbApiUrl}/query?query=SELECT * FROM Vendor WHERE DisplayName='${encodeURIComponent(vendorName)}' MAXRESULTS 1&minorversion=65`,
+      `${qbApiUrl}/query?query=SELECT * FROM Vendor WHERE DisplayName='${escapeQBSql(vendorName)}' MAXRESULTS 1&minorversion=65`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
