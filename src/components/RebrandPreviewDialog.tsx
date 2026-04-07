@@ -57,6 +57,7 @@ export const RebrandPreviewDialog = ({
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiProcessing, setAiProcessing] = useState(false);
   const [statusText, setStatusText] = useState("");
+  const [parsedMatrix, setParsedMatrix] = useState<string[][] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Cleanup blob URLs on unmount
