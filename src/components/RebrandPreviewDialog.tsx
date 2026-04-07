@@ -76,6 +76,7 @@ export const RebrandPreviewDialog = ({
       setPdfBlob(null);
       setAiPrompt("");
       setStatusText("");
+      setParsedMatrix(null);
       if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
       setPreviewBlobUrl(null);
     }
