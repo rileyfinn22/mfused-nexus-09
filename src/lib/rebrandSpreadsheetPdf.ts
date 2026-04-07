@@ -219,57 +219,64 @@ const drawPageChrome = (
   });
 };
 
+/** Parse a spreadsheet file and return the extracted matrix */
+export const parseSpreadsheetToMatrix = async (file: File): Promise<string[][]> => {
+  const workbook = await readWorkbook(file);
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) throw new Error("No sheets found");
+  const sheet = workbook.Sheets[sheetName];
+  const matrix = extractRelevantSection(getSheetMatrix(sheet));
+  if (matrix.length === 0) throw new Error("Could not read any data from the spreadsheet");
+  return matrix;
+};
+
+/** Generate a branded PDF from a pre-parsed matrix */
+export const matrixToBrandedPdf = async (
+  matrix: string[][],
+  options: SpreadsheetPdfOptions,
+): Promise<Blob> => {
+  if (matrix.length === 0) throw new Error("No data to render");
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
+  const logoDataUrl = await loadLogoDataUrl(options.logoPath || "/images/vibe-logo.png").catch(() => null);
+
+  const columnGroups = splitColumnGroups(matrix[0].length || 1);
+
+  columnGroups.forEach((group, groupIndex) => {
+    if (groupIndex > 0) {
+      doc.addPage("letter", "landscape");
+    }
+
+    const body = matrix.map((row) => group.map((columnIndex) => row[columnIndex] || ""));
+
+    autoTable(doc, {
+      startY: TABLE_TOP,
+      body,
+      theme: "grid",
+      margin: { top: TABLE_TOP, left: PAGE_MARGIN, right: PAGE_MARGIN, bottom: 24 },
+      styles: {
+        font: "helvetica",
+        fontSize: 8,
+        cellPadding: 3,
+        overflow: "linebreak",
+        textColor: DARK_GRAY,
+        lineColor: [210, 210, 210],
+        lineWidth: 0.25,
+        valign: "middle",
+      },
+      columnStyles: Object.fromEntries(group.map((_, index) => [index, { cellWidth: "auto" }])),
+      didDrawPage: () => {
+        drawPageChrome(doc, options, logoDataUrl);
+      },
+    });
+  });
+
+  return doc.output("blob");
+};
+
 export const rebrandSpreadsheetToPdf = async (
   file: File,
   options: SpreadsheetPdfOptions,
 ) => {
-  const workbook = await readWorkbook(file);
-  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
-  const logoDataUrl = await loadLogoDataUrl(options.logoPath || "/images/vibe-logo.png").catch(() => null);
-
-  let hasPages = false;
-
-  workbook.SheetNames.forEach((sheetName) => {
-    const sheet = workbook.Sheets[sheetName];
-    const matrix = extractRelevantSection(getSheetMatrix(sheet));
-    if (matrix.length === 0) return;
-
-    const columnGroups = splitColumnGroups(matrix[0].length || 1);
-
-    columnGroups.forEach((group, groupIndex) => {
-      if (hasPages) {
-        doc.addPage("letter", "landscape");
-      }
-      hasPages = true;
-
-      const body = matrix.map((row) => group.map((columnIndex) => row[columnIndex] || ""));
-
-      autoTable(doc, {
-        startY: TABLE_TOP,
-        body,
-        theme: "grid",
-        margin: { top: TABLE_TOP, left: PAGE_MARGIN, right: PAGE_MARGIN, bottom: 24 },
-        styles: {
-          font: "helvetica",
-          fontSize: 8,
-          cellPadding: 3,
-          overflow: "linebreak",
-          textColor: DARK_GRAY,
-          lineColor: [210, 210, 210],
-          lineWidth: 0.25,
-          valign: "middle",
-        },
-        columnStyles: Object.fromEntries(group.map((_, index) => [index, { cellWidth: "auto" }])),
-        didDrawPage: () => {
-          drawPageChrome(doc, options, logoDataUrl);
-        },
-      });
-    });
-  });
-
-  if (!hasPages) {
-    throw new Error("Could not read any data from the spreadsheet");
-  }
-
-  return doc.output("blob");
+  const matrix = await parseSpreadsheetToMatrix(file);
+  return matrixToBrandedPdf(matrix, options);
 };
