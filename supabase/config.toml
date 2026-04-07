@@ -77,3 +77,6 @@ verify_jwt = true
 
 [functions.send-delivery-notification]
 verify_jwt = true
+
+[functions.ai-edit-packing-list]
+verify_jwt = true
