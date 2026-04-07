@@ -221,7 +221,9 @@ export const RebrandPreviewDialog = ({
   };
 
   const processExcelFile = async (file: File): Promise<Blob> => {
-    return rebrandSpreadsheetToPdf(file, {
+    const matrix = await parseSpreadsheetToMatrix(file);
+    setParsedMatrix(matrix);
+    return matrixToBrandedPdf(matrix, {
       sourceFileName: file.name,
       invoiceNumber: invoice?.invoice_number,
       orderNumber: order?.order_number,
