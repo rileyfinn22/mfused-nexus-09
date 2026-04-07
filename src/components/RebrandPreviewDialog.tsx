@@ -462,10 +462,12 @@ export const RebrandPreviewDialog = ({
                 <Download className="h-4 w-4 mr-2" />
                 Download
               </Button>
-              <Button variant="outline" onClick={() => setStep("ai-edit")}>
-                <Sparkles className="h-4 w-4 mr-2" />
-                Edit with AI
-              </Button>
+              {parsedMatrix && (
+                <Button variant="outline" onClick={() => setStep("ai-edit")}>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Edit with AI
+                </Button>
+              )}
               <Button onClick={handleApprove} disabled={uploading}>
                 {uploading ? (
                   <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading…</>
