@@ -231,13 +231,20 @@ const renderInvoiceToDoc = async (
   const totalsWidth = 85;
   const totalsX = pageWidth - totalsWidth - 14;
   
-  // Compute subtotal from line items for consistency with displayed rows
-  const computedSubtotal = items.reduce((sum, item) => {
-    const qty = Number(item.shipped_quantity) > 0
-      ? Number(item.shipped_quantity)
-      : Number(item.quantity || 0);
-    return sum + qty * Number(item.unit_price || 0);
-  }, 0);
+  // Use DB-stored subtotal/total for the totals section to match portal logic.
+  // The DB trigger (recalculate_order_totals) applies the correct blanket logic:
+  //   has children → GREATEST(ordered, shipped)
+  //   no children, any shipped → shipped-only subtotal
+  //   nothing shipped → ordered subtotal
+  // Line items in the table above may still show ordered qty as fallback for display,
+  // but the totals must match the portal and DB.
+  const anyShipped = items.some((item) => Number(item.shipped_quantity || 0) > 0);
+  const computedSubtotal = anyShipped
+    ? items.reduce((sum, item) => {
+        const shipped = Number(item.shipped_quantity || 0);
+        return sum + (shipped > 0 ? shipped : 0) * Number(item.unit_price || 0);
+      }, 0)
+    : items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0), 0);
   const computedTotal = computedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
 
   const billedPct = invoice.billed_percentage;
