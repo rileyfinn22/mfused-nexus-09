@@ -26,7 +26,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { addPdfBranding, addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
+
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
