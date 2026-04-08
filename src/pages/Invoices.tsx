@@ -902,29 +902,33 @@ const Invoices = () => {
                           
                           if (!orderData) return;
 
-                          // Fetch inventory allocations for THIS specific invoice
-                          const { data: allocationsData } = await supabase
-                            .from('inventory_allocations')
-                            .select(`
-                              quantity_allocated,
-                              order_items (
-                                id, sku, name, unit_price, line_number
-                              )
-                            `)
-                            .eq('invoice_id', invoice.id);
-
-                          // Build the correct items list based on allocations
+                          // For blanket/full invoices, use all order items (with shipped_quantity).
+                          // Only use allocations for partial/shipment invoices.
+                          const isBlanket = invoice.invoice_type === 'full' || (!invoice.invoice_type && !(invoice as any).parent_invoice_id);
                           let itemsForPdf = orderData.order_items || [];
-                          
-                          if (allocationsData && allocationsData.length > 0) {
-                            // Use allocated quantities for this specific invoice
-                            itemsForPdf = allocationsData
-                              .sort((a, b) => (a.order_items?.line_number ?? 999) - (b.order_items?.line_number ?? 999))
-                              .map((alloc: any) => ({
-                                ...alloc.order_items,
-                                quantity: alloc.quantity_allocated,
-                                unit_price: alloc.order_items?.unit_price || 0
-                              }));
+
+                          if (!isBlanket) {
+                            // Fetch inventory allocations for THIS specific invoice
+                            const { data: allocationsData } = await supabase
+                              .from('inventory_allocations')
+                              .select(`
+                                quantity_allocated,
+                                order_items (
+                                  id, sku, name, unit_price, line_number
+                                )
+                              `)
+                              .eq('invoice_id', invoice.id);
+
+                            if (allocationsData && allocationsData.length > 0) {
+                              // Use allocated quantities for this specific invoice
+                              itemsForPdf = allocationsData
+                                .sort((a, b) => (a.order_items?.line_number ?? 999) - (b.order_items?.line_number ?? 999))
+                                .map((alloc: any) => ({
+                                  ...alloc.order_items,
+                                  quantity: alloc.quantity_allocated,
+                                  unit_price: alloc.order_items?.unit_price || 0
+                                }));
+                            }
                           }
 
                           // Create order data with correct items
