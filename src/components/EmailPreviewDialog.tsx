@@ -66,6 +66,7 @@ export function EmailPreviewDialog({
   attachmentName,
   artworkFiles = [],
   loadingArtwork = false,
+  previewHtml,
   onSend,
   sending = false,
 }: EmailPreviewDialogProps) {
