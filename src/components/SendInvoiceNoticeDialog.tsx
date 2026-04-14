@@ -518,6 +518,8 @@ export function SendInvoiceNoticeDialog({
                 Reply-to: <span className="font-medium text-foreground">{senderEmail}</span>
               </p>
             </div>
+              </div>
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="preview" className="mt-4">
