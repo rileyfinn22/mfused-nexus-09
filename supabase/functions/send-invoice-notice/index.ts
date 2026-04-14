@@ -9,6 +9,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+interface Attachment {
+  filename: string;
+  content: string;
+}
+
 interface SendNoticeRequest {
   noticeType: "billed" | "payment_due";
   recipientEmails: string[];
@@ -22,6 +27,7 @@ interface SendNoticeRequest {
   pdfFilename?: string;
   customSubject?: string;
   customBody?: string;
+  additionalAttachments?: Attachment[];
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -45,6 +51,7 @@ const handler = async (req: Request): Promise<Response> => {
       pdfFilename,
       customSubject,
       customBody,
+      additionalAttachments,
     }: SendNoticeRequest = await req.json();
 
     if (!recipientEmails || recipientEmails.length === 0) {
@@ -233,9 +240,18 @@ const handler = async (req: Request): Promise<Response> => {
       ? "VibePKG <invoices@vibepkgportal.com>"
       : "VibePKG <invoices@vibepkgportal.com>";
 
-    const attachments = pdfBase64
+    const attachments: Attachment[] = pdfBase64
       ? [{ filename: pdfFilename || `Invoice-${invoiceNumber}.pdf`, content: pdfBase64 }]
       : [];
+
+    if (additionalAttachments && additionalAttachments.length > 0) {
+      for (const attachment of additionalAttachments) {
+        attachments.push({
+          filename: attachment.filename,
+          content: attachment.content,
+        });
+      }
+    }
 
     const emailResponse = await resend.emails.send({
       from: fromAddress,

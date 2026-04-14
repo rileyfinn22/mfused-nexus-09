@@ -672,15 +672,23 @@ export function SendInvoiceNoticeDialog({
                     <span className="text-sm text-muted-foreground w-16">Subject:</span>
                     <span className="text-sm font-medium">{editableSubject}</span>
                   </div>
-                  {attachPdf && (
-                    <div className="flex items-start gap-3">
-                      <span className="text-sm text-muted-foreground w-16">Attach:</span>
-                      <div className="flex items-center gap-2">
-                        <Paperclip className="h-3 w-3" />
-                        <span className="text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
-                      </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-sm text-muted-foreground w-16">Attach:</span>
+                    <div className="flex flex-col gap-1">
+                      {attachPdf && (
+                        <div className="flex items-center gap-2">
+                          <Paperclip className="h-3 w-3" />
+                          <span className="text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
+                        </div>
+                      )}
+                      {additionalAttachments.map((attachment) => (
+                        <div key={attachment.file.name} className="flex items-center gap-2">
+                          <Paperclip className="h-3 w-3" />
+                          <span className="text-sm">{attachment.file.name}</span>
+                        </div>
+                      ))}
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Email Body Preview */}
