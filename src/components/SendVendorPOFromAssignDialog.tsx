@@ -352,6 +352,49 @@ Please confirm receipt of this order and provide an estimated delivery date.
 Thank you for your business.`;
   };
 
+  const getPreviewHtml = () => {
+    if (!po || !vendor) return undefined;
+    const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+    const formattedAmount = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalAmount);
+    const formattedOrderDate = new Date(po.order_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const formattedDeliveryDate = po.expected_delivery_date
+      ? new Date(po.expected_delivery_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      : null;
+    const vendorName = vendor?.contact_name || vendor?.name || "Valued Vendor";
+    const customMessage = message || getDefaultEmailMessage();
+    const messageHtml = customMessage.split('\n').map((line: string) => line.trim() === '' ? '<br/>' : `<p style="margin: 8px 0; color: #374151; font-size: 16px; line-height: 1.6;">${line}</p>`).join('');
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:#f4f4f5;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="min-width:100%;background-color:#f4f4f5;">
+<tr><td align="center" style="padding:40px 20px;">
+<table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;background-color:#ffffff;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+<tr><td style="background:linear-gradient(135deg,#16a34a 0%,#15803d 100%);padding:40px 40px 30px 40px;border-radius:12px 12px 0 0;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+<tr><td><h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:700;">VibePKG</h1><p style="margin:8px 0 0 0;color:rgba(255,255,255,0.9);font-size:14px;">Premium Packaging Solutions</p></td>
+<td align="right"><span style="background-color:rgba(255,255,255,0.2);color:#ffffff;padding:8px 16px;border-radius:20px;font-size:14px;font-weight:600;">PURCHASE ORDER</span></td></tr></table></td></tr>
+<tr><td style="padding:40px;">
+<p style="margin:0 0 24px 0;color:#374151;font-size:16px;line-height:1.6;">Dear ${vendorName},</p>
+${messageHtml}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f9fafb;border-radius:8px;margin:24px 0;">
+<tr><td style="padding:24px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+<tr><td style="padding-bottom:16px;border-bottom:1px solid #e5e7eb;"><p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">PO Number</p><p style="margin:4px 0 0 0;color:#111827;font-size:18px;font-weight:600;">${po.po_number}</p></td></tr>
+<tr><td style="padding:16px 0;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+<tr><td width="50%"><p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Order Date</p><p style="margin:4px 0 0 0;color:#111827;font-size:16px;font-weight:500;">${formattedOrderDate}</p></td>
+<td width="50%" align="right"><p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Total Amount</p><p style="margin:4px 0 0 0;color:#16a34a;font-size:24px;font-weight:700;">${formattedAmount}</p></td></tr></table></td></tr>
+${formattedDeliveryDate ? `<tr><td style="padding-top:16px;border-top:1px solid #e5e7eb;"><p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Expected Delivery</p><p style="margin:4px 0 0 0;color:#111827;font-size:16px;font-weight:500;">${formattedDeliveryDate}</p></td></tr>` : ''}
+</table></td></tr></table>
+<p style="margin:0;color:#6b7280;font-size:14px;line-height:1.6;">The purchase order PDF is attached to this email for your records.</p>
+</td></tr>
+<tr><td style="background-color:#f9fafb;padding:24px 40px;border-radius:0 0 12px 12px;border-top:1px solid #e5e7eb;">
+<p style="margin:0;color:#ef4444;font-size:12px;font-weight:600;">⚠️ Please do not reply to this email — this mailbox is not monitored.</p>
+<p style="margin:8px 0 0 0;color:#6b7280;font-size:14px;">Questions? Contact us at <a href="mailto:accounting@vibepkg.com" style="color:#16a34a;text-decoration:none;">accounting@vibepkg.com</a></p>
+<p style="margin:16px 0 0 0;color:#9ca3af;font-size:12px;">© ${new Date().getFullYear()} VibePKG. All rights reserved.</p>
+</td></tr></table></td></tr></table></body></html>`;
+  };
+
   const handleDownloadPdf = async () => {
     try {
       const pdfBase64 = await generatePdfBase64();
