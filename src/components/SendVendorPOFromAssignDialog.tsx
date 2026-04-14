@@ -666,6 +666,7 @@ ${formattedDeliveryDate ? `<tr><td style="padding-top:16px;border-top:1px solid 
         attachmentName={`PO-${po?.po_number}.pdf`}
         artworkFiles={artworkFiles}
         loadingArtwork={loadingArtwork}
+        previewHtml={getPreviewHtml()}
         onSend={handleSendEmail}
         sending={sendingEmail}
       />
