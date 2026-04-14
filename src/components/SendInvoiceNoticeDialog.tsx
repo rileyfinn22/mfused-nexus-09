@@ -49,7 +49,9 @@ export function SendInvoiceNoticeDialog({
   const [attachPdf, setAttachPdf] = useState(true);
   const [editableSubject, setEditableSubject] = useState("");
   const [editableBody, setEditableBody] = useState("");
+  const [additionalAttachments, setAdditionalAttachments] = useState<AdditionalAttachment[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isBilled = noticeType === "billed";
   const title = isBilled ? "Send Billed Notice" : "Send Payment Due Reminder";
@@ -87,6 +89,7 @@ export function SendInvoiceNoticeDialog({
       setActiveTab("compose");
       setShowEmailSuggestions(false);
       setAttachPdf(true);
+      setAdditionalAttachments([]);
 
       const dueDate = invoice?.due_date
         ? new Date(invoice.due_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
@@ -142,6 +145,78 @@ export function SendInvoiceNoticeDialog({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") { e.preventDefault(); addEmail(); }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const MAX_FILE_SIZE = 30 * 1024 * 1024;
+    const MAX_TOTAL_SIZE = 40 * 1024 * 1024;
+    let runningTotalSize = additionalAttachments.reduce((sum, attachment) => sum + attachment.file.size, 0);
+    const newAttachments: AdditionalAttachment[] = [];
+
+    for (const file of files) {
+      const isDuplicate = additionalAttachments.some((attachment) => attachment.file.name === file.name)
+        || newAttachments.some((attachment) => attachment.file.name === file.name);
+
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds 30MB limit`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      if (runningTotalSize + file.size > MAX_TOTAL_SIZE) {
+        toast({
+          title: "Total size limit reached",
+          description: "Total attachments cannot exceed 40MB",
+          variant: "destructive",
+        });
+        break;
+      }
+
+      if (isDuplicate) {
+        toast({
+          title: "Duplicate file",
+          description: `${file.name} is already attached`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1] || result);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      newAttachments.push({ file, base64 });
+      runningTotalSize += file.size;
+    }
+
+    if (newAttachments.length > 0) {
+      setAdditionalAttachments((prev) => [...prev, ...newAttachments]);
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (fileName: string) => {
+    setAdditionalAttachments((prev) => prev.filter((attachment) => attachment.file.name !== fileName));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const generatePdfBase64 = async (): Promise<string> => {
