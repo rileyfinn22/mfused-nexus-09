@@ -697,7 +697,9 @@ Thank you for your business.`;
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="compose" className="space-y-4 mt-4">
+          <TabsContent value="compose" className="mt-4">
+            <ScrollArea className="max-h-[calc(90vh-280px)] pr-3">
+              <div className="space-y-4">
             {/* Invoice Summary */}
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
