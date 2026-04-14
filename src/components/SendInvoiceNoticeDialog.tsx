@@ -395,7 +395,9 @@ export function SendInvoiceNoticeDialog({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="compose" className="space-y-4 mt-4">
+          <TabsContent value="compose" className="mt-4">
+            <ScrollArea className="max-h-[calc(90vh-280px)]">
+              <div className="space-y-4 pr-3">
             {/* Invoice Summary */}
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
@@ -516,6 +518,8 @@ export function SendInvoiceNoticeDialog({
                 Reply-to: <span className="font-medium text-foreground">{senderEmail}</span>
               </p>
             </div>
+              </div>
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="preview" className="mt-4">
