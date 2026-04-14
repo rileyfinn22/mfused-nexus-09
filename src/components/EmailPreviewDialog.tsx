@@ -45,6 +45,8 @@ interface EmailPreviewDialogProps {
   artworkFiles?: ArtworkFile[];
   /** Loading state for artwork files */
   loadingArtwork?: boolean;
+  /** Pre-rendered branded HTML for the preview tab (rendered in an iframe) */
+  previewHtml?: string;
   onSend: (data: {
     to: string[];
     subject: string;
@@ -64,6 +66,7 @@ export function EmailPreviewDialog({
   attachmentName,
   artworkFiles = [],
   loadingArtwork = false,
+  previewHtml,
   onSend,
   sending = false,
 }: EmailPreviewDialogProps) {
@@ -506,56 +509,64 @@ export function EmailPreviewDialog({
           </TabsContent>
 
           <TabsContent value="preview" className="mt-4">
-            <ScrollArea className="h-[400px] rounded-lg border bg-background">
-              <div className="p-6">
-                {/* Email Header Preview */}
-                <div className="space-y-3 pb-4 border-b">
-                  <div className="flex items-start gap-3">
-                    <span className="text-sm text-muted-foreground w-16">To:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {emails.length > 0 ? (
-                        emails.map((email) => (
-                          <span key={email} className="text-sm font-medium">{email}</span>
-                        ))
-                      ) : (
-                        <span className="text-sm text-muted-foreground italic">No recipients added</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-sm text-muted-foreground w-16">Subject:</span>
-                    <span className="text-sm font-medium">{subject || "(No subject)"}</span>
-                  </div>
-                  {(attachmentName || additionalAttachments.length > 0) && (
+            {previewHtml ? (
+              <div className="rounded-lg border overflow-hidden" style={{ height: 400 }}>
+                <iframe
+                  srcDoc={previewHtml}
+                  title="Email Preview"
+                  className="w-full h-full border-0"
+                  sandbox="allow-same-origin"
+                />
+              </div>
+            ) : (
+              <ScrollArea className="h-[400px] rounded-lg border bg-background">
+                <div className="p-6">
+                  <div className="space-y-3 pb-4 border-b">
                     <div className="flex items-start gap-3">
-                      <span className="text-sm text-muted-foreground w-16">Attach:</span>
-                      <div className="flex flex-col gap-1">
-                        {attachmentName && (
-                          <div className="flex items-center gap-2">
-                            <Paperclip className="h-3 w-3" />
-                            <span className="text-sm">{attachmentName}</span>
-                          </div>
+                      <span className="text-sm text-muted-foreground w-16">To:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {emails.length > 0 ? (
+                          emails.map((email) => (
+                            <span key={email} className="text-sm font-medium">{email}</span>
+                          ))
+                        ) : (
+                          <span className="text-sm text-muted-foreground italic">No recipients added</span>
                         )}
-                        {additionalAttachments.map((attachment) => (
-                          <div key={attachment.file.name} className="flex items-center gap-2">
-                            <Paperclip className="h-3 w-3" />
-                            <span className="text-sm">{attachment.file.name}</span>
-                          </div>
-                        ))}
                       </div>
                     </div>
-                  )}
+                    <div className="flex items-start gap-3">
+                      <span className="text-sm text-muted-foreground w-16">Subject:</span>
+                      <span className="text-sm font-medium">{subject || "(No subject)"}</span>
+                    </div>
+                    {(attachmentName || additionalAttachments.length > 0) && (
+                      <div className="flex items-start gap-3">
+                        <span className="text-sm text-muted-foreground w-16">Attach:</span>
+                        <div className="flex flex-col gap-1">
+                          {attachmentName && (
+                            <div className="flex items-center gap-2">
+                              <Paperclip className="h-3 w-3" />
+                              <span className="text-sm">{attachmentName}</span>
+                            </div>
+                          )}
+                          {additionalAttachments.map((attachment) => (
+                            <div key={attachment.file.name} className="flex items-center gap-2">
+                              <Paperclip className="h-3 w-3" />
+                              <span className="text-sm">{attachment.file.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="pt-4">
+                    <div 
+                      className="prose prose-sm max-w-none dark:prose-invert"
+                      dangerouslySetInnerHTML={{ __html: messageToHtml(message) }}
+                    />
+                  </div>
                 </div>
-
-                {/* Email Body Preview */}
-                <div className="pt-4">
-                  <div 
-                    className="prose prose-sm max-w-none dark:prose-invert"
-                    dangerouslySetInnerHTML={{ __html: messageToHtml(message) }}
-                  />
-                </div>
-              </div>
-            </ScrollArea>
+              </ScrollArea>
+            )}
           </TabsContent>
         </Tabs>
 
