@@ -361,7 +361,7 @@ Thank you for your business.`;
       ? new Date(po.expected_delivery_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
       : null;
     const vendorName = vendor?.contact_name || vendor?.name || "Valued Vendor";
-    const customMessage = message || getDefaultEmailMessage();
+    const customMessage = getDefaultEmailMessage();
     const messageHtml = customMessage.split('\n').map((line: string) => line.trim() === '' ? '<br/>' : `<p style="margin: 8px 0; color: #374151; font-size: 16px; line-height: 1.6;">${line}</p>`).join('');
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
