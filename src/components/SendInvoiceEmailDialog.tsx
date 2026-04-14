@@ -872,6 +872,8 @@ Thank you for your business.`;
                 This email will be sent from: <span className="font-medium text-foreground">{senderName} ({senderEmail})</span>
               </p>
             </div>
+              </div>
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="preview" className="mt-4">
