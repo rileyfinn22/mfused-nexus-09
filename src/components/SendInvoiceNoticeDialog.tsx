@@ -451,7 +451,7 @@ export function SendInvoiceNoticeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] w-[min(700px,calc(100vw-2rem))] flex-col overflow-hidden p-0 sm:max-w-[700px]">
+      <DialogContent className="flex max-h-[90vh] w-[min(700px,calc(100vw-2rem))] flex-col overflow-y-auto p-0 sm:max-w-[700px]">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="flex items-center gap-2">
             {icon}
@@ -464,7 +464,7 @@ export function SendInvoiceNoticeDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col px-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col px-6 pb-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="compose" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
@@ -476,9 +476,8 @@ export function SendInvoiceNoticeDialog({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="compose" className="mt-4 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
-            <ScrollArea className="min-h-0 flex-1 pr-3">
-              <div className="space-y-4 pb-6">
+          <TabsContent value="compose" className="mt-4 pr-1">
+            <div className="space-y-4 pb-2">
             {/* Invoice Summary */}
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
@@ -561,13 +560,13 @@ export function SendInvoiceNoticeDialog({
             </div>
 
             {/* Editable Body */}
-            <div className="space-y-2">
+              <div className="space-y-2">
               <Label>Email Body</Label>
               <Textarea
                 value={editableBody}
                 onChange={(e) => setEditableBody(e.target.value)}
                 placeholder="Email body text"
-                className="min-h-[260px] resize-y"
+                  className="min-h-[320px] resize-y"
               />
               <p className="text-xs text-muted-foreground">The invoice details card, &quot;View in Portal&quot; button, and footer will be included automatically below your message.</p>
             </div>
@@ -648,7 +647,6 @@ export function SendInvoiceNoticeDialog({
               </p>
             </div>
               </div>
-            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="preview" className="mt-4 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
