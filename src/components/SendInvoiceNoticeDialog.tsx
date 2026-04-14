@@ -49,7 +49,9 @@ export function SendInvoiceNoticeDialog({
   const [attachPdf, setAttachPdf] = useState(true);
   const [editableSubject, setEditableSubject] = useState("");
   const [editableBody, setEditableBody] = useState("");
+  const [additionalAttachments, setAdditionalAttachments] = useState<AdditionalAttachment[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isBilled = noticeType === "billed";
   const title = isBilled ? "Send Billed Notice" : "Send Payment Due Reminder";
@@ -87,6 +89,7 @@ export function SendInvoiceNoticeDialog({
       setActiveTab("compose");
       setShowEmailSuggestions(false);
       setAttachPdf(true);
+      setAdditionalAttachments([]);
 
       const dueDate = invoice?.due_date
         ? new Date(invoice.due_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
@@ -142,6 +145,78 @@ export function SendInvoiceNoticeDialog({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") { e.preventDefault(); addEmail(); }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const MAX_FILE_SIZE = 30 * 1024 * 1024;
+    const MAX_TOTAL_SIZE = 40 * 1024 * 1024;
+    let runningTotalSize = additionalAttachments.reduce((sum, attachment) => sum + attachment.file.size, 0);
+    const newAttachments: AdditionalAttachment[] = [];
+
+    for (const file of files) {
+      const isDuplicate = additionalAttachments.some((attachment) => attachment.file.name === file.name)
+        || newAttachments.some((attachment) => attachment.file.name === file.name);
+
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds 30MB limit`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      if (runningTotalSize + file.size > MAX_TOTAL_SIZE) {
+        toast({
+          title: "Total size limit reached",
+          description: "Total attachments cannot exceed 40MB",
+          variant: "destructive",
+        });
+        break;
+      }
+
+      if (isDuplicate) {
+        toast({
+          title: "Duplicate file",
+          description: `${file.name} is already attached`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1] || result);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      newAttachments.push({ file, base64 });
+      runningTotalSize += file.size;
+    }
+
+    if (newAttachments.length > 0) {
+      setAdditionalAttachments((prev) => [...prev, ...newAttachments]);
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (fileName: string) => {
+    setAdditionalAttachments((prev) => prev.filter((attachment) => attachment.file.name !== fileName));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const generatePdfBase64 = async (): Promise<string> => {
@@ -328,6 +403,11 @@ export function SendInvoiceNoticeDialog({
         pdfFilename = `Invoice-${invoice.invoice_number}.pdf`;
       }
 
+      const additionalAttachmentsData = additionalAttachments.map((attachment) => ({
+        filename: attachment.file.name,
+        content: attachment.base64,
+      }));
+
       const { data, error } = await supabase.functions.invoke('send-invoice-notice', {
         body: {
           noticeType,
@@ -342,6 +422,7 @@ export function SendInvoiceNoticeDialog({
           pdfFilename,
           customSubject: editableSubject,
           customBody: editableBody,
+          additionalAttachments: additionalAttachmentsData.length > 0 ? additionalAttachmentsData : undefined,
         },
       });
 
@@ -486,27 +567,75 @@ export function SendInvoiceNoticeDialog({
                 value={editableBody}
                 onChange={(e) => setEditableBody(e.target.value)}
                 placeholder="Email body text"
-                className="min-h-[140px]"
+                className="min-h-[260px] resize-y"
               />
               <p className="text-xs text-muted-foreground">The invoice details card, &quot;View in Portal&quot; button, and footer will be included automatically below your message.</p>
             </div>
 
-            {/* Attachment toggle */}
-            <div className="space-y-2">
-              <Label>Attachment</Label>
-              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-                <Paperclip className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm flex-1">Invoice-{invoice?.invoice_number}.pdf</span>
-                <Badge variant="outline">PDF</Badge>
+            {/* Attachments */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <Label>Attachments</Label>
                 <Button
                   type="button"
-                  variant={attachPdf ? "default" : "outline"}
+                  variant="outline"
                   size="sm"
-                  onClick={() => setAttachPdf(!attachPdf)}
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  {attachPdf ? "Attached" : "Attach"}
+                  <Upload className="mr-2 h-4 w-4" />
+                  Add Files
                 </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.zip"
+                />
               </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3">
+                  <Paperclip className="h-4 w-4 text-muted-foreground" />
+                  <span className="flex-1 text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
+                  <Badge variant="outline">PDF</Badge>
+                  <Button
+                    type="button"
+                    variant={attachPdf ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setAttachPdf(!attachPdf)}
+                  >
+                    {attachPdf ? "Attached" : "Attach"}
+                  </Button>
+                </div>
+
+                {additionalAttachments.map((attachment) => (
+                  <div key={attachment.file.name} className="flex items-center gap-2 rounded-lg bg-muted/30 p-3">
+                    <Paperclip className="h-4 w-4 text-muted-foreground" />
+                    <span className="flex-1 truncate text-sm" title={attachment.file.name}>
+                      {attachment.file.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatFileSize(attachment.file.size)}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeAttachment(attachment.file.name)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                {attachPdf ? 'Invoice PDF will be included.' : 'Invoice PDF is currently excluded.'}
+                {additionalAttachments.length > 0 ? ` ${additionalAttachments.length} extra file${additionalAttachments.length > 1 ? 's' : ''} added • Total ${formatFileSize(additionalAttachments.reduce((sum, attachment) => sum + attachment.file.size, 0))}` : ' Add extra files if needed.'}
+              </p>
             </div>
 
             {/* Sender Info */}
@@ -543,15 +672,23 @@ export function SendInvoiceNoticeDialog({
                     <span className="text-sm text-muted-foreground w-16">Subject:</span>
                     <span className="text-sm font-medium">{editableSubject}</span>
                   </div>
-                  {attachPdf && (
-                    <div className="flex items-start gap-3">
-                      <span className="text-sm text-muted-foreground w-16">Attach:</span>
-                      <div className="flex items-center gap-2">
-                        <Paperclip className="h-3 w-3" />
-                        <span className="text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
-                      </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-sm text-muted-foreground w-16">Attach:</span>
+                    <div className="flex flex-col gap-1">
+                      {attachPdf && (
+                        <div className="flex items-center gap-2">
+                          <Paperclip className="h-3 w-3" />
+                          <span className="text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
+                        </div>
+                      )}
+                      {additionalAttachments.map((attachment) => (
+                        <div key={attachment.file.name} className="flex items-center gap-2">
+                          <Paperclip className="h-3 w-3" />
+                          <span className="text-sm">{attachment.file.name}</span>
+                        </div>
+                      ))}
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Email Body Preview */}
