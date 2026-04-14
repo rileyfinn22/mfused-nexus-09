@@ -451,8 +451,8 @@ export function SendInvoiceNoticeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] w-[min(700px,calc(100vw-2rem))] flex-col overflow-hidden p-0 sm:max-w-[700px]">
+        <DialogHeader className="px-6 pt-6">
           <DialogTitle className="flex items-center gap-2">
             {icon}
             {title}
@@ -464,7 +464,7 @@ export function SendInvoiceNoticeDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col px-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="compose" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
@@ -476,9 +476,9 @@ export function SendInvoiceNoticeDialog({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="compose" className="mt-4">
-            <ScrollArea className="max-h-[calc(90vh-280px)]">
-              <div className="space-y-4 pr-3">
+          <TabsContent value="compose" className="mt-4 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+            <ScrollArea className="min-h-0 flex-1 pr-3">
+              <div className="space-y-4 pb-6">
             {/* Invoice Summary */}
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
@@ -651,8 +651,8 @@ export function SendInvoiceNoticeDialog({
             </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="preview" className="mt-4">
-            <ScrollArea className="h-[400px] rounded-lg border bg-background">
+          <TabsContent value="preview" className="mt-4 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+            <ScrollArea className="min-h-0 flex-1 rounded-lg border bg-background">
               <div className="p-6">
                 {/* Email Header Preview */}
                 <div className="space-y-3 pb-4 border-b">
@@ -744,9 +744,9 @@ export function SendInvoiceNoticeDialog({
           </TabsContent>
         </Tabs>
 
-        <Separator className="my-2" />
+        <Separator className="mt-2" />
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
             Cancel
           </Button>
