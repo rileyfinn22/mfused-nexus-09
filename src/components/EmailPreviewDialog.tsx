@@ -45,6 +45,8 @@ interface EmailPreviewDialogProps {
   artworkFiles?: ArtworkFile[];
   /** Loading state for artwork files */
   loadingArtwork?: boolean;
+  /** Pre-rendered branded HTML for the preview tab (rendered in an iframe) */
+  previewHtml?: string;
   onSend: (data: {
     to: string[];
     subject: string;
