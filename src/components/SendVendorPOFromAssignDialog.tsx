@@ -374,7 +374,7 @@ Thank you for your business.`;
 <tr><td><h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:700;">VibePKG</h1><p style="margin:8px 0 0 0;color:rgba(255,255,255,0.9);font-size:14px;">Premium Packaging Solutions</p></td>
 <td align="right"><span style="background-color:rgba(255,255,255,0.2);color:#ffffff;padding:8px 16px;border-radius:20px;font-size:14px;font-weight:600;">PURCHASE ORDER</span></td></tr></table></td></tr>
 <tr><td style="padding:40px;">
-<p style="margin:0 0 24px 0;color:#374151;font-size:16px;line-height:1.6;">Dear ${vendorName},</p>
+${messageHtml}
 ${messageHtml}
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f9fafb;border-radius:8px;margin:24px 0;">
 <tr><td style="padding:24px;">
