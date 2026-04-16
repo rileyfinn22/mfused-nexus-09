@@ -1782,6 +1782,30 @@ const OrderDetail = () => {
             <Download className="h-4 w-4 mr-2" />
             Invoice
           </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (!order) return;
+              try {
+                const { generateOrderConfirmationPdf } = await import("@/lib/orderConfirmationPdf");
+                const { blob } = await generateOrderConfirmationPdf(order, order.order_items || []);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `Order-Confirmation-${order.order_number}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              } catch (e) {
+                console.error(e);
+                toast({ title: "Error", description: "Failed to generate confirmation PDF", variant: "destructive" });
+              }
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Confirmation
+          </Button>
           {isVibeAdmin && (
             <Button variant="outline" onClick={() => setShowConfirmationDialog(true)}>
               <Mail className="h-4 w-4 mr-2" />
