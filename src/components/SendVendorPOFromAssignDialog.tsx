@@ -158,6 +158,16 @@ export function SendVendorPOFromAssignDialog({
     }
   };
 
+  const getOrderNumbers = (): string[] => {
+    const set = new Set<string>();
+    poItems.forEach((item: any) => {
+      const num = item?.order_items?.orders?.order_number;
+      if (num) set.add(num);
+    });
+    if (set.size === 0 && po?.orders?.order_number) set.add(po.orders.order_number);
+    return Array.from(set);
+  };
+
   const generatePdfBase64 = async (): Promise<string> => {
     if (!po || !vendor || poItems.length === 0) throw new Error("Missing PO data");
 
