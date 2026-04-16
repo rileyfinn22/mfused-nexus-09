@@ -155,6 +155,10 @@ const handler = async (req: Request): Promise<Response> => {
                               <td style="padding-bottom: 16px; border-bottom: 1px solid #e5e7eb;">
                                 <p style="margin: 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">PO Number</p>
                                 <p style="margin: 4px 0 0 0; color: #111827; font-size: 18px; font-weight: 600;">${poNumber}</p>
+                                ${orderNumbers && orderNumbers.length > 0 ? `
+                                <p style="margin: 12px 0 0 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Order Number${orderNumbers.length > 1 ? 's' : ''}</p>
+                                <p style="margin: 4px 0 0 0; color: #111827; font-size: 16px; font-weight: 600;">${orderNumbers.join(', ')}</p>
+                                ` : ''}
                               </td>
                             </tr>
                             <tr>
