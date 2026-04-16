@@ -173,6 +173,7 @@ export async function generateOrderConfirmationPdf(
     : [["#", "Product", "SKU", "Qty", "Description"]];
 
   const tableBody = items.map((item, i) => {
+    const qtyStr = item.quantity.toLocaleString();
     if (hasAnyPrice) {
       const price = item.unit_price || 0;
       const lineTotal = item.quantity * price;
@@ -180,7 +181,7 @@ export async function generateOrderConfirmationPdf(
         (i + 1).toString(),
         item.name,
         item.sku,
-        item.quantity.toString(),
+        qtyStr,
         `$${price.toFixed(3)}`,
         `$${lineTotal.toFixed(2)}`,
       ];
@@ -189,7 +190,7 @@ export async function generateOrderConfirmationPdf(
       (i + 1).toString(),
       item.name,
       item.sku,
-      item.quantity.toString(),
+      qtyStr,
       item.description || "",
     ];
   });
@@ -214,16 +215,16 @@ export async function generateOrderConfirmationPdf(
     },
     columnStyles: hasAnyPrice
       ? {
-          0: { cellWidth: 12 },
-          2: { fontStyle: "bold", cellWidth: 35 },
-          3: { halign: "center", cellWidth: 18 },
-          4: { halign: "right", cellWidth: 28 },
+          0: { cellWidth: 10 },
+          2: { fontStyle: "bold", cellWidth: 32 },
+          3: { halign: "center", cellWidth: 24, overflow: "visible" },
+          4: { halign: "right", cellWidth: 26 },
           5: { halign: "right", cellWidth: 28 },
         }
       : {
-          0: { cellWidth: 12 },
+          0: { cellWidth: 10 },
           2: { fontStyle: "bold", cellWidth: 35 },
-          3: { halign: "center", cellWidth: 18 },
+          3: { halign: "center", cellWidth: 24, overflow: "visible" },
         },
     margin: { left: 14, right: 14 },
   });
