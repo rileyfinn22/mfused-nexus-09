@@ -267,7 +267,9 @@ const handler = async (req: Request): Promise<Response> => {
       replyTo: senderEmail,
       to: recipientEmails,
       bcc: internalBccRecipients,
-      subject: `PO ${poNumber} From VibePKG`,
+      subject: orderNumbers && orderNumbers.length > 0
+        ? `PO ${poNumber} (Order ${orderNumbers.join(', ')}) From VibePKG`
+        : `PO ${poNumber} From VibePKG`,
       html: emailHtml,
       attachments,
     });
