@@ -398,7 +398,7 @@ ${messageHtml}
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f9fafb;border-radius:8px;margin:24px 0;">
 <tr><td style="padding:24px;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-<tr><td style="padding-bottom:16px;border-bottom:1px solid #e5e7eb;"><p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">PO Number</p><p style="margin:4px 0 0 0;color:#111827;font-size:18px;font-weight:600;">${po.po_number}</p></td></tr>
+<tr><td style="padding-bottom:16px;border-bottom:1px solid #e5e7eb;"><p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">PO Number</p><p style="margin:4px 0 0 0;color:#111827;font-size:18px;font-weight:600;">${po.po_number}</p>${getOrderNumbers().length > 0 ? `<p style="margin:12px 0 0 0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Order Number${getOrderNumbers().length > 1 ? 's' : ''}</p><p style="margin:4px 0 0 0;color:#111827;font-size:16px;font-weight:600;">${getOrderNumbers().join(', ')}</p>` : ''}</td></tr>
 <tr><td style="padding:16px 0;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
 <tr><td width="50%"><p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Order Date</p><p style="margin:4px 0 0 0;color:#111827;font-size:16px;font-weight:500;">${formattedOrderDate}</p></td>
