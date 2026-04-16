@@ -354,12 +354,16 @@ export function SendVendorPOFromAssignDialog({
   const getDefaultEmailMessage = () => {
     if (!po || !vendor) return "";
     const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+    const orderNums = getOrderNumbers();
+    const orderLine = orderNums.length > 0
+      ? `Order Number${orderNums.length > 1 ? "s" : ""}: ${orderNums.join(", ")}\n`
+      : "";
     return `Dear ${vendor.contact_name || vendor.name},
 
 Please find attached the purchase order from ${VIBE_COMPANY.name}.
 
 PO Number: ${po.po_number}
-Order Date: ${new Date(po.order_date).toLocaleDateString()}
+${orderLine}Order Date: ${new Date(po.order_date).toLocaleDateString()}
 Total Amount: $${totalAmount.toFixed(2)}
 
 Please confirm receipt of this order and provide an estimated delivery date.
