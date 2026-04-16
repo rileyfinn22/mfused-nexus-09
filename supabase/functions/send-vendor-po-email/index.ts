@@ -23,6 +23,7 @@ interface SendVendorPORequest {
   pdfBase64: string;
   pdfFilename?: string;
   poNumber: string;
+  orderNumbers?: string[];
   orderDate: string;
   expectedDeliveryDate?: string;
   totalAmount: number;
