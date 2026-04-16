@@ -456,6 +456,7 @@ ${formattedDeliveryDate ? `<tr><td style="padding-top:16px;border-top:1px solid 
           pdfBase64,
           pdfFilename: `PO-${po.po_number}.pdf`,
           poNumber: po.po_number,
+          orderNumbers: getOrderNumbers(),
           orderDate: po.order_date,
           expectedDeliveryDate: po.expected_delivery_date,
           totalAmount,
