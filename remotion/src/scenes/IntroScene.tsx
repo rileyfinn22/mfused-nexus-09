@@ -5,7 +5,9 @@ export const IntroScene = () => {
   const { fps } = useVideoConfig();
 
   const logoSpring = spring({ frame, fps, config: { damping: 15, stiffness: 120, mass: 1.5 } });
-  const logoScale = interpolate(logoSpring, [0, 1], [0.5, 1]);
+  const logoScaleRaw = interpolate(logoSpring, [0, 1], [0.5, 1]);
+  // Snap to 1.0 once spring settles to avoid sub-pixel softness on the held frames
+  const logoScale = frame > 35 ? 1 : logoScaleRaw;
   const logoOpacity = interpolate(logoSpring, [0, 1], [0, 1]);
 
   const subSpring = spring({ frame: frame - 25, fps, config: { damping: 20, stiffness: 180 } });
@@ -27,7 +29,14 @@ export const IntroScene = () => {
       >
         <Img
           src={staticFile("images/vibe-logo-dark.png")}
-          style={{ width: 500, height: "auto" }}
+          style={{
+            width: 600,
+            height: "auto",
+            display: "block",
+            imageRendering: "-webkit-optimize-contrast",
+            transform: "translateZ(0)",
+            backfaceVisibility: "hidden",
+          }}
         />
       </div>
 
