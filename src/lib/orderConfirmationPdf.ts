@@ -216,14 +216,14 @@ export async function generateOrderConfirmationPdf(
       ? {
           0: { cellWidth: 10 },
           2: { fontStyle: "bold", cellWidth: 32 },
-          3: { halign: "center", cellWidth: 24, noWrap: true },
+          3: { halign: "center", cellWidth: 24, overflow: "visible" },
           4: { halign: "right", cellWidth: 26 },
           5: { halign: "right", cellWidth: 28 },
         }
       : {
           0: { cellWidth: 10 },
           2: { fontStyle: "bold", cellWidth: 35 },
-          3: { halign: "center", cellWidth: 24, noWrap: true },
+          3: { halign: "center", cellWidth: 24, overflow: "visible" },
         },
     margin: { left: 14, right: 14 },
   });
