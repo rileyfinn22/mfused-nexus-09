@@ -247,7 +247,8 @@ export function SendVendorPOFromAssignDialog({
     doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
     doc.text("Order #:", rightColX, yPos + 21);
     doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(po.orders?.order_number || "N/A", rightColX + 45, yPos + 21);
+    const orderNumbersStr = getOrderNumbers().join(", ") || po.orders?.order_number || "N/A";
+    doc.text(orderNumbersStr, rightColX + 45, yPos + 21);
 
     yPos += 40;
 
