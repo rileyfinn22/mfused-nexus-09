@@ -49,6 +49,7 @@ const handler = async (req: Request): Promise<Response> => {
       pdfBase64,
       pdfFilename,
       poNumber,
+      orderNumbers,
       orderDate,
       expectedDeliveryDate,
       totalAmount,
