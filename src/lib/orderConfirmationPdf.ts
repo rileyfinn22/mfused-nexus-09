@@ -173,6 +173,7 @@ export async function generateOrderConfirmationPdf(
     : [["#", "Product", "SKU", "Qty", "Description"]];
 
   const tableBody = items.map((item, i) => {
+    const qtyStr = item.quantity.toLocaleString();
     if (hasAnyPrice) {
       const price = item.unit_price || 0;
       const lineTotal = item.quantity * price;
@@ -180,7 +181,7 @@ export async function generateOrderConfirmationPdf(
         (i + 1).toString(),
         item.name,
         item.sku,
-        item.quantity.toString(),
+        qtyStr,
         `$${price.toFixed(3)}`,
         `$${lineTotal.toFixed(2)}`,
       ];
@@ -189,7 +190,7 @@ export async function generateOrderConfirmationPdf(
       (i + 1).toString(),
       item.name,
       item.sku,
-      item.quantity.toString(),
+      qtyStr,
       item.description || "",
     ];
   });
