@@ -73,7 +73,11 @@ export function SendVendorPOFromAssignDialog({
 
       const [vendorRes, itemsRes] = await Promise.all([
         supabase.from("vendors").select("*").eq("id", poData.vendor_id).single(),
-        supabase.from("vendor_po_items").select("*").eq("vendor_po_id", vendorPoId).order("created_at"),
+        supabase
+          .from("vendor_po_items")
+          .select("*, order_items(orders(order_number))")
+          .eq("vendor_po_id", vendorPoId)
+          .order("created_at"),
       ]);
 
       if (vendorRes.data) setVendor(vendorRes.data);
@@ -152,6 +156,16 @@ export function SendVendorPOFromAssignDialog({
     } finally {
       setLoadingArtwork(false);
     }
+  };
+
+  const getOrderNumbers = (): string[] => {
+    const set = new Set<string>();
+    poItems.forEach((item: any) => {
+      const num = item?.order_items?.orders?.order_number;
+      if (num) set.add(num);
+    });
+    if (set.size === 0 && po?.orders?.order_number) set.add(po.orders.order_number);
+    return Array.from(set);
   };
 
   const generatePdfBase64 = async (): Promise<string> => {
@@ -243,7 +257,8 @@ export function SendVendorPOFromAssignDialog({
     doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
     doc.text("Order #:", rightColX, yPos + 21);
     doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(po.orders?.order_number || "N/A", rightColX + 45, yPos + 21);
+    const orderNumbersStr = getOrderNumbers().join(", ") || po.orders?.order_number || "N/A";
+    doc.text(orderNumbersStr, rightColX + 45, yPos + 21);
 
     yPos += 40;
 
@@ -339,12 +354,16 @@ export function SendVendorPOFromAssignDialog({
   const getDefaultEmailMessage = () => {
     if (!po || !vendor) return "";
     const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+    const orderNums = getOrderNumbers();
+    const orderLine = orderNums.length > 0
+      ? `Order Number${orderNums.length > 1 ? "s" : ""}: ${orderNums.join(", ")}\n`
+      : "";
     return `Dear ${vendor.contact_name || vendor.name},
 
 Please find attached the purchase order from ${VIBE_COMPANY.name}.
 
 PO Number: ${po.po_number}
-Order Date: ${new Date(po.order_date).toLocaleDateString()}
+${orderLine}Order Date: ${new Date(po.order_date).toLocaleDateString()}
 Total Amount: $${totalAmount.toFixed(2)}
 
 Please confirm receipt of this order and provide an estimated delivery date.
@@ -379,7 +398,7 @@ ${messageHtml}
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f9fafb;border-radius:8px;margin:24px 0;">
 <tr><td style="padding:24px;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-<tr><td style="padding-bottom:16px;border-bottom:1px solid #e5e7eb;"><p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">PO Number</p><p style="margin:4px 0 0 0;color:#111827;font-size:18px;font-weight:600;">${po.po_number}</p></td></tr>
+<tr><td style="padding-bottom:16px;border-bottom:1px solid #e5e7eb;"><p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">PO Number</p><p style="margin:4px 0 0 0;color:#111827;font-size:18px;font-weight:600;">${po.po_number}</p>${getOrderNumbers().length > 0 ? `<p style="margin:12px 0 0 0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Order Number${getOrderNumbers().length > 1 ? 's' : ''}</p><p style="margin:4px 0 0 0;color:#111827;font-size:16px;font-weight:600;">${getOrderNumbers().join(', ')}</p>` : ''}</td></tr>
 <tr><td style="padding:16px 0;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
 <tr><td width="50%"><p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Order Date</p><p style="margin:4px 0 0 0;color:#111827;font-size:16px;font-weight:500;">${formattedOrderDate}</p></td>
@@ -437,6 +456,7 @@ ${formattedDeliveryDate ? `<tr><td style="padding-top:16px;border-top:1px solid 
           pdfBase64,
           pdfFilename: `PO-${po.po_number}.pdf`,
           poNumber: po.po_number,
+          orderNumbers: getOrderNumbers(),
           orderDate: po.order_date,
           expectedDeliveryDate: po.expected_delivery_date,
           totalAmount,
