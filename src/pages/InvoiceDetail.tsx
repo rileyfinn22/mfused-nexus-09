@@ -825,11 +825,15 @@ const InvoiceDetail = () => {
       
       // For blanket invoices, we need to create inventory allocations if quantities are being set
       const isBlanketInvoice = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
-      
-      // For blanket invoices, fetch current DB shipped_quantity to avoid overwriting
-      // values set by child shipment invoices
+      const hasChildInvoices = relatedInvoices.some(
+        (ri: any) => ri.parent_invoice_id === invoiceId
+      );
+      const preserveChildShipmentQuantities = isBlanketInvoice && hasChildInvoices;
+
+      // Only protect blanket shipped quantities when child invoices exist.
+      // Otherwise admins must be able to directly lower or raise shipped qty.
       let dbShippedMap: Record<string, number> = {};
-      if (isBlanketInvoice && order?.id) {
+      if (preserveChildShipmentQuantities && order?.id) {
         const { data: currentItems } = await supabase
           .from('order_items')
           .select('id, shipped_quantity')
@@ -844,10 +848,10 @@ const InvoiceDetail = () => {
       // Update each order item
       for (const item of editedItems) {
         const editedShippedQty = Number(item.shipped_quantity) || 0;
-        // For blanket invoices, use the MAX of DB value and edited value to prevent
-        // accidentally resetting shipped quantities set by child invoices
+        // For blanket invoices with child invoices, preserve shipped qty already
+        // recorded by those child allocations. Otherwise honor the edited value.
         const dbShipped = dbShippedMap[item.id] ?? 0;
-        const newShippedQty = isBlanketInvoice
+        const newShippedQty = preserveChildShipmentQuantities
           ? Math.max(editedShippedQty, dbShipped)
           : editedShippedQty;
         // For blanket invoices, total should be based on ORDERED quantity, not shipped
@@ -902,7 +906,7 @@ const InvoiceDetail = () => {
       // Sync shipped quantities to linked vendor PO items
       try {
         for (const item of editedItems) {
-          const newShippedQty = isBlanketInvoice
+          const newShippedQty = preserveChildShipmentQuantities
             ? Math.max(Number(item.shipped_quantity) || 0, dbShippedMap[item.id] ?? 0)
             : Number(item.shipped_quantity) || 0;
           if (newShippedQty > 0) {
