@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { downloadStorageObject, normalizeStorageObjectPath } from "@/lib/storageUrl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -661,7 +662,7 @@ const QuoteDetail = () => {
 
   const handleDeleteDoc = async (docId: string, filePath: string) => {
     try {
-      await supabase.storage.from('quote-documents').remove([filePath]);
+      await supabase.storage.from('quote-documents').remove([normalizeStorageObjectPath(filePath, 'quote-documents')]);
       await supabase.from('quote_documents').delete().eq('id', docId);
       toast({ title: "Deleted", description: "Document removed" });
       fetchQuoteDocuments();
@@ -671,8 +672,7 @@ const QuoteDetail = () => {
   };
 
   const getDocDownloadUrl = async (filePath: string) => {
-    const { data } = await supabase.storage.from('quote-documents').createSignedUrl(filePath, 3600);
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+    await downloadStorageObject('quote-documents', filePath, filePath.split('/').pop() || 'document');
   };
 
 
@@ -1088,11 +1088,13 @@ const QuoteDetail = () => {
               <CardContent>
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <span className="text-sm font-medium">{quote.uploaded_filename}</span>
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={quote.uploaded_file_url} target="_blank" rel="noopener noreferrer">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </a>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadStorageObject('quote-documents', quote.uploaded_file_url, quote.uploaded_filename || 'document')}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
                   </Button>
                 </div>
               </CardContent>

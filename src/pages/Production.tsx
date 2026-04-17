@@ -19,6 +19,7 @@ import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipmentLegDialog";
 import { GenerateShipmentLinkDialog } from "@/components/GenerateShipmentLinkDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
+import { normalizeStorageObjectPath } from "@/lib/storageUrl";
 
 // Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
 const parseDateAsLocal = (dateStr: string | null): Date | undefined => {
@@ -112,10 +113,7 @@ export default function Production() {
           .from('packing-lists')
           .upload(filePath, file);
         if (uploadError) throw uploadError;
-        const { data: { publicUrl } } = supabase.storage
-          .from('packing-lists')
-          .getPublicUrl(filePath);
-        fileUrl = publicUrl;
+        fileUrl = normalizeStorageObjectPath(filePath, 'packing-lists');
         fileName = file.name;
       }
 

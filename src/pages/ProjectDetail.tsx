@@ -25,6 +25,7 @@ import {
   File
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { downloadStorageObject, getStoragePreviewUrl, normalizeStorageObjectPath } from "@/lib/storageUrl";
 
 const ProjectDetail = () => {
   const { projectId } = useParams();
@@ -41,6 +42,7 @@ const ProjectDetail = () => {
   const [loading, setLoading] = useState(true);
   const [plView, setPlView] = useState<"accrual" | "cash">("accrual");
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [documentUrls, setDocumentUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     checkAdminStatus();
@@ -149,7 +151,21 @@ const ProjectDetail = () => {
         .select('*')
         .eq('order_id', projectId)
         .order('created_at', { ascending: false });
-      setDocuments(docData || []);
+      const nextDocuments = docData || [];
+      setDocuments(nextDocuments);
+
+      const documentUrlEntries = await Promise.all(
+        nextDocuments.map(async (doc: any) => {
+          try {
+            const previewUrl = await getStoragePreviewUrl('project-documents', doc.file_path);
+            return [doc.id, previewUrl] as const;
+          } catch {
+            return [doc.id, ''] as const;
+          }
+        })
+      );
+
+      setDocumentUrls(Object.fromEntries(documentUrlEntries.filter(([, url]) => !!url)));
 
     } catch (error) {
       console.error('Error fetching project data:', error);
@@ -197,18 +213,18 @@ const ProjectDetail = () => {
 
   const handleDocumentDelete = async (doc: any) => {
     try {
-      await supabase.storage.from('project-documents').remove([doc.file_path]);
+      await supabase.storage.from('project-documents').remove([normalizeStorageObjectPath(doc.file_path, 'project-documents')]);
       await supabase.from('project_documents').delete().eq('id', doc.id);
       toast.success('Document deleted');
       setDocuments(prev => prev.filter(d => d.id !== doc.id));
+      setDocumentUrls(prev => {
+        const next = { ...prev };
+        delete next[doc.id];
+        return next;
+      });
     } catch (error: any) {
       toast.error(error.message || 'Delete failed');
     }
-  };
-
-  const getDocumentUrl = (filePath: string) => {
-    const { data } = supabase.storage.from('project-documents').getPublicUrl(filePath);
-    return data.publicUrl;
   };
 
   const formatFileSize = (bytes: number) => {
@@ -881,10 +897,10 @@ const ProjectDetail = () => {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {documents.map((doc) => {
-                    const url = getDocumentUrl(doc.file_path);
+                    const url = documentUrls[doc.id];
                     return (
                       <div key={doc.id} className="border border-border rounded-lg overflow-hidden">
-                        {isImageFile(doc.file_type) ? (
+                        {isImageFile(doc.file_type) && url ? (
                           <div className="h-40 bg-muted flex items-center justify-center overflow-hidden">
                             <img src={url} alt={doc.file_name} className="object-cover w-full h-full" />
                           </div>
@@ -899,10 +915,13 @@ const ProjectDetail = () => {
                             {formatFileSize(doc.file_size)} • {new Date(doc.created_at).toLocaleDateString()}
                           </p>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm" className="flex-1" asChild>
-                              <a href={url} download={doc.file_name} target="_blank" rel="noopener noreferrer">
-                                <Download className="h-3 w-3 mr-1" /> Download
-                              </a>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => downloadStorageObject('project-documents', doc.file_path, doc.file_name)}
+                            >
+                              <Download className="h-3 w-3 mr-1" /> Download
                             </Button>
                             {isVibeAdmin && (
                               <Button

@@ -19,6 +19,7 @@ import { UpdateBillDialog } from "@/components/UpdateBillDialog";
 import { VendorPOPackingListSection } from "@/components/VendorPOPackingListSection";
 import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
+import { normalizeStorageObjectPath, openStorageObjectInNewTab } from "@/lib/storageUrl";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
@@ -264,15 +265,11 @@ const VendorPODetail = () => {
       if (uploadError) throw uploadError;
 
       // Get the public URL
-      const { data: urlData } = supabase.storage
-        .from('po-documents')
-        .getPublicUrl(fileName);
-
       // Update vendor PO with attachment info
       const { error: updateError } = await supabase
         .from('vendor_pos')
         .update({
-          attachment_url: urlData.publicUrl,
+          attachment_url: normalizeStorageObjectPath(fileName, 'po-documents'),
           attachment_name: file.name
         })
         .eq('id', po.id);
@@ -304,11 +301,11 @@ const VendorPODetail = () => {
 
     try {
       // Extract file path from URL
-      const urlParts = po.attachment_url.split('/po-documents/');
-      if (urlParts[1]) {
+      const normalizedPath = normalizeStorageObjectPath(po.attachment_url, 'po-documents');
+      if (normalizedPath) {
         await supabase.storage
           .from('po-documents')
-          .remove([urlParts[1]]);
+          .remove([normalizedPath]);
       }
 
       // Clear attachment from vendor PO
@@ -1233,25 +1230,7 @@ Thank you for your business.`;
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={async () => {
-                        // Extract file path from the stored public URL
-                        const url = po.attachment_url;
-                        const bucketPath = url.includes('/object/public/po-documents/')
-                          ? url.split('/object/public/po-documents/')[1]
-                          : null;
-                        
-                        if (bucketPath) {
-                          const { data } = await supabase.storage
-                            .from('po-documents')
-                            .createSignedUrl(decodeURIComponent(bucketPath), 3600);
-                          if (data?.signedUrl) {
-                            window.open(data.signedUrl, '_blank');
-                            return;
-                          }
-                        }
-                        // Fallback to direct URL
-                        window.open(url, '_blank');
-                      }}
+                      onClick={() => openStorageObjectInNewTab('po-documents', po.attachment_url)}
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
                       View
