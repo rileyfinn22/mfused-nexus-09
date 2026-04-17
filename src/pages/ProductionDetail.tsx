@@ -17,6 +17,7 @@ import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipment
 import { getTrackingUrl } from "@/lib/trackingUtils";
 import { cn } from "@/lib/utils";
 import { SendDeliveryNotificationDialog } from "@/components/SendDeliveryNotificationDialog";
+import { normalizeStorageObjectPath, openStorageObjectInNewTab } from "@/lib/storageUrl";
 interface Order {
   id: string;
   order_number: string;
@@ -396,11 +397,7 @@ export default function ProductionDetail() {
       .upload(filePath, file);
     if (uploadError) throw uploadError;
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('packing-lists')
-      .getPublicUrl(filePath);
-
-    return { url: publicUrl, name: file.name };
+    return { url: normalizeStorageObjectPath(filePath, 'packing-lists'), name: file.name };
   };
 
   const handleAddShipmentLeg = async (formData: LegFormData, file?: File) => {
@@ -1346,6 +1343,7 @@ export default function ProductionDetail() {
         onAddLeg={isVibeAdmin || isVendor ? () => setAddLegDialogOpen(true) : undefined}
         onAttachmentUpload={isVibeAdmin || isVendor ? handleLegAttachmentUpload : undefined}
         onDeleteLeg={isVibeAdmin ? handleDeleteLeg : undefined}
+        onOpenAttachment={(path) => openStorageObjectInNewTab('packing-lists', path)}
         onNotesChange={isVibeAdmin || isVendor ? handleLegNotesChange : undefined}
         onSendDeliveryNotification={isVibeAdmin ? (leg) => setDeliveryNotifLeg(leg) : undefined}
       />
