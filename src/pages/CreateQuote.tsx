@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { normalizeStorageObjectPath } from "@/lib/storageUrl";
 
 interface PriceBreak {
   qty: number;
@@ -403,11 +404,7 @@ const CreateQuote = () => {
 
     if (uploadError) throw uploadError;
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('quote-documents')
-      .getPublicUrl(filePath);
-
-    return { url: publicUrl, filename: uploadedFile.name };
+    return { url: normalizeStorageObjectPath(filePath, 'quote-documents'), filename: uploadedFile.name };
   };
 
   // Filter products for the add items dialog
