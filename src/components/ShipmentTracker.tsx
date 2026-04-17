@@ -42,6 +42,7 @@ interface ShipmentTrackerProps {
   onDeleteLeg?: (legId: string) => Promise<void>;
   onNotesChange?: (legId: string, notes: string) => Promise<void>;
   onSendDeliveryNotification?: (leg: ShipmentLeg) => void;
+  onOpenAttachment?: (path: string) => void | Promise<void>;
 }
 
 const getLegIcon = (legType: string) => {
@@ -69,7 +70,7 @@ const getDateInputValue = (dateStr: string | null) => {
   return dateStr.split('T')[0];
 };
 
-export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArrivalChange, onAddLeg, onAttachmentUpload, onDeleteLeg, onNotesChange, onSendDeliveryNotification }: ShipmentTrackerProps) {
+export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArrivalChange, onAddLeg, onAttachmentUpload, onDeleteLeg, onNotesChange, onSendDeliveryNotification, onOpenAttachment }: ShipmentTrackerProps) {
   const [updatingLeg, setUpdatingLeg] = useState<string | null>(null);
   const [editingNotesLeg, setEditingNotesLeg] = useState<string | null>(null);
   const [notesText, setNotesText] = useState('');
@@ -304,15 +305,14 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
 
                         {leg.attachment_url && leg.attachment_name && (
                           <div className="mt-2">
-                            <a
-                              href={leg.attachment_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => leg.attachment_url && onOpenAttachment?.(leg.attachment_url)}
                               className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline bg-primary/10 rounded-md px-2 py-1"
                             >
                               <Paperclip className="h-3 w-3" />
                               {leg.attachment_name}
-                            </a>
+                            </button>
                           </div>
                         )}
                       </div>
