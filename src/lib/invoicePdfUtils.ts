@@ -178,9 +178,13 @@ const renderInvoiceToDoc = async (
   
   // ============ ITEMS TABLE ============
   const items = order.order_items || [];
+  // Use shipped quantity as the source of truth when ANY item has shipped
+  // (matches the footer/DB logic). When nothing has shipped on the invoice,
+  // fall back to ordered qty so deposit/blanket invoices still display lines.
+  const anyShippedForRows = items.some((it) => Number(it.shipped_quantity || 0) > 0);
   const tableData = items.map((item) => {
-    const qty = Number(item.shipped_quantity) > 0
-      ? Number(item.shipped_quantity)
+    const qty = anyShippedForRows
+      ? Number(item.shipped_quantity || 0)
       : Number(item.quantity || 0);
     return [
       item.sku || '',
