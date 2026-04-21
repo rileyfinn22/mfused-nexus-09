@@ -76,7 +76,15 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
     setItems(prev => prev.map(item => {
       const idMatch = item.isNew ? item.tempId === itemId : item.id === itemId;
       if (idMatch) {
-        return { ...item, [field]: typeof value === 'string' ? value : parseFloat(String(value)) || 0 };
+        if (field === 'editedSku' || field === 'editedName') {
+          return { ...item, [field]: String(value) };
+        }
+        // For numeric fields, store empty string as 0 internally but allow blank display
+        if (value === '' || value === null || value === undefined) {
+          return { ...item, [field]: '' as any };
+        }
+        const parsed = parseFloat(String(value));
+        return { ...item, [field]: isNaN(parsed) ? ('' as any) : parsed };
       }
       return item;
     }));
