@@ -100,8 +100,8 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
       quantity: 0,
       unit_cost: 0,
       total: 0,
-      editedQty: 1,
-      editedCost: 0,
+      editedQty: '' as any,
+      editedCost: '' as any,
       editedSku: '',
       editedName: '',
       isNew: true
