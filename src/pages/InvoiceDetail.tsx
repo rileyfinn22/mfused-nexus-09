@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,7 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package, ChevronsUpDown, FileSpreadsheet, Sparkles } from "lucide-react";
+
 import { format } from "date-fns";
 import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -51,6 +52,73 @@ const InvoiceDetail = () => {
   const [editedItems, setEditedItems] = useState<any[]>([]);
   const [editShippingCost, setEditShippingCost] = useState<string>('');
   const [editShippingNote, setEditShippingNote] = useState<string>('');
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAiAnalyzeShipped = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (e.target) e.target.value = '';
+
+    setAiAnalyzing(true);
+    try {
+      // Convert file to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const fileContent = btoa(binary);
+
+      const { data, error } = await supabase.functions.invoke('parse-vendor-packing-list', {
+        body: { fileContent, fileName: file.name },
+      });
+
+      if (error) throw error;
+      const items = (data?.items || []) as Array<{ description: string; total_qty: string }>;
+      if (items.length === 0) {
+        toast({ title: "No items found", description: "AI could not extract any line items from the file.", variant: "destructive" });
+        return;
+      }
+
+      // Match against editedItems by SKU or name; update shipped_quantity
+      const parseQty = (s: string) => {
+        const m = String(s || '').match(/[\d,]+(\.\d+)?/);
+        return m ? parseFloat(m[0].replace(/,/g, '')) : 0;
+      };
+      const norm = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      let matched = 0;
+      setEditedItems(prev => prev.map((item: any) => {
+        const itemSku = norm(item.sku);
+        const itemName = norm(item.name);
+        const found = items.find((p) => {
+          const desc = norm(p.description);
+          if (!desc) return false;
+          if (itemSku && (desc.includes(itemSku) || itemSku.includes(desc))) return true;
+          if (itemName && (desc.includes(itemName) || itemName.includes(desc))) return true;
+          return false;
+        });
+        if (!found) return item;
+        const qty = parseQty(found.total_qty);
+        if (!qty) return item;
+        matched++;
+        const isBlanket = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
+        return isBlanket
+          ? { ...item, shipped_quantity: qty }
+          : { ...item, quantity: qty, shipped_quantity: qty, total: qty * Number(item.unit_price || 0) };
+      }));
+
+      toast({
+        title: "AI analysis complete",
+        description: `Updated ${matched} of ${items.length} items. Review and click Save Changes.`,
+      });
+    } catch (err: any) {
+      console.error('AI analyze error:', err);
+      toast({ title: "Analysis failed", description: err.message || "Could not parse file", variant: "destructive" });
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
   const [inventoryAllocations, setInventoryAllocations] = useState<any[]>([]);
   const [relatedInvoices, setRelatedInvoices] = useState<any[]>([]);
   const [totalShippedAllInvoices, setTotalShippedAllInvoices] = useState(0);
@@ -2144,15 +2212,42 @@ const InvoiceDetail = () => {
 
           {/* Order Items - Main Invoice View */}
           <div className="p-8">
-            <h2 className="text-lg font-semibold mb-4">
-              Order Items
-              {invoice?.invoice_type === 'partial' && <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  (Items in this shipment only)
-                </span>}
-              {isEditMode && <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  (Editing Mode - Adjust quantities and prices as needed)
-                </span>}
-            </h2>
+            <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+              <h2 className="text-lg font-semibold">
+                Order Items
+                {invoice?.invoice_type === 'partial' && <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    (Items in this shipment only)
+                  </span>}
+                {isEditMode && <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    (Editing Mode - Adjust quantities and prices as needed)
+                  </span>}
+              </h2>
+              {isEditMode && isVibeAdmin && (
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={aiFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleAiAnalyzeShipped}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    disabled={aiAnalyzing}
+                    onClick={() => aiFileInputRef.current?.click()}
+                  >
+                    {aiAnalyzing ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Analyzing...</>
+                    ) : (
+                      <><Sparkles className="h-4 w-4 mr-2" />AI Analyze Excel</>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <Table>
               <TableHeader>
                 <TableRow>
