@@ -913,22 +913,16 @@ const InvoiceDetail = () => {
         }
       }
       
-      // Update each order item
-      for (const item of editedItems) {
+      // Update each order item IN PARALLEL (was sequential — very slow for many items)
+      await Promise.all(editedItems.map(async (item) => {
         const editedShippedQty = Number(item.shipped_quantity) || 0;
-        // For blanket invoices with child invoices, preserve shipped qty already
-        // recorded by those child allocations. Otherwise honor the edited value.
         const dbShipped = dbShippedMap[item.id] ?? 0;
         const newShippedQty = preserveChildShipmentQuantities
           ? Math.max(editedShippedQty, dbShipped)
           : editedShippedQty;
-        // For blanket invoices, total should be based on ORDERED quantity, not shipped
         const orderedTotal = Number(item.quantity) * Number(item.unit_price);
-        const shippedTotal = newShippedQty * Number(item.unit_price);
-        
-        const {
-          error
-        } = await supabase.from('order_items').update({
+
+        const { error } = await supabase.from('order_items').update({
           shipped_quantity: newShippedQty,
           unit_price: item.unit_price,
           total: orderedTotal,
@@ -939,25 +933,22 @@ const InvoiceDetail = () => {
           description: item.description,
         }).eq('id', item.id);
         if (error) throw error;
-        
+
         // Only create allocations for shipment/partial invoices, NOT blanket invoices
         if (!isBlanketInvoice && newShippedQty > 0) {
-          // Check if allocation already exists
           const { data: existingAlloc } = await supabase
             .from('inventory_allocations')
             .select('id, quantity_allocated')
             .eq('invoice_id', invoiceId)
             .eq('order_item_id', item.id)
-            .single();
-          
+            .maybeSingle();
+
           if (existingAlloc) {
-            // Update existing allocation
             await supabase
               .from('inventory_allocations')
               .update({ quantity_allocated: newShippedQty })
               .eq('id', existingAlloc.id);
           } else {
-            // Create new allocation
             await supabase
               .from('inventory_allocations')
               .insert({
@@ -969,51 +960,44 @@ const InvoiceDetail = () => {
               });
           }
         }
-      }
+      }));
 
-      // Sync shipped quantities to linked vendor PO items
+      // Sync shipped quantities to linked vendor PO items IN PARALLEL
       try {
-        for (const item of editedItems) {
+        const affectedPoIds = new Set<string>();
+        await Promise.all(editedItems.map(async (item) => {
           const newShippedQty = preserveChildShipmentQuantities
             ? Math.max(Number(item.shipped_quantity) || 0, dbShippedMap[item.id] ?? 0)
             : Number(item.shipped_quantity) || 0;
-          if (newShippedQty > 0) {
-            // Find vendor_po_items linked to this order_item_id and update their shipped_quantity
-            const { data: linkedVPOItems } = await supabase
+          if (newShippedQty <= 0) return;
+
+          const { data: linkedVPOItems } = await supabase
+            .from('vendor_po_items')
+            .select('id, unit_cost, vendor_po_id')
+            .eq('order_item_id', item.id);
+          if (!linkedVPOItems || linkedVPOItems.length === 0) return;
+
+          await Promise.all(linkedVPOItems.map(async (vpoItem: any) => {
+            const vpoTotal = Math.round(newShippedQty * Number(vpoItem.unit_cost) * 100) / 100;
+            affectedPoIds.add(vpoItem.vendor_po_id);
+            await supabase
               .from('vendor_po_items')
-              .select('id, unit_cost')
-              .eq('order_item_id', item.id);
-            if (linkedVPOItems && linkedVPOItems.length > 0) {
-              for (const vpoItem of linkedVPOItems) {
-                const vpoTotal = Math.round(newShippedQty * Number(vpoItem.unit_cost) * 100) / 100;
-                await supabase
-                  .from('vendor_po_items')
-                  .update({ shipped_quantity: newShippedQty, total: vpoTotal })
-                  .eq('id', vpoItem.id);
-              }
-              // Also update the parent vendor PO total
-              const vendorPoIds = [...new Set(linkedVPOItems.map((v: any) => v.id))];
-              // Get all vendor_po_ids for these items
-              const { data: vpoItemsFull } = await supabase
-                .from('vendor_po_items')
-                .select('vendor_po_id')
-                .eq('order_item_id', item.id);
-              if (vpoItemsFull) {
-                const uniquePoIds = [...new Set(vpoItemsFull.map((v: any) => v.vendor_po_id))];
-                for (const vpId of uniquePoIds) {
-                  const { data: allItems } = await supabase
-                    .from('vendor_po_items')
-                    .select('total')
-                    .eq('vendor_po_id', vpId);
-                  if (allItems) {
-                    const poTotal = Math.round(allItems.reduce((s: number, i: any) => s + Number(i.total), 0) * 100) / 100;
-                    await supabase.from('vendor_pos').update({ total: poTotal }).eq('id', vpId);
-                  }
-                }
-              }
-            }
+              .update({ shipped_quantity: newShippedQty, total: vpoTotal })
+              .eq('id', vpoItem.id);
+          }));
+        }));
+
+        // Recalculate each affected PO total once (parallel)
+        await Promise.all([...affectedPoIds].map(async (vpId) => {
+          const { data: allItems } = await supabase
+            .from('vendor_po_items')
+            .select('total')
+            .eq('vendor_po_id', vpId);
+          if (allItems) {
+            const poTotal = Math.round(allItems.reduce((s: number, i: any) => s + Number(i.total), 0) * 100) / 100;
+            await supabase.from('vendor_pos').update({ total: poTotal }).eq('id', vpId);
           }
-        }
+        }));
       } catch (syncErr) {
         console.error('Vendor PO sync error (non-fatal):', syncErr);
       }
