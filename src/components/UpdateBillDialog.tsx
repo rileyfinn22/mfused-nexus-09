@@ -142,16 +142,18 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
 
       // Update existing items with final values
       for (const item of productItems.filter(i => !i.isNew)) {
+        const qty = numOr0(item.editedQty);
+        const cost = numOr0(item.editedCost);
         const { error } = await supabase
           .from('vendor_po_items')
           .update({
             sku: item.editedSku,
             name: item.editedName,
-            quantity: item.editedQty,
-            unit_cost: item.editedCost,
-            total: item.editedQty * item.editedCost,
-            final_quantity: item.editedQty,
-            final_unit_cost: item.editedCost
+            quantity: qty,
+            unit_cost: cost,
+            total: qty * cost,
+            final_quantity: qty,
+            final_unit_cost: cost
           })
           .eq('id', item.id);
 
@@ -161,18 +163,20 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
       // Insert new items
       const newItems = productItems.filter(i => i.isNew && i.editedSku.trim());
       for (const item of newItems) {
+        const qty = numOr0(item.editedQty);
+        const cost = numOr0(item.editedCost);
         const { error } = await supabase
           .from('vendor_po_items')
           .insert({
             vendor_po_id: vendorPO.id,
             sku: item.editedSku,
             name: item.editedName,
-            quantity: item.editedQty,
-            unit_cost: item.editedCost,
-            total: item.editedQty * item.editedCost,
-            shipped_quantity: item.editedQty,
-            final_quantity: item.editedQty,
-            final_unit_cost: item.editedCost
+            quantity: qty,
+            unit_cost: cost,
+            total: qty * cost,
+            shipped_quantity: qty,
+            final_quantity: qty,
+            final_unit_cost: cost
           });
 
         if (error) throw error;
