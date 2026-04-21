@@ -7,7 +7,9 @@ const DARK_GRAY: [number, number, number] = [51, 51, 51];
 const MEDIUM_GRAY: [number, number, number] = [100, 100, 100];
 const LIGHT_GRAY: [number, number, number] = [248, 248, 248];
 const PAGE_MARGIN = 24;
-const TABLE_TOP = 48;
+// Reserve enough top space for the full branded header (logo, address, title, meta)
+const HEADER_BOTTOM = 150;
+const TABLE_TOP = HEADER_BOTTOM + 8;
 const MAX_COLUMNS_PER_PAGE = 8;
 
 interface SpreadsheetPdfOptions {
