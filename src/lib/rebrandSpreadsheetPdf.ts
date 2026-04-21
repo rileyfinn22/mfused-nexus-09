@@ -235,33 +235,21 @@ export const matrixToBrandedPdf = async (
       doc.addPage("letter", "landscape");
     }
 
-    const [headerRow, ...dataRows] = matrix;
-    const head = headerRow ? [group.map((columnIndex) => headerRow[columnIndex] || "")] : undefined;
-    const body = dataRows.map((row) => group.map((columnIndex) => row[columnIndex] || ""));
+    const body = matrix.map((row) => group.map((columnIndex) => row[columnIndex] || ""));
 
     autoTable(doc, {
       startY: TABLE_TOP,
-      head,
       body,
-      theme: "grid",
+      theme: "plain",
       margin: { top: TABLE_TOP, left: PAGE_MARGIN, right: PAGE_MARGIN, bottom: 24 },
-      headStyles: {
-        fillColor: BRAND_GREEN,
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        fontSize: 8,
-      },
       styles: {
         font: "helvetica",
-        fontSize: 8,
-        cellPadding: 3,
+        fontSize: 9,
+        cellPadding: 2,
         overflow: "linebreak",
         textColor: DARK_GRAY,
-        lineColor: [210, 210, 210],
-        lineWidth: 0.25,
-        valign: "middle",
+        valign: "top",
       },
-      alternateRowStyles: { fillColor: LIGHT_GRAY },
       columnStyles: Object.fromEntries(group.map((_, index) => [index, { cellWidth: "auto" }])),
       didDrawPage: () => {
         drawPageChrome(doc, options, logoDataUrl);
