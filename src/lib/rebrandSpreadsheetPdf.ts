@@ -240,15 +240,17 @@ export const matrixToBrandedPdf = async (
     autoTable(doc, {
       startY: TABLE_TOP,
       body,
-      theme: "plain",
+      theme: "grid",
       margin: { top: TABLE_TOP, left: PAGE_MARGIN, right: PAGE_MARGIN, bottom: 24 },
       styles: {
         font: "helvetica",
         fontSize: 9,
-        cellPadding: 2,
+        cellPadding: 3,
         overflow: "linebreak",
         textColor: DARK_GRAY,
-        valign: "top",
+        lineColor: [200, 200, 200],
+        lineWidth: 0.25,
+        valign: "middle",
       },
       columnStyles: Object.fromEntries(group.map((_, index) => [index, { cellWidth: "auto" }])),
       didDrawPage: () => {
