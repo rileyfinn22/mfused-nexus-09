@@ -703,24 +703,25 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <FileSpreadsheet className="h-4 w-4 text-primary" />
-                    <Label className="text-sm font-medium">Upload Packing List</Label>
+                    <Label className="text-sm font-medium">AI Analyze Excel / Packing List</Label>
                   </div>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="default"
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={parsingPackingList}
+                    className="gap-2"
                   >
                     {parsingPackingList ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Parsing...
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Analyzing...
                       </>
                     ) : (
                       <>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload File
+                        <Upload className="h-4 w-4" />
+                        Upload & Analyze
                       </>
                     )}
                   </Button>
@@ -733,7 +734,7 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Upload a packing list (CSV, TXT, or Excel) to auto-fill shipped quantities based on product name matching.
+                  Upload an Excel, CSV, or TXT file and AI will auto-fill shipped quantities below by matching SKUs and product names.
                 </p>
                 
                 {/* Packing List Results */}
