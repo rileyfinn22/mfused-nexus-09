@@ -59,20 +59,10 @@ const getSheetMatrix = (sheet: XLSX.WorkSheet) => {
     }
   }
 
-  for (const merge of sheet["!merges"] || []) {
-    const mergedValue = matrix[merge.s.r - range.s.r]?.[merge.s.c - range.s.c] || "";
-    if (!mergedValue) continue;
-
-    for (let row = merge.s.r; row <= merge.e.r; row += 1) {
-      for (let col = merge.s.c; col <= merge.e.c; col += 1) {
-        const targetRow = row - range.s.r;
-        const targetCol = col - range.s.c;
-        if (!matrix[targetRow]?.[targetCol]) {
-          matrix[targetRow][targetCol] = mergedValue;
-        }
-      }
-    }
-  }
+  // Note: We intentionally do NOT propagate merged cell values across spanned cells.
+  // Doing so creates duplicate values in adjacent rows/columns, which makes the
+  // rebranded output look like it has repeated rows and columns. The value lives
+  // only in the top-left cell of the merge, which is the correct visual behavior.
 
   const nonEmptyRows = matrix.filter((row) => row.some((cell) => cell.trim() !== ""));
   if (nonEmptyRows.length === 0) return [] as string[][];
