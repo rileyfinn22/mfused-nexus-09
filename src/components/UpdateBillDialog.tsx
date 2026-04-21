@@ -76,7 +76,15 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
     setItems(prev => prev.map(item => {
       const idMatch = item.isNew ? item.tempId === itemId : item.id === itemId;
       if (idMatch) {
-        return { ...item, [field]: typeof value === 'string' ? value : parseFloat(String(value)) || 0 };
+        if (field === 'editedSku' || field === 'editedName') {
+          return { ...item, [field]: String(value) };
+        }
+        // For numeric fields, store empty string as 0 internally but allow blank display
+        if (value === '' || value === null || value === undefined) {
+          return { ...item, [field]: '' as any };
+        }
+        const parsed = parseFloat(String(value));
+        return { ...item, [field]: isNaN(parsed) ? ('' as any) : parsed };
       }
       return item;
     }));
@@ -92,8 +100,8 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
       quantity: 0,
       unit_cost: 0,
       total: 0,
-      editedQty: 1,
-      editedCost: 0,
+      editedQty: '' as any,
+      editedCost: '' as any,
       editedSku: '',
       editedName: '',
       isNew: true
@@ -109,9 +117,10 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
     }
   };
 
-  // Calculate totals
+  // Calculate totals (treat blank as 0)
+  const numOr0 = (v: any) => (v === '' || v === null || v === undefined || isNaN(Number(v)) ? 0 : Number(v));
   const productItems = items.filter(item => item.editedSku !== 'SHIPPING' && item.sku !== 'SHIPPING');
-  const subtotal = productItems.reduce((sum, item) => sum + (item.editedQty * item.editedCost), 0);
+  const subtotal = productItems.reduce((sum, item) => sum + (numOr0(item.editedQty) * numOr0(item.editedCost)), 0);
   const shippingAmount = parseFloat(shippingCost) || 0;
   const finalTotal = subtotal + shippingAmount;
 
@@ -133,16 +142,18 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
 
       // Update existing items with final values
       for (const item of productItems.filter(i => !i.isNew)) {
+        const qty = numOr0(item.editedQty);
+        const cost = numOr0(item.editedCost);
         const { error } = await supabase
           .from('vendor_po_items')
           .update({
             sku: item.editedSku,
             name: item.editedName,
-            quantity: item.editedQty,
-            unit_cost: item.editedCost,
-            total: item.editedQty * item.editedCost,
-            final_quantity: item.editedQty,
-            final_unit_cost: item.editedCost
+            quantity: qty,
+            unit_cost: cost,
+            total: qty * cost,
+            final_quantity: qty,
+            final_unit_cost: cost
           })
           .eq('id', item.id);
 
@@ -152,18 +163,20 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
       // Insert new items
       const newItems = productItems.filter(i => i.isNew && i.editedSku.trim());
       for (const item of newItems) {
+        const qty = numOr0(item.editedQty);
+        const cost = numOr0(item.editedCost);
         const { error } = await supabase
           .from('vendor_po_items')
           .insert({
             vendor_po_id: vendorPO.id,
             sku: item.editedSku,
             name: item.editedName,
-            quantity: item.editedQty,
-            unit_cost: item.editedCost,
-            total: item.editedQty * item.editedCost,
-            shipped_quantity: item.editedQty,
-            final_quantity: item.editedQty,
-            final_unit_cost: item.editedCost
+            quantity: qty,
+            unit_cost: cost,
+            total: qty * cost,
+            shipped_quantity: qty,
+            final_quantity: qty,
+            final_unit_cost: cost
           });
 
         if (error) throw error;
@@ -293,9 +306,11 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
                         <Input
                           type="number"
                           min="0"
-                          value={item.editedQty}
+                          value={item.editedQty as any}
                           onChange={(e) => updateItem(itemKey, 'editedQty', e.target.value)}
-                          className="w-20 text-center mx-auto"
+                          onFocus={(e) => e.target.select()}
+                          onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                          className="w-20 text-center mx-auto [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </TableCell>
                       <TableCell>
@@ -303,13 +318,15 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
                           type="number"
                           step="0.001"
                           min="0"
-                          value={item.editedCost}
+                          value={item.editedCost as any}
                           onChange={(e) => updateItem(itemKey, 'editedCost', e.target.value)}
-                          className="w-24 text-right ml-auto"
+                          onFocus={(e) => e.target.select()}
+                          onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                          className="w-24 text-right ml-auto [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(item.editedQty * item.editedCost)}
+                        {formatCurrency(numOr0(item.editedQty) * numOr0(item.editedCost))}
                       </TableCell>
                       <TableCell>
                         <Button
