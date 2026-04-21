@@ -125,6 +125,14 @@ export const RebrandPreviewDialog = ({
         const coverH = await detectHeaderHeight(selectedFile);
         setStatusText("Rebranding PDF…");
         resultBlob = await rebrandPdf(selectedFile, coverH);
+        // Also extract a text matrix from the PDF so AI editing is available.
+        try {
+          setStatusText("Indexing text for AI editing…");
+          const textMatrix = await extractPdfTextMatrix(selectedFile);
+          if (textMatrix.length > 0) setParsedMatrix(textMatrix);
+        } catch (err) {
+          console.warn("PDF text extraction failed, AI editing disabled:", err);
+        }
       }
 
       const url = URL.createObjectURL(resultBlob);
@@ -137,6 +145,39 @@ export const RebrandPreviewDialog = ({
       setStep("pick");
     }
   };
+
+  const extractPdfTextMatrix = async (file: File): Promise<string[][]> => {
+    const pdfjsLib = await import("pdfjs-dist");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    const arrayBuf = await file.arrayBuffer();
+    const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
+
+    const allRows: string[][] = [];
+    for (let p = 1; p <= pdfDoc.numPages; p += 1) {
+      const page = await pdfDoc.getPage(p);
+      const content = await page.getTextContent();
+      // Group items by approximate Y position to reconstruct rows
+      const lineMap = new Map<number, { x: number; str: string }[]>();
+      for (const item of content.items as any[]) {
+        const tx = item.transform;
+        const y = Math.round(tx[5]);
+        const x = tx[4];
+        const str = (item.str || "").trim();
+        if (!str) continue;
+        // Bucket Y to nearest 4pt to merge same line
+        const bucket = Math.round(y / 4) * 4;
+        if (!lineMap.has(bucket)) lineMap.set(bucket, []);
+        lineMap.get(bucket)!.push({ x, str });
+      }
+      const sortedYs = Array.from(lineMap.keys()).sort((a, b) => b - a);
+      for (const yKey of sortedYs) {
+        const cells = lineMap.get(yKey)!.sort((a, b) => a.x - b.x).map((c) => c.str);
+        if (cells.length > 0) allRows.push(cells);
+      }
+    }
+    return allRows;
+  };
+
 
   const detectHeaderHeight = async (file: File): Promise<number> => {
     try {

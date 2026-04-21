@@ -7,7 +7,9 @@ const DARK_GRAY: [number, number, number] = [51, 51, 51];
 const MEDIUM_GRAY: [number, number, number] = [100, 100, 100];
 const LIGHT_GRAY: [number, number, number] = [248, 248, 248];
 const PAGE_MARGIN = 24;
-const TABLE_TOP = 48;
+// Reserve enough top space for the full branded header (logo, address, title, meta)
+const HEADER_BOTTOM = 150;
+const TABLE_TOP = HEADER_BOTTOM + 8;
 const MAX_COLUMNS_PER_PAGE = 8;
 
 interface SpreadsheetPdfOptions {
@@ -198,19 +200,65 @@ const drawPageChrome = (
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
+  // Brand block (top-left)
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(...BRAND_GREEN);
+  doc.text("ArmorPak Inc. DBA Vibe Packaging", PAGE_MARGIN, 28);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...MEDIUM_GRAY);
+  doc.text("1415 S 700 W", PAGE_MARGIN, 40);
+  doc.text("Salt Lake City, UT 84104", PAGE_MARGIN, 50);
+  doc.text("www.vibepkg.com", PAGE_MARGIN, 60);
+
+  // Logo (top-right)
   if (logoDataUrl) {
-    doc.addImage(logoDataUrl, "PNG", pageWidth - PAGE_MARGIN - 54, 10, 54, 24);
+    doc.addImage(logoDataUrl, "PNG", pageWidth - PAGE_MARGIN - 70, 14, 70, 32);
   } else {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
+    doc.setFontSize(14);
     doc.setTextColor(...BRAND_GREEN);
-    doc.text("Vibe Packaging", pageWidth - PAGE_MARGIN, 24, { align: "right" });
+    doc.text("Vibe Packaging", pageWidth - PAGE_MARGIN, 28, { align: "right" });
   }
 
+  // Divider
   doc.setDrawColor(...BRAND_GREEN);
-  doc.setLineWidth(0.5);
-  doc.line(PAGE_MARGIN, 38, pageWidth - PAGE_MARGIN, 38);
+  doc.setLineWidth(0.6);
+  doc.line(PAGE_MARGIN, 72, pageWidth - PAGE_MARGIN, 72);
 
+  // Title
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...DARK_GRAY);
+  doc.text("Packing List", PAGE_MARGIN, 96);
+
+  // Meta (right side)
+  const metaX = pageWidth - PAGE_MARGIN - 200;
+  const metaValueX = pageWidth - PAGE_MARGIN;
+  let metaY = 90;
+  const metaLine = (label: string, value: string) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...MEDIUM_GRAY);
+    doc.text(label, metaX, metaY);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...DARK_GRAY);
+    doc.text(value || "—", metaValueX, metaY, { align: "right" });
+    metaY += 12;
+  };
+  if (options.invoiceNumber) metaLine("Invoice #", String(options.invoiceNumber));
+  if (options.orderNumber) metaLine("Order #", String(options.orderNumber));
+  metaLine("Date", new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }));
+
+  // Section label above table
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...MEDIUM_GRAY);
+  doc.text("ITEMS", PAGE_MARGIN, HEADER_BOTTOM - 4);
+
+  // Footer
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...MEDIUM_GRAY);
@@ -246,13 +294,22 @@ export const matrixToBrandedPdf = async (
       doc.addPage("letter", "landscape");
     }
 
-    const body = matrix.map((row) => group.map((columnIndex) => row[columnIndex] || ""));
+    const [headerRow, ...dataRows] = matrix;
+    const head = headerRow ? [group.map((columnIndex) => headerRow[columnIndex] || "")] : undefined;
+    const body = dataRows.map((row) => group.map((columnIndex) => row[columnIndex] || ""));
 
     autoTable(doc, {
       startY: TABLE_TOP,
+      head,
       body,
       theme: "grid",
       margin: { top: TABLE_TOP, left: PAGE_MARGIN, right: PAGE_MARGIN, bottom: 24 },
+      headStyles: {
+        fillColor: BRAND_GREEN,
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 8,
+      },
       styles: {
         font: "helvetica",
         fontSize: 8,
@@ -263,6 +320,7 @@ export const matrixToBrandedPdf = async (
         lineWidth: 0.25,
         valign: "middle",
       },
+      alternateRowStyles: { fillColor: LIGHT_GRAY },
       columnStyles: Object.fromEntries(group.map((_, index) => [index, { cellWidth: "auto" }])),
       didDrawPage: () => {
         drawPageChrome(doc, options, logoDataUrl);
