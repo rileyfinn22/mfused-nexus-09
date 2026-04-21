@@ -306,9 +306,11 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
                         <Input
                           type="number"
                           min="0"
-                          value={item.editedQty}
+                          value={item.editedQty as any}
                           onChange={(e) => updateItem(itemKey, 'editedQty', e.target.value)}
-                          className="w-20 text-center mx-auto"
+                          onFocus={(e) => e.target.select()}
+                          onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                          className="w-20 text-center mx-auto [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </TableCell>
                       <TableCell>
@@ -316,13 +318,15 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
                           type="number"
                           step="0.001"
                           min="0"
-                          value={item.editedCost}
+                          value={item.editedCost as any}
                           onChange={(e) => updateItem(itemKey, 'editedCost', e.target.value)}
-                          className="w-24 text-right ml-auto"
+                          onFocus={(e) => e.target.select()}
+                          onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                          className="w-24 text-right ml-auto [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(item.editedQty * item.editedCost)}
+                        {formatCurrency(numOr0(item.editedQty) * numOr0(item.editedCost))}
                       </TableCell>
                       <TableCell>
                         <Button
