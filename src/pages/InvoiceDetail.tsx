@@ -52,6 +52,73 @@ const InvoiceDetail = () => {
   const [editedItems, setEditedItems] = useState<any[]>([]);
   const [editShippingCost, setEditShippingCost] = useState<string>('');
   const [editShippingNote, setEditShippingNote] = useState<string>('');
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAiAnalyzeShipped = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (e.target) e.target.value = '';
+
+    setAiAnalyzing(true);
+    try {
+      // Convert file to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const fileContent = btoa(binary);
+
+      const { data, error } = await supabase.functions.invoke('parse-vendor-packing-list', {
+        body: { fileContent, fileName: file.name },
+      });
+
+      if (error) throw error;
+      const items = (data?.items || []) as Array<{ description: string; total_qty: string }>;
+      if (items.length === 0) {
+        toast({ title: "No items found", description: "AI could not extract any line items from the file.", variant: "destructive" });
+        return;
+      }
+
+      // Match against editedItems by SKU or name; update shipped_quantity
+      const parseQty = (s: string) => {
+        const m = String(s || '').match(/[\d,]+(\.\d+)?/);
+        return m ? parseFloat(m[0].replace(/,/g, '')) : 0;
+      };
+      const norm = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      let matched = 0;
+      setEditedItems(prev => prev.map((item: any) => {
+        const itemSku = norm(item.sku);
+        const itemName = norm(item.name);
+        const found = items.find((p) => {
+          const desc = norm(p.description);
+          if (!desc) return false;
+          if (itemSku && (desc.includes(itemSku) || itemSku.includes(desc))) return true;
+          if (itemName && (desc.includes(itemName) || itemName.includes(desc))) return true;
+          return false;
+        });
+        if (!found) return item;
+        const qty = parseQty(found.total_qty);
+        if (!qty) return item;
+        matched++;
+        const isBlanket = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
+        return isBlanket
+          ? { ...item, shipped_quantity: qty }
+          : { ...item, quantity: qty, shipped_quantity: qty, total: qty * Number(item.unit_price || 0) };
+      }));
+
+      toast({
+        title: "AI analysis complete",
+        description: `Updated ${matched} of ${items.length} items. Review and click Save Changes.`,
+      });
+    } catch (err: any) {
+      console.error('AI analyze error:', err);
+      toast({ title: "Analysis failed", description: err.message || "Could not parse file", variant: "destructive" });
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
   const [inventoryAllocations, setInventoryAllocations] = useState<any[]>([]);
   const [relatedInvoices, setRelatedInvoices] = useState<any[]>([]);
   const [totalShippedAllInvoices, setTotalShippedAllInvoices] = useState(0);
