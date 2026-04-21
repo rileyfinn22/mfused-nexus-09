@@ -2212,15 +2212,42 @@ const InvoiceDetail = () => {
 
           {/* Order Items - Main Invoice View */}
           <div className="p-8">
-            <h2 className="text-lg font-semibold mb-4">
-              Order Items
-              {invoice?.invoice_type === 'partial' && <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  (Items in this shipment only)
-                </span>}
-              {isEditMode && <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  (Editing Mode - Adjust quantities and prices as needed)
-                </span>}
-            </h2>
+            <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+              <h2 className="text-lg font-semibold">
+                Order Items
+                {invoice?.invoice_type === 'partial' && <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    (Items in this shipment only)
+                  </span>}
+                {isEditMode && <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    (Editing Mode - Adjust quantities and prices as needed)
+                  </span>}
+              </h2>
+              {isEditMode && isVibeAdmin && (
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={aiFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleAiAnalyzeShipped}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    disabled={aiAnalyzing}
+                    onClick={() => aiFileInputRef.current?.click()}
+                  >
+                    {aiAnalyzing ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Analyzing...</>
+                    ) : (
+                      <><Sparkles className="h-4 w-4 mr-2" />AI Analyze Excel</>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <Table>
               <TableHeader>
                 <TableRow>
