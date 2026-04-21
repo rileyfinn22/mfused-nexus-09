@@ -117,9 +117,10 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
     }
   };
 
-  // Calculate totals
+  // Calculate totals (treat blank as 0)
+  const numOr0 = (v: any) => (v === '' || v === null || v === undefined || isNaN(Number(v)) ? 0 : Number(v));
   const productItems = items.filter(item => item.editedSku !== 'SHIPPING' && item.sku !== 'SHIPPING');
-  const subtotal = productItems.reduce((sum, item) => sum + (item.editedQty * item.editedCost), 0);
+  const subtotal = productItems.reduce((sum, item) => sum + (numOr0(item.editedQty) * numOr0(item.editedCost)), 0);
   const shippingAmount = parseFloat(shippingCost) || 0;
   const finalTotal = subtotal + shippingAmount;
 
