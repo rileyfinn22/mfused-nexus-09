@@ -765,13 +765,30 @@ const Inventory = () => {
                     )}
                     <span>{group.productName}</span>
                   </div>
-                  <div className={`${isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"} font-mono text-sm flex items-center gap-2`}>
-                    <span className="break-words" title={group.sku}>
-                      {group.sku}
-                    </span>
-                    {!hasApprovedArtwork(group.sku) && (
-                      <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
-                    )}
+                  <div className={`${isVibeAdmin && isEditMode ? "col-span-2" : "col-span-2"} font-mono text-sm flex flex-col gap-0.5`}>
+                    <div className="flex items-center gap-2">
+                      <span className="break-words" title={group.sku}>
+                        {group.sku}
+                      </span>
+                      {!hasApprovedArtwork(group.sku) && (
+                        <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
+                      )}
+                    </div>
+                    {hasMultipleOrders ? (
+                      <span className="text-[11px] text-muted-foreground font-sans">
+                        {group.items.length} orders
+                      </span>
+                    ) : group.items[0]?.orders ? (
+                      <span
+                        className="text-[11px] text-muted-foreground font-sans cursor-pointer hover:text-primary hover:underline w-fit"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/orders/${group.items[0].order_id}`);
+                        }}
+                      >
+                        #{group.items[0].orders.order_number}
+                      </span>
+                    ) : null}
                   </div>
                   <div className="col-span-1">
                     <Badge variant="outline" className="text-xs">{group.state}</Badge>
