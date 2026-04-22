@@ -920,14 +920,29 @@ const Invoices = () => {
                               .eq('invoice_id', invoice.id);
 
                             if (allocationsData && allocationsData.length > 0) {
-                              // Use allocated quantities for this specific invoice
+                              // Build a map of edited shipped_quantity from order_items
+                              const shippedMap = new Map<string, number>();
+                              (orderData.order_items || []).forEach((oi: any) => {
+                                shippedMap.set(oi.id, Number(oi.shipped_quantity || 0));
+                              });
+                              // Use allocated quantities for this specific invoice, but
+                              // honor the edited shipped_quantity on the underlying order item
+                              // so admins can zero-out lines on a shipment invoice.
                               itemsForPdf = allocationsData
                                 .sort((a, b) => (a.order_items?.line_number ?? 999) - (b.order_items?.line_number ?? 999))
-                                .map((alloc: any) => ({
-                                  ...alloc.order_items,
-                                  quantity: alloc.quantity_allocated,
-                                  unit_price: alloc.order_items?.unit_price || 0
-                                }));
+                                .map((alloc: any) => {
+                                  const oiId = alloc.order_items?.id;
+                                  const editedShipped = oiId ? shippedMap.get(oiId) : undefined;
+                                  const qty = editedShipped !== undefined
+                                    ? editedShipped
+                                    : Number(alloc.quantity_allocated || 0);
+                                  return {
+                                    ...alloc.order_items,
+                                    quantity: qty,
+                                    shipped_quantity: qty,
+                                    unit_price: alloc.order_items?.unit_price || 0
+                                  };
+                                });
                             }
                           }
 
