@@ -205,7 +205,7 @@ export default function Settings() {
   };
 
   const handleInviteTeamMember = async () => {
-    if (!inviteEmail || !companyId || !companyDomain) {
+    if (!inviteEmail || !companyId) {
       toast({
         title: "Missing information",
         description: "Please enter an email address",
@@ -214,12 +214,12 @@ export default function Settings() {
       return;
     }
 
-    // Validate email domain matches company domain
-    const emailDomain = inviteEmail.split("@")[1]?.toLowerCase();
-    if (emailDomain !== companyDomain.toLowerCase()) {
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(inviteEmail.trim())) {
       toast({
-        title: "Invalid email domain",
-        description: `Only users with @${companyDomain} email addresses can be invited`,
+        title: "Invalid email",
+        description: "Please enter a valid email address",
         variant: "destructive",
       });
       return;
