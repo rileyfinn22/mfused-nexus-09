@@ -577,9 +577,6 @@ export default function Settings() {
                     Invite
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  New members will be added as Company Users with access to your company only.
-                </p>
               </div>
 
               {/* Team Members List */}
@@ -595,9 +592,6 @@ export default function Settings() {
                           </div>
                           <div>
                             <p className="text-sm font-medium">{member.email || "Unknown"}</p>
-                            <Badge variant="secondary" className="text-xs capitalize">
-                              {member.role === "company" ? "Team Member" : member.role}
-                            </Badge>
                           </div>
                         </div>
                       </div>
