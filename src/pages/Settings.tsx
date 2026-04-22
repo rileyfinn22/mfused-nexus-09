@@ -557,29 +557,30 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Invite Section - Only for non-company users */}
-              {!isCompanyUser && (
-                <div className="space-y-4">
-                  <Label>Invite Team Member</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="email"
-                      placeholder="email@company.com"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button onClick={handleInviteTeamMember} disabled={inviteLoading}>
-                      {inviteLoading ? (
-                        <span className="animate-spin mr-2">⏳</span>
-                      ) : (
-                        <UserPlus className="h-4 w-4 mr-2" />
-                      )}
-                      Invite
-                    </Button>
-                  </div>
+              {/* Invite Section - Anyone with team access can invite teammates as Company Users */}
+              <div className="space-y-4">
+                <Label>Invite Team Member</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="email@company.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleInviteTeamMember} disabled={inviteLoading}>
+                    {inviteLoading ? (
+                      <span className="animate-spin mr-2">⏳</span>
+                    ) : (
+                      <UserPlus className="h-4 w-4 mr-2" />
+                    )}
+                    Invite
+                  </Button>
                 </div>
-              )}
+                <p className="text-xs text-muted-foreground">
+                  New members will be added as Company Users with access to your company only.
+                </p>
+              </div>
 
               {/* Team Members List */}
               {teamMembers.length > 0 ? (
@@ -605,10 +606,7 @@ export default function Settings() {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  {isCompanyUser 
-                    ? "Contact VibePKG to add team members to your account."
-                    : "No team members yet. Invite someone to get started."
-                  }
+                  No team members yet. Invite someone to get started.
                 </p>
               )}
             </CardContent>
