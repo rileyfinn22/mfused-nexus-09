@@ -557,8 +557,8 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Invite Section - Only for non-company users */}
-              {!isCompanyUser && (
+              {/* Invite Section - Company users can invite teammates as Company Users only */}
+              {(
                 <div className="space-y-4">
                   <Label>Invite Team Member</Label>
                   <div className="flex gap-2">
