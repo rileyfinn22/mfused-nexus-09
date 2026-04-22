@@ -592,9 +592,6 @@ export default function Settings() {
                           </div>
                           <div>
                             <p className="text-sm font-medium">{member.email || "Unknown"}</p>
-                            <Badge variant="secondary" className="text-xs capitalize">
-                              {member.role === "company" ? "Team Member" : member.role}
-                            </Badge>
                           </div>
                         </div>
                       </div>
