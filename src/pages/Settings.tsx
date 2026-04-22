@@ -606,10 +606,7 @@ export default function Settings() {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  {isCompanyUser 
-                    ? "Contact VibePKG to add team members to your account."
-                    : "No team members yet. Invite someone to get started."
-                  }
+                  No team members yet. Invite someone to get started.
                 </p>
               )}
             </CardContent>
