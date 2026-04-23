@@ -99,14 +99,23 @@ const Projects = () => {
           .eq('order_id', order.id);
 
         // Determine which invoices to count for revenue:
-        // - If there are child invoices (parent_invoice_id is set), only count those
+        // - If there are child invoices (parent_invoice_id is set), only count those for revenue
         // - Otherwise, count all invoices (including blanket if no children exist)
         const allInvoices = invoices || [];
         const childInvoices = allInvoices.filter(inv => inv.parent_invoice_id !== null);
+        const parentInvoices = allInvoices.filter(inv => inv.parent_invoice_id === null);
         const invoicesToCount = childInvoices.length > 0 ? childInvoices : allInvoices;
 
         const totalRevenue = invoicesToCount.reduce((sum, inv) => sum + (inv.total || 0), 0);
-        const totalPaid = invoicesToCount.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
+        // Payments: count children + any deposits/payments recorded against the parent blanket
+        // (buy-down model records deposits on the parent invoice, not on children).
+        const childrenPaid = childInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
+        const parentPaid = childInvoices.length > 0
+          ? parentInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0)
+          : 0;
+        const totalPaid = childInvoices.length > 0
+          ? childrenPaid + parentPaid
+          : allInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
         const totalCosts = (vendorPOs || []).reduce((sum, po) => sum + (po.total || 0), 0);
         const totalCostsPaid = (vendorPOs || []).reduce((sum, po) => sum + (po.total_paid || 0), 0);
 

@@ -269,7 +269,15 @@ const ProjectDetail = () => {
   // The blanket/parent invoice (no parent_invoice_id and not billed) doesn't count toward revenue
   const billedInvoices = invoices.filter(inv => inv.status === 'billed' || inv.status === 'paid');
   const totalRevenue = billedInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
-  const totalPaid = billedInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
+  // Payments: include parent (blanket) deposits in addition to billed invoice payments,
+  // since deposits in the buy-down model sit on the parent invoice.
+  const hasChildren = invoices.some(inv => inv.parent_invoice_id !== null);
+  const parentPaid = hasChildren
+    ? invoices
+        .filter(inv => inv.parent_invoice_id === null && inv.status !== 'billed' && inv.status !== 'paid')
+        .reduce((sum, inv) => sum + (inv.total_paid || 0), 0)
+    : 0;
+  const totalPaid = billedInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0) + parentPaid;
   const totalCosts = vendorPOs.reduce((sum, po) => sum + (po.total || 0), 0);
   const totalCostsPaid = vendorPOs.reduce((sum, po) => sum + (po.total_paid || 0), 0);
   const accrualProfit = totalRevenue - totalCosts;
