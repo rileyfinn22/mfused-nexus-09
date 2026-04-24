@@ -817,15 +817,17 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
-                              {availInv < (shipmentQuantities[item.id] || 0) && (
+                              {/* Only flag inventory shortfall if inventory is actually being tracked for this SKU */}
+                              {(availableInventory[item.sku]?.length ?? 0) > 0 && availInv < (shipmentQuantities[item.id] || 0) && (
                                 <AlertTriangle className="h-3 w-3 text-destructive" />
                               )}
                               <span className={
+                                (availableInventory[item.sku]?.length ?? 0) === 0 ? "text-muted-foreground" :
                                 availInv < (shipmentQuantities[item.id] || 0) ? "text-destructive font-bold" :
                                 availInv < remaining ? "text-warning font-medium" : 
                                 "text-success"
                               }>
-                                {availInv}
+                                {(availableInventory[item.sku]?.length ?? 0) === 0 ? "—" : availInv}
                               </span>
                             </div>
                           </TableCell>
