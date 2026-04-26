@@ -484,7 +484,7 @@ const Invoices = () => {
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Balance</p>
               <p className="text-2xl font-bold mt-2 text-warning">{formatCurrency(openAmount)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Lifetime ordered − payments</p>
+              
             </div>
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Billed (Unpaid)</p>
