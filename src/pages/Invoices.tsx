@@ -396,41 +396,74 @@ const Invoices = () => {
     return items;
   });
 
-  // Calculate OPEN amount - total of blanket orders minus all payments (including child invoices)
-  const openAmount = filteredInvoices
-    .filter(inv => {
-      const isBlanket = inv.invoice_type === 'full' || !inv.invoice_type;
-      const isNotPaid = getComputedStatus(inv) !== 'paid';
-      return isBlanket && isNotPaid;
-    })
-    .reduce((sum, invoice) => {
-      // Get all child invoices for this parent
-      const childInvoices = invoices.filter(inv => inv.parent_invoice_id === invoice.id);
-      // Sum payments on parent and all children
-      const parentPaid = Number(invoice.total_paid) || 0;
-      const childrenPaid = childInvoices.reduce((childSum, child) => 
-        childSum + (Number(child.total_paid) || 0), 0);
-      const totalPaid = parentPaid + childrenPaid;
-      // Calculate remaining: parent total minus all payments
-      const remaining = Number(invoice.total) - totalPaid;
-      return sum + remaining;
-    }, 0);
+  // Canonical blanket/child lifecycle math.
+  // - Blankets are the source of truth for the ordered amount.
+  // - Children DRAW DOWN against the blanket (never additive).
+  // - Open  = Σ max(0, blanket.total − Σ children.total)  for blankets WITH children
+  //         + 0 for blankets without children (they ARE the billed doc once shipped).
+  //   "Open" represents produced/warehoused inventory not yet pulled or billed.
+  // - Billed = Σ children.total           for blankets WITH children
+  //          + blanket.total              for blankets WITHOUT children (standalone shipped/billed)
+  //   then split into BILLED (not past due) vs DUE (past due) by computed status.
+  // Payments are NOT subtracted from any bucket — they're shown as a sub-line for context.
 
-  // Calculate BILLED amount - invoices that are billed and NOT past due
-  const billedAmount = filteredInvoices
-    .filter(inv => getComputedStatus(inv) === 'billed')
-    .reduce((sum, invoice) => {
-      const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
-      return sum + remaining;
-    }, 0);
+  const blanketParents = filteredInvoices.filter(
+    inv => (inv.invoice_type === 'full' || !inv.invoice_type)
+  );
 
-  // Calculate DUE amount - invoices that are past due (including billed invoices past due date)
-  const dueAmount = filteredInvoices
-    .filter(inv => getComputedStatus(inv) === 'due')
-    .reduce((sum, invoice) => {
-      const remaining = Number(invoice.total) - (Number(invoice.total_paid) || 0);
-      return sum + remaining;
-    }, 0);
+  let openAmount = 0;
+  let openPaid = 0;
+  let billedAmount = 0;
+  let billedPaid = 0;
+  let dueAmount = 0;
+  let duePaid = 0;
+
+  blanketParents.forEach(parent => {
+    const children = invoices.filter(inv => inv.parent_invoice_id === parent.id);
+    const parentTotal = Number(parent.total) || 0;
+    const parentPaid = Number(parent.total_paid) || 0;
+
+    if (children.length > 0) {
+      // Has children → blanket is a placeholder. Open = remainder not yet drawn.
+      const childrenTotal = children.reduce((s, c) => s + (Number(c.total) || 0), 0);
+      const remainder = Math.max(0, parentTotal - childrenTotal);
+      openAmount += remainder;
+      // No payments are tracked against the un-drawn remainder itself.
+
+      // Each child counts as Billed or Due based on its own status.
+      children.forEach(child => {
+        const cTotal = Number(child.total) || 0;
+        const cPaid = Number(child.total_paid) || 0;
+        const status = getComputedStatus(child);
+        if (status === 'due') {
+          dueAmount += cTotal;
+          duePaid += cPaid;
+        } else if (status === 'billed') {
+          billedAmount += cTotal;
+          billedPaid += cPaid;
+        } else if (status === 'paid') {
+          billedAmount += cTotal;
+          billedPaid += cPaid;
+        }
+        // status 'open' on a child is unusual (children are billing events) — ignore in totals.
+      });
+    } else {
+      // No children → the blanket itself is the billed doc once shipped.
+      const status = getComputedStatus(parent);
+      if (status === 'open') {
+        openAmount += parentTotal;
+      } else if (status === 'due') {
+        dueAmount += parentTotal;
+        duePaid += parentPaid;
+      } else if (status === 'billed') {
+        billedAmount += parentTotal;
+        billedPaid += parentPaid;
+      } else if (status === 'paid') {
+        billedAmount += parentTotal;
+        billedPaid += parentPaid;
+      }
+    }
+  });
 
   
 
