@@ -397,20 +397,18 @@ const Invoices = () => {
   });
 
   // Canonical blanket/child lifecycle math.
-  // - Children DRAW DOWN against the blanket (never additive to blanket totals).
-  // - Open  = (lifetime billed across all blankets/children) − all payments
-  //         + un-drawn blanket remainder (produced/warehoused, not yet billed).
-  //   Open is the running AR balance — payments reduce it.
-  // - Billed = Σ (doc.total − doc.paid)  for docs with status 'billed' (not past due).
-  // - Due    = Σ (doc.total − doc.paid)  for docs with status 'due'    (past due).
+  // - Blankets represent the full ordered amount. Children DRAW DOWN against the blanket.
+  // - Open  = Σ blanket.total (lifetime ordered) − all payments (parent + children).
+  //   This is the running AR balance against everything ever ordered.
+  // - Billed (Unpaid) = Σ (total − paid) for docs with status 'billed' (not past due).
+  // - Due    (Unpaid) = Σ (total − paid) for docs with status 'due'    (past due).
 
   const blanketParents = filteredInvoices.filter(
     inv => (inv.invoice_type === 'full' || !inv.invoice_type)
   );
 
-  let lifetimeBilled = 0;
+  let lifetimeOrdered = 0;
   let lifetimePaid = 0;
-  let undrawnRemainder = 0;
   let billedAmount = 0;
   let dueAmount = 0;
 
@@ -423,33 +421,24 @@ const Invoices = () => {
   };
 
   blanketParents.forEach(parent => {
-    const children = invoices.filter(inv => inv.parent_invoice_id === parent.id);
     const parentTotal = Number(parent.total) || 0;
     const parentPaid = Number(parent.total_paid) || 0;
+    const children = invoices.filter(inv => inv.parent_invoice_id === parent.id);
 
+    // Open pool: full ordered amount on the blanket (children are draws, not adds).
+    lifetimeOrdered += parentTotal;
+    lifetimePaid += parentPaid;
+    children.forEach(c => { lifetimePaid += Number(c.total_paid) || 0; });
+
+    // Billed/Due buckets walk the actual billing docs.
     if (children.length > 0) {
-      // Has children → blanket is a placeholder. Billed = Σchildren. Remainder is un-drawn.
-      const childrenTotal = children.reduce((s, c) => s + (Number(c.total) || 0), 0);
-      const childrenPaid = children.reduce((s, c) => s + (Number(c.total_paid) || 0), 0);
-      lifetimeBilled += childrenTotal;
-      lifetimePaid += childrenPaid;
-      undrawnRemainder += Math.max(0, parentTotal - childrenTotal);
       children.forEach(accumulateStatus);
     } else {
-      // No children → the blanket itself is the billed doc once shipped.
-      const status = getComputedStatus(parent);
-      if (status === 'open') {
-        // Not yet billed/shipped — counts as un-drawn remainder.
-        undrawnRemainder += parentTotal;
-      } else {
-        lifetimeBilled += parentTotal;
-        lifetimePaid += parentPaid;
-        accumulateStatus(parent);
-      }
+      accumulateStatus(parent);
     }
   });
 
-  const openAmount = Math.max(0, lifetimeBilled - lifetimePaid) + undrawnRemainder;
+  const openAmount = Math.max(0, lifetimeOrdered - lifetimePaid);
 
   
 
