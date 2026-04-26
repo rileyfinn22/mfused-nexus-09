@@ -493,19 +493,19 @@ const Invoices = () => {
           {/* Summary Row */}
           <div className="grid grid-cols-3 gap-6">
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Orders Total</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Balance</p>
               <p className="text-2xl font-bold mt-2 text-warning">{formatCurrency(openAmount)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Produced / not yet billed</p>
+              <p className="text-xs text-muted-foreground mt-1">Lifetime billed − payments + un-drawn blanket remainder</p>
             </div>
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Billed Pending Due</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Billed (Unpaid)</p>
               <p className="text-2xl font-bold mt-2 text-info">{formatCurrency(billedAmount)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Paid: {formatCurrency(billedPaid)} · Outstanding: {formatCurrency(billedAmount - billedPaid)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Status: billed · not past due</p>
             </div>
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Due Amount</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Due (Unpaid)</p>
               <p className="text-2xl font-bold mt-2 text-danger">{formatCurrency(dueAmount)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Paid: {formatCurrency(duePaid)} · Outstanding: {formatCurrency(dueAmount - duePaid)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Past due, awaiting payment</p>
             </div>
           </div>
 
