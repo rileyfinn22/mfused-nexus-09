@@ -397,26 +397,30 @@ const Invoices = () => {
   });
 
   // Canonical blanket/child lifecycle math.
-  // - Blankets are the source of truth for the ordered amount.
-  // - Children DRAW DOWN against the blanket (never additive).
-  // - Open  = Σ max(0, blanket.total − Σ children.total)  for blankets WITH children
-  //         + 0 for blankets without children (they ARE the billed doc once shipped).
-  //   "Open" represents produced/warehoused inventory not yet pulled or billed.
-  // - Billed = Σ children.total           for blankets WITH children
-  //          + blanket.total              for blankets WITHOUT children (standalone shipped/billed)
-  //   then split into BILLED (not past due) vs DUE (past due) by computed status.
-  // Payments are NOT subtracted from any bucket — they're shown as a sub-line for context.
+  // - Children DRAW DOWN against the blanket (never additive to blanket totals).
+  // - Open  = (lifetime billed across all blankets/children) − all payments
+  //         + un-drawn blanket remainder (produced/warehoused, not yet billed).
+  //   Open is the running AR balance — payments reduce it.
+  // - Billed = Σ (doc.total − doc.paid)  for docs with status 'billed' (not past due).
+  // - Due    = Σ (doc.total − doc.paid)  for docs with status 'due'    (past due).
 
   const blanketParents = filteredInvoices.filter(
     inv => (inv.invoice_type === 'full' || !inv.invoice_type)
   );
 
-  let openAmount = 0;
-  let openPaid = 0;
+  let lifetimeBilled = 0;
+  let lifetimePaid = 0;
+  let undrawnRemainder = 0;
   let billedAmount = 0;
-  let billedPaid = 0;
   let dueAmount = 0;
-  let duePaid = 0;
+
+  const accumulateStatus = (doc: any) => {
+    const total = Number(doc.total) || 0;
+    const paid = Number(doc.total_paid) || 0;
+    const status = getComputedStatus(doc);
+    if (status === 'billed') billedAmount += Math.max(0, total - paid);
+    else if (status === 'due') dueAmount += Math.max(0, total - paid);
+  };
 
   blanketParents.forEach(parent => {
     const children = invoices.filter(inv => inv.parent_invoice_id === parent.id);
@@ -424,46 +428,28 @@ const Invoices = () => {
     const parentPaid = Number(parent.total_paid) || 0;
 
     if (children.length > 0) {
-      // Has children → blanket is a placeholder. Open = remainder not yet drawn.
+      // Has children → blanket is a placeholder. Billed = Σchildren. Remainder is un-drawn.
       const childrenTotal = children.reduce((s, c) => s + (Number(c.total) || 0), 0);
-      const remainder = Math.max(0, parentTotal - childrenTotal);
-      openAmount += remainder;
-      // No payments are tracked against the un-drawn remainder itself.
-
-      // Each child counts as Billed or Due based on its own status.
-      children.forEach(child => {
-        const cTotal = Number(child.total) || 0;
-        const cPaid = Number(child.total_paid) || 0;
-        const status = getComputedStatus(child);
-        if (status === 'due') {
-          dueAmount += cTotal;
-          duePaid += cPaid;
-        } else if (status === 'billed') {
-          billedAmount += cTotal;
-          billedPaid += cPaid;
-        } else if (status === 'paid') {
-          billedAmount += cTotal;
-          billedPaid += cPaid;
-        }
-        // status 'open' on a child is unusual (children are billing events) — ignore in totals.
-      });
+      const childrenPaid = children.reduce((s, c) => s + (Number(c.total_paid) || 0), 0);
+      lifetimeBilled += childrenTotal;
+      lifetimePaid += childrenPaid;
+      undrawnRemainder += Math.max(0, parentTotal - childrenTotal);
+      children.forEach(accumulateStatus);
     } else {
       // No children → the blanket itself is the billed doc once shipped.
       const status = getComputedStatus(parent);
       if (status === 'open') {
-        openAmount += parentTotal;
-      } else if (status === 'due') {
-        dueAmount += parentTotal;
-        duePaid += parentPaid;
-      } else if (status === 'billed') {
-        billedAmount += parentTotal;
-        billedPaid += parentPaid;
-      } else if (status === 'paid') {
-        billedAmount += parentTotal;
-        billedPaid += parentPaid;
+        // Not yet billed/shipped — counts as un-drawn remainder.
+        undrawnRemainder += parentTotal;
+      } else {
+        lifetimeBilled += parentTotal;
+        lifetimePaid += parentPaid;
+        accumulateStatus(parent);
       }
     }
   });
+
+  const openAmount = Math.max(0, lifetimeBilled - lifetimePaid) + undrawnRemainder;
 
   
 
@@ -507,19 +493,19 @@ const Invoices = () => {
           {/* Summary Row */}
           <div className="grid grid-cols-3 gap-6">
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Orders Total</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Balance</p>
               <p className="text-2xl font-bold mt-2 text-warning">{formatCurrency(openAmount)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Produced / not yet billed</p>
+              <p className="text-xs text-muted-foreground mt-1">Lifetime billed − payments + un-drawn blanket remainder</p>
             </div>
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Billed Pending Due</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Billed (Unpaid)</p>
               <p className="text-2xl font-bold mt-2 text-info">{formatCurrency(billedAmount)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Paid: {formatCurrency(billedPaid)} · Outstanding: {formatCurrency(billedAmount - billedPaid)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Status: billed · not past due</p>
             </div>
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Due Amount</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Due (Unpaid)</p>
               <p className="text-2xl font-bold mt-2 text-danger">{formatCurrency(dueAmount)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Paid: {formatCurrency(duePaid)} · Outstanding: {formatCurrency(dueAmount - duePaid)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Past due, awaiting payment</p>
             </div>
           </div>
 
