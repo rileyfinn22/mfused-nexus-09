@@ -14,39 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _blanket_backfill_audit: {
-        Row: {
-          affected_line_count: number | null
-          company_name: string | null
-          id: string
-          invoice_id: string | null
-          invoice_number: string | null
-          order_id: string | null
-          order_number: string | null
-          ran_at: string
-        }
-        Insert: {
-          affected_line_count?: number | null
-          company_name?: string | null
-          id?: string
-          invoice_id?: string | null
-          invoice_number?: string | null
-          order_id?: string | null
-          order_number?: string | null
-          ran_at?: string
-        }
-        Update: {
-          affected_line_count?: number | null
-          company_name?: string | null
-          id?: string
-          invoice_id?: string | null
-          invoice_number?: string | null
-          order_id?: string | null
-          order_number?: string | null
-          ran_at?: string
-        }
-        Relationships: []
-      }
       artwork_files: {
         Row: {
           approved_at: string | null
@@ -1158,8 +1125,6 @@ export type Database = {
       invoices: {
         Row: {
           billed_percentage: number | null
-          blanket_closed_at: string | null
-          blanket_closed_by: string | null
           company_id: string
           created_at: string
           created_by: string | null
@@ -1196,8 +1161,6 @@ export type Database = {
         }
         Insert: {
           billed_percentage?: number | null
-          blanket_closed_at?: string | null
-          blanket_closed_by?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
@@ -1234,8 +1197,6 @@ export type Database = {
         }
         Update: {
           billed_percentage?: number | null
-          blanket_closed_at?: string | null
-          blanket_closed_by?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
@@ -1392,7 +1353,7 @@ export type Database = {
           order_id: string
           product_id: string | null
           quantity: number
-          shipped_quantity: number | null
+          shipped_quantity: number
           sku: string
           total: number
           unit_price: number
@@ -1410,7 +1371,7 @@ export type Database = {
           order_id: string
           product_id?: string | null
           quantity: number
-          shipped_quantity?: number | null
+          shipped_quantity: number
           sku: string
           total: number
           unit_price: number
@@ -1428,7 +1389,7 @@ export type Database = {
           order_id?: string
           product_id?: string | null
           quantity?: number
-          shipped_quantity?: number | null
+          shipped_quantity?: number
           sku?: string
           total?: number
           unit_price?: number
