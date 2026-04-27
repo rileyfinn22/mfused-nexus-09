@@ -1557,7 +1557,7 @@ const InvoiceDetail = () => {
                 </Button>}
               {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleCloseInvoice} className="border-green-500 text-green-700 hover:bg-green-50">
                   <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Close Invoice
+                  {relatedInvoices && relatedInvoices.some((inv: any) => inv.parent_invoice_id === invoice.id) ? 'Close Blanket' : 'Close Invoice'}
                 </Button>}
               {invoice.status === 'closed' && <Button variant="outline" onClick={handleReopenInvoice} className="border-amber-500 text-amber-700 hover:bg-amber-50">
                   <RotateCcw className="h-4 w-4 mr-2" />
