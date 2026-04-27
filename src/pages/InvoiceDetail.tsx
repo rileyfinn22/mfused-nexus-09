@@ -1279,19 +1279,22 @@ const InvoiceDetail = () => {
   };
 
   const handleCloseInvoice = async () => {
-    if (!confirm('Mark this invoice as closed? This indicates the blanket order is complete.')) {
+    if (!confirm('Close this blanket invoice? The total will be locked to the sum of all child shipment invoices. This action finalizes the blanket.')) {
       return;
     }
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const {
         error
       } = await supabase.from('invoices').update({
-        status: 'closed'
+        status: 'closed',
+        blanket_closed_at: new Date().toISOString(),
+        blanket_closed_by: user?.id ?? null,
       }).eq('id', invoiceId);
       if (error) throw error;
       toast({
-        title: "Invoice Closed",
-        description: "Invoice has been marked as closed"
+        title: "Blanket Closed",
+        description: "Blanket total is now locked to the sum of child invoices."
       });
       fetchInvoiceDetails();
     } catch (error: any) {
