@@ -1420,7 +1420,8 @@ const InvoiceDetail = () => {
   // Hide the "Deposit (X%)" deduction line on blankets once any payment has been recorded —
   // the deposit was billed and (presumably) paid; "Less Payments" already accounts for it.
   // Otherwise we double-deduct (deposit line + payments line).
-  const isDepositBilling = billedPct != null && billedPct > 0 && billedPct < 100 && displayTotalPaid === 0;
+  // Deposit billing line only applies to parent blanket invoices, never child shipment/deposit invoices.
+  const isDepositBilling = isBlanketDisplay && billedPct != null && billedPct > 0 && billedPct < 100 && displayTotalPaid === 0;
   const displayBilledTotal = isDepositBilling ? displayTotal * (billedPct / 100) : displayTotal;
   const displayBalance = displayBilledTotal - displayTotalPaid;
 
