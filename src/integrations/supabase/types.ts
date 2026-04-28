@@ -1180,6 +1180,7 @@ export type Database = {
           quickbooks_synced_at: string | null
           quote_id: string | null
           shipment_number: number | null
+          shipped_date: string | null
           shipping_city: string | null
           shipping_cost: number | null
           shipping_name: string | null
@@ -1218,6 +1219,7 @@ export type Database = {
           quickbooks_synced_at?: string | null
           quote_id?: string | null
           shipment_number?: number | null
+          shipped_date?: string | null
           shipping_city?: string | null
           shipping_cost?: number | null
           shipping_name?: string | null
@@ -1256,6 +1258,7 @@ export type Database = {
           quickbooks_synced_at?: string | null
           quote_id?: string | null
           shipment_number?: number | null
+          shipped_date?: string | null
           shipping_city?: string | null
           shipping_cost?: number | null
           shipping_name?: string | null
