@@ -1823,10 +1823,22 @@ const CreateOrder = () => {
         order = newOrder;
       }
 
+      // Helper: resolve a product, fetching directly if it's not in the cached list
+      const resolveProduct = async (productId: string) => {
+        const cached = products.find(p => p.id === productId);
+        if (cached && (cached.item_id || cached.name)) return cached;
+        const { data } = await supabase
+          .from('products')
+          .select('id, item_id, name, description')
+          .eq('id', productId)
+          .maybeSingle();
+        return data || cached || null;
+      };
+
       if (orderId && existingItemsMap) {
         // Update existing items and add new ones, preserving vendor assignments
         for (const item of selectedItems) {
-          const product = products.find(p => p.id === item.productId);
+          const product = await resolveProduct(item.productId);
           const price = item.unit_price ?? 0;
           const itemTotal = price * item.quantity;
           
@@ -1856,9 +1868,9 @@ const CreateOrder = () => {
               .insert({
                 order_id: order.id,
                 product_id: item.productId,
-                sku: product?.item_id || `SKU-${product?.id.substring(0, 8)}`,
+                sku: product?.item_id || `SKU-${item.productId.substring(0, 8)}`,
                 item_id: product?.item_id || null,
-                name: product?.name || "",
+                name: product?.name || "(unnamed product)",
                 description: product?.description || null,
                 quantity: item.quantity,
                 shipped_quantity: 0,
