@@ -718,6 +718,27 @@ const Invoices = () => {
                       }
                       return invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-';
                     })()}
+                    {(() => {
+                      // Shipped date — drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
+                      let shippedDate = invoice.shipped_date;
+                      if (!shippedDate && isParent && hasChildren) {
+                        // Show earliest child shipped date as fallback for parent rollup
+                        const childShipped = invoices
+                          .filter(inv => inv.parent_invoice_id === invoice.id && inv.shipped_date)
+                          .map(inv => new Date(inv.shipped_date))
+                          .sort((a, b) => a.getTime() - b.getTime());
+                        if (childShipped.length > 0) shippedDate = childShipped[0].toISOString();
+                      }
+                      if (!shippedDate) return null;
+                      return (
+                        <div
+                          className="text-[11px] text-blue-600 whitespace-nowrap mt-0.5"
+                          title="Shipped date — Net 30 starts here"
+                        >
+                          📦 {new Date(shippedDate).toLocaleDateString()}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="col-span-2">
                     <div className="font-medium text-sm">
