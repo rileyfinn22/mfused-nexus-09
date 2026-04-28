@@ -147,9 +147,13 @@ serve(async (req) => {
     // Determine effective billing percentage (explicit request wins)
     const orderTotal = Number(invoice.orders?.total || 0);
     const invoiceTotal = Number(invoice.total || 0);
+    const isPullShipInvoice = String(invoice.notes || '').toLowerCase().includes('pull & ship order');
 
     let billingPercentage = 100;
-    if (typeof requestedPercentage === 'number' && requestedPercentage > 0 && requestedPercentage <= 100) {
+    if (isPullShipInvoice) {
+      billingPercentage = 100;
+      console.log('Pull & Ship invoice detected — forcing 100% shipped-value billing');
+    } else if (typeof requestedPercentage === 'number' && requestedPercentage > 0 && requestedPercentage <= 100) {
       billingPercentage = requestedPercentage;
       console.log('Using requested billing percentage:', billingPercentage);
     } else if (orderTotal > 0 && invoiceTotal > 0 && invoiceTotal < orderTotal) {
@@ -715,7 +719,7 @@ serve(async (req) => {
 
     // Deduct deposits: check both directions
     // 1. Child invoice looking at parent deposit
-    if (invoice.parent_invoice_id && billingPercentage === 100) {
+    if (invoice.parent_invoice_id && billingPercentage === 100 && !isPullShipInvoice) {
       const { data: parentInvoice } = await supabase
         .from('invoices')
         .select('billed_percentage, total, total_paid, invoice_number')
@@ -1476,7 +1480,7 @@ serve(async (req) => {
         quickbooks_synced_at: new Date().toISOString(),
         quickbooks_sync_status: 'synced',
         quickbooks_payment_link: qbPaymentLink,
-        billed_percentage: billingPercentage,
+        billed_percentage: isPullShipInvoice ? null : billingPercentage,
         status: 'billed'
       })
       .eq('id', invoiceId);
