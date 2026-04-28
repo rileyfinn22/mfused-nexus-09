@@ -1563,16 +1563,16 @@ const InvoiceDetail = () => {
           <ArrowLeft className="h-4 w-4 mr-2" />
           {new URLSearchParams(window.location.search).get('returnTo') ? 'Back to Project' : 'Back to Invoices'}
         </Button>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2">
           {isVibeAdmin && <>
               {isEditMode ? <>
-                  <Button variant="outline" onClick={() => {
+                  <Button size="sm" variant="outline" onClick={() => {
               setIsEditMode(false);
               setEditedItems(order?.order_items || []);
             }}>
                     Cancel
                   </Button>
-                  <Button onClick={handleSaveQuantities}>
+                  <Button size="sm" onClick={handleSaveQuantities}>
                     Save Changes
                   </Button>
                 </> : <>
@@ -1580,10 +1580,10 @@ const InvoiceDetail = () => {
                   {invoice.quickbooks_sync_status === 'synced' && invoice.quickbooks_id ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button className="bg-green-600 hover:bg-green-700 text-white gap-2">
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1.5">
                           <Check className="h-4 w-4" />
-                          Synced to QBO
-                          <ChevronDown className="h-4 w-4" />
+                          Synced
+                          <ChevronDown className="h-3 w-3" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56">
@@ -1630,34 +1630,34 @@ const InvoiceDetail = () => {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   ) : (
-                    <Button variant="outline" onClick={() => setShowSyncDialog(true)} disabled={syncingToQB}>
-                      <RefreshCw className={`h-4 w-4 mr-2 ${syncingToQB ? 'animate-spin' : ''}`} />
-                      Bill in QuickBooks
+                    <Button size="sm" variant="outline" onClick={() => setShowSyncDialog(true)} disabled={syncingToQB}>
+                      <RefreshCw className={`h-4 w-4 mr-1.5 ${syncingToQB ? 'animate-spin' : ''}`} />
+                      Sync to QBO
                     </Button>
                   )}
-                  {invoice.status !== 'paid' && <Button onClick={() => setShowPaymentDialog(true)}>
-                      <DollarSign className="h-4 w-4 mr-2" />
+                  {invoice.status !== 'paid' && <Button size="sm" onClick={() => setShowPaymentDialog(true)}>
+                      <DollarSign className="h-4 w-4 mr-1.5" />
                       Record Payment
                     </Button>}
-                  {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button variant="outline" onClick={() => setShowDepositDialog(true)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
-                      <DollarSign className="h-4 w-4 mr-2" />
+                  {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button size="sm" variant="outline" onClick={() => setShowDepositDialog(true)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
+                      <DollarSign className="h-4 w-4 mr-1.5" />
                       Bill Deposit
                     </Button>}
-                  {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={openQuickShipDialog} className="border-purple-500 text-purple-700 hover:bg-purple-50">
-                      <Package className="h-4 w-4 mr-2" />
-                      Set Shipped Qtys
+                  {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={openQuickShipDialog} className="border-purple-500 text-purple-700 hover:bg-purple-50">
+                      <Package className="h-4 w-4 mr-1.5" />
+                      Set Shipped Qty
                     </Button>}
-                  {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Update Blanket Total
+                  {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
+                      <RotateCcw className="h-4 w-4 mr-1.5" />
+                      Update Blanket
                     </Button>}
 
                   {/* CONSOLIDATED ACTIONS DROPDOWN — secondary actions */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline">
+                      <Button size="sm" variant="outline">
                         Actions
-                        <ChevronDown className="h-4 w-4 ml-1" />
+                        <ChevronDown className="h-3 w-3 ml-1" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-60">
@@ -1732,14 +1732,12 @@ const InvoiceDetail = () => {
                   </DropdownMenu>
                 </>}
             </>}
-          <Button onClick={handleDownloadPDF}>
-            <Download className="h-4 w-4 mr-2" />
-            Download Invoice
+          <Button size="sm" onClick={handleDownloadPDF} title="Download Invoice PDF" aria-label="Download Invoice">
+            <Download className="h-4 w-4" />
           </Button>
           {(invoice.invoice_type === 'partial' || invoice.parent_invoice_id) && (
-            <Button variant="outline" onClick={handleDownloadPackingList}>
-              <FileText className="h-4 w-4 mr-2" />
-              Download Packing List
+            <Button size="sm" variant="outline" onClick={handleDownloadPackingList} title="Download Packing List" aria-label="Download Packing List">
+              <FileText className="h-4 w-4" />
             </Button>
           )}
         </div>
