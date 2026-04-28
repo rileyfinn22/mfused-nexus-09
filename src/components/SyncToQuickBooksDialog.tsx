@@ -257,7 +257,7 @@ export function SyncToQuickBooksDialog({
                           ) : (
                             <span className="text-muted-foreground">·</span>
                           )}
-                          {Number(inv.billed_percentage || 100) < 100 && (
+                          {!isPullShipInvoice && Number(inv.billed_percentage || 100) < 100 && (
                             <Badge variant="secondary" className="text-[10px] shrink-0">
                               {inv.billed_percentage}% Dep
                             </Badge>
