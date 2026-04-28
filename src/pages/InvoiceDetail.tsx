@@ -1576,24 +1576,7 @@ const InvoiceDetail = () => {
                     Save Changes
                   </Button>
                 </> : <>
-                  <Button variant="outline" onClick={() => {
-                // For blanket invoices, ensure we have the order items with shipped_quantity
-                if (invoice?.invoice_type === 'full' && order?.order_items) {
-                  setEditedItems(order.order_items.map((item: any) => ({
-                    ...item,
-                    shipped_quantity: item.shipped_quantity || 0
-                  })));
-                }
-                setEditShippingCost(String(invoice?.shipping_cost || 0));
-                setEditShippingNote(invoice?.shipping_note || '');
-                setIsEditMode(true);
-              }}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Items
-                  </Button>
-                  <Button variant="outline" onClick={() => navigate(`/orders/${invoice.order_id}`)}>
-                    View Order
-                  </Button>
+                  {/* PRIMARY ACTIONS — always visible */}
                   {invoice.quickbooks_sync_status === 'synced' && invoice.quickbooks_id ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -1629,7 +1612,7 @@ const InvoiceDetail = () => {
                           <span>View in QuickBooks</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           className="cursor-pointer"
                           onClick={() => setShowSyncDialog(true)}
                         >
@@ -1637,7 +1620,7 @@ const InvoiceDetail = () => {
                           <span>Re-Sync to QuickBooks</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           className="cursor-pointer text-destructive focus:text-destructive"
                           onClick={() => setShowUnsyncDialog(true)}
                         >
@@ -1652,69 +1635,103 @@ const InvoiceDetail = () => {
                       Bill in QuickBooks
                     </Button>
                   )}
-                  {invoice.quickbooks_id && <Button variant="outline" onClick={handleRefreshPaymentLink} disabled={refreshingLink}>
-                      <RefreshCw className={`h-4 w-4 mr-2 ${refreshingLink ? 'animate-spin' : ''}`} />
-                      {refreshingLink ? 'Getting Link...' : 'Get Payment Link'}
+                  {invoice.status !== 'paid' && <Button onClick={() => setShowPaymentDialog(true)}>
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Record Payment
                     </Button>}
-                  <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
+                  {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button variant="outline" onClick={() => setShowDepositDialog(true)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Bill Deposit
+                    </Button>}
+                  {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={openQuickShipDialog} className="border-purple-500 text-purple-700 hover:bg-purple-50">
+                      <Package className="h-4 w-4 mr-2" />
+                      Set Shipped Qtys
+                    </Button>}
+                  {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Update Blanket Total
+                    </Button>}
+
+                  {/* CONSOLIDATED ACTIONS DROPDOWN — secondary actions */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline">
+                        Actions
+                        <ChevronDown className="h-4 w-4 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-60">
+                      <DropdownMenuLabel>Edit</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => {
+                        if (invoice?.invoice_type === 'full' && order?.order_items) {
+                          setEditedItems(order.order_items.map((item: any) => ({
+                            ...item,
+                            shipped_quantity: item.shipped_quantity || 0
+                          })));
+                        }
+                        setEditShippingCost(String(invoice?.shipping_cost || 0));
+                        setEditShippingNote(invoice?.shipping_note || '');
+                        setIsEditMode(true);
+                      }}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Items
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate(`/orders/${invoice.order_id}`)}>
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        View Order
+                      </DropdownMenuItem>
+
+                      {invoice.quickbooks_id && <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Payment Link</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={handleRefreshPaymentLink} disabled={refreshingLink}>
+                          <RefreshCw className={`h-4 w-4 mr-2 ${refreshingLink ? 'animate-spin' : ''}`} />
+                          {refreshingLink ? 'Getting Link...' : 'Get Payment Link'}
+                        </DropdownMenuItem>
+                      </>}
+
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel>Email</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => setShowSendEmailDialog(true)}>
+                        <Mail className="h-4 w-4 mr-2" />
+                        Send Invoice to Customer
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowNoticeDialog("billed")}>
+                        <Bell className="h-4 w-4 mr-2" />
+                        Send Billed Notice (Net 30)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowNoticeDialog("payment_due")}>
+                        <AlertCircle className="h-4 w-4 mr-2" />
+                        Send Payment Due Reminder
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel>Status</DropdownMenuLabel>
+                      {invoice.invoice_type === 'full' && invoice.status !== 'closed' && (
+                        <DropdownMenuItem onClick={handleCloseInvoice}>
+                          <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                          {relatedInvoices && relatedInvoices.some((inv: any) => inv.parent_invoice_id === invoice.id) ? 'Close Blanket' : 'Close Invoice'}
+                        </DropdownMenuItem>
+                      )}
+                      {invoice.status === 'closed' && (
+                        <DropdownMenuItem onClick={handleReopenInvoice}>
+                          <RotateCcw className="h-4 w-4 mr-2 text-amber-600" />
+                          Reopen Invoice
+                        </DropdownMenuItem>
+                      )}
+
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setShowDeleteDialog(true)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Invoice
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>}
-              {invoice.status !== 'paid' && <Button onClick={() => setShowPaymentDialog(true)}>
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Record Payment
-                </Button>}
-              {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button variant="outline" onClick={() => setShowDepositDialog(true)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Bill Deposit
-                </Button>}
-              {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={openQuickShipDialog} className="border-purple-500 text-purple-700 hover:bg-purple-50">
-                  <Package className="h-4 w-4 mr-2" />
-                  Set Shipped Qtys
-                </Button>}
-              {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Update Blanket Total
-                </Button>}
-              {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleCloseInvoice} className="border-green-500 text-green-700 hover:bg-green-50">
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  {relatedInvoices && relatedInvoices.some((inv: any) => inv.parent_invoice_id === invoice.id) ? 'Close Blanket' : 'Close Invoice'}
-                </Button>}
-              {invoice.status === 'closed' && <Button variant="outline" onClick={handleReopenInvoice} className="border-amber-500 text-amber-700 hover:bg-amber-50">
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Reopen Invoice
-                </Button>}
             </>}
-          {isVibeAdmin && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Mail className="h-4 w-4 mr-2" />
-                  Email
-                  <ChevronDown className="h-3 w-3 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Send Email</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setShowSendEmailDialog(true)}>
-                  <Mail className="h-4 w-4 mr-2" />
-                  Send Invoice to Customer
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Notices</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => setShowNoticeDialog("billed")}>
-                  <Bell className="h-4 w-4 mr-2" />
-                  Send Billed Notice (Net 30)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowNoticeDialog("payment_due")}>
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  Send Payment Due Reminder
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
           <Button onClick={handleDownloadPDF}>
             <Download className="h-4 w-4 mr-2" />
             Download Invoice
