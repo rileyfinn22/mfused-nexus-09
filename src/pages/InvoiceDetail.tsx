@@ -1491,7 +1491,9 @@ const InvoiceDetail = () => {
   // the deposit was billed and (presumably) paid; "Less Payments" already accounts for it.
   // Otherwise we double-deduct (deposit line + payments line).
   // Deposit billing line only applies to parent blanket invoices, never child shipment/deposit invoices.
-  const isDepositBilling = isBlanketDisplay && billedPct != null && billedPct > 0 && billedPct < 100 && displayTotalPaid === 0;
+  // Once any shipment exists on the order, the deposit % no longer caps the bill — use realized total.
+  const anyShippedOnOrder = (order?.order_items || []).some((it: any) => Number(it.shipped_quantity || 0) > 0);
+  const isDepositBilling = isBlanketDisplay && !anyShippedOnOrder && billedPct != null && billedPct > 0 && billedPct < 100 && displayTotalPaid === 0;
   const displayBilledTotal = isDepositBilling ? displayTotal * (billedPct / 100) : displayTotal;
   const displayBalance = displayBilledTotal - displayTotalPaid;
 
