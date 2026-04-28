@@ -189,6 +189,10 @@ export async function approvePullShipOrder({
     invoiceNumber = generateInvoiceNumber(parentOrder.order_number, nextShipmentNumber);
 
     const blanketTotal = parentOrder.total || 1;
+    // Track informational draw-down % for the blanket update below, but
+    // Pull & Ship children invoice 100% of the shipped value — they are NOT
+    // percentage deposits. billed_percentage stays null so QBO sync bills the
+    // full shipped amount instead of treating it as an X% deposit.
     percentageOfOrder = (recalculatedTotal / blanketTotal) * 100;
 
     const { data: invoiceData, error: invoiceError } = await supabase
@@ -209,7 +213,7 @@ export async function approvePullShipOrder({
         shipping_state: pullOrder.shipping_state || null,
         shipping_zip: pullOrder.shipping_zip || null,
         shipment_number: nextShipmentNumber,
-        billed_percentage: Number(percentageOfOrder.toFixed(2)),
+        billed_percentage: null,
         parent_invoice_id: blanketInvoice.id,
         status: "draft",
         notes: `Pull & Ship Order: ${pullOrder.order_number}`,
