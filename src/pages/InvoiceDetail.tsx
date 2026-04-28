@@ -1400,7 +1400,15 @@ const InvoiceDetail = () => {
     return { subtotal: Number(invoice?.subtotal || 0), total: Number(invoice?.subtotal || 0) + Number(invoice?.tax || 0) + displayShipping };
   };
   
-  const { subtotal: displaySubtotal, total: displayTotal } = computeDisplayTotals();
+  const { subtotal: displaySubtotal, total: rawDisplayTotal } = computeDisplayTotals();
+  // For blanket invoices with children, roll up child shipping into the blanket total
+  // (children carry their own shipping; the blanket should reflect everything billed)
+  const childShippingTotal = isBlanketDisplay
+    ? relatedInvoices
+        .filter((ri: any) => ri.parent_invoice_id === invoiceId)
+        .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0)
+    : 0;
+  const displayTotal = rawDisplayTotal + childShippingTotal;
   // For blanket invoices with children, include child invoice payments in total paid
   const childPaymentsTotal = isBlanketDisplay
     ? relatedInvoices
@@ -1409,7 +1417,10 @@ const InvoiceDetail = () => {
     : 0;
   const displayTotalPaid = Number(invoice?.total_paid || 0) + childPaymentsTotal;
   const billedPct = invoice?.billed_percentage;
-  const isDepositBilling = billedPct != null && billedPct > 0 && billedPct < 100;
+  // Hide the "Deposit (X%)" deduction line on blankets once any payment has been recorded —
+  // the deposit was billed and (presumably) paid; "Less Payments" already accounts for it.
+  // Otherwise we double-deduct (deposit line + payments line).
+  const isDepositBilling = billedPct != null && billedPct > 0 && billedPct < 100 && displayTotalPaid === 0;
   const displayBilledTotal = isDepositBilling ? displayTotal * (billedPct / 100) : displayTotal;
   const displayBalance = displayBilledTotal - displayTotalPaid;
 
