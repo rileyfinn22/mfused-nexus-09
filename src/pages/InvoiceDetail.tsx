@@ -306,80 +306,103 @@ const InvoiceDetail = () => {
     setInvoice(invoiceData);
     setOrder(invoiceData.orders);
 
-    // Fetch products for the company (for product picker in edit mode)
-    if (invoiceData.company_id) {
-      const { data: productsData } = await supabase
-        .from('products')
-        .select('id, name, item_id, description, price')
-        .eq('company_id', invoiceData.company_id)
-        .order('name');
-      if (productsData) setProducts(productsData);
-    }
+    const isBlanketInvoice = invoiceData.invoice_type === 'full' && invoiceData.shipment_number === 1;
 
-    // Fetch inventory allocations for this invoice to get actual pulled items
-    const {
-      data: allocationsData
-    } = await supabase
-      .from('inventory_allocations')
-      .select(`
-        *,
-        order_items(id, name, sku, unit_price, quantity, shipped_quantity, item_id, description, line_number),
-        inventory(state, available)
-      `)
-      .eq('invoice_id', invoiceId)
-      .order('created_at', { ascending: true });
-    
-    // Sort by order_items.line_number after fetch
+    // Run all independent queries in parallel for faster page load
+    const [
+      productsRes,
+      allocationsRes,
+      vendorPOsRes,
+      relatedRes,
+      allAllocationsRes,
+      qbSettingsRes,
+      attachmentsRes,
+    ] = await Promise.all([
+      invoiceData.company_id
+        ? supabase
+            .from('products')
+            .select('id, name, item_id, description, price')
+            .eq('company_id', invoiceData.company_id)
+            .order('name')
+        : Promise.resolve({ data: null }),
+      supabase
+        .from('inventory_allocations')
+        .select(`
+          *,
+          order_items(id, name, sku, unit_price, quantity, shipped_quantity, item_id, description, line_number),
+          inventory(state, available)
+        `)
+        .eq('invoice_id', invoiceId)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('vendor_pos')
+        .select(`
+          *,
+          vendors(name, contact_name, contact_email),
+          vendor_po_items(*)
+        `)
+        .eq('order_id', invoiceData.order_id)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('invoices')
+        .select('*')
+        .eq('order_id', invoiceData.order_id)
+        .neq('id', invoiceId)
+        .is('deleted_at', null)
+        .order('shipment_number'),
+      supabase
+        .from('inventory_allocations')
+        .select(`quantity_allocated, invoice_id, invoices!inner(order_id)`)
+        .eq('invoices.order_id', invoiceData.order_id),
+      supabase
+        .from('quickbooks_settings')
+        .select('realm_id')
+        .eq('is_connected', true)
+        .limit(1)
+        .maybeSingle(),
+      invoiceData.order_id
+        ? supabase
+            .from('order_attachments')
+            .select('*')
+            .eq('order_id', invoiceData.order_id)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: null }),
+    ]);
+
+    if (productsRes.data) setProducts(productsRes.data);
+
+    const allocationsData = allocationsRes.data;
     if (allocationsData) {
-      allocationsData.sort((a, b) => {
+      allocationsData.sort((a: any, b: any) => {
         const lineA = a.order_items?.line_number ?? 999;
         const lineB = b.order_items?.line_number ?? 999;
         return lineA - lineB;
       });
-    }
-    if (allocationsData) {
       setInventoryAllocations(allocationsData);
 
-      // Check if this is a deposit invoice (no allocations, but has deposit note)
       const isDepositInvoice = invoiceData.notes && invoiceData.notes.includes('deposit payment');
-
-      // Blanket/full invoices always show ALL order items with ordered quantities
-      const isBlanketInvoice = invoiceData.invoice_type === 'full' && invoiceData.shipment_number === 1;
-      
       if (isBlanketInvoice || isDepositInvoice) {
-        // Blanket and deposit invoices show all order items with original quantities
         setEditedItems(invoiceData.orders?.order_items || []);
       } else if (allocationsData.length > 0) {
-        // Shipment/partial invoices show only allocated items
         const invoiceItems = allocationsData.map((alloc: any) => ({
           ...alloc.order_items,
           quantity: alloc.quantity_allocated,
           shipped_quantity: alloc.quantity_allocated,
-          total: alloc.quantity_allocated * (alloc.order_items?.unit_price || 0)
+          total: alloc.quantity_allocated * (alloc.order_items?.unit_price || 0),
         }));
         setEditedItems(invoiceItems);
       } else {
-        // No allocations yet - show all items for full invoices, empty for partials
         setEditedItems(invoiceData.invoice_type === 'full' ? invoiceData.orders?.order_items || [] : []);
       }
     } else {
       setEditedItems(invoiceData.orders?.order_items || []);
     }
 
-    // Fetch vendor POs for this order
-    const {
-      data: vendorPOData
-    } = await supabase.from('vendor_pos').select(`
-        *,
-        vendors(name, contact_name, contact_email),
-        vendor_po_items(*)
-      `).eq('order_id', invoiceData.order_id).order('created_at', { ascending: true });
-    
-    // Sort vendor_po_items by created_at for each PO
+    const vendorPOData = vendorPOsRes.data;
     if (vendorPOData) {
-      vendorPOData.forEach(po => {
+      vendorPOData.forEach((po: any) => {
         if (po.vendor_po_items) {
-          po.vendor_po_items.sort((a, b) => 
+          po.vendor_po_items.sort((a: any, b: any) =>
             new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           );
         }
@@ -387,144 +410,85 @@ const InvoiceDetail = () => {
       setVendorPOs(vendorPOData);
     }
 
-    // Fetch related invoices for the same order
-    const {
-      data: relatedData
-    } = await supabase.from('invoices').select('*').eq('order_id', invoiceData.order_id).neq('id', invoiceId).is('deleted_at', null).order('shipment_number');
-    if (relatedData) {
-      setRelatedInvoices(relatedData);
-    }
+    const relatedData = relatedRes.data;
+    if (relatedData) setRelatedInvoices(relatedData);
 
-    // Fetch ALL inventory allocations for ALL invoices connected to this order (for progress calculation)
-    const {
-      data: allAllocations
-    } = await supabase.from('inventory_allocations').select(`
-        quantity_allocated,
-        invoice_id,
-        invoices!inner(order_id)
-      `).eq('invoices.order_id', invoiceData.order_id);
-
-    // Calculate total shipped across all invoices for this order
-    const totalShippedAcrossAllInvoices = allAllocations?.reduce((sum, alloc) => sum + Number(alloc.quantity_allocated || 0), 0) || 0;
+    const totalShippedAcrossAllInvoices = allAllocationsRes.data?.reduce(
+      (sum: number, alloc: any) => sum + Number(alloc.quantity_allocated || 0),
+      0
+    ) || 0;
     setTotalShippedAllInvoices(totalShippedAcrossAllInvoices);
-    console.log('Total shipped across all invoices:', totalShippedAcrossAllInvoices);
 
-    // Fetch payments - if this is a blanket invoice (full type, shipment 1), get all payments from partial invoices
-    const isBlanketInvoice = invoiceData.invoice_type === 'full' && invoiceData.shipment_number === 1;
-    
+    if (qbSettingsRes.data?.realm_id) setQbRealmId(qbSettingsRes.data.realm_id);
+    if (attachmentsRes.data) setOrderAttachments(attachmentsRes.data);
+
+    // Payments need relatedData, so fetch after the parallel batch
     let paymentsData;
     if (isBlanketInvoice) {
-      // Get all invoice IDs for this order (including this one and all related)
       const allInvoiceIds = [invoiceId];
       if (relatedData && relatedData.length > 0) {
-        allInvoiceIds.push(...relatedData.map(inv => inv.id));
+        allInvoiceIds.push(...relatedData.map((inv: any) => inv.id));
       }
-      
-      console.log('Fetching payments for blanket invoice, all IDs:', allInvoiceIds);
-      
-      // Fetch all payments for all invoices with invoice details
       const { data: allPayments, error: paymentsError } = await supabase
         .from('payments')
         .select('*')
         .in('invoice_id', allInvoiceIds)
         .order('payment_date', { ascending: false });
-      
-      if (paymentsError) {
-        console.error('Error fetching payments:', paymentsError);
-      }
-      
-      // Add invoice info to each payment manually
+      if (paymentsError) console.error('Error fetching payments:', paymentsError);
       if (allPayments) {
-        const paymentsWithInvoices = allPayments.map(payment => {
-          const relatedInvoice = relatedData?.find(inv => inv.id === payment.invoice_id);
+        paymentsData = allPayments.map((payment: any) => {
+          const relatedInvoice = relatedData?.find((inv: any) => inv.id === payment.invoice_id);
           return {
             ...payment,
-            invoices: relatedInvoice ? {
-              invoice_number: relatedInvoice.invoice_number,
-              invoice_type: relatedInvoice.invoice_type,
-              shipment_number: relatedInvoice.shipment_number
-            } : (payment.invoice_id === invoiceId ? {
-              invoice_number: invoiceData.invoice_number,
-              invoice_type: invoiceData.invoice_type,
-              shipment_number: invoiceData.shipment_number
-            } : null)
+            invoices: relatedInvoice
+              ? {
+                  invoice_number: relatedInvoice.invoice_number,
+                  invoice_type: relatedInvoice.invoice_type,
+                  shipment_number: relatedInvoice.shipment_number,
+                }
+              : payment.invoice_id === invoiceId
+              ? {
+                  invoice_number: invoiceData.invoice_number,
+                  invoice_type: invoiceData.invoice_type,
+                  shipment_number: invoiceData.shipment_number,
+                }
+              : null,
           };
         });
-        paymentsData = paymentsWithInvoices;
       }
     } else if (invoiceData.parent_invoice_id) {
-      // Partial invoice with a parent - show payments for this invoice AND the parent blanket
       const parentAndSelfIds = [invoiceId!, invoiceData.parent_invoice_id];
-      // Also include sibling partial invoices
       if (relatedData && relatedData.length > 0) {
-        parentAndSelfIds.push(...relatedData.map(inv => inv.id));
+        parentAndSelfIds.push(...relatedData.map((inv: any) => inv.id));
       }
-      
       const { data: allRelatedPayments, error: relatedPaymentsError } = await supabase
         .from('payments')
         .select('*')
         .in('invoice_id', parentAndSelfIds)
         .order('payment_date', { ascending: false });
-      
-      if (relatedPaymentsError) {
-        console.error('Error fetching related payments:', relatedPaymentsError);
-      }
-      
+      if (relatedPaymentsError) console.error('Error fetching related payments:', relatedPaymentsError);
       if (allRelatedPayments) {
-        // Add invoice info to each payment
-        const paymentsWithInvoices = allRelatedPayments.map(payment => {
+        paymentsData = allRelatedPayments.map((payment: any) => {
           if (payment.invoice_id === invoiceId) {
             return { ...payment, invoices: { invoice_number: invoiceData.invoice_number, invoice_type: invoiceData.invoice_type, shipment_number: invoiceData.shipment_number } };
           }
           if (payment.invoice_id === invoiceData.parent_invoice_id) {
             return { ...payment, invoices: { invoice_number: 'Parent Blanket', invoice_type: 'full', shipment_number: 1 } };
           }
-          const sibling = relatedData?.find(inv => inv.id === payment.invoice_id);
+          const sibling = relatedData?.find((inv: any) => inv.id === payment.invoice_id);
           return { ...payment, invoices: sibling ? { invoice_number: sibling.invoice_number, invoice_type: sibling.invoice_type, shipment_number: sibling.shipment_number } : null };
         });
-        paymentsData = paymentsWithInvoices;
       }
     } else {
-      // Regular invoice - only show payments for this invoice
       const { data: singleInvoicePayments } = await supabase
         .from('payments')
         .select('*')
         .eq('invoice_id', invoiceId)
         .order('payment_date', { ascending: false });
-      
       paymentsData = singleInvoicePayments;
     }
-    
-    if (paymentsData) {
-      console.log('Setting payments:', paymentsData);
-      setPayments(paymentsData);
-    }
 
-    // Fetch QuickBooks realm_id for opening invoices in QBO
-    // Get the realm_id from any connected QB account (there's typically one QB connection for the whole system)
-    const { data: qbSettings } = await supabase
-      .from('quickbooks_settings')
-      .select('realm_id')
-      .eq('is_connected', true)
-      .limit(1)
-      .single();
-    
-    if (qbSettings?.realm_id) {
-      setQbRealmId(qbSettings.realm_id);
-    }
-
-    // Fetch order attachments (to display Customer PO, etc.)
-    if (invoiceData.order_id) {
-      const { data: attachmentsData } = await supabase
-        .from('order_attachments')
-        .select('*')
-        .eq('order_id', invoiceData.order_id)
-        .order('created_at', { ascending: false });
-      
-      if (attachmentsData) {
-        setOrderAttachments(attachmentsData);
-      }
-    }
+    if (paymentsData) setPayments(paymentsData);
 
     setLoading(false);
   };
