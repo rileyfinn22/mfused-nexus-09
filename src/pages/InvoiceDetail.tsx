@@ -1353,6 +1353,61 @@ const InvoiceDetail = () => {
     }
   };
 
+  const openQuickShipDialog = () => {
+    const initial: Record<string, string> = {};
+    (order?.order_items || []).forEach((oi: any) => {
+      initial[oi.id] = String(Number(oi.shipped_quantity ?? oi.quantity ?? 0));
+    });
+    setQuickShipQtys(initial);
+    setShowQuickShipDialog(true);
+  };
+
+  const handleSaveQuickShip = async () => {
+    if (!order?.order_items) return;
+    setSavingQuickShip(true);
+    try {
+      // Update each order_item's shipped_quantity
+      for (const oi of order.order_items) {
+        const raw = quickShipQtys[oi.id];
+        if (raw === undefined) continue;
+        const qty = Number(raw);
+        if (!isFinite(qty) || qty < 0) continue;
+        const { error } = await supabase
+          .from('order_items')
+          .update({ shipped_quantity: qty })
+          .eq('id', oi.id);
+        if (error) throw error;
+      }
+
+      // Recompute blanket subtotal/total to match shipped × price + child shipping
+      const newSubtotal = order.order_items.reduce((sum: number, oi: any) => {
+        const raw = quickShipQtys[oi.id];
+        const qty = raw !== undefined ? Number(raw) : Number(oi.shipped_quantity || 0);
+        return sum + (isFinite(qty) ? qty : 0) * Number(oi.unit_price || 0);
+      }, 0);
+      const newShipping = (relatedInvoices || [])
+        .filter((ri: any) => ri.parent_invoice_id === invoiceId)
+        .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0);
+      const newTotal = newSubtotal + Number(invoice?.tax || 0) + newShipping;
+
+      if (isBlanketDisplay) {
+        const { error: invErr } = await supabase
+          .from('invoices')
+          .update({ subtotal: newSubtotal, shipping_cost: newShipping, total: newTotal })
+          .eq('id', invoiceId);
+        if (invErr) throw invErr;
+      }
+
+      toast({ title: 'Shipped Quantities Updated', description: `Blanket total: ${formatCurrency(newTotal)}` });
+      setShowQuickShipDialog(false);
+      fetchInvoiceDetails();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to save shipped quantities', variant: 'destructive' });
+    } finally {
+      setSavingQuickShip(false);
+    }
+  };
+
   const handleReopenInvoice = async () => {
     if (!confirm('Reopen this invoice? This will set the status back to open.')) {
       return;
