@@ -1669,6 +1669,10 @@ const InvoiceDetail = () => {
                   <DollarSign className="h-4 w-4 mr-2" />
                   Bill Deposit
                 </Button>}
+              {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={openQuickShipDialog} className="border-purple-500 text-purple-700 hover:bg-purple-50">
+                  <Package className="h-4 w-4 mr-2" />
+                  Set Shipped Qtys
+                </Button>}
               {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Update Blanket Total
