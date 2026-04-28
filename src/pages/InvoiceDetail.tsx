@@ -1306,6 +1306,48 @@ const InvoiceDetail = () => {
     }
   };
 
+  const handleUpdateBlanketTotal = async () => {
+    if (!invoice || !order) return;
+    const newSubtotal = (order.order_items || []).reduce(
+      (sum: number, oi: any) =>
+        sum + Number(oi.shipped_quantity || 0) * Number(oi.unit_price || 0),
+      0
+    );
+    const newShipping = (relatedInvoices || [])
+      .filter((ri: any) => ri.parent_invoice_id === invoiceId)
+      .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0);
+    const newTotal = newSubtotal + Number(invoice.tax || 0) + newShipping;
+    if (
+      !confirm(
+        `Update blanket total to ${formatCurrency(newTotal)}?\n\nSubtotal (Σ shipped × price): ${formatCurrency(newSubtotal)}\nShipping (from shipments): ${formatCurrency(newShipping)}\nTax: ${formatCurrency(Number(invoice.tax || 0))}`
+      )
+    ) {
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('invoices')
+        .update({
+          subtotal: newSubtotal,
+          shipping_cost: newShipping,
+          total: newTotal,
+        })
+        .eq('id', invoiceId);
+      if (error) throw error;
+      toast({
+        title: 'Blanket Total Updated',
+        description: `New total: ${formatCurrency(newTotal)}`,
+      });
+      fetchInvoiceDetails();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update blanket total',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleReopenInvoice = async () => {
     if (!confirm('Reopen this invoice? This will set the status back to open.')) {
       return;
@@ -1566,6 +1608,10 @@ const InvoiceDetail = () => {
               {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button variant="outline" onClick={() => setShowDepositDialog(true)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
                   <DollarSign className="h-4 w-4 mr-2" />
                   Bill Deposit
+                </Button>}
+              {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Update Blanket Total
                 </Button>}
               {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleCloseInvoice} className="border-green-500 text-green-700 hover:bg-green-50">
                   <CheckCircle2 className="h-4 w-4 mr-2" />
