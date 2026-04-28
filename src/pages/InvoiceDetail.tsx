@@ -24,6 +24,8 @@ import { InvoiceAuditLog } from "@/components/InvoiceAuditLog";
 import { SendInvoiceEmailDialog } from "@/components/SendInvoiceEmailDialog";
 import { SendInvoiceNoticeDialog } from "@/components/SendInvoiceNoticeDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
