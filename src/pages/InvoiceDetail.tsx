@@ -1609,6 +1609,10 @@ const InvoiceDetail = () => {
                   <DollarSign className="h-4 w-4 mr-2" />
                   Bill Deposit
                 </Button>}
+              {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Update Blanket Total
+                </Button>}
               {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleCloseInvoice} className="border-green-500 text-green-700 hover:bg-green-50">
                   <CheckCircle2 className="h-4 w-4 mr-2" />
                   {relatedInvoices && relatedInvoices.some((inv: any) => inv.parent_invoice_id === invoice.id) ? 'Close Blanket' : 'Close Invoice'}
