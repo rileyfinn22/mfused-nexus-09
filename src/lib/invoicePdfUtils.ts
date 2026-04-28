@@ -252,7 +252,8 @@ const renderInvoiceToDoc = async (
   const computedTotal = computedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
 
   const billedPct = invoice.billed_percentage;
-  const isDeposit = billedPct != null && billedPct > 0 && billedPct < 100;
+  // Once any shipment has occurred, the deposit % no longer applies — bill the realized total.
+  const isDeposit = !anyShipped && billedPct != null && billedPct > 0 && billedPct < 100;
   const billedTotal = isDeposit ? computedTotal * (billedPct / 100) : computedTotal;
 
   const totalPaid = invoice.total_paid || 0;
