@@ -2546,14 +2546,15 @@ const InvoiceDetail = () => {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Blanket Invoice Total</p>
-                    <p className="text-lg font-semibold">{formatCurrency(Number(invoice.total || 0))}</p>
+                    <p className="text-lg font-semibold">{formatCurrency(Number(invoice.total || 0) + childShippingTotal)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Total Shipped Invoiced</p>
                     <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-                      {formatCurrency(relatedInvoices
-                        .filter(inv => inv.shipment_number > 1)
-                        .reduce((sum, inv) => sum + Number(inv.total || 0), 0)
+                      {formatCurrency(
+                        (order?.order_items?.reduce((sum: number, item: any) =>
+                          sum + (Number(item.shipped_quantity || 0) * Number(item.unit_price || 0)), 0) || 0)
+                        + childShippingTotal
                       )}
                     </p>
                   </div>
