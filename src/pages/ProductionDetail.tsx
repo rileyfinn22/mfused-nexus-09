@@ -1450,14 +1450,14 @@ export default function ProductionDetail() {
                           <span className="text-sm text-foreground">{item.name}</span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <span className="text-sm font-medium">{item.quantity.toLocaleString()}</span>
+                          <span className="text-sm font-medium">{(item.quantity ?? 0).toLocaleString()}</span>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className={cn(
                             "text-sm font-medium",
                             isFullyShipped ? "text-success" : isPartiallyShipped ? "text-warning" : "text-muted-foreground"
                           )}>
-                            {item.shipped_quantity.toLocaleString()}
+                            {(item.shipped_quantity ?? 0).toLocaleString()}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -1465,7 +1465,7 @@ export default function ProductionDetail() {
                             "text-sm font-medium",
                             remaining > 0 ? "text-foreground" : "text-muted-foreground"
                           )}>
-                            {remaining.toLocaleString()}
+                            {(remaining ?? 0).toLocaleString()}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
