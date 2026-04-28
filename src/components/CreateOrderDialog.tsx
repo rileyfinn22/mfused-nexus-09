@@ -248,9 +248,9 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
         return {
           order_id: order.id,
           product_id: item.productId,
-          sku: `SKU-${product?.id.substring(0, 8)}`,
+          sku: product?.item_id || `SKU-${product?.id.substring(0, 8)}`,
           item_id: product?.item_id || null,
-          name: product?.name || "",
+          name: product?.name || "(unnamed product)",
           description: product?.description || null,
           quantity: item.quantity,
           shipped_quantity: 0,
