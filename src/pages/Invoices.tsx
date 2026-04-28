@@ -583,7 +583,7 @@ const Invoices = () => {
         <div className="bg-muted border-b-2 border-border">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
-            <div className="col-span-1">Due Date</div>
+            <div className="col-span-1">Due / Shipped</div>
             <div className="col-span-2">Company</div>
             <div className="col-span-2">Description</div>
             <div className="col-span-1">Amount</div>
@@ -717,6 +717,27 @@ const Invoices = () => {
                         }
                       }
                       return invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-';
+                    })()}
+                    {(() => {
+                      // Shipped date — drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
+                      let shippedDate = invoice.shipped_date;
+                      if (!shippedDate && isParent && hasChildren) {
+                        // Show earliest child shipped date as fallback for parent rollup
+                        const childShipped = invoices
+                          .filter(inv => inv.parent_invoice_id === invoice.id && inv.shipped_date)
+                          .map(inv => new Date(inv.shipped_date))
+                          .sort((a, b) => a.getTime() - b.getTime());
+                        if (childShipped.length > 0) shippedDate = childShipped[0].toISOString();
+                      }
+                      if (!shippedDate) return null;
+                      return (
+                        <div
+                          className="text-[11px] text-blue-600 whitespace-nowrap mt-0.5"
+                          title="Shipped date — Net 30 starts here"
+                        >
+                          📦 {new Date(shippedDate).toLocaleDateString()}
+                        </div>
+                      );
                     })()}
                   </div>
                   <div className="col-span-2">

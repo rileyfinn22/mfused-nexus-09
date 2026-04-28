@@ -1936,6 +1936,51 @@ const InvoiceDetail = () => {
                     Created: {new Date(invoice.invoice_date).toLocaleDateString()}
                   </p>
                 </div>
+                <div className="mt-4">
+                  <p className="text-sm text-muted-foreground">Shipped Date</p>
+                  <p className="text-[11px] text-muted-foreground mb-1">Net 30 starts from this date</p>
+                  {isVibeAdmin ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className={cn(
+                            "h-auto p-0 font-medium hover:bg-transparent",
+                            !invoice.shipped_date && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {invoice.shipped_date ? format(new Date(invoice.shipped_date), "MMM d, yyyy") : "Set Shipped Date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="end">
+                        <Calendar
+                          mode="single"
+                          selected={invoice.shipped_date ? new Date(invoice.shipped_date) : undefined}
+                          onSelect={async (date) => {
+                            const { error } = await supabase
+                              .from('invoices')
+                              .update({ shipped_date: date ? date.toISOString() : null })
+                              .eq('id', invoice.id);
+
+                            if (error) {
+                              toast({ title: "Error", description: "Failed to update shipped date", variant: "destructive" });
+                            } else {
+                              setInvoice({ ...invoice, shipped_date: date ? date.toISOString() : null });
+                              toast({ title: "Shipped date updated" });
+                            }
+                          }}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <p className="font-medium">
+                      {invoice.shipped_date ? format(new Date(invoice.shipped_date), "MMM d, yyyy") : "Not set"}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
