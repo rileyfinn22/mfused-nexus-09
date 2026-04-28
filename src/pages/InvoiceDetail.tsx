@@ -131,6 +131,9 @@ const InvoiceDetail = () => {
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showDepositDialog, setShowDepositDialog] = useState(false);
   const [showShipmentDialog, setShowShipmentDialog] = useState(false);
+  const [showQuickShipDialog, setShowQuickShipDialog] = useState(false);
+  const [quickShipQtys, setQuickShipQtys] = useState<Record<string, string>>({});
+  const [savingQuickShip, setSavingQuickShip] = useState(false);
   const [refreshingLink, setRefreshingLink] = useState(false);
   const [syncingPayment, setSyncingPayment] = useState<string | null>(null);
   const [showPaymentPortal, setShowPaymentPortal] = useState(false);
