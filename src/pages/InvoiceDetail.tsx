@@ -2393,10 +2393,10 @@ const InvoiceDetail = () => {
                   <span className="font-semibold">{formatCurrency(displaySubtotal)}</span>
                 </div>
                 {/* Shipping Line - editable for vibe admins */}
-                {(Number(invoice?.shipping_cost || 0) > 0 || (isVibeAdmin && isEditMode)) ? (
+                {(Number(invoice?.shipping_cost || 0) > 0 || childShippingTotal > 0 || (isVibeAdmin && isEditMode)) ? (
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm items-center gap-2">
-                      <span className="text-muted-foreground">Shipping</span>
+                      <span className="text-muted-foreground">Shipping{childShippingTotal > 0 && isBlanketDisplay ? ' (from shipments)' : ''}</span>
                       {isVibeAdmin && isEditMode ? (
                         <Input
                           type="number"
@@ -2408,7 +2408,7 @@ const InvoiceDetail = () => {
                           placeholder="0.00"
                         />
                       ) : (
-                        <span className="font-semibold">{formatCurrency(invoice?.shipping_cost)}</span>
+                        <span className="font-semibold">{formatCurrency(Number(invoice?.shipping_cost || 0) + childShippingTotal)}</span>
                       )}
                     </div>
                     {isVibeAdmin && isEditMode ? (
