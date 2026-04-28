@@ -24,6 +24,8 @@ import { InvoiceAuditLog } from "@/components/InvoiceAuditLog";
 import { SendInvoiceEmailDialog } from "@/components/SendInvoiceEmailDialog";
 import { SendInvoiceNoticeDialog } from "@/components/SendInvoiceNoticeDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -129,6 +131,9 @@ const InvoiceDetail = () => {
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showDepositDialog, setShowDepositDialog] = useState(false);
   const [showShipmentDialog, setShowShipmentDialog] = useState(false);
+  const [showQuickShipDialog, setShowQuickShipDialog] = useState(false);
+  const [quickShipQtys, setQuickShipQtys] = useState<Record<string, string>>({});
+  const [savingQuickShip, setSavingQuickShip] = useState(false);
   const [refreshingLink, setRefreshingLink] = useState(false);
   const [syncingPayment, setSyncingPayment] = useState<string | null>(null);
   const [showPaymentPortal, setShowPaymentPortal] = useState(false);
@@ -1348,6 +1353,61 @@ const InvoiceDetail = () => {
     }
   };
 
+  const openQuickShipDialog = () => {
+    const initial: Record<string, string> = {};
+    (order?.order_items || []).forEach((oi: any) => {
+      initial[oi.id] = String(Number(oi.shipped_quantity ?? oi.quantity ?? 0));
+    });
+    setQuickShipQtys(initial);
+    setShowQuickShipDialog(true);
+  };
+
+  const handleSaveQuickShip = async () => {
+    if (!order?.order_items) return;
+    setSavingQuickShip(true);
+    try {
+      // Update each order_item's shipped_quantity
+      for (const oi of order.order_items) {
+        const raw = quickShipQtys[oi.id];
+        if (raw === undefined) continue;
+        const qty = Number(raw);
+        if (!isFinite(qty) || qty < 0) continue;
+        const { error } = await supabase
+          .from('order_items')
+          .update({ shipped_quantity: qty })
+          .eq('id', oi.id);
+        if (error) throw error;
+      }
+
+      // Recompute blanket subtotal/total to match shipped × price + child shipping
+      const newSubtotal = order.order_items.reduce((sum: number, oi: any) => {
+        const raw = quickShipQtys[oi.id];
+        const qty = raw !== undefined ? Number(raw) : Number(oi.shipped_quantity || 0);
+        return sum + (isFinite(qty) ? qty : 0) * Number(oi.unit_price || 0);
+      }, 0);
+      const newShipping = (relatedInvoices || [])
+        .filter((ri: any) => ri.parent_invoice_id === invoiceId)
+        .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0);
+      const newTotal = newSubtotal + Number(invoice?.tax || 0) + newShipping;
+
+      if (isBlanketDisplay) {
+        const { error: invErr } = await supabase
+          .from('invoices')
+          .update({ subtotal: newSubtotal, shipping_cost: newShipping, total: newTotal })
+          .eq('id', invoiceId);
+        if (invErr) throw invErr;
+      }
+
+      toast({ title: 'Shipped Quantities Updated', description: `Blanket total: ${formatCurrency(newTotal)}` });
+      setShowQuickShipDialog(false);
+      fetchInvoiceDetails();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to save shipped quantities', variant: 'destructive' });
+    } finally {
+      setSavingQuickShip(false);
+    }
+  };
+
   const handleReopenInvoice = async () => {
     if (!confirm('Reopen this invoice? This will set the status back to open.')) {
       return;
@@ -1608,6 +1668,10 @@ const InvoiceDetail = () => {
               {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button variant="outline" onClick={() => setShowDepositDialog(true)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
                   <DollarSign className="h-4 w-4 mr-2" />
                   Bill Deposit
+                </Button>}
+              {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={openQuickShipDialog} className="border-purple-500 text-purple-700 hover:bg-purple-50">
+                  <Package className="h-4 w-4 mr-2" />
+                  Set Shipped Qtys
                 </Button>}
               {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
                   <RotateCcw className="h-4 w-4 mr-2" />
@@ -3172,6 +3236,57 @@ const InvoiceDetail = () => {
 
       {/* Record Payment Dialog */}
       <RecordPaymentDialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog} invoice={invoice} onSuccess={fetchInvoiceDetails} />
+      <Dialog open={showQuickShipDialog} onOpenChange={setShowQuickShipDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Set Shipped Quantities</DialogTitle>
+            <DialogDescription>
+              Quickly enter shipped quantity for each line item. The blanket total will be recalculated as Σ(shipped × price) + child shipping.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto py-2">
+            {(order?.order_items || []).map((oi: any) => (
+              <div key={oi.id} className="grid grid-cols-[1fr_auto_120px] items-center gap-3 border-b pb-2">
+                <div>
+                  <p className="text-sm font-medium">{oi.name}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{oi.sku}</p>
+                </div>
+                <div className="text-xs text-muted-foreground text-right">
+                  Ordered: {Number(oi.quantity || 0).toLocaleString()}<br />
+                  @ {formatUnitPrice(Number(oi.unit_price || 0))}
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Shipped</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={quickShipQtys[oi.id] ?? ''}
+                    onChange={(e) => setQuickShipQtys((prev) => ({ ...prev, [oi.id]: e.target.value }))}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between items-center text-sm border-t pt-3">
+            <span className="text-muted-foreground">New subtotal preview:</span>
+            <span className="font-semibold">
+              {formatCurrency(
+                (order?.order_items || []).reduce((sum: number, oi: any) => {
+                  const raw = quickShipQtys[oi.id];
+                  const qty = raw !== undefined && raw !== '' ? Number(raw) : Number(oi.shipped_quantity || 0);
+                  return sum + (isFinite(qty) ? qty : 0) * Number(oi.unit_price || 0);
+                }, 0)
+              )}
+            </span>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowQuickShipDialog(false)} disabled={savingQuickShip}>Cancel</Button>
+            <Button onClick={handleSaveQuickShip} disabled={savingQuickShip}>
+              {savingQuickShip ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : 'Save & Update Total'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Sync to QuickBooks Dialog */}
       <SyncToQuickBooksDialog open={showSyncDialog} onOpenChange={setShowSyncDialog} invoice={invoice} onSync={handleSyncToQuickBooks} syncing={syncingToQB} />
