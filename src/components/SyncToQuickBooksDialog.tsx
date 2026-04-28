@@ -52,6 +52,7 @@ export function SyncToQuickBooksDialog({
   const [step, setStep] = useState<'review' | 'configure'>('review');
 
   const invoiceTotal = Number(invoice?.total || 0);
+  const isPullShipInvoice = String(invoice?.notes || '').toLowerCase().includes('pull & ship order');
   const billedAmount = (invoiceTotal * billingPercentage) / 100;
 
   // Load billing history for this order when dialog opens
@@ -61,7 +62,7 @@ export function SyncToQuickBooksDialog({
     }
     if (open) {
       // Auto-detect best default percentage
-      if (invoice?.invoice_type === 'partial' || invoice?.parent_invoice_id) {
+      if (isPullShipInvoice || invoice?.invoice_type === 'partial' || invoice?.parent_invoice_id) {
         setBillingPercentage(100);
       } else {
         setBillingPercentage(invoice?.billed_percentage || 100);
@@ -142,7 +143,7 @@ export function SyncToQuickBooksDialog({
   );
   
   // Deposit from parent (when viewing a child invoice)
-  const hasParentDeposit = parentInvoice && Number(parentInvoice.billed_percentage || 100) < 100;
+  const hasParentDeposit = !isPullShipInvoice && parentInvoice && Number(parentInvoice.billed_percentage || 100) < 100;
   
   // Deposit from children (when viewing the blanket invoice)
   const hasChildDeposits = depositChildInvoices.length > 0;
