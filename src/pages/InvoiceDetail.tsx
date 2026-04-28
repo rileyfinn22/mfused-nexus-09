@@ -1400,7 +1400,15 @@ const InvoiceDetail = () => {
     return { subtotal: Number(invoice?.subtotal || 0), total: Number(invoice?.subtotal || 0) + Number(invoice?.tax || 0) + displayShipping };
   };
   
-  const { subtotal: displaySubtotal, total: displayTotal } = computeDisplayTotals();
+  const { subtotal: displaySubtotal, total: rawDisplayTotal } = computeDisplayTotals();
+  // For blanket invoices with children, roll up child shipping into the blanket total
+  // (children carry their own shipping; the blanket should reflect everything billed)
+  const childShippingTotal = isBlanketDisplay
+    ? relatedInvoices
+        .filter((ri: any) => ri.parent_invoice_id === invoiceId)
+        .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0)
+    : 0;
+  const displayTotal = rawDisplayTotal + childShippingTotal;
   // For blanket invoices with children, include child invoice payments in total paid
   const childPaymentsTotal = isBlanketDisplay
     ? relatedInvoices
@@ -1409,7 +1417,10 @@ const InvoiceDetail = () => {
     : 0;
   const displayTotalPaid = Number(invoice?.total_paid || 0) + childPaymentsTotal;
   const billedPct = invoice?.billed_percentage;
-  const isDepositBilling = billedPct != null && billedPct > 0 && billedPct < 100;
+  // Hide the "Deposit (X%)" deduction line on blankets once any payment has been recorded —
+  // the deposit was billed and (presumably) paid; "Less Payments" already accounts for it.
+  // Otherwise we double-deduct (deposit line + payments line).
+  const isDepositBilling = billedPct != null && billedPct > 0 && billedPct < 100 && displayTotalPaid === 0;
   const displayBilledTotal = isDepositBilling ? displayTotal * (billedPct / 100) : displayTotal;
   const displayBalance = displayBilledTotal - displayTotalPaid;
 
@@ -2382,10 +2393,10 @@ const InvoiceDetail = () => {
                   <span className="font-semibold">{formatCurrency(displaySubtotal)}</span>
                 </div>
                 {/* Shipping Line - editable for vibe admins */}
-                {(Number(invoice?.shipping_cost || 0) > 0 || (isVibeAdmin && isEditMode)) ? (
+                {(Number(invoice?.shipping_cost || 0) > 0 || childShippingTotal > 0 || (isVibeAdmin && isEditMode)) ? (
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm items-center gap-2">
-                      <span className="text-muted-foreground">Shipping</span>
+                      <span className="text-muted-foreground">Shipping{childShippingTotal > 0 && isBlanketDisplay ? ' (from shipments)' : ''}</span>
                       {isVibeAdmin && isEditMode ? (
                         <Input
                           type="number"
@@ -2397,7 +2408,7 @@ const InvoiceDetail = () => {
                           placeholder="0.00"
                         />
                       ) : (
-                        <span className="font-semibold">{formatCurrency(invoice?.shipping_cost)}</span>
+                        <span className="font-semibold">{formatCurrency(Number(invoice?.shipping_cost || 0) + childShippingTotal)}</span>
                       )}
                     </div>
                     {isVibeAdmin && isEditMode ? (
@@ -2535,14 +2546,15 @@ const InvoiceDetail = () => {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Blanket Invoice Total</p>
-                    <p className="text-lg font-semibold">{formatCurrency(Number(invoice.total || 0))}</p>
+                    <p className="text-lg font-semibold">{formatCurrency(Number(invoice.total || 0) + childShippingTotal)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Total Shipped Invoiced</p>
                     <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-                      {formatCurrency(relatedInvoices
-                        .filter(inv => inv.shipment_number > 1)
-                        .reduce((sum, inv) => sum + Number(inv.total || 0), 0)
+                      {formatCurrency(
+                        (order?.order_items?.reduce((sum: number, item: any) =>
+                          sum + (Number(item.shipped_quantity || 0) * Number(item.unit_price || 0)), 0) || 0)
+                        + childShippingTotal
                       )}
                     </p>
                   </div>
