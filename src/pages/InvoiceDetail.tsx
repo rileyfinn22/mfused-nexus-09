@@ -1503,13 +1503,17 @@ const InvoiceDetail = () => {
   };
   
   const { subtotal: displaySubtotal, total: rawDisplayTotal } = computeDisplayTotals();
-  // For blanket invoices with children, roll up child shipping into the blanket total
-  // (children carry their own shipping; the blanket should reflect everything billed)
-  const childShippingTotal = isBlanketDisplay
+  // For blanket invoices with children, roll up child shipping for display.
+  // NOTE: "Update Blanket Total" / "Set Shipped Qty" persist Σ(child shipping) into the
+  // blanket's own shipping_cost. To avoid double counting, only add child shipping on top
+  // when the blanket's stored shipping_cost is 0 (legacy / not yet rolled up).
+  const rawChildShipping = isBlanketDisplay
     ? relatedInvoices
         .filter((ri: any) => ri.parent_invoice_id === invoiceId)
         .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0)
     : 0;
+  const blanketStoredShipping = Number(invoice?.shipping_cost || 0);
+  const childShippingTotal = isBlanketDisplay && blanketStoredShipping === 0 ? rawChildShipping : 0;
   const displayTotal = rawDisplayTotal + childShippingTotal;
   // For blanket invoices with children, include child invoice payments in total paid
   const childPaymentsTotal = isBlanketDisplay
