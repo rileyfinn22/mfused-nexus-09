@@ -252,8 +252,10 @@ const renderInvoiceToDoc = async (
   const computedTotal = computedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
 
   const billedPct = invoice.billed_percentage;
-  // Once any shipment has occurred, the deposit % no longer applies — bill the realized total.
-  const isDeposit = !anyShipped && billedPct != null && billedPct > 0 && billedPct < 100;
+  const totalPaidPreview = invoice.total_paid || 0;
+  // Deposit line only applies when nothing has shipped AND no payments have been recorded.
+  // Otherwise it's misleading clutter (deposit was already billed/paid; "Less Payments" covers it).
+  const isDeposit = !anyShipped && totalPaidPreview === 0 && billedPct != null && billedPct > 0 && billedPct < 100;
   const billedTotal = isDeposit ? computedTotal * (billedPct / 100) : computedTotal;
 
   const totalPaid = invoice.total_paid || 0;
