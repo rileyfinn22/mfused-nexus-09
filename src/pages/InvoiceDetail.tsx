@@ -3236,6 +3236,57 @@ const InvoiceDetail = () => {
 
       {/* Record Payment Dialog */}
       <RecordPaymentDialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog} invoice={invoice} onSuccess={fetchInvoiceDetails} />
+      <Dialog open={showQuickShipDialog} onOpenChange={setShowQuickShipDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Set Shipped Quantities</DialogTitle>
+            <DialogDescription>
+              Quickly enter shipped quantity for each line item. The blanket total will be recalculated as Σ(shipped × price) + child shipping.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto py-2">
+            {(order?.order_items || []).map((oi: any) => (
+              <div key={oi.id} className="grid grid-cols-[1fr_auto_120px] items-center gap-3 border-b pb-2">
+                <div>
+                  <p className="text-sm font-medium">{oi.name}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{oi.sku}</p>
+                </div>
+                <div className="text-xs text-muted-foreground text-right">
+                  Ordered: {Number(oi.quantity || 0).toLocaleString()}<br />
+                  @ {formatUnitPrice(Number(oi.unit_price || 0))}
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Shipped</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={quickShipQtys[oi.id] ?? ''}
+                    onChange={(e) => setQuickShipQtys((prev) => ({ ...prev, [oi.id]: e.target.value }))}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between items-center text-sm border-t pt-3">
+            <span className="text-muted-foreground">New subtotal preview:</span>
+            <span className="font-semibold">
+              {formatCurrency(
+                (order?.order_items || []).reduce((sum: number, oi: any) => {
+                  const raw = quickShipQtys[oi.id];
+                  const qty = raw !== undefined && raw !== '' ? Number(raw) : Number(oi.shipped_quantity || 0);
+                  return sum + (isFinite(qty) ? qty : 0) * Number(oi.unit_price || 0);
+                }, 0)
+              )}
+            </span>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowQuickShipDialog(false)} disabled={savingQuickShip}>Cancel</Button>
+            <Button onClick={handleSaveQuickShip} disabled={savingQuickShip}>
+              {savingQuickShip ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : 'Save & Update Total'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Sync to QuickBooks Dialog */}
       <SyncToQuickBooksDialog open={showSyncDialog} onOpenChange={setShowSyncDialog} invoice={invoice} onSync={handleSyncToQuickBooks} syncing={syncingToQB} />
