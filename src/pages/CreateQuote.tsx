@@ -109,7 +109,7 @@ const CreateQuote = () => {
   const [description, setDescription] = useState("");
   const [requestNotes, setRequestNotes] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
-  const [terms, setTerms] = useState("Net 30");
+  const [terms, setTerms] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingMethod, setShippingMethod] = useState("");
@@ -231,7 +231,7 @@ const CreateQuote = () => {
     setShippingZip(quote.shipping_zip || "");
     setDescription(quote.description || "");
     setInternalNotes(`Original Request Notes:\n${quote.request_notes || 'None'}`);
-    setTerms(quote.terms || "Net 30");
+    setTerms(quote.terms || "");
 
     // Load items from parent quote if they exist
     const { data: itemsData } = await supabase
@@ -324,7 +324,7 @@ const CreateQuote = () => {
     setDescription(quote.description || "");
     setRequestNotes(quote.request_notes || "");
     setInternalNotes(quote.internal_notes || "");
-    setTerms(quote.terms || "Net 30");
+    setTerms(quote.terms || "");
     setValidUntil(quote.valid_until ? quote.valid_until.split('T')[0] : "");
     setShippingCost(quote.shipping_cost || 0);
     setShippingMethod((quote as any).shipping_method || "");
@@ -662,7 +662,7 @@ const CreateQuote = () => {
         description: description || null,
         request_notes: requestNotes || null,
         internal_notes: internalNotes || null,
-        terms: terms || 'Net 30',
+        terms: terms || null,
         valid_until: validUntil ? new Date(validUntil).toISOString() : null,
         subtotal: calculateSubtotal(),
         shipping_cost: shippingCost,
@@ -1738,17 +1738,12 @@ const CreateQuote = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label>Terms</Label>
-                  <Select value={terms} onValueChange={setTerms}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Net 30">Net 30</SelectItem>
-                      <SelectItem value="Net 15">Net 15</SelectItem>
-                      <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
-                      <SelectItem value="Net 60">Net 60</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    value={terms}
+                    onChange={(e) => setTerms(e.target.value)}
+                    placeholder="From company default (or enter custom)"
+                    maxLength={200}
+                  />
                 </div>
                 {isVibeAdmin && (
                   <div className="space-y-2">
