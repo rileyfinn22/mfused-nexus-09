@@ -38,6 +38,7 @@ import {
 import { exportToCSV } from "@/lib/exportUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { ExpandToggleButton, ExpandDetailsPanel } from "@/components/RowExpandPanel";
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -51,6 +52,14 @@ const Orders = () => {
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState<any[]>([]);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const toggleExpandedRow = (id: string) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   // Update URL when company filter changes
   const setCompanyFilter = (value: string) => {
@@ -485,15 +494,22 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                 const completedStatuses = ['shipped', 'delivered', 'completed'];
                 const isCompleted = completedStatuses.includes(order.status.toLowerCase());
                 
+                const isExpanded = expandedRows.has(order.id);
                 return (
+                  <div key={order.id}>
                   <div 
-                    key={order.id} 
                     className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors even:bg-muted/40"
                   >
                     <div className="col-span-2 space-y-1">
-                      <div className="font-medium font-mono text-base">{order.order_number}</div>
+                      <div className="flex items-center gap-1">
+                        <ExpandToggleButton
+                          expanded={isExpanded}
+                          onToggle={() => toggleExpandedRow(order.id)}
+                        />
+                        <div className="font-medium font-mono text-base">{order.order_number}</div>
+                      </div>
                       {orderTypeInfo.show && (
-                        <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
+                        <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal ml-8`}>
                           <OrderIcon className="h-2.5 w-2.5" />
                           {orderTypeInfo.label}
                         </Badge>
@@ -598,6 +614,29 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                         </>
                       )}
                     </div>
+                  </div>
+                  {isExpanded && (
+                    <ExpandDetailsPanel
+                      details={[
+                        { label: "Order Type", value: order.order_type || "standard" },
+                        { label: "PO #", value: order.po_number || "—" },
+                        { label: "Customer", value: order.customer_name || "—" },
+                        { label: "Ship To", value: [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") || "—" },
+                        { label: "Items", value: order.order_items?.length ?? 0 },
+                        { label: "Total Qty", value: (order.order_items || []).reduce((s: number, i: any) => s + (Number(i.quantity) || 0), 0).toLocaleString() },
+                        { label: "Shipped Qty", value: (order.order_items || []).reduce((s: number, i: any) => s + (Number(i.shipped_quantity) || 0), 0).toLocaleString() },
+                        { label: "Status", value: order.status },
+                      ]}
+                      items={order.order_items || []}
+                      itemColumns={[
+                        { key: "sku", label: "SKU", className: "font-mono text-xs" },
+                        { key: "product_name", label: "Product" },
+                        { key: "quantity", label: "Qty", render: (r) => Number(r.quantity || 0).toLocaleString() },
+                        { key: "shipped_quantity", label: "Shipped", render: (r) => Number(r.shipped_quantity || 0).toLocaleString() },
+                        { key: "unit_price", label: "Unit $", render: (r) => `$${Number(r.unit_price || 0).toFixed(2)}` },
+                      ]}
+                    />
+                  )}
                   </div>
                 );
               })}

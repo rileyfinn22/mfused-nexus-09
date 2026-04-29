@@ -29,6 +29,7 @@ import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems } from "@/components/RowExpandPanel";
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -45,6 +46,14 @@ const Invoices = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
+  const [expandedDetailRows, setExpandedDetailRows] = useState<Set<string>>(new Set());
+  const toggleDetailRow = (id: string) => {
+    setExpandedDetailRows((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   const [collapsedWhileFiltering, setCollapsedWhileFiltering] = useState<Set<string>>(new Set());
   
 
@@ -626,9 +635,10 @@ const Invoices = () => {
                 return `border-muted-foreground/20 ${isExpanded ? 'bg-muted/50 border-muted-foreground/30' : 'hover:bg-muted/30'}`;
               };
               
+              const detailExpanded = expandedDetailRows.has(invoice.id);
               return (
+                <div key={invoice.id}>
                 <div 
-                  key={invoice.id} 
                   className={`grid grid-cols-12 gap-4 px-4 py-3 transition-colors cursor-pointer ${
                     isChild ? 'bg-muted/60 border-l-4 border-l-primary/50' : 'hover:bg-muted/50'
                    } ${isChild ? '' : 'even:bg-muted/40'}`}
@@ -636,6 +646,10 @@ const Invoices = () => {
                 >
                   <div className="col-span-2">
                     <div className="flex items-center gap-2">
+                      <ExpandToggleButton
+                        expanded={detailExpanded}
+                        onToggle={() => toggleDetailRow(invoice.id)}
+                      />
                       {isParent && hasChildren && (
                         <Button
                           variant="outline"
@@ -1003,6 +1017,8 @@ const Invoices = () => {
                     </Button>
                   </div>
                 </div>
+                {detailExpanded && <InvoiceRowExpanded invoice={invoice} />}
+                </div>
               );
             })
           )}
@@ -1021,5 +1037,33 @@ const Invoices = () => {
     </div>
   );
 };
+
+function InvoiceRowExpanded({ invoice }: { invoice: any }) {
+  const { items, loading } = useInvoiceItems(invoice.id, true);
+  return (
+    <ExpandDetailsPanel
+      details={[
+        { label: "Invoice #", value: invoice.invoice_number },
+        { label: "Order #", value: invoice.orders?.order_number || "—" },
+        { label: "Company", value: invoice.companies?.name || "—" },
+        { label: "Type", value: invoice.invoice_type || "full" },
+        { label: "Subtotal", value: `$${Number(invoice.subtotal || 0).toFixed(2)}` },
+        { label: "Total", value: `$${Number(invoice.total || 0).toFixed(2)}` },
+        { label: "Issued", value: invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : "—" },
+        { label: "Due", value: invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : "—" },
+      ]}
+      items={items || []}
+      loading={loading}
+      itemColumns={[
+        { key: "sku", label: "SKU", className: "font-mono text-xs" },
+        { key: "product_name", label: "Product" },
+        { key: "quantity", label: "Qty", render: (r) => Number(r.quantity || 0).toLocaleString() },
+        { key: "unit_price", label: "Unit $", render: (r) => `$${Number(r.unit_price || 0).toFixed(2)}` },
+        { key: "line_total", label: "Line $", render: (r) => `$${(Number(r.quantity || 0) * Number(r.unit_price || 0)).toFixed(2)}` },
+      ]}
+      emptyItemsLabel="No line items recorded"
+    />
+  );
+}
 
 export default Invoices;

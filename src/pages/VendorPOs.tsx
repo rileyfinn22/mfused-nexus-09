@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ import { VendorBillsAgingBuckets } from "@/components/VendorBillsAgingBuckets";
 import { VendorPaymentsLedger } from "@/components/VendorPaymentsLedger";
 import { VendorBalanceBreakdown } from "@/components/VendorBalanceBreakdown";
 import { VendorAPStatementTab } from "@/components/VendorAPStatementTab";
+import { ExpandToggleButton, ExpandDetailsPanel, useVendorPOItems } from "@/components/RowExpandPanel";
 
 const VendorPOs = () => {
   const navigate = useNavigate();
@@ -47,6 +48,14 @@ const VendorPOs = () => {
   const [isVibeAdmin, setIsVibeAdmin] = useState<boolean | null>(null);
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
   const [activeTab, setActiveTab] = useState("bills");
+  const [expandedDetailRows, setExpandedDetailRows] = useState<Set<string>>(new Set());
+  const toggleDetailRow = (id: string) => {
+    setExpandedDetailRows((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const setVendorFilter = (value: string) => {
     if (value === "all") {
@@ -386,6 +395,7 @@ const VendorPOs = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-10"></TableHead>
                         <TableHead>PO Number</TableHead>
                         <TableHead>Vendor</TableHead>
                         <TableHead>Customer/Order</TableHead>
@@ -400,11 +410,11 @@ const VendorPOs = () => {
                     <TableBody>
                       {loading ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center">Loading bills...</TableCell>
+                          <TableCell colSpan={10} className="text-center">Loading bills...</TableCell>
                         </TableRow>
                       ) : filteredPOs.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center">
+                          <TableCell colSpan={10} className="text-center">
                             <div className="py-8">
                               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
                               <p className="text-muted-foreground">No vendor bills found</p>
@@ -416,10 +426,11 @@ const VendorPOs = () => {
                           const total = po.final_total ?? po.total ?? 0;
                           const paid = po.total_paid || 0;
                           const balance = total - paid;
+                          const detailExpanded = expandedDetailRows.has(po.id);
 
                           return (
+                            <Fragment key={po.id}>
                             <TableRow
-                              key={po.id}
                               className="cursor-pointer hover:bg-muted/40"
                               onClick={() => {
                                 toast({ title: "Opening PO...", description: po.po_number });
@@ -434,6 +445,12 @@ const VendorPOs = () => {
                                 }
                               }}
                             >
+                              <TableCell className="w-10">
+                                <ExpandToggleButton
+                                  expanded={detailExpanded}
+                                  onToggle={() => toggleDetailRow(po.id)}
+                                />
+                              </TableCell>
                               <TableCell className="font-medium">{po.po_number}</TableCell>
                               <TableCell>{po.vendors?.name || 'Unassigned'}</TableCell>
                               <TableCell>
@@ -492,6 +509,14 @@ const VendorPOs = () => {
                                 </div>
                               </TableCell>
                             </TableRow>
+                            {detailExpanded && (
+                              <TableRow className="bg-transparent hover:bg-transparent">
+                                <TableCell colSpan={10} className="p-0">
+                                  <VendorPORowExpanded po={po} />
+                                </TableCell>
+                              </TableRow>
+                            )}
+                            </Fragment>
                           );
                         })
                       )}
@@ -555,5 +580,35 @@ const VendorPOs = () => {
     </div>
   );
 };
+
+function VendorPORowExpanded({ po }: { po: any }) {
+  const { items, loading } = useVendorPOItems(po.id, true);
+  const total = po.final_total ?? po.total ?? 0;
+  const paid = po.total_paid || 0;
+  return (
+    <ExpandDetailsPanel
+      details={[
+        { label: "PO #", value: po.po_number },
+        { label: "Vendor", value: po.vendors?.name || "Unassigned" },
+        { label: "Type", value: po.po_type || "standard" },
+        { label: "Customer/Order", value: po.po_type === "expense" ? (po.customer_company?.name || "—") : (po.orders?.order_number || "—") },
+        { label: "Order Date", value: po.order_date ? new Date(po.order_date).toLocaleDateString() : "—" },
+        { label: "Total", value: `$${Number(total).toFixed(2)}` },
+        { label: "Paid", value: `$${Number(paid).toFixed(2)}` },
+        { label: "Balance", value: `$${(Number(total) - Number(paid)).toFixed(2)}` },
+      ]}
+      items={items || []}
+      loading={loading}
+      itemColumns={[
+        { key: "sku", label: "SKU", className: "font-mono text-xs" },
+        { key: "product_name", label: "Product", render: (r) => r.product_name || r.description || "—" },
+        { key: "quantity", label: "Qty", render: (r) => Number(r.quantity || 0).toLocaleString() },
+        { key: "unit_cost", label: "Unit $", render: (r) => `$${Number(r.unit_cost || 0).toFixed(2)}` },
+        { key: "line_total", label: "Line $", render: (r) => `$${(Number(r.quantity || 0) * Number(r.unit_cost || 0)).toFixed(2)}` },
+      ]}
+      emptyItemsLabel="No PO line items"
+    />
+  );
+}
 
 export default VendorPOs;
