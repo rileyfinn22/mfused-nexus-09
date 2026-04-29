@@ -494,15 +494,22 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                 const completedStatuses = ['shipped', 'delivered', 'completed'];
                 const isCompleted = completedStatuses.includes(order.status.toLowerCase());
                 
+                const isExpanded = expandedRows.has(order.id);
                 return (
+                  <div key={order.id}>
                   <div 
-                    key={order.id} 
                     className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors even:bg-muted/40"
                   >
                     <div className="col-span-2 space-y-1">
-                      <div className="font-medium font-mono text-base">{order.order_number}</div>
+                      <div className="flex items-center gap-1">
+                        <ExpandToggleButton
+                          expanded={isExpanded}
+                          onToggle={() => toggleExpandedRow(order.id)}
+                        />
+                        <div className="font-medium font-mono text-base">{order.order_number}</div>
+                      </div>
                       {orderTypeInfo.show && (
-                        <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
+                        <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal ml-8`}>
                           <OrderIcon className="h-2.5 w-2.5" />
                           {orderTypeInfo.label}
                         </Badge>
