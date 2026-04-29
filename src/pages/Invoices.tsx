@@ -1017,6 +1017,8 @@ const Invoices = () => {
                     </Button>
                   </div>
                 </div>
+                {detailExpanded && <InvoiceRowExpanded invoice={invoice} />}
+                </div>
               );
             })
           )}
