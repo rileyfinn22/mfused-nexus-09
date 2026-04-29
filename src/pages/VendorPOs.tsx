@@ -475,7 +475,11 @@ const VendorPOs = () => {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <div className="flex gap-2 justify-end">
+                                <div className="flex gap-2 justify-end items-center">
+                                  <ExpandToggleButton
+                                    expanded={detailExpanded}
+                                    onToggle={() => toggleDetailRow(po.id)}
+                                  />
                                   <Button 
                                     variant="ghost" 
                                     size="sm"
