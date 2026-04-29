@@ -32,6 +32,7 @@ import { VendorBillsAgingBuckets } from "@/components/VendorBillsAgingBuckets";
 import { VendorPaymentsLedger } from "@/components/VendorPaymentsLedger";
 import { VendorBalanceBreakdown } from "@/components/VendorBalanceBreakdown";
 import { VendorAPStatementTab } from "@/components/VendorAPStatementTab";
+import { ExpandToggleButton, ExpandDetailsPanel, useVendorPOItems } from "@/components/RowExpandPanel";
 
 const VendorPOs = () => {
   const navigate = useNavigate();
