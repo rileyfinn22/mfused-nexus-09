@@ -605,6 +605,9 @@ function VendorPORowExpanded({ po }: { po: any }) {
         { key: "line_total", label: "Line $", render: (r) => `$${(Number(r.quantity || 0) * Number(r.unit_cost || 0)).toFixed(2)}` },
       ]}
       emptyItemsLabel="No PO line items"
+      payments={payments}
+      paymentsLoading={paymentsLoading}
+      paymentsLabel="Vendor Payments"
     />
   );
 }
