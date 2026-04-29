@@ -244,3 +244,65 @@ export function useVendorPOItems(poId: string | null, enabled: boolean) {
 
   return { items, loading };
 }
+
+/**
+ * Lazy-loads invoice payments when the row is expanded.
+ */
+export function useInvoicePayments(invoiceId: string | null, enabled: boolean) {
+  const [payments, setPayments] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !invoiceId || payments !== null) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const { data } = await supabase
+          .from("payments")
+          .select("id, amount, payment_method, reference_number, payment_date")
+          .eq("invoice_id", invoiceId)
+          .order("payment_date", { ascending: false });
+        if (!cancelled) setPayments(data || []);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [invoiceId, enabled, payments]);
+
+  return { payments, loading };
+}
+
+/**
+ * Lazy-loads vendor PO payments when the row is expanded.
+ */
+export function useVendorPOPayments(poId: string | null, enabled: boolean) {
+  const [payments, setPayments] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !poId || payments !== null) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const { data } = await supabase
+          .from("vendor_po_payments")
+          .select("id, amount, payment_method, reference_number, payment_date")
+          .eq("vendor_po_id", poId)
+          .order("payment_date", { ascending: false });
+        if (!cancelled) setPayments(data || []);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [poId, enabled, payments]);
+
+  return { payments, loading };
+}
