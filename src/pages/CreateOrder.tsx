@@ -187,20 +187,6 @@ const CreateOrder = () => {
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
-
-  // When vibe admin selects a customer company, prefill terms from that company's default
-  useEffect(() => {
-    if (!selectedCompanyId) return;
-    (async () => {
-      const { data } = await supabase
-        .from('companies')
-        .select('payment_terms')
-        .eq('id', selectedCompanyId)
-        .maybeSingle();
-      const companyTerms = (data as any)?.payment_terms || "";
-      setFormData((prev) => (prev.terms ? prev : { ...prev, terms: companyTerms }));
-    })();
-  }, [selectedCompanyId]);
   const [productTemplates, setProductTemplates] = useState<ProductTemplateOption[]>([]);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
