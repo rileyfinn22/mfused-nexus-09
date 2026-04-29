@@ -635,9 +635,10 @@ const Invoices = () => {
                 return `border-muted-foreground/20 ${isExpanded ? 'bg-muted/50 border-muted-foreground/30' : 'hover:bg-muted/30'}`;
               };
               
+              const detailExpanded = expandedDetailRows.has(invoice.id);
               return (
+                <div key={invoice.id}>
                 <div 
-                  key={invoice.id} 
                   className={`grid grid-cols-12 gap-4 px-4 py-3 transition-colors cursor-pointer ${
                     isChild ? 'bg-muted/60 border-l-4 border-l-primary/50' : 'hover:bg-muted/50'
                    } ${isChild ? '' : 'even:bg-muted/40'}`}
@@ -645,6 +646,10 @@ const Invoices = () => {
                 >
                   <div className="col-span-2">
                     <div className="flex items-center gap-2">
+                      <ExpandToggleButton
+                        expanded={detailExpanded}
+                        onToggle={() => toggleDetailRow(invoice.id)}
+                      />
                       {isParent && hasChildren && (
                         <Button
                           variant="outline"
