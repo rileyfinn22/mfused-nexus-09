@@ -48,6 +48,14 @@ const VendorPOs = () => {
   const [isVibeAdmin, setIsVibeAdmin] = useState<boolean | null>(null);
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
   const [activeTab, setActiveTab] = useState("bills");
+  const [expandedDetailRows, setExpandedDetailRows] = useState<Set<string>>(new Set());
+  const toggleDetailRow = (id: string) => {
+    setExpandedDetailRows((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const setVendorFilter = (value: string) => {
     if (value === "all") {
