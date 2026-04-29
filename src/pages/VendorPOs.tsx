@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -509,6 +509,14 @@ const VendorPOs = () => {
                                 </div>
                               </TableCell>
                             </TableRow>
+                            {detailExpanded && (
+                              <TableRow className="bg-transparent hover:bg-transparent">
+                                <TableCell colSpan={10} className="p-0">
+                                  <VendorPORowExpanded po={po} />
+                                </TableCell>
+                              </TableRow>
+                            )}
+                            </Fragment>
                           );
                         })
                       )}
