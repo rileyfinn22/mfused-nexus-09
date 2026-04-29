@@ -287,7 +287,7 @@ const CreateOrder = () => {
           if (userRole?.company_id && isMounted) {
             const { data: companyData } = await supabase
               .from('companies')
-              .select('name')
+              .select('name, payment_terms')
               .eq('id', userRole.company_id)
               .single();
 
@@ -295,6 +295,7 @@ const CreateOrder = () => {
               setFormData(prev => ({
                 ...prev,
                 customerName: companyData.name,
+                terms: prev.terms || (companyData as any).payment_terms || "",
               }));
             }
             
