@@ -46,6 +46,14 @@ const Invoices = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
+  const [expandedDetailRows, setExpandedDetailRows] = useState<Set<string>>(new Set());
+  const toggleDetailRow = (id: string) => {
+    setExpandedDetailRows((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   const [collapsedWhileFiltering, setCollapsedWhileFiltering] = useState<Set<string>>(new Set());
   
 
