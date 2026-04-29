@@ -1244,7 +1244,7 @@ const QuoteDetail = () => {
               )}
               <div>
                 <p className="text-sm text-muted-foreground">Terms</p>
-                <p className="font-medium">{quote.terms || 'Net 30'}</p>
+                <p className="font-medium">{quote.terms || '—'}</p>
               </div>
               {quote.valid_until && (
                 <div>
