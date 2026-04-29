@@ -1043,16 +1043,7 @@ function InvoiceRowExpanded({ invoice }: { invoice: any }) {
   const { payments, loading: paymentsLoading } = useInvoicePayments(invoice.id, true);
   return (
     <ExpandDetailsPanel
-      details={[
-        { label: "Invoice #", value: invoice.invoice_number },
-        { label: "Order #", value: invoice.orders?.order_number || "—" },
-        { label: "Company", value: invoice.companies?.name || "—" },
-        { label: "Type", value: invoice.invoice_type || "full" },
-        { label: "Subtotal", value: `$${Number(invoice.subtotal || 0).toFixed(2)}` },
-        { label: "Total", value: `$${Number(invoice.total || 0).toFixed(2)}` },
-        { label: "Issued", value: invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : "—" },
-        { label: "Due", value: invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : "—" },
-      ]}
+      details={[]}
       items={items || []}
       loading={loading}
       itemColumns={[
