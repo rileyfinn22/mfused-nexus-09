@@ -166,7 +166,7 @@ export function useInvoiceItems(invoiceId: string | null, enabled: boolean) {
         // Try inventory allocations first (shipment invoices)
         const { data: allocs } = await supabase
           .from("inventory_allocations")
-          .select("quantity, order_items(sku, product_name, unit_price, line_number)")
+          .select("quantity_allocated, order_items(sku, name, unit_price, line_number)")
           .eq("invoice_id", invoiceId);
 
         let rows: any[] = [];
@@ -174,8 +174,8 @@ export function useInvoiceItems(invoiceId: string | null, enabled: boolean) {
           rows = allocs
             .map((a: any) => ({
               sku: a.order_items?.sku,
-              product_name: a.order_items?.product_name,
-              quantity: a.quantity,
+              product_name: a.order_items?.name,
+              quantity: a.quantity_allocated,
               unit_price: a.order_items?.unit_price,
               line_number: a.order_items?.line_number ?? 999,
             }))
@@ -190,12 +190,12 @@ export function useInvoiceItems(invoiceId: string | null, enabled: boolean) {
           if (inv?.order_id) {
             const { data: oi } = await supabase
               .from("order_items")
-              .select("sku, product_name, quantity, shipped_quantity, unit_price, line_number")
+              .select("sku, name, quantity, shipped_quantity, unit_price, line_number")
               .eq("order_id", inv.order_id)
               .order("line_number");
             rows = (oi || []).map((o: any) => ({
               sku: o.sku,
-              product_name: o.product_name,
+              product_name: o.name,
               quantity: o.shipped_quantity || o.quantity,
               unit_price: o.unit_price,
             }));
