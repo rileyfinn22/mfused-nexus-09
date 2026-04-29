@@ -225,7 +225,7 @@ const CreateOrder = () => {
     billingZip: "",
     poNumber: "",
     dueDate: "",
-    terms: "Net 30",
+    terms: "",
     memo: "",
   });
 
