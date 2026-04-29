@@ -646,10 +646,6 @@ const Invoices = () => {
                 >
                   <div className="col-span-2">
                     <div className="flex items-center gap-2">
-                      <ExpandToggleButton
-                        expanded={detailExpanded}
-                        onToggle={() => toggleDetailRow(invoice.id)}
-                      />
                       {isParent && hasChildren && (
                         <Button
                           variant="outline"
