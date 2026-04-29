@@ -410,11 +410,11 @@ const VendorPOs = () => {
                     <TableBody>
                       {loading ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center">Loading bills...</TableCell>
+                          <TableCell colSpan={10} className="text-center">Loading bills...</TableCell>
                         </TableRow>
                       ) : filteredPOs.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center">
+                          <TableCell colSpan={10} className="text-center">
                             <div className="py-8">
                               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
                               <p className="text-muted-foreground">No vendor bills found</p>
@@ -426,10 +426,11 @@ const VendorPOs = () => {
                           const total = po.final_total ?? po.total ?? 0;
                           const paid = po.total_paid || 0;
                           const balance = total - paid;
+                          const detailExpanded = expandedDetailRows.has(po.id);
 
                           return (
+                            <Fragment key={po.id}>
                             <TableRow
-                              key={po.id}
                               className="cursor-pointer hover:bg-muted/40"
                               onClick={() => {
                                 toast({ title: "Opening PO...", description: po.po_number });
@@ -444,6 +445,12 @@ const VendorPOs = () => {
                                 }
                               }}
                             >
+                              <TableCell className="w-10">
+                                <ExpandToggleButton
+                                  expanded={detailExpanded}
+                                  onToggle={() => toggleDetailRow(po.id)}
+                                />
+                              </TableCell>
                               <TableCell className="font-medium">{po.po_number}</TableCell>
                               <TableCell>{po.vendors?.name || 'Unassigned'}</TableCell>
                               <TableCell>
