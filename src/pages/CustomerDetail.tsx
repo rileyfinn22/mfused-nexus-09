@@ -60,6 +60,7 @@ const customerSchema = z.object({
   shipping_state: z.string().trim().max(50).optional().or(z.literal("")),
   shipping_zip: z.string().trim().max(20).optional().or(z.literal("")),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
+  payment_terms: z.string().trim().max(200).optional().or(z.literal("")),
 });
 
 const productSchema = z.object({
@@ -143,6 +144,7 @@ const CustomerDetail = () => {
     shipping_state: "",
     shipping_zip: "",
     notes: "",
+    payment_terms: "",
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -310,6 +312,7 @@ const CustomerDetail = () => {
         shipping_state: data.shipping_state || "",
         shipping_zip: data.shipping_zip || "",
         notes: data.notes || "",
+        payment_terms: (data as any).payment_terms || "",
       });
     }
     setLoading(false);
@@ -1208,6 +1211,23 @@ const CustomerDetail = () => {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment Terms</CardTitle>
+              <CardDescription>
+                Default payment terms for this company. Used when creating new orders, quotes and invoices. Leave blank for no default.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Input
+                value={formData.payment_terms}
+                onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
+                placeholder='e.g. "Net 30", "Due on receipt", "50% deposit, balance before ship"'
+                maxLength={200}
+              />
             </CardContent>
           </Card>
 
