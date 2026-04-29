@@ -229,6 +229,20 @@ const CreateOrder = () => {
     memo: "",
   });
 
+  // When vibe admin selects a customer company, prefill terms from that company's default
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    (async () => {
+      const { data } = await supabase
+        .from('companies')
+        .select('payment_terms')
+        .eq('id', selectedCompanyId)
+        .maybeSingle();
+      const companyTerms = (data as any)?.payment_terms || "";
+      setFormData((prev) => (prev.terms ? prev : { ...prev, terms: companyTerms }));
+    })();
+  }, [selectedCompanyId]);
+
   // Initial data loading - runs once on mount
   useEffect(() => {
     let isMounted = true;
