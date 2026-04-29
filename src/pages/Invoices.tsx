@@ -1031,4 +1031,32 @@ const Invoices = () => {
   );
 };
 
+function InvoiceRowExpanded({ invoice }: { invoice: any }) {
+  const { items, loading } = useInvoiceItems(invoice.id, true);
+  return (
+    <ExpandDetailsPanel
+      details={[
+        { label: "Invoice #", value: invoice.invoice_number },
+        { label: "Order #", value: invoice.orders?.order_number || "—" },
+        { label: "Company", value: invoice.companies?.name || "—" },
+        { label: "Type", value: invoice.invoice_type || "full" },
+        { label: "Subtotal", value: `$${Number(invoice.subtotal || 0).toFixed(2)}` },
+        { label: "Total", value: `$${Number(invoice.total || 0).toFixed(2)}` },
+        { label: "Issued", value: invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : "—" },
+        { label: "Due", value: invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : "—" },
+      ]}
+      items={items || []}
+      loading={loading}
+      itemColumns={[
+        { key: "sku", label: "SKU", className: "font-mono text-xs" },
+        { key: "product_name", label: "Product" },
+        { key: "quantity", label: "Qty", render: (r) => Number(r.quantity || 0).toLocaleString() },
+        { key: "unit_price", label: "Unit $", render: (r) => `$${Number(r.unit_price || 0).toFixed(2)}` },
+        { key: "line_total", label: "Line $", render: (r) => `$${(Number(r.quantity || 0) * Number(r.unit_price || 0)).toFixed(2)}` },
+      ]}
+      emptyItemsLabel="No line items recorded"
+    />
+  );
+}
+
 export default Invoices;
