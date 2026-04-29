@@ -29,7 +29,7 @@ import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
-import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems } from "@/components/RowExpandPanel";
+import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
 
 const Invoices = () => {
   const navigate = useNavigate();
