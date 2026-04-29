@@ -290,6 +290,7 @@ export type Database = {
           is_active: boolean
           name: string
           notes: string | null
+          payment_terms: string | null
           phone: string | null
           quickbooks_id: string | null
           shipping_city: string | null
@@ -314,6 +315,7 @@ export type Database = {
           is_active?: boolean
           name: string
           notes?: string | null
+          payment_terms?: string | null
           phone?: string | null
           quickbooks_id?: string | null
           shipping_city?: string | null
@@ -338,6 +340,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           notes?: string | null
+          payment_terms?: string | null
           phone?: string | null
           quickbooks_id?: string | null
           shipping_city?: string | null
