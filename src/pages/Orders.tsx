@@ -615,6 +615,29 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                       )}
                     </div>
                   </div>
+                  {isExpanded && (
+                    <ExpandDetailsPanel
+                      details={[
+                        { label: "Order Type", value: order.order_type || "standard" },
+                        { label: "PO #", value: order.po_number || "—" },
+                        { label: "Customer", value: order.customer_name || "—" },
+                        { label: "Ship To", value: [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") || "—" },
+                        { label: "Items", value: order.order_items?.length ?? 0 },
+                        { label: "Total Qty", value: (order.order_items || []).reduce((s: number, i: any) => s + (Number(i.quantity) || 0), 0).toLocaleString() },
+                        { label: "Shipped Qty", value: (order.order_items || []).reduce((s: number, i: any) => s + (Number(i.shipped_quantity) || 0), 0).toLocaleString() },
+                        { label: "Status", value: order.status },
+                      ]}
+                      items={order.order_items || []}
+                      itemColumns={[
+                        { key: "sku", label: "SKU", className: "font-mono text-xs" },
+                        { key: "product_name", label: "Product" },
+                        { key: "quantity", label: "Qty", render: (r) => Number(r.quantity || 0).toLocaleString() },
+                        { key: "shipped_quantity", label: "Shipped", render: (r) => Number(r.shipped_quantity || 0).toLocaleString() },
+                        { key: "unit_price", label: "Unit $", render: (r) => `$${Number(r.unit_price || 0).toFixed(2)}` },
+                      ]}
+                    />
+                  )}
+                  </div>
                 );
               })}
             </div>
