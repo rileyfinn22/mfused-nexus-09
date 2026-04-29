@@ -271,6 +271,10 @@ const CreateQuote = () => {
 
     const companyName = companyData.name;
 
+    // Pre-fill payment terms from this company's default (don't overwrite user edits)
+    const companyTerms = (companyData as any).payment_terms || "";
+    setTerms((prev) => prev || companyTerms);
+
     const { data: addressesData } = await supabase
       .from('customer_addresses')
       .select('*')
