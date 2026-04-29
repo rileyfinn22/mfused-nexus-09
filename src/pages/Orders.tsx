@@ -38,6 +38,7 @@ import {
 import { exportToCSV } from "@/lib/exportUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { ExpandToggleButton, ExpandDetailsPanel } from "@/components/RowExpandPanel";
 
 const Orders = () => {
   const navigate = useNavigate();
