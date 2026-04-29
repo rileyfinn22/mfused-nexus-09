@@ -581,4 +581,34 @@ const VendorPOs = () => {
   );
 };
 
+function VendorPORowExpanded({ po }: { po: any }) {
+  const { items, loading } = useVendorPOItems(po.id, true);
+  const total = po.final_total ?? po.total ?? 0;
+  const paid = po.total_paid || 0;
+  return (
+    <ExpandDetailsPanel
+      details={[
+        { label: "PO #", value: po.po_number },
+        { label: "Vendor", value: po.vendors?.name || "Unassigned" },
+        { label: "Type", value: po.po_type || "standard" },
+        { label: "Customer/Order", value: po.po_type === "expense" ? (po.customer_company?.name || "—") : (po.orders?.order_number || "—") },
+        { label: "Order Date", value: po.order_date ? new Date(po.order_date).toLocaleDateString() : "—" },
+        { label: "Total", value: `$${Number(total).toFixed(2)}` },
+        { label: "Paid", value: `$${Number(paid).toFixed(2)}` },
+        { label: "Balance", value: `$${(Number(total) - Number(paid)).toFixed(2)}` },
+      ]}
+      items={items || []}
+      loading={loading}
+      itemColumns={[
+        { key: "sku", label: "SKU", className: "font-mono text-xs" },
+        { key: "product_name", label: "Product", render: (r) => r.product_name || r.description || "—" },
+        { key: "quantity", label: "Qty", render: (r) => Number(r.quantity || 0).toLocaleString() },
+        { key: "unit_cost", label: "Unit $", render: (r) => `$${Number(r.unit_cost || 0).toFixed(2)}` },
+        { key: "line_total", label: "Line $", render: (r) => `$${(Number(r.quantity || 0) * Number(r.unit_cost || 0)).toFixed(2)}` },
+      ]}
+      emptyItemsLabel="No PO line items"
+    />
+  );
+}
+
 export default VendorPOs;
