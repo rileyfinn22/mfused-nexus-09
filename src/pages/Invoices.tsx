@@ -1063,6 +1063,8 @@ function InvoiceRowExpanded({ invoice }: { invoice: any }) {
         { key: "line_total", label: "Line $", render: (r) => `$${(Number(r.quantity || 0) * Number(r.unit_price || 0)).toFixed(2)}` },
       ]}
       emptyItemsLabel="No line items recorded"
+      payments={payments}
+      paymentsLoading={paymentsLoading}
     />
   );
 }
