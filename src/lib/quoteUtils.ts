@@ -162,7 +162,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   if (quote.valid_until) {
     detailRows.push(['Valid Until:', new Date(quote.valid_until).toLocaleDateString()]);
   }
-  detailRows.push(['Terms:', quote.terms || 'Net 30']);
+  if (quote.terms) detailRows.push(['Terms:', quote.terms]);
   if (quote.shipping_method) {
     const methodLabel = quote.shipping_method === 'domestic' ? 'Domestic'
       : quote.shipping_method === 'air' ? 'Air Freight'

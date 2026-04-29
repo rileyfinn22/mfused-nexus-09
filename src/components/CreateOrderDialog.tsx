@@ -74,13 +74,35 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
     billingZip: "",
     poNumber: "",
     dueDate: "",
-    terms: "Net 30",
+    terms: "",
     memo: "",
   });
 
   useEffect(() => {
     if (open) {
       fetchProducts();
+      // Pre-fill terms from the active company's default payment terms
+      (async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          const { data: userRole } = await supabase
+            .from('user_roles')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (!userRole?.company_id) return;
+          const { data: company } = await supabase
+            .from('companies')
+            .select('payment_terms')
+            .eq('id', userRole.company_id)
+            .maybeSingle();
+          const companyTerms = (company as any)?.payment_terms || "";
+          setFormData((prev) => (prev.terms ? prev : { ...prev, terms: companyTerms }));
+        } catch (_) {
+          // ignore — leave terms blank
+        }
+      })();
     }
   }, [open]);
 
@@ -287,7 +309,7 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
         billingZip: "",
         poNumber: "",
         dueDate: "",
-        terms: "Net 30",
+        terms: "",
         memo: "",
       });
       setSelectedItems([]);
@@ -669,17 +691,13 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="terms">Terms</Label>
-                  <Select value={formData.terms} onValueChange={(value) => setFormData({ ...formData, terms: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Net 30">Net 30</SelectItem>
-                      <SelectItem value="Net 60">Net 60</SelectItem>
-                      <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
-                      <SelectItem value="Prepaid">Prepaid</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    id="terms"
+                    value={formData.terms}
+                    onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
+                    placeholder="From company default (or enter custom)"
+                    maxLength={200}
+                  />
                 </div>
               </div>
 

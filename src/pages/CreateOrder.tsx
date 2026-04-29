@@ -225,9 +225,23 @@ const CreateOrder = () => {
     billingZip: "",
     poNumber: "",
     dueDate: "",
-    terms: "Net 30",
+    terms: "",
     memo: "",
   });
+
+  // When vibe admin selects a customer company, prefill terms from that company's default
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    (async () => {
+      const { data } = await supabase
+        .from('companies')
+        .select('payment_terms')
+        .eq('id', selectedCompanyId)
+        .maybeSingle();
+      const companyTerms = (data as any)?.payment_terms || "";
+      setFormData((prev) => (prev.terms ? prev : { ...prev, terms: companyTerms }));
+    })();
+  }, [selectedCompanyId]);
 
   // Initial data loading - runs once on mount
   useEffect(() => {
@@ -287,7 +301,7 @@ const CreateOrder = () => {
           if (userRole?.company_id && isMounted) {
             const { data: companyData } = await supabase
               .from('companies')
-              .select('name')
+              .select('name, payment_terms')
               .eq('id', userRole.company_id)
               .single();
 
@@ -295,6 +309,7 @@ const CreateOrder = () => {
               setFormData(prev => ({
                 ...prev,
                 customerName: companyData.name,
+                terms: prev.terms || (companyData as any).payment_terms || "",
               }));
             }
             
