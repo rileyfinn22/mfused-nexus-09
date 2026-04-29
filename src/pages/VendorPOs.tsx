@@ -508,7 +508,7 @@ const VendorPOs = () => {
                             </TableRow>
                             {detailExpanded && (
                               <TableRow className="bg-transparent hover:bg-transparent">
-                                <TableCell colSpan={10} className="p-0">
+                                <TableCell colSpan={9} className="p-0">
                                   <VendorPORowExpanded po={po} />
                                 </TableCell>
                               </TableRow>
