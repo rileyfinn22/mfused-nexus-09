@@ -229,10 +229,16 @@ export function useVendorPOItems(poId: string | null, enabled: boolean) {
       try {
         const { data } = await supabase
           .from("vendor_po_items")
-          .select("sku, product_name, description, quantity, unit_cost, line_number")
+          .select("sku, name, description, quantity, final_quantity, unit_cost, final_unit_cost")
           .eq("vendor_po_id", poId)
-          .order("line_number", { ascending: true });
-        if (!cancelled) setItems(data || []);
+          .order("created_at", { ascending: true });
+        const mapped = (data || []).map((r: any) => ({
+          sku: r.sku,
+          product_name: r.name || r.description,
+          quantity: r.final_quantity ?? r.quantity,
+          unit_cost: r.final_unit_cost ?? r.unit_cost,
+        }));
+        if (!cancelled) setItems(mapped);
       } finally {
         if (!cancelled) setLoading(false);
       }
