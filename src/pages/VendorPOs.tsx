@@ -585,16 +585,7 @@ function VendorPORowExpanded({ po }: { po: any }) {
   const paid = po.total_paid || 0;
   return (
     <ExpandDetailsPanel
-      details={[
-        { label: "PO #", value: po.po_number },
-        { label: "Vendor", value: po.vendors?.name || "Unassigned" },
-        { label: "Type", value: po.po_type || "standard" },
-        { label: "Customer/Order", value: po.po_type === "expense" ? (po.customer_company?.name || "—") : (po.orders?.order_number || "—") },
-        { label: "Order Date", value: po.order_date ? new Date(po.order_date).toLocaleDateString() : "—" },
-        { label: "Total", value: `$${Number(total).toFixed(2)}` },
-        { label: "Paid", value: `$${Number(paid).toFixed(2)}` },
-        { label: "Balance", value: `$${(Number(total) - Number(paid)).toFixed(2)}` },
-      ]}
+      details={[]}
       items={items || []}
       loading={loading}
       itemColumns={[
