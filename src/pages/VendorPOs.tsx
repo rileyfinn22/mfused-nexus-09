@@ -581,8 +581,6 @@ const VendorPOs = () => {
 function VendorPORowExpanded({ po }: { po: any }) {
   const { items, loading } = useVendorPOItems(po.id, true);
   const { payments, loading: paymentsLoading } = useVendorPOPayments(po.id, true);
-  const total = po.final_total ?? po.total ?? 0;
-  const paid = po.total_paid || 0;
   return (
     <ExpandDetailsPanel
       details={[]}
