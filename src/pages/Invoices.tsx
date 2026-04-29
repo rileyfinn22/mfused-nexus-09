@@ -1040,6 +1040,7 @@ const Invoices = () => {
 
 function InvoiceRowExpanded({ invoice }: { invoice: any }) {
   const { items, loading } = useInvoiceItems(invoice.id, true);
+  const { payments, loading: paymentsLoading } = useInvoicePayments(invoice.id, true);
   return (
     <ExpandDetailsPanel
       details={[
