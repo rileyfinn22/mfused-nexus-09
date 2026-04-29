@@ -193,13 +193,18 @@ const Invoices = () => {
     
     if (status === 'due') return 'due';
 
-    if (status === 'billed') {
-      if (invoice?.due_date) {
-        const daysUntilDue = getDaysUntilDue(invoice.due_date);
-        if (daysUntilDue <= 0) return 'due';
-      }
-      return 'billed';
+    // Any non-paid invoice with a past due_date and an outstanding balance is DUE,
+    // regardless of whether DB status is 'billed' or 'open' (e.g., partially-paid
+    // child invoices stay 'open' but are functionally past-due once the date passes).
+    const total = Number(invoice?.total) || 0;
+    const paid = Number(invoice?.total_paid) || 0;
+    const balance = total - paid;
+    if (invoice?.due_date && balance > 0.01) {
+      const daysUntilDue = getDaysUntilDue(invoice.due_date);
+      if (daysUntilDue <= 0) return 'due';
     }
+
+    if (status === 'billed') return 'billed';
 
     // Treat anything else (open/pending/etc.) as OPEN for display purposes
     return 'open';
