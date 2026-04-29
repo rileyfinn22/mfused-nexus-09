@@ -395,7 +395,6 @@ const VendorPOs = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-10"></TableHead>
                         <TableHead>PO Number</TableHead>
                         <TableHead>Vendor</TableHead>
                         <TableHead>Customer/Order</TableHead>
