@@ -575,7 +575,11 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                         <span className="text-xs text-muted-foreground">Not set</span>
                       )}
                     </div>
-                    <div className="col-span-2 flex gap-1">
+                    <div className="col-span-2 flex gap-1 items-center justify-end">
+                      <ExpandToggleButton
+                        expanded={isExpanded}
+                        onToggle={() => toggleExpandedRow(order.id)}
+                      />
                       <Button 
                         variant="ghost" 
                         size="sm" 
