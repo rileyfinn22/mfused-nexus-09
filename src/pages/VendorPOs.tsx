@@ -32,7 +32,7 @@ import { VendorBillsAgingBuckets } from "@/components/VendorBillsAgingBuckets";
 import { VendorPaymentsLedger } from "@/components/VendorPaymentsLedger";
 import { VendorBalanceBreakdown } from "@/components/VendorBalanceBreakdown";
 import { VendorAPStatementTab } from "@/components/VendorAPStatementTab";
-import { ExpandToggleButton, ExpandDetailsPanel, useVendorPOItems } from "@/components/RowExpandPanel";
+import { ExpandToggleButton, ExpandDetailsPanel, useVendorPOItems, useVendorPOPayments } from "@/components/RowExpandPanel";
 
 const VendorPOs = () => {
   const navigate = useNavigate();
@@ -395,7 +395,6 @@ const VendorPOs = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-10"></TableHead>
                         <TableHead>PO Number</TableHead>
                         <TableHead>Vendor</TableHead>
                         <TableHead>Customer/Order</TableHead>
@@ -410,11 +409,11 @@ const VendorPOs = () => {
                     <TableBody>
                       {loading ? (
                         <TableRow>
-                          <TableCell colSpan={10} className="text-center">Loading bills...</TableCell>
+                          <TableCell colSpan={9} className="text-center">Loading bills...</TableCell>
                         </TableRow>
                       ) : filteredPOs.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={10} className="text-center">
+                          <TableCell colSpan={9} className="text-center">
                             <div className="py-8">
                               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
                               <p className="text-muted-foreground">No vendor bills found</p>
@@ -445,12 +444,6 @@ const VendorPOs = () => {
                                 }
                               }}
                             >
-                              <TableCell className="w-10">
-                                <ExpandToggleButton
-                                  expanded={detailExpanded}
-                                  onToggle={() => toggleDetailRow(po.id)}
-                                />
-                              </TableCell>
                               <TableCell className="font-medium">{po.po_number}</TableCell>
                               <TableCell>{po.vendors?.name || 'Unassigned'}</TableCell>
                               <TableCell>
@@ -482,7 +475,11 @@ const VendorPOs = () => {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <div className="flex gap-2 justify-end">
+                                <div className="flex gap-2 justify-end items-center">
+                                  <ExpandToggleButton
+                                    expanded={detailExpanded}
+                                    onToggle={() => toggleDetailRow(po.id)}
+                                  />
                                   <Button 
                                     variant="ghost" 
                                     size="sm"
@@ -511,7 +508,7 @@ const VendorPOs = () => {
                             </TableRow>
                             {detailExpanded && (
                               <TableRow className="bg-transparent hover:bg-transparent">
-                                <TableCell colSpan={10} className="p-0">
+                                <TableCell colSpan={9} className="p-0">
                                   <VendorPORowExpanded po={po} />
                                 </TableCell>
                               </TableRow>
@@ -583,6 +580,7 @@ const VendorPOs = () => {
 
 function VendorPORowExpanded({ po }: { po: any }) {
   const { items, loading } = useVendorPOItems(po.id, true);
+  const { payments, loading: paymentsLoading } = useVendorPOPayments(po.id, true);
   const total = po.final_total ?? po.total ?? 0;
   const paid = po.total_paid || 0;
   return (
@@ -607,6 +605,9 @@ function VendorPORowExpanded({ po }: { po: any }) {
         { key: "line_total", label: "Line $", render: (r) => `$${(Number(r.quantity || 0) * Number(r.unit_cost || 0)).toFixed(2)}` },
       ]}
       emptyItemsLabel="No PO line items"
+      payments={payments}
+      paymentsLoading={paymentsLoading}
+      paymentsLabel="Vendor Payments"
     />
   );
 }

@@ -501,15 +501,9 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                     className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors even:bg-muted/40"
                   >
                     <div className="col-span-2 space-y-1">
-                      <div className="flex items-center gap-1">
-                        <ExpandToggleButton
-                          expanded={isExpanded}
-                          onToggle={() => toggleExpandedRow(order.id)}
-                        />
-                        <div className="font-medium font-mono text-base">{order.order_number}</div>
-                      </div>
+                      <div className="font-medium font-mono text-base">{order.order_number}</div>
                       {orderTypeInfo.show && (
-                        <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal ml-8`}>
+                        <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
                           <OrderIcon className="h-2.5 w-2.5" />
                           {orderTypeInfo.label}
                         </Badge>
@@ -581,7 +575,11 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                         <span className="text-xs text-muted-foreground">Not set</span>
                       )}
                     </div>
-                    <div className="col-span-2 flex gap-1">
+                    <div className="col-span-2 flex gap-1 items-center justify-end">
+                      <ExpandToggleButton
+                        expanded={isExpanded}
+                        onToggle={() => toggleExpandedRow(order.id)}
+                      />
                       <Button 
                         variant="ghost" 
                         size="sm" 

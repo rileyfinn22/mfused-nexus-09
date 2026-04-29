@@ -29,7 +29,7 @@ import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
-import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems } from "@/components/RowExpandPanel";
+import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -646,10 +646,6 @@ const Invoices = () => {
                 >
                   <div className="col-span-2">
                     <div className="flex items-center gap-2">
-                      <ExpandToggleButton
-                        expanded={detailExpanded}
-                        onToggle={() => toggleDetailRow(invoice.id)}
-                      />
                       {isParent && hasChildren && (
                         <Button
                           variant="outline"
@@ -676,7 +672,7 @@ const Invoices = () => {
                           <Package className="h-3.5 w-3.5" />
                         </div>
                       )}
-                      <div className={`font-medium font-mono text-base ${isChild ? 'ml-1' : ''} ${!isParent || !hasChildren ? 'ml-10' : ''}`}>{invoice.invoice_number}</div>
+                      <div className={`font-medium font-mono text-base ${isChild ? 'ml-1' : ''}`}>{invoice.invoice_number}</div>
                       {showOverdueAlert && (
                         <Badge 
                           variant="outline" 
@@ -807,7 +803,11 @@ const Invoices = () => {
                       {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
                     </Badge>
                   </div>
-                  <div className="col-span-2 flex gap-1">
+                  <div className="col-span-2 flex gap-1 items-center justify-end">
+                    <ExpandToggleButton
+                      expanded={detailExpanded}
+                      onToggle={() => toggleDetailRow(invoice.id)}
+                    />
                     {isVibeAdmin && (
                       <>
                         <Button
@@ -1040,6 +1040,7 @@ const Invoices = () => {
 
 function InvoiceRowExpanded({ invoice }: { invoice: any }) {
   const { items, loading } = useInvoiceItems(invoice.id, true);
+  const { payments, loading: paymentsLoading } = useInvoicePayments(invoice.id, true);
   return (
     <ExpandDetailsPanel
       details={[
@@ -1062,6 +1063,8 @@ function InvoiceRowExpanded({ invoice }: { invoice: any }) {
         { key: "line_total", label: "Line $", render: (r) => `$${(Number(r.quantity || 0) * Number(r.unit_price || 0)).toFixed(2)}` },
       ]}
       emptyItemsLabel="No line items recorded"
+      payments={payments}
+      paymentsLoading={paymentsLoading}
     />
   );
 }

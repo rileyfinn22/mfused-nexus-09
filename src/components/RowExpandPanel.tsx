@@ -47,12 +47,20 @@ export function ExpandDetailsPanel({
   itemColumns,
   emptyItemsLabel = "No line items",
   loading,
+  payments,
+  paymentsLoading,
+  paymentsLabel = "Payments",
+  emptyPaymentsLabel = "No payments recorded",
 }: {
   details: DetailItem[];
   items?: any[];
   itemColumns?: { key: string; label: string; render?: (row: any) => React.ReactNode; className?: string }[];
   emptyItemsLabel?: string;
   loading?: boolean;
+  payments?: any[] | null;
+  paymentsLoading?: boolean;
+  paymentsLabel?: string;
+  emptyPaymentsLabel?: string;
 }) {
   return (
     <div className="bg-muted/30 border-t border-border px-6 py-4 space-y-4">
@@ -96,6 +104,39 @@ export function ExpandDetailsPanel({
                           {c.render ? c.render(row) : row[c.key] ?? "—"}
                         </td>
                       ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+      {payments !== undefined && (
+        <div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{paymentsLabel}</div>
+          {paymentsLoading ? (
+            <div className="text-sm text-muted-foreground py-2">Loading payments…</div>
+          ) : !payments || payments.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-2">{emptyPaymentsLabel}</div>
+          ) : (
+            <div className="rounded-md border border-border bg-background overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Method</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Reference</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((p, idx) => (
+                    <tr key={p.id || idx} className="border-t border-border">
+                      <td className="px-3 py-2">{p.payment_date ? new Date(p.payment_date).toLocaleDateString() : "—"}</td>
+                      <td className="px-3 py-2 capitalize">{(p.payment_method || "—").toString().replace(/_/g, " ")}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{p.reference_number || "—"}</td>
+                      <td className="px-3 py-2 text-right font-medium text-success">${Number(p.amount || 0).toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -202,4 +243,66 @@ export function useVendorPOItems(poId: string | null, enabled: boolean) {
   }, [poId, enabled, items]);
 
   return { items, loading };
+}
+
+/**
+ * Lazy-loads invoice payments when the row is expanded.
+ */
+export function useInvoicePayments(invoiceId: string | null, enabled: boolean) {
+  const [payments, setPayments] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !invoiceId || payments !== null) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const { data } = await supabase
+          .from("payments")
+          .select("id, amount, payment_method, reference_number, payment_date")
+          .eq("invoice_id", invoiceId)
+          .order("payment_date", { ascending: false });
+        if (!cancelled) setPayments(data || []);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [invoiceId, enabled, payments]);
+
+  return { payments, loading };
+}
+
+/**
+ * Lazy-loads vendor PO payments when the row is expanded.
+ */
+export function useVendorPOPayments(poId: string | null, enabled: boolean) {
+  const [payments, setPayments] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !poId || payments !== null) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const { data } = await supabase
+          .from("vendor_po_payments")
+          .select("id, amount, payment_method, reference_number, payment_date")
+          .eq("vendor_po_id", poId)
+          .order("payment_date", { ascending: false });
+        if (!cancelled) setPayments(data || []);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [poId, enabled, payments]);
+
+  return { payments, loading };
 }
