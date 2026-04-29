@@ -803,7 +803,11 @@ const Invoices = () => {
                       {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
                     </Badge>
                   </div>
-                  <div className="col-span-2 flex gap-1">
+                  <div className="col-span-2 flex gap-1 items-center justify-end">
+                    <ExpandToggleButton
+                      expanded={detailExpanded}
+                      onToggle={() => toggleDetailRow(invoice.id)}
+                    />
                     {isVibeAdmin && (
                       <>
                         <Button
