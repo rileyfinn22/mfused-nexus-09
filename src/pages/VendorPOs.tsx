@@ -444,12 +444,6 @@ const VendorPOs = () => {
                                 }
                               }}
                             >
-                              <TableCell className="w-10">
-                                <ExpandToggleButton
-                                  expanded={detailExpanded}
-                                  onToggle={() => toggleDetailRow(po.id)}
-                                />
-                              </TableCell>
                               <TableCell className="font-medium">{po.po_number}</TableCell>
                               <TableCell>{po.vendors?.name || 'Unassigned'}</TableCell>
                               <TableCell>
