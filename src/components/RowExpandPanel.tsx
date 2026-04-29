@@ -112,6 +112,39 @@ export function ExpandDetailsPanel({
           )}
         </div>
       )}
+      {payments !== undefined && (
+        <div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{paymentsLabel}</div>
+          {paymentsLoading ? (
+            <div className="text-sm text-muted-foreground py-2">Loading payments…</div>
+          ) : !payments || payments.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-2">{emptyPaymentsLabel}</div>
+          ) : (
+            <div className="rounded-md border border-border bg-background overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Method</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Reference</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((p, idx) => (
+                    <tr key={p.id || idx} className="border-t border-border">
+                      <td className="px-3 py-2">{p.payment_date ? new Date(p.payment_date).toLocaleDateString() : "—"}</td>
+                      <td className="px-3 py-2 capitalize">{(p.payment_method || "—").toString().replace(/_/g, " ")}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{p.reference_number || "—"}</td>
+                      <td className="px-3 py-2 text-right font-medium text-success">${Number(p.amount || 0).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
