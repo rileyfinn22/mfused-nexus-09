@@ -47,12 +47,20 @@ export function ExpandDetailsPanel({
   itemColumns,
   emptyItemsLabel = "No line items",
   loading,
+  payments,
+  paymentsLoading,
+  paymentsLabel = "Payments",
+  emptyPaymentsLabel = "No payments recorded",
 }: {
   details: DetailItem[];
   items?: any[];
   itemColumns?: { key: string; label: string; render?: (row: any) => React.ReactNode; className?: string }[];
   emptyItemsLabel?: string;
   loading?: boolean;
+  payments?: any[] | null;
+  paymentsLoading?: boolean;
+  paymentsLabel?: string;
+  emptyPaymentsLabel?: string;
 }) {
   return (
     <div className="bg-muted/30 border-t border-border px-6 py-4 space-y-4">
