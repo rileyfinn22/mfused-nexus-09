@@ -41,7 +41,8 @@ export function RecordPaymentDialog({ open, onOpenChange, invoice, onSuccess }: 
       }
 
       const remainingBalance = invoice.total - (invoice.total_paid || 0);
-      if (paymentAmount > remainingBalance) {
+      // Allow up to 1 cent over the computed balance to handle sub-cent rounding (totals stored with 3+ decimals)
+      if (paymentAmount > remainingBalance + 0.01) {
         toast({
           title: "Amount Too Large",
           description: `Payment amount cannot exceed remaining balance of $${remainingBalance.toFixed(2)}`,
