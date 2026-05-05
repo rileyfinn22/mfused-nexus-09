@@ -48,6 +48,7 @@ import { normalizeStorageObjectPath } from "@/lib/storageUrl";
 interface PriceBreak {
   qty: number;
   unit_price: number;
+  label?: string;
 }
 
 interface QuoteItem {
