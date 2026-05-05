@@ -218,15 +218,18 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       rowKinds.push('product');
 
       item.price_breaks.forEach((pb, i) => {
-        const label = pb.label?.trim() ? pb.label : `Option ${i + 1}`;
+        const hasCustomLabel = !!pb.label?.trim();
+        const label = hasCustomLabel ? pb.label! : `Option ${i + 1}`;
         const noteSuffix = pb.note?.trim() ? `\n${pb.note.trim()}` : '';
         const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
 
         if (tiers) {
-          tableBody.push([
-            { content: `${label}${noteSuffix}`, colSpan: 4 }
-          ]);
-          rowKinds.push('option');
+          if (hasCustomLabel || pb.note?.trim()) {
+            tableBody.push([
+              { content: `${hasCustomLabel ? label : ''}${noteSuffix}`.trim(), colSpan: 4 }
+            ]);
+            rowKinds.push('option');
+          }
           tiers.forEach((t) => {
             const tNote = t.note?.trim() ? `\n${t.note.trim()}` : '';
             tableBody.push([
