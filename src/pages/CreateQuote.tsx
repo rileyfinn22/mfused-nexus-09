@@ -342,6 +342,7 @@ const CreateQuote = () => {
     setValidUntil(quote.valid_until ? quote.valid_until.split('T')[0] : "");
     setShippingCost(quote.shipping_cost || 0);
     setShippingMethod((quote as any).shipping_method || "");
+    setLeadTime((quote as any).lead_time || "");
     setExistingFileUrl(quote.uploaded_file_url);
     setExistingFilename(quote.uploaded_filename);
 
