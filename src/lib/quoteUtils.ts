@@ -229,9 +229,9 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
           tiers.forEach((t) => {
             const tNote = t.note?.trim() ? `\n${t.note.trim()}` : '';
             tableBody.push([
-              tNote ? `${t.qty.toLocaleString()}${tNote}` : `${t.qty.toLocaleString()}`,
-              formatUnitPrice(t.unit_price),
+              tNote ? t.note!.trim() : '',
               t.qty.toLocaleString(),
+              formatUnitPrice(t.unit_price),
               formatCurrency(t.qty * t.unit_price)
             ]);
             rowKinds.push('tier');
@@ -239,8 +239,8 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         } else {
           tableBody.push([
             noteSuffix ? `${pb.note!.trim()}` : '',
-            formatUnitPrice(pb.unit_price),
             pb.qty.toLocaleString(),
+            formatUnitPrice(pb.unit_price),
             formatCurrency(pb.qty * pb.unit_price)
           ]);
           rowKinds.push('tier');
@@ -249,8 +249,8 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     } else {
       tableBody.push([
         `${headerLine}${descLine}`,
-        formatUnitPrice(item.unit_price),
         item.quantity.toLocaleString(),
+        formatUnitPrice(item.unit_price),
         formatCurrency(item.total)
       ]);
       rowKinds.push('simple');
@@ -259,7 +259,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
 
   autoTable(doc, {
     startY: yPos,
-    head: [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']],
+    head: [['ITEM', 'QTY', 'UNIT PRICE', 'TOTAL']],
     body: tableBody,
     theme: 'plain',
     headStyles: {
