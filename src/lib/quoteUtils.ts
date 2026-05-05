@@ -1,10 +1,16 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+interface QuantityTier {
+  qty: number;
+  unit_price: number;
+}
+
 interface PriceBreak {
   qty: number;
   unit_price: number;
   label?: string;
+  tiers?: QuantityTier[];
 }
 
 interface QuoteItem {
@@ -202,12 +208,27 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       ]);
       item.price_breaks.forEach((pb, i) => {
         const label = pb.label?.trim() ? pb.label : `Option ${i + 1}`;
-        tableBody.push([
-          `  ${label}`,
-          formatUnitPrice(pb.unit_price),
-          pb.qty.toLocaleString(),
-          formatCurrency(pb.qty * pb.unit_price)
-        ]);
+        const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
+        if (tiers) {
+          tableBody.push([
+            { content: `  ${label}`, colSpan: 4, styles: { fontStyle: 'bold' } }
+          ]);
+          tiers.forEach((t) => {
+            tableBody.push([
+              `      ${t.qty.toLocaleString()} units`,
+              formatUnitPrice(t.unit_price),
+              t.qty.toLocaleString(),
+              formatCurrency(t.qty * t.unit_price)
+            ]);
+          });
+        } else {
+          tableBody.push([
+            `  ${label}`,
+            formatUnitPrice(pb.unit_price),
+            pb.qty.toLocaleString(),
+            formatCurrency(pb.qty * pb.unit_price)
+          ]);
+        }
       });
     } else {
       tableBody.push([

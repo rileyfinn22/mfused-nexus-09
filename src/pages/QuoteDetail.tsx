@@ -61,10 +61,16 @@ import {
 import { generateQuotePDF } from "@/lib/quoteUtils";
 import { SendToVendorDialog } from "@/components/SendToVendorDialog";
 
+interface QuantityTier {
+  qty: number;
+  unit_price: number;
+}
+
 interface PriceBreak {
   qty: number;
   unit_price: number;
   label?: string;
+  tiers?: QuantityTier[];
 }
 
 interface QuoteItem {
@@ -941,17 +947,42 @@ const QuoteDetail = () => {
                                   </div>
                                 </TableCell>
                               </TableRow>
-                              {/* One row per shipping option */}
-                              {item.price_breaks.map((pb, idx) => (
-                                <TableRow key={`${item.id}-opt-${idx}`}>
-                                  <TableCell colSpan={2} className="pl-8">
-                                    <span className="text-sm font-medium">{pb.label?.trim() ? pb.label : `Option ${idx + 1}`}</span>
-                                  </TableCell>
-                                  <TableCell className="text-right">{pb.qty.toLocaleString()}</TableCell>
-                                  <TableCell className="text-right">{formatUnitPrice(pb.unit_price)}</TableCell>
-                                  <TableCell className="text-right font-medium">{formatCurrency(pb.qty * pb.unit_price)}</TableCell>
-                                </TableRow>
-                              ))}
+                              {/* Rows per shipping option (with optional nested qty tiers) */}
+                              {item.price_breaks.map((pb, idx) => {
+                                const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
+                                const optLabel = pb.label?.trim() ? pb.label : `Option ${idx + 1}`;
+                                if (!tiers) {
+                                  return (
+                                    <TableRow key={`${item.id}-opt-${idx}`}>
+                                      <TableCell colSpan={2} className="pl-8">
+                                        <span className="text-sm font-medium">{optLabel}</span>
+                                      </TableCell>
+                                      <TableCell className="text-right">{pb.qty.toLocaleString()}</TableCell>
+                                      <TableCell className="text-right">{formatUnitPrice(pb.unit_price)}</TableCell>
+                                      <TableCell className="text-right font-medium">{formatCurrency(pb.qty * pb.unit_price)}</TableCell>
+                                    </TableRow>
+                                  );
+                                }
+                                return (
+                                  <React.Fragment key={`${item.id}-opt-${idx}`}>
+                                    <TableRow>
+                                      <TableCell colSpan={5} className="pl-8 py-2 bg-muted/10">
+                                        <span className="text-sm font-semibold">{optLabel}</span>
+                                      </TableCell>
+                                    </TableRow>
+                                    {tiers.map((t, tIdx) => (
+                                      <TableRow key={`${item.id}-opt-${idx}-t-${tIdx}`}>
+                                        <TableCell colSpan={2} className="pl-14 text-sm text-muted-foreground">
+                                          {t.qty.toLocaleString()} units
+                                        </TableCell>
+                                        <TableCell className="text-right">{t.qty.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right">{formatUnitPrice(t.unit_price)}</TableCell>
+                                        <TableCell className="text-right font-medium">{formatCurrency(t.qty * t.unit_price)}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </React.Fragment>
+                                );
+                              })}
                             </React.Fragment>
                           );
                         }
