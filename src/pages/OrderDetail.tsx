@@ -55,6 +55,7 @@ const OrderDetail = () => {
   const [vibeNotes, setVibeNotes] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [isFinance, setIsFinance] = useState(false);
   const [showVendorDialog, setShowVendorDialog] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
