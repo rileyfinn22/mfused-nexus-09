@@ -423,7 +423,7 @@ const QuoteDetail = () => {
     : ['draft', 'pending_review', 'sent', 'rejected'].includes(quote.status); // Customer can delete their drafts, requests, and received/rejected quotes
 
   const handleDownloadPDF = async () => {
-    await generateQuotePDF({ ...quote, shipping_method: (quote as any).shipping_method || null }, items);
+    await generateQuotePDF({ ...quote, shipping_method: (quote as any).shipping_method || null, lead_time: (quote as any).lead_time || null }, items);
   };
 
   const generateOrderNumber = async () => {
