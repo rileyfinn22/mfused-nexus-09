@@ -120,6 +120,7 @@ const CreateQuote = () => {
   const [internalNotes, setInternalNotes] = useState("");
   const [terms, setTerms] = useState("");
   const [validUntil, setValidUntil] = useState("");
+  const [leadTime, setLeadTime] = useState("");
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingMethod, setShippingMethod] = useState("");
   const [items, setItems] = useState<QuoteItem[]>([]);
