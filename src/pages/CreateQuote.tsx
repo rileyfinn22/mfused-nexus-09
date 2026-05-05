@@ -626,6 +626,39 @@ const CreateQuote = () => {
     setItems(newItems);
   };
 
+  const addQuantityTier = (itemIndex: number, optionIndex: number) => {
+    const newItems = [...items];
+    const opt = newItems[itemIndex].price_breaks[optionIndex];
+    const tiers = opt.tiers || [{ qty: opt.qty || 1, unit_price: opt.unit_price || 0 }];
+    const last = tiers[tiers.length - 1];
+    tiers.push({ qty: (last?.qty || 1) * 2, unit_price: last?.unit_price || 0 });
+    opt.tiers = tiers;
+    setItems(newItems);
+  };
+
+  const updateQuantityTier = (
+    itemIndex: number,
+    optionIndex: number,
+    tierIndex: number,
+    field: 'qty' | 'unit_price',
+    value: number
+  ) => {
+    const newItems = [...items];
+    const opt = newItems[itemIndex].price_breaks[optionIndex];
+    if (!opt.tiers) return;
+    opt.tiers[tierIndex] = { ...opt.tiers[tierIndex], [field]: value };
+    setItems(newItems);
+  };
+
+  const removeQuantityTier = (itemIndex: number, optionIndex: number, tierIndex: number) => {
+    const newItems = [...items];
+    const opt = newItems[itemIndex].price_breaks[optionIndex];
+    if (!opt.tiers) return;
+    opt.tiers.splice(tierIndex, 1);
+    if (opt.tiers.length === 0) delete opt.tiers;
+    setItems(newItems);
+  };
+
   const formatQty = (qty: number) => {
     return qty.toLocaleString();
   };
