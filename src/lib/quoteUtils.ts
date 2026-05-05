@@ -201,9 +201,9 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`, colSpan: 4, styles: { fontStyle: 'bold', fillColor: COLORS.lightGray } }
       ]);
       item.price_breaks.forEach((pb, i) => {
-        const label = pb.label?.trim() ? pb.label : `Tier ${i + 1}`;
+        const label = pb.label?.trim() ? pb.label : `Option ${i + 1}`;
         tableBody.push([
-          `  ${label}: ${pb.qty.toLocaleString()} units`,
+          `  ${label}`,
           formatUnitPrice(pb.unit_price),
           pb.qty.toLocaleString(),
           formatCurrency(pb.qty * pb.unit_price)
