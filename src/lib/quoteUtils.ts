@@ -224,12 +224,6 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
 
         if (tiers) {
-          if (hasCustomLabel || pb.note?.trim()) {
-            tableBody.push([
-              { content: `${hasCustomLabel ? label : ''}${noteSuffix}`.trim(), colSpan: 4 }
-            ]);
-            rowKinds.push('option');
-          }
           tiers.forEach((t) => {
             const tNote = t.note?.trim() ? `\n${t.note.trim()}` : '';
             tableBody.push([
@@ -305,12 +299,11 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
           data.cell.styles.cellPadding = { top: 4, right: 4, bottom: 4, left: 8 };
         }
       } else if (kind === 'tier') {
+        data.cell.styles.fontStyle = 'bold';
         if (data.column.index === 0) {
           data.cell.styles.cellPadding = { top: 3, right: 4, bottom: 3, left: 16 };
           data.cell.styles.textColor = COLORS.mediumGray;
-          data.cell.styles.fontStyle = 'bold';
         } else {
-          data.cell.styles.fontStyle = 'bold';
           data.cell.styles.textColor = COLORS.darkGray;
         }
       }
