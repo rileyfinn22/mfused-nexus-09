@@ -1586,6 +1586,7 @@ export type Database = {
           quote_id: string | null
           shipping_city: string
           shipping_cost: number | null
+          shipping_method: string | null
           shipping_name: string
           shipping_state: string
           shipping_street: string
@@ -1595,7 +1596,9 @@ export type Database = {
           tax: number
           terms: string | null
           total: number
+          tracking_carrier: string | null
           tracking_number: string | null
+          tracking_url: string | null
           updated_at: string
           vibe_approved: boolean
           vibe_approved_at: string | null
@@ -1645,6 +1648,7 @@ export type Database = {
           quote_id?: string | null
           shipping_city: string
           shipping_cost?: number | null
+          shipping_method?: string | null
           shipping_name: string
           shipping_state: string
           shipping_street: string
@@ -1654,7 +1658,9 @@ export type Database = {
           tax?: number
           terms?: string | null
           total?: number
+          tracking_carrier?: string | null
           tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
           vibe_approved?: boolean
           vibe_approved_at?: string | null
@@ -1704,6 +1710,7 @@ export type Database = {
           quote_id?: string | null
           shipping_city?: string
           shipping_cost?: number | null
+          shipping_method?: string | null
           shipping_name?: string
           shipping_state?: string
           shipping_street?: string
@@ -1713,7 +1720,9 @@ export type Database = {
           tax?: number
           terms?: string | null
           total?: number
+          tracking_carrier?: string | null
           tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
           vibe_approved?: boolean
           vibe_approved_at?: string | null
@@ -3445,6 +3454,7 @@ export type Database = {
           ship_to_street: string | null
           ship_to_zip: string | null
           shipping_cost: number
+          shipping_method: string | null
           status: string
           total: number
           total_paid: number | null
@@ -3479,6 +3489,7 @@ export type Database = {
           ship_to_street?: string | null
           ship_to_zip?: string | null
           shipping_cost?: number
+          shipping_method?: string | null
           status?: string
           total?: number
           total_paid?: number | null
@@ -3513,6 +3524,7 @@ export type Database = {
           ship_to_street?: string | null
           ship_to_zip?: string | null
           shipping_cost?: number
+          shipping_method?: string | null
           status?: string
           total?: number
           total_paid?: number | null
