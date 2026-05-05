@@ -1,10 +1,16 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+interface QuantityTier {
+  qty: number;
+  unit_price: number;
+}
+
 interface PriceBreak {
   qty: number;
   unit_price: number;
   label?: string;
+  tiers?: QuantityTier[];
 }
 
 interface QuoteItem {
