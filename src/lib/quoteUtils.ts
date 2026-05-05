@@ -218,12 +218,14 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       rowKinds.push('product');
 
       item.price_breaks.forEach((pb, i) => {
-        const hasCustomLabel = !!pb.label?.trim();
-        const label = hasCustomLabel ? pb.label! : `Option ${i + 1}`;
         const noteSuffix = pb.note?.trim() ? `\n${pb.note.trim()}` : '';
         const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
 
         if (tiers) {
+          if (noteSuffix) {
+            tableBody.push([{ content: pb.note!.trim(), colSpan: 4 }]);
+            rowKinds.push('option');
+          }
           tiers.forEach((t) => {
             const tNote = t.note?.trim() ? `\n${t.note.trim()}` : '';
             tableBody.push([
@@ -236,12 +238,12 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
           });
         } else {
           tableBody.push([
-            `${label}${noteSuffix}`,
+            noteSuffix ? `${pb.note!.trim()}` : '',
             formatUnitPrice(pb.unit_price),
             pb.qty.toLocaleString(),
             formatCurrency(pb.qty * pb.unit_price)
           ]);
-          rowKinds.push('option');
+          rowKinds.push('tier');
         }
       });
     } else {
@@ -286,11 +288,11 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       if (data.section !== 'body') return;
       const kind = rowKinds[data.row.index];
       if (kind === 'product') {
-        data.cell.styles.fillColor = COLORS.primaryGreen;
-        data.cell.styles.textColor = 255;
+        data.cell.styles.fillColor = COLORS.lightGray;
+        data.cell.styles.textColor = COLORS.darkGray;
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.fontSize = 10;
-        data.cell.styles.cellPadding = { top: 6, right: 4, bottom: 6, left: 4 };
+        data.cell.styles.cellPadding = { top: 5, right: 4, bottom: 5, left: 4 };
       } else if (kind === 'option') {
         data.cell.styles.fillColor = [240, 245, 235];
         data.cell.styles.fontStyle = 'bold';
