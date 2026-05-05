@@ -2816,6 +2816,7 @@ export type Database = {
           description: string | null
           id: string
           internal_notes: string | null
+          lead_time: string | null
           parent_quote_id: string | null
           quote_number: string
           request_notes: string | null
@@ -2854,6 +2855,7 @@ export type Database = {
           description?: string | null
           id?: string
           internal_notes?: string | null
+          lead_time?: string | null
           parent_quote_id?: string | null
           quote_number: string
           request_notes?: string | null
@@ -2892,6 +2894,7 @@ export type Database = {
           description?: string | null
           id?: string
           internal_notes?: string | null
+          lead_time?: string | null
           parent_quote_id?: string | null
           quote_number?: string
           request_notes?: string | null

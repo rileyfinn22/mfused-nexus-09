@@ -64,12 +64,14 @@ import { SendToVendorDialog } from "@/components/SendToVendorDialog";
 interface QuantityTier {
   qty: number;
   unit_price: number;
+  note?: string;
 }
 
 interface PriceBreak {
   qty: number;
   unit_price: number;
   label?: string;
+  note?: string;
   tiers?: QuantityTier[];
 }
 
@@ -421,7 +423,7 @@ const QuoteDetail = () => {
     : ['draft', 'pending_review', 'sent', 'rejected'].includes(quote.status); // Customer can delete their drafts, requests, and received/rejected quotes
 
   const handleDownloadPDF = async () => {
-    await generateQuotePDF({ ...quote, shipping_method: (quote as any).shipping_method || null }, items);
+    await generateQuotePDF({ ...quote, shipping_method: (quote as any).shipping_method || null, lead_time: (quote as any).lead_time || null }, items);
   };
 
   const generateOrderNumber = async () => {
@@ -962,7 +964,10 @@ const QuoteDetail = () => {
                                   return (
                                     <TableRow key={`${item.id}-opt-${idx}`}>
                                       <TableCell colSpan={2} className="pl-8">
-                                        <span className="text-sm font-medium">{optLabel}</span>
+                                        <div>
+                                          <span className="text-sm font-medium">{optLabel}</span>
+                                          {pb.note && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{pb.note}</p>}
+                                        </div>
                                       </TableCell>
                                       <TableCell className="text-right">{pb.qty.toLocaleString()}</TableCell>
                                       <TableCell className="text-right">{formatUnitPrice(pb.unit_price)}</TableCell>
@@ -974,13 +979,19 @@ const QuoteDetail = () => {
                                   <React.Fragment key={`${item.id}-opt-${idx}`}>
                                     <TableRow>
                                       <TableCell colSpan={5} className="pl-8 py-2 bg-muted/10">
-                                        <span className="text-sm font-semibold">{optLabel}</span>
+                                        <div>
+                                          <span className="text-sm font-semibold">{optLabel}</span>
+                                          {pb.note && <p className="text-xs text-muted-foreground font-normal mt-0.5 whitespace-pre-wrap">{pb.note}</p>}
+                                        </div>
                                       </TableCell>
                                     </TableRow>
                                     {tiers.map((t, tIdx) => (
                                       <TableRow key={`${item.id}-opt-${idx}-t-${tIdx}`}>
                                         <TableCell colSpan={2} className="pl-14 text-sm text-muted-foreground">
-                                          {t.qty.toLocaleString()} units
+                                          <div>
+                                            <span>{t.qty.toLocaleString()} units</span>
+                                            {t.note && <p className="text-xs text-muted-foreground/80 mt-0.5 whitespace-pre-wrap">{t.note}</p>}
+                                          </div>
                                         </TableCell>
                                         <TableCell className="text-right">{t.qty.toLocaleString()}</TableCell>
                                         <TableCell className="text-right">{formatUnitPrice(t.unit_price)}</TableCell>
@@ -1300,6 +1311,12 @@ const QuoteDetail = () => {
                   <p className="font-medium">
                     {(quote as any).shipping_method === 'domestic' ? 'Domestic' : (quote as any).shipping_method === 'air' ? 'Air Freight' : (quote as any).shipping_method === 'ocean' ? 'Ocean Freight' : (quote as any).shipping_method}
                   </p>
+                </div>
+              )}
+              {(quote as any).lead_time && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Lead Time</p>
+                  <p className="font-medium whitespace-pre-wrap">{(quote as any).lead_time}</p>
                 </div>
               )}
               {quote.sent_at && (

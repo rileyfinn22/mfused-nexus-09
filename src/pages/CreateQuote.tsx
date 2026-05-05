@@ -48,12 +48,14 @@ import { normalizeStorageObjectPath } from "@/lib/storageUrl";
 interface QuantityTier {
   qty: number;
   unit_price: number;
+  note?: string;
 }
 
 interface PriceBreak {
   qty: number;
   unit_price: number;
   label?: string;
+  note?: string;
   tiers?: QuantityTier[];
 }
 
@@ -118,6 +120,7 @@ const CreateQuote = () => {
   const [internalNotes, setInternalNotes] = useState("");
   const [terms, setTerms] = useState("");
   const [validUntil, setValidUntil] = useState("");
+  const [leadTime, setLeadTime] = useState("");
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingMethod, setShippingMethod] = useState("");
   const [items, setItems] = useState<QuoteItem[]>([]);
@@ -339,6 +342,7 @@ const CreateQuote = () => {
     setValidUntil(quote.valid_until ? quote.valid_until.split('T')[0] : "");
     setShippingCost(quote.shipping_cost || 0);
     setShippingMethod((quote as any).shipping_method || "");
+    setLeadTime((quote as any).lead_time || "");
     setExistingFileUrl(quote.uploaded_file_url);
     setExistingFilename(quote.uploaded_filename);
 
@@ -640,13 +644,13 @@ const CreateQuote = () => {
     itemIndex: number,
     optionIndex: number,
     tierIndex: number,
-    field: 'qty' | 'unit_price',
-    value: number
+    field: 'qty' | 'unit_price' | 'note',
+    value: number | string
   ) => {
     const newItems = [...items];
     const opt = newItems[itemIndex].price_breaks[optionIndex];
     if (!opt.tiers) return;
-    opt.tiers[tierIndex] = { ...opt.tiers[tierIndex], [field]: value };
+    opt.tiers[tierIndex] = { ...opt.tiers[tierIndex], [field]: value } as QuantityTier;
     setItems(newItems);
   };
 
@@ -711,6 +715,7 @@ const CreateQuote = () => {
         subtotal: calculateSubtotal(),
         shipping_cost: shippingCost,
         shipping_method: shippingMethod || null,
+        lead_time: leadTime || null,
         total: calculateTotal(),
         status: isVibeAdmin ? 'draft' : 'pending_review'
       };
@@ -1210,6 +1215,13 @@ const CreateQuote = () => {
                                                   onChange={(e) => updatePriceBreak(index, breakIndex, 'label', e.target.value)}
                                                   className="h-8 w-full max-w-xs font-medium"
                                                 />
+                                                <Input
+                                                  type="text"
+                                                  placeholder="Note (e.g. lead time, MOQ, etc.)"
+                                                  value={priceBreak.note || ''}
+                                                  onChange={(e) => updatePriceBreak(index, breakIndex, 'note', e.target.value)}
+                                                  className="h-8 w-full max-w-md text-xs"
+                                                />
                                                 {!tiers && (
                                                   <div className="flex items-center gap-2 flex-wrap">
                                                     <Label className="text-xs w-8">Qty</Label>
@@ -1274,39 +1286,48 @@ const CreateQuote = () => {
                                             {tiers && (
                                               <div className="ml-2 pl-3 border-l-2 border-border space-y-1.5">
                                                 {tiers.map((t, tIdx) => (
-                                                  <div key={tIdx} className="flex items-center gap-2 flex-wrap">
-                                                    <Label className="text-xs w-8">Qty</Label>
-                                                    <Input
-                                                      type="number"
-                                                      min="1"
-                                                      value={t.qty}
-                                                      onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'qty', parseInt(e.target.value) || 1)}
-                                                      className="h-8 w-32"
-                                                    />
-                                                    <Label className="text-xs w-16">Price Each</Label>
-                                                    <div className="relative">
-                                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                                  <div key={tIdx} className="space-y-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                      <Label className="text-xs w-8">Qty</Label>
                                                       <Input
                                                         type="number"
-                                                        min="0"
-                                                        step="any"
-                                                        value={t.unit_price}
-                                                        onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'unit_price', parseFloat(e.target.value) || 0)}
-                                                        className="h-8 w-28 pl-5"
+                                                        min="1"
+                                                        value={t.qty}
+                                                        onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'qty', parseInt(e.target.value) || 1)}
+                                                        className="h-8 w-32"
                                                       />
+                                                      <Label className="text-xs w-16">Price Each</Label>
+                                                      <div className="relative">
+                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                                        <Input
+                                                          type="number"
+                                                          min="0"
+                                                          step="any"
+                                                          value={t.unit_price}
+                                                          onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                          className="h-8 w-28 pl-5"
+                                                        />
+                                                      </div>
+                                                      <span className="text-xs text-muted-foreground">
+                                                        Total: <span className="font-medium text-foreground">{formatCurrency(t.qty * t.unit_price)}</span>
+                                                      </span>
+                                                      <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 w-7 p-0 text-destructive"
+                                                        onClick={() => removeQuantityTier(index, breakIndex, tIdx)}
+                                                      >
+                                                        <X className="h-3.5 w-3.5" />
+                                                      </Button>
                                                     </div>
-                                                    <span className="text-xs text-muted-foreground">
-                                                      Total: <span className="font-medium text-foreground">{formatCurrency(t.qty * t.unit_price)}</span>
-                                                    </span>
-                                                    <Button
-                                                      type="button"
-                                                      variant="ghost"
-                                                      size="sm"
-                                                      className="h-7 w-7 p-0 text-destructive"
-                                                      onClick={() => removeQuantityTier(index, breakIndex, tIdx)}
-                                                    >
-                                                      <X className="h-3.5 w-3.5" />
-                                                    </Button>
+                                                    <Input
+                                                      type="text"
+                                                      placeholder="Note (e.g. lead time)"
+                                                      value={t.note || ''}
+                                                      onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'note', e.target.value)}
+                                                      className="h-7 w-full max-w-md text-xs ml-10"
+                                                    />
                                                   </div>
                                                 ))}
                                               </div>
@@ -1870,6 +1891,14 @@ const CreateQuote = () => {
                     />
                   </div>
                 )}
+                <div className="space-y-2">
+                  <Label>Lead Time</Label>
+                  <Input
+                    value={leadTime}
+                    onChange={(e) => setLeadTime(e.target.value)}
+                    placeholder="e.g. 4-6 weeks production + 30 days shipping"
+                  />
+                </div>
               </CardContent>
             </Card>
 
