@@ -233,7 +233,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
           tiers.forEach((t) => {
             const tNote = t.note?.trim() ? `\n${t.note.trim()}` : '';
             tableBody.push([
-              `${t.qty.toLocaleString()} units${tNote}`,
+              tNote ? `${t.qty.toLocaleString()}${tNote}` : `${t.qty.toLocaleString()}`,
               formatUnitPrice(t.unit_price),
               t.qty.toLocaleString(),
               formatCurrency(t.qty * t.unit_price)
