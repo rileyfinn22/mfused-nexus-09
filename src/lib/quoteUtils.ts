@@ -180,6 +180,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       : quote.shipping_method;
     detailRows.push(['Shipping:', methodLabel]);
   }
+  if (quote.lead_time) detailRows.push(['Lead Time:', quote.lead_time]);
 
   detailRows.forEach(([label, value], i) => {
     const rowY = detailsStartY + i * 7;
