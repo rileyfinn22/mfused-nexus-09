@@ -37,6 +37,7 @@ import { InvoicePackingListSection } from "@/components/InvoicePackingListSectio
 import { calculateInvoiceTotals, blanketTotalItems, partialTotalItems } from "@/lib/invoiceTotals";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { triggerBlobFileDownload } from "@/lib/storageUrl";
+import { CARRIERS, getTrackingUrl } from "@/lib/trackingUtils";
 
 const InvoiceDetail = () => {
   const {
