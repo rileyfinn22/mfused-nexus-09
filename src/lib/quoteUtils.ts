@@ -224,12 +224,6 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
 
         if (tiers) {
-          if (hasCustomLabel || pb.note?.trim()) {
-            tableBody.push([
-              { content: `${hasCustomLabel ? label : ''}${noteSuffix}`.trim(), colSpan: 4 }
-            ]);
-            rowKinds.push('option');
-          }
           tiers.forEach((t) => {
             const tNote = t.note?.trim() ? `\n${t.note.trim()}` : '';
             tableBody.push([
