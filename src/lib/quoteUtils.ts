@@ -180,6 +180,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       : quote.shipping_method;
     detailRows.push(['Shipping:', methodLabel]);
   }
+  if (quote.lead_time) detailRows.push(['Lead Time:', quote.lead_time]);
 
   detailRows.forEach(([label, value], i) => {
     const rowY = detailsStartY + i * 7;
@@ -194,52 +195,66 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   yPos = Math.max(custY + 10, detailsStartY + detailRows.length * 7 + 10, yPos + 40);
 
   // ============ ITEMS TABLE ============
-  const tableBody: (string | { content: string; colSpan?: number; styles?: any })[][] = [];
+  type Row = (string | { content: string; colSpan?: number; styles?: any })[];
+  const tableBody: Row[] = [];
+  // Track row "kinds" so we can style per-row in didParseCell
+  const rowKinds: ('product' | 'option' | 'tier' | 'simple')[] = [];
 
   items.forEach((item) => {
     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
     const isDescriptionMode = item.quantity === 0 && item.description;
     const descLine = item.description ? `\n${item.description}` : '';
+    const headerLine = `${item.name}    ${item.sku}${item.state ? `  •  ${item.state}` : ''}`;
 
     if (isDescriptionMode) {
       tableBody.push([
-        { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}\n\n${item.description}`, colSpan: 4, styles: { fontStyle: 'normal' } }
+        { content: `${headerLine}\n\n${item.description}`, colSpan: 4 }
       ]);
+      rowKinds.push('product');
     } else if (hasPriceBreaks) {
       tableBody.push([
-        { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`, colSpan: 4, styles: { fontStyle: 'bold', fillColor: COLORS.lightGray } }
+        { content: `${headerLine}${descLine}`, colSpan: 4 }
       ]);
+      rowKinds.push('product');
+
       item.price_breaks.forEach((pb, i) => {
         const label = pb.label?.trim() ? pb.label : `Option ${i + 1}`;
+        const noteSuffix = pb.note?.trim() ? `\n${pb.note.trim()}` : '';
         const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
+
         if (tiers) {
           tableBody.push([
-            { content: `  ${label}`, colSpan: 4, styles: { fontStyle: 'bold' } }
+            { content: `${label}${noteSuffix}`, colSpan: 4 }
           ]);
+          rowKinds.push('option');
           tiers.forEach((t) => {
+            const tNote = t.note?.trim() ? `\n${t.note.trim()}` : '';
             tableBody.push([
-              `      ${t.qty.toLocaleString()} units`,
+              `${t.qty.toLocaleString()} units${tNote}`,
               formatUnitPrice(t.unit_price),
               t.qty.toLocaleString(),
               formatCurrency(t.qty * t.unit_price)
             ]);
+            rowKinds.push('tier');
           });
         } else {
           tableBody.push([
-            `  ${label}`,
+            `${label}${noteSuffix}`,
             formatUnitPrice(pb.unit_price),
             pb.qty.toLocaleString(),
             formatCurrency(pb.qty * pb.unit_price)
           ]);
+          rowKinds.push('option');
         }
       });
     } else {
       tableBody.push([
-        `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`,
+        `${headerLine}${descLine}`,
         formatUnitPrice(item.unit_price),
         item.quantity.toLocaleString(),
         formatCurrency(item.total)
       ]);
+      rowKinds.push('simple');
     }
   });
 
@@ -257,22 +272,42 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     },
     bodyStyles: {
       fontSize: 9,
-      cellPadding: 4,
+      cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
       textColor: COLORS.darkGray,
       lineWidth: 0
     },
-    alternateRowStyles: {
-      fillColor: COLORS.lightGray
-    },
     columnStyles: {
-      0: { cellWidth: 80 },
-      1: { halign: 'right', cellWidth: 35 },
-      2: { halign: 'center', cellWidth: 30 },
-      3: { halign: 'right', cellWidth: 35, fontStyle: 'bold' }
+      0: { cellWidth: 90 },
+      1: { halign: 'right', cellWidth: 30 },
+      2: { halign: 'right', cellWidth: 25 },
+      3: { halign: 'right', cellWidth: 37, fontStyle: 'bold' }
     },
     margin: { left: 14, right: 14 },
     showHead: 'firstPage',
-    tableLineWidth: 0
+    tableLineWidth: 0,
+    didParseCell: (data) => {
+      if (data.section !== 'body') return;
+      const kind = rowKinds[data.row.index];
+      if (kind === 'product') {
+        data.cell.styles.fillColor = COLORS.primaryGreen;
+        data.cell.styles.textColor = 255;
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.fontSize = 10;
+        data.cell.styles.cellPadding = { top: 6, right: 4, bottom: 6, left: 4 };
+      } else if (kind === 'option') {
+        data.cell.styles.fillColor = [240, 245, 235];
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.textColor = COLORS.darkGray;
+        if (data.column.index === 0) {
+          data.cell.styles.cellPadding = { top: 4, right: 4, bottom: 4, left: 8 };
+        }
+      } else if (kind === 'tier') {
+        if (data.column.index === 0) {
+          data.cell.styles.cellPadding = { top: 3, right: 4, bottom: 3, left: 16 };
+          data.cell.styles.textColor = COLORS.mediumGray;
+        }
+      }
+    }
   });
 
   const finalY = (doc as any).lastAutoTable.finalY + 10;
