@@ -45,10 +45,16 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { normalizeStorageObjectPath } from "@/lib/storageUrl";
 
+interface QuantityTier {
+  qty: number;
+  unit_price: number;
+}
+
 interface PriceBreak {
   qty: number;
   unit_price: number;
   label?: string;
+  tiers?: QuantityTier[];
 }
 
 interface QuoteItem {
