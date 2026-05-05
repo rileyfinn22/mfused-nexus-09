@@ -44,6 +44,7 @@ interface Quote {
   tax: number;
   shipping_cost: number;
   shipping_method: string | null;
+  lead_time?: string | null;
   total: number;
   created_at: string;
 }
