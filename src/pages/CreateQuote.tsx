@@ -1286,39 +1286,48 @@ const CreateQuote = () => {
                                             {tiers && (
                                               <div className="ml-2 pl-3 border-l-2 border-border space-y-1.5">
                                                 {tiers.map((t, tIdx) => (
-                                                  <div key={tIdx} className="flex items-center gap-2 flex-wrap">
-                                                    <Label className="text-xs w-8">Qty</Label>
-                                                    <Input
-                                                      type="number"
-                                                      min="1"
-                                                      value={t.qty}
-                                                      onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'qty', parseInt(e.target.value) || 1)}
-                                                      className="h-8 w-32"
-                                                    />
-                                                    <Label className="text-xs w-16">Price Each</Label>
-                                                    <div className="relative">
-                                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                                  <div key={tIdx} className="space-y-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                      <Label className="text-xs w-8">Qty</Label>
                                                       <Input
                                                         type="number"
-                                                        min="0"
-                                                        step="any"
-                                                        value={t.unit_price}
-                                                        onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'unit_price', parseFloat(e.target.value) || 0)}
-                                                        className="h-8 w-28 pl-5"
+                                                        min="1"
+                                                        value={t.qty}
+                                                        onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'qty', parseInt(e.target.value) || 1)}
+                                                        className="h-8 w-32"
                                                       />
+                                                      <Label className="text-xs w-16">Price Each</Label>
+                                                      <div className="relative">
+                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                                        <Input
+                                                          type="number"
+                                                          min="0"
+                                                          step="any"
+                                                          value={t.unit_price}
+                                                          onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                          className="h-8 w-28 pl-5"
+                                                        />
+                                                      </div>
+                                                      <span className="text-xs text-muted-foreground">
+                                                        Total: <span className="font-medium text-foreground">{formatCurrency(t.qty * t.unit_price)}</span>
+                                                      </span>
+                                                      <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 w-7 p-0 text-destructive"
+                                                        onClick={() => removeQuantityTier(index, breakIndex, tIdx)}
+                                                      >
+                                                        <X className="h-3.5 w-3.5" />
+                                                      </Button>
                                                     </div>
-                                                    <span className="text-xs text-muted-foreground">
-                                                      Total: <span className="font-medium text-foreground">{formatCurrency(t.qty * t.unit_price)}</span>
-                                                    </span>
-                                                    <Button
-                                                      type="button"
-                                                      variant="ghost"
-                                                      size="sm"
-                                                      className="h-7 w-7 p-0 text-destructive"
-                                                      onClick={() => removeQuantityTier(index, breakIndex, tIdx)}
-                                                    >
-                                                      <X className="h-3.5 w-3.5" />
-                                                    </Button>
+                                                    <Input
+                                                      type="text"
+                                                      placeholder="Note (e.g. lead time)"
+                                                      value={t.note || ''}
+                                                      onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'note', e.target.value)}
+                                                      className="h-7 w-full max-w-md text-xs ml-10"
+                                                    />
                                                   </div>
                                                 ))}
                                               </div>
