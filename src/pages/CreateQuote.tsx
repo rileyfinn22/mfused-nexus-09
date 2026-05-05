@@ -48,12 +48,14 @@ import { normalizeStorageObjectPath } from "@/lib/storageUrl";
 interface QuantityTier {
   qty: number;
   unit_price: number;
+  note?: string;
 }
 
 interface PriceBreak {
   qty: number;
   unit_price: number;
   label?: string;
+  note?: string;
   tiers?: QuantityTier[];
 }
 
