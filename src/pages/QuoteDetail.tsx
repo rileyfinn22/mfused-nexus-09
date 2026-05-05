@@ -950,9 +950,9 @@ const QuoteDetail = () => {
                                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{item.description}</p>
                                    )}
                                  </TableCell>
-                                 <TableCell className="text-right">{item.quantity > 0 ? item.quantity.toLocaleString() : ''}</TableCell>
-                                 <TableCell className="text-right">{item.unit_price > 0 ? formatUnitPrice(item.unit_price) : ''}</TableCell>
-                                 <TableCell className="text-right font-medium">{item.total > 0 ? formatCurrency(item.total) : ''}</TableCell>
+                                 <TableCell className="text-right"></TableCell>
+                                 <TableCell className="text-right"></TableCell>
+                                 <TableCell className="text-right"></TableCell>
                                </TableRow>
                               {/* Rows per shipping option (with optional nested qty tiers) */}
                               {item.price_breaks.map((pb, idx) => {

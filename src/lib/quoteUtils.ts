@@ -204,10 +204,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       ]);
     } else if (hasPriceBreaks) {
       tableBody.push([
-        { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`, styles: { fontStyle: 'bold', fillColor: COLORS.lightGray } },
-        item.unit_price > 0 ? formatUnitPrice(item.unit_price) : '',
-        item.quantity > 0 ? item.quantity.toLocaleString() : '',
-        item.total > 0 ? formatCurrency(item.total) : ''
+        { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`, colSpan: 4, styles: { fontStyle: 'bold', fillColor: COLORS.lightGray } }
       ]);
       item.price_breaks.forEach((pb, i) => {
         const label = pb.label?.trim() ? pb.label : `Option ${i + 1}`;
