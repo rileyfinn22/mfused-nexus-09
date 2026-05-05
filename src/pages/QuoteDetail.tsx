@@ -61,10 +61,16 @@ import {
 import { generateQuotePDF } from "@/lib/quoteUtils";
 import { SendToVendorDialog } from "@/components/SendToVendorDialog";
 
+interface QuantityTier {
+  qty: number;
+  unit_price: number;
+}
+
 interface PriceBreak {
   qty: number;
   unit_price: number;
   label?: string;
+  tiers?: QuantityTier[];
 }
 
 interface QuoteItem {
