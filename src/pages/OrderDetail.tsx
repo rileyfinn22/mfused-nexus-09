@@ -171,6 +171,7 @@ const OrderDetail = () => {
 
       setIsAdmin(admin);
       setIsVibeAdmin(vibeAdmin);
+      setIsFinance(finance);
       setIsVendor(vendor);
       // Company-side users (admin/customer/company) should see the simplified customer view
       setIsCustomer(customer);
