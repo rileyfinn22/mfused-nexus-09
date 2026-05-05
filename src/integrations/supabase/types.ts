@@ -1186,6 +1186,7 @@ export type Database = {
           shipped_date: string | null
           shipping_city: string | null
           shipping_cost: number | null
+          shipping_method: string | null
           shipping_name: string | null
           shipping_note: string | null
           shipping_state: string | null
@@ -1196,6 +1197,9 @@ export type Database = {
           tax: number
           total: number
           total_paid: number | null
+          tracking_carrier: string | null
+          tracking_number: string | null
+          tracking_url: string | null
           updated_at: string
         }
         Insert: {
@@ -1225,6 +1229,7 @@ export type Database = {
           shipped_date?: string | null
           shipping_city?: string | null
           shipping_cost?: number | null
+          shipping_method?: string | null
           shipping_name?: string | null
           shipping_note?: string | null
           shipping_state?: string | null
@@ -1235,6 +1240,9 @@ export type Database = {
           tax?: number
           total?: number
           total_paid?: number | null
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
         }
         Update: {
@@ -1264,6 +1272,7 @@ export type Database = {
           shipped_date?: string | null
           shipping_city?: string | null
           shipping_cost?: number | null
+          shipping_method?: string | null
           shipping_name?: string | null
           shipping_note?: string | null
           shipping_state?: string | null
@@ -1274,6 +1283,9 @@ export type Database = {
           tax?: number
           total?: number
           total_paid?: number | null
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
         }
         Relationships: [
