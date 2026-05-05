@@ -64,6 +64,7 @@ import { SendToVendorDialog } from "@/components/SendToVendorDialog";
 interface PriceBreak {
   qty: number;
   unit_price: number;
+  label?: string;
 }
 
 interface QuoteItem {
@@ -944,7 +945,7 @@ const QuoteDetail = () => {
                               {item.price_breaks.map((pb, idx) => (
                                 <TableRow key={`${item.id}-tier-${idx}`}>
                                   <TableCell colSpan={2} className="pl-8">
-                                    <span className="text-sm text-muted-foreground">Tier {idx + 1}:</span>
+                                    <span className="text-sm text-muted-foreground">{pb.label?.trim() ? pb.label : `Tier ${idx + 1}`}:</span>
                                     <span className="ml-2 font-medium">{pb.qty.toLocaleString()} units</span>
                                   </TableCell>
                                   <TableCell className="text-right">{pb.qty.toLocaleString()}</TableCell>

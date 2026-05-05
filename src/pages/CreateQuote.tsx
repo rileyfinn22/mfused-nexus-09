@@ -48,6 +48,7 @@ import { normalizeStorageObjectPath } from "@/lib/storageUrl";
 interface PriceBreak {
   qty: number;
   unit_price: number;
+  label?: string;
 }
 
 interface QuoteItem {
@@ -588,7 +589,7 @@ const CreateQuote = () => {
     setItems(newItems);
   };
 
-  const updatePriceBreak = (itemIndex: number, breakIndex: number, field: keyof PriceBreak, value: number) => {
+  const updatePriceBreak = (itemIndex: number, breakIndex: number, field: keyof PriceBreak, value: number | string) => {
     const newItems = [...items];
     newItems[itemIndex].price_breaks[breakIndex] = {
       ...newItems[itemIndex].price_breaks[breakIndex],
@@ -1157,7 +1158,14 @@ const CreateQuote = () => {
                                                 : 'border-border'
                                             }`}
                                           >
-                                            <div className="flex items-center gap-2 flex-1">
+                                            <div className="flex items-center gap-2 flex-1 flex-wrap">
+                                              <Input
+                                                type="text"
+                                                placeholder="Label (e.g. Ocean, Air)"
+                                                value={priceBreak.label || ''}
+                                                onChange={(e) => updatePriceBreak(index, breakIndex, 'label', e.target.value)}
+                                                className="h-8 w-44"
+                                              />
                                               <Label className="text-xs w-8">Qty</Label>
                                               <Input
                                                 type="number"

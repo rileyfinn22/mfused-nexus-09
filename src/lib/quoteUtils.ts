@@ -4,6 +4,7 @@ import autoTable from 'jspdf-autotable';
 interface PriceBreak {
   qty: number;
   unit_price: number;
+  label?: string;
 }
 
 interface QuoteItem {
@@ -199,9 +200,10 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       tableBody.push([
         { content: `${item.name}\n${item.sku}${item.state ? ` (${item.state})` : ''}${descLine}`, colSpan: 4, styles: { fontStyle: 'bold', fillColor: COLORS.lightGray } }
       ]);
-      item.price_breaks.forEach((pb) => {
+      item.price_breaks.forEach((pb, i) => {
+        const label = pb.label?.trim() ? pb.label : `Tier ${i + 1}`;
         tableBody.push([
-          `  Tier: ${pb.qty.toLocaleString()} units`,
+          `  ${label}: ${pb.qty.toLocaleString()} units`,
           formatUnitPrice(pb.unit_price),
           pb.qty.toLocaleString(),
           formatCurrency(pb.qty * pb.unit_price)
