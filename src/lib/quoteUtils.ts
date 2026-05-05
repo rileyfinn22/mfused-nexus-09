@@ -297,7 +297,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(...COLORS.mediumGray);
-    doc.text('* Pricing shown per tier. Final total depends on quantity selected.', 14, finalY);
+    doc.text('* Pricing shown per shipping option. Customer selects preferred option.', 14, finalY);
   }
 
   // ============ NOTES ============

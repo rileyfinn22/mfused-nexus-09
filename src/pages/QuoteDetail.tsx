@@ -1044,7 +1044,7 @@ const QuoteDetail = () => {
                   )}
                   {hasAnyPriceBreaks && (
                     <div className="text-sm text-muted-foreground italic p-4 text-center border-t">
-                      * Pricing shown per tier. Final total depends on quantity selected.
+                      * Pricing shown per shipping option. Customer selects preferred option.
                     </div>
                   )}
                 </div>
