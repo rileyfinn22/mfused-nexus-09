@@ -2074,30 +2074,25 @@ const InvoiceDetail = () => {
                 <h3 className="text-sm font-semibold mb-2">Tracking</h3>
                 {isVibeAdmin ? (
                   <div className="flex gap-2">
-                    <Select
-                      value={invoice?.tracking_carrier || ''}
-                      onValueChange={async (val) => {
-                        const trackingUrl = invoice?.tracking_number ? getTrackingUrl(val, invoice.tracking_number) : null;
+                    <Input
+                      defaultValue={invoice?.tracking_carrier || ''}
+                      placeholder="Carrier"
+                      className="w-40"
+                      onBlur={async (e) => {
+                        const val = e.target.value.trim() || null;
+                        if (val === (invoice?.tracking_carrier || null)) return;
+                        const trackingUrl = invoice?.tracking_number ? getTrackingUrl(val || '', invoice.tracking_number) : null;
                         const { error } = await supabase
                           .from('invoices')
-                          .update({ tracking_carrier: val || null, tracking_url: trackingUrl })
+                          .update({ tracking_carrier: val, tracking_url: trackingUrl })
                           .eq('id', invoice.id);
                         if (error) {
                           toast({ title: "Error", description: "Failed to update carrier", variant: "destructive" });
                         } else {
-                          setInvoice({ ...invoice, tracking_carrier: val || null, tracking_url: trackingUrl });
+                          setInvoice({ ...invoice, tracking_carrier: val, tracking_url: trackingUrl });
                         }
                       }}
-                    >
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Carrier" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CARRIERS.map((c) => (
-                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                     <Input
                       defaultValue={invoice?.tracking_number || ''}
                       placeholder="Tracking #"
