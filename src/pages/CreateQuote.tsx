@@ -715,6 +715,7 @@ const CreateQuote = () => {
         subtotal: calculateSubtotal(),
         shipping_cost: shippingCost,
         shipping_method: shippingMethod || null,
+        lead_time: leadTime || null,
         total: calculateTotal(),
         status: isVibeAdmin ? 'draft' : 'pending_review'
       };
