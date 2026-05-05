@@ -644,13 +644,13 @@ const CreateQuote = () => {
     itemIndex: number,
     optionIndex: number,
     tierIndex: number,
-    field: 'qty' | 'unit_price',
-    value: number
+    field: 'qty' | 'unit_price' | 'note',
+    value: number | string
   ) => {
     const newItems = [...items];
     const opt = newItems[itemIndex].price_breaks[optionIndex];
     if (!opt.tiers) return;
-    opt.tiers[tierIndex] = { ...opt.tiers[tierIndex], [field]: value };
+    opt.tiers[tierIndex] = { ...opt.tiers[tierIndex], [field]: value } as QuantityTier;
     setItems(newItems);
   };
 
