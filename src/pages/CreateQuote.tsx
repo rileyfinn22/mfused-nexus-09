@@ -1188,66 +1188,132 @@ const CreateQuote = () => {
                                       </p>
                                     ) : (
                                       <div className="space-y-2">
-                                        {item.price_breaks.map((priceBreak, breakIndex) => (
+                                        {item.price_breaks.map((priceBreak, breakIndex) => {
+                                          const tiers = priceBreak.tiers && priceBreak.tiers.length > 0
+                                            ? priceBreak.tiers
+                                            : null;
+                                          return (
                                           <div 
                                             key={breakIndex} 
-                                            className={`flex items-center gap-3 p-2 rounded-md border ${
+                                            className={`p-3 rounded-md border space-y-2 ${
                                               item.selected_tier === breakIndex 
                                                 ? 'border-primary bg-primary/5' 
                                                 : 'border-border'
                                             }`}
                                           >
-                                            <div className="flex items-center gap-2 flex-1 flex-wrap">
-                                              <Input
-                                                type="text"
-                                                placeholder="Shipping option (e.g. Ocean, Air, Domestic)"
-                                                value={priceBreak.label || ''}
-                                                onChange={(e) => updatePriceBreak(index, breakIndex, 'label', e.target.value)}
-                                                className="h-8 w-56"
-                                              />
-                                              <Label className="text-xs w-8">Qty</Label>
-                                              <Input
-                                                type="number"
-                                                min="1"
-                                                value={priceBreak.qty}
-                                                onChange={(e) => updatePriceBreak(index, breakIndex, 'qty', parseInt(e.target.value) || 1)}
-                                                className="h-8 w-32"
-                                              />
-                                              <Label className="text-xs w-16">Price Each</Label>
-                                              <div className="relative">
-                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                            <div className="flex items-start gap-3">
+                                              <div className="flex-1 space-y-2">
                                                 <Input
-                                                  type="number"
-                                                  min="0"
-                                                  step="any"
-                                                  value={priceBreak.unit_price}
-                                                  onChange={(e) => updatePriceBreak(index, breakIndex, 'unit_price', parseFloat(e.target.value) || 0)}
-                                                  className="h-8 w-28 pl-5"
+                                                  type="text"
+                                                  placeholder="Shipping option (e.g. Ocean, Air, Domestic)"
+                                                  value={priceBreak.label || ''}
+                                                  onChange={(e) => updatePriceBreak(index, breakIndex, 'label', e.target.value)}
+                                                  className="h-8 w-full max-w-xs font-medium"
                                                 />
+                                                {!tiers && (
+                                                  <div className="flex items-center gap-2 flex-wrap">
+                                                    <Label className="text-xs w-8">Qty</Label>
+                                                    <Input
+                                                      type="number"
+                                                      min="1"
+                                                      value={priceBreak.qty}
+                                                      onChange={(e) => updatePriceBreak(index, breakIndex, 'qty', parseInt(e.target.value) || 1)}
+                                                      className="h-8 w-32"
+                                                    />
+                                                    <Label className="text-xs w-16">Price Each</Label>
+                                                    <div className="relative">
+                                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                                      <Input
+                                                        type="number"
+                                                        min="0"
+                                                        step="any"
+                                                        value={priceBreak.unit_price}
+                                                        onChange={(e) => updatePriceBreak(index, breakIndex, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                        className="h-8 w-28 pl-5"
+                                                      />
+                                                    </div>
+                                                    <span className="text-xs text-muted-foreground">
+                                                      Total: <span className="font-medium text-foreground">{formatCurrency(priceBreak.qty * priceBreak.unit_price)}</span>
+                                                    </span>
+                                                  </div>
+                                                )}
                                               </div>
-                                              <span className="text-xs text-muted-foreground">
-                                                Total: <span className="font-medium text-foreground">{formatCurrency(priceBreak.qty * priceBreak.unit_price)}</span>
-                                              </span>
+                                              <div className="flex flex-col gap-1 items-end">
+                                                <div className="flex items-center gap-1">
+                                                  <Button
+                                                    type="button"
+                                                    variant={item.selected_tier === breakIndex ? "default" : "outline"}
+                                                    size="sm"
+                                                    onClick={() => selectPriceTier(index, breakIndex)}
+                                                  >
+                                                    {item.selected_tier === breakIndex ? "Selected" : "Select"}
+                                                  </Button>
+                                                  <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0 text-destructive"
+                                                    onClick={() => removePriceBreak(index, breakIndex)}
+                                                  >
+                                                    <X className="h-4 w-4" />
+                                                  </Button>
+                                                </div>
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-7 text-xs"
+                                                  onClick={() => addQuantityTier(index, breakIndex)}
+                                                >
+                                                  <Plus className="h-3 w-3 mr-1" />
+                                                  Add Qty Tier
+                                                </Button>
+                                              </div>
                                             </div>
-                                            <Button
-                                              type="button"
-                                              variant={item.selected_tier === breakIndex ? "default" : "outline"}
-                                              size="sm"
-                                              onClick={() => selectPriceTier(index, breakIndex)}
-                                            >
-                                              {item.selected_tier === breakIndex ? "Selected" : "Select"}
-                                            </Button>
-                                            <Button
-                                              type="button"
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-8 w-8 p-0 text-destructive"
-                                              onClick={() => removePriceBreak(index, breakIndex)}
-                                            >
-                                              <X className="h-4 w-4" />
-                                            </Button>
+
+                                            {tiers && (
+                                              <div className="ml-2 pl-3 border-l-2 border-border space-y-1.5">
+                                                {tiers.map((t, tIdx) => (
+                                                  <div key={tIdx} className="flex items-center gap-2 flex-wrap">
+                                                    <Label className="text-xs w-8">Qty</Label>
+                                                    <Input
+                                                      type="number"
+                                                      min="1"
+                                                      value={t.qty}
+                                                      onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'qty', parseInt(e.target.value) || 1)}
+                                                      className="h-8 w-32"
+                                                    />
+                                                    <Label className="text-xs w-16">Price Each</Label>
+                                                    <div className="relative">
+                                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                                      <Input
+                                                        type="number"
+                                                        min="0"
+                                                        step="any"
+                                                        value={t.unit_price}
+                                                        onChange={(e) => updateQuantityTier(index, breakIndex, tIdx, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                        className="h-8 w-28 pl-5"
+                                                      />
+                                                    </div>
+                                                    <span className="text-xs text-muted-foreground">
+                                                      Total: <span className="font-medium text-foreground">{formatCurrency(t.qty * t.unit_price)}</span>
+                                                    </span>
+                                                    <Button
+                                                      type="button"
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      className="h-7 w-7 p-0 text-destructive"
+                                                      onClick={() => removeQuantityTier(index, breakIndex, tIdx)}
+                                                    >
+                                                      <X className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
                                           </div>
-                                        ))}
+                                          );
+                                        })}
                                       </div>
                                     )}
                                     
