@@ -218,39 +218,40 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       rowKinds.push('product');
 
       item.price_breaks.forEach((pb, i) => {
+        const label = pb.label?.trim() ? pb.label : `Option ${i + 1}`;
         const noteSuffix = pb.note?.trim() ? `\n${pb.note.trim()}` : '';
         const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
 
         if (tiers) {
-          if (noteSuffix) {
-            tableBody.push([{ content: pb.note!.trim(), colSpan: 4 }]);
-            rowKinds.push('option');
-          }
+          tableBody.push([
+            { content: `${label}${noteSuffix}`, colSpan: 4 }
+          ]);
+          rowKinds.push('option');
           tiers.forEach((t) => {
             const tNote = t.note?.trim() ? `\n${t.note.trim()}` : '';
             tableBody.push([
-              tNote ? t.note!.trim() : '',
-              t.qty.toLocaleString(),
+              `${t.qty.toLocaleString()} units${tNote}`,
               formatUnitPrice(t.unit_price),
+              t.qty.toLocaleString(),
               formatCurrency(t.qty * t.unit_price)
             ]);
             rowKinds.push('tier');
           });
         } else {
           tableBody.push([
-            noteSuffix ? `${pb.note!.trim()}` : '',
-            pb.qty.toLocaleString(),
+            `${label}${noteSuffix}`,
             formatUnitPrice(pb.unit_price),
+            pb.qty.toLocaleString(),
             formatCurrency(pb.qty * pb.unit_price)
           ]);
-          rowKinds.push('tier');
+          rowKinds.push('option');
         }
       });
     } else {
       tableBody.push([
         `${headerLine}${descLine}`,
-        item.quantity.toLocaleString(),
         formatUnitPrice(item.unit_price),
+        item.quantity.toLocaleString(),
         formatCurrency(item.total)
       ]);
       rowKinds.push('simple');
@@ -259,7 +260,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
 
   autoTable(doc, {
     startY: yPos,
-    head: [['ITEM', 'QTY', 'UNIT PRICE', 'TOTAL']],
+    head: [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']],
     body: tableBody,
     theme: 'plain',
     headStyles: {
@@ -277,8 +278,8 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     },
     columnStyles: {
       0: { cellWidth: 90 },
-      1: { halign: 'right', cellWidth: 25 },
-      2: { halign: 'right', cellWidth: 30 },
+      1: { halign: 'right', cellWidth: 30 },
+      2: { halign: 'right', cellWidth: 25 },
       3: { halign: 'right', cellWidth: 37, fontStyle: 'bold' }
     },
     margin: { left: 14, right: 14 },
@@ -288,11 +289,11 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       if (data.section !== 'body') return;
       const kind = rowKinds[data.row.index];
       if (kind === 'product') {
-        data.cell.styles.fillColor = COLORS.lightGray;
-        data.cell.styles.textColor = COLORS.darkGray;
+        data.cell.styles.fillColor = COLORS.primaryGreen;
+        data.cell.styles.textColor = 255;
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.fontSize = 10;
-        data.cell.styles.cellPadding = { top: 5, right: 4, bottom: 5, left: 4 };
+        data.cell.styles.cellPadding = { top: 6, right: 4, bottom: 6, left: 4 };
       } else if (kind === 'option') {
         data.cell.styles.fillColor = [240, 245, 235];
         data.cell.styles.fontStyle = 'bold';
@@ -301,12 +302,9 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
           data.cell.styles.cellPadding = { top: 4, right: 4, bottom: 4, left: 8 };
         }
       } else if (kind === 'tier') {
-        data.cell.styles.fontStyle = 'bold';
         if (data.column.index === 0) {
           data.cell.styles.cellPadding = { top: 3, right: 4, bottom: 3, left: 16 };
           data.cell.styles.textColor = COLORS.mediumGray;
-        } else {
-          data.cell.styles.textColor = COLORS.darkGray;
         }
       }
     }
