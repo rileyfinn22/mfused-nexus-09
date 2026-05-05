@@ -589,7 +589,7 @@ const CreateQuote = () => {
     setItems(newItems);
   };
 
-  const updatePriceBreak = (itemIndex: number, breakIndex: number, field: keyof PriceBreak, value: number) => {
+  const updatePriceBreak = (itemIndex: number, breakIndex: number, field: keyof PriceBreak, value: number | string) => {
     const newItems = [...items];
     newItems[itemIndex].price_breaks[breakIndex] = {
       ...newItems[itemIndex].price_breaks[breakIndex],
