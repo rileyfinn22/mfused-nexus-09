@@ -2010,6 +2010,100 @@ const InvoiceDetail = () => {
                   </div>
                 </div>}
             </div>
+
+            {/* Shipping Method & Tracking */}
+            <div className="mt-6 pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-sm font-semibold mb-2">Shipping Method</h3>
+                {isVibeAdmin ? (
+                  <Input
+                    defaultValue={invoice?.shipping_method || ''}
+                    placeholder="e.g., LTL Freight, Ground, Ocean FCL"
+                    onBlur={async (e) => {
+                      const val = e.target.value || null;
+                      if (val === (invoice?.shipping_method || null)) return;
+                      const { error } = await supabase
+                        .from('invoices')
+                        .update({ shipping_method: val })
+                        .eq('id', invoice.id);
+                      if (error) {
+                        toast({ title: "Error", description: "Failed to update shipping method", variant: "destructive" });
+                      } else {
+                        setInvoice({ ...invoice, shipping_method: val });
+                        toast({ title: "Shipping method updated" });
+                      }
+                    }}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">{invoice?.shipping_method || '—'}</p>
+                )}
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-2">Tracking</h3>
+                {isVibeAdmin ? (
+                  <div className="flex gap-2">
+                    <Select
+                      value={invoice?.tracking_carrier || ''}
+                      onValueChange={async (val) => {
+                        const trackingUrl = invoice?.tracking_number ? getTrackingUrl(val, invoice.tracking_number) : null;
+                        const { error } = await supabase
+                          .from('invoices')
+                          .update({ tracking_carrier: val || null, tracking_url: trackingUrl })
+                          .eq('id', invoice.id);
+                        if (error) {
+                          toast({ title: "Error", description: "Failed to update carrier", variant: "destructive" });
+                        } else {
+                          setInvoice({ ...invoice, tracking_carrier: val || null, tracking_url: trackingUrl });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Carrier" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CARRIERS.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      defaultValue={invoice?.tracking_number || ''}
+                      placeholder="Tracking #"
+                      onBlur={async (e) => {
+                        const val = e.target.value || null;
+                        if (val === (invoice?.tracking_number || null)) return;
+                        const trackingUrl = val ? getTrackingUrl(invoice?.tracking_carrier || '', val) : null;
+                        const { error } = await supabase
+                          .from('invoices')
+                          .update({ tracking_number: val, tracking_url: trackingUrl })
+                          .eq('id', invoice.id);
+                        if (error) {
+                          toast({ title: "Error", description: "Failed to update tracking", variant: "destructive" });
+                        } else {
+                          setInvoice({ ...invoice, tracking_number: val, tracking_url: trackingUrl });
+                          toast({ title: "Tracking updated" });
+                        }
+                      }}
+                      className="flex-1"
+                    />
+                  </div>
+                ) : (
+                  invoice?.tracking_number ? (
+                    <a
+                      href={invoice.tracking_url || getTrackingUrl(invoice.tracking_carrier || '', invoice.tracking_number)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      {CARRIERS.find(c => c.value === invoice.tracking_carrier)?.label || invoice.tracking_carrier} — {invoice.tracking_number}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">—</p>
+                  )
+                )}
+              </div>
+            </div>
             
             {/* Payment Terms - Editable by vibe_admin */}
             {isVibeAdmin && (
