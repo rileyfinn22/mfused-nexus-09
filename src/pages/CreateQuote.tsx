@@ -1215,6 +1215,13 @@ const CreateQuote = () => {
                                                   onChange={(e) => updatePriceBreak(index, breakIndex, 'label', e.target.value)}
                                                   className="h-8 w-full max-w-xs font-medium"
                                                 />
+                                                <Input
+                                                  type="text"
+                                                  placeholder="Note (e.g. lead time, MOQ, etc.)"
+                                                  value={priceBreak.note || ''}
+                                                  onChange={(e) => updatePriceBreak(index, breakIndex, 'note', e.target.value)}
+                                                  className="h-8 w-full max-w-md text-xs"
+                                                />
                                                 {!tiers && (
                                                   <div className="flex items-center gap-2 flex-wrap">
                                                     <Label className="text-xs w-8">Qty</Label>
