@@ -163,7 +163,8 @@ const OrderDetail = () => {
 
       const roles = (roleRows || []).map((r: any) => String(r.role));
       const vibeAdmin = roles.includes('vibe_admin');
-      const admin = roles.includes('admin') || vibeAdmin;
+      const finance = roles.includes('finance');
+      const admin = roles.includes('admin') || vibeAdmin || finance;
       const vendor = roles.includes('vendor');
       const customer = roles.some(r => r === 'admin' || r === 'customer' || r === 'company');
 
