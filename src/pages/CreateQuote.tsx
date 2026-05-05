@@ -1131,7 +1131,7 @@ const CreateQuote = () => {
                                     {item.pricing_mode !== 'description' && (
                                     <div className="space-y-3">
                                       <div className="flex items-center justify-between">
-                                        <h4 className="text-sm font-medium">Price Breaks</h4>
+                                        <h4 className="text-sm font-medium">Shipping Options & Pricing</h4>
                                         <Button
                                           type="button"
                                           variant="outline"
@@ -1139,13 +1139,13 @@ const CreateQuote = () => {
                                           onClick={() => addPriceBreak(index)}
                                         >
                                           <Plus className="h-3 w-3 mr-1" />
-                                          Add Tier
+                                          Add Shipping Option
                                         </Button>
                                       </div>
                                     
                                     {item.price_breaks.length === 0 ? (
                                       <p className="text-sm text-muted-foreground">
-                                        No price tiers defined. Add tiers to offer volume-based pricing.
+                                        No shipping options defined. Add an option (e.g. Ocean, Air, Domestic) with its qty and per-piece price.
                                       </p>
                                     ) : (
                                       <div className="space-y-2">
@@ -1161,10 +1161,10 @@ const CreateQuote = () => {
                                             <div className="flex items-center gap-2 flex-1 flex-wrap">
                                               <Input
                                                 type="text"
-                                                placeholder="Label (e.g. Ocean, Air)"
+                                                placeholder="Shipping option (e.g. Ocean, Air, Domestic)"
                                                 value={priceBreak.label || ''}
                                                 onChange={(e) => updatePriceBreak(index, breakIndex, 'label', e.target.value)}
-                                                className="h-8 w-44"
+                                                className="h-8 w-56"
                                               />
                                               <Label className="text-xs w-8">Qty</Label>
                                               <Input
@@ -1172,10 +1172,9 @@ const CreateQuote = () => {
                                                 min="1"
                                                 value={priceBreak.qty}
                                                 onChange={(e) => updatePriceBreak(index, breakIndex, 'qty', parseInt(e.target.value) || 1)}
-                                                onBlur={() => sortPriceBreaks(index)}
                                                 className="h-8 w-32"
                                               />
-                                              <Label className="text-xs w-10">Price</Label>
+                                              <Label className="text-xs w-16">Price Each</Label>
                                               <div className="relative">
                                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                                                 <Input
@@ -1184,12 +1183,11 @@ const CreateQuote = () => {
                                                   step="any"
                                                   value={priceBreak.unit_price}
                                                   onChange={(e) => updatePriceBreak(index, breakIndex, 'unit_price', parseFloat(e.target.value) || 0)}
-                                                  onBlur={() => sortPriceBreaks(index)}
                                                   className="h-8 w-28 pl-5"
                                                 />
                                               </div>
                                               <span className="text-xs text-muted-foreground">
-                                                = {formatCurrency(priceBreak.qty * priceBreak.unit_price)}
+                                                Total: <span className="font-medium text-foreground">{formatCurrency(priceBreak.qty * priceBreak.unit_price)}</span>
                                               </span>
                                             </div>
                                             <Button

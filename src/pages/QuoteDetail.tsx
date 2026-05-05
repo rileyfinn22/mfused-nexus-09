@@ -941,12 +941,11 @@ const QuoteDetail = () => {
                                   </div>
                                 </TableCell>
                               </TableRow>
-                              {/* One row per price tier */}
+                              {/* One row per shipping option */}
                               {item.price_breaks.map((pb, idx) => (
-                                <TableRow key={`${item.id}-tier-${idx}`}>
+                                <TableRow key={`${item.id}-opt-${idx}`}>
                                   <TableCell colSpan={2} className="pl-8">
-                                    <span className="text-sm text-muted-foreground">{pb.label?.trim() ? pb.label : `Tier ${idx + 1}`}:</span>
-                                    <span className="ml-2 font-medium">{pb.qty.toLocaleString()} units</span>
+                                    <span className="text-sm font-medium">{pb.label?.trim() ? pb.label : `Option ${idx + 1}`}</span>
                                   </TableCell>
                                   <TableCell className="text-right">{pb.qty.toLocaleString()}</TableCell>
                                   <TableCell className="text-right">{formatUnitPrice(pb.unit_price)}</TableCell>
@@ -1045,7 +1044,7 @@ const QuoteDetail = () => {
                   )}
                   {hasAnyPriceBreaks && (
                     <div className="text-sm text-muted-foreground italic p-4 text-center border-t">
-                      * Pricing shown per tier. Final total depends on quantity selected.
+                      * Pricing shown per shipping option. Customer selects preferred option.
                     </div>
                   )}
                 </div>
