@@ -288,11 +288,11 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       if (data.section !== 'body') return;
       const kind = rowKinds[data.row.index];
       if (kind === 'product') {
-        data.cell.styles.fillColor = COLORS.primaryGreen;
-        data.cell.styles.textColor = 255;
+        data.cell.styles.fillColor = COLORS.lightGray;
+        data.cell.styles.textColor = COLORS.darkGray;
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.fontSize = 10;
-        data.cell.styles.cellPadding = { top: 6, right: 4, bottom: 6, left: 4 };
+        data.cell.styles.cellPadding = { top: 5, right: 4, bottom: 5, left: 4 };
       } else if (kind === 'option') {
         data.cell.styles.fillColor = [240, 245, 235];
         data.cell.styles.fontStyle = 'bold';
