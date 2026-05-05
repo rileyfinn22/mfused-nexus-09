@@ -929,24 +929,31 @@ const QuoteDetail = () => {
                         
                         if (hasPriceBreaks) {
                           return (
-                            <React.Fragment key={item.id}>
-                              {/* Item header row spanning full width */}
-                              <TableRow className="bg-muted/30">
-                                <TableCell colSpan={5}>
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-semibold">{item.name}</p>
-                                    <span className="text-muted-foreground font-mono text-xs">{item.sku}</span>
-                                    {item.state && (
-                                      <Badge variant="outline" className="text-xs px-1.5 py-0">
-                                        {item.state}
-                                      </Badge>
-                                    )}
-                                    {item.description && (
-                                      <span className="text-sm text-muted-foreground ml-2">— {item.description}</span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
+                             <React.Fragment key={item.id}>
+                               {/* Item header row: show name + qty/price if set */}
+                               <TableRow className="bg-muted/30">
+                                 <TableCell>
+                                   <div>
+                                     <p className="font-semibold">{item.name}</p>
+                                     <div className="flex items-center gap-2 mt-0.5">
+                                       <span className="text-muted-foreground font-mono text-xs">{item.sku}</span>
+                                       {item.state && (
+                                         <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                           {item.state}
+                                         </Badge>
+                                       )}
+                                     </div>
+                                   </div>
+                                 </TableCell>
+                                 <TableCell>
+                                   {item.description && (
+                                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{item.description}</p>
+                                   )}
+                                 </TableCell>
+                                 <TableCell className="text-right">{item.quantity > 0 ? item.quantity.toLocaleString() : ''}</TableCell>
+                                 <TableCell className="text-right">{item.unit_price > 0 ? formatUnitPrice(item.unit_price) : ''}</TableCell>
+                                 <TableCell className="text-right font-medium">{item.total > 0 ? formatCurrency(item.total) : ''}</TableCell>
+                               </TableRow>
                               {/* Rows per shipping option (with optional nested qty tiers) */}
                               {item.price_breaks.map((pb, idx) => {
                                 const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
