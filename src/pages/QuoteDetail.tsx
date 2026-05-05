@@ -64,6 +64,7 @@ import { SendToVendorDialog } from "@/components/SendToVendorDialog";
 interface PriceBreak {
   qty: number;
   unit_price: number;
+  label?: string;
 }
 
 interface QuoteItem {
