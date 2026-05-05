@@ -4,12 +4,14 @@ import autoTable from 'jspdf-autotable';
 interface QuantityTier {
   qty: number;
   unit_price: number;
+  note?: string;
 }
 
 interface PriceBreak {
   qty: number;
   unit_price: number;
   label?: string;
+  note?: string;
   tiers?: QuantityTier[];
 }
 
