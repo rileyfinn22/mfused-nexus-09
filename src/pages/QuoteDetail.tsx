@@ -1313,6 +1313,12 @@ const QuoteDetail = () => {
                   </p>
                 </div>
               )}
+              {(quote as any).lead_time && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Lead Time</p>
+                  <p className="font-medium whitespace-pre-wrap">{(quote as any).lead_time}</p>
+                </div>
+              )}
               {quote.sent_at && (
                 <div>
                   <p className="text-sm text-muted-foreground">Sent</p>
