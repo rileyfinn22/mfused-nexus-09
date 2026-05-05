@@ -1933,9 +1933,41 @@ const InvoiceDetail = () => {
                       {invoice.due_date ? format(new Date(invoice.due_date), "MMM d, yyyy") : "Not set"}
                     </p>
                   )}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Created: {new Date(invoice.invoice_date).toLocaleDateString()}
-                  </p>
+                  <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    <span>Invoice Date:</span>
+                    {isVibeAdmin ? (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="ghost" className="h-auto p-0 text-xs font-medium hover:bg-transparent">
+                            {format(new Date(invoice.invoice_date), "MMM d, yyyy")}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                          <Calendar
+                            mode="single"
+                            selected={invoice.invoice_date ? new Date(invoice.invoice_date) : undefined}
+                            onSelect={async (date) => {
+                              if (!date) return;
+                              const { error } = await supabase
+                                .from('invoices')
+                                .update({ invoice_date: date.toISOString() })
+                                .eq('id', invoice.id);
+                              if (error) {
+                                toast({ title: "Error", description: "Failed to update invoice date", variant: "destructive" });
+                              } else {
+                                setInvoice({ ...invoice, invoice_date: date.toISOString() });
+                                toast({ title: "Invoice date updated" });
+                              }
+                            }}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <span>{new Date(invoice.invoice_date).toLocaleDateString()}</span>
+                    )}
+                  </div>
                 </div>
                 <div className="mt-4">
                   <p className="text-sm text-muted-foreground">Shipped Date</p>
