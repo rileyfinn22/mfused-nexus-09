@@ -1131,7 +1131,7 @@ const CreateQuote = () => {
                                     {item.pricing_mode !== 'description' && (
                                     <div className="space-y-3">
                                       <div className="flex items-center justify-between">
-                                        <h4 className="text-sm font-medium">Price Breaks</h4>
+                                        <h4 className="text-sm font-medium">Shipping Options & Pricing</h4>
                                         <Button
                                           type="button"
                                           variant="outline"
@@ -1139,13 +1139,13 @@ const CreateQuote = () => {
                                           onClick={() => addPriceBreak(index)}
                                         >
                                           <Plus className="h-3 w-3 mr-1" />
-                                          Add Tier
+                                          Add Shipping Option
                                         </Button>
                                       </div>
                                     
                                     {item.price_breaks.length === 0 ? (
                                       <p className="text-sm text-muted-foreground">
-                                        No price tiers defined. Add tiers to offer volume-based pricing.
+                                        No shipping options defined. Add an option (e.g. Ocean, Air, Domestic) with its qty and per-piece price.
                                       </p>
                                     ) : (
                                       <div className="space-y-2">
