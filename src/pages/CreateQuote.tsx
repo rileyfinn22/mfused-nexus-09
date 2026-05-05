@@ -631,7 +631,7 @@ const CreateQuote = () => {
     const opt = newItems[itemIndex].price_breaks[optionIndex];
     const tiers = opt.tiers || [{ qty: opt.qty || 1, unit_price: opt.unit_price || 0 }];
     const last = tiers[tiers.length - 1];
-    tiers.push({ qty: (last?.qty || 1) * 2, unit_price: last?.unit_price || 0 });
+    tiers.push({ qty: 0, unit_price: last?.unit_price || 0 });
     opt.tiers = tiers;
     setItems(newItems);
   };
