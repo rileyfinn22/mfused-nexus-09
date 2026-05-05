@@ -65,10 +65,9 @@ const VendorPODetail = () => {
       const { data } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
-        .single();
-      const role = data?.role as string;
-      setIsAdmin(role === 'admin' || role === 'vibe_admin');
+        .eq('user_id', user.id);
+      const roles = (data || []).map((r: any) => String(r.role));
+      setIsAdmin(roles.includes('admin') || roles.includes('vibe_admin') || roles.includes('finance'));
     } else {
       setIsAdmin(false);
     }
@@ -1105,25 +1104,47 @@ Thank you for your business.`;
               <div className="space-y-4">
                 <div>
                   <Label className="text-xs text-muted-foreground">Order Date</Label>
-                  <p className="font-medium">{new Date(po.order_date).toLocaleDateString()}</p>
+                  <Input
+                    type="date"
+                    value={po.order_date ? new Date(po.order_date).toISOString().split('T')[0] : ''}
+                    className="mt-1"
+                    onChange={async (e) => {
+                      if (!e.target.value) return;
+                      const newDate = new Date(e.target.value).toISOString();
+                      const { error } = await supabase.from('vendor_pos').update({ order_date: newDate }).eq('id', po.id);
+                      if (!error) setPO({ ...po, order_date: newDate });
+                      else toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                    }}
+                  />
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Requested Due Date</Label>
-                  {isEditMode ? (
-                    <Input
-                      type="date"
-                      value={editedPO.expected_delivery_date || ''}
-                      onChange={(e) => setEditedPO({...editedPO, expected_delivery_date: e.target.value})}
-                      className="mt-1"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {po.expected_delivery_date 
-                        ? new Date(po.expected_delivery_date).toLocaleDateString()
-                        : 'Not set'
-                      }
-                    </p>
-                  )}
+                  <Input
+                    type="date"
+                    value={po.expected_delivery_date ? new Date(po.expected_delivery_date).toISOString().split('T')[0] : ''}
+                    className="mt-1"
+                    onChange={async (e) => {
+                      const val = e.target.value ? new Date(e.target.value).toISOString() : null;
+                      const { error } = await supabase.from('vendor_pos').update({ expected_delivery_date: val }).eq('id', po.id);
+                      if (!error) setPO({ ...po, expected_delivery_date: val });
+                      else toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Shipping Method</Label>
+                  <Input
+                    defaultValue={po.shipping_method || ''}
+                    placeholder="e.g. Ocean LCL, Air, Ground"
+                    className="mt-1"
+                    onBlur={async (e) => {
+                      const val = e.target.value.trim() || null;
+                      if (val === (po.shipping_method || null)) return;
+                      const { error } = await supabase.from('vendor_pos').update({ shipping_method: val } as any).eq('id', po.id);
+                      if (!error) setPO({ ...po, shipping_method: val });
+                      else toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                    }}
+                  />
                 </div>
               </div>
               <div>

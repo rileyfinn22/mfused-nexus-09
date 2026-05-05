@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { SendOrderConfirmationDialog } from "@/components/SendOrderConfirmationDialog";
+import { getTrackingUrl } from "@/lib/trackingUtils";
 
 
 const STAGE_DEFINITIONS = [
@@ -55,6 +56,7 @@ const OrderDetail = () => {
   const [vibeNotes, setVibeNotes] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [isFinance, setIsFinance] = useState(false);
   const [showVendorDialog, setShowVendorDialog] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -163,12 +165,14 @@ const OrderDetail = () => {
 
       const roles = (roleRows || []).map((r: any) => String(r.role));
       const vibeAdmin = roles.includes('vibe_admin');
-      const admin = roles.includes('admin') || vibeAdmin;
+      const finance = roles.includes('finance');
+      const admin = roles.includes('admin') || vibeAdmin || finance;
       const vendor = roles.includes('vendor');
       const customer = roles.some(r => r === 'admin' || r === 'customer' || r === 'company');
 
       setIsAdmin(admin);
       setIsVibeAdmin(vibeAdmin);
+      setIsFinance(finance);
       setIsVendor(vendor);
       // Company-side users (admin/customer/company) should see the simplified customer view
       setIsCustomer(customer);
@@ -2111,15 +2115,44 @@ const OrderDetail = () => {
               <div>
                 <h1 className="text-3xl font-bold mb-2">Order #{order.order_number}</h1>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                  <span>Order Date: {new Date(order.order_date || order.created_at).toLocaleDateString()}</span>
+                  {(isVibeAdmin || isFinance) ? (
+                    <div className="flex items-center gap-2">
+                      <span>Order Date:</span>
+                      <Input
+                        type="date"
+                        value={order.order_date ? new Date(order.order_date).toISOString().split('T')[0] : ''}
+                        onChange={async (e) => {
+                          const newDate = e.target.value ? new Date(e.target.value).toISOString() : null;
+                          if (!newDate) return;
+                          const { error } = await supabase
+                            .from('orders')
+                            .update({ order_date: newDate })
+                            .eq('id', order.id);
+                          if (!error) setOrder({ ...order, order_date: newDate });
+                          else toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                        }}
+                        className="h-7 w-40 text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <span>Order Date: {new Date(order.order_date || order.created_at).toLocaleDateString()}</span>
+                  )}
                   <span>•</span>
-                  {isEditMode ? (
+                  {(isVibeAdmin || isFinance) ? (
                     <div className="flex items-center gap-2">
                       <span>Est. Delivery:</span>
                       <Input
                         type="date"
-                        value={editedOrder.estimated_delivery_date || ''}
-                        onChange={(e) => setEditedOrder({...editedOrder, estimated_delivery_date: e.target.value || null})}
+                        value={order.estimated_delivery_date || ''}
+                        onChange={async (e) => {
+                          const val = e.target.value || null;
+                          const { error } = await supabase
+                            .from('orders')
+                            .update({ estimated_delivery_date: val })
+                            .eq('id', order.id);
+                          if (!error) setOrder({ ...order, estimated_delivery_date: val });
+                          else toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                        }}
                         className="h-7 w-40 text-sm"
                       />
                     </div>
@@ -2147,6 +2180,66 @@ const OrderDetail = () => {
                     </>
                   )}
                 </div>
+                {(isVibeAdmin || isFinance) && (
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 max-w-3xl">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Shipping Method</Label>
+                      <Input
+                        defaultValue={order.shipping_method || ''}
+                        placeholder="e.g. Ground, 2-Day Air"
+                        className="h-8 text-sm mt-1"
+                        onBlur={async (e) => {
+                          const val = e.target.value.trim() || null;
+                          if (val === (order.shipping_method || null)) return;
+                          const { error } = await supabase.from('orders').update({ shipping_method: val }).eq('id', order.id);
+                          if (!error) setOrder({ ...order, shipping_method: val });
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Carrier</Label>
+                      <Input
+                        defaultValue={order.tracking_carrier || ''}
+                        placeholder="UPS, FedEx, MSC..."
+                        className="h-8 text-sm mt-1"
+                        onBlur={async (e) => {
+                          const carrier = e.target.value.trim() || null;
+                          const url = carrier && order.tracking_number ? getTrackingUrl(carrier, order.tracking_number) : null;
+                          const { error } = await supabase.from('orders').update({ tracking_carrier: carrier, tracking_url: url }).eq('id', order.id);
+                          if (!error) setOrder({ ...order, tracking_carrier: carrier, tracking_url: url });
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Tracking #</Label>
+                      <Input
+                        defaultValue={order.tracking_number || ''}
+                        placeholder="Tracking number"
+                        className="h-8 text-sm mt-1"
+                        onBlur={async (e) => {
+                          const num = e.target.value.trim() || null;
+                          const url = num && order.tracking_carrier ? getTrackingUrl(order.tracking_carrier, num) : null;
+                          const { error } = await supabase.from('orders').update({ tracking_number: num, tracking_url: url }).eq('id', order.id);
+                          if (!error) setOrder({ ...order, tracking_number: num, tracking_url: url });
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+                {!(isVibeAdmin || isFinance) && (order.shipping_method || order.tracking_number) && (
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                    {order.shipping_method && <span>📦 {order.shipping_method}</span>}
+                    {order.tracking_number && (
+                      order.tracking_url ? (
+                        <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+                          {order.tracking_carrier} {order.tracking_number} <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <span>{order.tracking_carrier} {order.tracking_number}</span>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
               <div className="text-right">
                 <Badge className="text-sm px-4 py-1.5 mb-2 capitalize">{order.status}</Badge>
