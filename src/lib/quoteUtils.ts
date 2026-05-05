@@ -308,6 +308,10 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         if (data.column.index === 0) {
           data.cell.styles.cellPadding = { top: 3, right: 4, bottom: 3, left: 16 };
           data.cell.styles.textColor = COLORS.mediumGray;
+          data.cell.styles.fontStyle = 'bold';
+        } else {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = COLORS.darkGray;
         }
       }
     }
