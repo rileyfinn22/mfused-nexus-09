@@ -4,6 +4,7 @@ import autoTable from 'jspdf-autotable';
 interface PriceBreak {
   qty: number;
   unit_price: number;
+  label?: string;
 }
 
 interface QuoteItem {
