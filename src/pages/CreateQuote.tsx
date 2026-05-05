@@ -1891,6 +1891,14 @@ const CreateQuote = () => {
                     />
                   </div>
                 )}
+                <div className="space-y-2">
+                  <Label>Lead Time</Label>
+                  <Input
+                    value={leadTime}
+                    onChange={(e) => setLeadTime(e.target.value)}
+                    placeholder="e.g. 4-6 weeks production + 30 days shipping"
+                  />
+                </div>
               </CardContent>
             </Card>
 
