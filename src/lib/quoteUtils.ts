@@ -277,8 +277,8 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     },
     columnStyles: {
       0: { cellWidth: 90 },
-      1: { halign: 'right', cellWidth: 30 },
-      2: { halign: 'right', cellWidth: 25 },
+      1: { halign: 'right', cellWidth: 25 },
+      2: { halign: 'right', cellWidth: 30 },
       3: { halign: 'right', cellWidth: 37, fontStyle: 'bold' }
     },
     margin: { left: 14, right: 14 },
