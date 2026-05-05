@@ -65,10 +65,9 @@ const VendorPODetail = () => {
       const { data } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
-        .single();
-      const role = data?.role as string;
-      setIsAdmin(role === 'admin' || role === 'vibe_admin');
+        .eq('user_id', user.id);
+      const roles = (data || []).map((r: any) => String(r.role));
+      setIsAdmin(roles.includes('admin') || roles.includes('vibe_admin') || roles.includes('finance'));
     } else {
       setIsAdmin(false);
     }
