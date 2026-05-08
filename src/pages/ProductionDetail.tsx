@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Upload, Plus, CalendarClock, FileText, Package, Truck, CheckCircle2, AlertCircle, StickyNote, MessageSquare, Send } from "lucide-react";
+import { Loader2, ArrowLeft, Upload, Plus, CalendarClock, FileText, Package, Truck, CheckCircle2, AlertCircle, StickyNote, MessageSquare, Send, ChevronDown, ChevronRight, ClipboardList } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
 import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
@@ -316,6 +317,8 @@ export default function ProductionDetail() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [shipmentLegs, setShipmentLegs] = useState<ShipmentLeg[]>([]);
+  const [packingListsByInvoice, setPackingListsByInvoice] = useState<Record<string, Array<{ id: string; file_name: string; file_path: string }>>>({});
+  const [itemsExpanded, setItemsExpanded] = useState(false);
   const [addLegDialogOpen, setAddLegDialogOpen] = useState(false);
   const [deliveryNotifLeg, setDeliveryNotifLeg] = useState<ShipmentLeg | null>(null);
 
@@ -371,8 +374,40 @@ export default function ProductionDetail() {
         .order('line_number', { ascending: true });
 
       setOrderItems(itemsData || []);
+
+      // Fetch packing lists attached to these invoices
+      const invoiceIds = (shipmentsData || []).map((s: any) => s.id);
+      if (invoiceIds.length > 0) {
+        const { data: plData } = await supabase
+          .from('invoice_packing_lists')
+          .select('id, invoice_id, file_name, file_path')
+          .in('invoice_id', invoiceIds);
+        const byInv: Record<string, Array<{ id: string; file_name: string; file_path: string }>> = {};
+        (plData || []).forEach((pl: any) => {
+          (byInv[pl.invoice_id] ||= []).push({ id: pl.id, file_name: pl.file_name, file_path: pl.file_path });
+        });
+        setPackingListsByInvoice(byInv);
+      } else {
+        setPackingListsByInvoice({});
+      }
     } catch (error: any) {
       console.error('Error fetching fulfillment data:', error);
+    }
+  };
+
+  const handleViewPackingList = async (filePath: string) => {
+    try {
+      const normalized = normalizeStorageObjectPath(filePath, 'packing-lists');
+      const { data, error } = await supabase.storage
+        .from('packing-lists')
+        .createSignedUrl(normalized, 3600);
+      if (error || !data?.signedUrl) {
+        toast({ title: "Error", description: error?.message || "Failed to open packing list", variant: "destructive" });
+        return;
+      }
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to open packing list", variant: "destructive" });
     }
   };
 
@@ -1422,113 +1457,173 @@ export default function ProductionDetail() {
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {/* Items Fulfillment Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-table-header">
-                  <tr className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    <th className="px-4 py-3">SKU</th>
-                    <th className="px-4 py-3">Product</th>
-                    <th className="px-4 py-3 text-right">Ordered</th>
-                    <th className="px-4 py-3 text-right">Shipped</th>
-                    <th className="px-4 py-3 text-right">Remaining</th>
-                    <th className="px-4 py-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {orderItems.map((item) => {
-                    const remaining = item.quantity - item.shipped_quantity;
-                    const isFullyShipped = remaining <= 0;
-                    const isPartiallyShipped = item.shipped_quantity > 0 && remaining > 0;
-                    
+            {/* Items Fulfillment Table - Collapsible */}
+            <Collapsible open={itemsExpanded} onOpenChange={setItemsExpanded}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    {itemsExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className="text-sm font-medium">Line Items</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {orderItems.length}
+                    </Badge>
+                  </div>
+                  {(() => {
+                    const totalOrdered = orderItems.reduce((s, i) => s + (i.quantity ?? 0), 0);
+                    const totalShipped = orderItems.reduce((s, i) => s + (i.shipped_quantity ?? 0), 0);
+                    const totalRemaining = Math.max(totalOrdered - totalShipped, 0);
                     return (
-                      <tr key={item.id} className="hover:bg-table-row-hover transition-colors">
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-sm">{item.sku}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-sm text-foreground">{item.name}</span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-sm font-medium">{(item.quantity ?? 0).toLocaleString()}</span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className={cn(
-                            "text-sm font-medium",
-                            isFullyShipped ? "text-success" : isPartiallyShipped ? "text-warning" : "text-muted-foreground"
-                          )}>
-                            {(item.shipped_quantity ?? 0).toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className={cn(
-                            "text-sm font-medium",
-                            remaining > 0 ? "text-foreground" : "text-muted-foreground"
-                          )}>
-                            {(remaining ?? 0).toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {isFullyShipped ? (
-                            <Badge variant="outline" className="bg-success/10 text-success border-success/30">
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                              Complete
-                            </Badge>
-                          ) : isPartiallyShipped ? (
-                            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
-                              Partial
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-muted-foreground">
-                              Pending
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>Ordered: <span className="font-medium text-foreground">{totalOrdered.toLocaleString()}</span></span>
+                        <span>Shipped: <span className={cn("font-medium", totalShipped > 0 ? "text-success" : "text-foreground")}>{totalShipped.toLocaleString()}</span></span>
+                        <span>Remaining: <span className="font-medium text-foreground">{totalRemaining.toLocaleString()}</span></span>
+                      </div>
                     );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                  })()}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="overflow-x-auto border-t border-border">
+                  <table className="w-full">
+                    <thead className="bg-table-header">
+                      <tr className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th className="px-4 py-3">SKU</th>
+                        <th className="px-4 py-3">Product</th>
+                        <th className="px-4 py-3 text-right">Ordered</th>
+                        <th className="px-4 py-3 text-right">Shipped</th>
+                        <th className="px-4 py-3 text-right">Remaining</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {orderItems.map((item) => {
+                        const remaining = item.quantity - item.shipped_quantity;
+                        const isFullyShipped = remaining <= 0;
+                        const isPartiallyShipped = item.shipped_quantity > 0 && remaining > 0;
+
+                        return (
+                          <tr key={item.id} className="hover:bg-table-row-hover transition-colors">
+                            <td className="px-4 py-3">
+                              <span className="font-mono text-sm">{item.sku}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-sm text-foreground">{item.name}</span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className="text-sm font-medium">{(item.quantity ?? 0).toLocaleString()}</span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className={cn(
+                                "text-sm font-medium",
+                                isFullyShipped ? "text-success" : isPartiallyShipped ? "text-warning" : "text-muted-foreground"
+                              )}>
+                                {(item.shipped_quantity ?? 0).toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className={cn(
+                                "text-sm font-medium",
+                                remaining > 0 ? "text-foreground" : "text-muted-foreground"
+                              )}>
+                                {(remaining ?? 0).toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {isFullyShipped ? (
+                                <Badge variant="outline" className="bg-success/10 text-success border-success/30">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Complete
+                                </Badge>
+                              ) : isPartiallyShipped ? (
+                                <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
+                                  Partial
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-muted-foreground">
+                                  Pending
+                                </Badge>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Shipments List */}
             {shipments.length > 0 && (
               <div className="p-4 bg-muted/20">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Shipment History</p>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {shipments.map((shipment) => (
-                    <div 
-                      key={shipment.id} 
-                      className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg hover:border-primary/30 transition-colors cursor-pointer"
-                      onClick={() => navigate(`/invoices/${shipment.id}`)}
-                    >
-                      <div className={cn(
-                        "p-2 rounded-lg",
-                        shipment.status === 'paid' ? "bg-success/10" : "bg-primary/10"
-                      )}>
-                        <Package className={cn(
-                          "h-4 w-4",
-                          shipment.status === 'paid' ? "text-success" : "text-primary"
-                        )} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-mono text-sm font-medium truncate">{shipment.invoice_number}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Shipment #{shipment.shipment_number || 1} • ${shipment.total.toLocaleString()}
-                        </p>
-                      </div>
-                      <Badge 
-                        variant="outline" 
-                        className={cn(
-                          "text-xs capitalize",
-                          shipment.status === 'paid' && "bg-success/10 text-success border-success/30",
-                          shipment.status === 'open' && "bg-info/10 text-info border-info/30"
-                        )}
+                  {shipments.map((shipment) => {
+                    const pls = packingListsByInvoice[shipment.id] || [];
+                    return (
+                      <div
+                        key={shipment.id}
+                        className="flex flex-col gap-2 p-3 bg-card border border-border rounded-lg hover:border-primary/30 transition-colors"
                       >
-                        {shipment.status}
-                      </Badge>
-                    </div>
-                  ))}
+                        <div
+                          className="flex items-center gap-3 cursor-pointer"
+                          onClick={() => navigate(`/invoices/${shipment.id}`)}
+                        >
+                          <div className={cn(
+                            "p-2 rounded-lg",
+                            shipment.status === 'paid' ? "bg-success/10" : "bg-primary/10"
+                          )}>
+                            <Package className={cn(
+                              "h-4 w-4",
+                              shipment.status === 'paid' ? "text-success" : "text-primary"
+                            )} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-mono text-sm font-medium truncate">{shipment.invoice_number}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Shipment #{shipment.shipment_number || 1} • ${shipment.total.toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-xs capitalize",
+                              shipment.status === 'paid' && "bg-success/10 text-success border-success/30",
+                              shipment.status === 'open' && "bg-info/10 text-info border-info/30"
+                            )}
+                          >
+                            {shipment.status}
+                          </Badge>
+                        </div>
+                        {pls.length > 0 && (
+                          <div className="border-t border-border pt-2 space-y-1">
+                            {pls.map((pl) => (
+                              <button
+                                key={pl.id}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewPackingList(pl.file_path);
+                                }}
+                                className="w-full flex items-center gap-2 text-xs text-primary hover:underline text-left"
+                                title={pl.file_name}
+                              >
+                                <ClipboardList className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">{pl.file_name || 'Packing list'}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
