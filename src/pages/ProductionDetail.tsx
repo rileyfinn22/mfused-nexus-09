@@ -317,6 +317,8 @@ export default function ProductionDetail() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [shipmentLegs, setShipmentLegs] = useState<ShipmentLeg[]>([]);
+  const [packingListsByInvoice, setPackingListsByInvoice] = useState<Record<string, Array<{ id: string; file_name: string; file_path: string }>>>({});
+  const [itemsExpanded, setItemsExpanded] = useState(false);
   const [addLegDialogOpen, setAddLegDialogOpen] = useState(false);
   const [deliveryNotifLeg, setDeliveryNotifLeg] = useState<ShipmentLeg | null>(null);
 
