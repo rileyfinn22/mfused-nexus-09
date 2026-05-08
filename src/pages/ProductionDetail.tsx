@@ -395,19 +395,40 @@ export default function ProductionDetail() {
     }
   };
 
-  const handleViewPackingList = async (filePath: string) => {
+  const handleDownloadPackingList = async (filePath: string, fileName: string) => {
     try {
       const normalized = normalizeStorageObjectPath(filePath, 'packing-lists');
-      const { data, error } = await supabase.storage
+      // Try direct blob download first
+      const { data: blob, error: dlError } = await supabase.storage
         .from('packing-lists')
-        .createSignedUrl(normalized, 3600);
-      if (error || !data?.signedUrl) {
-        toast({ title: "Error", description: error?.message || "Failed to open packing list", variant: "destructive" });
+        .download(normalized);
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || 'packing-list';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
         return;
       }
-      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+      // Fallback to signed URL with download flag
+      const { data, error } = await supabase.storage
+        .from('packing-lists')
+        .createSignedUrl(normalized, 3600, { download: fileName || true });
+      if (error || !data?.signedUrl) {
+        toast({ title: "Error", description: error?.message || dlError?.message || "Failed to download packing list", variant: "destructive" });
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = data.signedUrl;
+      a.download = fileName || 'packing-list';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     } catch (e: any) {
-      toast({ title: "Error", description: e?.message || "Failed to open packing list", variant: "destructive" });
+      toast({ title: "Error", description: e?.message || "Failed to download packing list", variant: "destructive" });
     }
   };
 
