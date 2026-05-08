@@ -374,8 +374,40 @@ export default function ProductionDetail() {
         .order('line_number', { ascending: true });
 
       setOrderItems(itemsData || []);
+
+      // Fetch packing lists attached to these invoices
+      const invoiceIds = (shipmentsData || []).map((s: any) => s.id);
+      if (invoiceIds.length > 0) {
+        const { data: plData } = await supabase
+          .from('invoice_packing_lists')
+          .select('id, invoice_id, file_name, file_path')
+          .in('invoice_id', invoiceIds);
+        const byInv: Record<string, Array<{ id: string; file_name: string; file_path: string }>> = {};
+        (plData || []).forEach((pl: any) => {
+          (byInv[pl.invoice_id] ||= []).push({ id: pl.id, file_name: pl.file_name, file_path: pl.file_path });
+        });
+        setPackingListsByInvoice(byInv);
+      } else {
+        setPackingListsByInvoice({});
+      }
     } catch (error: any) {
       console.error('Error fetching fulfillment data:', error);
+    }
+  };
+
+  const handleViewPackingList = async (filePath: string) => {
+    try {
+      const normalized = normalizeStorageObjectPath(filePath, 'packing-lists');
+      const { data, error } = await supabase.storage
+        .from('packing-lists')
+        .createSignedUrl(normalized, 3600);
+      if (error || !data?.signedUrl) {
+        toast({ title: "Error", description: error?.message || "Failed to open packing list", variant: "destructive" });
+        return;
+      }
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to open packing list", variant: "destructive" });
     }
   };
 
