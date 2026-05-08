@@ -1631,13 +1631,14 @@ export default function ProductionDetail() {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleViewPackingList(pl.file_path);
+                                  handleDownloadPackingList(pl.file_path, pl.file_name);
                                 }}
                                 className="w-full flex items-center gap-2 text-xs text-primary hover:underline text-left"
-                                title={pl.file_name}
+                                title={`Download ${pl.file_name}`}
                               >
                                 <ClipboardList className="h-3.5 w-3.5 shrink-0" />
                                 <span className="truncate">{pl.file_name || 'Packing list'}</span>
+                                <span className="ml-auto text-muted-foreground text-[10px] uppercase">Download</span>
                               </button>
                             ))}
                           </div>
