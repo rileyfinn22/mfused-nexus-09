@@ -395,19 +395,40 @@ export default function ProductionDetail() {
     }
   };
 
-  const handleViewPackingList = async (filePath: string) => {
+  const handleDownloadPackingList = async (filePath: string, fileName: string) => {
     try {
       const normalized = normalizeStorageObjectPath(filePath, 'packing-lists');
-      const { data, error } = await supabase.storage
+      // Try direct blob download first
+      const { data: blob, error: dlError } = await supabase.storage
         .from('packing-lists')
-        .createSignedUrl(normalized, 3600);
-      if (error || !data?.signedUrl) {
-        toast({ title: "Error", description: error?.message || "Failed to open packing list", variant: "destructive" });
+        .download(normalized);
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || 'packing-list';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
         return;
       }
-      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+      // Fallback to signed URL with download flag
+      const { data, error } = await supabase.storage
+        .from('packing-lists')
+        .createSignedUrl(normalized, 3600, { download: fileName || true });
+      if (error || !data?.signedUrl) {
+        toast({ title: "Error", description: error?.message || dlError?.message || "Failed to download packing list", variant: "destructive" });
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = data.signedUrl;
+      a.download = fileName || 'packing-list';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     } catch (e: any) {
-      toast({ title: "Error", description: e?.message || "Failed to open packing list", variant: "destructive" });
+      toast({ title: "Error", description: e?.message || "Failed to download packing list", variant: "destructive" });
     }
   };
 
@@ -1610,13 +1631,14 @@ export default function ProductionDetail() {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleViewPackingList(pl.file_path);
+                                  handleDownloadPackingList(pl.file_path, pl.file_name);
                                 }}
                                 className="w-full flex items-center gap-2 text-xs text-primary hover:underline text-left"
-                                title={pl.file_name}
+                                title={`Download ${pl.file_name}`}
                               >
                                 <ClipboardList className="h-3.5 w-3.5 shrink-0" />
                                 <span className="truncate">{pl.file_name || 'Packing list'}</span>
+                                <span className="ml-auto text-muted-foreground text-[10px] uppercase">Download</span>
                               </button>
                             ))}
                           </div>
