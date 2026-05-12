@@ -1,0 +1,2 @@
+UPDATE artwork_files SET filename = 'MD-Fire-Blue Dream-Plus-1G-0904.pdf' WHERE sku = 'MF-SLV-MD-1G-FIRE-BLUEDREAM';
+UPDATE artwork_files SET filename = 'MD-Fire-Maui Pineapple-Plus-1G-0904.pdf' WHERE sku = 'MF-SLV-MD-1G-FIRE-MAUIPINEAPPLE';
