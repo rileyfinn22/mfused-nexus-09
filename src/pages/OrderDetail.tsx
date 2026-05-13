@@ -1138,7 +1138,7 @@ const OrderDetail = () => {
           quantity: item.quantity,
           unit_price: item.unit_price,
           total: Number(item.quantity) * Number(item.unit_price),
-          shipped_quantity: 0
+          shipped_quantity: null
         }));
         phase1Promises.push(
           (async () => { await supabase.from('order_items').insert(itemsToInsert); })()
@@ -1379,7 +1379,7 @@ const OrderDetail = () => {
       quantity: newItemQuantity,
       unit_price: newItemPrice || product.price || 0,
       total: newItemQuantity * (newItemPrice || product.price || 0),
-      shipped_quantity: 0,
+      shipped_quantity: null,
       isNew: true
     };
 
@@ -1553,7 +1553,7 @@ const OrderDetail = () => {
                   quantity: item.quantity || 1,
                   unit_price: item.unit_price || product?.price || 0,
                   total: (item.quantity || 1) * (item.unit_price || product?.price || 0),
-                  shipped_quantity: 0,
+                  shipped_quantity: null,
                   isNew: true
                 });
               } else {
@@ -1592,7 +1592,7 @@ const OrderDetail = () => {
                 quantity: item.quantity || 1,
                 unit_price: item.unit_price || product?.price || 0,
                 total: (item.quantity || 1) * (item.unit_price || product?.price || 0),
-                shipped_quantity: 0,
+                shipped_quantity: null,
                 isNew: true
               });
             } else {
@@ -1654,7 +1654,7 @@ const OrderDetail = () => {
       quantity: item.quantity || 1,
       unit_price: item.unit_price || product.price || 0,
       total: (item.quantity || 1) * (item.unit_price || product.price || 0),
-      shipped_quantity: 0,
+      shipped_quantity: null,
       isNew: true
     };
 

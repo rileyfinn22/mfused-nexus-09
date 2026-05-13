@@ -589,7 +589,7 @@ const CreateOrder = () => {
               name: product?.name || "",
               description: product?.description || null,
               quantity: item.quantity,
-              shipped_quantity: 0,
+              shipped_quantity: null,
               unit_price: price,
               total: price * item.quantity,
             };
@@ -1888,7 +1888,7 @@ const CreateOrder = () => {
                 name: product?.name || "(unnamed product)",
                 description: product?.description || null,
                 quantity: item.quantity,
-                shipped_quantity: 0,
+                shipped_quantity: null,
                 unit_price: price,
                 total: itemTotal,
               });
@@ -1924,7 +1924,7 @@ const CreateOrder = () => {
               name: item.name || item.description || 'Unmatched Item',
               description: item.description || null,
               quantity: qty,
-              shipped_quantity: 0,
+              shipped_quantity: null,
               unit_price: unit,
               total: qty * unit,
             };
@@ -1951,7 +1951,7 @@ const CreateOrder = () => {
             name: product?.name || "",
             description: product?.description || null,
             quantity: item.quantity,
-            shipped_quantity: 0,
+            shipped_quantity: null,
             unit_price: price,
             total: itemTotal,
           };
@@ -1969,7 +1969,7 @@ const CreateOrder = () => {
             name: item.name || item.description || 'Unmatched Item',
             description: item.description || null,
             quantity: qty,
-            shipped_quantity: 0,
+            shipped_quantity: null,
             unit_price: unit,
             total: qty * unit,
           };
