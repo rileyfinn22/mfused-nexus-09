@@ -59,6 +59,8 @@ export function CreateCustomVendorPODialog({
   const [fetchingData, setFetchingData] = useState(true);
   const [createdPOId, setCreatedPOId] = useState<string | null>(null);
   const [createdPONumber, setCreatedPONumber] = useState<string | null>(null);
+  const [existingPO, setExistingPO] = useState<{ id: string; po_number: string } | null>(null);
+  const [mergeChoice, setMergeChoice] = useState<"merge" | "new">("merge");
 
   // Form state
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
