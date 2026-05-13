@@ -408,6 +408,34 @@ export function CreateCustomVendorPODialog({
               </div>
             </div>
 
+            {existingPO && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
+                <div className="text-sm font-medium">
+                  This vendor already has PO <span className="font-mono">{existingPO.po_number}</span> on this order.
+                </div>
+                <div className="flex flex-col gap-1.5 text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="mergeChoice"
+                      checked={mergeChoice === "merge"}
+                      onChange={() => setMergeChoice("merge")}
+                    />
+                    Add these line items to existing PO {existingPO.po_number}
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="mergeChoice"
+                      checked={mergeChoice === "new"}
+                      onChange={() => setMergeChoice("new")}
+                    />
+                    Create a new separate PO for this vendor
+                  </label>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Description / Notes</Label>
               <Textarea
