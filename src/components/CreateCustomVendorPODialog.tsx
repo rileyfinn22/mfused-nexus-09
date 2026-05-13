@@ -199,12 +199,19 @@ export function CreateCustomVendorPODialog({
     setLoading(true);
     try {
       // Check if a vendor PO already exists for this vendor + order
-      const { data: existingPO } = await supabase
-        .from("vendor_pos")
-        .select("*")
-        .eq("order_id", orderId)
-        .eq("vendor_id", selectedVendorId)
-        .maybeSingle();
+      // (only honor merge when user explicitly chose to merge)
+      let existingPO: any = null;
+      if (mergeChoice === "merge") {
+        const { data } = await supabase
+          .from("vendor_pos")
+          .select("*")
+          .eq("order_id", orderId)
+          .eq("vendor_id", selectedVendorId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        existingPO = data;
+      }
 
       let targetPO: any;
 
