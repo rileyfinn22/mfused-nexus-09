@@ -76,8 +76,34 @@ export function CreateCustomVendorPODialog({
       // Reset form when opening
       setCreatedPOId(null);
       setCreatedPONumber(null);
+      setExistingPO(null);
+      setMergeChoice("merge");
     }
   }, [open]);
+
+  // Detect existing PO when vendor changes
+  useEffect(() => {
+    if (!selectedVendorId || !orderId) {
+      setExistingPO(null);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("vendor_pos")
+        .select("id, po_number")
+        .eq("order_id", orderId)
+        .eq("vendor_id", selectedVendorId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        setExistingPO({ id: data.id, po_number: data.po_number });
+        setMergeChoice("merge");
+      } else {
+        setExistingPO(null);
+      }
+    })();
+  }, [selectedVendorId, orderId]);
 
   const fetchVendors = async () => {
     setFetchingData(true);
