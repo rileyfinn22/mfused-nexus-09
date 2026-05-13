@@ -59,6 +59,8 @@ export function CreateCustomVendorPODialog({
   const [fetchingData, setFetchingData] = useState(true);
   const [createdPOId, setCreatedPOId] = useState<string | null>(null);
   const [createdPONumber, setCreatedPONumber] = useState<string | null>(null);
+  const [existingPO, setExistingPO] = useState<{ id: string; po_number: string } | null>(null);
+  const [mergeChoice, setMergeChoice] = useState<"merge" | "new">("merge");
 
   // Form state
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
@@ -74,8 +76,34 @@ export function CreateCustomVendorPODialog({
       // Reset form when opening
       setCreatedPOId(null);
       setCreatedPONumber(null);
+      setExistingPO(null);
+      setMergeChoice("merge");
     }
   }, [open]);
+
+  // Detect existing PO when vendor changes
+  useEffect(() => {
+    if (!selectedVendorId || !orderId) {
+      setExistingPO(null);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("vendor_pos")
+        .select("id, po_number")
+        .eq("order_id", orderId)
+        .eq("vendor_id", selectedVendorId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        setExistingPO({ id: data.id, po_number: data.po_number });
+        setMergeChoice("merge");
+      } else {
+        setExistingPO(null);
+      }
+    })();
+  }, [selectedVendorId, orderId]);
 
   const fetchVendors = async () => {
     setFetchingData(true);
@@ -171,12 +199,19 @@ export function CreateCustomVendorPODialog({
     setLoading(true);
     try {
       // Check if a vendor PO already exists for this vendor + order
-      const { data: existingPO } = await supabase
-        .from("vendor_pos")
-        .select("*")
-        .eq("order_id", orderId)
-        .eq("vendor_id", selectedVendorId)
-        .maybeSingle();
+      // (only honor merge when user explicitly chose to merge)
+      let existingPO: any = null;
+      if (mergeChoice === "merge") {
+        const { data } = await supabase
+          .from("vendor_pos")
+          .select("*")
+          .eq("order_id", orderId)
+          .eq("vendor_id", selectedVendorId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        existingPO = data;
+      }
 
       let targetPO: any;
 
@@ -372,6 +407,34 @@ export function CreateCustomVendorPODialog({
                 />
               </div>
             </div>
+
+            {existingPO && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
+                <div className="text-sm font-medium">
+                  This vendor already has PO <span className="font-mono">{existingPO.po_number}</span> on this order.
+                </div>
+                <div className="flex flex-col gap-1.5 text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="mergeChoice"
+                      checked={mergeChoice === "merge"}
+                      onChange={() => setMergeChoice("merge")}
+                    />
+                    Add these line items to existing PO {existingPO.po_number}
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="mergeChoice"
+                      checked={mergeChoice === "new"}
+                      onChange={() => setMergeChoice("new")}
+                    />
+                    Create a new separate PO for this vendor
+                  </label>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Description / Notes</Label>
