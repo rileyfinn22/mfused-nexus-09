@@ -149,7 +149,6 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
           .update({
             sku: item.editedSku,
             name: item.editedName,
-            quantity: qty,
             unit_cost: cost,
             total: qty * cost,
             final_quantity: qty,
