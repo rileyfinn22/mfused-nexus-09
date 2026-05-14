@@ -48,7 +48,7 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
     if (open && poItems) {
       setItems(poItems.map(item => ({
         ...item,
-        editedQty: item.final_quantity ?? item.shipped_quantity ?? item.quantity,
+        editedQty: item.final_quantity ?? (item.shipped_quantity && item.shipped_quantity > 0 ? item.shipped_quantity : item.quantity),
         editedCost: item.final_unit_cost ?? item.unit_cost,
         editedSku: item.sku,
         editedName: item.name
