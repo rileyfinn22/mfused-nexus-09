@@ -159,9 +159,7 @@ export function SyncToQuickBooksDialog({
   // Total deposit amount.
   // When parent carries the deposit %, the actual deposit billed = parent.total * pct / 100
   // (parent.total is the full blanket, not the deposit slice).
-  const depositAmount = hasParentDeposit 
-    ? Number(parentInvoice.total || 0) * Number(parentInvoice.billed_percentage || 0) / 100
-    : hasChildDeposits 
+  const depositAmount = hasChildDeposits 
       ? depositChildInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0)
       : hasDirectDepositPayment
         ? effectiveInvoicePaid
@@ -169,15 +167,11 @@ export function SyncToQuickBooksDialog({
   
   const hasDeposit = hasParentDeposit || hasChildDeposits || hasDirectDepositPayment;
   
-  const depositPaid = hasParentDeposit 
-    ? payments.filter(p => p.invoice_id === parentInvoice.id).reduce((sum, p) => sum + Number(p.amount || 0), 0)
-    : hasChildDeposits
+  const depositPaid = hasChildDeposits
       ? payments.filter(p => depositChildInvoices.some(d => d.id === p.invoice_id)).reduce((sum, p) => sum + Number(p.amount || 0), 0)
       : 0;
   
-  const depositInvoiceLabel = hasParentDeposit
-    ? `${Math.round(Number(parentInvoice.billed_percentage))}% Deposit (${parentInvoice.invoice_number})`
-    : hasChildDeposits
+  const depositInvoiceLabel = hasChildDeposits
       ? depositChildInvoices.map(d => `${Math.round(Number(d.billed_percentage))}% Deposit (${d.invoice_number})`).join(', ')
       : hasDirectDepositPayment
         ? 'Deposit Payment Received'
