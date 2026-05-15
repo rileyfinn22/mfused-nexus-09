@@ -263,7 +263,7 @@ export function SyncToQuickBooksDialog({
                           ) : (
                             <span className="text-muted-foreground">·</span>
                           )}
-                          {!isPullShipInvoice && Number(inv.billed_percentage || 100) < 99.99 && (
+                          {!inv.parent_invoice_id && !isPullShipInvoice && Number(inv.billed_percentage || 100) < 99.99 && (
                             <Badge variant="secondary" className="text-[10px] shrink-0">
                               {Math.round(Number(inv.billed_percentage))}% Dep
                             </Badge>
