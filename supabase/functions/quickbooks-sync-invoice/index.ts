@@ -149,18 +149,27 @@ serve(async (req) => {
     const invoiceTotal = Number(invoice.total || 0);
     const isPullShipInvoice = String(invoice.notes || '').toLowerCase().includes('pull & ship order');
 
+    const isChildInvoice = !!invoice.parent_invoice_id;
+    const storedBilledPercentage = Number(invoice.billed_percentage || 100);
+
     let billingPercentage = 100;
     if (isPullShipInvoice) {
       billingPercentage = 100;
       console.log('Pull & Ship invoice detected — forcing 100% shipped-value billing');
+    } else if (isChildInvoice && storedBilledPercentage >= 99.99) {
+      billingPercentage = 100;
+      console.log('Child shipment invoice detected — forcing 100% shipped-value billing');
+    } else if (isChildInvoice && storedBilledPercentage < 99.99) {
+      billingPercentage = storedBilledPercentage;
+      console.log('Child deposit invoice detected — using stored billed percentage:', billingPercentage);
     } else if (typeof requestedPercentage === 'number' && requestedPercentage > 0 && requestedPercentage <= 100) {
       billingPercentage = requestedPercentage;
       console.log('Using requested billing percentage:', billingPercentage);
-    } else if (orderTotal > 0 && invoiceTotal > 0 && invoiceTotal < orderTotal) {
+    } else if (!isChildInvoice && orderTotal > 0 && invoiceTotal > 0 && invoiceTotal < orderTotal) {
       billingPercentage = Math.round((invoiceTotal / orderTotal) * 100);
       console.log(`Calculated billing percentage from totals: ${invoiceTotal}/${orderTotal} = ${billingPercentage}%`);
-    } else if (invoice.billed_percentage && invoice.billed_percentage < 100) {
-      billingPercentage = invoice.billed_percentage;
+    } else if (storedBilledPercentage < 99.99) {
+      billingPercentage = storedBilledPercentage;
       console.log('Using stored billed_percentage:', billingPercentage);
     }
     console.log('Effective billing percentage:', billingPercentage);
@@ -717,46 +726,13 @@ serve(async (req) => {
       }
     }
 
-    // Deduct deposits: check both directions
-    // 1. Child invoice looking at parent deposit
-    if (invoice.parent_invoice_id && billingPercentage === 100 && !isPullShipInvoice) {
-      const { data: parentInvoice } = await supabase
-        .from('invoices')
-        .select('billed_percentage, total, total_paid, invoice_number')
-        .eq('id', invoice.parent_invoice_id)
-        .single();
+    const isFullBlanketSync = !invoice.parent_invoice_id && billingPercentage === 100;
 
-      if (parentInvoice && parentInvoice.billed_percentage && Number(parentInvoice.billed_percentage) < 99.99) {
-        const parentPct = Number(parentInvoice.billed_percentage);
-        const depositAmount = Number(parentInvoice.total || 0) * parentPct / 100;
-        if (depositAmount > 0) {
-          console.log(`Parent invoice ${parentInvoice.invoice_number} was a ${parentPct}% deposit of $${depositAmount} — deducting from child invoice`);
-
-          const depositItemId = await findOrCreateQBItem('Deposit Applied', 'Previously billed deposit credit', depositAmount);
-
-          lineItems.push({
-            DetailType: 'SalesItemLineDetail',
-            Amount: -depositAmount,
-            Description: `Less: ${Math.round(parentPct)}% Deposit (Invoice #${parentInvoice.invoice_number})`,
-            SalesItemLineDetail: {
-              ItemRef: {
-                value: depositItemId,
-                name: 'Deposit Applied',
-              },
-              Qty: 1,
-              UnitPrice: -depositAmount,
-            },
-          });
-
-          calculatedSubtotal -= depositAmount;
-          console.log(`Adjusted subtotal after deposit deduction: ${calculatedSubtotal}`);
-        }
-      }
-    }
-
-    // 2. Blanket/parent invoice looking at child deposit invoices
+    // Deduct deposits only when syncing the blanket/final invoice.
+    // Shipment child invoices are already their own draw-down amount.
+    // 1. Blanket/parent invoice looking at child deposit invoices
     let hasDepositChildInvoices = false;
-    if (!invoice.parent_invoice_id && billingPercentage === 100) {
+    if (isFullBlanketSync) {
       const { data: childDeposits } = await supabase
         .from('invoices')
         .select('billed_percentage, total, total_paid, invoice_number, quickbooks_id')
@@ -1481,7 +1457,7 @@ serve(async (req) => {
         quickbooks_synced_at: new Date().toISOString(),
         quickbooks_sync_status: 'synced',
         quickbooks_payment_link: qbPaymentLink,
-        billed_percentage: isPullShipInvoice ? null : billingPercentage,
+        billed_percentage: isPullShipInvoice || isChildInvoice ? null : billingPercentage,
         status: 'billed'
       })
       .eq('id', invoiceId);
