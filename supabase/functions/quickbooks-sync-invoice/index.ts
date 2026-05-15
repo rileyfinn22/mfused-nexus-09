@@ -149,18 +149,24 @@ serve(async (req) => {
     const invoiceTotal = Number(invoice.total || 0);
     const isPullShipInvoice = String(invoice.notes || '').toLowerCase().includes('pull & ship order');
 
+    const isChildInvoice = !!invoice.parent_invoice_id;
+    const storedBilledPercentage = Number(invoice.billed_percentage || 100);
+
     let billingPercentage = 100;
     if (isPullShipInvoice) {
       billingPercentage = 100;
       console.log('Pull & Ship invoice detected — forcing 100% shipped-value billing');
+    } else if (isChildInvoice && storedBilledPercentage >= 99.99) {
+      billingPercentage = 100;
+      console.log('Child shipment invoice detected — forcing 100% shipped-value billing');
     } else if (typeof requestedPercentage === 'number' && requestedPercentage > 0 && requestedPercentage <= 100) {
       billingPercentage = requestedPercentage;
       console.log('Using requested billing percentage:', billingPercentage);
-    } else if (orderTotal > 0 && invoiceTotal > 0 && invoiceTotal < orderTotal) {
+    } else if (!isChildInvoice && orderTotal > 0 && invoiceTotal > 0 && invoiceTotal < orderTotal) {
       billingPercentage = Math.round((invoiceTotal / orderTotal) * 100);
       console.log(`Calculated billing percentage from totals: ${invoiceTotal}/${orderTotal} = ${billingPercentage}%`);
-    } else if (invoice.billed_percentage && invoice.billed_percentage < 100) {
-      billingPercentage = invoice.billed_percentage;
+    } else if (storedBilledPercentage < 99.99) {
+      billingPercentage = storedBilledPercentage;
       console.log('Using stored billed_percentage:', billingPercentage);
     }
     console.log('Effective billing percentage:', billingPercentage);
