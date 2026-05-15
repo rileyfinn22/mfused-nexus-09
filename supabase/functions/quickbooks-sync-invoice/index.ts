@@ -726,17 +726,18 @@ serve(async (req) => {
         .eq('id', invoice.parent_invoice_id)
         .single();
 
-      if (parentInvoice && parentInvoice.billed_percentage && Number(parentInvoice.billed_percentage) < 100) {
-        const depositAmount = Number(parentInvoice.total || 0);
+      if (parentInvoice && parentInvoice.billed_percentage && Number(parentInvoice.billed_percentage) < 99.99) {
+        const parentPct = Number(parentInvoice.billed_percentage);
+        const depositAmount = Number(parentInvoice.total || 0) * parentPct / 100;
         if (depositAmount > 0) {
-          console.log(`Parent invoice ${parentInvoice.invoice_number} was a ${parentInvoice.billed_percentage}% deposit of $${depositAmount} — deducting from child invoice`);
+          console.log(`Parent invoice ${parentInvoice.invoice_number} was a ${parentPct}% deposit of $${depositAmount} — deducting from child invoice`);
 
           const depositItemId = await findOrCreateQBItem('Deposit Applied', 'Previously billed deposit credit', depositAmount);
 
           lineItems.push({
             DetailType: 'SalesItemLineDetail',
             Amount: -depositAmount,
-            Description: `Less: ${parentInvoice.billed_percentage}% Deposit (Invoice #${parentInvoice.invoice_number})`,
+            Description: `Less: ${Math.round(parentPct)}% Deposit (Invoice #${parentInvoice.invoice_number})`,
             SalesItemLineDetail: {
               ItemRef: {
                 value: depositItemId,
