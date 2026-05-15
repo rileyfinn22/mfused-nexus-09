@@ -727,44 +727,8 @@ serve(async (req) => {
     const isFullBlanketSync = !invoice.parent_invoice_id && billingPercentage === 100;
 
     // Deduct deposits only when syncing the blanket/final invoice.
-    // Shipment child invoices are already their own draw-down amount, so applying the
-    // parent blanket deposit to each child can incorrectly make the QBO invoice $0.
-    if (isFullBlanketSync && !isPullShipInvoice) {
-      const { data: parentInvoice } = await supabase
-        .from('invoices')
-        .select('billed_percentage, total, total_paid, invoice_number')
-        .eq('id', invoice.parent_invoice_id)
-        .single();
-
-      if (parentInvoice && parentInvoice.billed_percentage && Number(parentInvoice.billed_percentage) < 99.99) {
-        const parentPct = Number(parentInvoice.billed_percentage);
-        const depositAmount = roundMoney(Number(parentInvoice.total || 0) * parentPct / 100);
-        if (depositAmount > 0) {
-          console.log(`Parent invoice ${parentInvoice.invoice_number} was a ${parentPct}% deposit of $${depositAmount} — deducting from child invoice`);
-
-          const depositItemId = await findOrCreateQBItem('Deposit Applied', 'Previously billed deposit credit', depositAmount);
-
-          lineItems.push({
-            DetailType: 'SalesItemLineDetail',
-            Amount: -depositAmount,
-            Description: `Less: ${Math.round(parentPct)}% Deposit (Invoice #${parentInvoice.invoice_number})`,
-            SalesItemLineDetail: {
-              ItemRef: {
-                value: depositItemId,
-                name: 'Deposit Applied',
-              },
-              Qty: 1,
-              UnitPrice: -depositAmount,
-            },
-          });
-
-          calculatedSubtotal -= depositAmount;
-          console.log(`Adjusted subtotal after deposit deduction: ${calculatedSubtotal}`);
-        }
-      }
-    }
-
-    // 2. Blanket/parent invoice looking at child deposit invoices
+    // Shipment child invoices are already their own draw-down amount.
+    // 1. Blanket/parent invoice looking at child deposit invoices
     let hasDepositChildInvoices = false;
     if (isFullBlanketSync) {
       const { data: childDeposits } = await supabase
