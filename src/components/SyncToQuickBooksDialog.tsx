@@ -153,9 +153,11 @@ export function SyncToQuickBooksDialog({
   const isBlanket = !invoice?.parent_invoice_id;
   const hasDirectDepositPayment = isBlanket && !hasChildDeposits && effectiveInvoicePaid > 0;
 
-  // Total deposit amount
+  // Total deposit amount.
+  // When parent carries the deposit %, the actual deposit billed = parent.total * pct / 100
+  // (parent.total is the full blanket, not the deposit slice).
   const depositAmount = hasParentDeposit 
-    ? Number(parentInvoice.total || 0)
+    ? Number(parentInvoice.total || 0) * Number(parentInvoice.billed_percentage || 0) / 100
     : hasChildDeposits 
       ? depositChildInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0)
       : hasDirectDepositPayment
