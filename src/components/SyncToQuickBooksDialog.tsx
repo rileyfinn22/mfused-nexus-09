@@ -137,13 +137,14 @@ export function SyncToQuickBooksDialog({
     ? billingHistory.find(inv => inv.id === invoice.parent_invoice_id)
     : null;
   
-  // Find deposit child invoices (billed_percentage < 100) for this order
+  // Find deposit child invoices (billed_percentage < 100) for this order.
+  // Use a tolerance to ignore float-precision artifacts like 99.99999999999999.
   const depositChildInvoices = billingHistory.filter(
-    inv => inv.parent_invoice_id === invoice?.id && Number(inv.billed_percentage || 100) < 100
+    inv => inv.parent_invoice_id === invoice?.id && Number(inv.billed_percentage || 100) < 99.99
   );
   
   // Deposit from parent (when viewing a child invoice)
-  const hasParentDeposit = !isPullShipInvoice && parentInvoice && Number(parentInvoice.billed_percentage || 100) < 100;
+  const hasParentDeposit = !isPullShipInvoice && parentInvoice && Number(parentInvoice.billed_percentage || 100) < 99.99;
   
   // Deposit from children (when viewing the blanket invoice)
   const hasChildDeposits = depositChildInvoices.length > 0;
@@ -152,9 +153,11 @@ export function SyncToQuickBooksDialog({
   const isBlanket = !invoice?.parent_invoice_id;
   const hasDirectDepositPayment = isBlanket && !hasChildDeposits && effectiveInvoicePaid > 0;
 
-  // Total deposit amount
+  // Total deposit amount.
+  // When parent carries the deposit %, the actual deposit billed = parent.total * pct / 100
+  // (parent.total is the full blanket, not the deposit slice).
   const depositAmount = hasParentDeposit 
-    ? Number(parentInvoice.total || 0)
+    ? Number(parentInvoice.total || 0) * Number(parentInvoice.billed_percentage || 0) / 100
     : hasChildDeposits 
       ? depositChildInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0)
       : hasDirectDepositPayment
@@ -170,9 +173,9 @@ export function SyncToQuickBooksDialog({
       : 0;
   
   const depositInvoiceLabel = hasParentDeposit
-    ? `${parentInvoice.billed_percentage}% Deposit (${parentInvoice.invoice_number})`
+    ? `${Math.round(Number(parentInvoice.billed_percentage))}% Deposit (${parentInvoice.invoice_number})`
     : hasChildDeposits
-      ? depositChildInvoices.map(d => `${d.billed_percentage}% Deposit (${d.invoice_number})`).join(', ')
+      ? depositChildInvoices.map(d => `${Math.round(Number(d.billed_percentage))}% Deposit (${d.invoice_number})`).join(', ')
       : hasDirectDepositPayment
         ? 'Deposit Payment Received'
         : '';
@@ -257,9 +260,9 @@ export function SyncToQuickBooksDialog({
                           ) : (
                             <span className="text-muted-foreground">·</span>
                           )}
-                          {!isPullShipInvoice && Number(inv.billed_percentage || 100) < 100 && (
+                          {!isPullShipInvoice && Number(inv.billed_percentage || 100) < 99.99 && (
                             <Badge variant="secondary" className="text-[10px] shrink-0">
-                              {inv.billed_percentage}% Dep
+                              {Math.round(Number(inv.billed_percentage))}% Dep
                             </Badge>
                           )}
                           {isCurrent && (
