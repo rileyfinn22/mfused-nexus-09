@@ -173,9 +173,9 @@ export function SyncToQuickBooksDialog({
       : 0;
   
   const depositInvoiceLabel = hasParentDeposit
-    ? `${parentInvoice.billed_percentage}% Deposit (${parentInvoice.invoice_number})`
+    ? `${Math.round(Number(parentInvoice.billed_percentage))}% Deposit (${parentInvoice.invoice_number})`
     : hasChildDeposits
-      ? depositChildInvoices.map(d => `${d.billed_percentage}% Deposit (${d.invoice_number})`).join(', ')
+      ? depositChildInvoices.map(d => `${Math.round(Number(d.billed_percentage))}% Deposit (${d.invoice_number})`).join(', ')
       : hasDirectDepositPayment
         ? 'Deposit Payment Received'
         : '';
