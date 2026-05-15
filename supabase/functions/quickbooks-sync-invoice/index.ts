@@ -159,6 +159,9 @@ serve(async (req) => {
     } else if (isChildInvoice && storedBilledPercentage >= 99.99) {
       billingPercentage = 100;
       console.log('Child shipment invoice detected — forcing 100% shipped-value billing');
+    } else if (isChildInvoice && storedBilledPercentage < 99.99) {
+      billingPercentage = storedBilledPercentage;
+      console.log('Child deposit invoice detected — using stored billed percentage:', billingPercentage);
     } else if (typeof requestedPercentage === 'number' && requestedPercentage > 0 && requestedPercentage <= 100) {
       billingPercentage = requestedPercentage;
       console.log('Using requested billing percentage:', billingPercentage);
