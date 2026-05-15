@@ -768,7 +768,7 @@ serve(async (req) => {
         // Previously required c.quickbooks_id which caused blanket invoices
         // (e.g. 10737) to bill the full amount when the deposit wasn't synced first.
         const depositChildren = childDeposits.filter(
-          (c: any) => Number(c.billed_percentage || 100) < 100
+          (c: any) => Number(c.billed_percentage || 100) < 99.99
         );
 
         hasDepositChildInvoices = depositChildren.length > 0;
@@ -783,7 +783,7 @@ serve(async (req) => {
             lineItems.push({
               DetailType: 'SalesItemLineDetail',
               Amount: -depositAmount,
-              Description: `Less: ${child.billed_percentage}% Deposit (Invoice #${child.invoice_number})`,
+              Description: `Less: ${Math.round(Number(child.billed_percentage))}% Deposit (Invoice #${child.invoice_number})`,
               SalesItemLineDetail: {
                 ItemRef: {
                   value: depositItemId,
