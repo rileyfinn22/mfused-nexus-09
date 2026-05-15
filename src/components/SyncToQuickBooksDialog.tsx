@@ -143,8 +143,11 @@ export function SyncToQuickBooksDialog({
     inv => inv.parent_invoice_id === invoice?.id && Number(inv.billed_percentage || 100) < 99.99
   );
   
-  // Deposit from parent (when viewing a child invoice)
-  const hasParentDeposit = !isPullShipInvoice && parentInvoice && Number(parentInvoice.billed_percentage || 100) < 99.99;
+  const isChildInvoice = !!invoice?.parent_invoice_id;
+
+  // Parent blanket deposits are not deducted from child shipment invoices;
+  // child invoices already represent their own draw-down amount.
+  const hasParentDeposit = false;
   
   // Deposit from children (when viewing the blanket invoice)
   const hasChildDeposits = depositChildInvoices.length > 0;
@@ -185,7 +188,7 @@ export function SyncToQuickBooksDialog({
 
   // What will actually be billed in QBO for THIS sync
   // Safety net mirrors backend behavior: never bill above remaining balance when billing 100%
-  const depositOffsetForBilling = billingPercentage === 100
+  const depositOffsetForBilling = billingPercentage === 100 && !isChildInvoice
     ? Math.max(depositAmount, effectiveInvoicePaid)
     : 0;
 
