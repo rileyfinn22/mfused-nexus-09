@@ -723,9 +723,13 @@ serve(async (req) => {
       }
     }
 
-    // Deduct deposits: check both directions
-    // 1. Child invoice looking at parent deposit
-    if (invoice.parent_invoice_id && billingPercentage === 100 && !isPullShipInvoice) {
+    const roundMoney = (value: number) => Number(value.toFixed(2));
+    const isFullBlanketSync = !invoice.parent_invoice_id && billingPercentage === 100;
+
+    // Deduct deposits only when syncing the blanket/final invoice.
+    // Shipment child invoices are already their own draw-down amount, so applying the
+    // parent blanket deposit to each child can incorrectly make the QBO invoice $0.
+    if (isFullBlanketSync && !isPullShipInvoice) {
       const { data: parentInvoice } = await supabase
         .from('invoices')
         .select('billed_percentage, total, total_paid, invoice_number')
@@ -734,7 +738,7 @@ serve(async (req) => {
 
       if (parentInvoice && parentInvoice.billed_percentage && Number(parentInvoice.billed_percentage) < 99.99) {
         const parentPct = Number(parentInvoice.billed_percentage);
-        const depositAmount = Number(parentInvoice.total || 0) * parentPct / 100;
+        const depositAmount = roundMoney(Number(parentInvoice.total || 0) * parentPct / 100);
         if (depositAmount > 0) {
           console.log(`Parent invoice ${parentInvoice.invoice_number} was a ${parentPct}% deposit of $${depositAmount} — deducting from child invoice`);
 
@@ -762,7 +766,7 @@ serve(async (req) => {
 
     // 2. Blanket/parent invoice looking at child deposit invoices
     let hasDepositChildInvoices = false;
-    if (!invoice.parent_invoice_id && billingPercentage === 100) {
+    if (isFullBlanketSync) {
       const { data: childDeposits } = await supabase
         .from('invoices')
         .select('billed_percentage, total, total_paid, invoice_number, quickbooks_id')
