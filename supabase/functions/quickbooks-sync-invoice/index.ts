@@ -726,7 +726,6 @@ serve(async (req) => {
       }
     }
 
-    const roundMoney = (value: number) => Number(value.toFixed(2));
     const isFullBlanketSync = !invoice.parent_invoice_id && billingPercentage === 100;
 
     // Deduct deposits only when syncing the blanket/final invoice.
