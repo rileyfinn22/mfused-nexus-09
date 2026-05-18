@@ -51,6 +51,7 @@ const InvoiceDetail = () => {
   const [vendorPOs, setVendorPOs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [editAddressesOpen, setEditAddressesOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedItems, setEditedItems] = useState<any[]>([]);
