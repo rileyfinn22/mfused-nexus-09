@@ -1023,7 +1023,7 @@ serve(async (req) => {
         value: customerId, // Always use parent customer
       },
       Line: lineItems,
-      TxnDate: invoice.invoice_date.split('T')[0],
+      TxnDate: new Date().toISOString().split('T')[0],
       DueDate: invoice.due_date ? invoice.due_date.split('T')[0] : undefined,
       DocNumber: invoice.invoice_number.substring(0, 21), // QuickBooks max 21 chars
       PrivateNote: invoice.notes || '',
@@ -1458,7 +1458,8 @@ serve(async (req) => {
         quickbooks_sync_status: 'synced',
         quickbooks_payment_link: qbPaymentLink,
         billed_percentage: isPullShipInvoice || isChildInvoice ? null : billingPercentage,
-        status: 'billed'
+        status: 'billed',
+        invoice_date: new Date().toISOString(),
       })
       .eq('id', invoiceId);
 
