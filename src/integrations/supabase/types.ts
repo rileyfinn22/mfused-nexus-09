@@ -1161,6 +1161,11 @@ export type Database = {
       invoices: {
         Row: {
           billed_percentage: number | null
+          billing_city: string | null
+          billing_name: string | null
+          billing_state: string | null
+          billing_street: string | null
+          billing_zip: string | null
           blanket_closed_at: string | null
           blanket_closed_by: string | null
           company_id: string
@@ -1204,6 +1209,11 @@ export type Database = {
         }
         Insert: {
           billed_percentage?: number | null
+          billing_city?: string | null
+          billing_name?: string | null
+          billing_state?: string | null
+          billing_street?: string | null
+          billing_zip?: string | null
           blanket_closed_at?: string | null
           blanket_closed_by?: string | null
           company_id: string
@@ -1247,6 +1257,11 @@ export type Database = {
         }
         Update: {
           billed_percentage?: number | null
+          billing_city?: string | null
+          billing_name?: string | null
+          billing_state?: string | null
+          billing_street?: string | null
+          billing_zip?: string | null
           blanket_closed_at?: string | null
           blanket_closed_by?: string | null
           company_id?: string
