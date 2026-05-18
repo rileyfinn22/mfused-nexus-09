@@ -1458,7 +1458,8 @@ serve(async (req) => {
         quickbooks_sync_status: 'synced',
         quickbooks_payment_link: qbPaymentLink,
         billed_percentage: isPullShipInvoice || isChildInvoice ? null : billingPercentage,
-        status: 'billed'
+        status: 'billed',
+        invoice_date: new Date().toISOString(),
       })
       .eq('id', invoiceId);
 
