@@ -1171,6 +1171,7 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          customer_po_number: string | null
           deleted_at: string | null
           description: string | null
           due_date: string | null
@@ -1219,6 +1220,7 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
+          customer_po_number?: string | null
           deleted_at?: string | null
           description?: string | null
           due_date?: string | null
@@ -1267,6 +1269,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          customer_po_number?: string | null
           deleted_at?: string | null
           description?: string | null
           due_date?: string | null
