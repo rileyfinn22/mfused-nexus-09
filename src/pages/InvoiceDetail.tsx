@@ -38,6 +38,7 @@ import { calculateInvoiceTotals, blanketTotalItems, partialTotalItems } from "@/
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { triggerBlobFileDownload } from "@/lib/storageUrl";
 import { CARRIERS, getTrackingUrl } from "@/lib/trackingUtils";
+import { EditInvoiceAddressesDialog } from "@/components/EditInvoiceAddressesDialog";
 
 const InvoiceDetail = () => {
   const {
