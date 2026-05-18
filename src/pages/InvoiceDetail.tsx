@@ -3484,6 +3484,14 @@ const InvoiceDetail = () => {
           senderEmail={currentUserEmail}
         />
       )}
+
+      <EditInvoiceAddressesDialog
+        open={editAddressesOpen}
+        onOpenChange={setEditAddressesOpen}
+        invoice={invoice}
+        order={order}
+        onSaved={(updated) => setInvoice(updated)}
+      />
     </div>;
 };
 export default InvoiceDetail;
