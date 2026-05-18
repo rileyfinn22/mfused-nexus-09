@@ -38,6 +38,7 @@ import { calculateInvoiceTotals, blanketTotalItems, partialTotalItems } from "@/
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { triggerBlobFileDownload } from "@/lib/storageUrl";
 import { CARRIERS, getTrackingUrl } from "@/lib/trackingUtils";
+import { EditInvoiceAddressesDialog } from "@/components/EditInvoiceAddressesDialog";
 
 const InvoiceDetail = () => {
   const {
@@ -50,6 +51,7 @@ const InvoiceDetail = () => {
   const [vendorPOs, setVendorPOs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
+  const [editAddressesOpen, setEditAddressesOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedItems, setEditedItems] = useState<any[]>([]);
@@ -2020,9 +2022,17 @@ const InvoiceDetail = () => {
 
           {/* Shipping Information */}
           <div className="p-8 border-b">
+            <div className="flex items-start justify-between mb-3">
+              <h3 className="text-sm font-semibold">Addresses</h3>
+              {isVibeAdmin && (
+                <Button variant="outline" size="sm" onClick={() => setEditAddressesOpen(true)}>
+                  <Edit className="h-3 w-3 mr-1" /> Edit
+                </Button>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-8">
               <div>
-                <h3 className="text-sm font-semibold mb-3">Ship To</h3>
+                <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Ship To</h4>
                 <div className="text-sm space-y-1">
                   <p className="font-medium">{invoice?.shipping_name || order?.shipping_name}</p>
                   <p className="text-muted-foreground">{invoice?.shipping_street || order?.shipping_street}</p>
@@ -2031,16 +2041,18 @@ const InvoiceDetail = () => {
                   </p>
                 </div>
               </div>
-              {order?.billing_name && <div>
-                  <h3 className="text-sm font-semibold mb-3">Bill To</h3>
+              {(invoice?.billing_name || order?.billing_name) && (
+                <div>
+                  <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Bill To</h4>
                   <div className="text-sm space-y-1">
-                    <p className="font-medium">{order?.billing_name}</p>
-                    <p className="text-muted-foreground">{order?.billing_street}</p>
+                    <p className="font-medium">{invoice?.billing_name || order?.billing_name}</p>
+                    <p className="text-muted-foreground">{invoice?.billing_street || order?.billing_street}</p>
                     <p className="text-muted-foreground">
-                      {order?.billing_city}, {order?.billing_state} {order?.billing_zip}
+                      {invoice?.billing_city || order?.billing_city}, {invoice?.billing_state || order?.billing_state} {invoice?.billing_zip || order?.billing_zip}
                     </p>
                   </div>
-                </div>}
+                </div>
+              )}
             </div>
 
             {/* Shipping Method & Tracking */}
@@ -3472,6 +3484,14 @@ const InvoiceDetail = () => {
           senderEmail={currentUserEmail}
         />
       )}
+
+      <EditInvoiceAddressesDialog
+        open={editAddressesOpen}
+        onOpenChange={setEditAddressesOpen}
+        invoice={invoice}
+        order={order}
+        onSaved={(updated) => setInvoice(updated)}
+      />
     </div>;
 };
 export default InvoiceDetail;
