@@ -131,16 +131,17 @@ const renderInvoiceToDoc = async (
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-  doc.text(invoice.companies?.name || order.customer_name, leftColX, yPos + 8);
+  doc.text(invoice.billing_name || invoice.companies?.name || order.customer_name, leftColX, yPos + 8);
   
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
   
-  const billStreet = order.billing_street || order.shipping_street || '';
-  const billCity = order.billing_city || order.shipping_city || '';
-  const billState = order.billing_state || order.shipping_state || '';
-  const billZip = order.billing_zip || order.shipping_zip || '';
+  // Prefer invoice-level address overrides, then order billing, then order shipping
+  const billStreet = invoice.billing_street || invoice.shipping_street || order.billing_street || order.shipping_street || '';
+  const billCity = invoice.billing_city || invoice.shipping_city || order.billing_city || order.shipping_city || '';
+  const billState = invoice.billing_state || invoice.shipping_state || order.billing_state || order.shipping_state || '';
+  const billZip = invoice.billing_zip || invoice.shipping_zip || order.billing_zip || order.shipping_zip || '';
   
   let billY = yPos + 14;
   if (billStreet) {
