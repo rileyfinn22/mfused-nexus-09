@@ -904,10 +904,23 @@ const Artwork = () => {
     }
   };
 
+  const handleSelectProduct = (product: Product) => {
+    selectedProductIdRef.current = product.id;
+    setArtworkFiles([]);
+    setSelectedFile(null);
+    setPreviewDialogOpen(false);
+    setProductArtworkLoading(true);
+    setSelectedProduct(product);
+  };
+
   const handleBack = () => {
     if (selectedProduct) {
+      selectedProductIdRef.current = null;
       setSelectedProduct(null);
       setArtworkFiles([]);
+      setSelectedFile(null);
+      setPreviewDialogOpen(false);
+      setProductArtworkLoading(false);
     } else if (selectedTemplate) {
       setSelectedTemplate(null);
       setProducts([]);
