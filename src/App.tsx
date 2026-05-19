@@ -34,6 +34,7 @@ import VendorSignup from "./pages/VendorSignup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AcceptInvite from "./pages/AcceptInvite";
+import ArtworkReconcile from "./pages/ArtworkReconcile";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import Projects from "./pages/Projects";
