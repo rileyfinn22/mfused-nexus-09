@@ -317,11 +317,24 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     }
   });
 
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  let finalY = (doc as any).lastAutoTable.finalY + 10;
   const hasAnyPriceBreaks = items.some(item => item.price_breaks && item.price_breaks.length > 0);
+
+  // Reserve room for the "Thank you" footer (~20mm). If totals would collide, push to new page.
+  const FOOTER_RESERVE = 24;
+  const ensureRoom = (needed: number) => {
+    if (finalY + needed > pageHeight - FOOTER_RESERVE) {
+      doc.addPage();
+      finalY = 20;
+    }
+  };
 
   // ============ TOTALS SECTION ============
   if (!hasAnyPriceBreaks) {
+    const totalsHeight =
+      8 + (quote.shipping_cost > 0 ? 8 : 0) + (quote.tax > 0 ? 8 : 0) + 14;
+    ensureRoom(totalsHeight + 5);
+
     const totalsWidth = 85;
     const totalsX = pageWidth - totalsWidth - 14;
     let totalsY = finalY + 5;
@@ -346,44 +359,50 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       totalsY += 8;
     }
 
-    // Divider
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.3);
     doc.line(totalsX, totalsY, totalsX + totalsWidth, totalsY);
     totalsY += 6;
 
-    // Total - emphasized
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...COLORS.primaryGreen);
     doc.text('TOTAL', totalsX, totalsY);
     doc.text(formatCurrency(quote.total), totalsX + totalsWidth, totalsY, { align: 'right' });
+    finalY = totalsY + 6;
   } else {
-    // Note about pricing tiers
+    ensureRoom(10);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(...COLORS.mediumGray);
     doc.text('* Pricing shown per shipping option. Customer selects preferred option.', 14, finalY);
+    finalY += 6;
   }
 
   // ============ NOTES ============
   if (quote.description) {
-    const notesY = hasAnyPriceBreaks ? finalY + 15 : finalY + 35;
+    const notesLines = doc.splitTextToSize(quote.description, pageWidth - 28);
+    const notesHeight = 6 + notesLines.length * 4.5;
+    ensureRoom(notesHeight + 10);
+    const notesY = finalY + 10;
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...COLORS.darkGray);
     doc.text('Notes:', 14, notesY);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...COLORS.mediumGray);
-    const notesLines = doc.splitTextToSize(quote.description, pageWidth - 28);
     doc.text(notesLines, 14, notesY + 6);
   }
 
-  // ============ FOOTER ============
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.primaryGreen);
-  doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+  // ============ FOOTER (on every page) ============
+  const pageCount = doc.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...COLORS.primaryGreen);
+    doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 10, { align: 'center' });
+  }
 
   doc.save(`${quote.quote_number}.pdf`);
 }
