@@ -439,7 +439,10 @@ const Artwork = () => {
   };
 
   const fetchArtworkForProduct = async (product = selectedProduct) => {
-    if (!product?.item_id) return;
+    if (!product?.item_id) {
+      setProductArtworkLoading(false);
+      return;
+    }
     const requestProductId = product.id;
     setProductArtworkLoading(true);
     
