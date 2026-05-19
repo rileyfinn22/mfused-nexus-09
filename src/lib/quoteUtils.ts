@@ -250,7 +250,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       });
     } else {
       tableBody.push([
-        `${headerLine}${descLine}`,
+        `${headerLine}${item.description ? `\n${item.description}` : ''}`,
         formatUnitPrice(item.unit_price),
         item.quantity.toLocaleString(),
         formatCurrency(item.total)
