@@ -16,6 +16,17 @@ interface InvoiceData {
   notes?: string | null;
   companies?: { name: string } | null;
   billed_percentage?: number | null;
+  // Invoice-level address overrides (take precedence over order addresses)
+  billing_name?: string | null;
+  billing_street?: string | null;
+  billing_city?: string | null;
+  billing_state?: string | null;
+  billing_zip?: string | null;
+  shipping_name?: string | null;
+  shipping_street?: string | null;
+  shipping_city?: string | null;
+  shipping_state?: string | null;
+  shipping_zip?: string | null;
 }
 
 interface OrderData {
