@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,13 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { formatUSD } from "@/lib/financeUtils";
+import { calculateFinanceFee, formatUSD } from "@/lib/financeUtils";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
-  invoice: { id: string; financed_amount: number; paid_back_amount: number; invoice_number?: string } | null;
+  invoice: { id: string; financed_amount: number; paid_back_amount: number; financed_date?: string; paid_back_date?: string | null; invoice_number?: string } | null;
 }
 
 export function RecordFinanceRepaymentDialog({ open, onOpenChange, onSuccess, invoice }: Props) {
@@ -25,9 +25,23 @@ export function RecordFinanceRepaymentDialog({ open, onOpenChange, onSuccess, in
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const principalBalance = invoice ? invoice.financed_amount - invoice.paid_back_amount : 0;
+  const fee = invoice && invoice.financed_date
+    ? calculateFinanceFee(invoice.financed_amount, invoice.financed_date, invoice.paid_back_amount, invoice.paid_back_date)
+    : null;
+  const payoffBalance = fee ? principalBalance + fee.feeAmount : principalBalance;
+
+  // Preload amount with full payoff (principal + fee) when dialog opens
+  useEffect(() => {
+    if (open && invoice) {
+      setAmount(payoffBalance > 0 ? payoffBalance.toFixed(2) : "");
+    }
+  }, [open, invoice?.id]);
+
   if (!invoice) return null;
 
-  const balance = invoice.financed_amount - invoice.paid_back_amount;
+  const balance = payoffBalance;
+
 
   const handleSubmit = async () => {
     const amt = parseFloat(amount);
