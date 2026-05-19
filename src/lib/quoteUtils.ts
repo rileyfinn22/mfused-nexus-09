@@ -198,24 +198,25 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   type Row = (string | { content: string; colSpan?: number; styles?: any })[];
   const tableBody: Row[] = [];
   // Track row "kinds" so we can style per-row in didParseCell
-  const rowKinds: ('product' | 'option' | 'tier' | 'simple')[] = [];
+  const rowKinds: ('product' | 'desc' | 'option' | 'tier' | 'simple')[] = [];
 
   items.forEach((item) => {
     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
     const isDescriptionMode = item.quantity === 0 && item.description;
-    const descLine = item.description ? `\n${item.description}` : '';
     const headerLine = `${item.name}    ${item.sku}${item.state ? `  •  ${item.state}` : ''}`;
 
     if (isDescriptionMode) {
-      tableBody.push([
-        { content: `${headerLine}\n\n${item.description}`, colSpan: 4 }
-      ]);
+      tableBody.push([{ content: headerLine, colSpan: 4 }]);
       rowKinds.push('product');
+      tableBody.push([{ content: item.description!, colSpan: 4 }]);
+      rowKinds.push('desc');
     } else if (hasPriceBreaks) {
-      tableBody.push([
-        { content: `${headerLine}${descLine}`, colSpan: 4 }
-      ]);
+      tableBody.push([{ content: headerLine, colSpan: 4 }]);
       rowKinds.push('product');
+      if (item.description) {
+        tableBody.push([{ content: item.description, colSpan: 4 }]);
+        rowKinds.push('desc');
+      }
 
       item.price_breaks.forEach((pb, i) => {
         const label = pb.label?.trim() ? pb.label : `Option ${i + 1}`;
@@ -249,7 +250,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       });
     } else {
       tableBody.push([
-        `${headerLine}${descLine}`,
+        `${headerLine}${item.description ? `\n${item.description}` : ''}`,
         formatUnitPrice(item.unit_price),
         item.quantity.toLocaleString(),
         formatCurrency(item.total)
@@ -293,7 +294,13 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         data.cell.styles.textColor = 255;
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.fontSize = 10;
-        data.cell.styles.cellPadding = { top: 6, right: 4, bottom: 6, left: 4 };
+        data.cell.styles.cellPadding = { top: 5, right: 4, bottom: 5, left: 4 };
+      } else if (kind === 'desc') {
+        data.cell.styles.fillColor = [250, 250, 250];
+        data.cell.styles.textColor = COLORS.darkGray;
+        data.cell.styles.fontStyle = 'normal';
+        data.cell.styles.fontSize = 9;
+        data.cell.styles.cellPadding = { top: 4, right: 6, bottom: 4, left: 6 };
       } else if (kind === 'option') {
         data.cell.styles.fillColor = [240, 245, 235];
         data.cell.styles.fontStyle = 'bold';
@@ -310,11 +317,24 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     }
   });
 
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  let finalY = (doc as any).lastAutoTable.finalY + 10;
   const hasAnyPriceBreaks = items.some(item => item.price_breaks && item.price_breaks.length > 0);
+
+  // Reserve room for the "Thank you" footer (~20mm). If totals would collide, push to new page.
+  const FOOTER_RESERVE = 24;
+  const ensureRoom = (needed: number) => {
+    if (finalY + needed > pageHeight - FOOTER_RESERVE) {
+      doc.addPage();
+      finalY = 20;
+    }
+  };
 
   // ============ TOTALS SECTION ============
   if (!hasAnyPriceBreaks) {
+    const totalsHeight =
+      8 + (quote.shipping_cost > 0 ? 8 : 0) + (quote.tax > 0 ? 8 : 0) + 14;
+    ensureRoom(totalsHeight + 5);
+
     const totalsWidth = 85;
     const totalsX = pageWidth - totalsWidth - 14;
     let totalsY = finalY + 5;
@@ -339,44 +359,50 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       totalsY += 8;
     }
 
-    // Divider
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.3);
     doc.line(totalsX, totalsY, totalsX + totalsWidth, totalsY);
     totalsY += 6;
 
-    // Total - emphasized
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...COLORS.primaryGreen);
     doc.text('TOTAL', totalsX, totalsY);
     doc.text(formatCurrency(quote.total), totalsX + totalsWidth, totalsY, { align: 'right' });
+    finalY = totalsY + 6;
   } else {
-    // Note about pricing tiers
+    ensureRoom(10);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(...COLORS.mediumGray);
     doc.text('* Pricing shown per shipping option. Customer selects preferred option.', 14, finalY);
+    finalY += 6;
   }
 
   // ============ NOTES ============
   if (quote.description) {
-    const notesY = hasAnyPriceBreaks ? finalY + 15 : finalY + 35;
+    const notesLines = doc.splitTextToSize(quote.description, pageWidth - 28);
+    const notesHeight = 6 + notesLines.length * 4.5;
+    ensureRoom(notesHeight + 10);
+    const notesY = finalY + 10;
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...COLORS.darkGray);
     doc.text('Notes:', 14, notesY);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...COLORS.mediumGray);
-    const notesLines = doc.splitTextToSize(quote.description, pageWidth - 28);
     doc.text(notesLines, 14, notesY + 6);
   }
 
-  // ============ FOOTER ============
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.primaryGreen);
-  doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+  // ============ FOOTER (on every page) ============
+  const pageCount = doc.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...COLORS.primaryGreen);
+    doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 10, { align: 'center' });
+  }
 
   doc.save(`${quote.quote_number}.pdf`);
 }
