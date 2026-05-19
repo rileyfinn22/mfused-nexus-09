@@ -90,6 +90,7 @@ const App = () => (
           <Route path="/invoices/:invoiceId" element={<DashboardLayout><InvoiceDetail /></DashboardLayout>} />
           <Route path="/invoices/:invoiceId/shipped" element={<DashboardLayout><InvoiceShippedEdit /></DashboardLayout>} />
           <Route path="/artwork" element={<DashboardLayout><Artwork /></DashboardLayout>} />
+          <Route path="/artwork/reconcile" element={<DashboardLayout><ArtworkReconcile /></DashboardLayout>} />
           <Route path="/artwork/rejected" element={<DashboardLayout><RejectedArchive /></DashboardLayout>} />
           <Route path="/pull-ship" element={<DashboardLayout><PullShip /></DashboardLayout>} />
           <Route path="/pull-ship-orders" element={<DashboardLayout><PullShipOrders /></DashboardLayout>} />
