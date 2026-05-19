@@ -1870,21 +1870,28 @@ const Artwork = () => {
         </div>
       )}
 
-      {/* Rejected Archive Link */}
-      {rejectedFiles.length > 0 && (
-        <div className="mt-6">
-          <div 
+      {/* Admin tools */}
+      <div className="mt-6 flex flex-wrap gap-2">
+        {rejectedFiles.length > 0 && (
+          <div
             className="inline-flex items-center gap-2 bg-card border border-destructive/20 rounded-lg px-4 py-2 hover:shadow-md transition-all cursor-pointer"
             onClick={() => navigate('/artwork/rejected')}
           >
             <XCircle className="h-4 w-4 text-destructive" />
             <span className="text-sm font-medium">Rejected Archive</span>
-            <Badge variant="destructive" className="text-xs">
-              {rejectedFiles.length}
-            </Badge>
+            <Badge variant="destructive" className="text-xs">{rejectedFiles.length}</Badge>
           </div>
-        </div>
-      )}
+        )}
+        {isVibeAdmin && (
+          <div
+            className="inline-flex items-center gap-2 bg-card border border-amber-500/30 rounded-lg px-4 py-2 hover:shadow-md transition-all cursor-pointer"
+            onClick={() => navigate('/artwork/reconcile')}
+          >
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-medium">Reconcile Orphaned Artwork</span>
+          </div>
+        )}
+      </div>
 
         {/* Add Artwork Dialog - defaults to vibe_proof for this tab */}
         <AddArtworkDialog
