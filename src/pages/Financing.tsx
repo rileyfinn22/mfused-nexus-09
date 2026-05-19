@@ -128,11 +128,11 @@ export default function Financing() {
   const totalFinanced = allActive.reduce((s, i) => s + (i.financed_amount || 0), 0);
   const totalFinancedRMB = allActive.reduce((s, i) => s + (i.financed_amount_rmb || 0), 0);
   const totalOutstanding = allActive.filter(i => i.status === "open").reduce((s, i) => {
-    const fee = calculateFinanceFee(i.financed_amount, i.financed_date, i.paid_back_amount);
+    const fee = calculateFinanceFee(i.financed_amount, i.financed_date, i.paid_back_amount, i.paid_back_date);
     return s + (i.financed_amount + fee.feeAmount - i.paid_back_amount);
   }, 0);
   const totalOutstandingRMB = allActive.filter(i => i.status === "open").reduce((s, i) => {
-    const fee = calculateFinanceFee(i.financed_amount, i.financed_date, i.paid_back_amount);
+    const fee = calculateFinanceFee(i.financed_amount, i.financed_date, i.paid_back_amount, i.paid_back_date);
     const rate = i.exchange_rate || 7.2;
     return s + ((i.financed_amount + fee.feeAmount - i.paid_back_amount) * rate);
   }, 0);
@@ -154,7 +154,7 @@ export default function Financing() {
 
     const rows = tab.map((inv) => {
       const vpo = inv.vendor_pos as any;
-      const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
+      const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount, inv.paid_back_date);
       const row: string[] = [];
       if (isVibeAdmin) row.push(vpo?.po_number ? `PO #${vpo.po_number}` : "");
       row.push(
@@ -187,7 +187,7 @@ export default function Financing() {
   };
 
   const renderActiveRow = (inv: any, idx: number) => {
-    const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
+    const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount, inv.paid_back_date);
     const invoice = inv.invoices as any;
     const order = invoice?.orders as any;
     const vendorPO = inv.vendor_pos as any;
