@@ -1426,6 +1426,16 @@ const OrderDetail = () => {
         shipping_note: targetInvoice.shipping_note,
         notes: targetInvoice.notes,
         companies: { name: order.customer_name },
+        billing_name: targetInvoice.billing_name,
+        billing_street: targetInvoice.billing_street,
+        billing_city: targetInvoice.billing_city,
+        billing_state: targetInvoice.billing_state,
+        billing_zip: targetInvoice.billing_zip,
+        shipping_name: targetInvoice.shipping_name,
+        shipping_street: targetInvoice.shipping_street,
+        shipping_city: targetInvoice.shipping_city,
+        shipping_state: targetInvoice.shipping_state,
+        shipping_zip: targetInvoice.shipping_zip,
       };
       
       const orderData = {
