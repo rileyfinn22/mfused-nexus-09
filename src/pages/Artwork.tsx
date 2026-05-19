@@ -1053,7 +1053,13 @@ const Artwork = () => {
         </div>
 
         {/* Artwork Grid */}
-        {artworkFiles.length === 0 ? (
+        {productArtworkLoading ? (
+          <Card className="p-12 text-center">
+            <Loader2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4 animate-spin" />
+            <p className="font-medium mb-2">Loading artwork files</p>
+            <p className="text-sm text-muted-foreground">Fetching files for this SKU...</p>
+          </Card>
+        ) : artworkFiles.length === 0 ? (
           <Card className="p-12 text-center">
             <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
             <p className="font-medium mb-2">No artwork files</p>
