@@ -138,7 +138,7 @@ export default function FinanceView() {
                   </thead>
                   <tbody>
                     {invoices.map((inv: any, idx: number) => {
-                      const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount);
+                      const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount, inv.paid_back_date);
                       const rate = inv.exchange_rate || 7.2;
                       const desc = inv.vendor_po_description || inv.customer_name || "—";
                       return (
