@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -113,7 +113,9 @@ const Artwork = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [artworkFiles, setArtworkFiles] = useState<ArtworkFile[]>([]);
+  const [productArtworkLoading, setProductArtworkLoading] = useState(false);
   const [rejectedFiles, setRejectedFiles] = useState<any[]>([]);
+  const selectedProductIdRef = useRef<string | null>(null);
   
   // Artwork counts per product SKU
   const [artworkCounts, setArtworkCounts] = useState<Record<string, { total: number; approved: number; pending: number }>>({});
@@ -189,10 +191,17 @@ const Artwork = () => {
   }, [selectedTemplate, companyFilter, stateFilter]);
 
   useEffect(() => {
+    selectedProductIdRef.current = selectedProduct?.id ?? null;
+
     if (selectedProduct) {
-      fetchArtworkForProduct();
+      setArtworkFiles([]);
+      setSelectedFile(null);
+      setPreviewDialogOpen(false);
+      fetchArtworkForProduct(selectedProduct);
+    } else {
+      setProductArtworkLoading(false);
     }
-  }, [selectedProduct, statusFilter]);
+  }, [selectedProduct?.id, selectedProduct?.item_id, statusFilter]);
 
   useEffect(() => {
     if (companyCtxLoading) return;
