@@ -438,14 +438,16 @@ const Artwork = () => {
     }
   };
 
-  const fetchArtworkForProduct = async () => {
-    if (!selectedProduct?.item_id) return;
+  const fetchArtworkForProduct = async (product = selectedProduct) => {
+    if (!product?.item_id) return;
+    const requestProductId = product.id;
+    setProductArtworkLoading(true);
     
     try {
       let query = supabase
         .from('artwork_files')
         .select('*')
-        .eq('sku', selectedProduct.item_id)
+        .eq('sku', product.item_id)
         .order('created_at', { ascending: false });
       
       if (statusFilter === 'approved') {
@@ -455,9 +457,15 @@ const Artwork = () => {
       }
       
       const { data } = await query;
-      setArtworkFiles(data || []);
+      if (selectedProductIdRef.current === requestProductId) {
+        setArtworkFiles(data || []);
+      }
     } catch (error) {
       console.error('Error fetching artwork:', error);
+    } finally {
+      if (selectedProductIdRef.current === requestProductId) {
+        setProductArtworkLoading(false);
+      }
     }
   };
 
