@@ -198,24 +198,25 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   type Row = (string | { content: string; colSpan?: number; styles?: any })[];
   const tableBody: Row[] = [];
   // Track row "kinds" so we can style per-row in didParseCell
-  const rowKinds: ('product' | 'option' | 'tier' | 'simple')[] = [];
+  const rowKinds: ('product' | 'desc' | 'option' | 'tier' | 'simple')[] = [];
 
   items.forEach((item) => {
     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
     const isDescriptionMode = item.quantity === 0 && item.description;
-    const descLine = item.description ? `\n${item.description}` : '';
     const headerLine = `${item.name}    ${item.sku}${item.state ? `  •  ${item.state}` : ''}`;
 
     if (isDescriptionMode) {
-      tableBody.push([
-        { content: `${headerLine}\n\n${item.description}`, colSpan: 4 }
-      ]);
+      tableBody.push([{ content: headerLine, colSpan: 4 }]);
       rowKinds.push('product');
+      tableBody.push([{ content: item.description!, colSpan: 4 }]);
+      rowKinds.push('desc');
     } else if (hasPriceBreaks) {
-      tableBody.push([
-        { content: `${headerLine}${descLine}`, colSpan: 4 }
-      ]);
+      tableBody.push([{ content: headerLine, colSpan: 4 }]);
       rowKinds.push('product');
+      if (item.description) {
+        tableBody.push([{ content: item.description, colSpan: 4 }]);
+        rowKinds.push('desc');
+      }
 
       item.price_breaks.forEach((pb, i) => {
         const label = pb.label?.trim() ? pb.label : `Option ${i + 1}`;
