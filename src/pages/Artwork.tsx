@@ -1568,7 +1568,7 @@ const Artwork = () => {
                 <Card
                   key={product.id}
                   className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
-                  onClick={() => setSelectedProduct(product)}
+                  onClick={() => handleSelectProduct(product)}
                 >
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
                     {/* Priority: artwork thumbnail > PDF thumbnail > product image > package icon */}
@@ -1634,7 +1634,7 @@ const Artwork = () => {
                   <div
                     key={product.id}
                     className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/30 transition-colors cursor-pointer items-center"
-                    onClick={() => setSelectedProduct(product)}
+                    onClick={() => handleSelectProduct(product)}
                   >
                     <div className="col-span-1">
                       {/* Priority: artwork thumbnail > PDF thumbnail > product image > package icon */}
