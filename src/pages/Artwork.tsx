@@ -269,18 +269,33 @@ const Artwork = () => {
         .in('id', templateIds.length > 0 ? templateIds : ['none'])
         .order('name');
       
-      // Fetch artwork counts per SKU AND preview URLs for thumbnails
-      let artworkQuery = supabase
-        .from('artwork_files')
-        .select('sku, is_approved, preview_url, artwork_url, filename');
-      
-      if (!isVibeAdmin && userCompanyId) {
-        artworkQuery = artworkQuery.eq('company_id', userCompanyId);
-      } else if (isVibeAdmin && companyFilter !== 'all') {
-        artworkQuery = artworkQuery.eq('company_id', companyFilter);
+      // Fetch artwork counts per SKU AND preview URLs for thumbnails.
+      // IMPORTANT: paginate to bypass Supabase's default 1000-row cap.
+      const PAGE_SIZE = 1000;
+      let artworkData: Array<{ sku: string; is_approved: boolean; preview_url: string | null; artwork_url: string | null; filename: string | null }> = [];
+      let pageFrom = 0;
+      while (true) {
+        let pageQuery = supabase
+          .from('artwork_files')
+          .select('sku, is_approved, preview_url, artwork_url, filename')
+          .range(pageFrom, pageFrom + PAGE_SIZE - 1);
+
+        if (!isVibeAdmin && userCompanyId) {
+          pageQuery = pageQuery.eq('company_id', userCompanyId);
+        } else if (isVibeAdmin && companyFilter !== 'all') {
+          pageQuery = pageQuery.eq('company_id', companyFilter);
+        }
+
+        const { data: pageData, error: pageErr } = await pageQuery;
+        if (pageErr) {
+          console.error('Error fetching artwork page:', pageErr);
+          break;
+        }
+        if (!pageData || pageData.length === 0) break;
+        artworkData = artworkData.concat(pageData as any);
+        if (pageData.length < PAGE_SIZE) break;
+        pageFrom += PAGE_SIZE;
       }
-      
-      const { data: artworkData } = await artworkQuery;
       
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
       // Also track first available thumbnail per SKU
