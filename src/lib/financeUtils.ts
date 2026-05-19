@@ -1,5 +1,5 @@
 // Fee calculation for PO financing
-export function calculateFinanceFee(financedAmount: number, financedDate: string, paidBackAmount: number = 0): {
+export function calculateFinanceFee(financedAmount: number, financedDate: string, paidBackAmount: number = 0, paidBackDate?: string | null): {
   daysAging: number;
   feeTier: string;
   feePercent: number;
@@ -7,7 +7,11 @@ export function calculateFinanceFee(financedAmount: number, financedDate: string
   balance: number;
   dailyRate: number;
 } {
-  const now = new Date();
+  const balanceCheck = financedAmount - paidBackAmount;
+  // If fully paid and we have a paid-back date, stop the clock there.
+  const now = balanceCheck <= 0 && paidBackDate
+    ? new Date(String(paidBackDate).split("T")[0] + "T00:00:00")
+    : new Date();
   const dateStr = String(financedDate).split("T")[0];
   const start = new Date(dateStr + "T00:00:00");
   const daysAging = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
