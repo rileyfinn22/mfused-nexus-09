@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -113,7 +113,9 @@ const Artwork = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [artworkFiles, setArtworkFiles] = useState<ArtworkFile[]>([]);
+  const [productArtworkLoading, setProductArtworkLoading] = useState(false);
   const [rejectedFiles, setRejectedFiles] = useState<any[]>([]);
+  const selectedProductIdRef = useRef<string | null>(null);
   
   // Artwork counts per product SKU
   const [artworkCounts, setArtworkCounts] = useState<Record<string, { total: number; approved: number; pending: number }>>({});
@@ -189,10 +191,17 @@ const Artwork = () => {
   }, [selectedTemplate, companyFilter, stateFilter]);
 
   useEffect(() => {
+    selectedProductIdRef.current = selectedProduct?.id ?? null;
+
     if (selectedProduct) {
-      fetchArtworkForProduct();
+      setArtworkFiles([]);
+      setSelectedFile(null);
+      setPreviewDialogOpen(false);
+      fetchArtworkForProduct(selectedProduct);
+    } else {
+      setProductArtworkLoading(false);
     }
-  }, [selectedProduct, statusFilter]);
+  }, [selectedProduct?.id, selectedProduct?.item_id, statusFilter]);
 
   useEffect(() => {
     if (companyCtxLoading) return;
@@ -429,14 +438,19 @@ const Artwork = () => {
     }
   };
 
-  const fetchArtworkForProduct = async () => {
-    if (!selectedProduct?.item_id) return;
+  const fetchArtworkForProduct = async (product = selectedProduct) => {
+    if (!product?.item_id) {
+      setProductArtworkLoading(false);
+      return;
+    }
+    const requestProductId = product.id;
+    setProductArtworkLoading(true);
     
     try {
       let query = supabase
         .from('artwork_files')
         .select('*')
-        .eq('sku', selectedProduct.item_id)
+        .eq('sku', product.item_id)
         .order('created_at', { ascending: false });
       
       if (statusFilter === 'approved') {
@@ -446,9 +460,15 @@ const Artwork = () => {
       }
       
       const { data } = await query;
-      setArtworkFiles(data || []);
+      if (selectedProductIdRef.current === requestProductId) {
+        setArtworkFiles(data || []);
+      }
     } catch (error) {
       console.error('Error fetching artwork:', error);
+    } finally {
+      if (selectedProductIdRef.current === requestProductId) {
+        setProductArtworkLoading(false);
+      }
     }
   };
 
@@ -884,10 +904,23 @@ const Artwork = () => {
     }
   };
 
+  const handleSelectProduct = (product: Product) => {
+    selectedProductIdRef.current = product.id;
+    setArtworkFiles([]);
+    setSelectedFile(null);
+    setPreviewDialogOpen(false);
+    setProductArtworkLoading(true);
+    setSelectedProduct(product);
+  };
+
   const handleBack = () => {
     if (selectedProduct) {
+      selectedProductIdRef.current = null;
       setSelectedProduct(null);
       setArtworkFiles([]);
+      setSelectedFile(null);
+      setPreviewDialogOpen(false);
+      setProductArtworkLoading(false);
     } else if (selectedTemplate) {
       setSelectedTemplate(null);
       setProducts([]);
@@ -1036,7 +1069,13 @@ const Artwork = () => {
         </div>
 
         {/* Artwork Grid */}
-        {artworkFiles.length === 0 ? (
+        {productArtworkLoading ? (
+          <Card className="p-12 text-center">
+            <Loader2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4 animate-spin" />
+            <p className="font-medium mb-2">Loading artwork files</p>
+            <p className="text-sm text-muted-foreground">Fetching files for this SKU...</p>
+          </Card>
+        ) : artworkFiles.length === 0 ? (
           <Card className="p-12 text-center">
             <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
             <p className="font-medium mb-2">No artwork files</p>
@@ -1529,7 +1568,7 @@ const Artwork = () => {
                 <Card
                   key={product.id}
                   className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
-                  onClick={() => setSelectedProduct(product)}
+                  onClick={() => handleSelectProduct(product)}
                 >
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
                     {/* Priority: artwork thumbnail > PDF thumbnail > product image > package icon */}
@@ -1595,7 +1634,7 @@ const Artwork = () => {
                   <div
                     key={product.id}
                     className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/30 transition-colors cursor-pointer items-center"
-                    onClick={() => setSelectedProduct(product)}
+                    onClick={() => handleSelectProduct(product)}
                   >
                     <div className="col-span-1">
                       {/* Priority: artwork thumbnail > PDF thumbnail > product image > package icon */}
