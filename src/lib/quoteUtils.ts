@@ -294,7 +294,13 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         data.cell.styles.textColor = 255;
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.fontSize = 10;
-        data.cell.styles.cellPadding = { top: 6, right: 4, bottom: 6, left: 4 };
+        data.cell.styles.cellPadding = { top: 5, right: 4, bottom: 5, left: 4 };
+      } else if (kind === 'desc') {
+        data.cell.styles.fillColor = [250, 250, 250];
+        data.cell.styles.textColor = COLORS.darkGray;
+        data.cell.styles.fontStyle = 'normal';
+        data.cell.styles.fontSize = 9;
+        data.cell.styles.cellPadding = { top: 4, right: 6, bottom: 4, left: 6 };
       } else if (kind === 'option') {
         data.cell.styles.fillColor = [240, 245, 235];
         data.cell.styles.fontStyle = 'bold';
