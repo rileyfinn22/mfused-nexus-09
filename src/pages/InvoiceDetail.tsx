@@ -619,6 +619,16 @@ const InvoiceDetail = () => {
       notes: invoice.notes,
       companies: (invoice.companies as any) || { name: order.customer_name },
       billed_percentage: invoice.billed_percentage,
+      billing_name: invoice.billing_name,
+      billing_street: invoice.billing_street,
+      billing_city: invoice.billing_city,
+      billing_state: invoice.billing_state,
+      billing_zip: invoice.billing_zip,
+      shipping_name: invoice.shipping_name,
+      shipping_street: invoice.shipping_street,
+      shipping_city: invoice.shipping_city,
+      shipping_state: invoice.shipping_state,
+      shipping_zip: invoice.shipping_zip,
     };
 
     const orderForPdf = {
