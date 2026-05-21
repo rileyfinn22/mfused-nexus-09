@@ -74,9 +74,9 @@ function walk(node: Node, style: Style, out: { runs: RichRun[]; bullet: boolean 
   const isBullet = tag === "li";
 
   if (tag === "br") {
-    out.push(current);
-    const fresh = { runs: [] as RichRun[], bullet: false };
-    Object.assign(current, fresh);
+    out.push({ runs: current.runs, bullet: current.bullet });
+    current.runs = [];
+    current.bullet = false;
     return;
   }
 
