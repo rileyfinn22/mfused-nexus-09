@@ -343,9 +343,13 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         }
       }
 
-      // Bottom hairline under every body row
+      // Hairlines: product rows get a top divider, all rows get a bottom hairline
       data.cell.styles.lineColor = COLORS.rule;
-      data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0.1, left: 0 } as any;
+      if (meta.kind === 'product') {
+        data.cell.styles.lineWidth = { top: 0.4, right: 0, bottom: 0.2, left: 0 } as any;
+      } else {
+        data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0.1, left: 0 } as any;
+      }
     },
     didDrawCell: (data) => {
       if (data.section !== 'body') return;
