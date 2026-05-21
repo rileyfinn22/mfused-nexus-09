@@ -207,21 +207,26 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   // Description column index in the rendered table (0-based)
   const DESC_COL = 0; // descriptions span full width
 
+  const allDescriptionOnly = items.length > 0 && items.every(
+    (it) => it.quantity === 0 && !!it.description && (!it.price_breaks || it.price_breaks.length === 0)
+  );
+  const FULL_SPAN = allDescriptionOnly ? 1 : 4;
+
   items.forEach((item) => {
     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
     const isDescriptionMode = item.quantity === 0 && item.description;
     const headerLine = `${item.name}    ${item.sku}${item.state ? `  ·  ${item.state}` : ''}`;
 
     if (isDescriptionMode) {
-      tableBody.push([{ content: headerLine, colSpan: 4 }]);
+      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
       rowMeta.push({ kind: 'product' });
-      tableBody.push([{ content: '', colSpan: 4 }]);
+      tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
       rowMeta.push({ kind: 'desc', descHtml: item.description! });
     } else if (hasPriceBreaks) {
-      tableBody.push([{ content: headerLine, colSpan: 4 }]);
+      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
       rowMeta.push({ kind: 'product' });
       if (item.description) {
-        tableBody.push([{ content: '', colSpan: 4 }]);
+        tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
         rowMeta.push({ kind: 'desc', descHtml: item.description });
       }
       item.price_breaks.forEach((pb, i) => {
@@ -230,7 +235,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
 
         if (tiers) {
-          tableBody.push([{ content: `${label}${noteSuffix}`, colSpan: 4 }]);
+          tableBody.push([{ content: `${label}${noteSuffix}`, colSpan: FULL_SPAN }]);
           rowMeta.push({ kind: 'option' });
           tiers.forEach((t) => {
             const tNote = t.note?.trim() ? `\n${t.note.trim()}` : '';
@@ -253,10 +258,10 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         }
       });
     } else {
-      tableBody.push([{ content: headerLine, colSpan: 4 }]);
+      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
       rowMeta.push({ kind: 'product' });
       if (item.description) {
-        tableBody.push([{ content: '', colSpan: 4 }]);
+        tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
         rowMeta.push({ kind: 'desc', descHtml: item.description });
       }
       tableBody.push([
@@ -270,13 +275,11 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   });
 
   const tableInnerWidth = pageWidth - MARGIN * 2;
-  // If every item is description-only (no qty/price), hide the price columns
-  const allDescriptionOnly = items.length > 0 && items.every(
-    (it) => it.quantity === 0 && !!it.description && (!it.price_breaks || it.price_breaks.length === 0)
-  );
   const headRow = allDescriptionOnly
     ? [['ITEM']]
     : [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']];
+
+
 
   autoTable(doc, {
     startY: yPos,
