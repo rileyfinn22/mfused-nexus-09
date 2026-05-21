@@ -416,7 +416,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...COLORS.muted);
     doc.text('NOTES', MARGIN, notesY);
-    drawRichText(doc, quote.description, MARGIN, notesY + 2, widthAvailable, 9);
+    drawRichText(doc, quote.description, MARGIN, notesY + 3, widthAvailable, 9);
   }
 
   // ============ FOOTER ============
