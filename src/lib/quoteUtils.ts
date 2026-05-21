@@ -354,12 +354,20 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     didDrawCell: (data) => {
       if (data.section !== 'body') return;
       const meta = rowMeta[data.row.index];
-      if (!meta || meta.kind !== 'desc' || data.column.index !== DESC_COL || !meta.descHtml) return;
-      // The description row uses colSpan=4; only draw once in column 0
-      const x = data.cell.x + 6;
-      const y = data.cell.y + 1;
-      const width = tableInnerWidth - 12;
-      drawRichText(doc, meta.descHtml, x, y, width, 9);
+      if (!meta) return;
+
+      // Left accent bar on product rows for a clean section marker
+      if (meta.kind === 'product' && data.column.index === 0) {
+        doc.setFillColor(...COLORS.ink);
+        doc.rect(data.cell.x, data.cell.y + 2, 1.6, data.cell.height - 4, 'F');
+      }
+
+      if (meta.kind === 'desc' && data.column.index === DESC_COL && meta.descHtml) {
+        const x = data.cell.x + 6;
+        const y = data.cell.y + 1;
+        const width = tableInnerWidth - 12;
+        drawRichText(doc, meta.descHtml, x, y, width, 9);
+      }
     },
   });
 
