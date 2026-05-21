@@ -1926,11 +1926,11 @@ const CreateQuote = () => {
                 <CardTitle className="text-base">Description</CardTitle>
               </CardHeader>
               <CardContent>
-                <Textarea
+                <RichTextEditor
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={setDescription}
                   placeholder="Quote description or notes"
-                  rows={3}
+                  minHeightClass="min-h-[100px]"
                 />
               </CardContent>
             </Card>
