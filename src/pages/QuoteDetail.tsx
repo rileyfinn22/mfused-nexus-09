@@ -949,9 +949,9 @@ const QuoteDetail = () => {
                                    </div>
                                  </TableCell>
                                  <TableCell>
-                                   {item.description && (
-                                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{item.description}</p>
-                                   )}
+                                    {item.description && (
+                                      <RichText html={item.description} className="text-muted-foreground" />
+                                    )}
                                  </TableCell>
                                  <TableCell className="text-right"></TableCell>
                                  <TableCell className="text-right"></TableCell>
