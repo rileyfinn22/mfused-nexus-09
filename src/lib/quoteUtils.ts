@@ -316,11 +316,11 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       if (!meta) return;
 
       if (meta.kind === 'product') {
-        data.cell.styles.fillColor = COLORS.productBand;
-        data.cell.styles.textColor = 255;
+        data.cell.styles.fillColor = [255, 255, 255] as any;
+        data.cell.styles.textColor = COLORS.ink;
         data.cell.styles.fontStyle = 'bold';
-        data.cell.styles.fontSize = 10;
-        data.cell.styles.cellPadding = { top: 5, right: 6, bottom: 5, left: 6 };
+        data.cell.styles.fontSize = 10.5;
+        data.cell.styles.cellPadding = { top: 8, right: 6, bottom: 5, left: 10 };
       } else if (meta.kind === 'desc') {
         // Suppress autoTable's own text — we'll draw rich HTML in didDrawCell
         data.cell.text = [''];
@@ -343,19 +343,31 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         }
       }
 
-      // Bottom hairline under every body row
+      // Hairlines: product rows get a top divider, all rows get a bottom hairline
       data.cell.styles.lineColor = COLORS.rule;
-      data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0.1, left: 0 } as any;
+      if (meta.kind === 'product') {
+        data.cell.styles.lineWidth = { top: 0.4, right: 0, bottom: 0.2, left: 0 } as any;
+      } else {
+        data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0.1, left: 0 } as any;
+      }
     },
     didDrawCell: (data) => {
       if (data.section !== 'body') return;
       const meta = rowMeta[data.row.index];
-      if (!meta || meta.kind !== 'desc' || data.column.index !== DESC_COL || !meta.descHtml) return;
-      // The description row uses colSpan=4; only draw once in column 0
-      const x = data.cell.x + 6;
-      const y = data.cell.y + 1;
-      const width = tableInnerWidth - 12;
-      drawRichText(doc, meta.descHtml, x, y, width, 9);
+      if (!meta) return;
+
+      // Left accent bar on product rows for a clean section marker
+      if (meta.kind === 'product' && data.column.index === 0) {
+        doc.setFillColor(...COLORS.ink);
+        doc.rect(data.cell.x, data.cell.y + 2, 1.6, data.cell.height - 4, 'F');
+      }
+
+      if (meta.kind === 'desc' && data.column.index === DESC_COL && meta.descHtml) {
+        const x = data.cell.x + 6;
+        const y = data.cell.y + 1;
+        const width = tableInnerWidth - 12;
+        drawRichText(doc, meta.descHtml, x, y, width, 9);
+      }
     },
   });
 
