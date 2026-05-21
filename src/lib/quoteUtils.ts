@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { measureRichText, drawRichText } from './pdfRichText';
 
 interface QuantityTier {
   qty: number;
@@ -49,37 +50,38 @@ interface Quote {
   created_at: string;
 }
 
-// Vibe Packaging brand colors
+// Professional palette — charcoal/slate, no lime green
 const COLORS = {
-  primaryGreen: [76, 175, 80] as [number, number, number],
-  darkGray: [51, 51, 51] as [number, number, number],
-  mediumGray: [100, 100, 100] as [number, number, number],
-  lightGray: [248, 248, 248] as [number, number, number],
-  white: [255, 255, 255] as [number, number, number],
+  ink: [35, 41, 49] as [number, number, number],          // headings / body emphasis
+  body: [70, 78, 89] as [number, number, number],         // body text
+  muted: [120, 128, 138] as [number, number, number],     // labels / secondary
+  rule: [220, 224, 230] as [number, number, number],      // dividers
+  headerBg: [245, 246, 248] as [number, number, number],  // table header band
+  rowAlt: [250, 251, 252] as [number, number, number],    // subtle zebra
+  productBand: [35, 41, 49] as [number, number, number],  // dark product header
+  optionBand: [240, 242, 245] as [number, number, number],
 };
 
 export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promise<void> {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const MARGIN = 16;
 
   // ============ HEADER ============
-  let yPos = 15;
+  let yPos = 18;
 
-  // Company name + address on left
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.primaryGreen);
-  doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
+  doc.setTextColor(...COLORS.ink);
+  doc.text('ArmorPak Inc. DBA Vibe Packaging', MARGIN, yPos);
 
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...COLORS.mediumGray);
-  doc.text('1415 S 700 W', 14, yPos + 7);
-  doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
-  doc.text('www.vibepkg.com', 14, yPos + 17);
+  doc.setTextColor(...COLORS.muted);
+  doc.text('1415 S 700 W  ·  Salt Lake City, UT 84104  ·  www.vibepkg.com', MARGIN, yPos + 6);
 
-  // Logo on right
+  // Logo right
   try {
     const logoResponse = await fetch('/images/vibe-logo.png');
     const logoBlob = await logoResponse.blob();
@@ -88,176 +90,186 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       reader.onloadend = () => resolve(reader.result as string);
       reader.readAsDataURL(logoBlob);
     });
-    doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
+    doc.addImage(logoBase64, 'PNG', pageWidth - MARGIN - 36, yPos - 8, 36, 22);
   } catch {
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...COLORS.primaryGreen);
-    doc.text('VIBE', pageWidth - 14, yPos + 8, { align: 'right' });
+    // Silent fallback — no colored mark
   }
 
-  yPos += 28;
+  yPos += 16;
 
-  // Green divider
-  doc.setDrawColor(...COLORS.primaryGreen);
-  doc.setLineWidth(0.5);
-  doc.line(14, yPos, pageWidth - 14, yPos);
+  // Subtle neutral divider (no lime green)
+  doc.setDrawColor(...COLORS.rule);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, yPos, pageWidth - MARGIN, yPos);
 
-  yPos += 12;
+  yPos += 14;
 
   // ============ QUOTE TITLE ============
-  doc.setFontSize(24);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...COLORS.muted);
+  doc.text('QUOTE', MARGIN, yPos);
+
+  doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.darkGray);
-  doc.text('Quote', 14, yPos);
+  doc.setTextColor(...COLORS.ink);
+  doc.text(quote.quote_number, MARGIN, yPos + 9);
 
-  yPos += 15;
-
-  // ============ CUSTOMER & DETAILS SECTION ============
-  const leftColX = 14;
-  const rightColX = pageWidth / 2 + 10;
-
-  // Customer info on left
+  // Date block right-aligned
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...COLORS.muted);
+  const dateLabel = new Date(quote.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  doc.text('Issued', pageWidth - MARGIN, yPos, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...COLORS.ink);
   doc.setFontSize(10);
+  doc.text(dateLabel, pageWidth - MARGIN, yPos + 6, { align: 'right' });
+
+  yPos += 18;
+
+  // ============ BILL TO + DETAILS ============
+  const leftColX = MARGIN;
+  const rightColX = pageWidth / 2 + 4;
+  const detailsStartY = yPos;
+
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.mediumGray);
-  doc.text('Prepared for', leftColX, yPos);
+  doc.setTextColor(...COLORS.muted);
+  doc.text('PREPARED FOR', leftColX, yPos);
 
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.darkGray);
-  doc.text(quote.customer_name, leftColX, yPos + 8);
+  doc.setTextColor(...COLORS.ink);
+  doc.text(quote.customer_name, leftColX, yPos + 7);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...COLORS.mediumGray);
+  doc.setTextColor(...COLORS.body);
 
-  let custY = yPos + 14;
-  if (quote.customer_email) {
-    doc.text(quote.customer_email, leftColX, custY);
-    custY += 5;
-  }
-  if (quote.customer_phone) {
-    doc.text(quote.customer_phone, leftColX, custY);
-    custY += 5;
-  }
+  let custY = yPos + 13;
+  if (quote.customer_email) { doc.text(quote.customer_email, leftColX, custY); custY += 5; }
+  if (quote.customer_phone) { doc.text(quote.customer_phone, leftColX, custY); custY += 5; }
 
-  // Ship-to under customer info
   if (quote.shipping_street) {
-    custY += 3;
+    custY += 4;
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...COLORS.mediumGray);
-    doc.text('Ship to', leftColX, custY);
-    doc.setFont('helvetica', 'normal');
-    custY += 6;
-    if (quote.shipping_name) {
-      doc.text(quote.shipping_name, leftColX, custY);
-      custY += 5;
-    }
-    doc.text(quote.shipping_street, leftColX, custY);
+    doc.setFontSize(8);
+    doc.setTextColor(...COLORS.muted);
+    doc.text('SHIP TO', leftColX, custY);
     custY += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...COLORS.body);
+    if (quote.shipping_name) { doc.text(quote.shipping_name, leftColX, custY); custY += 5; }
+    doc.text(quote.shipping_street, leftColX, custY); custY += 5;
     doc.text(`${quote.shipping_city || ''}, ${quote.shipping_state || ''} ${quote.shipping_zip || ''}`, leftColX, custY);
   }
 
-  // Quote details on right
-  const detailsStartY = yPos;
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...COLORS.mediumGray);
+  // Details right
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...COLORS.muted);
+  doc.text('DETAILS', rightColX, detailsStartY);
 
-  const detailRows: [string, string][] = [
-    ['Quote #:', quote.quote_number],
-    ['Date:', new Date(quote.created_at).toLocaleDateString()],
-  ];
-  if (quote.valid_until) {
-    detailRows.push(['Valid Until:', new Date(quote.valid_until).toLocaleDateString()]);
-  }
-  if (quote.terms) detailRows.push(['Terms:', quote.terms]);
+  const detailRows: [string, string][] = [];
+  if (quote.valid_until) detailRows.push(['Valid Until', new Date(quote.valid_until).toLocaleDateString()]);
+  if (quote.terms) detailRows.push(['Terms', quote.terms]);
   if (quote.shipping_method) {
     const methodLabel = quote.shipping_method === 'domestic' ? 'Domestic'
       : quote.shipping_method === 'air' ? 'Air Freight'
       : quote.shipping_method === 'ocean' ? 'Ocean Freight'
       : quote.shipping_method;
-    detailRows.push(['Shipping:', methodLabel]);
+    detailRows.push(['Shipping', methodLabel]);
   }
-  if (quote.lead_time) detailRows.push(['Lead Time:', quote.lead_time]);
+  if (quote.lead_time) detailRows.push(['Lead Time', quote.lead_time]);
 
   detailRows.forEach(([label, value], i) => {
-    const rowY = detailsStartY + i * 7;
-    doc.setTextColor(...COLORS.mediumGray);
+    const rowY = detailsStartY + 7 + i * 6;
+    doc.setTextColor(...COLORS.muted);
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
     doc.text(label, rightColX, rowY);
-    doc.setTextColor(...COLORS.darkGray);
+    doc.setTextColor(...COLORS.ink);
     doc.setFont('helvetica', 'bold');
-    doc.text(value, rightColX + 45, rowY);
+    doc.text(value, rightColX + 38, rowY);
   });
 
-  yPos = Math.max(custY + 10, detailsStartY + detailRows.length * 7 + 10, yPos + 40);
+  yPos = Math.max(custY + 12, detailsStartY + 7 + detailRows.length * 6 + 10, yPos + 40);
 
   // ============ ITEMS TABLE ============
-  type Row = (string | { content: string; colSpan?: number; styles?: any })[];
+  type Row = (string | { content: string; colSpan?: number })[];
   const tableBody: Row[] = [];
-  // Track row "kinds" so we can style per-row in didParseCell
-  const rowKinds: ('product' | 'desc' | 'option' | 'tier' | 'simple')[] = [];
+  // Per-row metadata: kind + optional descriptionHtml for rich rendering
+  type Kind = 'product' | 'desc' | 'option' | 'tier' | 'simple';
+  const rowMeta: { kind: Kind; descHtml?: string }[] = [];
+
+  // Description column index in the rendered table (0-based)
+  const DESC_COL = 0; // descriptions span full width
 
   items.forEach((item) => {
     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
     const isDescriptionMode = item.quantity === 0 && item.description;
-    const headerLine = `${item.name}    ${item.sku}${item.state ? `  •  ${item.state}` : ''}`;
+    const headerLine = `${item.name}    ${item.sku}${item.state ? `  ·  ${item.state}` : ''}`;
 
     if (isDescriptionMode) {
       tableBody.push([{ content: headerLine, colSpan: 4 }]);
-      rowKinds.push('product');
-      tableBody.push([{ content: item.description!, colSpan: 4 }]);
-      rowKinds.push('desc');
+      rowMeta.push({ kind: 'product' });
+      tableBody.push([{ content: '', colSpan: 4 }]);
+      rowMeta.push({ kind: 'desc', descHtml: item.description! });
     } else if (hasPriceBreaks) {
       tableBody.push([{ content: headerLine, colSpan: 4 }]);
-      rowKinds.push('product');
+      rowMeta.push({ kind: 'product' });
       if (item.description) {
-        tableBody.push([{ content: item.description, colSpan: 4 }]);
-        rowKinds.push('desc');
+        tableBody.push([{ content: '', colSpan: 4 }]);
+        rowMeta.push({ kind: 'desc', descHtml: item.description });
       }
-
       item.price_breaks.forEach((pb, i) => {
         const label = pb.label?.trim() ? pb.label : `Option ${i + 1}`;
         const noteSuffix = pb.note?.trim() ? `\n${pb.note.trim()}` : '';
         const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
 
         if (tiers) {
-          tableBody.push([
-            { content: `${label}${noteSuffix}`, colSpan: 4 }
-          ]);
-          rowKinds.push('option');
+          tableBody.push([{ content: `${label}${noteSuffix}`, colSpan: 4 }]);
+          rowMeta.push({ kind: 'option' });
           tiers.forEach((t) => {
             const tNote = t.note?.trim() ? `\n${t.note.trim()}` : '';
             tableBody.push([
               `${t.qty.toLocaleString()} units${tNote}`,
               formatUnitPrice(t.unit_price),
               t.qty.toLocaleString(),
-              formatCurrency(t.qty * t.unit_price)
+              formatCurrency(t.qty * t.unit_price),
             ]);
-            rowKinds.push('tier');
+            rowMeta.push({ kind: 'tier' });
           });
         } else {
           tableBody.push([
             `${label}${noteSuffix}`,
             formatUnitPrice(pb.unit_price),
             pb.qty.toLocaleString(),
-            formatCurrency(pb.qty * pb.unit_price)
+            formatCurrency(pb.qty * pb.unit_price),
           ]);
-          rowKinds.push('option');
+          rowMeta.push({ kind: 'option' });
         }
       });
     } else {
+      tableBody.push([{ content: headerLine, colSpan: 4 }]);
+      rowMeta.push({ kind: 'product' });
+      if (item.description) {
+        tableBody.push([{ content: '', colSpan: 4 }]);
+        rowMeta.push({ kind: 'desc', descHtml: item.description });
+      }
       tableBody.push([
-        `${headerLine}${item.description ? `\n${item.description}` : ''}`,
+        '',
         formatUnitPrice(item.unit_price),
         item.quantity.toLocaleString(),
-        formatCurrency(item.total)
+        formatCurrency(item.total),
       ]);
-      rowKinds.push('simple');
+      rowMeta.push({ kind: 'simple' });
     }
   });
+
+  const tableInnerWidth = pageWidth - MARGIN * 2;
 
   autoTable(doc, {
     startY: yPos,
@@ -265,62 +277,79 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     body: tableBody,
     theme: 'plain',
     headStyles: {
-      fillColor: COLORS.primaryGreen,
-      textColor: 255,
+      fillColor: COLORS.headerBg,
+      textColor: COLORS.muted,
       fontStyle: 'bold',
-      fontSize: 9,
-      cellPadding: 4
+      fontSize: 8,
+      cellPadding: { top: 4, right: 4, bottom: 4, left: 6 },
     },
     bodyStyles: {
       fontSize: 9,
-      cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
-      textColor: COLORS.darkGray,
-      lineWidth: 0
+      cellPadding: { top: 4, right: 4, bottom: 4, left: 6 },
+      textColor: COLORS.body,
+      lineWidth: 0,
     },
     columnStyles: {
-      0: { cellWidth: 90 },
-      1: { halign: 'right', cellWidth: 30 },
-      2: { halign: 'right', cellWidth: 25 },
-      3: { halign: 'right', cellWidth: 37, fontStyle: 'bold' }
+      0: { cellWidth: 92 },
+      1: { halign: 'right', cellWidth: 28 },
+      2: { halign: 'right', cellWidth: 22 },
+      3: { halign: 'right', cellWidth: tableInnerWidth - 92 - 28 - 22, fontStyle: 'bold' },
     },
-    margin: { left: 14, right: 14 },
+    margin: { left: MARGIN, right: MARGIN },
     showHead: 'firstPage',
     tableLineWidth: 0,
     didParseCell: (data) => {
       if (data.section !== 'body') return;
-      const kind = rowKinds[data.row.index];
-      if (kind === 'product') {
-        data.cell.styles.fillColor = COLORS.primaryGreen;
+      const meta = rowMeta[data.row.index];
+      if (!meta) return;
+
+      if (meta.kind === 'product') {
+        data.cell.styles.fillColor = COLORS.productBand;
         data.cell.styles.textColor = 255;
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.fontSize = 10;
-        data.cell.styles.cellPadding = { top: 5, right: 4, bottom: 5, left: 4 };
-      } else if (kind === 'desc') {
-        data.cell.styles.fillColor = [250, 250, 250];
-        data.cell.styles.textColor = COLORS.darkGray;
-        data.cell.styles.fontStyle = 'normal';
-        data.cell.styles.fontSize = 9;
+        data.cell.styles.cellPadding = { top: 5, right: 6, bottom: 5, left: 6 };
+      } else if (meta.kind === 'desc') {
+        // Suppress autoTable's own text — we'll draw rich HTML in didDrawCell
+        data.cell.text = [''];
+        data.cell.styles.fillColor = COLORS.rowAlt;
         data.cell.styles.cellPadding = { top: 4, right: 6, bottom: 4, left: 6 };
-      } else if (kind === 'option') {
-        data.cell.styles.fillColor = [240, 245, 235];
-        data.cell.styles.fontStyle = 'bold';
-        data.cell.styles.textColor = COLORS.darkGray;
-        if (data.column.index === 0) {
-          data.cell.styles.cellPadding = { top: 4, right: 4, bottom: 4, left: 8 };
+        // Pre-compute height so the cell expands correctly
+        if (data.column.index === DESC_COL && meta.descHtml) {
+          const widthAvailable = tableInnerWidth - 12; // padding
+          const { totalHeight } = measureRichText(doc, meta.descHtml, widthAvailable, 9);
+          data.cell.styles.minCellHeight = totalHeight + 6;
         }
-      } else if (kind === 'tier') {
+      } else if (meta.kind === 'option') {
+        data.cell.styles.fillColor = COLORS.optionBand;
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.textColor = COLORS.ink;
+      } else if (meta.kind === 'tier') {
         if (data.column.index === 0) {
-          data.cell.styles.cellPadding = { top: 3, right: 4, bottom: 3, left: 16 };
-          data.cell.styles.textColor = COLORS.mediumGray;
+          data.cell.styles.cellPadding = { top: 3, right: 4, bottom: 3, left: 14 };
+          data.cell.styles.textColor = COLORS.muted;
         }
       }
-    }
+
+      // Bottom hairline under every body row
+      data.cell.styles.lineColor = COLORS.rule;
+      data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0.1, left: 0 } as any;
+    },
+    didDrawCell: (data) => {
+      if (data.section !== 'body') return;
+      const meta = rowMeta[data.row.index];
+      if (!meta || meta.kind !== 'desc' || data.column.index !== DESC_COL || !meta.descHtml) return;
+      // The description row uses colSpan=4; only draw once in column 0
+      const x = data.cell.x + 6;
+      const y = data.cell.y + 1;
+      const width = tableInnerWidth - 12;
+      drawRichText(doc, meta.descHtml, x, y, width, 9);
+    },
   });
 
   let finalY = (doc as any).lastAutoTable.finalY + 10;
-  const hasAnyPriceBreaks = items.some(item => item.price_breaks && item.price_breaks.length > 0);
+  const hasAnyPriceBreaks = items.some((item) => item.price_breaks && item.price_breaks.length > 0);
 
-  // Reserve room for the "Thank you" footer (~20mm). If totals would collide, push to new page.
   const FOOTER_RESERVE = 24;
   const ensureRoom = (needed: number) => {
     if (finalY + needed > pageHeight - FOOTER_RESERVE) {
@@ -329,44 +358,41 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     }
   };
 
-  // ============ TOTALS SECTION ============
+  // ============ TOTALS ============
   if (!hasAnyPriceBreaks) {
-    const totalsHeight =
-      8 + (quote.shipping_cost > 0 ? 8 : 0) + (quote.tax > 0 ? 8 : 0) + 14;
+    const totalsHeight = 8 + (quote.shipping_cost > 0 ? 7 : 0) + (quote.tax > 0 ? 7 : 0) + 14;
     ensureRoom(totalsHeight + 5);
 
-    const totalsWidth = 85;
-    const totalsX = pageWidth - totalsWidth - 14;
+    const totalsWidth = 80;
+    const totalsX = pageWidth - totalsWidth - MARGIN;
     let totalsY = finalY + 5;
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...COLORS.darkGray);
-
+    doc.setTextColor(...COLORS.body);
     doc.text('Subtotal', totalsX, totalsY);
     doc.text(formatCurrency(quote.subtotal), totalsX + totalsWidth, totalsY, { align: 'right' });
-    totalsY += 8;
+    totalsY += 7;
 
     if (quote.shipping_cost > 0) {
       doc.text('Shipping', totalsX, totalsY);
       doc.text(formatCurrency(quote.shipping_cost), totalsX + totalsWidth, totalsY, { align: 'right' });
-      totalsY += 8;
+      totalsY += 7;
     }
-
     if (quote.tax > 0) {
       doc.text('Tax', totalsX, totalsY);
       doc.text(formatCurrency(quote.tax), totalsX + totalsWidth, totalsY, { align: 'right' });
-      totalsY += 8;
+      totalsY += 7;
     }
 
-    doc.setDrawColor(200, 200, 200);
+    doc.setDrawColor(...COLORS.rule);
     doc.setLineWidth(0.3);
     doc.line(totalsX, totalsY, totalsX + totalsWidth, totalsY);
     totalsY += 6;
 
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...COLORS.primaryGreen);
+    doc.setTextColor(...COLORS.ink);
     doc.text('TOTAL', totalsX, totalsY);
     doc.text(formatCurrency(quote.total), totalsX + totalsWidth, totalsY, { align: 'right' });
     finalY = totalsY + 6;
@@ -374,34 +400,37 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     ensureRoom(10);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
-    doc.setTextColor(...COLORS.mediumGray);
-    doc.text('* Pricing shown per shipping option. Customer selects preferred option.', 14, finalY);
+    doc.setTextColor(...COLORS.muted);
+    doc.text('* Pricing shown per shipping option. Customer selects preferred option.', MARGIN, finalY);
     finalY += 6;
   }
 
-  // ============ NOTES ============
+  // ============ NOTES (rich text) ============
   if (quote.description) {
-    const notesLines = doc.splitTextToSize(quote.description, pageWidth - 28);
-    const notesHeight = 6 + notesLines.length * 4.5;
+    const widthAvailable = pageWidth - MARGIN * 2;
+    const { totalHeight } = measureRichText(doc, quote.description, widthAvailable, 9);
+    const notesHeight = 8 + totalHeight;
     ensureRoom(notesHeight + 10);
     const notesY = finalY + 10;
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...COLORS.darkGray);
-    doc.text('Notes:', 14, notesY);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...COLORS.mediumGray);
-    doc.text(notesLines, 14, notesY + 6);
+    doc.setTextColor(...COLORS.muted);
+    doc.text('NOTES', MARGIN, notesY);
+    drawRichText(doc, quote.description, MARGIN, notesY + 2, widthAvailable, 9);
   }
 
-  // ============ FOOTER (on every page) ============
+  // ============ FOOTER ============
   const pageCount = doc.getNumberOfPages();
   for (let p = 1; p <= pageCount; p++) {
     doc.setPage(p);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...COLORS.primaryGreen);
-    doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 10, { align: 'center' });
+    doc.setDrawColor(...COLORS.rule);
+    doc.setLineWidth(0.2);
+    doc.line(MARGIN, pageHeight - 14, pageWidth - MARGIN, pageHeight - 14);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...COLORS.muted);
+    doc.text('Thank you for your business.', MARGIN, pageHeight - 8);
+    doc.text(`Page ${p} of ${pageCount}`, pageWidth - MARGIN, pageHeight - 8, { align: 'right' });
   }
 
   doc.save(`${quote.quote_number}.pdf`);
