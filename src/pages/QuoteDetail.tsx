@@ -1107,7 +1107,7 @@ const QuoteDetail = () => {
                 <CardTitle className="text-base">Description</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm whitespace-pre-wrap">{quote.description}</p>
+                <RichText html={quote.description} />
               </CardContent>
             </Card>
           )}
