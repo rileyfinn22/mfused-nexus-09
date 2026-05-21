@@ -111,8 +111,16 @@ export function parseHtmlToParagraphs(html: string, defaultSizePt = 9): { runs: 
   const current = { runs: [] as RichRun[], bullet: false };
   const baseStyle: Style = { bold: false, italic: false, underline: false, sizePt: defaultSizePt };
   tmp.childNodes.forEach((n) => walk(n, baseStyle, paragraphs, current));
-  if (current.runs.length > 0) paragraphs.push({ ...current });
-  return paragraphs.filter((p) => p.runs.length > 0 || p.bullet);
+  paragraphs.push({ ...current });
+  // Collapse runs of >2 trailing blank paragraphs but keep single blanks as spacer lines
+  while (paragraphs.length > 1 && paragraphs[paragraphs.length - 1].runs.length === 0 && paragraphs[paragraphs.length - 2].runs.length === 0) {
+    paragraphs.pop();
+  }
+  // Strip leading blank paragraphs
+  while (paragraphs.length > 0 && paragraphs[0].runs.length === 0 && !paragraphs[0].bullet) {
+    paragraphs.shift();
+  }
+  return paragraphs;
 }
 
 function setFontForRun(doc: jsPDF, run: RichRun) {
