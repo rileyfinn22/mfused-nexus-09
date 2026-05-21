@@ -1047,9 +1047,9 @@ const QuoteDetail = () => {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {item.description || '-'}
-                              </p>
+                              {item.description
+                                ? <RichText html={item.description} className="text-muted-foreground" />
+                                : <p className="text-sm text-muted-foreground">-</p>}
                             </TableCell>
                             <TableCell className="text-right">{item.quantity.toLocaleString()}</TableCell>
                             <TableCell className="text-right">{formatUnitPrice(item.unit_price)}</TableCell>
