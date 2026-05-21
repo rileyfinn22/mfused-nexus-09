@@ -207,6 +207,11 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   // Description column index in the rendered table (0-based)
   const DESC_COL = 0; // descriptions span full width
 
+  const allDescriptionOnly = items.length > 0 && items.every(
+    (it) => it.quantity === 0 && !!it.description && (!it.price_breaks || it.price_breaks.length === 0)
+  );
+  const FULL_SPAN = allDescriptionOnly ? 1 : 4;
+
   items.forEach((item) => {
     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
     const isDescriptionMode = item.quantity === 0 && item.description;
