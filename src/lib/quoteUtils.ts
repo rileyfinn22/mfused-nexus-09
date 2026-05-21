@@ -270,10 +270,17 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   });
 
   const tableInnerWidth = pageWidth - MARGIN * 2;
+  // If every item is description-only (no qty/price), hide the price columns
+  const allDescriptionOnly = items.length > 0 && items.every(
+    (it) => it.quantity === 0 && !!it.description && (!it.price_breaks || it.price_breaks.length === 0)
+  );
+  const headRow = allDescriptionOnly
+    ? [['ITEM']]
+    : [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']];
 
   autoTable(doc, {
     startY: yPos,
-    head: [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']],
+    head: headRow,
     body: tableBody,
     theme: 'plain',
     headStyles: {
@@ -289,12 +296,14 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       textColor: COLORS.body,
       lineWidth: 0,
     },
-    columnStyles: {
-      0: { cellWidth: 92 },
-      1: { halign: 'right', cellWidth: 28 },
-      2: { halign: 'right', cellWidth: 22 },
-      3: { halign: 'right', cellWidth: tableInnerWidth - 92 - 28 - 22, fontStyle: 'bold' },
-    },
+    columnStyles: allDescriptionOnly
+      ? { 0: { cellWidth: tableInnerWidth } }
+      : {
+          0: { cellWidth: 92 },
+          1: { halign: 'right', cellWidth: 28 },
+          2: { halign: 'right', cellWidth: 22 },
+          3: { halign: 'right', cellWidth: tableInnerWidth - 92 - 28 - 22, fontStyle: 'bold' },
+        },
     margin: { left: MARGIN, right: MARGIN },
     showHead: 'firstPage',
     tableLineWidth: 0,
