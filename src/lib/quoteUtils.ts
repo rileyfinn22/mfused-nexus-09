@@ -274,12 +274,10 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     }
   });
 
-  const tableInnerWidth = pageWidth - MARGIN * 2;
-  // If every item is description-only (no qty/price), hide the price columns
-  const allDescriptionOnly = items.length > 0 && items.every(
-    (it) => it.quantity === 0 && !!it.description && (!it.price_breaks || it.price_breaks.length === 0)
-  );
   const headRow = allDescriptionOnly
+    ? [['ITEM']]
+    : [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']];
+
     ? [['ITEM']]
     : [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']];
 
