@@ -132,36 +132,47 @@ function setFontForRun(doc: jsPDF, run: RichRun) {
   doc.setFontSize(run.sizePt);
 }
 
+// pt → mm
+const PT_TO_MM = 0.3528;
+const LINE_SPACING = 1.25;
+
 function wrapParagraph(
   doc: jsPDF,
   para: { runs: RichRun[]; bullet: boolean },
   maxWidth: number,
-  bulletIndent: number
+  bulletIndent: number,
+  defaultSizePt: number
 ): RichLine[] {
   const indent = para.bullet ? bulletIndent : 0;
   const effWidth = maxWidth - indent;
   const lines: RichLine[] = [];
   let currentLine: RichRun[] = [];
   let currentWidth = 0;
-  let currentHeight = 0;
+  let currentMaxPt = 0;
 
   const pushLine = (isFirst: boolean) => {
+    const maxPt = currentMaxPt || defaultSizePt;
     lines.push({
       runs: currentLine,
       bullet: para.bullet && isFirst,
       width: currentWidth,
-      height: Math.max(currentHeight, 12) * 0.35, // mm-ish height per pt size approx
+      height: maxPt * PT_TO_MM * LINE_SPACING,
     });
     currentLine = [];
     currentWidth = 0;
-    currentHeight = 0;
+    currentMaxPt = 0;
   };
 
   let isFirstLine = true;
 
+  // Empty paragraph → blank spacer line
+  if (para.runs.length === 0) {
+    pushLine(true);
+    return lines;
+  }
+
   for (const run of para.runs) {
     setFontForRun(doc, run);
-    // Split into tokens preserving spaces
     const tokens = run.text.split(/(\s+)/);
     for (const tok of tokens) {
       if (!tok) continue;
@@ -169,21 +180,14 @@ function wrapParagraph(
       if (currentWidth + w > effWidth && currentLine.length > 0) {
         pushLine(isFirstLine);
         isFirstLine = false;
-        if (/^\s+$/.test(tok)) continue; // skip leading whitespace on wrapped line
+        if (/^\s+$/.test(tok)) continue;
       }
       currentLine.push({ ...run, text: tok });
       currentWidth += w;
-      currentHeight = Math.max(currentHeight, run.sizePt);
+      currentMaxPt = Math.max(currentMaxPt, run.sizePt);
     }
   }
-  if (currentLine.length > 0 || lines.length === 0) {
-    pushLine(isFirstLine);
-  }
-  // Compute proper line heights in mm: pt * 0.3528 * 1.25 (line spacing)
-  for (const l of lines) {
-    const maxPt = l.runs.reduce((m, r) => Math.max(m, r.sizePt), 9);
-    l.height = maxPt * 0.3528 * 1.3;
-  }
+  if (currentLine.length > 0) pushLine(isFirstLine);
   return lines;
 }
 
@@ -196,7 +200,7 @@ export function measureRichText(
   const paragraphs = parseHtmlToParagraphs(html, defaultSizePt);
   const allLines: (RichLine & { _paraIndex: number })[] = [];
   paragraphs.forEach((para, pIdx) => {
-    const wrapped = wrapParagraph(doc, para, maxWidth, 4);
+    const wrapped = wrapParagraph(doc, para, maxWidth, 4, defaultSizePt);
     wrapped.forEach((l) => allLines.push({ ...l, _paraIndex: pIdx }));
   });
   const totalHeight = allLines.reduce((s, l) => s + l.height, 0);
@@ -214,25 +218,30 @@ export function drawRichText(
   const { lines } = measureRichText(doc, html, maxWidth, defaultSizePt);
   let cursorY = y;
   for (const line of lines) {
-    cursorY += line.height;
+    // Baseline = top of line + ascent. Approximate ascent as 0.8 * fontSize in mm.
+    const maxPt = line.runs.reduce((m, r) => Math.max(m, r.sizePt), defaultSizePt);
+    const ascent = maxPt * PT_TO_MM * 0.85;
+    const baselineY = cursorY + ascent;
     let cursorX = x;
     if (line.bullet) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(defaultSizePt);
-      doc.text("•", x, cursorY - line.height * 0.25);
+      doc.text("•", x, baselineY);
       cursorX = x + 4;
     }
     for (const run of line.runs) {
       setFontForRun(doc, run);
       const w = doc.getTextWidth(run.text);
-      doc.text(run.text, cursorX, cursorY - line.height * 0.25);
+      doc.text(run.text, cursorX, baselineY);
       if (run.underline && run.text.trim()) {
-        const uy = cursorY - line.height * 0.2 + 0.6;
+        const uy = baselineY + 0.6;
         doc.setLineWidth(0.2);
         doc.line(cursorX, uy, cursorX + w, uy);
       }
       cursorX += w;
     }
+    cursorY += line.height;
   }
   return cursorY;
 }
+
