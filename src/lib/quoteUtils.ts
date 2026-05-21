@@ -316,11 +316,11 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       if (!meta) return;
 
       if (meta.kind === 'product') {
-        data.cell.styles.fillColor = COLORS.productBand;
-        data.cell.styles.textColor = 255;
+        data.cell.styles.fillColor = [255, 255, 255] as any;
+        data.cell.styles.textColor = COLORS.ink;
         data.cell.styles.fontStyle = 'bold';
-        data.cell.styles.fontSize = 10;
-        data.cell.styles.cellPadding = { top: 5, right: 6, bottom: 5, left: 6 };
+        data.cell.styles.fontSize = 10.5;
+        data.cell.styles.cellPadding = { top: 8, right: 6, bottom: 5, left: 10 };
       } else if (meta.kind === 'desc') {
         // Suppress autoTable's own text — we'll draw rich HTML in didDrawCell
         data.cell.text = [''];
