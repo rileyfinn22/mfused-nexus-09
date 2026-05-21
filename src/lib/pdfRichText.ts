@@ -37,8 +37,17 @@ type Style = { bold: boolean; italic: boolean; underline: boolean; sizePt: numbe
 
 function walk(node: Node, style: Style, out: { runs: RichRun[]; bullet: boolean }[], current: { runs: RichRun[]; bullet: boolean }) {
   if (node.nodeType === Node.TEXT_NODE) {
-    const txt = (node.textContent || "").replace(/\u00a0/g, " ");
-    if (txt) current.runs.push({ text: txt, ...style });
+    const raw = (node.textContent || "").replace(/\u00a0/g, " ");
+    // Respect embedded newlines as hard line breaks
+    const parts = raw.split(/\n/);
+    parts.forEach((piece, i) => {
+      if (piece) current.runs.push({ text: piece, ...style });
+      if (i < parts.length - 1) {
+        out.push({ runs: current.runs, bullet: current.bullet });
+        current.runs = [];
+        current.bullet = false;
+      }
+    });
     return;
   }
   if (node.nodeType !== Node.ELEMENT_NODE) return;
