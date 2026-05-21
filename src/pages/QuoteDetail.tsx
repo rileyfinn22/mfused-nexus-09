@@ -1025,9 +1025,7 @@ const QuoteDetail = () => {
                                 </div>
                               </TableCell>
                               <TableCell colSpan={4}>
-                                <p className="text-sm whitespace-pre-wrap">
-                                  {item.description}
-                                </p>
+                                <RichText html={item.description} />
                               </TableCell>
                             </TableRow>
                           );
