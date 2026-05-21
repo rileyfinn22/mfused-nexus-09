@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/table";
 import { generateQuotePDF } from "@/lib/quoteUtils";
 import { SendToVendorDialog } from "@/components/SendToVendorDialog";
+import { RichText } from "@/components/RichText";
 
 interface QuantityTier {
   qty: number;
@@ -948,9 +949,9 @@ const QuoteDetail = () => {
                                    </div>
                                  </TableCell>
                                  <TableCell>
-                                   {item.description && (
-                                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{item.description}</p>
-                                   )}
+                                    {item.description && (
+                                      <RichText html={item.description} className="text-muted-foreground" />
+                                    )}
                                  </TableCell>
                                  <TableCell className="text-right"></TableCell>
                                  <TableCell className="text-right"></TableCell>
@@ -1024,9 +1025,7 @@ const QuoteDetail = () => {
                                 </div>
                               </TableCell>
                               <TableCell colSpan={4}>
-                                <p className="text-sm whitespace-pre-wrap">
-                                  {item.description}
-                                </p>
+                                <RichText html={item.description} />
                               </TableCell>
                             </TableRow>
                           );
@@ -1048,9 +1047,9 @@ const QuoteDetail = () => {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {item.description || '-'}
-                              </p>
+                              {item.description
+                                ? <RichText html={item.description} className="text-muted-foreground" />
+                                : <p className="text-sm text-muted-foreground">-</p>}
                             </TableCell>
                             <TableCell className="text-right">{item.quantity.toLocaleString()}</TableCell>
                             <TableCell className="text-right">{formatUnitPrice(item.unit_price)}</TableCell>
@@ -1108,7 +1107,7 @@ const QuoteDetail = () => {
                 <CardTitle className="text-base">Description</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm whitespace-pre-wrap">{quote.description}</p>
+                <RichText html={quote.description} />
               </CardContent>
             </Card>
           )}

@@ -44,6 +44,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { normalizeStorageObjectPath } from "@/lib/storageUrl";
+import { RichTextEditor } from "@/components/RichTextEditor";
 
 interface QuantityTier {
   qty: number;
@@ -1159,17 +1160,17 @@ const CreateQuote = () => {
                                       <Label className="text-sm font-medium">
                                         {item.pricing_mode === 'description' ? 'Pricing Options & Description' : 'Item Description'}
                                       </Label>
-                                      <Textarea
-                                        placeholder={item.pricing_mode === 'description'
-                                          ? "Enter pricing options, e.g.:\n.018 SBS - $0.420 ea\n.018 CNK - $0.476 ea\n.024 SBS - $0.486 ea"
-                                          : "Add description for this item..."}
+                                      <RichTextEditor
                                         value={item.description || ''}
-                                        onChange={(e) => {
+                                        onChange={(html) => {
                                           const newItems = [...items];
-                                          newItems[index].description = e.target.value;
+                                          newItems[index].description = html;
                                           setItems(newItems);
                                         }}
-                                        className={item.pricing_mode === 'description' ? "min-h-[120px]" : "min-h-[60px]"}
+                                        placeholder={item.pricing_mode === 'description'
+                                          ? "Enter pricing options, e.g. .018 SBS - $0.420 ea"
+                                          : "Add description for this item..."}
+                                        minHeightClass={item.pricing_mode === 'description' ? "min-h-[140px]" : "min-h-[80px]"}
                                       />
                                     </div>
                                     {item.pricing_mode !== 'description' && (
@@ -1925,11 +1926,11 @@ const CreateQuote = () => {
                 <CardTitle className="text-base">Description</CardTitle>
               </CardHeader>
               <CardContent>
-                <Textarea
+                <RichTextEditor
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={setDescription}
                   placeholder="Quote description or notes"
-                  rows={3}
+                  minHeightClass="min-h-[100px]"
                 />
               </CardContent>
             </Card>
