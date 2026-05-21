@@ -274,12 +274,12 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     }
   });
 
+  const tableInnerWidth = pageWidth - MARGIN * 2;
   const headRow = allDescriptionOnly
     ? [['ITEM']]
     : [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']];
 
-    ? [['ITEM']]
-    : [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']];
+
 
   autoTable(doc, {
     startY: yPos,
