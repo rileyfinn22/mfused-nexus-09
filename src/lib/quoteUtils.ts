@@ -218,15 +218,15 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     const headerLine = `${item.name}    ${item.sku}${item.state ? `  ·  ${item.state}` : ''}`;
 
     if (isDescriptionMode) {
-      tableBody.push([{ content: headerLine, colSpan: 4 }]);
+      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
       rowMeta.push({ kind: 'product' });
-      tableBody.push([{ content: '', colSpan: 4 }]);
+      tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
       rowMeta.push({ kind: 'desc', descHtml: item.description! });
     } else if (hasPriceBreaks) {
-      tableBody.push([{ content: headerLine, colSpan: 4 }]);
+      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
       rowMeta.push({ kind: 'product' });
       if (item.description) {
-        tableBody.push([{ content: '', colSpan: 4 }]);
+        tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
         rowMeta.push({ kind: 'desc', descHtml: item.description });
       }
       item.price_breaks.forEach((pb, i) => {
@@ -235,7 +235,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         const tiers = pb.tiers && pb.tiers.length > 0 ? pb.tiers : null;
 
         if (tiers) {
-          tableBody.push([{ content: `${label}${noteSuffix}`, colSpan: 4 }]);
+          tableBody.push([{ content: `${label}${noteSuffix}`, colSpan: FULL_SPAN }]);
           rowMeta.push({ kind: 'option' });
           tiers.forEach((t) => {
             const tNote = t.note?.trim() ? `\n${t.note.trim()}` : '';
@@ -258,10 +258,10 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         }
       });
     } else {
-      tableBody.push([{ content: headerLine, colSpan: 4 }]);
+      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
       rowMeta.push({ kind: 'product' });
       if (item.description) {
-        tableBody.push([{ content: '', colSpan: 4 }]);
+        tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
         rowMeta.push({ kind: 'desc', descHtml: item.description });
       }
       tableBody.push([
