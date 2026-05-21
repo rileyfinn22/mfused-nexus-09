@@ -1160,17 +1160,17 @@ const CreateQuote = () => {
                                       <Label className="text-sm font-medium">
                                         {item.pricing_mode === 'description' ? 'Pricing Options & Description' : 'Item Description'}
                                       </Label>
-                                      <Textarea
-                                        placeholder={item.pricing_mode === 'description'
-                                          ? "Enter pricing options, e.g.:\n.018 SBS - $0.420 ea\n.018 CNK - $0.476 ea\n.024 SBS - $0.486 ea"
-                                          : "Add description for this item..."}
+                                      <RichTextEditor
                                         value={item.description || ''}
-                                        onChange={(e) => {
+                                        onChange={(html) => {
                                           const newItems = [...items];
-                                          newItems[index].description = e.target.value;
+                                          newItems[index].description = html;
                                           setItems(newItems);
                                         }}
-                                        className={item.pricing_mode === 'description' ? "min-h-[120px]" : "min-h-[60px]"}
+                                        placeholder={item.pricing_mode === 'description'
+                                          ? "Enter pricing options, e.g. .018 SBS - $0.420 ea"
+                                          : "Add description for this item..."}
+                                        minHeightClass={item.pricing_mode === 'description' ? "min-h-[140px]" : "min-h-[80px]"}
                                       />
                                     </div>
                                     {item.pricing_mode !== 'description' && (
