@@ -44,6 +44,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { normalizeStorageObjectPath } from "@/lib/storageUrl";
+import { RichTextEditor } from "@/components/RichTextEditor";
 
 interface QuantityTier {
   qty: number;
