@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/table";
 import { generateQuotePDF } from "@/lib/quoteUtils";
 import { SendToVendorDialog } from "@/components/SendToVendorDialog";
+import { RichText } from "@/components/RichText";
 
 interface QuantityTier {
   qty: number;
