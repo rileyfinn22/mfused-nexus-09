@@ -307,7 +307,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
           2: { halign: 'right', cellWidth: 22 },
           3: { halign: 'right', cellWidth: tableInnerWidth - 92 - 28 - 22, fontStyle: 'bold' },
         },
-    margin: { left: MARGIN, right: MARGIN },
+    margin: { left: MARGIN, right: MARGIN, bottom: 24 },
     showHead: 'firstPage',
     tableLineWidth: 0,
     didParseCell: (data) => {
