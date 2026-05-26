@@ -1022,14 +1022,19 @@ const OrderDetail = () => {
       .eq('id', orderId);
 
     if (!error) {
-      // Check if invoice already exists
-      const { data: existingInvoice } = await supabase
+      // Check if a blanket invoice already exists.
+      // Use limit(1) + array — .maybeSingle() ERRORS when >1 rows exist and
+      // returns data=null, which the old code treated as "no invoice" and
+      // then inserted another duplicate blanket. That bug created repeat
+      // invoice numbers on this order.
+      const { data: existingInvoices } = await supabase
         .from('invoices')
         .select('id')
         .eq('order_id', orderId)
-        .maybeSingle();
+        .is('deleted_at', null)
+        .limit(1);
 
-      if (!existingInvoice) {
+      if (!existingInvoices || existingInvoices.length === 0) {
         // Create invoice with status "Final Review" using order number
         const invoiceNumber = generateInvoiceNumber(order.order_number, 1);
         const { error: invoiceError } = await supabase
@@ -1240,7 +1245,10 @@ const OrderDetail = () => {
         })()
       );
 
-      // Update blanket invoice in parallel
+      // Update blanket invoice in parallel.
+      // Existing rows use invoice_type='full' (legacy) — match both 'full' and
+      // 'blanket' so edits actually sync. Filter by shipment_number=1 so we
+      // never touch child invoices.
       phase2Promises.push(
         (async () => {
           await supabase
@@ -1250,7 +1258,8 @@ const OrderDetail = () => {
               total: newTotal + Number(editedOrder.shipping_cost || 0)
             })
             .eq('order_id', orderId)
-            .eq('invoice_type', 'blanket')
+            .in('invoice_type', ['full', 'blanket'])
+            .eq('shipment_number', 1)
             .is('deleted_at', null);
         })()
       );
