@@ -275,360 +275,12 @@ export const InvoicePackingListSection = ({
     setProcessingExcel(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      // Read file as base64
-      const fileContent = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(excelFile);
-      });
 
-      // Get order items for matching
-      const orderItems = (order?.order_items || editedItems).map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        sku: item.sku,
-        quantity: item.quantity,
-        shipped_quantity: item.shipped_quantity || 0
-      }));
-
-      // Call parse-packing-list edge function
-      const { data: parseResult, error: parseError } = await supabase.functions.invoke('parse-packing-list', {
-        body: {
-          fileContent,
-          orderItems,
-          fileName: excelFile.name,
-          isBase64: true
-        }
-      });
-
-      if (parseError) throw parseError;
-      if (parseResult?.error) throw new Error(parseResult.error);
-
-      console.log('Parse result:', parseResult);
-
-      // Generate PDF from parsed data
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      
-      // Colors
-      const primaryGreen = [76, 175, 80];
-      const darkGray = [51, 51, 51];
-      const lightGray = [248, 248, 248];
-      const mediumGray = [100, 100, 100];
-      
-      let yPos = 15;
-      
-      // Company header
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
-      
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('1415 S 700 W', 14, yPos + 7);
-      doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
-      doc.text('www.vibepkg.com', 14, yPos + 17);
-      
-      // Logo on right
-      try {
-        const logoResponse = await fetch('/images/vibe-logo.png');
-        const logoBlob = await logoResponse.blob();
-        const logoBase64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(logoBlob);
-        });
-        doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
-      } catch (error) {
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-        doc.text('VIBE', pageWidth - 14, yPos + 8, { align: 'right' });
-      }
-      
-      yPos += 28;
-      
-      // Divider
-      doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.setLineWidth(0.5);
-      doc.line(14, yPos, pageWidth - 14, yPos);
-      
-      yPos += 12;
-      
-      // Title
-      doc.setFontSize(24);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text('Packing List', 14, yPos);
-      
-      // No source file note shown to customers
-      
-      yPos += 15;
-      
-      // Ship To and Details
-      const leftColX = 14;
-      const rightColX = pageWidth / 2 + 10;
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Delivery Address', leftColX, yPos);
-      
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(order?.shipping_name || '', leftColX, yPos + 8);
-      
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      
-      let shipY = yPos + 14;
-      if (order?.shipping_street) {
-        doc.text(order.shipping_street, leftColX, shipY);
-        shipY += 5;
-      }
-      doc.text(`${order?.shipping_city || ''}, ${order?.shipping_state || ''} ${order?.shipping_zip || ''}`, leftColX, shipY);
-      
-      // Details on right
-      const detailsStartY = yPos;
-      doc.text('Invoice #:', rightColX, detailsStartY);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(invoice.invoice_number, rightColX + 45, detailsStartY);
-      
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Order #:', rightColX, detailsStartY + 7);
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(order?.order_number || '', rightColX + 45, detailsStartY + 7);
-      
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Date:', rightColX, detailsStartY + 14);
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(format(new Date(), 'MMM d, yyyy'), rightColX + 45, detailsStartY + 14);
-      
-      if (order?.po_number) {
-        doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-        doc.text('PO #:', rightColX, detailsStartY + 21);
-        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-        doc.text(order.po_number, rightColX + 45, detailsStartY + 21);
-      }
-      
-      yPos += 40;
-      
-      // Build items table - use matched items if available, otherwise use extracted unmatched items
-      const matchedItems = parseResult?.matched_items || [];
-      const unmatchedItems = parseResult?.unmatched_items || [];
-      const shippingSummary = parseResult?.shipping_summary || {};
-      const orderItemsMap = new Map<string, any>((order?.order_items || editedItems).map((item: any) => [item.id, item]));
-      
-      let tableData: (string | number)[][] = [];
-      let usedUnmatched = false;
-      let hasCartonInfo = false;
-      let hasWeightInfo = false;
-      
-      // Check if we have carton/weight data in unmatched items
-      if (unmatchedItems.length > 0) {
-        hasCartonInfo = unmatchedItems.some((item: any) => item.carton_numbers || item.num_cartons);
-        hasWeightInfo = unmatchedItems.some((item: any) => item.gross_weight_kg || item.net_weight_kg);
-      }
-      
-      if (matchedItems.length > 0) {
-        // Use matched items (simpler format)
-        tableData = matchedItems.map((match: any, index: number) => {
-          const orderItem = orderItemsMap.get(match.order_item_id) as any;
-          return [
-            String(index + 1),
-            orderItem?.sku || '',
-            orderItem?.name || match.packing_list_name || '',
-            (match.shipped_quantity || 0).toLocaleString()
-          ];
-        });
-      } else if (unmatchedItems.length > 0) {
-        // Fallback: use unmatched/extracted items directly from the packing list with full details
-        usedUnmatched = true;
-        
-        if (hasCartonInfo || hasWeightInfo) {
-          // Rich packing list format with cartons, weights, etc.
-          tableData = unmatchedItems.map((item: any, index: number) => {
-            const row: (string | number)[] = [
-              String(index + 1),
-              item.carton_numbers || '-',
-              item.name || 'Unknown Item',
-              item.num_cartons || '-',
-              (item.quantity || 0).toLocaleString(),
-            ];
-            if (hasWeightInfo) {
-              row.push(item.gross_weight_kg ? `${item.gross_weight_kg} kg` : '-');
-            }
-            return row;
-          });
-        } else {
-          // Simple format
-          tableData = unmatchedItems.map((item: any, index: number) => [
-            String(index + 1),
-            '-',
-            item.name || 'Unknown Item',
-            '-',
-            (item.quantity || 0).toLocaleString(),
-            '-'
-          ]);
-        }
-      }
-      
-      if (tableData.length === 0) {
-        toast({
-          title: "No Items Found",
-          description: "Could not extract any items from the Excel file. Please check the file format.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Dynamic headers based on data available
-      const headers = usedUnmatched && (hasCartonInfo || hasWeightInfo)
-        ? hasWeightInfo 
-          ? [['#', 'CTN NO.', 'DESCRIPTION', 'CTNS', 'QTY', 'G.W.']]
-          : [['#', 'CTN NO.', 'DESCRIPTION', 'CTNS', 'QTY', 'G.W.']]
-        : [['#', 'CTN NO.', 'DESCRIPTION', 'CTNS', 'QTY', 'G.W.']];
-      
-      // Reformat matched items to include placeholder columns for consistency
-      if (matchedItems.length > 0) {
-        tableData = matchedItems.map((match: any, index: number) => {
-          const orderItem = orderItemsMap.get(match.order_item_id) as any;
-          return [
-            String(index + 1),
-            '-',
-            orderItem?.name || match.packing_list_name || '',
-            '-',
-            (match.shipped_quantity || 0).toLocaleString(),
-            '-'
-          ];
-        });
-      }
-      
-      autoTable(doc, {
-        startY: yPos,
-        head: headers,
-        body: tableData,
-        theme: 'grid',
-        headStyles: { 
-          fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]], 
-          textColor: 255,
-          fontStyle: 'bold',
-          fontSize: 8,
-          cellPadding: 3,
-          halign: 'center',
-          lineWidth: 0.5,
-          lineColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]]
-        },
-        bodyStyles: {
-          fontSize: 8,
-          cellPadding: 3,
-          textColor: [darkGray[0], darkGray[1], darkGray[2]],
-          lineWidth: 0.25,
-          lineColor: [200, 200, 200]
-        },
-        alternateRowStyles: {
-          fillColor: [lightGray[0], lightGray[1], lightGray[2]]
-        },
-        columnStyles: {
-          0: { cellWidth: 12, halign: 'center' },  // #
-          1: { cellWidth: 25, halign: 'center' },  // CTN NO.
-          2: { cellWidth: 80 },                     // DESCRIPTION
-          3: { cellWidth: 18, halign: 'center' },  // CTNS
-          4: { cellWidth: 25, halign: 'center' },  // QTY
-          5: { cellWidth: 22, halign: 'center' }   // G.W.
-        },
-        margin: { left: 14, right: 14 },
-        showHead: 'firstPage',
-        tableLineWidth: 0.25,
-        tableLineColor: [200, 200, 200]
-      });
-      
-      // Summary section with shipping totals
-      let tableEndY = (doc as any).lastAutoTable.finalY + 10;
-      
-      // Check if summary + footer will overflow the page
-      const summaryNeededSpace = 28 + 40; // summary box + notes + footer
-      if (tableEndY + summaryNeededSpace > pageHeight - 10) {
-        doc.addPage();
-        tableEndY = 20;
-      }
-      
-      // Calculate totals from data
-      const totalQty = usedUnmatched 
-        ? unmatchedItems.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
-        : matchedItems.reduce((sum: number, item: any) => sum + (item.shipped_quantity || 0), 0);
-      const totalCartons = shippingSummary.total_cartons || 
-        unmatchedItems.reduce((sum: number, item: any) => sum + (item.num_cartons || 0), 0);
-      const totalGrossWeight = shippingSummary.total_gross_weight_kg ||
-        unmatchedItems.reduce((sum: number, item: any) => sum + (item.gross_weight_kg || 0), 0);
-      const totalNetWeight = shippingSummary.total_net_weight_kg ||
-        unmatchedItems.reduce((sum: number, item: any) => sum + (item.net_weight_kg || 0), 0);
-      const totalCbm = shippingSummary.total_cbm ||
-        unmatchedItems.reduce((sum: number, item: any) => sum + (item.cbm || 0), 0);
-      
-      // Draw summary box
-      doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.setLineWidth(0.5);
-      doc.roundedRect(14, tableEndY, pageWidth - 28, 28, 2, 2, 'S');
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text('SHIPPING SUMMARY', 20, tableEndY + 7);
-      
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      
-      const summaryY = tableEndY + 15;
-      const colWidth = (pageWidth - 28) / 5;
-      
-      // Summary items
-      const summaryItems = [
-        { label: 'Total Qty:', value: totalQty.toLocaleString() },
-        { label: 'Total Cartons:', value: totalCartons > 0 ? totalCartons.toLocaleString() : '-' },
-        { label: 'Gross Weight:', value: totalGrossWeight > 0 ? `${totalGrossWeight.toFixed(1)} kg` : '-' },
-        { label: 'Net Weight:', value: totalNetWeight > 0 ? `${totalNetWeight.toFixed(1)} kg` : '-' },
-        { label: 'Volume (CBM):', value: totalCbm > 0 ? totalCbm.toFixed(3) : '-' },
-      ];
-      
-      summaryItems.forEach((item, idx) => {
-        const xPos = 20 + (idx * colWidth);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-        doc.text(item.label, xPos, summaryY);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-        doc.text(item.value, xPos, summaryY + 6);
-      });
-      
-      // No vendor source note in customer-facing PDF
-      
-      // Footer
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
-      
-      // Convert to blob and upload
-      const pdfBlob = doc.output('blob');
-      const fileName = `${invoiceId}/${Date.now()}-${sanitizeStorageFileName(`packing-list-${invoice.invoice_number}.pdf`)}`;
-      
+      // Upload the raw Excel/CSV file as-is (no parsing, no qty changes)
+      const fileName = `${invoiceId}/${Date.now()}-${sanitizeStorageFileName(excelFile.name)}`;
       const { error: uploadError } = await supabase.storage
         .from('packing-lists')
-        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+        .upload(fileName, excelFile, { contentType: excelFile.type || 'application/octet-stream' });
 
       if (uploadError) {
         if (uploadError.message.includes('Bucket not found')) {
@@ -642,43 +294,33 @@ export const InvoicePackingListSection = ({
         throw uploadError;
       }
 
-      // Create database record
       const { error: dbError } = await supabase
         .from('invoice_packing_lists')
         .insert({
           invoice_id: invoiceId,
-          file_name: `packing-list-${invoice.invoice_number}.pdf`,
+          file_name: excelFile.name,
           file_path: fileName,
-          file_size: pdfBlob.size,
-          file_type: 'application/pdf',
-          source: 'excel-import',
+          file_size: excelFile.size,
+          file_type: excelFile.type || 'application/octet-stream',
+          source: 'uploaded',
           created_by: user?.id,
-          notes: notes || `Generated from: ${excelFile.name}`
+          notes: notes || null
         });
 
       if (dbError) throw dbError;
 
-      const successMsg = usedUnmatched 
-        ? `Created packing list with ${tableData.length} items extracted from vendor file.`
-        : `Successfully created packing list. ${matchedItems.length} items matched.`;
-      
       toast({
-        title: "Packing List Created",
-        description: successMsg
+        title: "Spreadsheet Attached",
+        description: "File uploaded successfully"
       });
-
-      // After creating packing list, optionally update shipped quantities
-      if (applyShippedQty && matchedItems.length > 0) {
-        await applyShippedQuantities(matchedItems);
-      }
 
       setShowExcelUploadDialog(false);
       fetchPackingLists();
     } catch (error: any) {
-      console.error('Excel processing error:', error);
+      console.error('Excel upload error:', error);
       toast({
-        title: "Processing Failed",
-        description: error.message || "Failed to process Excel file",
+        title: "Upload Failed",
+        description: error.message || "Failed to upload spreadsheet",
         variant: "destructive"
       });
     } finally {
