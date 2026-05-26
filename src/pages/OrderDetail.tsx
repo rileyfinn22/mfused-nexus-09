@@ -1245,7 +1245,10 @@ const OrderDetail = () => {
         })()
       );
 
-      // Update blanket invoice in parallel
+      // Update blanket invoice in parallel.
+      // Existing rows use invoice_type='full' (legacy) — match both 'full' and
+      // 'blanket' so edits actually sync. Filter by shipment_number=1 so we
+      // never touch child invoices.
       phase2Promises.push(
         (async () => {
           await supabase
@@ -1255,7 +1258,8 @@ const OrderDetail = () => {
               total: newTotal + Number(editedOrder.shipping_cost || 0)
             })
             .eq('order_id', orderId)
-            .eq('invoice_type', 'blanket')
+            .in('invoice_type', ['full', 'blanket'])
+            .eq('shipment_number', 1)
             .is('deleted_at', null);
         })()
       );
