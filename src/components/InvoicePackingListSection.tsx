@@ -932,7 +932,7 @@ export const InvoicePackingListSection = ({
                 onClick={handleExcelUploadClick}
               >
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
-                From Excel
+                Attach Excel
               </Button>
               <Button 
                 size="sm"
