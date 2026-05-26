@@ -201,16 +201,25 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   type Row = (string | { content: string; colSpan?: number })[];
   const tableBody: Row[] = [];
   // Per-row metadata: kind + optional descriptionHtml for rich rendering
-  type Kind = 'product' | 'desc' | 'option' | 'tier' | 'simple';
-  const rowMeta: { kind: Kind; descHtml?: string }[] = [];
+  type Kind = 'product' | 'productWithDesc' | 'option' | 'tier' | 'simple';
+  const rowMeta: { kind: Kind; headerLine?: string; descHtml?: string }[] = [];
 
-  // Description column index in the rendered table (0-based)
-  const DESC_COL = 0; // descriptions span full width
+  const DESC_COL = 0;
 
   const allDescriptionOnly = items.length > 0 && items.every(
     (it) => it.quantity === 0 && !!it.description && (!it.price_breaks || it.price_breaks.length === 0)
   );
   const FULL_SPAN = allDescriptionOnly ? 1 : 4;
+
+  const pushProductRow = (headerLine: string, descHtml?: string) => {
+    if (descHtml) {
+      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
+      rowMeta.push({ kind: 'productWithDesc', headerLine, descHtml });
+    } else {
+      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
+      rowMeta.push({ kind: 'product', headerLine });
+    }
+  };
 
   items.forEach((item) => {
     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
@@ -218,17 +227,9 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     const headerLine = `${item.name}    ${item.sku}${item.state ? `  ·  ${item.state}` : ''}`;
 
     if (isDescriptionMode) {
-      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
-      rowMeta.push({ kind: 'product' });
-      tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
-      rowMeta.push({ kind: 'desc', descHtml: item.description! });
+      pushProductRow(headerLine, item.description!);
     } else if (hasPriceBreaks) {
-      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
-      rowMeta.push({ kind: 'product' });
-      if (item.description) {
-        tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
-        rowMeta.push({ kind: 'desc', descHtml: item.description });
-      }
+      pushProductRow(headerLine, item.description || undefined);
       item.price_breaks.forEach((pb, i) => {
         const label = pb.label?.trim() ? pb.label : `Option ${i + 1}`;
         const noteSuffix = pb.note?.trim() ? `\n${pb.note.trim()}` : '';
@@ -258,12 +259,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         }
       });
     } else {
-      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
-      rowMeta.push({ kind: 'product' });
-      if (item.description) {
-        tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
-        rowMeta.push({ kind: 'desc', descHtml: item.description });
-      }
+      pushProductRow(headerLine, item.description || undefined);
       tableBody.push([
         '',
         formatUnitPrice(item.unit_price),
@@ -313,16 +309,14 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     willDrawCell: (data) => {
       if (data.section !== 'body' || data.column.index !== 0) return;
       const meta = rowMeta[data.row.index];
-      if (!meta || meta.kind !== 'product') return;
-      // Estimate height of this product header + any rows that should stick with it
-      // (description, options, and the first tier/simple row beneath it).
+      if (!meta) return;
+      if (meta.kind !== 'product' && meta.kind !== 'productWithDesc') return;
       let groupH = data.row.height || 16;
       for (let i = data.row.index + 1; i < rowMeta.length; i++) {
         const m = rowMeta[i];
-        if (!m || m.kind === 'product') break;
+        if (!m || m.kind === 'product' || m.kind === 'productWithDesc') break;
         const r = (data.table.body as any[])[i];
         groupH += (r?.height) || 12;
-        // Stop after we've absorbed desc + first priced row to avoid forcing huge breaks
         if (m.kind === 'tier' || m.kind === 'simple' || m.kind === 'option') break;
       }
       const pageH = doc.internal.pageSize.getHeight();
@@ -343,16 +337,14 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.fontSize = 10.5;
         data.cell.styles.cellPadding = { top: 6, right: 6, bottom: 6, left: 10 };
-      } else if (meta.kind === 'desc') {
-        // Suppress autoTable's own text — we'll draw rich HTML in didDrawCell
+      } else if (meta.kind === 'productWithDesc') {
         data.cell.text = [''];
         data.cell.styles.fillColor = COLORS.rowAlt;
-        data.cell.styles.cellPadding = { top: 4, right: 6, bottom: 4, left: 6 };
-        // Pre-compute height so the cell expands correctly
+        data.cell.styles.cellPadding = { top: 0, right: 0, bottom: 0, left: 0 };
         if (data.column.index === DESC_COL && meta.descHtml) {
-          const widthAvailable = tableInnerWidth - 12; // padding
+          const widthAvailable = tableInnerWidth - 12;
           const { totalHeight } = measureRichText(doc, meta.descHtml, widthAvailable, 9);
-          data.cell.styles.minCellHeight = totalHeight + 6;
+          data.cell.styles.minCellHeight = 16 + totalHeight + 8;
         }
       } else if (meta.kind === 'option') {
         data.cell.styles.fillColor = COLORS.optionBand;
@@ -365,9 +357,8 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         }
       }
 
-      // Hairlines: product rows get a top divider, all rows get a bottom hairline
       data.cell.styles.lineColor = COLORS.rule;
-      if (meta.kind === 'product') {
+      if (meta.kind === 'product' || meta.kind === 'productWithDesc') {
         data.cell.styles.lineWidth = { top: 0.4, right: 0, bottom: 0.2, left: 0 } as any;
       } else {
         data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0.1, left: 0 } as any;
@@ -378,17 +369,27 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       const meta = rowMeta[data.row.index];
       if (!meta) return;
 
-      // Left accent bar on product rows for a clean section marker
       if (meta.kind === 'product' && data.column.index === 0) {
         doc.setFillColor(...COLORS.ink);
         doc.rect(data.cell.x, data.cell.y + 2, 1.6, data.cell.height - 4, 'F');
       }
 
-      if (meta.kind === 'desc' && data.column.index === DESC_COL && meta.descHtml) {
-        const x = data.cell.x + 6;
-        const y = data.cell.y + 1;
-        const width = tableInnerWidth - 12;
-        drawRichText(doc, meta.descHtml, x, y, width, 9);
+      if (meta.kind === 'productWithDesc' && data.column.index === DESC_COL && meta.headerLine) {
+        const bandH = 14;
+        doc.setFillColor(232, 235, 239);
+        doc.rect(data.cell.x, data.cell.y, data.cell.width, bandH, 'F');
+        doc.setFillColor(...COLORS.ink);
+        doc.rect(data.cell.x, data.cell.y + 2, 1.6, bandH - 4, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
+        doc.setTextColor(...COLORS.ink);
+        doc.text(meta.headerLine, data.cell.x + 10, data.cell.y + bandH - 4);
+        if (meta.descHtml) {
+          const x = data.cell.x + 6;
+          const y = data.cell.y + bandH + 2;
+          const width = tableInnerWidth - 12;
+          drawRichText(doc, meta.descHtml, x, y, width, 9);
+        }
       }
     },
   });
