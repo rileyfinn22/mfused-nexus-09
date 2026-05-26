@@ -1098,9 +1098,9 @@ export const InvoicePackingListSection = ({
       <Dialog open={showExcelUploadDialog} onOpenChange={setShowExcelUploadDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Packing List from Excel</DialogTitle>
+            <DialogTitle>Attach Spreadsheet</DialogTitle>
             <DialogDescription>
-              Upload an Excel or CSV file to create a branded packing list. Items will be matched to order items automatically.
+              Attach an Excel or CSV file as-is to this invoice. Shipped quantities will not be changed — use "Input Shipped Qty" or "Rebrand PDF" for those flows.
             </DialogDescription>
           </DialogHeader>
           
@@ -1128,29 +1128,9 @@ export const InvoicePackingListSection = ({
                 id="excelNotes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add any notes about this packing list"
+                placeholder="Add any notes about this file"
                 className="mt-1"
               />
-            </div>
-
-            <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-              <p className="font-medium mb-1">How it works:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Upload your vendor's packing list (Excel or CSV)</li>
-                <li>Items are automatically matched to order items by SKU and name</li>
-                <li>A branded VibePKG PDF is generated for your customer</li>
-              </ul>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="applyShippedQty"
-                checked={applyShippedQty}
-                onCheckedChange={(checked) => setApplyShippedQty(!!checked)}
-              />
-              <Label htmlFor="applyShippedQty" className="text-sm font-medium cursor-pointer">
-                Also update shipped quantities on the invoice from matched items
-              </Label>
             </div>
           </div>
           
@@ -1165,12 +1145,12 @@ export const InvoicePackingListSection = ({
               {processingExcel ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing...
+                  Uploading...
                 </>
               ) : (
                 <>
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Create Packing List
+                  Attach File
                 </>
               )}
             </Button>
