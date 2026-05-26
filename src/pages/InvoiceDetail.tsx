@@ -2028,18 +2028,22 @@ const InvoiceDetail = () => {
                           mode="single"
                           selected={invoice.shipped_date ? new Date(invoice.shipped_date) : undefined}
                           onSelect={async (date) => {
+                            const iso = date ? date.toISOString() : null;
+                            const updates: { shipped_date: string | null; invoice_date?: string } = { shipped_date: iso };
+                            if (iso) updates.invoice_date = iso;
                             const { error } = await supabase
                               .from('invoices')
-                              .update({ shipped_date: date ? date.toISOString() : null })
+                              .update(updates)
                               .eq('id', invoice.id);
 
                             if (error) {
                               toast({ title: "Error", description: "Failed to update shipped date", variant: "destructive" });
                             } else {
-                              setInvoice({ ...invoice, shipped_date: date ? date.toISOString() : null });
-                              toast({ title: "Shipped date updated" });
+                              setInvoice({ ...invoice, shipped_date: iso, ...(iso ? { invoice_date: iso } : {}) });
+                              toast({ title: iso ? "Shipped & invoice date updated" : "Shipped date cleared" });
                             }
                           }}
+
                           initialFocus
                           className={cn("p-3 pointer-events-auto")}
                         />
