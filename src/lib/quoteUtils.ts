@@ -200,9 +200,8 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   // ============ ITEMS TABLE ============
   type Row = (string | { content: string; colSpan?: number })[];
   const tableBody: Row[] = [];
-  // Per-row metadata: kind + optional descriptionHtml for rich rendering
-  type Kind = 'product' | 'description' | 'option' | 'tier' | 'simple';
-  const rowMeta: { kind: Kind; descHtml?: string }[] = [];
+  type Kind = 'product' | 'productWithDesc' | 'option' | 'tier' | 'simple';
+  const rowMeta: { kind: Kind; headerLine?: string; descHtml?: string }[] = [];
 
   const DESC_COL = 0;
 
@@ -211,12 +210,20 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   );
   const FULL_SPAN = allDescriptionOnly ? 1 : 4;
 
+  // Header band visuals
+  const BAND_H = 14;
+  const DESC_TOP_PAD = 3;
+  const DESC_BOTTOM_PAD = 5;
+  const DESC_LEFT_PAD = 10;
+  const DESC_RIGHT_PAD = 10;
+
   const pushProductRow = (headerLine: string, descHtml?: string) => {
-    tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
-    rowMeta.push({ kind: 'product' });
     if (descHtml) {
       tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
-      rowMeta.push({ kind: 'description', descHtml });
+      rowMeta.push({ kind: 'productWithDesc', headerLine, descHtml });
+    } else {
+      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
+      rowMeta.push({ kind: 'product', headerLine });
     }
   };
 
@@ -274,13 +281,13 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     ? [['ITEM']]
     : [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']];
 
-  // Pre-measure description heights so cells reserve correct space
-  const descHeights: Record<number, number> = {};
+  // Pre-measure description heights using the SAME width drawRichText will use
+  const descDrawWidth = tableInnerWidth - DESC_LEFT_PAD - DESC_RIGHT_PAD;
+  const combinedHeights: Record<number, number> = {};
   rowMeta.forEach((m, i) => {
-    if (m.kind === 'description' && m.descHtml) {
-      const widthAvailable = tableInnerWidth - 12;
-      const { totalHeight } = measureRichText(doc, m.descHtml, widthAvailable, 9);
-      descHeights[i] = totalHeight + 6;
+    if (m.kind === 'productWithDesc' && m.descHtml) {
+      const { totalHeight } = measureRichText(doc, m.descHtml, descDrawWidth, 9);
+      combinedHeights[i] = BAND_H + DESC_TOP_PAD + totalHeight + DESC_BOTTOM_PAD;
     }
   });
 
@@ -313,26 +320,6 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     margin: { left: MARGIN, right: MARGIN, bottom: 24 },
     showHead: 'firstPage',
     tableLineWidth: 0,
-    willDrawCell: (data) => {
-      if (data.section !== 'body' || data.column.index !== 0) return;
-      const meta = rowMeta[data.row.index];
-      if (!meta || meta.kind !== 'product') return;
-      // Keep product header together with following description row (and any first child row)
-      let groupH = data.row.height || 14;
-      for (let i = data.row.index + 1; i < rowMeta.length && i <= data.row.index + 2; i++) {
-        const m = rowMeta[i];
-        if (!m) break;
-        const r = (data.table.body as any[])[i];
-        groupH += (r?.height) || 12;
-        if (m.kind !== 'description') break;
-      }
-      const pageH = doc.internal.pageSize.getHeight();
-      const bottomLimit = pageH - 24;
-      if (data.cursor && data.cursor.y + groupH > bottomLimit && data.cursor.y > 40) {
-        doc.addPage();
-        data.cursor.y = 20;
-      }
-    },
     didParseCell: (data) => {
       if (data.section !== 'body') return;
       const meta = rowMeta[data.row.index];
@@ -344,12 +331,13 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.fontSize = 10.5;
         data.cell.styles.cellPadding = { top: 6, right: 6, bottom: 6, left: 10 };
-      } else if (meta.kind === 'description') {
+      } else if (meta.kind === 'productWithDesc') {
+        // Suppress autoTable text; we draw header band + description manually
         data.cell.text = [''];
         data.cell.styles.fillColor = COLORS.rowAlt;
-        data.cell.styles.cellPadding = { top: 4, right: 6, bottom: 6, left: 10 };
+        data.cell.styles.cellPadding = { top: 0, right: 0, bottom: 0, left: 0 };
         if (data.column.index === DESC_COL) {
-          data.cell.styles.minCellHeight = descHeights[data.row.index] || 10;
+          data.cell.styles.minCellHeight = combinedHeights[data.row.index] || (BAND_H + 10);
         }
       } else if (meta.kind === 'option') {
         data.cell.styles.fillColor = COLORS.optionBand;
@@ -363,10 +351,8 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       }
 
       data.cell.styles.lineColor = COLORS.rule;
-      if (meta.kind === 'product') {
-        data.cell.styles.lineWidth = { top: 0.4, right: 0, bottom: 0, left: 0 } as any;
-      } else if (meta.kind === 'description') {
-        data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0.2, left: 0 } as any;
+      if (meta.kind === 'product' || meta.kind === 'productWithDesc') {
+        data.cell.styles.lineWidth = { top: 0.4, right: 0, bottom: 0.2, left: 0 } as any;
       } else {
         data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0.1, left: 0 } as any;
       }
@@ -381,11 +367,24 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         doc.rect(data.cell.x, data.cell.y + 2, 1.6, data.cell.height - 4, 'F');
       }
 
-      if (meta.kind === 'description' && data.column.index === DESC_COL && meta.descHtml) {
-        const x = data.cell.x + 10;
-        const y = data.cell.y + 4;
-        const width = tableInnerWidth - 16;
-        drawRichText(doc, meta.descHtml, x, y, width, 9);
+      if (meta.kind === 'productWithDesc' && data.column.index === DESC_COL && meta.headerLine) {
+        // Header band (darker grey) covering the top of the cell
+        doc.setFillColor(232, 235, 239);
+        doc.rect(data.cell.x, data.cell.y, data.cell.width, BAND_H, 'F');
+        // Left accent bar (band only)
+        doc.setFillColor(...COLORS.ink);
+        doc.rect(data.cell.x, data.cell.y + 2, 1.6, BAND_H - 4, 'F');
+        // Header text vertically centered in band
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
+        doc.setTextColor(...COLORS.ink);
+        doc.text(meta.headerLine, data.cell.x + DESC_LEFT_PAD, data.cell.y + BAND_H - 4.5);
+        // Description below band
+        if (meta.descHtml) {
+          const x = data.cell.x + DESC_LEFT_PAD;
+          const y = data.cell.y + BAND_H + DESC_TOP_PAD;
+          drawRichText(doc, meta.descHtml, x, y, descDrawWidth, 9);
+        }
       }
     },
   });
