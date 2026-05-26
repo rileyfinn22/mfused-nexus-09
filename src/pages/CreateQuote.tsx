@@ -399,12 +399,35 @@ const CreateQuote = () => {
   };
 
   const generateQuoteNumber = async () => {
-    const { count } = await supabase
+    // Find the highest existing QT-##### number and increment.
+    // Using count() breaks when quotes are deleted or filtered by RLS, causing duplicates.
+    const { data } = await supabase
       .from('quotes')
-      .select('*', { count: 'exact', head: true });
-    
-    const nextNumber = (count || 0) + 1;
-    return `QT-${String(nextNumber).padStart(5, '0')}`;
+      .select('quote_number')
+      .like('quote_number', 'QT-%')
+      .order('quote_number', { ascending: false })
+      .limit(1);
+
+    let maxNumber = 0;
+    if (data && data.length > 0) {
+      const match = data[0].quote_number?.match(/QT-(\d+)/);
+      if (match) maxNumber = parseInt(match[1], 10);
+    }
+
+    let candidate = maxNumber + 1;
+    // Safety: ensure the candidate isn't already taken (handles concurrent creates)
+    // by probing forward until a free slot is found.
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const candidateNumber = `QT-${String(candidate).padStart(5, '0')}`;
+      const { data: existing } = await supabase
+        .from('quotes')
+        .select('id')
+        .eq('quote_number', candidateNumber)
+        .maybeSingle();
+      if (!existing) return candidateNumber;
+      candidate += 1;
+    }
   };
 
   const handleFileUpload = async () => {
