@@ -67,6 +67,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const MARGIN = 16;
+  const FOOTER_RESERVE = 36;
 
   // ============ HEADER ============
   let yPos = 18;
@@ -287,7 +288,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   rowMeta.forEach((m, i) => {
     if (m.kind === 'productWithDesc' && m.descHtml) {
       const { totalHeight } = measureRichText(doc, m.descHtml, descDrawWidth, 9);
-      combinedHeights[i] = BAND_H + DESC_TOP_PAD + totalHeight + DESC_BOTTOM_PAD;
+      combinedHeights[i] = BAND_H + DESC_TOP_PAD + totalHeight + DESC_BOTTOM_PAD + 8;
     }
   });
 
@@ -317,8 +318,9 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
           2: { halign: 'right', cellWidth: 22 },
           3: { halign: 'right', cellWidth: tableInnerWidth - 92 - 28 - 22, fontStyle: 'bold' },
         },
-    margin: { left: MARGIN, right: MARGIN, bottom: 24 },
+    margin: { left: MARGIN, right: MARGIN, bottom: FOOTER_RESERVE },
     showHead: 'firstPage',
+    rowPageBreak: 'avoid',
     tableLineWidth: 0,
     didParseCell: (data) => {
       if (data.section !== 'body') return;
@@ -392,7 +394,6 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   let finalY = (doc as any).lastAutoTable.finalY + 10;
   const hasAnyPriceBreaks = items.some((item) => item.price_breaks && item.price_breaks.length > 0);
 
-  const FOOTER_RESERVE = 24;
   const ensureRoom = (needed: number) => {
     if (finalY + needed > pageHeight - FOOTER_RESERVE) {
       doc.addPage();
