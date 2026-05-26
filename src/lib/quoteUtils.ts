@@ -201,8 +201,8 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   type Row = (string | { content: string; colSpan?: number })[];
   const tableBody: Row[] = [];
   // Per-row metadata: kind + optional descriptionHtml for rich rendering
-  type Kind = 'product' | 'productWithDesc' | 'option' | 'tier' | 'simple';
-  const rowMeta: { kind: Kind; headerLine?: string; descHtml?: string }[] = [];
+  type Kind = 'product' | 'description' | 'option' | 'tier' | 'simple';
+  const rowMeta: { kind: Kind; descHtml?: string }[] = [];
 
   const DESC_COL = 0;
 
@@ -212,12 +212,11 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   const FULL_SPAN = allDescriptionOnly ? 1 : 4;
 
   const pushProductRow = (headerLine: string, descHtml?: string) => {
+    tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
+    rowMeta.push({ kind: 'product' });
     if (descHtml) {
-      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
-      rowMeta.push({ kind: 'productWithDesc', headerLine, descHtml });
-    } else {
-      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
-      rowMeta.push({ kind: 'product', headerLine });
+      tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
+      rowMeta.push({ kind: 'description', descHtml });
     }
   };
 
@@ -275,7 +274,15 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     ? [['ITEM']]
     : [['ITEM', 'UNIT PRICE', 'QTY', 'TOTAL']];
 
-
+  // Pre-measure description heights so cells reserve correct space
+  const descHeights: Record<number, number> = {};
+  rowMeta.forEach((m, i) => {
+    if (m.kind === 'description' && m.descHtml) {
+      const widthAvailable = tableInnerWidth - 12;
+      const { totalHeight } = measureRichText(doc, m.descHtml, widthAvailable, 9);
+      descHeights[i] = totalHeight + 6;
+    }
+  });
 
   autoTable(doc, {
     startY: yPos,
@@ -309,15 +316,15 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     willDrawCell: (data) => {
       if (data.section !== 'body' || data.column.index !== 0) return;
       const meta = rowMeta[data.row.index];
-      if (!meta) return;
-      if (meta.kind !== 'product' && meta.kind !== 'productWithDesc') return;
-      let groupH = data.row.height || 16;
-      for (let i = data.row.index + 1; i < rowMeta.length; i++) {
+      if (!meta || meta.kind !== 'product') return;
+      // Keep product header together with following description row (and any first child row)
+      let groupH = data.row.height || 14;
+      for (let i = data.row.index + 1; i < rowMeta.length && i <= data.row.index + 2; i++) {
         const m = rowMeta[i];
-        if (!m || m.kind === 'product' || m.kind === 'productWithDesc') break;
+        if (!m) break;
         const r = (data.table.body as any[])[i];
         groupH += (r?.height) || 12;
-        if (m.kind === 'tier' || m.kind === 'simple' || m.kind === 'option') break;
+        if (m.kind !== 'description') break;
       }
       const pageH = doc.internal.pageSize.getHeight();
       const bottomLimit = pageH - 24;
@@ -337,14 +344,12 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.fontSize = 10.5;
         data.cell.styles.cellPadding = { top: 6, right: 6, bottom: 6, left: 10 };
-      } else if (meta.kind === 'productWithDesc') {
+      } else if (meta.kind === 'description') {
         data.cell.text = [''];
         data.cell.styles.fillColor = COLORS.rowAlt;
-        data.cell.styles.cellPadding = { top: 0, right: 0, bottom: 0, left: 0 };
-        if (data.column.index === DESC_COL && meta.descHtml) {
-          const widthAvailable = tableInnerWidth - 12;
-          const { totalHeight } = measureRichText(doc, meta.descHtml, widthAvailable, 9);
-          data.cell.styles.minCellHeight = 16 + totalHeight + 8;
+        data.cell.styles.cellPadding = { top: 4, right: 6, bottom: 6, left: 10 };
+        if (data.column.index === DESC_COL) {
+          data.cell.styles.minCellHeight = descHeights[data.row.index] || 10;
         }
       } else if (meta.kind === 'option') {
         data.cell.styles.fillColor = COLORS.optionBand;
@@ -358,8 +363,10 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
       }
 
       data.cell.styles.lineColor = COLORS.rule;
-      if (meta.kind === 'product' || meta.kind === 'productWithDesc') {
-        data.cell.styles.lineWidth = { top: 0.4, right: 0, bottom: 0.2, left: 0 } as any;
+      if (meta.kind === 'product') {
+        data.cell.styles.lineWidth = { top: 0.4, right: 0, bottom: 0, left: 0 } as any;
+      } else if (meta.kind === 'description') {
+        data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0.2, left: 0 } as any;
       } else {
         data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0.1, left: 0 } as any;
       }
@@ -374,22 +381,11 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         doc.rect(data.cell.x, data.cell.y + 2, 1.6, data.cell.height - 4, 'F');
       }
 
-      if (meta.kind === 'productWithDesc' && data.column.index === DESC_COL && meta.headerLine) {
-        const bandH = 14;
-        doc.setFillColor(232, 235, 239);
-        doc.rect(data.cell.x, data.cell.y, data.cell.width, bandH, 'F');
-        doc.setFillColor(...COLORS.ink);
-        doc.rect(data.cell.x, data.cell.y + 2, 1.6, bandH - 4, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10.5);
-        doc.setTextColor(...COLORS.ink);
-        doc.text(meta.headerLine, data.cell.x + 10, data.cell.y + bandH - 4);
-        if (meta.descHtml) {
-          const x = data.cell.x + 6;
-          const y = data.cell.y + bandH + 2;
-          const width = tableInnerWidth - 12;
-          drawRichText(doc, meta.descHtml, x, y, width, 9);
-        }
+      if (meta.kind === 'description' && data.column.index === DESC_COL && meta.descHtml) {
+        const x = data.cell.x + 10;
+        const y = data.cell.y + 4;
+        const width = tableInnerWidth - 16;
+        drawRichText(doc, meta.descHtml, x, y, width, 9);
       }
     },
   });
