@@ -201,16 +201,25 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   type Row = (string | { content: string; colSpan?: number })[];
   const tableBody: Row[] = [];
   // Per-row metadata: kind + optional descriptionHtml for rich rendering
-  type Kind = 'product' | 'desc' | 'option' | 'tier' | 'simple';
-  const rowMeta: { kind: Kind; descHtml?: string }[] = [];
+  type Kind = 'product' | 'productWithDesc' | 'option' | 'tier' | 'simple';
+  const rowMeta: { kind: Kind; headerLine?: string; descHtml?: string }[] = [];
 
-  // Description column index in the rendered table (0-based)
-  const DESC_COL = 0; // descriptions span full width
+  const DESC_COL = 0;
 
   const allDescriptionOnly = items.length > 0 && items.every(
     (it) => it.quantity === 0 && !!it.description && (!it.price_breaks || it.price_breaks.length === 0)
   );
   const FULL_SPAN = allDescriptionOnly ? 1 : 4;
+
+  const pushProductRow = (headerLine: string, descHtml?: string) => {
+    if (descHtml) {
+      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
+      rowMeta.push({ kind: 'productWithDesc', headerLine, descHtml });
+    } else {
+      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
+      rowMeta.push({ kind: 'product', headerLine });
+    }
+  };
 
   items.forEach((item) => {
     const hasPriceBreaks = item.price_breaks && item.price_breaks.length > 0;
@@ -218,17 +227,9 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     const headerLine = `${item.name}    ${item.sku}${item.state ? `  ·  ${item.state}` : ''}`;
 
     if (isDescriptionMode) {
-      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
-      rowMeta.push({ kind: 'product' });
-      tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
-      rowMeta.push({ kind: 'desc', descHtml: item.description! });
+      pushProductRow(headerLine, item.description!);
     } else if (hasPriceBreaks) {
-      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
-      rowMeta.push({ kind: 'product' });
-      if (item.description) {
-        tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
-        rowMeta.push({ kind: 'desc', descHtml: item.description });
-      }
+      pushProductRow(headerLine, item.description || undefined);
       item.price_breaks.forEach((pb, i) => {
         const label = pb.label?.trim() ? pb.label : `Option ${i + 1}`;
         const noteSuffix = pb.note?.trim() ? `\n${pb.note.trim()}` : '';
@@ -258,12 +259,7 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
         }
       });
     } else {
-      tableBody.push([{ content: headerLine, colSpan: FULL_SPAN }]);
-      rowMeta.push({ kind: 'product' });
-      if (item.description) {
-        tableBody.push([{ content: '', colSpan: FULL_SPAN }]);
-        rowMeta.push({ kind: 'desc', descHtml: item.description });
-      }
+      pushProductRow(headerLine, item.description || undefined);
       tableBody.push([
         '',
         formatUnitPrice(item.unit_price),
