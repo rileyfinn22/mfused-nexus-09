@@ -310,6 +310,28 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     margin: { left: MARGIN, right: MARGIN, bottom: 24 },
     showHead: 'firstPage',
     tableLineWidth: 0,
+    willDrawCell: (data) => {
+      if (data.section !== 'body' || data.column.index !== 0) return;
+      const meta = rowMeta[data.row.index];
+      if (!meta || meta.kind !== 'product') return;
+      // Estimate height of this product header + any rows that should stick with it
+      // (description, options, and the first tier/simple row beneath it).
+      let groupH = data.row.height || 16;
+      for (let i = data.row.index + 1; i < rowMeta.length; i++) {
+        const m = rowMeta[i];
+        if (!m || m.kind === 'product') break;
+        const r = (data.table.body as any[])[i];
+        groupH += (r?.height) || 12;
+        // Stop after we've absorbed desc + first priced row to avoid forcing huge breaks
+        if (m.kind === 'tier' || m.kind === 'simple' || m.kind === 'option') break;
+      }
+      const pageH = doc.internal.pageSize.getHeight();
+      const bottomLimit = pageH - 24;
+      if (data.cursor && data.cursor.y + groupH > bottomLimit && data.cursor.y > 40) {
+        doc.addPage();
+        data.cursor.y = 20;
+      }
+    },
     didParseCell: (data) => {
       if (data.section !== 'body') return;
       const meta = rowMeta[data.row.index];
