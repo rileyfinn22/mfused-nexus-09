@@ -105,7 +105,7 @@ export const InvoicePackingListSection = ({
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [processingExcel, setProcessingExcel] = useState(false);
-  const [applyShippedQty, setApplyShippedQty] = useState(true);
+  
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showExcelUploadDialog, setShowExcelUploadDialog] = useState(false);
   const [showManualShippedDialog, setShowManualShippedDialog] = useState(false);
