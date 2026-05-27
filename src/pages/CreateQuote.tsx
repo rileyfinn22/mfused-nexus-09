@@ -125,6 +125,10 @@ const CreateQuote = () => {
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingMethod, setShippingMethod] = useState("");
   const [items, setItems] = useState<QuoteItem[]>([]);
+  const [autosaveReady, setAutosaveReady] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveInFlight = useRef(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
   const [existingFilename, setExistingFilename] = useState<string | null>(null);
