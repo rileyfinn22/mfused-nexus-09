@@ -1137,11 +1137,14 @@ const InvoiceDetail = () => {
         }
       }
 
-      // Re-sync to get updated payment link
+      // Re-sync to get updated payment link.
+      // billed_percentage is a one-shot deposit flag — once an invoice already exists in QBO,
+      // refreshing the link should always bill the full remaining balance (100%), otherwise
+      // the QBO invoice/link stays stuck at the original deposit amount.
       const { error } = await supabase.functions.invoke('quickbooks-sync-invoice', {
         body: {
           invoiceId,
-          billingPercentage: invoice.billed_percentage || 100
+          billingPercentage: 100
         }
       });
       if (error) throw error;
