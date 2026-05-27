@@ -389,29 +389,47 @@ const CreateQuote = () => {
       autosaveInFlight.current = true;
       setAutosaveStatus('saving');
       try {
-        const { error: descErr } = await supabase
+        // Save every editable field — same set the manual Update button writes,
+        // minus status (status is only changed via explicit actions).
+        const { error: quoteErr } = await supabase
           .from('quotes')
           .update({
+            company_id: companyId || null,
+            customer_name: customerName || companyNameManual,
+            customer_email: customerEmail || null,
+            customer_phone: customerPhone || null,
+            shipping_name: shippingName || null,
+            shipping_street: shippingStreet || null,
+            shipping_city: shippingCity || null,
+            shipping_state: shippingState || null,
+            shipping_zip: shippingZip || null,
             description: description || null,
+            request_notes: requestNotes || null,
+            internal_notes: internalNotes || null,
+            terms: terms || null,
+            valid_until: validUntil ? new Date(validUntil).toISOString() : null,
             subtotal: calculateSubtotal(),
+            shipping_cost: shippingCost,
+            shipping_method: shippingMethod || null,
+            lead_time: leadTime || null,
             total: calculateTotal(),
           })
           .eq('id', quoteId);
-        if (descErr) throw descErr;
+        if (quoteErr) throw quoteErr;
 
         if (items.length > 0) {
           const itemsToInsert = items.map(item => ({
             quote_id: quoteId,
             product_id: item.product_id || null,
-            sku: item.sku,
-            name: item.name,
+            sku: item.sku || '',
+            name: item.name || '',
             description: item.description || null,
             state: item.state || null,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            total: item.total,
-            price_breaks: item.price_breaks.length > 0 ? JSON.parse(JSON.stringify(item.price_breaks)) : null,
-            selected_tier: item.selected_tier,
+            quantity: item.quantity ?? 0,
+            unit_price: item.unit_price ?? 0,
+            total: item.total ?? 0,
+            price_breaks: item.price_breaks && item.price_breaks.length > 0 ? JSON.parse(JSON.stringify(item.price_breaks)) : null,
+            selected_tier: item.selected_tier ?? null,
           }));
           const { data: inserted, error: insErr } = await supabase
             .from('quote_items')
@@ -420,21 +438,26 @@ const CreateQuote = () => {
           if (insErr) throw insErr;
           const newIds = (inserted || []).map((r: any) => r.id);
           if (newIds.length > 0) {
-            await supabase
+            const { error: delErr } = await supabase
               .from('quote_items')
               .delete()
               .eq('quote_id', quoteId)
               .not('id', 'in', `(${newIds.join(',')})`);
+            if (delErr) throw delErr;
           }
         }
-        // If items.length === 0, do NOT auto-delete — manual save handles
-        // intentional clear with a confirm prompt.
+        // items.length === 0 → DO NOT delete; clearing requires manual Update.
 
         setAutosaveStatus('saved');
         setTimeout(() => setAutosaveStatus(s => (s === 'saved' ? 'idle' : s)), 1500);
-      } catch (e) {
+      } catch (e: any) {
         console.error('Autosave failed:', e);
         setAutosaveStatus('error');
+        toast({
+          title: 'Autosave failed',
+          description: e?.message || 'Changes not saved. Check connection and try Update Quote.',
+          variant: 'destructive',
+        });
       } finally {
         autosaveInFlight.current = false;
       }
@@ -443,7 +466,13 @@ const CreateQuote = () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [description, items, isEditing, autosaveReady, quoteId]);
+  }, [
+    description, items, isEditing, autosaveReady, quoteId,
+    companyId, customerName, companyNameManual, customerEmail, customerPhone,
+    shippingName, shippingStreet, shippingCity, shippingState, shippingZip,
+    requestNotes, internalNotes, terms, validUntil,
+    shippingCost, shippingMethod, leadTime,
+  ]);
 
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
