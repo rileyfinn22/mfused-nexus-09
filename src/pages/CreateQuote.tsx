@@ -752,17 +752,31 @@ const CreateQuote = () => {
       let savedQuoteId = quoteId;
 
       if (isEditing) {
+        // Safety guard: refuse to wipe items on edit if the form has none.
+        // Prevents accidental data loss (e.g. items state didn't load before save).
+        if (items.length === 0) {
+          const { count: existingCount } = await supabase
+            .from('quote_items')
+            .select('id', { count: 'exact', head: true })
+            .eq('quote_id', quoteId);
+          if ((existingCount ?? 0) > 0) {
+            const confirmed = window.confirm(
+              `This quote currently has ${existingCount} line item(s) but you're saving with none. ` +
+              `Continue and REMOVE all line items? Click Cancel to keep them.`
+            );
+            if (!confirmed) {
+              setSaving(false);
+              return;
+            }
+          }
+        }
+
         const { error } = await supabase
           .from('quotes')
           .update(quoteData)
           .eq('id', quoteId);
 
         if (error) throw error;
-
-        await supabase
-          .from('quote_items')
-          .delete()
-          .eq('quote_id', quoteId);
       } else {
         quoteData.quote_number = await generateQuoteNumber();
         quoteData.created_by = user?.id;
@@ -783,6 +797,9 @@ const CreateQuote = () => {
         savedQuoteId = newQuote.id;
       }
 
+      // Insert-then-delete pattern: insert new items FIRST. Only after that
+      // succeeds do we remove the old rows. If the insert fails, the old
+      // items remain intact instead of being wiped.
       if (items.length > 0) {
         const itemsToInsert = items.map(item => ({
           quote_id: savedQuoteId,
@@ -798,11 +815,29 @@ const CreateQuote = () => {
           selected_tier: item.selected_tier
         }));
 
-        const { error: itemsError } = await supabase
+        const { data: insertedItems, error: itemsError } = await supabase
           .from('quote_items')
-          .insert(itemsToInsert);
+          .insert(itemsToInsert)
+          .select('id');
 
         if (itemsError) throw itemsError;
+
+        if (isEditing) {
+          const newIds = (insertedItems || []).map((r: any) => r.id);
+          if (newIds.length > 0) {
+            await supabase
+              .from('quote_items')
+              .delete()
+              .eq('quote_id', savedQuoteId)
+              .not('id', 'in', `(${newIds.join(',')})`);
+          }
+        }
+      } else if (isEditing) {
+        // Explicitly confirmed empty save — now safe to clear.
+        await supabase
+          .from('quote_items')
+          .delete()
+          .eq('quote_id', savedQuoteId);
       }
 
       toast({
