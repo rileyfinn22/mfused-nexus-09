@@ -955,6 +955,13 @@ const CreateQuote = () => {
         <div>
           <h1 className="page-title">
             {isEditing ? "Edit Quote" : (isResponding ? "Create Quote for Customer" : (isVibeAdmin ? "Create Quote" : "Request Quote"))}
+            {isEditing && (
+              <span className="ml-3 text-xs font-normal text-muted-foreground align-middle">
+                {autosaveStatus === 'saving' && '· Saving…'}
+                {autosaveStatus === 'saved' && '· Saved'}
+                {autosaveStatus === 'error' && <span className="text-destructive">· Autosave failed — use Update Quote</span>}
+              </span>
+            )}
           </h1>
           <p className="page-subtitle">
             {isResponding 
