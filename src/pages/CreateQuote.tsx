@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -125,6 +125,10 @@ const CreateQuote = () => {
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingMethod, setShippingMethod] = useState("");
   const [items, setItems] = useState<QuoteItem[]>([]);
+  const [autosaveReady, setAutosaveReady] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveInFlight = useRef(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
   const [existingFilename, setExistingFilename] = useState<string | null>(null);
@@ -370,7 +374,76 @@ const CreateQuote = () => {
 
     // Fetch products for this company
     await fetchProducts(quote.company_id);
+
+    // Enable autosave only after initial data is loaded into state
+    setTimeout(() => setAutosaveReady(true), 0);
   };
+
+  // Autosave: persist description + items while editing an existing quote.
+  // Uses the same safe insert-then-delete pattern as manual save.
+  useEffect(() => {
+    if (!isEditing || !autosaveReady) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(async () => {
+      if (autosaveInFlight.current) return;
+      autosaveInFlight.current = true;
+      setAutosaveStatus('saving');
+      try {
+        const { error: descErr } = await supabase
+          .from('quotes')
+          .update({
+            description: description || null,
+            subtotal: calculateSubtotal(),
+            total: calculateTotal(),
+          })
+          .eq('id', quoteId);
+        if (descErr) throw descErr;
+
+        if (items.length > 0) {
+          const itemsToInsert = items.map(item => ({
+            quote_id: quoteId,
+            product_id: item.product_id || null,
+            sku: item.sku,
+            name: item.name,
+            description: item.description || null,
+            state: item.state || null,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total: item.total,
+            price_breaks: item.price_breaks.length > 0 ? JSON.parse(JSON.stringify(item.price_breaks)) : null,
+            selected_tier: item.selected_tier,
+          }));
+          const { data: inserted, error: insErr } = await supabase
+            .from('quote_items')
+            .insert(itemsToInsert)
+            .select('id');
+          if (insErr) throw insErr;
+          const newIds = (inserted || []).map((r: any) => r.id);
+          if (newIds.length > 0) {
+            await supabase
+              .from('quote_items')
+              .delete()
+              .eq('quote_id', quoteId)
+              .not('id', 'in', `(${newIds.join(',')})`);
+          }
+        }
+        // If items.length === 0, do NOT auto-delete — manual save handles
+        // intentional clear with a confirm prompt.
+
+        setAutosaveStatus('saved');
+        setTimeout(() => setAutosaveStatus(s => (s === 'saved' ? 'idle' : s)), 1500);
+      } catch (e) {
+        console.error('Autosave failed:', e);
+        setAutosaveStatus('error');
+      } finally {
+        autosaveInFlight.current = false;
+      }
+    }, 1200);
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [description, items, isEditing, autosaveReady, quoteId]);
 
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
@@ -882,6 +955,13 @@ const CreateQuote = () => {
         <div>
           <h1 className="page-title">
             {isEditing ? "Edit Quote" : (isResponding ? "Create Quote for Customer" : (isVibeAdmin ? "Create Quote" : "Request Quote"))}
+            {isEditing && (
+              <span className="ml-3 text-xs font-normal text-muted-foreground align-middle">
+                {autosaveStatus === 'saving' && '· Saving…'}
+                {autosaveStatus === 'saved' && '· Saved'}
+                {autosaveStatus === 'error' && <span className="text-destructive">· Autosave failed — use Update Quote</span>}
+              </span>
+            )}
           </h1>
           <p className="page-subtitle">
             {isResponding 
