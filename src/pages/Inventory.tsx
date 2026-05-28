@@ -218,7 +218,8 @@ const Inventory = () => {
       const { data, error } = await supabase
         .from('artwork_files')
         .select('sku, preview_url, artwork_url')
-        .eq('is_approved', true);
+        .eq('is_approved', true)
+        .limit(50000);
 
       if (error) throw error;
 
