@@ -59,6 +59,29 @@ interface ProductTemplateOption {
   cost: number | null;
 }
 
+const PRODUCT_PAGE_SIZE = 1000;
+
+const fetchAllOrderProducts = async (): Promise<Product[]> => {
+  const allProducts: Product[] = [];
+
+  for (let from = 0; ; from += PRODUCT_PAGE_SIZE) {
+    const to = from + PRODUCT_PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, item_id, cost, description, image_url, company_id, state')
+      .order('name')
+      .range(from, to);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    allProducts.push(...data);
+    if (data.length < PRODUCT_PAGE_SIZE) break;
+  }
+
+  return allProducts;
+};
+
 interface OrderItem {
   productId: string;
   quantity: number;
@@ -267,14 +290,8 @@ const CreateOrder = () => {
           setRoleChecked(true);
         }
 
-        // Fetch products (raise limit above Supabase's 1000 default — catalog can exceed it)
-        const { data: productsData } = await supabase
-          .from('products')
-          .select('id, name, item_id, cost, description, image_url, company_id, state')
-          .order('name')
-          .limit(50000);
-        
-        if (productsData && isMounted) {
+        const productsData = await fetchAllOrderProducts();
+        if (isMounted) {
           setProducts(productsData);
         }
 
@@ -1176,14 +1193,11 @@ const CreateOrder = () => {
   };
 
   const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, name, item_id, cost, description, image_url, company_id, state')
-      .order('name')
-      .limit(50000);
-    
-    if (!error && data) {
+    try {
+      const data = await fetchAllOrderProducts();
       setProducts(data);
+    } catch (error) {
+      console.error('Error fetching products:', error);
     }
 
     // Also fetch all companies for reference
