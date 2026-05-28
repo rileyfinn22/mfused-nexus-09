@@ -139,7 +139,8 @@ export function CustomerArtworkTab({
       // Get templates that have products
       let productsQuery = supabase
         .from('products')
-        .select('template_id, item_id, image_url');
+        .select('template_id, item_id, image_url')
+        .limit(50000);
       
       if (!isVibeAdmin && userCompanyId) {
         productsQuery = productsQuery.eq('company_id', userCompanyId);
