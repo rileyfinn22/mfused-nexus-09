@@ -195,7 +195,8 @@ const Inventory = () => {
     try {
       const { data, error } = await supabase
         .from('artwork_files')
-        .select('sku, is_approved');
+        .select('sku, is_approved')
+        .limit(50000);
 
       if (error) throw error;
 
@@ -217,7 +218,8 @@ const Inventory = () => {
       const { data, error } = await supabase
         .from('artwork_files')
         .select('sku, preview_url, artwork_url')
-        .eq('is_approved', true);
+        .eq('is_approved', true)
+        .limit(50000);
 
       if (error) throw error;
 
@@ -337,7 +339,8 @@ const Inventory = () => {
       let query = supabase
         .from('products')
         .select('id, name, item_id, company_id, state')
-        .order('name');
+        .order('name')
+        .limit(50000);
 
       // Filter by company if we have one
       if (targetCompanyId) {

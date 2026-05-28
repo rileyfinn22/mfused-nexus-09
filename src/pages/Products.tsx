@@ -178,7 +178,8 @@ const Products = () => {
       let query = supabase
         .from('products')
         .select('*, product_states(*)')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50000);
 
       // For vibe admins: use URL company filter if set
       // For regular users: always filter by their active company
@@ -301,7 +302,8 @@ const Products = () => {
     try {
       const { data, error } = await supabase
         .from('artwork_files')
-        .select('sku, is_approved');
+        .select('sku, is_approved')
+        .limit(50000);
 
       if (error) throw error;
 
@@ -322,7 +324,8 @@ const Products = () => {
       const { data, error } = await supabase
         .from('artwork_files')
         .select('sku, filename, preview_url, artwork_url')
-        .eq('is_approved', true);
+        .eq('is_approved', true)
+        .limit(50000);
 
       if (error) throw error;
 

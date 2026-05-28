@@ -139,7 +139,8 @@ export function CustomerArtworkTab({
       // Get templates that have products
       let productsQuery = supabase
         .from('products')
-        .select('template_id, item_id, image_url');
+        .select('template_id, item_id, image_url')
+        .limit(50000);
       
       if (!isVibeAdmin && userCompanyId) {
         productsQuery = productsQuery.eq('company_id', userCompanyId);
@@ -161,7 +162,8 @@ export function CustomerArtworkTab({
       let artworkQuery = supabase
         .from('artwork_files')
         .select('sku, is_approved, preview_url, artwork_url, filename')
-        .eq('artwork_type', 'customer');
+        .eq('artwork_type', 'customer')
+        .limit(50000);
       
       if (!isVibeAdmin && userCompanyId) {
         artworkQuery = artworkQuery.eq('company_id', userCompanyId);

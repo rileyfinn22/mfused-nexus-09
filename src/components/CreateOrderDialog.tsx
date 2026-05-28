@@ -110,7 +110,8 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .order('name');
+      .order('name')
+      .limit(50000);
     
     if (error) {
       toast({

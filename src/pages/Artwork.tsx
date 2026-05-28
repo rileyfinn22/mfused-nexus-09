@@ -244,7 +244,8 @@ const Artwork = () => {
       // Get all products
       let productsQuery = supabase
         .from('products')
-        .select('id, name, item_id, template_id, company_id, image_url');
+        .select('id, name, item_id, template_id, company_id, image_url')
+        .limit(50000);
       
       if (!isVibeAdmin && userCompanyId) {
         productsQuery = productsQuery.eq('company_id', userCompanyId);
@@ -477,7 +478,8 @@ const Artwork = () => {
       let query = supabase
         .from('artwork_files')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50000);
 
       if (!isVibeAdmin && userCompanyId) {
         query = query.eq('company_id', userCompanyId);

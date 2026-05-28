@@ -322,7 +322,8 @@ const CustomerDetail = () => {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .order('name');
+      .order('name')
+      .limit(50000);
 
     if (!error && data) {
       setProducts(data);
