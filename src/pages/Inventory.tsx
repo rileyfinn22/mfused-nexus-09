@@ -339,7 +339,8 @@ const Inventory = () => {
       let query = supabase
         .from('products')
         .select('id, name, item_id, company_id, state')
-        .order('name');
+        .order('name')
+        .limit(50000);
 
       // Filter by company if we have one
       if (targetCompanyId) {
