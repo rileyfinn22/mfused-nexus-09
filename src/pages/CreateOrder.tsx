@@ -1179,7 +1179,8 @@ const CreateOrder = () => {
     const { data, error } = await supabase
       .from('products')
       .select('id, name, item_id, cost, description, image_url, company_id, state')
-      .order('name');
+      .order('name')
+      .limit(10000);
     
     if (!error && data) {
       setProducts(data);
