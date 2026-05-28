@@ -162,7 +162,8 @@ export function CustomerArtworkTab({
       let artworkQuery = supabase
         .from('artwork_files')
         .select('sku, is_approved, preview_url, artwork_url, filename')
-        .eq('artwork_type', 'customer');
+        .eq('artwork_type', 'customer')
+        .limit(50000);
       
       if (!isVibeAdmin && userCompanyId) {
         artworkQuery = artworkQuery.eq('company_id', userCompanyId);
