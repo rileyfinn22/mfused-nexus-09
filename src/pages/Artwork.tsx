@@ -244,7 +244,8 @@ const Artwork = () => {
       // Get all products
       let productsQuery = supabase
         .from('products')
-        .select('id, name, item_id, template_id, company_id, image_url');
+        .select('id, name, item_id, template_id, company_id, image_url')
+        .limit(50000);
       
       if (!isVibeAdmin && userCompanyId) {
         productsQuery = productsQuery.eq('company_id', userCompanyId);
