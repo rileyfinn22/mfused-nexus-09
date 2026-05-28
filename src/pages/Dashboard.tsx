@@ -107,7 +107,7 @@ const Dashboard = () => {
 
       const { data: inventoryValueData } = await inventoryValueQuery;
 
-      let productsQuery = supabase.from('products').select('id, cost, company_id');
+      let productsQuery = supabase.from('products').select('id, cost, company_id').limit(50000);
       if (companyFilter) {
         productsQuery = productsQuery.eq('company_id', companyFilter);
       }
