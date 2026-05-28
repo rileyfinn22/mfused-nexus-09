@@ -267,11 +267,12 @@ const CreateOrder = () => {
           setRoleChecked(true);
         }
 
-        // Fetch products
+        // Fetch products (raise limit above Supabase's 1000 default — catalog can exceed it)
         const { data: productsData } = await supabase
           .from('products')
           .select('id, name, item_id, cost, description, image_url, company_id, state')
-          .order('name');
+          .order('name')
+          .limit(10000);
         
         if (productsData && isMounted) {
           setProducts(productsData);
