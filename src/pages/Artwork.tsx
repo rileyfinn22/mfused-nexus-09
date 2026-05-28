@@ -478,7 +478,8 @@ const Artwork = () => {
       let query = supabase
         .from('artwork_files')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50000);
 
       if (!isVibeAdmin && userCompanyId) {
         query = query.eq('company_id', userCompanyId);
