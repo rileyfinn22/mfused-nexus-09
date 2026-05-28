@@ -272,7 +272,7 @@ const CreateOrder = () => {
           .from('products')
           .select('id, name, item_id, cost, description, image_url, company_id, state')
           .order('name')
-          .limit(10000);
+          .limit(50000);
         
         if (productsData && isMounted) {
           setProducts(productsData);
@@ -1180,7 +1180,7 @@ const CreateOrder = () => {
       .from('products')
       .select('id, name, item_id, cost, description, image_url, company_id, state')
       .order('name')
-      .limit(10000);
+      .limit(50000);
     
     if (!error && data) {
       setProducts(data);
