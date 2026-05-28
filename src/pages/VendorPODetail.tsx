@@ -1016,6 +1016,26 @@ Thank you for your business.`;
               </Button>
             </>
           )}
+          {isAdmin && po.status === 'created' && (
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const { error } = await supabase
+                  .from('vendor_pos')
+                  .update({ status: 'sent' })
+                  .eq('id', poId);
+                if (error) {
+                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                } else {
+                  toast({ title: "Marked as Sent", description: "PO status updated without sending email." });
+                  fetchPODetails();
+                }
+              }}
+            >
+              <FileCheck className="h-4 w-4 mr-2" />
+              Mark as Sent
+            </Button>
+          )}
           {vendor?.contact_email && (
             <Button onClick={handleOpenEmailDialog}>
               <Send className="h-4 w-4 mr-2" />
