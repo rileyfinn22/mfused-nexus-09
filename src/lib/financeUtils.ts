@@ -21,18 +21,8 @@ export function calculateFinanceFee(financedAmount: number, financedDate: string
   let feeTier: string;
   let dailyRate = 0;
 
-  if (daysAging <= 60) {
-    feePercent = 5;
-    feeTier = '0-60 days (5%)';
-  } else if (daysAging <= 90) {
-    feePercent = 7;
-    feeTier = '61-90 days (7%)';
-  } else {
-    const extraDays = daysAging - 90;
-    dailyRate = 0.05; // 0.05% per day
-    feePercent = 7 + (extraDays * dailyRate);
-    feeTier = `90+ days (7% + ${extraDays}d × 0.05%)`;
-  }
+  feePercent = 5;
+  feeTier = 'Flat 5%';
 
   const feeAmount = balance * (feePercent / 100);
 
