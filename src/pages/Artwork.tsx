@@ -1255,8 +1255,8 @@ const Artwork = () => {
                     </div>
                   )}
 
-                  {/* Archive button for approved artwork */}
-                  {file.is_approved && isVibeAdmin && (
+                  {/* Archive button - vibe admin can archive any file (approved or pending) */}
+                  {isVibeAdmin && (
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -1272,6 +1272,7 @@ const Artwork = () => {
                       Archive
                     </Button>
                   )}
+
 
                   {/* Only vibe admins can delete */}
                   {!file.is_approved && isVibeAdmin && (
