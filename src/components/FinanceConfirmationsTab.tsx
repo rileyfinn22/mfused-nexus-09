@@ -141,12 +141,20 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser, lang: lang
                     const fi = r.financed_invoices as any;
                     const desc = fi?.description || fi?.vendor_pos?.description || "—";
                     const rate = fi?.exchange_rate || 7.2;
+                    const principal = fi?.financed_amount || 0;
+                    const fee = Math.max(0, r.amount - principal);
+                    const isFullPayoff = principal > 0 && fee > 0.01 && Math.abs(r.amount - principal * 1.05) < 0.05;
                     return (
                       <tr key={r.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} ${r.confirmation_status === "disputed" ? "bg-destructive/5" : ""}`}>
                         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(r.payment_date + "T00:00:00").toLocaleDateString()}</td>
                         <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{desc}</td>
                         <td className="px-2 py-1.5 text-right font-medium whitespace-nowrap">
                           <DualCurrency usd={r.amount} rmb={r.amount * rate} lang={lang} />
+                          {isFullPayoff && (
+                            <div className="text-[10px] text-muted-foreground font-normal mt-0.5">
+                              {formatUSD(principal)} + {formatUSD(fee)} {t("fee").toLowerCase()} (5%)
+                            </div>
+                          )}
                         </td>
                         <td className="px-2 py-1.5 capitalize">{r.payment_method || "—"}</td>
                         <td className="px-2 py-1.5 font-mono text-muted-foreground">{r.reference_number || "—"}</td>

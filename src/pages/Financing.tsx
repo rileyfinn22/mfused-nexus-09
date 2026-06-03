@@ -367,6 +367,7 @@ export default function Financing() {
     const invoice = inv.invoices as any;
     const vendorPO = inv.vendor_pos as any;
     const rate = inv.exchange_rate || 7.2;
+    const feeAmount = (inv.paid_back_amount || 0) - (inv.financed_amount || 0);
 
     return (
       <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer opacity-70`} onClick={() => navigate(`/financing/${inv.id}`)}>
@@ -394,8 +395,11 @@ export default function Financing() {
           />
         </td>
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap text-yellow-600">
+          {feeAmount > 0.01 ? <>+{renderDualAmount(feeAmount, rate)} <span className="text-[10px] opacity-75">(5%)</span></> : <span className="text-muted-foreground">—</span>}
+        </td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
-        <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.paid_back_amount, rate)}</td>
+        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap text-green-600">{renderDualAmount(inv.paid_back_amount, rate)}</td>
         <td className="px-2 py-1.5 text-center">
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-green-500 border-green-500/30">
             <CheckCircle2 className="h-2.5 w-2.5 mr-1" /> {t("paid")}
@@ -603,6 +607,7 @@ export default function Financing() {
                       <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("description")}</th>
                       <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("invoice")}</th>
                       <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("financed")}</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("fee")}</th>
                       <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("date")}</th>
                       <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("repaid")}</th>
                       <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">{t("status")}</th>
