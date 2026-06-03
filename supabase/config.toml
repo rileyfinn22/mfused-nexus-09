@@ -86,3 +86,6 @@ verify_jwt = false
 
 [functions.claude-admin]
 verify_jwt = false
+
+[functions.storage-mirror]
+verify_jwt = false
