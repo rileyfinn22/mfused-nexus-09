@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
       }
 
       case "snapshot": {
-        // Trigger full DB + storage manifest backup
+        // Start a background DB + storage manifest backup. Returns run_id immediately.
         const r = await fetch(`${SUPABASE_URL}/functions/v1/db-backup`, {
           method: "POST",
           headers: {
@@ -161,7 +161,41 @@ Deno.serve(async (req) => {
             apikey: SERVICE_ROLE,
             "Content-Type": "application/json",
           },
-          body: "{}",
+          body: JSON.stringify({ action: "start" }),
+        });
+        const text = await r.text();
+        let parsed: unknown = text;
+        try { parsed = JSON.parse(text); } catch { /* */ }
+        return json({ status: r.status, body: parsed });
+      }
+
+      case "snapshot_status": {
+        // Poll a running/finished snapshot. payload: { run_id }
+        if (!payload.run_id) return json({ error: "run_id required" }, 400);
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/db-backup`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${SERVICE_ROLE}`,
+            apikey: SERVICE_ROLE,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ action: "status", run_id: payload.run_id }),
+        });
+        const text = await r.text();
+        let parsed: unknown = text;
+        try { parsed = JSON.parse(text); } catch { /* */ }
+        return json({ status: r.status, body: parsed });
+      }
+
+      case "snapshot_list": {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/db-backup`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${SERVICE_ROLE}`,
+            apikey: SERVICE_ROLE,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ action: "list" }),
         });
         const text = await r.text();
         let parsed: unknown = text;
