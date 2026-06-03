@@ -280,12 +280,12 @@ export default function Financing() {
             ) : "—"}
           </td>
         )}
-        <td className="px-2 py-1.5 max-w-[180px] text-muted-foreground">
+        <td className="px-2 py-1.5 min-w-[220px] max-w-[340px] align-top text-muted-foreground">
           <EditableTextCell
             value={inv.description}
             editable={isVibeAdmin}
             placeholder={isVibeAdmin ? "Add description" : "—"}
-            className="truncate"
+            className="whitespace-normal break-words leading-snug"
             onSave={(v) => saveInvoiceField(inv.id, "description", v)}
           />
         </td>
@@ -326,12 +326,12 @@ export default function Financing() {
             {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
           </td>
         )}
-        <td className="px-2 py-1.5 max-w-[200px] text-muted-foreground">
+        <td className="px-2 py-1.5 min-w-[220px] max-w-[340px] align-top text-muted-foreground">
           <EditableTextCell
             value={inv.description}
             editable={isVibeAdmin}
             placeholder={isVibeAdmin ? "Add description" : "—"}
-            className="truncate"
+            className="whitespace-normal break-words leading-snug"
             onSave={(v) => saveInvoiceField(inv.id, "description", v)}
           />
         </td>
@@ -375,12 +375,12 @@ export default function Financing() {
             {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
           </td>
         )}
-        <td className="px-2 py-1.5 max-w-[180px] text-muted-foreground">
+        <td className="px-2 py-1.5 min-w-[220px] max-w-[340px] align-top text-muted-foreground">
           <EditableTextCell
             value={inv.description}
             editable={isVibeAdmin}
             placeholder={isVibeAdmin ? "Add description" : "—"}
-            className="truncate"
+            className="whitespace-normal break-words leading-snug"
             onSave={(v) => saveInvoiceField(inv.id, "description", v)}
           />
         </td>
