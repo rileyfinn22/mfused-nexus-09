@@ -1314,8 +1314,18 @@ const CreateOrder = () => {
           description: `${unmatchedItems.length} item(s) from the PO are shown below. Add products from your catalog to match them.`,
         });
       }
+
+      // Populate the saved-addresses picker without overwriting the order's saved ship-to/bill-to
+      const { data: addrs } = await supabase
+        .from('customer_addresses')
+        .select('*')
+        .eq('company_id', order.company_id)
+        .order('is_default', { ascending: false });
+      if (addrs) setSavedAddresses(addrs);
     }
   };
+
+
 
   const loadAddress = (address: SavedAddress, type: 'shipping' | 'billing') => {
     if (type === 'shipping') {
