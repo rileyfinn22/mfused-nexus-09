@@ -195,37 +195,40 @@ const Products = () => {
 
       if (productsError) throw productsError;
 
-      const productsWithStates = await Promise.all(
-        (productsData || []).map(async (product) => {
-          const { data: states, error: statesError } = await supabase
-            .from('product_states')
-            .select('*')
-            .eq('product_id', product.id);
+      // Batch fetch product_states + inventory in 2 queries (was N+1 per product)
+      const productIds = (productsData || []).map((p: any) => p.id);
+      const [{ data: statesData }, { data: inventoryRows }] = productIds.length > 0
+        ? await Promise.all([
+            supabase.from('product_states').select('*').in('product_id', productIds),
+            supabase.from('inventory').select('sku, product_id').in('product_id', productIds),
+          ])
+        : [{ data: [] as any[] }, { data: [] as any[] }];
 
-          if (statesError) throw statesError;
+      const statesByProduct = new Map<string, any[]>();
+      (statesData || []).forEach((s: any) => {
+        const arr = statesByProduct.get(s.product_id) || [];
+        arr.push(s);
+        statesByProduct.set(s.product_id, arr);
+      });
+      const skuByProduct = new Map<string, string>();
+      (inventoryRows || []).forEach((row: any) => {
+        if (!skuByProduct.has(row.product_id)) skuByProduct.set(row.product_id, row.sku);
+      });
 
-          const { data: inventoryData } = await supabase
-            .from('inventory')
-            .select('sku')
-            .eq('product_id', product.id)
-            .limit(1)
-            .single();
+      const productsWithStates = (productsData || []).map((product: any) => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        state: product.state,
+        cost: product.cost,
+        price: product.price,
+        image_url: product.image_url,
+        item_id: product.item_id,
+        sku: skuByProduct.get(product.id),
+        states: statesByProduct.get(product.id) || [],
+        template_id: product.template_id,
+      }));
 
-          return {
-            id: product.id,
-            name: product.name,
-            description: product.description,
-            state: product.state,
-            cost: product.cost,
-            price: product.price,
-            image_url: product.image_url,
-            item_id: product.item_id,
-            sku: inventoryData?.sku,
-            states: states || [],
-            template_id: product.template_id
-          };
-        })
-      );
 
       const productsToUpdate = productsWithStates.filter(p => !p.item_id);
       if (productsToUpdate.length > 0) {
@@ -267,32 +270,32 @@ const Products = () => {
 
       if (templatesError) throw templatesError;
 
-      // Fetch product counts for each template
-      const templatesWithCounts = await Promise.all(
-        (templatesData || []).map(async (template) => {
-          let query = supabase
-            .from('products')
-            .select('id', { count: 'exact', head: true })
-            .eq('template_id', template.id);
+      // Batch product counts per template in ONE query (was N+1 per template)
+      const templateIds = (templatesData || []).map((t: any) => t.id);
+      let countsByTemplate = new Map<string, number>();
+      if (templateIds.length > 0) {
+        let countsQuery = supabase
+          .from('products')
+          .select('template_id')
+          .in('template_id', templateIds);
+        if (isVibeAdmin) {
+          if (companyFilter !== 'all') countsQuery = countsQuery.eq('company_id', companyFilter);
+        } else if (activeCompanyId) {
+          countsQuery = countsQuery.eq('company_id', activeCompanyId);
+        }
+        const { data: countRows } = await countsQuery;
+        (countRows || []).forEach((row: any) => {
+          countsByTemplate.set(row.template_id, (countsByTemplate.get(row.template_id) || 0) + 1);
+        });
+      }
 
-          if (isVibeAdmin) {
-            if (companyFilter !== 'all') {
-              query = query.eq('company_id', companyFilter);
-            }
-          } else if (activeCompanyId) {
-            query = query.eq('company_id', activeCompanyId);
-          }
-
-          const { count } = await query;
-
-          return {
-            ...template,
-            product_count: count || 0
-          };
-        })
-      );
+      const templatesWithCounts = (templatesData || []).map((template: any) => ({
+        ...template,
+        product_count: countsByTemplate.get(template.id) || 0,
+      }));
 
       setTemplates(templatesWithCounts);
+
     } catch (error) {
       console.error('Error fetching templates:', error);
     }

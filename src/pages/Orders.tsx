@@ -132,40 +132,39 @@ const Orders = () => {
         ? data 
         : data.filter(order => order.status !== 'draft');
       
-      // Fetch artwork approval status and production stages for all orders
-      const ordersWithChecklist = await Promise.all(filteredData.map(async (order) => {
-        // Use the manually-set production_progress from the database
-        const completedStatuses = ['completed', 'shipped', 'delivered'];
+      // Batch-fetch artwork approval status for ALL orders in ONE query (was N+1)
+      const allSkus = Array.from(new Set(
+        filteredData.flatMap((o: any) => (o.order_items || []).map((i: any) => i.sku).filter(Boolean))
+      ));
+      let approvedSkus = new Set<string>();
+      if (allSkus.length > 0) {
+        const { data: artworkData } = await supabase
+          .from('artwork_files')
+          .select('sku, is_approved')
+          .in('sku', allSkus)
+          .eq('is_approved', true);
+        approvedSkus = new Set((artworkData || []).map((a: any) => a.sku));
+      }
+
+      const completedStatuses = ['completed', 'shipped', 'delivered'];
+      const ordersWithChecklist = filteredData.map((order: any) => {
         const productionProgress = completedStatuses.includes(order.status?.toLowerCase())
           ? 100
           : (order.production_progress ?? 0);
-        
-        if (order.order_items && order.order_items.length > 0) {
-          const { data: artworkData } = await supabase
-            .from('artwork_files')
-            .select('is_approved, sku')
-            .in('sku', order.order_items.map((item: any) => item.sku));
-          
-          const allApproved = order.order_items.every((item: any) => 
-            artworkData?.some((art: any) => art.sku === item.sku && art.is_approved)
-          );
-          
-          return {
-            ...order,
-            artApproved: allApproved,
-            checklistComplete: allApproved && order.order_finalized && order.vibe_processed,
-            productionProgress
-          };
-        }
+
+        const items = order.order_items || [];
+        const allApproved = items.length > 0 && items.every((item: any) => approvedSkus.has(item.sku));
+
         return {
           ...order,
-          artApproved: false,
-          checklistComplete: false,
-          productionProgress
+          artApproved: allApproved,
+          checklistComplete: allApproved && order.order_finalized && order.vibe_processed,
+          productionProgress,
         };
-      }));
-      
+      });
+
       setOrders(ordersWithChecklist);
+
     }
     setLoading(false);
   };
