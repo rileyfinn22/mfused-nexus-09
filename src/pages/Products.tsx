@@ -195,37 +195,40 @@ const Products = () => {
 
       if (productsError) throw productsError;
 
-      const productsWithStates = await Promise.all(
-        (productsData || []).map(async (product) => {
-          const { data: states, error: statesError } = await supabase
-            .from('product_states')
-            .select('*')
-            .eq('product_id', product.id);
+      // Batch fetch product_states + inventory in 2 queries (was N+1 per product)
+      const productIds = (productsData || []).map((p: any) => p.id);
+      const [{ data: statesData }, { data: inventoryRows }] = productIds.length > 0
+        ? await Promise.all([
+            supabase.from('product_states').select('*').in('product_id', productIds),
+            supabase.from('inventory').select('sku, product_id').in('product_id', productIds),
+          ])
+        : [{ data: [] as any[] }, { data: [] as any[] }];
 
-          if (statesError) throw statesError;
+      const statesByProduct = new Map<string, any[]>();
+      (statesData || []).forEach((s: any) => {
+        const arr = statesByProduct.get(s.product_id) || [];
+        arr.push(s);
+        statesByProduct.set(s.product_id, arr);
+      });
+      const skuByProduct = new Map<string, string>();
+      (inventoryRows || []).forEach((row: any) => {
+        if (!skuByProduct.has(row.product_id)) skuByProduct.set(row.product_id, row.sku);
+      });
 
-          const { data: inventoryData } = await supabase
-            .from('inventory')
-            .select('sku')
-            .eq('product_id', product.id)
-            .limit(1)
-            .single();
+      const productsWithStates = (productsData || []).map((product: any) => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        state: product.state,
+        cost: product.cost,
+        price: product.price,
+        image_url: product.image_url,
+        item_id: product.item_id,
+        sku: skuByProduct.get(product.id),
+        states: statesByProduct.get(product.id) || [],
+        template_id: product.template_id,
+      }));
 
-          return {
-            id: product.id,
-            name: product.name,
-            description: product.description,
-            state: product.state,
-            cost: product.cost,
-            price: product.price,
-            image_url: product.image_url,
-            item_id: product.item_id,
-            sku: inventoryData?.sku,
-            states: states || [],
-            template_id: product.template_id
-          };
-        })
-      );
 
       const productsToUpdate = productsWithStates.filter(p => !p.item_id);
       if (productsToUpdate.length > 0) {
