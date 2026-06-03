@@ -169,6 +169,24 @@ Deno.serve(async (req) => {
         return json({ status: r.status, body: parsed });
       }
 
+      case "mirror": {
+        // Copy actual file bytes from source buckets into db-backups/files/.
+        // Incremental + resumable. Optional payload.buckets (defaults to artwork + print-files).
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/storage-mirror`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${SERVICE_ROLE}`,
+            apikey: SERVICE_ROLE,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ buckets: payload.buckets }),
+        });
+        const text = await r.text();
+        let parsed: unknown = text;
+        try { parsed = JSON.parse(text); } catch { /* */ }
+        return json({ status: r.status, body: parsed });
+      }
+
       case "help":
       case undefined:
         return json({
