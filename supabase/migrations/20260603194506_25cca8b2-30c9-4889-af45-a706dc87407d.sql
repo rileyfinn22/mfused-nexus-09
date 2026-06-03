@@ -1,0 +1,1 @@
+UPDATE public.order_items SET quantity = quantity WHERE order_id = '0177ba12-1559-498c-bd32-29273829a87f';
