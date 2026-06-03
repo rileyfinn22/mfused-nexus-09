@@ -459,12 +459,13 @@ const CreateOrder = () => {
     fetchProductTemplates();
   }, [isVibeAdmin, roleChecked, selectedCompanyId]);
 
-  // Only load company addresses when admin manually selects a company (not during initial load of existing order)
+  // Only load company addresses when admin manually selects a company on a NEW order.
+  // When editing an existing order, never overwrite its saved ship-to/bill-to with company defaults.
   useEffect(() => {
-    if (selectedCompanyId && roleChecked && !initialLoading) {
+    if (selectedCompanyId && roleChecked && !initialLoading && !orderId) {
       loadCompanyAddresses();
     }
-  }, [selectedCompanyId, roleChecked, initialLoading]);
+  }, [selectedCompanyId, roleChecked, initialLoading, orderId]);
 
   // Auto-save draft every 1 minute - ONLY for new orders (not editing existing)
   const performAutoSave = useCallback(async () => {
