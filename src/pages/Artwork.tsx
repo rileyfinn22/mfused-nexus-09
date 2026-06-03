@@ -169,8 +169,8 @@ const Artwork = () => {
     const shouldFetch = isVibeAdmin === true || (isVibeAdmin === false && userCompanyId !== null);
     
     if (shouldFetch) {
+      // fetchTemplates also populates artworkFiles to avoid a duplicate artwork_files fetch.
       fetchTemplates();
-      fetchAllArtwork();
       fetchRejectedArtwork();
       fetchAvailableStates();
       if (isVibeAdmin) {
