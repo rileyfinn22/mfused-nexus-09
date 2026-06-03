@@ -246,23 +246,25 @@ const OrderDetail = () => {
     
     if (!error && data) {
       setProductionStages(data);
-      
-      // Fetch updates for each stage
-      const updates: {[key: string]: any[]} = {};
-      for (const stage of data) {
-        const { data: stageUpdatesData } = await supabase
+
+      // Batch-fetch ALL stage updates in ONE query (was N+1 per stage)
+      const stageIds = data.map((s: any) => s.id);
+      const updates: { [key: string]: any[] } = {};
+      if (stageIds.length > 0) {
+        const { data: updatesData } = await supabase
           .from('production_stage_updates')
           .select('*')
-          .eq('stage_id', stage.id)
+          .in('stage_id', stageIds)
           .order('created_at', { ascending: false });
-        
-        if (stageUpdatesData) {
-          updates[stage.id] = stageUpdatesData;
-        }
+        for (const id of stageIds) updates[id] = [];
+        (updatesData || []).forEach((u: any) => {
+          (updates[u.stage_id] ||= []).push(u);
+        });
       }
       setStageUpdates(updates);
     }
   };
+
 
   const fetchVendors = async () => {
     const { data, error } = await supabase

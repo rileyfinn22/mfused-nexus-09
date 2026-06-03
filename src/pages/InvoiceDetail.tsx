@@ -253,22 +253,19 @@ const InvoiceDetail = () => {
     let hasCompanyAccess = false;
 
     try {
-      const { data: isAdmin, error: isAdminError } = await supabase.rpc('has_role', {
-        _user_id: user.id,
-        _role: 'vibe_admin',
-      });
-      if (isAdminError) console.error('has_role error:', isAdminError);
-      isVibeAdminUser = !!isAdmin;
-
-      const { data: access, error: accessError } = await supabase.rpc('user_has_company_access', {
-        _user_id: user.id,
-        _company_id: invoiceCompanyId,
-      });
-      if (accessError) console.error('user_has_company_access error:', accessError);
-      hasCompanyAccess = !!access;
+      // Run both permission checks in parallel (was sequential)
+      const [adminRes, accessRes] = await Promise.all([
+        supabase.rpc('has_role', { _user_id: user.id, _role: 'vibe_admin' }),
+        supabase.rpc('user_has_company_access', { _user_id: user.id, _company_id: invoiceCompanyId }),
+      ]);
+      if (adminRes.error) console.error('has_role error:', adminRes.error);
+      if (accessRes.error) console.error('user_has_company_access error:', accessRes.error);
+      isVibeAdminUser = !!adminRes.data;
+      hasCompanyAccess = !!accessRes.data;
     } catch (err) {
       console.error('Error checking invoice access:', err);
     }
+
 
     // If the user is authenticated but not yet linked to this invoice's company,
     // try to auto-associate by email before denying access, then re-check access.
