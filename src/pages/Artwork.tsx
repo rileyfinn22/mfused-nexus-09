@@ -279,33 +279,45 @@ const Artwork = () => {
         .in('id', templateIds.length > 0 ? templateIds : ['none'])
         .order('name');
       
-      // Fetch artwork counts per SKU AND preview URLs for thumbnails.
-      // IMPORTANT: paginate to bypass Supabase's default 1000-row cap.
-      const PAGE_SIZE = 1000;
-      let artworkData: Array<{ sku: string; is_approved: boolean; preview_url: string | null; artwork_url: string | null; filename: string | null }> = [];
-      let pageFrom = 0;
-      while (true) {
-        let pageQuery = supabase
+      // Fetch all artwork rows once (parallel pagination) and reuse for
+      // both the artwork list and the per-SKU template counts/thumbnails.
+      // This replaces what used to be a separate fetchAllArtwork() call.
+      const buildArtworkBaseQuery = () => {
+        let q = supabase
           .from('artwork_files')
-          .select('sku, is_approved, preview_url, artwork_url, filename')
-          .range(pageFrom, pageFrom + PAGE_SIZE - 1);
-
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false });
         if (!isVibeAdmin && userCompanyId) {
-          pageQuery = pageQuery.eq('company_id', userCompanyId);
+          q = q.eq('company_id', userCompanyId);
         } else if (isVibeAdmin && companyFilter !== 'all') {
-          pageQuery = pageQuery.eq('company_id', companyFilter);
+          q = q.eq('company_id', companyFilter);
         }
+        return q;
+      };
 
-        const { data: pageData, error: pageErr } = await pageQuery;
-        if (pageErr) {
-          console.error('Error fetching artwork page:', pageErr);
-          break;
+      const PAGE_SIZE = 1000;
+      const firstPage = await buildArtworkBaseQuery().range(0, PAGE_SIZE - 1);
+      let artworkData: any[] = firstPage.data ?? [];
+      const totalCount = firstPage.count ?? artworkData.length;
+
+      if (totalCount > PAGE_SIZE) {
+        const pagePromises: Promise<any>[] = [];
+        for (let from = PAGE_SIZE; from < totalCount; from += PAGE_SIZE) {
+          pagePromises.push(
+            buildArtworkBaseQuery().range(from, from + PAGE_SIZE - 1)
+          );
         }
-        if (!pageData || pageData.length === 0) break;
-        artworkData = artworkData.concat(pageData as any);
-        if (pageData.length < PAGE_SIZE) break;
-        pageFrom += PAGE_SIZE;
+        const pages = await Promise.all(pagePromises);
+        for (const p of pages) {
+          if (p.data) artworkData = artworkData.concat(p.data);
+        }
       }
+
+      // Populate the flat artwork list used by the "All Artwork" tab.
+      if (!selectedProduct) {
+        setArtworkFiles(artworkData);
+      }
+
       
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
       // Also track first available thumbnail per SKU
