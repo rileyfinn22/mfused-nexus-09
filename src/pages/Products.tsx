@@ -270,32 +270,32 @@ const Products = () => {
 
       if (templatesError) throw templatesError;
 
-      // Fetch product counts for each template
-      const templatesWithCounts = await Promise.all(
-        (templatesData || []).map(async (template) => {
-          let query = supabase
-            .from('products')
-            .select('id', { count: 'exact', head: true })
-            .eq('template_id', template.id);
+      // Batch product counts per template in ONE query (was N+1 per template)
+      const templateIds = (templatesData || []).map((t: any) => t.id);
+      let countsByTemplate = new Map<string, number>();
+      if (templateIds.length > 0) {
+        let countsQuery = supabase
+          .from('products')
+          .select('template_id')
+          .in('template_id', templateIds);
+        if (isVibeAdmin) {
+          if (companyFilter !== 'all') countsQuery = countsQuery.eq('company_id', companyFilter);
+        } else if (activeCompanyId) {
+          countsQuery = countsQuery.eq('company_id', activeCompanyId);
+        }
+        const { data: countRows } = await countsQuery;
+        (countRows || []).forEach((row: any) => {
+          countsByTemplate.set(row.template_id, (countsByTemplate.get(row.template_id) || 0) + 1);
+        });
+      }
 
-          if (isVibeAdmin) {
-            if (companyFilter !== 'all') {
-              query = query.eq('company_id', companyFilter);
-            }
-          } else if (activeCompanyId) {
-            query = query.eq('company_id', activeCompanyId);
-          }
-
-          const { count } = await query;
-
-          return {
-            ...template,
-            product_count: count || 0
-          };
-        })
-      );
+      const templatesWithCounts = (templatesData || []).map((template: any) => ({
+        ...template,
+        product_count: countsByTemplate.get(template.id) || 0,
+      }));
 
       setTemplates(templatesWithCounts);
+
     } catch (error) {
       console.error('Error fetching templates:', error);
     }
