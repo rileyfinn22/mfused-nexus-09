@@ -22,6 +22,71 @@ import { useFinanceLang } from "@/lib/financeI18n";
 import { FinanceLangToggle } from "@/components/FinanceLangToggle";
 import { CardCurrency, DualCurrency } from "@/components/DualCurrency";
 
+// Inline-editable text cell for the financing table (description / invoice #).
+// Click to edit; Enter or blur saves; Escape cancels. Stops row-navigation clicks.
+function EditableTextCell({
+  value,
+  placeholder = "—",
+  editable = true,
+  mono = false,
+  className = "",
+  onSave,
+}: {
+  value: string | null;
+  placeholder?: string;
+  editable?: boolean;
+  mono?: boolean;
+  className?: string;
+  onSave: (next: string) => Promise<void> | void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setDraft(value ?? ""); }, [value]);
+
+  const commit = async () => {
+    const next = draft.trim();
+    if (next === (value ?? "")) { setEditing(false); return; }
+    setSaving(true);
+    await onSave(next);
+    setSaving(false);
+    setEditing(false);
+  };
+
+  if (!editable) {
+    return <span className={`${mono ? "font-mono " : ""}${className}`}>{value || placeholder}</span>;
+  }
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        value={draft}
+        disabled={saving}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          else if (e.key === "Escape") { setDraft(value ?? ""); setEditing(false); }
+        }}
+        className={`h-6 text-xs px-1.5 ${mono ? "font-mono" : ""}`}
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      title="Click to edit"
+      className={`block cursor-text rounded -mx-1 px-1 hover:bg-muted ${mono ? "font-mono " : ""}${value ? "" : "italic text-muted-foreground/50 "}${className}`}
+    >
+      {value || placeholder}
+    </span>
+  );
+}
+
 export default function Financing() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -93,6 +158,19 @@ export default function Financing() {
     setLoading(false);
   };
 
+  // Inline-edit save for description / invoice_number directly on the table.
+  const saveInvoiceField = async (id: string, field: "description" | "invoice_number", next: string) => {
+    const { error } = await supabase
+      .from("financed_invoices")
+      .update({ [field]: next || null })
+      .eq("id", id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, [field]: next || null } : i)));
+  };
+
   if (!isAuthorized) return null;
 
   const filterBySearchAndDate = (list: any[]) => {
@@ -158,7 +236,7 @@ export default function Financing() {
       const row: string[] = [];
       if (isVibeAdmin) row.push(vpo?.po_number ? `PO #${vpo.po_number}` : "");
       row.push(
-        inv.description || vpo?.description || "",
+        inv.description || "",
         String(inv.financed_amount || 0),
         inv.financed_date || "",
         inv.finance_status || "",
@@ -189,11 +267,7 @@ export default function Financing() {
   const renderActiveRow = (inv: any, idx: number) => {
     const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount, inv.paid_back_date);
     const invoice = inv.invoices as any;
-    const order = invoice?.orders as any;
     const vendorPO = inv.vendor_pos as any;
-    const poOrder = vendorPO?.orders as any;
-    const adminDesc = vendorPO?.description || poOrder?.description || poOrder?.customer_name || order?.description || order?.customer_name || "—";
-    const displayDesc = isFinanceUser ? (inv.description || "—") : (order?.description || order?.customer_name || adminDesc);
     const needsPOLink = isVibeAdmin && !inv.vendor_po_id && inv.created_by_role === "finance";
     const rate = inv.exchange_rate || 7.2;
 
@@ -206,8 +280,24 @@ export default function Financing() {
             ) : "—"}
           </td>
         )}
-        <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{displayDesc}</td>
-        <td className="px-2 py-1.5 font-mono whitespace-nowrap">{invoice?.invoice_number || inv.invoice_number || "—"}</td>
+        <td className="px-2 py-1.5 max-w-[180px] text-muted-foreground">
+          <EditableTextCell
+            value={inv.description}
+            editable={isVibeAdmin}
+            placeholder={isVibeAdmin ? "Add description" : "—"}
+            className="truncate"
+            onSave={(v) => saveInvoiceField(inv.id, "description", v)}
+          />
+        </td>
+        <td className="px-2 py-1.5 whitespace-nowrap">
+          <EditableTextCell
+            value={inv.invoice_number}
+            editable={isVibeAdmin}
+            mono
+            placeholder={invoice?.invoice_number || (isVibeAdmin ? "Add invoice #" : "—")}
+            onSave={(v) => saveInvoiceField(inv.id, "invoice_number", v)}
+          />
+        </td>
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
         <td className="px-2 py-1.5 text-center"><Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}{t("days")}</Badge></td>
@@ -227,8 +317,6 @@ export default function Financing() {
 
   const renderPendingRow = (inv: any, idx: number) => {
     const vendorPO = inv.vendor_pos as any;
-    const poOrder = vendorPO?.orders as any;
-    const desc = isFinanceUser ? (inv.description || vendorPO?.description || "—") : (poOrder?.description || poOrder?.customer_name || vendorPO?.description || "—");
     const rate = inv.exchange_rate || 7.2;
 
     return (
@@ -238,7 +326,15 @@ export default function Financing() {
             {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
           </td>
         )}
-        <td className="px-2 py-1.5 max-w-[200px] truncate text-muted-foreground">{desc}</td>
+        <td className="px-2 py-1.5 max-w-[200px] text-muted-foreground">
+          <EditableTextCell
+            value={inv.description}
+            editable={isVibeAdmin}
+            placeholder={isVibeAdmin ? "Add description" : "—"}
+            className="truncate"
+            onSave={(v) => saveInvoiceField(inv.id, "description", v)}
+          />
+        </td>
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.created_at || inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
         <td className="px-2 py-1.5 text-center">
@@ -270,8 +366,6 @@ export default function Financing() {
   const renderCompletedRow = (inv: any, idx: number) => {
     const invoice = inv.invoices as any;
     const vendorPO = inv.vendor_pos as any;
-    const poOrder = vendorPO?.orders as any;
-    const desc = isFinanceUser ? (inv.description || "—") : (poOrder?.description || poOrder?.customer_name || vendorPO?.description || "—");
     const rate = inv.exchange_rate || 7.2;
 
     return (
@@ -281,8 +375,24 @@ export default function Financing() {
             {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
           </td>
         )}
-        <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{desc}</td>
-        <td className="px-2 py-1.5 font-mono whitespace-nowrap">{invoice?.invoice_number || inv.invoice_number || "—"}</td>
+        <td className="px-2 py-1.5 max-w-[180px] text-muted-foreground">
+          <EditableTextCell
+            value={inv.description}
+            editable={isVibeAdmin}
+            placeholder={isVibeAdmin ? "Add description" : "—"}
+            className="truncate"
+            onSave={(v) => saveInvoiceField(inv.id, "description", v)}
+          />
+        </td>
+        <td className="px-2 py-1.5 whitespace-nowrap">
+          <EditableTextCell
+            value={inv.invoice_number}
+            editable={isVibeAdmin}
+            mono
+            placeholder={invoice?.invoice_number || (isVibeAdmin ? "Add invoice #" : "—")}
+            onSave={(v) => saveInvoiceField(inv.id, "invoice_number", v)}
+          />
+        </td>
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.paid_back_amount, rate)}</td>
