@@ -607,6 +607,7 @@ export default function Financing() {
                       <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("description")}</th>
                       <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("invoice")}</th>
                       <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("financed")}</th>
+                      <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("fee")}</th>
                       <th className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{t("date")}</th>
                       <th className="px-2 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{t("repaid")}</th>
                       <th className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">{t("status")}</th>
