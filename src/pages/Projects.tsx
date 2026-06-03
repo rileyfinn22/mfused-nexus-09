@@ -83,41 +83,53 @@ const Projects = () => {
 
       if (error) throw error;
 
-      // For each order, fetch invoices, payments, and vendor POs
-      const projectPromises = (orders || []).map(async (order) => {
-        // Fetch invoices with parent_invoice_id to detect blanket vs child invoices
-        const { data: invoices } = await supabase
-          .from('invoices')
-          .select('id, total, total_paid, status, parent_invoice_id')
-          .eq('order_id', order.id)
-          .is('deleted_at', null);
+      // Batch-fetch ALL invoices and vendor POs in 2 queries instead of N+1 (was 2 per order)
+      const orderIds = (orders || []).map(o => o.id);
+      const [{ data: allInvoices }, { data: allVendorPOs }] = orderIds.length > 0
+        ? await Promise.all([
+            supabase
+              .from('invoices')
+              .select('id, order_id, total, total_paid, status, parent_invoice_id')
+              .in('order_id', orderIds)
+              .is('deleted_at', null),
+            supabase
+              .from('vendor_pos')
+              .select('id, order_id, total, total_paid')
+              .in('order_id', orderIds),
+          ])
+        : [{ data: [] as any[] }, { data: [] as any[] }];
 
-        // Fetch vendor POs
-        const { data: vendorPOs } = await supabase
-          .from('vendor_pos')
-          .select('id, total, total_paid')
-          .eq('order_id', order.id);
+      const invoicesByOrder = new Map<string, any[]>();
+      (allInvoices || []).forEach((inv: any) => {
+        const arr = invoicesByOrder.get(inv.order_id) || [];
+        arr.push(inv);
+        invoicesByOrder.set(inv.order_id, arr);
+      });
+      const posByOrder = new Map<string, any[]>();
+      (allVendorPOs || []).forEach((po: any) => {
+        const arr = posByOrder.get(po.order_id) || [];
+        arr.push(po);
+        posByOrder.set(po.order_id, arr);
+      });
 
-        // Determine which invoices to count for revenue:
-        // - If there are child invoices (parent_invoice_id is set), only count those for revenue
-        // - Otherwise, count all invoices (including blanket if no children exist)
-        const allInvoices = invoices || [];
-        const childInvoices = allInvoices.filter(inv => inv.parent_invoice_id !== null);
-        const parentInvoices = allInvoices.filter(inv => inv.parent_invoice_id === null);
-        const invoicesToCount = childInvoices.length > 0 ? childInvoices : allInvoices;
+      const projectData = (orders || []).map((order) => {
+        const invoices = invoicesByOrder.get(order.id) || [];
+        const vendorPOs = posByOrder.get(order.id) || [];
+
+        const childInvoices = invoices.filter(inv => inv.parent_invoice_id !== null);
+        const parentInvoices = invoices.filter(inv => inv.parent_invoice_id === null);
+        const invoicesToCount = childInvoices.length > 0 ? childInvoices : invoices;
 
         const totalRevenue = invoicesToCount.reduce((sum, inv) => sum + (inv.total || 0), 0);
-        // Payments: count children + any deposits/payments recorded against the parent blanket
-        // (buy-down model records deposits on the parent invoice, not on children).
         const childrenPaid = childInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
         const parentPaid = childInvoices.length > 0
           ? parentInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0)
           : 0;
         const totalPaid = childInvoices.length > 0
           ? childrenPaid + parentPaid
-          : allInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
-        const totalCosts = (vendorPOs || []).reduce((sum, po) => sum + (po.total || 0), 0);
-        const totalCostsPaid = (vendorPOs || []).reduce((sum, po) => sum + (po.total_paid || 0), 0);
+          : invoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
+        const totalCosts = vendorPOs.reduce((sum, po) => sum + (po.total || 0), 0);
+        const totalCostsPaid = vendorPOs.reduce((sum, po) => sum + (po.total_paid || 0), 0);
 
         return {
           id: order.id,
@@ -133,13 +145,13 @@ const Projects = () => {
           total_costs: totalCosts,
           total_costs_paid: totalCostsPaid,
           profit: totalRevenue - totalCosts,
-          invoice_count: invoices?.length || 0,
-          vendor_po_count: vendorPOs?.length || 0,
+          invoice_count: invoices.length,
+          vendor_po_count: vendorPOs.length,
         };
       });
 
-      const projectData = await Promise.all(projectPromises);
       setProjects(projectData);
+
     } catch (error) {
       console.error('Error fetching projects:', error);
     } finally {
