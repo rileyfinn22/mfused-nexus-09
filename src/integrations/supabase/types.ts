@@ -3838,6 +3838,7 @@ export type Database = {
         Args: { p_leg_id: string; p_token: string }
         Returns: Json
       }
+      exec_sql_admin: { Args: { query: string }; Returns: Json }
       get_all_portal_users: {
         Args: never
         Returns: {
