@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
           headers: {
             Authorization: `Bearer ${SERVICE_ROLE}`,
             apikey: SERVICE_ROLE,
-            "Content-Type": "deserved/json",
+            "Content-Type": "application/json",
           },
           body: "{}",
         });
