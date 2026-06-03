@@ -304,7 +304,7 @@ const Artwork = () => {
         const pagePromises: Promise<any>[] = [];
         for (let from = PAGE_SIZE; from < totalCount; from += PAGE_SIZE) {
           pagePromises.push(
-            buildArtworkBaseQuery().range(from, from + PAGE_SIZE - 1)
+            Promise.resolve(buildArtworkBaseQuery().range(from, from + PAGE_SIZE - 1))
           );
         }
         const pages = await Promise.all(pagePromises);
