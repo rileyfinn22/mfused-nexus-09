@@ -152,6 +152,23 @@ Deno.serve(async (req) => {
         return json(await r.json(), r.status);
       }
 
+      case "snapshot": {
+        // Trigger full DB + storage manifest backup
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/db-backup`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${SERVICE_ROLE}`,
+            apikey: SERVICE_ROLE,
+            "Content-Type": "application/json",
+          },
+          body: "{}",
+        });
+        const text = await r.text();
+        let parsed: unknown = text;
+        try { parsed = JSON.parse(text); } catch { /* */ }
+        return json({ status: r.status, body: parsed });
+      }
+
       case "help":
       case undefined:
         return json({

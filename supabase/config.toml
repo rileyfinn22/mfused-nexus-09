@@ -80,3 +80,9 @@ verify_jwt = true
 
 [functions.ai-edit-packing-list]
 verify_jwt = true
+
+[functions.db-backup]
+verify_jwt = false
+
+[functions.claude-admin]
+verify_jwt = false
