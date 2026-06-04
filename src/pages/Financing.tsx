@@ -95,6 +95,7 @@ export default function Financing() {
   const [userRole, setUserRole] = useState<"vibe_admin" | "finance" | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]);
+  const [repayments, setRepayments] = useState<any[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   
   const [repayOpen, setRepayOpen] = useState(false);
@@ -144,17 +145,21 @@ export default function Financing() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [invRes, depRes] = await Promise.all([
+    const [invRes, depRes, repRes] = await Promise.all([
       supabase.from("financed_invoices").select("*, invoices(invoice_number, total, orders(order_number, customer_name, description)), vendor_pos(po_number, description, total, orders(order_number, customer_name, description), vendors(name))").order("financed_date", { ascending: false }),
       supabase.from("finance_deposits").select("*").order("payment_date", { ascending: false }),
+      supabase.from("finance_repayments").select("id, amount, source, payment_method, payment_batch_id, confirmation_status, payment_date"),
     ]);
     setInvoices(invRes.data || []);
     setDeposits(depRes.data || []);
-    const [repConf, depConf] = await Promise.all([
-      supabase.from("finance_repayments").select("id", { count: "exact", head: true }).eq("confirmation_status", "pending"),
-      supabase.from("finance_deposits").select("id", { count: "exact", head: true }).eq("confirmation_status", "pending"),
-    ]);
-    setPendingConfirmations((repConf.count || 0) + (depConf.count || 0));
+    const reps = repRes.data || [];
+    setRepayments(reps);
+    // Count pending confirmations by BATCH: a wire / deposit-pull batch is one confirmation, not one per allocation row.
+    const pendingReps = reps.filter((r: any) => r.confirmation_status === "pending");
+    const pendingBatches = new Set(pendingReps.filter((r: any) => r.payment_batch_id).map((r: any) => r.payment_batch_id));
+    const pendingUnbatched = pendingReps.filter((r: any) => !r.payment_batch_id).length;
+    const pendingDeposits = (depRes.data || []).filter((d: any) => d.confirmation_status === "pending").length;
+    setPendingConfirmations(pendingBatches.size + pendingUnbatched + pendingDeposits);
     setLoading(false);
   };
 
@@ -216,7 +221,9 @@ export default function Financing() {
   }, 0);
   const requiredDeposit = allActive.filter(i => i.status === "open").reduce((s, i) => s + i.financed_amount, 0) * 0.10;
   const requiredDepositRMB = allActive.filter(i => i.status === "open").reduce((s, i) => s + (i.financed_amount_rmb || i.financed_amount * (i.exchange_rate || 7.2)), 0) * 0.10;
-  const currentDeposit = deposits.reduce((s, d) => s + (d.amount || 0), 0);
+  const totalDeposited = deposits.filter(d => d.confirmation_status !== "disputed").reduce((s, d) => s + (d.amount || 0), 0);
+  const depositPulled = repayments.filter(r => (r.source === "deposit" || r.payment_method === "deposit") && r.confirmation_status !== "disputed").reduce((s, r) => s + (r.amount || 0), 0);
+  const currentDeposit = totalDeposited - depositPulled;
   const avgRate = allActive.length > 0 ? allActive.reduce((s, i) => s + (i.exchange_rate || 7.2), 0) / allActive.length : 7.2;
   const currentDepositRMB = currentDeposit * avgRate;
   const depositShortfall = Math.max(0, requiredDeposit - currentDeposit);
@@ -463,6 +470,11 @@ export default function Financing() {
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-72 p-0" align="start">
+                <div className="p-3 border-b border-border space-y-1">
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Total Deposited</span><span className="font-medium">{formatUSD(totalDeposited)}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Pulled to Repayments</span><span className="font-medium text-amber-500">−{formatUSD(depositPulled)}</span></div>
+                  <div className="flex justify-between text-xs border-t border-border pt-1 mt-1"><span className="font-semibold">Available</span><span className="font-semibold text-green-500">{formatUSD(currentDeposit)}</span></div>
+                </div>
                 <div className="p-3 border-b border-border"><p className="text-xs font-semibold text-muted-foreground">{t("depositHistory")}</p></div>
                 {deposits.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-4">{t("noDeposits")}</p>
