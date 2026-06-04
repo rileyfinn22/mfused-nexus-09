@@ -776,11 +776,7 @@ export function ProductionStageTimeline({
                 <div className="space-y-2">
                   {visibleUpdates
                     .filter(u => u.update_type !== 'status_change' || u.note_text || u.image_url || u.file_url)
-                    .sort((a, b) => {
-                      // Vibe admin: customer-visible (published) updates above internal (unpublished); newest first within each group.
-                      if (isVibeAdmin && !!a.is_published !== !!b.is_published) return a.is_published ? -1 : 1;
-                      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-                    })
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                     .map((update) => {
                       const noteText = getUpdateNoteText(update);
                       const imageUrl = getUpdateImageUrl(update);
@@ -1035,31 +1031,10 @@ export function ProductionStageTimeline({
       {isVibeAdmin ? (
         <>
           {(() => {
-            const internalDefs = visibleStageDefinitions.filter(d => d.adminOnly);
-            if (internalDefs.length === 0) return null;
-            return (
-              <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-50/50 dark:bg-amber-500/10">
-                    Internal Only
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">Not visible to customers</span>
-                </div>
-                <div className="relative">
-                  <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-amber-300/40 dark:bg-amber-500/20" />
-                  <div className="space-y-3">
-                    {internalDefs.map((stageDef) => renderStageCard(stageDef))}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {(() => {
             const customerDefs = visibleStageDefinitions.filter(d => !d.adminOnly);
             if (customerDefs.length === 0) return null;
             return (
-              <div className="space-y-3">
+              <div className="space-y-3 mb-6">
                 <div className="flex items-center gap-2 mb-1">
                   <Badge variant="outline" className="text-xs border-blue-500/50 text-blue-600 bg-blue-50/50 dark:bg-blue-500/10">
                     Customer Visible
@@ -1070,6 +1045,27 @@ export function ProductionStageTimeline({
                   <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border" />
                   <div className="space-y-3">
                     {customerDefs.map((stageDef) => renderStageCard(stageDef))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const internalDefs = visibleStageDefinitions.filter(d => d.adminOnly);
+            if (internalDefs.length === 0) return null;
+            return (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-50/50 dark:bg-amber-500/10">
+                    Internal Only
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">Not visible to customers</span>
+                </div>
+                <div className="relative">
+                  <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-amber-300/40 dark:bg-amber-500/20" />
+                  <div className="space-y-3">
+                    {internalDefs.map((stageDef) => renderStageCard(stageDef))}
                   </div>
                 </div>
               </div>
