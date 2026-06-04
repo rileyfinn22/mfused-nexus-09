@@ -776,7 +776,11 @@ export function ProductionStageTimeline({
                 <div className="space-y-2">
                   {visibleUpdates
                     .filter(u => u.update_type !== 'status_change' || u.note_text || u.image_url || u.file_url)
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .sort((a, b) => {
+                      // Vibe admin: customer-visible (published) updates above internal (unpublished); newest first within each group.
+                      if (isVibeAdmin && !!a.is_published !== !!b.is_published) return a.is_published ? -1 : 1;
+                      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                    })
                     .map((update) => {
                       const noteText = getUpdateNoteText(update);
                       const imageUrl = getUpdateImageUrl(update);
