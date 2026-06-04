@@ -228,8 +228,10 @@ export default function Financing() {
   const currentDepositRMB = currentDeposit * avgRate;
   const depositShortfall = Math.max(0, requiredDeposit - currentDeposit);
   const depositShortfallRMB = Math.max(0, requiredDepositRMB - currentDepositRMB);
-  const totalRepaidUSD = activeInvoices.reduce((s, i) => s + (i.paid_back_amount || 0), 0);
-  const totalRepaidRMB = activeInvoices.reduce((s, i) => s + ((i.paid_back_amount || 0) * (i.exchange_rate || 7.2)), 0);
+  // Total repaid = everything paid back across ALL financed invoices (active + completed),
+  // so it doesn't drop to 0 once invoices are fully paid off.
+  const totalRepaidUSD = invoices.reduce((s, i) => s + (i.paid_back_amount || 0), 0);
+  const totalRepaidRMB = invoices.reduce((s, i) => s + ((i.paid_back_amount || 0) * (i.exchange_rate || 7.2)), 0);
 
   const exportCSV = () => {
     const tab = activeTab === "pending" ? pendingInvoices : activeTab === "active" ? activeInvoices : completedInvoices;
