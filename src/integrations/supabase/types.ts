@@ -710,6 +710,7 @@ export type Database = {
       finance_repayments: {
         Row: {
           amount: number
+          batch_reference: string | null
           confirmation_status: string
           confirmed_at: string | null
           confirmed_by: string | null
@@ -719,12 +720,15 @@ export type Database = {
           financed_invoice_id: string
           id: string
           notes: string | null
+          payment_batch_id: string | null
           payment_date: string
           payment_method: string | null
           reference_number: string | null
+          source: string | null
         }
         Insert: {
           amount?: number
+          batch_reference?: string | null
           confirmation_status?: string
           confirmed_at?: string | null
           confirmed_by?: string | null
@@ -734,12 +738,15 @@ export type Database = {
           financed_invoice_id: string
           id?: string
           notes?: string | null
+          payment_batch_id?: string | null
           payment_date?: string
           payment_method?: string | null
           reference_number?: string | null
+          source?: string | null
         }
         Update: {
           amount?: number
+          batch_reference?: string | null
           confirmation_status?: string
           confirmed_at?: string | null
           confirmed_by?: string | null
@@ -749,9 +756,11 @@ export type Database = {
           financed_invoice_id?: string
           id?: string
           notes?: string | null
+          payment_batch_id?: string | null
           payment_date?: string
           payment_method?: string | null
           reference_number?: string | null
+          source?: string | null
         }
         Relationships: [
           {

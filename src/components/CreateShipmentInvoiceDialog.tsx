@@ -350,7 +350,11 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         .reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
 
       const blanketTotal = Number(blanketInvoice.total);
-      const blanketDepositAmount = Number(blanketInvoice.billed_percentage || 100) < 100
+      // Deposit % on the blanket is a one-shot upfront billing flag. Once ANY child
+      // shipment invoice exists, those children ARE the draw-down ledger — don't
+      // double-count the deposit on top of children (it would over-cap remaining).
+      const hasChildShipments = existingInvoices.some(inv => inv.invoice_type !== 'full');
+      const blanketDepositAmount = !hasChildShipments && Number(blanketInvoice.billed_percentage || 100) < 100
         ? blanketTotal * (Number(blanketInvoice.billed_percentage) / 100)
         : 0;
 
