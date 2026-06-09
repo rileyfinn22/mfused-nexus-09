@@ -1231,7 +1231,8 @@ const CreateOrder = () => {
 
   const fetchProducts = async () => {
     try {
-      const data = await fetchAllOrderProducts();
+      const companyId = isVibeAdmin ? (selectedCompanyId || null) : null;
+      const data = await fetchAllOrderProducts(companyId);
       setProducts(data);
     } catch (error) {
       console.error('Error fetching products:', error);
