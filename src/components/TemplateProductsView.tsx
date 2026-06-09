@@ -33,6 +33,7 @@ import {
   Package,
   Search,
   AlertTriangle,
+  Clock,
   LayoutGrid,
   List,
   Loader2
@@ -334,9 +335,9 @@ export function TemplateProductsView({
     }
   };
 
-  const hasApprovedArtwork = (itemId?: string | null) => {
-    if (!itemId) return false;
-    return artworkStatus[itemId] === true;
+  const getArtworkAvailability = (itemId?: string | null) => {
+    if (!itemId || artworkStatus[itemId] === undefined) return "none";
+    return artworkStatus[itemId] ? "approved" : "pending";
   };
 
   const getDisplayName = (product: Product) => {
@@ -500,8 +501,17 @@ export function TemplateProductsView({
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
 
-                {/* Warning badge for no artwork */}
-                {product.item_id && !hasApprovedArtwork(product.item_id) && (
+                {product.item_id && getArtworkAvailability(product.item_id) === "pending" && (
+                  <Badge 
+                    variant="outline" 
+                    className="absolute top-2 right-2 bg-warning/10 text-warning border-warning/30"
+                  >
+                    <Clock className="h-3 w-3 mr-1" />
+                    Pending Art
+                  </Badge>
+                )}
+
+                {product.item_id && getArtworkAvailability(product.item_id) === "none" && (
                   <Badge 
                     variant="outline" 
                     className="absolute top-2 right-2 bg-warning/10 text-warning border-warning/30"
