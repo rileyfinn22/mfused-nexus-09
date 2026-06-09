@@ -335,7 +335,7 @@ const Artwork = () => {
           counts[art.sku].pending++;
         }
 
-        if (!skuThumbnails[art.sku]) {
+        if (!skuThumbnails[art.sku] || art.is_approved) {
           if (isUsableArtworkPreviewUrl(art.filename, art.preview_url)) {
             skuThumbnails[art.sku] = art.preview_url;
           } else if (art.filename && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(art.filename)) {
@@ -343,7 +343,7 @@ const Artwork = () => {
           }
         }
         // Track first PDF URL per SKU as fallback for thumbnail rendering
-        if (!skuPdfUrls[art.sku] && art.filename && /\.pdf$/i.test(art.filename)) {
+        if ((!skuPdfUrls[art.sku] || art.is_approved) && art.filename && /\.pdf$/i.test(art.filename)) {
           skuPdfUrls[art.sku] = art.artwork_url;
         }
       });
