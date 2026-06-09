@@ -326,8 +326,9 @@ const Products = () => {
     try {
       const { data, error } = await supabase
         .from('artwork_files')
-        .select('sku, filename, preview_url, artwork_url')
-        .eq('is_approved', true)
+        .select('sku, filename, preview_url, artwork_url, is_approved')
+        .order('is_approved', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(50000);
 
       if (error) throw error;
