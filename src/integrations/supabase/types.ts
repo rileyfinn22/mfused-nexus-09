@@ -1426,6 +1426,38 @@ export type Database = {
           },
         ]
       }
+      order_item_costs: {
+        Row: {
+          order_item_id: string
+          updated_at: string
+          vendor_cost: number | null
+          vendor_id: string | null
+          vendor_po_number: string | null
+        }
+        Insert: {
+          order_item_id: string
+          updated_at?: string
+          vendor_cost?: number | null
+          vendor_id?: string | null
+          vendor_po_number?: string | null
+        }
+        Update: {
+          order_item_id?: string
+          updated_at?: string
+          vendor_cost?: number | null
+          vendor_id?: string | null
+          vendor_po_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_item_costs_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: true
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string
@@ -1441,6 +1473,9 @@ export type Database = {
           sku: string
           total: number
           unit_price: number
+          vendor_cost: number | null
+          vendor_id: string | null
+          vendor_po_number: string | null
         }
         Insert: {
           created_at?: string
@@ -1456,6 +1491,9 @@ export type Database = {
           sku: string
           total: number
           unit_price: number
+          vendor_cost?: number | null
+          vendor_id?: string | null
+          vendor_po_number?: string | null
         }
         Update: {
           created_at?: string
@@ -1471,6 +1509,9 @@ export type Database = {
           sku?: string
           total?: number
           unit_price?: number
+          vendor_cost?: number | null
+          vendor_id?: string | null
+          vendor_po_number?: string | null
         }
         Relationships: [
           {
@@ -1485,6 +1526,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]
@@ -2184,6 +2232,35 @@ export type Database = {
           },
         ]
       }
+      product_costs: {
+        Row: {
+          cost: number | null
+          preferred_vendor_id: string | null
+          product_id: string
+          updated_at: string
+        }
+        Insert: {
+          cost?: number | null
+          preferred_vendor_id?: string | null
+          product_id: string
+          updated_at?: string
+        }
+        Update: {
+          cost?: number | null
+          preferred_vendor_id?: string | null
+          product_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_costs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_states: {
         Row: {
           artwork_status: string
@@ -2225,9 +2302,36 @@ export type Database = {
           },
         ]
       }
+      product_template_costs: {
+        Row: {
+          cost: number | null
+          template_id: string
+          updated_at: string
+        }
+        Insert: {
+          cost?: number | null
+          template_id: string
+          updated_at?: string
+        }
+        Update: {
+          cost?: number | null
+          template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_template_costs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: true
+            referencedRelation: "product_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_templates: {
         Row: {
           company_id: string | null
+          cost: number | null
           created_at: string
           description: string | null
           id: string
@@ -2239,6 +2343,7 @@ export type Database = {
         }
         Insert: {
           company_id?: string | null
+          cost?: number | null
           created_at?: string
           description?: string | null
           id?: string
@@ -2250,6 +2355,7 @@ export type Database = {
         }
         Update: {
           company_id?: string | null
+          cost?: number | null
           created_at?: string
           description?: string | null
           id?: string
@@ -2436,12 +2542,14 @@ export type Database = {
         Row: {
           cases_per_pallet: number | null
           company_id: string
+          cost: number | null
           created_at: string
           description: string | null
           id: string
           image_url: string | null
           item_id: string | null
           name: string
+          preferred_vendor_id: string | null
           price: number | null
           print_template_id: string | null
           product_type: string | null
@@ -2458,12 +2566,14 @@ export type Database = {
         Insert: {
           cases_per_pallet?: number | null
           company_id: string
+          cost?: number | null
           created_at?: string
           description?: string | null
           id?: string
           image_url?: string | null
           item_id?: string | null
           name: string
+          preferred_vendor_id?: string | null
           price?: number | null
           print_template_id?: string | null
           product_type?: string | null
@@ -2480,12 +2590,14 @@ export type Database = {
         Update: {
           cases_per_pallet?: number | null
           company_id?: string
+          cost?: number | null
           created_at?: string
           description?: string | null
           id?: string
           image_url?: string | null
           item_id?: string | null
           name?: string
+          preferred_vendor_id?: string | null
           price?: number | null
           print_template_id?: string | null
           product_type?: string | null
@@ -2505,6 +2617,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_preferred_vendor_id_fkey"
+            columns: ["preferred_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
           {
