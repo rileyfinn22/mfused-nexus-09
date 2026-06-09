@@ -503,6 +503,15 @@ const CreateOrder = () => {
     }
   }, [selectedCompanyId, roleChecked, initialLoading, orderId]);
 
+  // Refetch products scoped to the selected company when an admin switches it.
+  useEffect(() => {
+    if (!roleChecked || !isVibeAdmin) return;
+    (async () => {
+      const data = await fetchAllOrderProducts(selectedCompanyId || null);
+      setProducts(data);
+    })();
+  }, [isVibeAdmin, roleChecked, selectedCompanyId]);
+
   // Auto-save draft every 1 minute - ONLY for new orders (not editing existing)
   const performAutoSave = useCallback(async () => {
     // Skip auto-save if editing an existing order (orderId is set from URL params)
