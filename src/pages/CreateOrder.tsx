@@ -61,16 +61,20 @@ interface ProductTemplateOption {
 
 const PRODUCT_PAGE_SIZE = 1000;
 
-const fetchAllOrderProducts = async (): Promise<Product[]> => {
+const fetchAllOrderProducts = async (companyId?: string | null): Promise<Product[]> => {
   const allProducts: Product[] = [];
 
   for (let from = 0; ; from += PRODUCT_PAGE_SIZE) {
     const to = from + PRODUCT_PAGE_SIZE - 1;
-    const { data, error } = await supabase
+    let query = supabase
       .from('products')
       .select('id, name, item_id, description, image_url, company_id, state')
       .order('name')
       .range(from, to);
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+    const { data, error } = await query;
 
     if (error) throw error;
     if (!data || data.length === 0) break;
@@ -309,7 +313,8 @@ const CreateOrder = () => {
           setRoleChecked(true);
         }
 
-        const productsData = await fetchAllOrderProducts();
+        const productsCompanyId = isAdmin ? null : (userRole?.company_id ?? null);
+        const productsData = await fetchAllOrderProducts(productsCompanyId);
         if (isMounted) {
           setProducts(productsData);
         }
@@ -497,6 +502,15 @@ const CreateOrder = () => {
       loadCompanyAddresses();
     }
   }, [selectedCompanyId, roleChecked, initialLoading, orderId]);
+
+  // Refetch products scoped to the selected company when an admin switches it.
+  useEffect(() => {
+    if (!roleChecked || !isVibeAdmin) return;
+    (async () => {
+      const data = await fetchAllOrderProducts(selectedCompanyId || null);
+      setProducts(data);
+    })();
+  }, [isVibeAdmin, roleChecked, selectedCompanyId]);
 
   // Auto-save draft every 1 minute - ONLY for new orders (not editing existing)
   const performAutoSave = useCallback(async () => {
@@ -1226,7 +1240,8 @@ const CreateOrder = () => {
 
   const fetchProducts = async () => {
     try {
-      const data = await fetchAllOrderProducts();
+      const companyId = isVibeAdmin ? (selectedCompanyId || null) : null;
+      const data = await fetchAllOrderProducts(companyId);
       setProducts(data);
     } catch (error) {
       console.error('Error fetching products:', error);
