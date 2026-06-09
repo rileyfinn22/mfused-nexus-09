@@ -1925,18 +1925,38 @@ const CreateOrder = () => {
         // Delete items that are no longer in the order (matched items that were removed)
         const itemsToDelete = Array.from(existingItemsMap.values());
         if (itemsToDelete.length > 0) {
+          const deleteIds = itemsToDelete.map(i => i.id);
+          // Detach vendor PO lines first so they survive (defense in depth — FK is also SET NULL)
+          await supabase
+            .from('vendor_po_items')
+            .update({ order_item_id: null })
+            .in('order_item_id', deleteIds);
           await supabase
             .from('order_items')
             .delete()
-            .in('id', itemsToDelete.map(i => i.id));
+            .in('id', deleteIds);
         }
 
-        // Keep unmatched (product_id is null) line items in sync with the UI
+        // Keep unmatched (product_id is null) line items in sync with the UI.
+        // Detach any vendor PO lines linked to them first.
+        const { data: unmatchedExisting } = await supabase
+          .from('order_items')
+          .select('id')
+          .eq('order_id', order.id)
+          .is('product_id', null);
+        const unmatchedIds = (unmatchedExisting || []).map((r: any) => r.id);
+        if (unmatchedIds.length > 0) {
+          await supabase
+            .from('vendor_po_items')
+            .update({ order_item_id: null })
+            .in('order_item_id', unmatchedIds);
+        }
         await supabase
           .from('order_items')
           .delete()
           .eq('order_id', order.id)
           .is('product_id', null);
+
 
         if (unmatchedPoItems.length > 0) {
           const unmatchedOrderItems = unmatchedPoItems.map((item) => {
