@@ -33,6 +33,7 @@ import {
   Package,
   Search,
   AlertTriangle,
+  Clock,
   LayoutGrid,
   List,
   Pencil,
@@ -209,8 +210,9 @@ export function CompanyProductTemplates({
 
       const { data: thumbData } = await supabase
         .from('artwork_files')
-        .select('sku, preview_url, artwork_url')
-        .eq('is_approved', true);
+        .select('sku, preview_url, artwork_url, is_approved')
+        .order('is_approved', { ascending: false })
+        .order('created_at', { ascending: false });
 
       const thumbnailMap: Record<string, string> = {};
       thumbData?.forEach(artwork => {
@@ -329,9 +331,9 @@ export function CompanyProductTemplates({
     }
   };
 
-  const hasApprovedArtwork = (itemId?: string | null) => {
-    if (!itemId) return false;
-    return artworkStatus[itemId] === true;
+  const getArtworkAvailability = (itemId?: string | null) => {
+    if (!itemId || artworkStatus[itemId] === undefined) return "none";
+    return artworkStatus[itemId] ? "approved" : "pending";
   };
 
   // Strip template name prefix from product name for display
@@ -714,7 +716,16 @@ export function CompanyProductTemplates({
                     <Package className="h-12 w-12 text-muted-foreground/30" />
                   )}
 
-                  {product.item_id && !hasApprovedArtwork(product.item_id) && (
+                  {product.item_id && getArtworkAvailability(product.item_id) === "pending" && (
+                    <Badge 
+                      variant="outline" 
+                      className="absolute top-2 right-2 bg-warning/10 text-warning border-warning/30 text-xs"
+                    >
+                      <Clock className="h-3 w-3" />
+                    </Badge>
+                  )}
+
+                  {product.item_id && getArtworkAvailability(product.item_id) === "none" && (
                     <Badge 
                       variant="outline" 
                       className="absolute top-2 right-2 bg-warning/10 text-warning border-warning/30 text-xs"
