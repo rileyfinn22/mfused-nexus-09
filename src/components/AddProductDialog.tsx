@@ -203,9 +203,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
           name: formData.name,
           description: formData.description || null,
           state: formData.state,
-          cost: formData.cost ? parseFloat(formData.cost) : null,
           price: formData.price ? parseFloat(formData.price) : null,
-          preferred_vendor_id: formData.preferred_vendor_id || null,
           image_url: imageUrl,
           item_id: tempSKU,
           company_id: finalCompanyId
@@ -214,6 +212,17 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
         .single();
 
       if (productError) throw productError;
+
+      // Cost/vendor moved to companion table product_costs
+      const { error: costError } = await (supabase as any)
+        .from('product_costs')
+        .upsert({
+          product_id: product.id,
+          cost: formData.cost ? parseFloat(formData.cost) : null,
+          preferred_vendor_id: formData.preferred_vendor_id || null,
+        }, { onConflict: 'product_id' });
+
+      if (costError) throw costError;
 
       // Create product state if specs provided
       if (formData.specs) {

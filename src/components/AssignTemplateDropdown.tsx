@@ -50,7 +50,7 @@ export function AssignTemplateDropdown({
     try {
       let query = supabase
         .from("product_templates")
-        .select("id, name, description, price, cost, state")
+        .select("id, name, description, price, state")
         .order("name");
 
       if (companyId) {
@@ -60,7 +60,21 @@ export function AssignTemplateDropdown({
       const { data, error } = await query;
 
       if (error) throw error;
-      setTemplates(data || []);
+
+      // Template cost moved to companion table product_template_costs
+      const templateIds = (data || []).map(t => t.id);
+      const costMap: Record<string, number | null> = {};
+      if (templateIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from("product_template_costs")
+          .select("template_id, cost")
+          .in("template_id", templateIds);
+        (costRows || []).forEach((row: any) => {
+          costMap[row.template_id] = row.cost;
+        });
+      }
+
+      setTemplates((data || []).map(t => ({ ...t, cost: costMap[t.id] ?? null })));
     } catch (error) {
       console.error("Error fetching templates:", error);
     }

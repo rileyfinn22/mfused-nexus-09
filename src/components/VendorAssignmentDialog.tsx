@@ -64,10 +64,29 @@ export const VendorAssignmentDialog = ({
     
     console.log('Fetched order items:', data);
     console.log('Fetch error:', error);
-    
+
     if (data) {
+      // Vendor cost/id moved to companion table order_item_costs — merge it back in
+      const itemIds = data.map((i) => i.id);
+      const costMap: Record<string, any> = {};
+      if (itemIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from('order_item_costs')
+          .select('order_item_id, vendor_cost, vendor_id, vendor_po_number')
+          .in('order_item_id', itemIds);
+        (costRows || []).forEach((row: any) => {
+          costMap[row.order_item_id] = row;
+        });
+      }
+      const merged: any[] = data.map((i) => ({
+        ...i,
+        vendor_id: costMap[i.id]?.vendor_id ?? null,
+        vendor_cost: costMap[i.id]?.vendor_cost ?? null,
+        vendor_po_number: costMap[i.id]?.vendor_po_number ?? null,
+      }));
+
       // Sort to match the original orderItems order to prevent scrambling
-      const sortedData = data.sort((a, b) => {
+      const sortedData = merged.sort((a, b) => {
         const indexA = orderItems.findIndex(item => item.id === a.id);
         const indexB = orderItems.findIndex(item => item.id === b.id);
         // If both found in original orderItems, use that order
@@ -216,16 +235,17 @@ export const VendorAssignmentDialog = ({
       }
 
       // Update order item with new vendor info
-      const { error: itemError } = await supabase
-        .from('order_items')
-        .update({
+      // Vendor cost/id moved to companion table order_item_costs
+      const { error: itemError } = await (supabase as any)
+        .from('order_item_costs')
+        .upsert({
+          order_item_id: itemId,
           vendor_id: assignment.vendorId,
           vendor_cost: parseFloat(assignment.vendorCost)
-        })
-        .eq('id', itemId);
+        }, { onConflict: 'order_item_id' });
 
       if (itemError) {
-        console.error('Error updating order item:', itemError);
+        console.error('Error updating order item cost:', itemError);
         throw itemError;
       }
 
@@ -472,13 +492,14 @@ export const VendorAssignmentDialog = ({
         }
 
         // Update order item with vendor info
-        await supabase
-          .from('order_items')
-          .update({
+        // Vendor cost/id moved to companion table order_item_costs
+        await (supabase as any)
+          .from('order_item_costs')
+          .upsert({
+            order_item_id: itemId,
             vendor_id: bulkVendorId,
             vendor_cost: parseFloat(bulkCost)
-          })
-          .eq('id', itemId);
+          }, { onConflict: 'order_item_id' });
 
         // Check if vendor PO exists for this vendor and order
         let vendorPO;

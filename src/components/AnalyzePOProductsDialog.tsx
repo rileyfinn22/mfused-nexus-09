@@ -380,7 +380,8 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
           name: finalName,
           description: selectedTemplate?.description || productDescription || null,
           state: selectedTemplate?.state || productState || null,
-          cost: productCost || selectedTemplate?.cost || null,
+          // Cost moved to companion table product_costs — kept here transiently for the companion upsert below
+          _cost: productCost || selectedTemplate?.cost || null,
           price: selectedTemplate?.price || null,
           product_type: productType || null,
           template_id: p.template_id || null,
@@ -388,9 +389,25 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
         };
       });
 
-      const { error } = await supabase.from('products').insert(productsToInsert);
+      // Strip the transient cost field from the base-table payload
+      const basePayload = productsToInsert.map(({ _cost, ...rest }) => rest);
+
+      const { data: insertedProducts, error } = await supabase
+        .from('products')
+        .insert(basePayload)
+        .select('id');
 
       if (error) throw error;
+
+      // Cost moved to companion table product_costs
+      const costRows = (insertedProducts || [])
+        .map((row, idx) => ({ product_id: row.id, cost: productsToInsert[idx]?._cost ?? null }))
+        .filter(r => r.cost !== null);
+      if (costRows.length > 0) {
+        await (supabase as any)
+          .from('product_costs')
+          .upsert(costRows, { onConflict: 'product_id' });
+      }
 
       const withTemplate = selectedProducts.filter(p => p.template_id).length;
       toast({

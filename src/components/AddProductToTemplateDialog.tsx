@@ -106,7 +106,6 @@ export function AddProductToTemplateDialog({
           .insert({
             name: fullProductName,
             description: template.description,
-            cost: template.cost,
             price: template.price,
             state: template.state,
             item_id: tempSKU,
@@ -120,6 +119,11 @@ export function AddProductToTemplateDialog({
           console.error('Error creating product:', productError);
           continue;
         }
+
+        // Cost moved to companion table product_costs
+        await (supabase as any)
+          .from('product_costs')
+          .upsert({ product_id: product.id, cost: template.cost ?? null }, { onConflict: 'product_id' });
 
         createdProducts.push(product.id);
       }

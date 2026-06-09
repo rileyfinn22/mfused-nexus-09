@@ -68,15 +68,34 @@ const fetchAllOrderProducts = async (): Promise<Product[]> => {
     const to = from + PRODUCT_PAGE_SIZE - 1;
     const { data, error } = await supabase
       .from('products')
-      .select('id, name, item_id, cost, description, image_url, company_id, state')
+      .select('id, name, item_id, description, image_url, company_id, state')
       .order('name')
       .range(from, to);
 
     if (error) throw error;
     if (!data || data.length === 0) break;
 
-    allProducts.push(...data);
+    allProducts.push(...(data as any[]).map((p) => ({ ...p, cost: null as number | null })));
     if (data.length < PRODUCT_PAGE_SIZE) break;
+  }
+
+  // Product cost moved to companion table product_costs
+  const productIds = allProducts.map((p) => p.id);
+  if (productIds.length > 0) {
+    const costMap: Record<string, number | null> = {};
+    for (let i = 0; i < productIds.length; i += PRODUCT_PAGE_SIZE) {
+      const batch = productIds.slice(i, i + PRODUCT_PAGE_SIZE);
+      const { data: costRows } = await (supabase as any)
+        .from('product_costs')
+        .select('product_id, cost')
+        .in('product_id', batch);
+      (costRows || []).forEach((row: any) => {
+        costMap[row.product_id] = row.cost;
+      });
+    }
+    allProducts.forEach((p) => {
+      p.cost = costMap[p.id] ?? null;
+    });
   }
 
   return allProducts;
@@ -433,7 +452,7 @@ const CreateOrder = () => {
     const fetchProductTemplates = async () => {
       let query = supabase
         .from('product_templates')
-        .select('id, name, state, description, price, cost')
+        .select('id, name, state, description, price')
         .order('name');
 
       if (isVibeAdmin) {
@@ -446,7 +465,19 @@ const CreateOrder = () => {
 
       const { data, error } = await query;
       if (!error) {
-        setProductTemplates(data || []);
+        // Template cost moved to companion table product_template_costs
+        const templateIds = (data || []).map((t) => t.id);
+        const costMap: Record<string, number | null> = {};
+        if (templateIds.length > 0) {
+          const { data: costRows } = await (supabase as any)
+            .from('product_template_costs')
+            .select('template_id, cost')
+            .in('template_id', templateIds);
+          (costRows || []).forEach((row: any) => {
+            costMap[row.template_id] = row.cost;
+          });
+        }
+        setProductTemplates((data || []).map((t) => ({ ...t, cost: costMap[t.id] ?? null })));
       }
     };
 
@@ -1493,13 +1524,14 @@ const CreateOrder = () => {
       const finalName = selectedTemplate ? `${selectedTemplate.name} - ${baseName}` : unmatchedItem.name;
       const finalItemId = unmatchedItem.catalogItemId.trim() || unmatchedItem.sku || null;
 
+      const newProductCost = unmatchedItem.unit_price || selectedTemplate?.cost || null;
+
       const { data: newProduct, error } = await supabase
         .from('products')
         .insert({
           name: finalName,
           item_id: finalItemId,
           description: selectedTemplate?.description || unmatchedItem.description || null,
-          cost: unmatchedItem.unit_price || selectedTemplate?.cost || null,
           price: selectedTemplate?.price || null,
           state: selectedTemplate?.state || null,
           company_id: companyId,
@@ -1510,7 +1542,12 @@ const CreateOrder = () => {
 
       if (error) throw error;
 
-      setProducts(prev => [...prev, newProduct]);
+      // Cost moved to companion table product_costs
+      await (supabase as any)
+        .from('product_costs')
+        .upsert({ product_id: newProduct.id, cost: newProductCost }, { onConflict: 'product_id' });
+
+      setProducts(prev => [...prev, { ...newProduct, cost: newProductCost }]);
       setSelectedItems(prev => {
         const exists = prev.find(item => item.productId === newProduct.id);
         if (exists) return prev;

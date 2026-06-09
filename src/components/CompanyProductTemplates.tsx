@@ -144,6 +144,19 @@ export function CompanyProductTemplates({
 
       if (templatesError) throw templatesError;
 
+      // Template cost moved to companion table product_template_costs
+      const templateIds = (templatesData || []).map(t => t.id);
+      const costMap: Record<string, number | null> = {};
+      if (templateIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from('product_template_costs')
+          .select('template_id, cost')
+          .in('template_id', templateIds);
+        (costRows || []).forEach((row: any) => {
+          costMap[row.template_id] = row.cost;
+        });
+      }
+
       // Fetch product counts for this company
       const templatesWithCounts = await Promise.all(
         (templatesData || []).map(async (template) => {
@@ -155,6 +168,7 @@ export function CompanyProductTemplates({
 
           return {
             ...template,
+            cost: costMap[template.id] ?? null,
             product_count: count || 0
           };
         })
@@ -180,13 +194,27 @@ export function CompanyProductTemplates({
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, description, item_id, price, cost, image_url, state')
+        .select('id, name, description, item_id, price, image_url, state')
         .eq('template_id', selectedTemplate.id)
         .eq('company_id', companyId)
         .order('name');
 
       if (error) throw error;
-      setProducts(data || []);
+
+      // Product cost moved to companion table product_costs
+      const productIds = (data || []).map(p => p.id);
+      const productCostMap: Record<string, number | null> = {};
+      if (productIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from('product_costs')
+          .select('product_id, cost')
+          .in('product_id', productIds);
+        (costRows || []).forEach((row: any) => {
+          productCostMap[row.product_id] = row.cost;
+        });
+      }
+
+      setProducts((data || []).map(p => ({ ...p, cost: productCostMap[p.id] ?? null })));
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
@@ -299,19 +327,27 @@ export function CompanyProductTemplates({
     try {
       const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
       
-      const { error } = await supabase
+      const { data: newProduct, error } = await supabase
         .from('products')
         .insert({
           name: `${product.name} (Copy)`,
           description: product.description,
           price: product.price,
-          cost: product.cost,
           item_id: tempSKU,
           template_id: selectedTemplate?.id,
           company_id: companyId
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Cost moved to companion table product_costs
+      if (newProduct) {
+        await (supabase as any)
+          .from('product_costs')
+          .upsert({ product_id: newProduct.id, cost: product.cost ?? null }, { onConflict: 'product_id' });
+      }
 
       toast({
         title: "Product duplicated",
@@ -367,11 +403,18 @@ export function CompanyProductTemplates({
           name: fullName,
           description: editProductDescription.trim() || null,
           price: editProductPrice ? parseFloat(editProductPrice) : null,
-          cost: editProductCost ? parseFloat(editProductCost) : null,
         })
         .eq('id', editingProduct.id);
 
       if (error) throw error;
+
+      // Cost moved to companion table product_costs
+      await (supabase as any)
+        .from('product_costs')
+        .upsert({
+          product_id: editingProduct.id,
+          cost: editProductCost ? parseFloat(editProductCost) : null,
+        }, { onConflict: 'product_id' });
 
       toast({
         title: "Product updated",
@@ -401,7 +444,7 @@ export function CompanyProductTemplates({
       const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
       const fullName = `${selectedTemplate.name} - ${quickAddName.trim()}`;
       
-      const { error } = await supabase
+      const { data: newProduct, error } = await supabase
         .from('products')
         .insert({
           name: fullName,
@@ -409,10 +452,18 @@ export function CompanyProductTemplates({
           template_id: selectedTemplate.id,
           company_id: companyId,
           price: selectedTemplate.price,
-          cost: selectedTemplate.cost,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Cost moved to companion table product_costs
+      if (newProduct) {
+        await (supabase as any)
+          .from('product_costs')
+          .upsert({ product_id: newProduct.id, cost: selectedTemplate.cost ?? null }, { onConflict: 'product_id' });
+      }
 
       toast({
         title: "Product added",
@@ -457,12 +508,19 @@ export function CompanyProductTemplates({
           name: editTemplateName.trim(),
           description: editTemplateDescription.trim() || null,
           price: editTemplatePrice ? parseFloat(editTemplatePrice) : null,
-          cost: editTemplateCost ? parseFloat(editTemplateCost) : null,
           state: editTemplateState.trim() || null
         })
         .eq('id', editingTemplate.id);
 
       if (error) throw error;
+
+      // Template cost moved to companion table product_template_costs
+      await (supabase as any)
+        .from('product_template_costs')
+        .upsert({
+          template_id: editingTemplate.id,
+          cost: editTemplateCost ? parseFloat(editTemplateCost) : null,
+        }, { onConflict: 'template_id' });
 
       toast({
         title: "Template updated",
@@ -500,18 +558,29 @@ export function CompanyProductTemplates({
     setCreatingTemplate(true);
 
     try {
-      const { error } = await supabase
+      const { data: newTemplate, error } = await supabase
         .from('product_templates')
         .insert({
           name: newTemplateName.trim(),
           description: newTemplateDescription.trim() || null,
           price: newTemplatePrice ? parseFloat(newTemplatePrice) : null,
-          cost: newTemplateCost ? parseFloat(newTemplateCost) : null,
           state: newTemplateState.trim() || null,
           company_id: companyId // Company-specific template
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Template cost moved to companion table product_template_costs
+      if (newTemplate) {
+        await (supabase as any)
+          .from('product_template_costs')
+          .upsert({
+            template_id: newTemplate.id,
+            cost: newTemplateCost ? parseFloat(newTemplateCost) : null,
+          }, { onConflict: 'template_id' });
+      }
 
       toast({
         title: "Template created",

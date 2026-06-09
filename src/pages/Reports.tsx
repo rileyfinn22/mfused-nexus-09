@@ -71,12 +71,25 @@ export default function Reports() {
 
       const { data: inventory } = await supabase
         .from("inventory")
-        .select("available, product:products(cost)")
+        .select("available, product_id")
         .eq("company_id", userRole.company_id);
+
+      // Product cost moved to companion table product_costs
+      const costMap: Record<string, number> = {};
+      const invProductIds = Array.from(new Set((inventory || []).map((i: any) => i.product_id).filter(Boolean)));
+      if (invProductIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from("product_costs")
+          .select("product_id, cost")
+          .in("product_id", invProductIds);
+        (costRows || []).forEach((row: any) => {
+          costMap[row.product_id] = Number(row.cost || 0);
+        });
+      }
 
       const totalRevenue = invoices?.reduce((sum, inv) => sum + Number(inv.total || 0), 0) || 0;
       const inventoryValue = inventory?.reduce((sum, item: any) => {
-        const cost = Number(item.product?.cost || 0);
+        const cost = costMap[item.product_id] || 0;
         return sum + (cost * item.available);
       }, 0) || 0;
 

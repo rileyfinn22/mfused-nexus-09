@@ -91,11 +91,25 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
     try {
       const { data, error } = await supabase
         .from('product_templates')
-        .select('id, name, description, price, cost, company_id, state')
+        .select('id, name, description, price, company_id, state')
         .order('name');
 
       if (error) throw error;
-      setTemplates(data || []);
+
+      // Template cost moved to companion table product_template_costs
+      const templateIds = (data || []).map(t => t.id);
+      const costMap: Record<string, number | null> = {};
+      if (templateIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from('product_template_costs')
+          .select('template_id, cost')
+          .in('template_id', templateIds);
+        (costRows || []).forEach((row: any) => {
+          costMap[row.template_id] = row.cost;
+        });
+      }
+
+      setTemplates((data || []).map(t => ({ ...t, cost: costMap[t.id] ?? null })));
     } catch (error) {
       console.error('Error fetching templates:', error);
     }
@@ -176,7 +190,6 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
           .insert({
             name: fullProductName,
             description: productDescription,
-            cost: productCost,
             price: productPrice,
             state: productState,
             item_id: tempSKU,
@@ -190,6 +203,11 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
           console.error('Error creating product:', productError);
           continue;
         }
+
+        // Cost moved to companion table product_costs
+        await (supabase as any)
+          .from('product_costs')
+          .upsert({ product_id: product.id, cost: productCost ?? null }, { onConflict: 'product_id' });
 
         createdProducts.push(product.id);
       }

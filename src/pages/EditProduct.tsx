@@ -90,6 +90,13 @@ const EditProduct = () => {
 
       if (error) throw error;
 
+      // Cost/vendor moved to companion table product_costs
+      const { data: costData } = await (supabase as any)
+        .from('product_costs')
+        .select('cost, preferred_vendor_id')
+        .eq('product_id', id)
+        .maybeSingle();
+
       setProductCompanyId(data.company_id);
       setProductTemplateId(data.template_id || null);
       setFormData({
@@ -100,9 +107,9 @@ const EditProduct = () => {
         units_per_case: data.units_per_case?.toString() || "",
         cases_per_pallet: data.cases_per_pallet?.toString() || "",
         weight_per_case: data.weight_per_case?.toString() || "",
-        cost: data.cost?.toString() || "",
+        cost: costData?.cost?.toString() || "",
         price: data.price?.toString() || "",
-        preferred_vendor_id: data.preferred_vendor_id || ""
+        preferred_vendor_id: costData?.preferred_vendor_id || ""
       });
     } catch (error) {
       console.error('Error fetching product:', error);
@@ -212,13 +219,22 @@ const EditProduct = () => {
           units_per_case: formData.units_per_case ? parseInt(formData.units_per_case) : null,
           cases_per_pallet: formData.cases_per_pallet ? parseInt(formData.cases_per_pallet) : null,
           weight_per_case: formData.weight_per_case ? parseFloat(formData.weight_per_case) : null,
-          cost: formData.cost ? parseFloat(formData.cost) : null,
-          price: formData.price ? parseFloat(formData.price) : null,
-          preferred_vendor_id: formData.preferred_vendor_id || null
+          price: formData.price ? parseFloat(formData.price) : null
         })
         .eq('id', id);
 
       if (error) throw error;
+
+      // Cost/vendor moved to companion table product_costs
+      const { error: costError } = await (supabase as any)
+        .from('product_costs')
+        .upsert({
+          product_id: id,
+          cost: formData.cost ? parseFloat(formData.cost) : null,
+          preferred_vendor_id: formData.preferred_vendor_id || null
+        }, { onConflict: 'product_id' });
+
+      if (costError) throw costError;
 
       toast.success("Product updated successfully");
       if (productTemplateId) {

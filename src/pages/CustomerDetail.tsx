@@ -338,7 +338,23 @@ const CustomerDetail = () => {
       .order('name');
 
     if (!error && data) {
-      setCustomerProducts(data);
+      // Cost/vendor moved to companion table product_costs
+      const productIds = data.map((p: any) => p.id);
+      const costMap: Record<string, { cost: number | null; preferred_vendor_id: string | null }> = {};
+      if (productIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from('product_costs')
+          .select('product_id, cost, preferred_vendor_id')
+          .in('product_id', productIds);
+        (costRows || []).forEach((row: any) => {
+          costMap[row.product_id] = { cost: row.cost, preferred_vendor_id: row.preferred_vendor_id };
+        });
+      }
+      setCustomerProducts(data.map((p: any) => ({
+        ...p,
+        cost: costMap[p.id]?.cost ?? null,
+        preferred_vendor_id: costMap[p.id]?.preferred_vendor_id ?? null,
+      })));
     }
   };
 
@@ -521,20 +537,28 @@ const CustomerDetail = () => {
     try {
       const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
       
-      const { error } = await supabase
+      const { data: newProduct, error } = await supabase
         .from('products')
         .insert({
           name: `${product.name} (Copy)`,
           description: product.description,
           price: product.price,
-          cost: product.cost,
           state: product.state,
           item_id: tempSKU,
           template_id: product.template_id || null,
           company_id: customerId
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Cost moved to companion table product_costs
+      if (newProduct) {
+        await (supabase as any)
+          .from('product_costs')
+          .upsert({ product_id: newProduct.id, cost: product.cost ?? null }, { onConflict: 'product_id' });
+      }
 
       toast({
         title: "Product duplicated",
@@ -601,15 +625,23 @@ const CustomerDetail = () => {
         item_id: validated.item_id || null,
         description: validated.description || null,
         price: validated.price ? parseFloat(validated.price) : null,
-        cost: validated.cost ? parseFloat(validated.cost) : null,
         company_id: customerId, // customerId is now the company ID
       };
 
-      const { error } = await supabase
+      const { data: newProduct, error } = await supabase
         .from('products')
-        .insert([productData]);
+        .insert([productData])
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Cost moved to companion table product_costs
+      if (newProduct) {
+        await (supabase as any)
+          .from('product_costs')
+          .upsert({ product_id: newProduct.id, cost: validated.cost ? parseFloat(validated.cost) : null }, { onConflict: 'product_id' });
+      }
 
       toast({
         title: "Product created",
@@ -718,7 +750,6 @@ const CustomerDetail = () => {
         item_id: validated.item_id || null,
         description: validated.description || null,
         price: validated.price ? parseFloat(validated.price) : null,
-        cost: validated.cost ? parseFloat(validated.cost) : null,
       };
       console.log("Product data to update:", JSON.stringify(productData, null, 2));
 
@@ -727,6 +758,15 @@ const CustomerDetail = () => {
         .update(productData)
         .eq('id', editingProduct.id)
         .select();
+
+      // Cost moved to companion table product_costs
+      const { error: costError } = await (supabase as any)
+        .from('product_costs')
+        .upsert({ product_id: editingProduct.id, cost: validated.cost ? parseFloat(validated.cost) : null }, { onConflict: 'product_id' });
+      if (costError) {
+        console.error("Database error (product_costs):", costError);
+        throw costError;
+      }
 
       console.log("Update result - data:", data);
       console.log("Update result - error:", error);
@@ -903,15 +943,27 @@ const CustomerDetail = () => {
         item_id: row.item_id || null,
         description: row.description || null,
         price: row.price ? parseFloat(row.price) : null,
-        cost: row.cost ? parseFloat(row.cost) : null,
         company_id: customerId, // customerId is now the company ID
       }));
 
-      const { error } = await supabase
+      const csvCosts = csvData.map((row) => (row.cost ? parseFloat(row.cost) : null));
+
+      const { data: insertedProducts, error } = await supabase
         .from('products')
-        .insert(productsToCreate);
+        .insert(productsToCreate)
+        .select('id');
 
       if (error) throw error;
+
+      // Cost moved to companion table product_costs
+      const costRows = (insertedProducts || [])
+        .map((row, idx) => ({ product_id: row.id, cost: csvCosts[idx] ?? null }))
+        .filter(r => r.cost !== null);
+      if (costRows.length > 0) {
+        await (supabase as any)
+          .from('product_costs')
+          .upsert(costRows, { onConflict: 'product_id' });
+      }
 
       toast({
         title: "Products created",

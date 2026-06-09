@@ -112,7 +112,7 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
       .select('*')
       .order('name')
       .limit(50000);
-    
+
     if (error) {
       toast({
         title: "Error",
@@ -121,8 +121,21 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
       });
       return;
     }
-    
-    setProducts(data || []);
+
+    // Product cost moved to companion table product_costs
+    const productIds = (data || []).map((p) => p.id);
+    const costMap: Record<string, number | null> = {};
+    if (productIds.length > 0) {
+      const { data: costRows } = await (supabase as any)
+        .from('product_costs')
+        .select('product_id, cost')
+        .in('product_id', productIds);
+      (costRows || []).forEach((row: any) => {
+        costMap[row.product_id] = row.cost;
+      });
+    }
+
+    setProducts((data || []).map((p) => ({ ...p, cost: costMap[p.id] ?? null })));
   };
 
   const handleProductToggle = (productId: string) => {

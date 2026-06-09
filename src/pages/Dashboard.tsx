@@ -107,13 +107,26 @@ const Dashboard = () => {
 
       const { data: inventoryValueData } = await inventoryValueQuery;
 
-      let productsQuery = supabase.from('products').select('id, cost, company_id').limit(50000);
+      let productsQuery = supabase.from('products').select('id, company_id').limit(50000);
       if (companyFilter) {
         productsQuery = productsQuery.eq('company_id', companyFilter);
       }
       const { data: productsData } = await productsQuery;
 
-      const productCostMap = new Map((productsData || []).map(p => [p.id, p.cost || 0]));
+      // Product cost moved to companion table product_costs
+      const dashProductIds = (productsData || []).map(p => p.id);
+      const dashCostMap: Record<string, number> = {};
+      if (dashProductIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from('product_costs')
+          .select('product_id, cost')
+          .in('product_id', dashProductIds);
+        (costRows || []).forEach((row: any) => {
+          dashCostMap[row.product_id] = row.cost || 0;
+        });
+      }
+
+      const productCostMap = new Map((productsData || []).map(p => [p.id, dashCostMap[p.id] || 0]));
       const totalValue = (inventoryValueData || []).reduce((sum, item) => {
         const cost = productCostMap.get(item.product_id) || 0;
         return sum + (item.available * cost);

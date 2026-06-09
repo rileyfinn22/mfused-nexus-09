@@ -1441,9 +1441,6 @@ export type Database = {
           sku: string
           total: number
           unit_price: number
-          vendor_cost: number | null
-          vendor_id: string | null
-          vendor_po_number: string | null
         }
         Insert: {
           created_at?: string
@@ -1459,9 +1456,6 @@ export type Database = {
           sku: string
           total: number
           unit_price: number
-          vendor_cost?: number | null
-          vendor_id?: string | null
-          vendor_po_number?: string | null
         }
         Update: {
           created_at?: string
@@ -1477,9 +1471,6 @@ export type Database = {
           sku?: string
           total?: number
           unit_price?: number
-          vendor_cost?: number | null
-          vendor_id?: string | null
-          vendor_po_number?: string | null
         }
         Relationships: [
           {
@@ -1494,13 +1485,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]
@@ -2244,7 +2228,6 @@ export type Database = {
       product_templates: {
         Row: {
           company_id: string | null
-          cost: number | null
           created_at: string
           description: string | null
           id: string
@@ -2256,7 +2239,6 @@ export type Database = {
         }
         Insert: {
           company_id?: string | null
-          cost?: number | null
           created_at?: string
           description?: string | null
           id?: string
@@ -2268,7 +2250,6 @@ export type Database = {
         }
         Update: {
           company_id?: string | null
-          cost?: number | null
           created_at?: string
           description?: string | null
           id?: string
@@ -2455,14 +2436,12 @@ export type Database = {
         Row: {
           cases_per_pallet: number | null
           company_id: string
-          cost: number | null
           created_at: string
           description: string | null
           id: string
           image_url: string | null
           item_id: string | null
           name: string
-          preferred_vendor_id: string | null
           price: number | null
           print_template_id: string | null
           product_type: string | null
@@ -2479,14 +2458,12 @@ export type Database = {
         Insert: {
           cases_per_pallet?: number | null
           company_id: string
-          cost?: number | null
           created_at?: string
           description?: string | null
           id?: string
           image_url?: string | null
           item_id?: string | null
           name: string
-          preferred_vendor_id?: string | null
           price?: number | null
           print_template_id?: string | null
           product_type?: string | null
@@ -2503,14 +2480,12 @@ export type Database = {
         Update: {
           cases_per_pallet?: number | null
           company_id?: string
-          cost?: number | null
           created_at?: string
           description?: string | null
           id?: string
           image_url?: string | null
           item_id?: string | null
           name?: string
-          preferred_vendor_id?: string | null
           price?: number | null
           print_template_id?: string | null
           product_type?: string | null
@@ -2530,13 +2505,6 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "products_preferred_vendor_id_fkey"
-            columns: ["preferred_vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
           {

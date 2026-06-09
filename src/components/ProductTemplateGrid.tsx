@@ -108,6 +108,19 @@ export function ProductTemplateGrid({
 
       if (templatesError) throw templatesError;
 
+      // Template cost moved to companion table product_template_costs
+      const templateIds = (templatesData || []).map(t => t.id);
+      const costMap: Record<string, number | null> = {};
+      if (templateIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from('product_template_costs')
+          .select('template_id, cost')
+          .in('template_id', templateIds);
+        (costRows || []).forEach((row: any) => {
+          costMap[row.template_id] = row.cost;
+        });
+      }
+
       // Fetch product counts for each template (scoped to selected company when filtered)
       const templatesWithCounts = await Promise.all(
         (templatesData || []).map(async (template) => {
@@ -124,6 +137,7 @@ export function ProductTemplateGrid({
 
           return {
             ...template,
+            cost: costMap[template.id] ?? null,
             product_count: count || 0
           };
         })
@@ -195,13 +209,20 @@ export function ProductTemplateGrid({
           name: editName.trim(),
           description: editDescription.trim() || null,
           price: editPrice ? parseFloat(editPrice) : null,
-          cost: editCost ? parseFloat(editCost) : null,
           state: editState.trim() || null,
           thumbnail_url: thumbnailUrl
         })
         .eq('id', editingTemplate.id);
 
       if (error) throw error;
+
+      // Template cost moved to companion table product_template_costs
+      await (supabase as any)
+        .from('product_template_costs')
+        .upsert({
+          template_id: editingTemplate.id,
+          cost: editCost ? parseFloat(editCost) : null,
+        }, { onConflict: 'template_id' });
 
       toast({ title: "Template updated", description: "Changes saved successfully." });
       setEditDialogOpen(false);
@@ -239,18 +260,30 @@ export function ProductTemplateGrid({
     if (!dupToCompanyTemplate || !dupTargetCompanyId) return;
     setDupToCompanyLoading(true);
     try {
-      const { error } = await supabase
+      const { data: newTemplate, error } = await supabase
         .from('product_templates')
         .insert({
           name: dupToCompanyTemplate.name,
           description: dupToCompanyTemplate.description,
           price: dupToCompanyTemplate.price,
-          cost: dupToCompanyTemplate.cost,
           company_id: dupTargetCompanyId,
           state: dupToCompanyTemplate.state,
           thumbnail_url: dupToCompanyTemplate.thumbnail_url,
-        });
+        })
+        .select()
+        .single();
       if (error) throw error;
+
+      // Template cost moved to companion table product_template_costs
+      if (newTemplate) {
+        await (supabase as any)
+          .from('product_template_costs')
+          .upsert({
+            template_id: newTemplate.id,
+            cost: dupToCompanyTemplate.cost ?? null,
+          }, { onConflict: 'template_id' });
+      }
+
       toast({ title: "Template duplicated", description: "An independent copy has been created for the selected company." });
       setDupToCompanyOpen(false);
       fetchTemplates();
@@ -312,18 +345,29 @@ export function ProductTemplateGrid({
     setCreating(true);
 
     try {
-      const { error } = await supabase
+      const { data: newTemplate, error } = await supabase
         .from('product_templates')
         .insert({
           name: newTemplateName.trim(),
           description: newTemplateDescription.trim() || null,
           price: newTemplatePrice ? parseFloat(newTemplatePrice) : null,
-          cost: newTemplateCost ? parseFloat(newTemplateCost) : null,
           state: newTemplateState.trim() || null,
           company_id: null // Global template
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Template cost moved to companion table product_template_costs
+      if (newTemplate) {
+        await (supabase as any)
+          .from('product_template_costs')
+          .upsert({
+            template_id: newTemplate.id,
+            cost: newTemplateCost ? parseFloat(newTemplateCost) : null,
+          }, { onConflict: 'template_id' });
+      }
 
       toast({ title: "Template created", description: "New template has been created successfully." });
       setCreateDialogOpen(false);

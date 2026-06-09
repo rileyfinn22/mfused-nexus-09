@@ -204,6 +204,18 @@ const Products = () => {
           ])
         : [{ data: [] as any[] }, { data: [] as any[] }];
 
+      // Product cost moved to companion table product_costs
+      const productCostMap: Record<string, number | null> = {};
+      if (productIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from('product_costs')
+          .select('product_id, cost')
+          .in('product_id', productIds);
+        (costRows || []).forEach((row: any) => {
+          productCostMap[row.product_id] = row.cost;
+        });
+      }
+
       const statesByProduct = new Map<string, any[]>();
       (statesData || []).forEach((s: any) => {
         const arr = statesByProduct.get(s.product_id) || [];
@@ -220,7 +232,7 @@ const Products = () => {
         name: product.name,
         description: product.description,
         state: product.state,
-        cost: product.cost,
+        cost: productCostMap[product.id] ?? null,
         price: product.price,
         image_url: product.image_url,
         item_id: product.item_id,
@@ -272,6 +284,19 @@ const Products = () => {
 
       // Batch product counts per template in ONE query (was N+1 per template)
       const templateIds = (templatesData || []).map((t: any) => t.id);
+
+      // Template cost moved to companion table product_template_costs
+      const templateCostMap: Record<string, number | null> = {};
+      if (templateIds.length > 0) {
+        const { data: tCostRows } = await (supabase as any)
+          .from('product_template_costs')
+          .select('template_id, cost')
+          .in('template_id', templateIds);
+        (tCostRows || []).forEach((row: any) => {
+          templateCostMap[row.template_id] = row.cost;
+        });
+      }
+
       let countsByTemplate = new Map<string, number>();
       if (templateIds.length > 0) {
         let countsQuery = supabase
@@ -291,6 +316,7 @@ const Products = () => {
 
       const templatesWithCounts = (templatesData || []).map((template: any) => ({
         ...template,
+        cost: templateCostMap[template.id] ?? null,
         product_count: countsByTemplate.get(template.id) || 0,
       }));
 
@@ -446,20 +472,28 @@ const Products = () => {
         .eq('id', product.id)
         .single();
       
-      const { error } = await supabase
+      const { data: newProduct, error } = await supabase
         .from('products')
         .insert({
           name: `${product.name} (Copy)`,
           description: product.description,
           price: product.price,
-          cost: product.cost,
           state: product.state,
           item_id: tempSKU,
           template_id: product.template_id || null,
           company_id: originalProduct?.company_id
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Cost moved to companion table product_costs
+      if (newProduct) {
+        await (supabase as any)
+          .from('product_costs')
+          .upsert({ product_id: newProduct.id, cost: product.cost ?? null }, { onConflict: 'product_id' });
+      }
 
       toast({
         title: "Product duplicated",
@@ -505,7 +539,6 @@ const Products = () => {
         name: templateEditName.trim(),
         description: templateEditDescription.trim() || null,
         price: templateEditPrice ? parseFloat(templateEditPrice) : null,
-        cost: templateEditCost ? parseFloat(templateEditCost) : null,
         state: templateEditState.trim() || null,
       };
 
@@ -513,16 +546,22 @@ const Products = () => {
         .from("product_templates")
         .update(updates)
         .eq("id", editingTemplate.id)
-        .select("id, name, description, price, cost, company_id, thumbnail_url, state")
+        .select("id, name, description, price, company_id, thumbnail_url, state")
         .single();
 
       if (error) throw error;
+
+      // Template cost moved to companion table product_template_costs
+      const newTemplateCostValue = templateEditCost ? parseFloat(templateEditCost) : null;
+      await (supabase as any)
+        .from("product_template_costs")
+        .upsert({ template_id: editingTemplate.id, cost: newTemplateCostValue }, { onConflict: 'template_id' });
 
       toast({ title: "Template updated", description: "Changes saved successfully." });
 
       // Keep selectedTemplate in sync (so TemplateProductsView header updates too)
       if (selectedTemplate?.id === editingTemplate.id && data) {
-        setSelectedTemplate({ ...selectedTemplate, ...data });
+        setSelectedTemplate({ ...selectedTemplate, ...data, cost: newTemplateCostValue });
       }
 
       setTemplateEditOpen(false);
@@ -552,19 +591,27 @@ const Products = () => {
     try {
       setDuplicateTemplateLoading(true);
 
-      const { error } = await supabase
+      const { data: newTemplate, error } = await supabase
         .from('product_templates')
         .insert({
           name: `${templateToDuplicate.name} (Copy)`,
           description: templateToDuplicate.description,
           price: templateToDuplicate.price,
-          cost: templateToDuplicate.cost,
           company_id: duplicateTargetCompanyId,
           thumbnail_url: templateToDuplicate.thumbnail_url,
           state: templateToDuplicate.state,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Template cost moved to companion table product_template_costs
+      if (newTemplate) {
+        await (supabase as any)
+          .from('product_template_costs')
+          .upsert({ template_id: newTemplate.id, cost: templateToDuplicate.cost ?? null }, { onConflict: 'template_id' });
+      }
 
       toast({
         title: "Template duplicated",
@@ -639,16 +686,24 @@ const Products = () => {
     
     setCreatingTemplate(true);
     try {
-      const { error } = await supabase.from('product_templates').insert({
+      const { data: newTemplate, error } = await supabase.from('product_templates').insert({
         name: newTemplateName.trim(),
         description: newTemplateDescription.trim() || null,
         price: newTemplatePrice ? parseFloat(newTemplatePrice) : null,
-        cost: newTemplateCost ? parseFloat(newTemplateCost) : null,
         state: newTemplateState.trim() || null,
         company_id: targetCompanyId,
-      });
+      })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Template cost moved to companion table product_template_costs
+      if (newTemplate) {
+        await (supabase as any)
+          .from('product_template_costs')
+          .upsert({ template_id: newTemplate.id, cost: newTemplateCost ? parseFloat(newTemplateCost) : null }, { onConflict: 'template_id' });
+      }
 
       toast({
         title: "Template created",

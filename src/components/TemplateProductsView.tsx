@@ -113,7 +113,7 @@ export function TemplateProductsView({
     try {
       let query = supabase
         .from('products')
-        .select('id, name, description, item_id, price, cost, image_url, state')
+        .select('id, name, description, item_id, price, image_url, state')
         .eq('template_id', template.id)
         .order('name');
 
@@ -124,7 +124,21 @@ export function TemplateProductsView({
       const { data, error } = await query;
 
       if (error) throw error;
-      setProducts(data || []);
+
+      // Product cost moved to companion table product_costs
+      const productIds = (data || []).map(p => p.id);
+      const costMap: Record<string, number | null> = {};
+      if (productIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from('product_costs')
+          .select('product_id, cost')
+          .in('product_id', productIds);
+        (costRows || []).forEach((row: any) => {
+          costMap[row.product_id] = row.cost;
+        });
+      }
+
+      setProducts((data || []).map(p => ({ ...p, cost: costMap[p.id] ?? null })));
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
@@ -214,20 +228,28 @@ export function TemplateProductsView({
       // Use companyFilter if set, otherwise use template's company_id
       const targetCompanyId = companyFilter !== 'all' ? companyFilter : template.company_id;
       
-      const { error } = await supabase
+      const { data: newProduct, error } = await supabase
         .from('products')
         .insert({
           name: `${product.name} (Copy)`,
           description: product.description,
           price: product.price,
-          cost: product.cost,
           state: product.state,
           item_id: tempSKU,
           template_id: template.id,
           company_id: targetCompanyId
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Cost moved to companion table product_costs
+      if (newProduct) {
+        await (supabase as any)
+          .from('product_costs')
+          .upsert({ product_id: newProduct.id, cost: product.cost ?? null }, { onConflict: 'product_id' });
+      }
 
       toast({
         title: "Product duplicated",
@@ -264,20 +286,28 @@ export function TemplateProductsView({
       const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
       const fullProductName = `${template.name} - ${quickAddName.trim()}`;
 
-      const { error } = await supabase
+      const { data: newProduct, error } = await supabase
         .from('products')
         .insert({
           name: fullProductName,
           description: template.description,
           price: template.price,
-          cost: template.cost,
           state: template.state,
           item_id: tempSKU,
           template_id: template.id,
           company_id: targetCompanyId
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Cost moved to companion table product_costs
+      if (newProduct) {
+        await (supabase as any)
+          .from('product_costs')
+          .upsert({ product_id: newProduct.id, cost: template.cost ?? null }, { onConflict: 'product_id' });
+      }
 
       toast({ title: "Product added", description: `"${quickAddName.trim()}" has been added.` });
       setQuickAddName("");
@@ -317,12 +347,19 @@ export function TemplateProductsView({
         .update({
           name: fullName,
           description: editDescription.trim() || null,
-          price: editPrice ? parseFloat(editPrice) : null,
-          cost: editCost ? parseFloat(editCost) : null
+          price: editPrice ? parseFloat(editPrice) : null
         })
         .eq('id', editingProduct.id);
 
       if (error) throw error;
+
+      // Cost moved to companion table product_costs
+      await (supabase as any)
+        .from('product_costs')
+        .upsert({
+          product_id: editingProduct.id,
+          cost: editCost ? parseFloat(editCost) : null,
+        }, { onConflict: 'product_id' });
 
       toast({ title: "Product updated", description: "Changes saved successfully." });
       setEditDialogOpen(false);
