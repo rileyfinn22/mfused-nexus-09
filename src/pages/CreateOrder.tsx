@@ -313,7 +313,8 @@ const CreateOrder = () => {
           setRoleChecked(true);
         }
 
-        const productsData = await fetchAllOrderProducts();
+        const productsCompanyId = isAdmin ? null : (userRole?.company_id ?? null);
+        const productsData = await fetchAllOrderProducts(productsCompanyId);
         if (isMounted) {
           setProducts(productsData);
         }
