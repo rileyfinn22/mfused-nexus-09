@@ -61,16 +61,20 @@ interface ProductTemplateOption {
 
 const PRODUCT_PAGE_SIZE = 1000;
 
-const fetchAllOrderProducts = async (): Promise<Product[]> => {
+const fetchAllOrderProducts = async (companyId?: string | null): Promise<Product[]> => {
   const allProducts: Product[] = [];
 
   for (let from = 0; ; from += PRODUCT_PAGE_SIZE) {
     const to = from + PRODUCT_PAGE_SIZE - 1;
-    const { data, error } = await supabase
+    let query = supabase
       .from('products')
       .select('id, name, item_id, description, image_url, company_id, state')
       .order('name')
       .range(from, to);
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+    const { data, error } = await query;
 
     if (error) throw error;
     if (!data || data.length === 0) break;
