@@ -716,7 +716,16 @@ export function CompanyProductTemplates({
                     <Package className="h-12 w-12 text-muted-foreground/30" />
                   )}
 
-                  {product.item_id && !hasApprovedArtwork(product.item_id) && (
+                  {product.item_id && getArtworkAvailability(product.item_id) === "pending" && (
+                    <Badge 
+                      variant="outline" 
+                      className="absolute top-2 right-2 bg-warning/10 text-warning border-warning/30 text-xs"
+                    >
+                      <Clock className="h-3 w-3" />
+                    </Badge>
+                  )}
+
+                  {product.item_id && getArtworkAvailability(product.item_id) === "none" && (
                     <Badge 
                       variant="outline" 
                       className="absolute top-2 right-2 bg-warning/10 text-warning border-warning/30 text-xs"
