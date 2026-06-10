@@ -1247,7 +1247,7 @@ const CreateOrder = () => {
 
   const fetchProducts = async () => {
     try {
-      const companyId = isVibeAdmin ? (selectedCompanyId || null) : null;
+      const companyId = isVibeAdmin ? (selectedCompanyId || null) : (activeCompanyId || null);
       const data = await fetchAllOrderProducts(companyId);
       setProducts(data);
     } catch (error) {
