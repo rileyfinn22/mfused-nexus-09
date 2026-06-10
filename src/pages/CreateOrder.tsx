@@ -304,19 +304,22 @@ const CreateOrder = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || !isMounted) return;
 
-        const { data: userRole } = await supabase
+        const { data: userRoles } = await supabase
           .from('user_roles')
           .select('role, company_id')
-          .eq('user_id', user.id)
-          .single();
+          .eq('user_id', user.id);
 
-        const isAdmin = userRole?.role === 'vibe_admin';
+        const isAdmin = (userRoles || []).some((r: any) => r.role === 'vibe_admin');
         if (isMounted) {
           setIsVibeAdmin(isAdmin);
           setRoleChecked(true);
         }
 
-        const productsCompanyId = isAdmin ? null : (userRole?.company_id ?? null);
+        // For non-admins, scope to the currently active company (handles multi-company users).
+        // Fall back to the first role's company_id only if the active company isn't ready yet.
+        const productsCompanyId = isAdmin
+          ? null
+          : (activeCompanyId ?? (userRoles?.[0]?.company_id ?? null));
         const productsData = await fetchAllOrderProducts(productsCompanyId);
         if (isMounted) {
           setProducts(productsData);
