@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 const orderSchema = z.object({
   customerName: z.string().trim().min(1, "Customer name is required").max(200),
