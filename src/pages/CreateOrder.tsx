@@ -207,6 +207,7 @@ interface SavedAddress {
 const CreateOrder = () => {
   const navigate = useNavigate();
   const { orderId } = useParams();
+  const { activeCompanyId } = useActiveCompany();
   const [products, setProducts] = useState<Product[]>([]);
   const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
