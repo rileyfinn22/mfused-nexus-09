@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 const orderSchema = z.object({
   customerName: z.string().trim().min(1, "Customer name is required").max(200),
@@ -206,6 +207,7 @@ interface SavedAddress {
 const CreateOrder = () => {
   const navigate = useNavigate();
   const { orderId } = useParams();
+  const { activeCompanyId } = useActiveCompany();
   const [products, setProducts] = useState<Product[]>([]);
   const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
@@ -302,19 +304,22 @@ const CreateOrder = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || !isMounted) return;
 
-        const { data: userRole } = await supabase
+        const { data: userRoles } = await supabase
           .from('user_roles')
           .select('role, company_id')
-          .eq('user_id', user.id)
-          .single();
+          .eq('user_id', user.id);
 
-        const isAdmin = userRole?.role === 'vibe_admin';
+        const isAdmin = (userRoles || []).some((r: any) => r.role === 'vibe_admin');
         if (isMounted) {
           setIsVibeAdmin(isAdmin);
           setRoleChecked(true);
         }
 
-        const productsCompanyId = isAdmin ? null : (userRole?.company_id ?? null);
+        // For non-admins, scope to the currently active company (handles multi-company users).
+        // Fall back to the first role's company_id only if the active company isn't ready yet.
+        const productsCompanyId = isAdmin
+          ? null
+          : (activeCompanyId ?? (userRoles?.[0]?.company_id ?? null));
         const productsData = await fetchAllOrderProducts(productsCompanyId);
         if (isMounted) {
           setProducts(productsData);
@@ -340,12 +345,13 @@ const CreateOrder = () => {
             setCompanies(allCompaniesData);
           }
         } else {
-          // For regular users, load their company info
-          if (userRole?.company_id && isMounted) {
+          // For regular users, load their (active) company info
+          const userCompanyId = activeCompanyId ?? userRoles?.[0]?.company_id ?? null;
+          if (userCompanyId && isMounted) {
             const { data: companyData } = await supabase
               .from('companies')
               .select('name, payment_terms')
-              .eq('id', userRole.company_id)
+              .eq('id', userCompanyId)
               .single();
 
             if (companyData && isMounted) {
@@ -360,7 +366,7 @@ const CreateOrder = () => {
             const { data: addressData } = await supabase
               .from('customer_addresses')
               .select('*')
-              .eq('company_id', userRole.company_id)
+              .eq('company_id', userCompanyId)
               .order('is_default', { ascending: false });
             
             if (addressData && isMounted) {
@@ -504,14 +510,17 @@ const CreateOrder = () => {
     }
   }, [selectedCompanyId, roleChecked, initialLoading, orderId]);
 
-  // Refetch products scoped to the selected company when an admin switches it.
+  // Refetch products scoped to the selected/active company when it changes.
   useEffect(() => {
-    if (!roleChecked || !isVibeAdmin) return;
+    if (!roleChecked) return;
     (async () => {
-      const data = await fetchAllOrderProducts(selectedCompanyId || null);
+      const companyId = isVibeAdmin
+        ? (selectedCompanyId || null)
+        : (activeCompanyId || null);
+      const data = await fetchAllOrderProducts(companyId);
       setProducts(data);
     })();
-  }, [isVibeAdmin, roleChecked, selectedCompanyId]);
+  }, [isVibeAdmin, roleChecked, selectedCompanyId, activeCompanyId]);
 
   // Auto-save draft every 1 minute - ONLY for new orders (not editing existing)
   const performAutoSave = useCallback(async () => {
@@ -1241,7 +1250,7 @@ const CreateOrder = () => {
 
   const fetchProducts = async () => {
     try {
-      const companyId = isVibeAdmin ? (selectedCompanyId || null) : null;
+      const companyId = isVibeAdmin ? (selectedCompanyId || null) : (activeCompanyId || null);
       const data = await fetchAllOrderProducts(companyId);
       setProducts(data);
     } catch (error) {
