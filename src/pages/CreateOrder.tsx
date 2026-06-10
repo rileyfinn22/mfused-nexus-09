@@ -345,12 +345,13 @@ const CreateOrder = () => {
             setCompanies(allCompaniesData);
           }
         } else {
-          // For regular users, load their company info
-          if (userRole?.company_id && isMounted) {
+          // For regular users, load their (active) company info
+          const userCompanyId = activeCompanyId ?? userRoles?.[0]?.company_id ?? null;
+          if (userCompanyId && isMounted) {
             const { data: companyData } = await supabase
               .from('companies')
               .select('name, payment_terms')
-              .eq('id', userRole.company_id)
+              .eq('id', userCompanyId)
               .single();
 
             if (companyData && isMounted) {
@@ -365,7 +366,7 @@ const CreateOrder = () => {
             const { data: addressData } = await supabase
               .from('customer_addresses')
               .select('*')
-              .eq('company_id', userRole.company_id)
+              .eq('company_id', userCompanyId)
               .order('is_default', { ascending: false });
             
             if (addressData && isMounted) {
