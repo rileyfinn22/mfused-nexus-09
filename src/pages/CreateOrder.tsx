@@ -510,14 +510,17 @@ const CreateOrder = () => {
     }
   }, [selectedCompanyId, roleChecked, initialLoading, orderId]);
 
-  // Refetch products scoped to the selected company when an admin switches it.
+  // Refetch products scoped to the selected/active company when it changes.
   useEffect(() => {
-    if (!roleChecked || !isVibeAdmin) return;
+    if (!roleChecked) return;
     (async () => {
-      const data = await fetchAllOrderProducts(selectedCompanyId || null);
+      const companyId = isVibeAdmin
+        ? (selectedCompanyId || null)
+        : (activeCompanyId || null);
+      const data = await fetchAllOrderProducts(companyId);
       setProducts(data);
     })();
-  }, [isVibeAdmin, roleChecked, selectedCompanyId]);
+  }, [isVibeAdmin, roleChecked, selectedCompanyId, activeCompanyId]);
 
   // Auto-save draft every 1 minute - ONLY for new orders (not editing existing)
   const performAutoSave = useCallback(async () => {
