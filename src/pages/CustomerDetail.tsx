@@ -764,8 +764,9 @@ const CustomerDetail = () => {
         .from('product_costs')
         .upsert({ product_id: editingProduct.id, cost: validated.cost ? parseFloat(validated.cost) : null }, { onConflict: 'product_id' });
       if (costError) {
+        // Non-fatal: cost is admin-only data (product_costs is admin/finance-write).
+        // A non-admin editing other product fields must not break here.
         console.error("Database error (product_costs):", costError);
-        throw costError;
       }
 
       console.log("Update result - data:", data);

@@ -39,6 +39,7 @@ interface Product {
   name: string;
   item_id: string | null;
   cost: number | null;
+  price: number | null;
   description: string | null;
   image_url: string | null;
   company_id: string;
@@ -68,7 +69,7 @@ const fetchAllOrderProducts = async (companyId?: string | null): Promise<Product
     const to = from + PRODUCT_PAGE_SIZE - 1;
     let query = supabase
       .from('products')
-      .select('id, name, item_id, description, image_url, company_id, state')
+      .select('id, name, item_id, price, description, image_url, company_id, state')
       .order('name')
       .range(from, to);
     if (companyId) {
@@ -3100,7 +3101,7 @@ const CreateOrder = () => {
                               <TableCell className="font-medium">
                                 {product.state ? `${product.state} - ${product.name}` : product.name}
                               </TableCell>
-                              <TableCell className="text-right">${product.cost?.toFixed(3) || '0.000'}</TableCell>
+                              <TableCell className="text-right">${product.price?.toFixed(2) || '0.00'}</TableCell>
                             </TableRow>
                           ))
                         )}
