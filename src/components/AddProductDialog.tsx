@@ -457,6 +457,16 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
             />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="customer_item_id">Customer Item ID / CID (Optional)</Label>
+            <Input
+              id="customer_item_id"
+              value={formData.customer_item_id}
+              onChange={(e) => setFormData({ ...formData, customer_item_id: e.target.value })}
+              placeholder="Customer's SKU / item number"
+              maxLength={100}
+            />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="image">Product Image</Label>
             <div className="flex items-center gap-4">
               <Input
