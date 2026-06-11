@@ -62,6 +62,7 @@ interface Product {
   price: number | null;
   image_url: string | null;
   item_id?: string | null;
+  customer_item_id?: string | null;
   sku?: string;
   states: ProductState[];
   template_id?: string | null;
