@@ -215,6 +215,7 @@ const EditProduct = () => {
         .from('products')
         .update({
           item_id: formData.item_id || null,
+          customer_item_id: formData.customer_item_id || null,
           product_type: formData.product_type,
           name: formData.name,
           description: formData.description,
