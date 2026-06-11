@@ -27,6 +27,7 @@ const EditProduct = () => {
   
   const [formData, setFormData] = useState({
     item_id: "",
+    customer_item_id: "",
     product_type: "",
     name: "",
     description: "",
@@ -101,6 +102,7 @@ const EditProduct = () => {
       setProductTemplateId(data.template_id || null);
       setFormData({
         item_id: data.item_id || "",
+        customer_item_id: (data as any).customer_item_id || "",
         product_type: data.product_type || "",
         name: data.name || "",
         description: data.description || "",
@@ -213,6 +215,7 @@ const EditProduct = () => {
         .from('products')
         .update({
           item_id: formData.item_id || null,
+          customer_item_id: formData.customer_item_id || null,
           product_type: formData.product_type,
           name: formData.name,
           description: formData.description,
@@ -278,15 +281,27 @@ const EditProduct = () => {
         <div className="space-y-4 bg-card p-6 rounded-lg border">
           <h2 className="text-lg font-semibold mb-4">Product</h2>
           
-          <div className="space-y-2">
-            <Label htmlFor="item_id">Item ID</Label>
-            <Input
-              id="item_id"
-              value={formData.item_id}
-              onChange={(e) => setFormData({ ...formData, item_id: e.target.value })}
-              placeholder="e.g., SKU-12345"
-              disabled={!isVibeAdmin}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="item_id">Item ID (SKU)</Label>
+              <Input
+                id="item_id"
+                value={formData.item_id}
+                onChange={(e) => setFormData({ ...formData, item_id: e.target.value })}
+                placeholder="e.g., MF-MP-ION-..."
+                disabled={!isVibeAdmin}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer_item_id">Customer Item ID (CID)</Label>
+              <Input
+                id="customer_item_id"
+                value={formData.customer_item_id}
+                onChange={(e) => setFormData({ ...formData, customer_item_id: e.target.value })}
+                placeholder="Customer's SKU / item number"
+                disabled={!isVibeAdmin}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

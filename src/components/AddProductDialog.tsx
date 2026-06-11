@@ -40,7 +40,8 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
     cost: "",
     price: "",
     preferred_vendor_id: "",
-    specs: ""
+    specs: "",
+    customer_item_id: ""
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -206,6 +207,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
           price: formData.price ? parseFloat(formData.price) : null,
           image_url: imageUrl,
           item_id: tempSKU,
+          customer_item_id: formData.customer_item_id || null,
           company_id: finalCompanyId
         })
         .select()
@@ -248,7 +250,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
       }
       
       setOpen(false);
-      setFormData({ name: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "" });
+      setFormData({ name: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "", customer_item_id: "" });
       setImageFile(null);
       setImagePreview(null);
       // Reset company only if not pre-selected
@@ -452,6 +454,16 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
               onChange={(e) => setFormData({ ...formData, specs: e.target.value })}
               placeholder="e.g., 1g, 510 thread"
               maxLength={200}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="customer_item_id">Customer Item ID / CID (Optional)</Label>
+            <Input
+              id="customer_item_id"
+              value={formData.customer_item_id}
+              onChange={(e) => setFormData({ ...formData, customer_item_id: e.target.value })}
+              placeholder="Customer's SKU / item number"
+              maxLength={100}
             />
           </div>
           <div className="space-y-2">

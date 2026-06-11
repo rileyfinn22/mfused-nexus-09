@@ -2544,6 +2544,7 @@ export type Database = {
           company_id: string
           cost: number | null
           created_at: string
+          customer_item_id: string | null
           description: string | null
           id: string
           image_url: string | null
@@ -2568,6 +2569,7 @@ export type Database = {
           company_id: string
           cost?: number | null
           created_at?: string
+          customer_item_id?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
@@ -2592,6 +2594,7 @@ export type Database = {
           company_id?: string
           cost?: number | null
           created_at?: string
+          customer_item_id?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
