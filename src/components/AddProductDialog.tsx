@@ -314,15 +314,27 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
               maxLength={200}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="item_id">SKU / Item ID (Optional)</Label>
-            <Input
-              id="item_id"
-              value={formData.item_id}
-              onChange={(e) => setFormData({ ...formData, item_id: e.target.value })}
-              placeholder="e.g., MF-MP-ION-... (auto-generated if blank)"
-              maxLength={100}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="item_id">SKU / Item ID (Optional)</Label>
+              <Input
+                id="item_id"
+                value={formData.item_id}
+                onChange={(e) => setFormData({ ...formData, item_id: e.target.value })}
+                placeholder="e.g., MF-MP-ION-..."
+                maxLength={100}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer_item_id">Customer Item ID / CID</Label>
+              <Input
+                id="customer_item_id"
+                value={formData.customer_item_id}
+                onChange={(e) => setFormData({ ...formData, customer_item_id: e.target.value })}
+                placeholder="Customer's SKU / item number"
+                maxLength={100}
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
@@ -465,16 +477,6 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
               onChange={(e) => setFormData({ ...formData, specs: e.target.value })}
               placeholder="e.g., 1g, 510 thread"
               maxLength={200}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="customer_item_id">Customer Item ID / CID (Optional)</Label>
-            <Input
-              id="customer_item_id"
-              value={formData.customer_item_id}
-              onChange={(e) => setFormData({ ...formData, customer_item_id: e.target.value })}
-              placeholder="Customer's SKU / item number"
-              maxLength={100}
             />
           </div>
           <div className="space-y-2">
