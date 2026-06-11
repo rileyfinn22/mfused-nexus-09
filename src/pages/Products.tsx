@@ -1177,10 +1177,15 @@ const Products = () => {
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         )}
                       </div>
-                      <div className={cn("font-mono text-xs flex items-center gap-2", isEditMode ? "col-span-2" : "col-span-2")}>
-                        <span className="truncate">{product.item_id || `${product.id.slice(0, 8)}...`}</span>
-                        {product.sku && !hasApprovedArtwork(product.sku) && (
-                          <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />
+                      <div className={cn("font-mono text-xs flex flex-col gap-0.5", isEditMode ? "col-span-2" : "col-span-2")}>
+                        <div className="flex items-center gap-2">
+                          <span className="truncate">{product.item_id || `${product.id.slice(0, 8)}...`}</span>
+                          {product.sku && !hasApprovedArtwork(product.sku) && (
+                            <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />
+                          )}
+                        </div>
+                        {product.customer_item_id && (
+                          <span className="truncate text-muted-foreground">CID: {product.customer_item_id}</span>
                         )}
                       </div>
                       <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
