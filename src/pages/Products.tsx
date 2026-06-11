@@ -1090,9 +1090,14 @@ const Products = () => {
                     {/* Product Info */}
                     <div className="p-3 space-y-1">
                       <h3 className="font-medium text-sm leading-snug truncate">{product.name}</h3>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground truncate">
                         {product.item_id || product.id.slice(0, 8)}
                       </p>
+                      {product.customer_item_id && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          CID: {product.customer_item_id}
+                        </p>
+                      )}
                       <p className="text-sm font-medium">
                         {isVibeAdmin 
                           ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
