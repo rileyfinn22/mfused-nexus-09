@@ -40,7 +40,8 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
     cost: "",
     price: "",
     preferred_vendor_id: "",
-    specs: ""
+    specs: "",
+    customer_item_id: ""
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
