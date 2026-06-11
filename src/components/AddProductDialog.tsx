@@ -207,7 +207,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
           state: formData.state,
           price: formData.price ? parseFloat(formData.price) : null,
           image_url: imageUrl,
-          item_id: tempSKU,
+          item_id: formData.item_id?.trim() || tempSKU,
           customer_item_id: formData.customer_item_id || null,
           company_id: finalCompanyId
         })
@@ -251,7 +251,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
       }
       
       setOpen(false);
-      setFormData({ name: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "", customer_item_id: "" });
+      setFormData({ name: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "", customer_item_id: "", item_id: "" });
       setImageFile(null);
       setImagePreview(null);
       // Reset company only if not pre-selected
@@ -312,6 +312,16 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
               maxLength={200}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="item_id">SKU / Item ID (Optional)</Label>
+            <Input
+              id="item_id"
+              value={formData.item_id}
+              onChange={(e) => setFormData({ ...formData, item_id: e.target.value })}
+              placeholder="e.g., MF-MP-ION-... (auto-generated if blank)"
+              maxLength={100}
             />
           </div>
           <div className="space-y-2">
