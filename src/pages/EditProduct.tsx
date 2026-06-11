@@ -102,6 +102,7 @@ const EditProduct = () => {
       setProductTemplateId(data.template_id || null);
       setFormData({
         item_id: data.item_id || "",
+        customer_item_id: (data as any).customer_item_id || "",
         product_type: data.product_type || "",
         name: data.name || "",
         description: data.description || "",
