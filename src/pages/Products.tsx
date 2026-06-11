@@ -743,7 +743,8 @@ const Products = () => {
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     product.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (product.item_id && product.item_id.toLowerCase().includes(searchQuery.toLowerCase()))
+    (product.item_id && product.item_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (product.customer_item_id && product.customer_item_id.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const filteredTemplates = templates.filter(template =>
