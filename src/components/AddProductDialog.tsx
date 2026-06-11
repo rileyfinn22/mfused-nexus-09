@@ -250,7 +250,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
       }
       
       setOpen(false);
-      setFormData({ name: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "" });
+      setFormData({ name: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "", customer_item_id: "" });
       setImageFile(null);
       setImagePreview(null);
       // Reset company only if not pre-selected
