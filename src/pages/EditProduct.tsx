@@ -27,6 +27,7 @@ const EditProduct = () => {
   
   const [formData, setFormData] = useState({
     item_id: "",
+    customer_item_id: "",
     product_type: "",
     name: "",
     description: "",
