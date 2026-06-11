@@ -207,6 +207,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
           price: formData.price ? parseFloat(formData.price) : null,
           image_url: imageUrl,
           item_id: tempSKU,
+          customer_item_id: formData.customer_item_id || null,
           company_id: finalCompanyId
         })
         .select()
