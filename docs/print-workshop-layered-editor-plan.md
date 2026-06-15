@@ -178,3 +178,60 @@ Vector path export branch, blend-mode approximation, font-substitution UX, "what
 
 ## 9. TL;DR
 You already have the editor engine (Fabric). The work is: **(a)** upgrade the objects panel into a real Layers panel, and **(b)** add per-format importers that decompose uploads into layers — SVG and PSD give true layers, PDF/AI give real text + images with a raster fallback, PNG/JPG are inherently flat. Start with the Layers panel + SVG import for the fastest "it feels like Illustrator" moment, then tackle PDF and PSD.
+
+---
+
+## 10. Phase 6+ — feature backlog (from the OnPrintShop / quadlabels reference)
+
+The quadlabels "Live Design Studio" is **OnPrintShop's** licensed web-to-print Design Studio (Angular SPA on CloudFront + PHP backend + direct-to-S3 uploads + OpenAI). It's the same *class* of system we're building (Fabric-class canvas designer); the gap is **breadth**, not architecture. Worth pulling into our build, in rough priority:
+
+1. **Shapes library** *(small)* — rectangle, rounded-rect, circle, ellipse, line, triangle, polygon, hexagon, octagon, star (5/6/12/24-pt). All native Fabric objects. Pairs naturally with the existing perf-line drawing tool.
+2. **QR code generator** *(small)* — URL / text / phone / email / WiFi / vCard payloads → QR added as a vector/image object. Very common label need. (`qrcode` lib or an edge function.)
+3. **Clip-art / icon library** *(medium)* — searchable categorized gallery of pre-approved SVG art; click to place as an editable layer. (We already have `IconPickerDialog` — extend it into a real categorized library.)
+4. **Curve / arc text** *(medium)* — text on a path (the reference ships preset arcs: circle, semicircle, wave, ribbon, spiral). High-impact for labels/badges.
+5. **Preflight on export** *(medium)* — before accepting a print PDF, check font embedding, overprint, ICC profile, and that document dimensions match the template. Surfaces production problems early; this is the biggest *production-grade* gap.
+6. **Finishes preview** *(medium)* — Spot UV, Emboss, Deboss, Foil as a per-object flag with a preview overlay (drives a separate spot layer in the print file). Premium upsell.
+7. **3D fold preview** *(large)* — for boxes/bags, fold the flat dieline into a 3D proof. We already generate the dieline geometry, so the data exists.
+8. **Image filters & adjustments** *(medium)* — brightness/contrast/saturation/hue + preset color matrices (sepia, vintage, etc.). Fabric has filter support built in.
+9. **Predefined text snippets** *(small)* — admin-curated reusable text blocks (ingredients, warnings, compliance copy) a customer can drop in.
+
+Out of scope for us (deliberately): calendar/month-layout/photobook flows, social-media image imports — these are OnPrintShop product lines we don't need.
+
+---
+
+## 11. UI/UX redesign — adopt the three-zone web-to-print layout
+
+**Problem:** the current `TemplateEditor` toolbar is a single flat row of ~15 buttons (Draw Text, Draw Locked, Image BG, PDF BG, Locked Image, Editable Image, PDF Art, Import SVG, four AI dialogs, Draw Mask, Perf Line, Extract Editable/Locked, Extract PDF Text, Extract All Text). It's overloaded — especially the AI buttons sitting at the same level as primitives — and it doesn't scale as we add Shapes/QR/Clip-art/Curve-text.
+
+**Target:** the same **three-zone layout** OnPrintShop/quadlabels uses, which is the web-to-print convention:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  TOP BAR: undo/redo · zoom · grid · layers · save · preview   │  ← actions only
+├──────────┬───────────────────────────────────────┬───────────┤
+│  LEFT    │                                       │  RIGHT    │
+│  RAIL    │            CANVAS                      │  PROPERTY │
+│ (add):   │       (with bleed/trim/dieline)       │  PANEL    │
+│  Text    │                                       │ (context  │
+│  Images  │                                       │  for the  │
+│  Shapes  │                                       │  selected │
+│  ClipArt │                                       │  object): │
+│  Upload  │                                       │  font,    │
+│  QR      │                                       │  color,   │
+│  Bg      │                                       │  size,    │
+│  Dieline │                                       │  align,   │
+│  Layers  │                                       │  lock,    │
+│          │                                       │  opacity, │
+│          │                                       │  arrange  │
+└──────────┴───────────────────────────────────────┴───────────┘
+```
+
+Principles:
+- **Left rail = "add things."** Vertical icon rail of *categories*; clicking one opens a panel (Text, Images, Shapes, Clip Art, Upload, QR, Background, Dieline tools). Each panel holds the sub-actions currently crammed into the top toolbar.
+- **Top bar = "actions only."** Undo/redo, zoom, grid/margin toggle, Layers toggle, Save, and Preview/Continue. Nothing that *adds* content.
+- **Right panel = "properties of the selection."** Contextual: shows font/size/color/align for text, crop/filters/replace for images, fill/stroke for shapes, plus the universal lock / opacity / arrange (bring-forward, send-back) / align controls. Empty state when nothing is selected.
+- **Demote AI.** AI is *not* a top-level category. Surface AI actions **contextually**: "AI edit / remove background / upscale" live in the **image** property panel; "AI text (rephrase/fix spelling)" lives in the **text** property panel; generative "create image" lives inside the **Images** add-panel. This alone removes ~4 buttons from the main bar.
+- **Mode-aware.** In **`use` (customer order) mode**, collapse the left rail to just what customers may do (edit unlocked text, upload their art) — matching decision #2. The full rail is **`edit` (admin) mode** only.
+
+Implementation note: this is a **layout refactor of `TemplateEditor.tsx`**, not an engine change — the same Fabric actions get reorganized into `LeftToolRail`, `TopActionBar`, and a contextual `PropertyPanel`. The `CanvasObjectsPanel` (Layers) becomes the "Layers" entry in the left rail. Best done **before** Phase 6 features land, so Shapes/QR/Clip-art/Curve-text slot into the left rail instead of growing the flat toolbar further.
+
