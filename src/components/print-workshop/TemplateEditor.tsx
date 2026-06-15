@@ -2901,6 +2901,38 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
               }}
             />
           </div>
+
+          {/* Perf line measurement overlay (relative to trim) */}
+          {perfInfo && perfInfo.orientation === "h" && (
+            <>
+              <div
+                className="pointer-events-none absolute z-30 left-0 right-0 flex justify-end pr-1"
+                style={{ top: Math.max(0, perfInfo.cssY - 18) }}
+              >
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium shadow-sm"
+                  style={{ background: PERF_COLOR, color: "white" }}
+                >
+                  <Scissors className="h-2.5 w-2.5" />
+                  {perfInfo.fromTop.toFixed(3)}" from top · {perfInfo.fromBottom.toFixed(3)}" from bottom
+                </span>
+              </div>
+            </>
+          )}
+          {perfInfo && perfInfo.orientation === "v" && (
+            <div
+              className="pointer-events-none absolute z-30 top-0 bottom-0 flex items-start pt-1"
+              style={{ left: Math.max(0, perfInfo.cssX + 4) }}
+            >
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium shadow-sm"
+                style={{ background: PERF_COLOR, color: "white" }}
+              >
+                <Scissors className="h-2.5 w-2.5" />
+                {perfInfo.fromTop.toFixed(3)}" from left · {perfInfo.fromBottom.toFixed(3)}" from right
+              </span>
+            </div>
+          )}
         </div>
       </div>
       </div>
