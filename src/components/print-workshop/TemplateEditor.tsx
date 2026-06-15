@@ -2407,8 +2407,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
   // Perf line measurement (relative to trim box). Recomputes on perfTick (drag) and selection change.
   const perfInfo = useMemo(() => {
-    const obj: any = selectedObject;
-    if (!obj || obj.name !== PERF_LINE_NAME) return null;
+    const obj: any = activePerfRef.current;
+    if (!obj) return null;
+    const isPerf = obj.name === PERF_LINE_NAME || obj.name === "_perfDraft";
+    if (!isPerf) return null;
     const x1 = obj.x1 ?? 0, y1 = obj.y1 ?? 0, x2 = obj.x2 ?? 0, y2 = obj.y2 ?? 0;
     const left = obj.left ?? 0;
     const top = obj.top ?? 0;
