@@ -2006,6 +2006,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         perfLine.set({ x1: startPt.x, y1: startPt.y, x2: startPt.x, y2: y });
       }
       perfLine.setCoords();
+      activePerfRef.current = perfLine;
+      setPerfTick((n) => n + 1);
       canvas.renderAll();
     };
 
