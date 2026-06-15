@@ -2434,8 +2434,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       const cssX = xMid * displayScale;
       return { orientation: "v" as const, fromTop: fromLeft, fromBottom: fromRight, cssX, cssY: 0 };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedObject, perfTick, bleedPx, canvasHeight, canvasWidth, displayScale]);
+  }, [perfTick, bleedPx, canvasHeight, canvasWidth, displayScale]);
 
 
 
