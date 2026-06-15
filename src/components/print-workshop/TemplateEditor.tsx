@@ -195,6 +195,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const drawMaskRectRef = useRef<Rect | null>(null);
   const [drawPerfMode, setDrawPerfMode] = useState(false);
   const [perfTick, setPerfTick] = useState(0);
+  const activePerfRef = useRef<any>(null);
 
   // Undo/redo history
   const undoStack = useRef<string[]>([]);
@@ -841,14 +842,29 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     });
     canvas.on("object:modified", () => { clearGuidelines(canvas); syncCanvas(); });
     canvas.on("text:changed", syncCanvas);
-    // Live-update perf line measurement while dragging
-    const bumpPerf = (e: any) => {
-      const t = e?.target as any;
-      if (t && t.name === PERF_LINE_NAME) setPerfTick((n) => n + 1);
+    // Show perf measurement only on hover (after placement) or while drawing (handled in startDrawPerf)
+    const isPerf = (t: any) => t && (t.name === PERF_LINE_NAME || t.name === "_perfDraft");
+    canvas.on("mouse:over", (e: any) => {
+      if (isPerf(e?.target)) {
+        activePerfRef.current = e.target;
+        setPerfTick((n) => n + 1);
+      }
+    });
+    canvas.on("mouse:out", (e: any) => {
+      if (isPerf(e?.target) && activePerfRef.current === e.target) {
+        activePerfRef.current = null;
+        setPerfTick((n) => n + 1);
+      }
+    });
+    // Live-update measurement when an existing perf line is being moved
+    const bumpPerfMove = (e: any) => {
+      if (isPerf(e?.target)) {
+        activePerfRef.current = e.target;
+        setPerfTick((n) => n + 1);
+      }
     };
-    canvas.on("object:moving", bumpPerf);
-    canvas.on("object:scaling", bumpPerf);
-    canvas.on("object:modified", bumpPerf);
+    canvas.on("object:moving", bumpPerfMove);
+    canvas.on("object:modified", bumpPerfMove);
 
     // In use mode: auto-enter text editing on click
     if (mode === "use") {
@@ -1970,6 +1986,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         name: "_perfDraft",
       } as any);
       canvas.add(perfLine);
+      activePerfRef.current = perfLine;
+      setPerfTick((n) => n + 1);
       canvas.renderAll();
     };
 
@@ -1988,6 +2006,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         perfLine.set({ x1: startPt.x, y1: startPt.y, x2: startPt.x, y2: y });
       }
       perfLine.setCoords();
+      activePerfRef.current = perfLine;
+      setPerfTick((n) => n + 1);
       canvas.renderAll();
     };
 
@@ -2026,6 +2046,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         }
         canvas.renderAll();
       }
+
+      // Clear the measurement once the drag is done; hover will bring it back
+      activePerfRef.current = null;
+      setPerfTick((n) => n + 1);
 
       endDrawPerf();
     };
@@ -2406,8 +2430,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
   // Perf line measurement (relative to trim box). Recomputes on perfTick (drag) and selection change.
   const perfInfo = useMemo(() => {
-    const obj: any = selectedObject;
-    if (!obj || obj.name !== PERF_LINE_NAME) return null;
+    const obj: any = activePerfRef.current;
+    if (!obj) return null;
+    const isPerf = obj.name === PERF_LINE_NAME || obj.name === "_perfDraft";
+    if (!isPerf) return null;
     const x1 = obj.x1 ?? 0, y1 = obj.y1 ?? 0, x2 = obj.x2 ?? 0, y2 = obj.y2 ?? 0;
     const left = obj.left ?? 0;
     const top = obj.top ?? 0;
@@ -2431,8 +2457,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       const cssX = xMid * displayScale;
       return { orientation: "v" as const, fromTop: fromLeft, fromBottom: fromRight, cssX, cssY: 0 };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedObject, perfTick, bleedPx, canvasHeight, canvasWidth, displayScale]);
+  }, [perfTick, bleedPx, canvasHeight, canvasWidth, displayScale]);
 
 
 
