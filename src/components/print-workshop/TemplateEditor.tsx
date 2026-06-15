@@ -581,6 +581,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             lockScalingY: true,
             lockRotation: true,
             stroke: obj.stroke || PERF_COLOR,
+            strokeWidth: 0.75,
+            strokeDashArray: [3, 3],
+            strokeUniform: true,
             borderColor: PERF_COLOR,
           });
           obj.setCoords?.();
