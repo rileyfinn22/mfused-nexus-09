@@ -1986,6 +1986,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         name: "_perfDraft",
       } as any);
       canvas.add(perfLine);
+      activePerfRef.current = perfLine;
+      setPerfTick((n) => n + 1);
       canvas.renderAll();
     };
 
