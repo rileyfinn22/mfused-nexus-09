@@ -2047,6 +2047,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         canvas.renderAll();
       }
 
+      // Clear the measurement once the drag is done; hover will bring it back
+      activePerfRef.current = null;
+      setPerfTick((n) => n + 1);
+
       endDrawPerf();
     };
 
