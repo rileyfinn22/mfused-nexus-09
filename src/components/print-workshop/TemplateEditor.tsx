@@ -2404,6 +2404,40 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     return false;
   })();
 
+  // Perf line measurement (relative to trim box). Recomputes on perfTick (drag) and selection change.
+  const perfInfo = useMemo(() => {
+    const obj: any = selectedObject;
+    if (!obj || obj.name !== PERF_LINE_NAME) return null;
+    const x1 = obj.x1 ?? 0, y1 = obj.y1 ?? 0, x2 = obj.x2 ?? 0, y2 = obj.y2 ?? 0;
+    const left = (obj.left ?? 0);
+    const top = (obj.top ?? 0);
+    // Fabric line coords are relative to its origin; absolute = left/top + (xN - originX)
+    const ax1 = left + Math.min(x1, x2) - Math.min(x1, x2); // simpler: use bounding rect
+    const rect = obj.getBoundingRect ? obj.getBoundingRect(true, true) : { left, top, width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
+    const isHorizontal = Math.abs(y2 - y1) < Math.abs(x2 - x1);
+    const trimTop = bleedPx;
+    const trimBottom = canvasHeight - bleedPx;
+    const trimLeft = bleedPx;
+    const trimRight = canvasWidth - bleedPx;
+    if (isHorizontal) {
+      const yMid = rect.top + rect.height / 2;
+      const fromTop = Math.max(0, (yMid - trimTop) / DPI);
+      const fromBottom = Math.max(0, (trimBottom - yMid) / DPI);
+      // overlay position in CSS pixels
+      const cssY = yMid * displayScale;
+      return { orientation: "h" as const, fromTop, fromBottom, cssY, cssX: 0 };
+    } else {
+      const xMid = rect.left + rect.width / 2;
+      const fromLeft = Math.max(0, (xMid - trimLeft) / DPI);
+      const fromRight = Math.max(0, (trimRight - xMid) / DPI);
+      const cssX = xMid * displayScale;
+      return { orientation: "v" as const, fromTop: fromLeft, fromBottom: fromRight, cssX, cssY: 0 };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedObject, perfTick, bleedPx, canvasHeight, canvasWidth, displayScale]);
+
+
+
   return (
     <div className="flex flex-col gap-4">
       {/* Toolbar */}
