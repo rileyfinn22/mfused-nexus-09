@@ -134,6 +134,9 @@ Turn `CanvasObjectsPanel` into a real layer manager: drag-reorder, lock, rename,
 Replace/augment the flatten-then-OCR flow: on PDF upload, run `getTextContent()` for real text objects and extract embedded images as separate layers; keep a rasterized background only as a fallback for un-extractable vector.
 **Why:** PDFs/AI are your most common print files; this is the core of the vision. **Effort:** L (PDF internals are fiddly). Builds on existing `pdfjs-dist` usage.
 
+**Status — v1 shipped (text):** "Extract PDF Text" button in `TemplateEditor` uses `page.getTextContent()` to pull real, live text into locked editable layers with knockouts, placement-mapped from the on-canvas `pdf_background` rect (works regardless of crop/fit). Falls back to a hint to use AI "Extract All Text" when the PDF text is outlined.
+**Still TODO (Phase 2.1):** embedded raster image extraction via `getOperatorList()` / `OPS.paintImageXObject`; merging fragmented text runs per line; recovering text color (not exposed by `getTextContent`, so v1 imports as black).
+
 ### Phase 3 — PSD import
 Add `ag-psd`; map each layer → object, text layers → editable text, preserve names/opacity/visibility/blend.
 **Why:** true Photoshop-style layers. **Effort:** M.

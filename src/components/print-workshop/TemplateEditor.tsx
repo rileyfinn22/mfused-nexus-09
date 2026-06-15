@@ -190,6 +190,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const drawTextRectRef = useRef<Rect | null>(null);
   const [unlockZoneMode, setUnlockZoneMode] = useState(false);
   const [extractingAll, setExtractingAll] = useState(false);
+  const [extractingVector, setExtractingVector] = useState(false);
   const [drawMaskMode, setDrawMaskMode] = useState(false);
   const drawMaskStartRef = useRef<{ x: number; y: number } | null>(null);
   const drawMaskRectRef = useRef<Rect | null>(null);
@@ -1166,6 +1167,115 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       }
     };
     input.click();
+  };
+
+  /**
+   * Phase 2 — extract REAL text from the PDF's vector layer via pdf.js getTextContent().
+   * Far more accurate than AI/OCR when the PDF has live (non-outlined) text: exact
+   * characters, positions and sizes. Each text run becomes a locked editable layer,
+   * with a knockout covering the original baked-in text. Placement is derived from the
+   * on-canvas pdf_background rectangle, so it works regardless of crop/fit/centering.
+   */
+  const extractPdfVectorText = async () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    if (!sourcePdfPath) {
+      toast.error("Add a PDF background first, then extract its text");
+      return;
+    }
+    const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background") as any;
+    if (!bg) {
+      toast.error("No PDF background found on the canvas");
+      return;
+    }
+    setExtractingVector(true);
+    try {
+      const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(sourcePdfPath);
+      const cacheBusted = `${urlData.publicUrl}${urlData.publicUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(sourcePdfPath)}-${Date.now()}`;
+      const resp = await fetch(cacheBusted, { cache: "no-store" });
+      if (!resp.ok) throw new Error("Could not fetch the source PDF");
+      const buf = await resp.arrayBuffer();
+
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+      const page = await pdf.getPage(1);
+      const vp = page.getViewport({ scale: 1 });
+      const pageW = vp.width;   // PDF points
+      const pageH = vp.height;
+      const tc = await page.getTextContent();
+      const items = (tc.items as any[]).filter((it) => typeof it.str === "string" && it.str.trim().length > 0);
+
+      if (items.length === 0) {
+        toast.warning("No selectable text found — this PDF's text is likely outlined. Try AI 'Extract All Text' instead.");
+        return;
+      }
+
+      // On-canvas rectangle the PDF occupies (placement-agnostic mapping)
+      const bgLeft = bg.left ?? 0;
+      const bgTop = bg.top ?? 0;
+      const bgW = bg.getScaledWidth();
+      const bgH = bg.getScaledHeight();
+      const sx = bgW / pageW;
+      const sy = bgH / pageH;
+
+      let added = 0;
+      for (const it of items) {
+        const str = it.str.trim();
+        if (!str) continue;
+
+        const t = it.transform as number[]; // [a,b,c,d,e,f]; e,f = baseline x,y (origin bottom-left)
+        const ex = t[4];
+        const ey = t[5];
+        const fontPtPdf = Math.hypot(t[2], t[3]) || Math.abs(t[3]) || 10;
+        const fontPx = fontPtPdf * sy;
+
+        const leftPx = bgLeft + (ex / pageW) * bgW;
+        const baselineFromTop = bgTop + ((pageH - ey) / pageH) * bgH;
+        const topPx = baselineFromTop - fontPx; // shift from baseline to top of glyph (approx)
+        const widthPx = ((it.width as number) || str.length * fontPtPdf * 0.5) * sx;
+
+        const fam = tc.styles?.[it.fontName]?.fontFamily || "Arial";
+        const fontDef = FONT_OPTIONS.find((f) => f.value.toLowerCase() === String(fam).toLowerCase());
+        const useFam = fontDef?.value || "Arial";
+        if (fontDef?.google) await loadGoogleFont(fontDef.value);
+
+        const textObj = new IText(str, {
+          left: leftPx,
+          top: topPx,
+          fontSize: fontPx,
+          fontFamily: useFam,
+          fill: "#000000",
+          editable: true,
+          originX: "left",
+          originY: "top",
+          padding: 0,
+        });
+        (textObj as any)._fontSizePt = pxToPt(fontPx);
+        (textObj as any).locked = true;      // locked by default per policy
+        (textObj as any).editable = false;
+        (textObj as any).name = "locked_text";
+        textObj.set({ borderColor: "#94a3b8", cornerColor: "#94a3b8" } as any);
+
+        canvas.add(textObj);
+        addOcrKnockoutCover(canvas, {
+          left: leftPx,
+          top: topPx,
+          width: Math.max(widthPx, fontPx * 0.3),
+          height: fontPx * 1.2,
+        });
+        canvas.bringObjectToFront(textObj);
+        added++;
+      }
+
+      fixZOrder(canvas);
+      canvas.requestRenderAll();
+      syncCanvas();
+      toast.success(`Extracted ${added} real text layer${added !== 1 ? "s" : ""} from the PDF`);
+    } catch (err: any) {
+      console.error("PDF vector text extract error:", err);
+      toast.error(err.message || "Failed to extract PDF text");
+    } finally {
+      setExtractingVector(false);
+    }
   };
 
   // Extract ALL text from the canvas using AI full-page analysis
@@ -2705,6 +2815,27 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                   <Button
                     size="sm"
                     variant="secondary"
+                    onClick={extractPdfVectorText}
+                    disabled={extractingVector}
+                    className="gap-1.5"
+                  >
+                    {extractingVector ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Type className="h-3.5 w-3.5" />
+                    )}
+                    <span className="text-xs">
+                      {extractingVector ? "Extracting..." : "Extract PDF Text"}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Pull real (live) text straight from the PDF — exact characters &amp; positions. Best when the PDF text isn't outlined.</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="secondary"
                     onClick={extractAllText}
                     disabled={extractingAll}
                     className="gap-1.5"
@@ -2719,7 +2850,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                     </span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Use AI to detect and extract all text from the design at once</TooltipContent>
+                <TooltipContent side="bottom" className="text-xs">Use AI to detect and extract all text from the design (fallback for outlined / flattened text)</TooltipContent>
               </Tooltip>
             </TooltipProvider>
 
