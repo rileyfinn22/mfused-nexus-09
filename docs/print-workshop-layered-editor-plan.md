@@ -235,3 +235,26 @@ Principles:
 
 Implementation note: this is a **layout refactor of `TemplateEditor.tsx`**, not an engine change — the same Fabric actions get reorganized into `LeftToolRail`, `TopActionBar`, and a contextual `PropertyPanel`. The `CanvasObjectsPanel` (Layers) becomes the "Layers" entry in the left rail. Best done **before** Phase 6 features land, so Shapes/QR/Clip-art/Curve-text slot into the left rail instead of growing the flat toolbar further.
 
+---
+
+## 12. Core differentiator: customer self-service template ordering ⭐
+
+**This is the thing the OnPrintShop/quadlabels flow does *not* give end customers, and it is the heart of our product — so it must stay first-class as the editor grows.**
+
+The model: an **admin builds a template once**, assigns it to one or more companies, and then **those companies' customers can self-serve** — open the template, edit only the parts we unlocked, proof it, and **place (and re-order) on demand**, with no admin in the loop per order.
+
+This already exists in skeleton form and must be **preserved and strengthened**, never regressed, as we add importers, the new UI, and Phase 6 features:
+- **Template → company assignment:** `print_template_companies` + `is_global` (who can see/order a template). Saving a template auto-creates/syncs a matching `products` row per assigned company.
+- **Customer edit surface:** `TemplateEditor` `mode="use"` — only `editable`/unlocked layers are interactive; locked layers (and dielines, knockouts, perf lines) are non-selectable. This is exactly why **"locked by default" (decision #1)** matters: the admin decides the customer's editable surface.
+- **Proof + order:** `OrderPanel` → `PrintCart` → `PrintCheckout`, with the edited canvas captured and a print-ready PDF generated client-side. `design_saves` records each customer design (canvas + thumbnail + print file) for liability/reuse.
+- **Re-order on demand:** `WorkshopOrders` ("My Orders") + saved designs let a customer reorder or tweak a past design without starting over.
+
+Design rules so this differentiator survives the rebuild:
+1. **Every editor feature must declare its customer story.** For each new capability (shapes, QR, curve text, clip art, AI), decide explicitly whether it's **admin-only** (template construction) or **also customer-facing** (per-order personalization). Default new tools to **admin-only**; opt specific ones into `use` mode deliberately.
+2. **The UI redesign (§11) is mode-aware.** `use` mode shows a **stripped left rail** — only the customer-permitted actions (edit unlocked text, upload/replace their own art/logo, maybe QR) — plus an unmistakable **"edit the highlighted fields → Add to cart"** path and a **reorder** entry. The full rail is `edit` (admin) mode only.
+3. **Locked/unlocked is the contract.** The per-layer lock in the Layers panel is *the* mechanism that defines what a customer can touch. Importers set imported layers locked by default; the admin unlocks the few fields meant for personalization.
+4. **On-demand means no admin bottleneck.** Pricing (`preset_price_per_unit`), proofing, and print-file generation must complete **without** an admin step for preset-priced templates. (Quote-based templates can still route to admin — that's a deliberate exception, not the default.)
+5. **Don't let production features gate self-service.** Preflight (§10.5) runs at order time and should *warn/guide* the customer, not silently block a valid order.
+
+In short: OnPrintShop is an admin/operator tool with a customer personalize step bolted on; **ours is a customer self-service ordering platform** where the admin's job is to define a safe, editable template and then get out of the way. Keep that asymmetry visible in every phase.
+
