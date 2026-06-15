@@ -2859,12 +2859,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       )}
       {drawPerfMode && (
         <div
-          className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm"
-          style={{ background: "rgba(22,163,74,0.10)", borderColor: "rgba(22,163,74,0.35)", color: PERF_COLOR }}
+          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px] w-fit"
+          style={{ background: "rgba(22,163,74,0.08)", borderColor: "rgba(22,163,74,0.35)", color: PERF_COLOR }}
         >
-          <Scissors className="h-4 w-4" />
-          <span>Click and drag to add a perforation line — it snaps horizontal or vertical.</span>
-          <Button size="sm" variant="ghost" onClick={endDrawPerf} className="ml-auto h-6 px-2 text-xs">Cancel</Button>
+          <Scissors className="h-3 w-3" />
+          <span>Drag to add a perf line (snaps H/V)</span>
+          <Button size="sm" variant="ghost" onClick={endDrawPerf} className="ml-1 h-5 px-1.5 text-[10px]">Cancel</Button>
         </div>
       )}
 
