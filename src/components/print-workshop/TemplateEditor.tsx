@@ -2409,10 +2409,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     const obj: any = selectedObject;
     if (!obj || obj.name !== PERF_LINE_NAME) return null;
     const x1 = obj.x1 ?? 0, y1 = obj.y1 ?? 0, x2 = obj.x2 ?? 0, y2 = obj.y2 ?? 0;
-    const left = (obj.left ?? 0);
-    const top = (obj.top ?? 0);
-    // Fabric line coords are relative to its origin; absolute = left/top + (xN - originX)
-    const ax1 = left + Math.min(x1, x2) - Math.min(x1, x2); // simpler: use bounding rect
+    const left = obj.left ?? 0;
+    const top = obj.top ?? 0;
     const rect = obj.getBoundingRect ? obj.getBoundingRect(true, true) : { left, top, width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
     const isHorizontal = Math.abs(y2 - y1) < Math.abs(x2 - x1);
     const trimTop = bleedPx;
