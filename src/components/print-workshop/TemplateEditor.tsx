@@ -4,8 +4,9 @@ import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Scissors, Square, Layers } from "lucide-react";
+import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Scissors, Square, Layers, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
 import { AiCleanupDialog } from "./AiCleanupDialog";
@@ -195,6 +196,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const drawMaskStartRef = useRef<{ x: number; y: number } | null>(null);
   const drawMaskRectRef = useRef<Rect | null>(null);
   const [drawPerfMode, setDrawPerfMode] = useState(false);
+  // Which left-rail tool category popover is open (Quad-style grouped toolbar)
+  const [openCat, setOpenCat] = useState<string | null>(null);
   const [perfTick, setPerfTick] = useState(0);
   const activePerfRef = useRef<any>(null);
 
@@ -2676,183 +2679,124 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         )}
         {mode === "edit" && (
           <>
-            {/* Draw text box mode */}
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant={drawTextMode === "editable" ? "default" : "outline"}
-                    onClick={() => drawTextMode === "editable" ? endDrawText() : startDrawText("editable")}
-                    className="gap-1.5"
-                  >
-                    <Type className="h-3.5 w-3.5" />
-                    <span className="text-xs">Draw Text</span>
+            {/* ── Text ── */}
+            <Popover open={openCat === "text"} onOpenChange={(o) => setOpenCat(o ? "text" : null)}>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant={drawTextMode !== "off" ? "default" : "outline"} className="gap-1.5">
+                  <Type className="h-3.5 w-3.5" /><span className="text-xs">Text</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-52 p-1.5 space-y-1">
+                <Button size="sm" variant={drawTextMode === "editable" ? "default" : "ghost"} className="w-full justify-start gap-2"
+                  onClick={() => { drawTextMode === "editable" ? endDrawText() : startDrawText("editable"); setOpenCat(null); }}>
+                  <Type className="h-3.5 w-3.5" /> Draw editable text
+                </Button>
+                <Button size="sm" variant={drawTextMode === "locked" ? "default" : "ghost"} className="w-full justify-start gap-2"
+                  onClick={() => { drawTextMode === "locked" ? endDrawText() : startDrawText("locked"); setOpenCat(null); }}>
+                  <Lock className="h-3.5 w-3.5" /> Draw locked text
+                </Button>
+              </PopoverContent>
+            </Popover>
+
+            {/* ── Images ── */}
+            <Popover open={openCat === "images"} onOpenChange={(o) => setOpenCat(o ? "images" : null)}>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant="outline" className="gap-1.5">
+                  <ImageIcon className="h-3.5 w-3.5" /><span className="text-xs">Images</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-52 p-1.5 space-y-1">
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2" onClick={() => { addArtworkImage(true); setOpenCat(null); }}>
+                  <Upload className="h-3.5 w-3.5" /> Add image (editable)
+                </Button>
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2" onClick={() => { addArtworkImage(false); setOpenCat(null); }}>
+                  <Upload className="h-3.5 w-3.5" /> Add image (locked)
+                </Button>
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2" onClick={() => { addPdfArtwork(); setOpenCat(null); }}>
+                  <FileText className="h-3.5 w-3.5" /> Add PDF artwork
+                </Button>
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2" onClick={() => { importSvg(); setOpenCat(null); }}>
+                  <Layers className="h-3.5 w-3.5" /> Import SVG (layers)
+                </Button>
+                <div className="h-px bg-border my-1" />
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2" onClick={() => { addBackgroundImage(); setOpenCat(null); }}>
+                  <ImageIcon className="h-3.5 w-3.5" /> Set image background
+                </Button>
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2" onClick={() => { addPdfBackground(); setOpenCat(null); }}>
+                  <FileText className="h-3.5 w-3.5" /> Set PDF background
+                </Button>
+              </PopoverContent>
+            </Popover>
+
+            {/* ── AI (demoted from top-level into one group) ── */}
+            <Popover open={openCat === "ai"} onOpenChange={(o) => setOpenCat(o ? "ai" : null)}>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant="outline" className="gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" /><span className="text-xs">AI</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-56 p-1.5 space-y-1 flex flex-col items-stretch">
+                <AiImageDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
+                <AiEditDialog getCanvasImage={getCanvasImage} onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
+                <AiCleanupDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
+                <IconPickerDialog onIconSelected={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
+              </PopoverContent>
+            </Popover>
+
+            {/* ── Dieline ── */}
+            <Popover open={openCat === "dieline"} onOpenChange={(o) => setOpenCat(o ? "dieline" : null)}>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant={drawMaskMode || drawPerfMode ? "default" : "outline"} className="gap-1.5">
+                  <Scissors className="h-3.5 w-3.5" /><span className="text-xs">Dieline</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-52 p-1.5 space-y-1">
+                <Button size="sm" variant={drawPerfMode ? "default" : "ghost"} className="w-full justify-start gap-2"
+                  onClick={() => { drawPerfMode ? endDrawPerf() : startDrawPerf(); setOpenCat(null); }}>
+                  <Scissors className="h-3.5 w-3.5" /> Perf line
+                </Button>
+                <Button size="sm" variant={drawMaskMode ? "default" : "ghost"} className="w-full justify-start gap-2"
+                  onClick={() => { drawMaskMode ? endDrawMask() : startDrawMask(); setOpenCat(null); }}>
+                  <Square className="h-3.5 w-3.5" /> Mask area
+                </Button>
+              </PopoverContent>
+            </Popover>
+
+            {/* ── Extract ── */}
+            <Popover open={openCat === "extract"} onOpenChange={(o) => setOpenCat(o ? "extract" : null)}>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant="outline" className="gap-1.5">
+                  <Scan className="h-3.5 w-3.5" /><span className="text-xs">Extract</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-60 p-2 space-y-1.5">
+                <p className="text-[11px] text-muted-foreground px-1">Extracted text becomes…</p>
+                <div className="flex gap-1">
+                  <Button size="sm" variant={zoneExtractLocked ? "outline" : "default"} className="flex-1 gap-1" onClick={() => setZoneExtractLocked(false)} disabled={extractingText}>
+                    <Unlock className="h-3 w-3" /><span className="text-[10px]">Editable</span>
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Click &amp; drag on the canvas to place an editable text box</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant={drawTextMode === "locked" ? "default" : "outline"}
-                    onClick={() => drawTextMode === "locked" ? endDrawText() : startDrawText("locked")}
-                    className="gap-1.5"
-                  >
-                    <Lock className="h-3.5 w-3.5" />
-                    <span className="text-xs">Draw Locked</span>
+                  <Button size="sm" variant={zoneExtractLocked ? "default" : "outline"} className="flex-1 gap-1" onClick={() => setZoneExtractLocked(true)} disabled={extractingText}>
+                    <Lock className="h-3 w-3" /><span className="text-[10px]">Locked</span>
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Click &amp; drag to place a locked (non-editable by end users) text box</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <div className="w-px h-6 bg-border mx-1" />
-            <Button size="sm" variant="outline" onClick={addBackgroundImage} className="gap-1.5">
-              <ImageIcon className="h-3.5 w-3.5" />
-              <span className="text-xs">Image BG</span>
-            </Button>
-            <Button size="sm" variant="outline" onClick={addPdfBackground} className="gap-1.5">
-              <FileText className="h-3.5 w-3.5" />
-              <span className="text-xs">PDF BG</span>
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => addArtworkImage(false)} className="gap-1.5">
-              <Upload className="h-3.5 w-3.5" />
-              <span className="text-xs">Locked Image</span>
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => addArtworkImage(true)} className="gap-1.5">
-              <Upload className="h-3.5 w-3.5" />
-              <span className="text-xs">Editable Image</span>
-            </Button>
-            <Button size="sm" variant="outline" onClick={addPdfArtwork} className="gap-1.5">
-              <FileText className="h-3.5 w-3.5" />
-              <span className="text-xs">PDF Art</span>
-            </Button>
-            <Button size="sm" variant="outline" onClick={importSvg} className="gap-1.5">
-              <Layers className="h-3.5 w-3.5" />
-              <span className="text-xs">Import SVG</span>
-            </Button>
-            <div className="w-px h-6 bg-border mx-1" />
-            <AiImageDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
-            <AiEditDialog getCanvasImage={getCanvasImage} onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
-            <AiCleanupDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
-            <IconPickerDialog onIconSelected={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
-            <div className="w-px h-6 bg-border mx-1" />
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant={drawMaskMode ? "default" : "outline"}
-                    onClick={drawMaskMode ? endDrawMask : startDrawMask}
-                    className="gap-1.5"
-                  >
-                    <Square className="h-3.5 w-3.5" />
-                    <span className="text-xs">Draw Mask</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Draw a white rectangle to cover unwanted parts of the PDF background</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant={drawPerfMode ? "default" : "outline"}
-                    onClick={drawPerfMode ? endDrawPerf : startDrawPerf}
-                    className="gap-1.5"
-                  >
-                    <Scissors className="h-3.5 w-3.5" />
-                    <span className="text-xs">Perf Line</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Click &amp; drag to add a perforation (tear-off) line. Green dashed; snaps horizontal/vertical.</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <div className="w-px h-6 bg-border mx-1" />
-            {/* Controls whether extracted text will be editable or locked for end users */}
-            <Button
-              size="sm"
-              variant={zoneExtractLocked ? "outline" : "default"}
-              onClick={() => setZoneExtractLocked(false)}
-              disabled={extractingText}
-              className="gap-1 px-2"
-              title="Extracted text will be editable by customers"
-            >
-              <Unlock className="h-3 w-3" />
-              <span className="text-[10px]">Extract Editable</span>
-            </Button>
-            <Button
-              size="sm"
-              variant={zoneExtractLocked ? "default" : "outline"}
-              onClick={() => setZoneExtractLocked(true)}
-              disabled={extractingText}
-              className="gap-1 px-2"
-              title="Extracted text will be locked (not editable by customers)"
-            >
-              <Lock className="h-3 w-3" />
-              <span className="text-[10px]">Extract Locked</span>
-            </Button>
-            <Button
-              size="sm"
-              variant={zoneSelectMode ? "destructive" : "secondary"}
-              onClick={zoneSelectMode ? endZoneSelect : startZoneSelect}
-              disabled={extractingText}
-              className="gap-1.5"
-            >
-              {extractingText ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Scan className="h-3.5 w-3.5" />
-              )}
-              <span className="text-xs">
-                {extractingText ? "Extracting..." : zoneSelectMode ? "Cancel" : "Extract Text"}
-              </span>
-            </Button>
-            
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={extractPdfVectorText}
-                    disabled={extractingVector}
-                    className="gap-1.5"
-                  >
-                    {extractingVector ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Type className="h-3.5 w-3.5" />
-                    )}
-                    <span className="text-xs">
-                      {extractingVector ? "Extracting..." : "Extract PDF Text"}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Pull real (live) text straight from the PDF — exact characters &amp; positions. Best when the PDF text isn't outlined.</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={extractAllText}
-                    disabled={extractingAll}
-                    className="gap-1.5"
-                  >
-                    {extractingAll ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <FileText className="h-3.5 w-3.5" />
-                    )}
-                    <span className="text-xs">
-                      {extractingAll ? "Analyzing..." : "Extract All Text"}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Use AI to detect and extract all text from the design (fallback for outlined / flattened text)</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                </div>
+                <div className="h-px bg-border my-1" />
+                <Button size="sm" variant={zoneSelectMode ? "destructive" : "ghost"} className="w-full justify-start gap-2" disabled={extractingText}
+                  onClick={() => { zoneSelectMode ? endZoneSelect() : startZoneSelect(); setOpenCat(null); }}>
+                  {extractingText ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Scan className="h-3.5 w-3.5" />}
+                  {extractingText ? "Extracting…" : zoneSelectMode ? "Cancel area select" : "Extract from area"}
+                </Button>
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2" disabled={extractingVector}
+                  onClick={() => { extractPdfVectorText(); setOpenCat(null); }}>
+                  {extractingVector ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Type className="h-3.5 w-3.5" />}
+                  {extractingVector ? "Extracting…" : "Extract PDF text (real)"}
+                </Button>
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2" disabled={extractingAll}
+                  onClick={() => { extractAllText(); setOpenCat(null); }}>
+                  {extractingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                  {extractingAll ? "Analyzing…" : "Extract all text (AI)"}
+                </Button>
+              </PopoverContent>
+            </Popover>
 
             <div className="w-px h-6 bg-border mx-1" />
           </>
