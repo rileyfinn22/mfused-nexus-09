@@ -135,6 +135,12 @@ function loadGoogleFont(fontFamily: string): Promise<void> {
 const GUIDE_NAME = "_snapGuide";
 const OCR_KNOCKOUT_NAME = "_ocrKnockout";
 
+// Perforation (tear-off) line — industry convention is a green dashed line.
+// Stored as a regular, persisted canvas object (NOT a "_"-prefixed helper) so it
+// survives save/load and is included in print-ready exports.
+const PERF_LINE_NAME = "perf_line";
+const PERF_COLOR = "#16a34a";
+
 function clearGuidelines(canvas: FabricCanvas) {
   const guides = canvas.getObjects().filter((o: any) => o.name === GUIDE_NAME);
   guides.forEach((g) => canvas.remove(g));
@@ -187,6 +193,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const [drawMaskMode, setDrawMaskMode] = useState(false);
   const drawMaskStartRef = useRef<{ x: number; y: number } | null>(null);
   const drawMaskRectRef = useRef<Rect | null>(null);
+  const [drawPerfMode, setDrawPerfMode] = useState(false);
 
   // Undo/redo history
   const undoStack = useRef<string[]>([]);
@@ -396,6 +403,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       bg.set({ selectable: false, evented: false, hasControls: false, hasBorders: false });
       canvas.sendObjectToBack(bg);
     }
+    // Perforation lines sit above artwork but below the auto dieline guides
+    const perfObjs = canvas.getObjects().filter((o: any) => o.name === PERF_LINE_NAME);
+    perfObjs.forEach((o: any) => canvas.bringObjectToFront(o));
     // Bring dieline guides and labels to front (above all artwork)
     const dielineObjs = canvas.getObjects().filter((o: any) => o.name === "_dieline" || o.name === "_dielineLabel");
     dielineObjs.forEach((o: any) => canvas.bringObjectToFront(o));
@@ -555,6 +565,23 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             obj.set({ left: savedLeft, top: savedTop });
             obj.setCoords?.();
           }
+        });
+
+        // Re-apply perforation-line styling so reloaded perf lines stay clean & locked.
+        // (Fabric doesn't serialize interaction flags, so we restore them here.)
+        canvas.getObjects().forEach((obj: any) => {
+          if (obj.name !== PERF_LINE_NAME) return;
+          obj.locked = true;
+          obj.editable = false;
+          obj.set({
+            hasControls: false,
+            lockScalingX: true,
+            lockScalingY: true,
+            lockRotation: true,
+            stroke: obj.stroke || PERF_COLOR,
+            borderColor: PERF_COLOR,
+          });
+          obj.setCoords?.();
         });
       }
 
@@ -1905,6 +1932,113 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     canvas.renderAll();
   };
 
+  // --- Draw Perf Line: click-drag to add a perforation (tear-off) line to the dieline ---
+  // The line snaps to pure horizontal or vertical based on the dominant drag axis, which
+  // keeps it clean on screen and unambiguous to reconstruct in the print-ready PDF export.
+  const startDrawPerf = () => {
+    setDrawPerfMode(true);
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.selection = false;
+    canvas.defaultCursor = "crosshair";
+    canvas.getObjects().forEach((o: any) => o.set({ evented: false }));
+    canvas.renderAll();
+
+    let startPt: { x: number; y: number } | null = null;
+    let perfLine: Line | null = null;
+
+    const onMouseDown = (e: any) => {
+      const pointer = canvas.getViewportPoint(e.e);
+      const zoom = canvas.getZoom();
+      startPt = { x: pointer.x / zoom, y: pointer.y / zoom };
+      perfLine = new Line([startPt.x, startPt.y, startPt.x, startPt.y], {
+        stroke: PERF_COLOR,
+        strokeWidth: ptToPx(1),
+        strokeDashArray: [ptToPx(6), ptToPx(4)],
+        strokeUniform: true,
+        selectable: false,
+        evented: false,
+        name: "_perfDraft",
+      } as any);
+      canvas.add(perfLine);
+      canvas.renderAll();
+    };
+
+    const onMouseMove = (e: any) => {
+      if (!startPt || !perfLine) return;
+      const pointer = canvas.getViewportPoint(e.e);
+      const zoom = canvas.getZoom();
+      const x = pointer.x / zoom;
+      const y = pointer.y / zoom;
+      // Snap to pure horizontal or vertical based on the dominant drag axis
+      const dx = Math.abs(x - startPt.x);
+      const dy = Math.abs(y - startPt.y);
+      if (dx >= dy) {
+        perfLine.set({ x1: startPt.x, y1: startPt.y, x2: x, y2: startPt.y });
+      } else {
+        perfLine.set({ x1: startPt.x, y1: startPt.y, x2: startPt.x, y2: y });
+      }
+      perfLine.setCoords();
+      canvas.renderAll();
+    };
+
+    const onMouseUp = () => {
+      canvas.off("mouse:down", onMouseDown);
+      canvas.off("mouse:move", onMouseMove);
+      canvas.off("mouse:up", onMouseUp);
+
+      if (perfLine) {
+        const len = Math.hypot(
+          (perfLine.x2 ?? 0) - (perfLine.x1 ?? 0),
+          (perfLine.y2 ?? 0) - (perfLine.y1 ?? 0),
+        );
+        if (len < 4) {
+          // Accidental click, not a drag — discard
+          canvas.remove(perfLine);
+        } else {
+          (perfLine as any).name = PERF_LINE_NAME;
+          (perfLine as any).locked = true;   // end users can't move/edit it in "use" mode
+          (perfLine as any).editable = false;
+          perfLine.set({
+            selectable: true,                 // admins can still select / move / delete in edit mode
+            evented: true,
+            hasControls: false,               // keep it a clean straight segment (no resize handles)
+            hasBorders: true,
+            lockScalingX: true,
+            lockScalingY: true,
+            lockRotation: true,
+            borderColor: PERF_COLOR,
+          } as any);
+          perfLine.setCoords();
+          canvas.setActiveObject(perfLine);
+          fixZOrder(canvas);
+          syncCanvas();
+          toast.success("Perf line added");
+        }
+        canvas.renderAll();
+      }
+
+      endDrawPerf();
+    };
+
+    canvas.on("mouse:down", onMouseDown);
+    canvas.on("mouse:move", onMouseMove);
+    canvas.on("mouse:up", onMouseUp);
+  };
+
+  const endDrawPerf = () => {
+    setDrawPerfMode(false);
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.selection = mode === "edit";
+    canvas.defaultCursor = "default";
+    canvas.getObjects().forEach((o: any) => {
+      if (o.name === "_trimGuide" || o.name === GUIDE_NAME || o.name === OCR_KNOCKOUT_NAME) return;
+      o.set({ evented: true });
+    });
+    canvas.renderAll();
+  };
+
   // --- Unlock Zone: draw box in use mode to unlock text for editing ---
   const startUnlockZone = () => {
     setUnlockZoneMode(true);
@@ -2362,6 +2496,20 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">Draw a white rectangle to cover unwanted parts of the PDF background</TooltipContent>
               </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant={drawPerfMode ? "default" : "outline"}
+                    onClick={drawPerfMode ? endDrawPerf : startDrawPerf}
+                    className="gap-1.5"
+                  >
+                    <Scissors className="h-3.5 w-3.5" />
+                    <span className="text-xs">Perf Line</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Click &amp; drag to add a perforation (tear-off) line. Green dashed; snaps horizontal/vertical.</TooltipContent>
+              </Tooltip>
             </TooltipProvider>
             <div className="w-px h-6 bg-border mx-1" />
             {/* Controls whether extracted text will be editable or locked for end users */}
@@ -2666,6 +2814,16 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
           <Button size="sm" variant="ghost" onClick={endUnlockZone} className="ml-auto h-6 px-2 text-xs">Cancel</Button>
         </div>
       )}
+      {drawPerfMode && (
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm"
+          style={{ background: "rgba(22,163,74,0.10)", borderColor: "rgba(22,163,74,0.35)", color: PERF_COLOR }}
+        >
+          <Scissors className="h-4 w-4" />
+          <span>Click and drag to add a perforation line — it snaps horizontal or vertical.</span>
+          <Button size="sm" variant="ghost" onClick={endDrawPerf} className="ml-auto h-6 px-2 text-xs">Cancel</Button>
+        </div>
+      )}
 
       <div ref={measureRef} className="max-w-full">
         <div ref={containerRef} className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center max-w-full">
@@ -2717,6 +2875,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
           <span className="flex items-center gap-1">
             <span className="w-3 h-0.5 border-t border-dashed border-destructive inline-block" />
             Trim line
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-3 h-0.5 inline-block" style={{ borderTop: `1.5px dashed ${PERF_COLOR}` }} />
+            Perf line
           </span>
           {dielineResult && (
             <>
