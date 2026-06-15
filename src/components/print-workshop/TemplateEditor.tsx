@@ -194,6 +194,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const drawMaskStartRef = useRef<{ x: number; y: number } | null>(null);
   const drawMaskRectRef = useRef<Rect | null>(null);
   const [drawPerfMode, setDrawPerfMode] = useState(false);
+  const [perfTick, setPerfTick] = useState(0);
 
   // Undo/redo history
   const undoStack = useRef<string[]>([]);
