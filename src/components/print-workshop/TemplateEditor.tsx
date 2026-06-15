@@ -194,6 +194,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const drawMaskStartRef = useRef<{ x: number; y: number } | null>(null);
   const drawMaskRectRef = useRef<Rect | null>(null);
   const [drawPerfMode, setDrawPerfMode] = useState(false);
+  const [perfTick, setPerfTick] = useState(0);
 
   // Undo/redo history
   const undoStack = useRef<string[]>([]);
@@ -840,6 +841,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     });
     canvas.on("object:modified", () => { clearGuidelines(canvas); syncCanvas(); });
     canvas.on("text:changed", syncCanvas);
+    // Live-update perf line measurement while dragging
+    const bumpPerf = (e: any) => {
+      const t = e?.target as any;
+      if (t && t.name === PERF_LINE_NAME) setPerfTick((n) => n + 1);
+    };
+    canvas.on("object:moving", bumpPerf);
+    canvas.on("object:scaling", bumpPerf);
+    canvas.on("object:modified", bumpPerf);
 
     // In use mode: auto-enter text editing on click
     if (mode === "use") {
@@ -2395,6 +2404,38 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     return false;
   })();
 
+  // Perf line measurement (relative to trim box). Recomputes on perfTick (drag) and selection change.
+  const perfInfo = useMemo(() => {
+    const obj: any = selectedObject;
+    if (!obj || obj.name !== PERF_LINE_NAME) return null;
+    const x1 = obj.x1 ?? 0, y1 = obj.y1 ?? 0, x2 = obj.x2 ?? 0, y2 = obj.y2 ?? 0;
+    const left = obj.left ?? 0;
+    const top = obj.top ?? 0;
+    const rect = obj.getBoundingRect ? obj.getBoundingRect(true, true) : { left, top, width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
+    const isHorizontal = Math.abs(y2 - y1) < Math.abs(x2 - x1);
+    const trimTop = bleedPx;
+    const trimBottom = canvasHeight - bleedPx;
+    const trimLeft = bleedPx;
+    const trimRight = canvasWidth - bleedPx;
+    if (isHorizontal) {
+      const yMid = rect.top + rect.height / 2;
+      const fromTop = Math.max(0, (yMid - trimTop) / DPI);
+      const fromBottom = Math.max(0, (trimBottom - yMid) / DPI);
+      // overlay position in CSS pixels
+      const cssY = yMid * displayScale;
+      return { orientation: "h" as const, fromTop, fromBottom, cssY, cssX: 0 };
+    } else {
+      const xMid = rect.left + rect.width / 2;
+      const fromLeft = Math.max(0, (xMid - trimLeft) / DPI);
+      const fromRight = Math.max(0, (trimRight - xMid) / DPI);
+      const cssX = xMid * displayScale;
+      return { orientation: "v" as const, fromTop: fromLeft, fromBottom: fromRight, cssX, cssY: 0 };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedObject, perfTick, bleedPx, canvasHeight, canvasWidth, displayScale]);
+
+
+
   return (
     <div className="flex flex-col gap-4">
       {/* Toolbar */}
@@ -2816,12 +2857,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       )}
       {drawPerfMode && (
         <div
-          className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm"
-          style={{ background: "rgba(22,163,74,0.10)", borderColor: "rgba(22,163,74,0.35)", color: PERF_COLOR }}
+          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px] w-fit"
+          style={{ background: "rgba(22,163,74,0.08)", borderColor: "rgba(22,163,74,0.35)", color: PERF_COLOR }}
         >
-          <Scissors className="h-4 w-4" />
-          <span>Click and drag to add a perforation line — it snaps horizontal or vertical.</span>
-          <Button size="sm" variant="ghost" onClick={endDrawPerf} className="ml-auto h-6 px-2 text-xs">Cancel</Button>
+          <Scissors className="h-3 w-3" />
+          <span>Drag to add a perf line (snaps H/V)</span>
+          <Button size="sm" variant="ghost" onClick={endDrawPerf} className="ml-1 h-5 px-1.5 text-[10px]">Cancel</Button>
         </div>
       )}
 
@@ -2858,6 +2899,38 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
               }}
             />
           </div>
+
+          {/* Perf line measurement overlay (relative to trim) */}
+          {perfInfo && perfInfo.orientation === "h" && (
+            <>
+              <div
+                className="pointer-events-none absolute z-30 left-0 right-0 flex justify-end pr-1"
+                style={{ top: Math.max(0, perfInfo.cssY - 18) }}
+              >
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium shadow-sm"
+                  style={{ background: PERF_COLOR, color: "white" }}
+                >
+                  <Scissors className="h-2.5 w-2.5" />
+                  {perfInfo.fromTop.toFixed(3)}" from top · {perfInfo.fromBottom.toFixed(3)}" from bottom
+                </span>
+              </div>
+            </>
+          )}
+          {perfInfo && perfInfo.orientation === "v" && (
+            <div
+              className="pointer-events-none absolute z-30 top-0 bottom-0 flex items-start pt-1"
+              style={{ left: Math.max(0, perfInfo.cssX + 4) }}
+            >
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium shadow-sm"
+                style={{ background: PERF_COLOR, color: "white" }}
+              >
+                <Scissors className="h-2.5 w-2.5" />
+                {perfInfo.fromTop.toFixed(3)}" from left · {perfInfo.fromBottom.toFixed(3)}" from right
+              </span>
+            </div>
+          )}
         </div>
       </div>
       </div>
