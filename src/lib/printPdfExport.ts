@@ -202,6 +202,31 @@ function drawRectObject(doc: jsPDF, obj: any, canvasDpi: number) {
 }
 
 /**
+ * Draw a straight line object (e.g. a perforation line) into the PDF.
+ * Perf lines are drawn horizontal/vertical only, so endpoints can be reconstructed
+ * unambiguously from the object's left/top + scaled width/height.
+ */
+function drawLineObject(doc: jsPDF, obj: any, canvasDpi: number) {
+  const x1 = (obj.left ?? 0) / canvasDpi;
+  const y1 = (obj.top ?? 0) / canvasDpi;
+  const wIn = ((obj.width || 0) * (obj.scaleX || 1)) / canvasDpi;
+  const hIn = ((obj.height || 0) * (obj.scaleY || 1)) / canvasDpi;
+  const x2 = x1 + wIn;
+  const y2 = y1 + hIn;
+
+  const { r, g, b } = parseColor(typeof obj.stroke === "string" ? obj.stroke : "#16a34a");
+  doc.setDrawColor(r, g, b);
+  doc.setLineWidth(Math.max(0.006, (obj.strokeWidth || 1) / canvasDpi));
+
+  const dash = Array.isArray(obj.strokeDashArray) ? obj.strokeDashArray : null;
+  if (dash && dash.length >= 2) {
+    doc.setLineDashPattern(dash.map((d: number) => d / canvasDpi), 0);
+  }
+  doc.line(x1, y1, x2, y2);
+  doc.setLineDashPattern([], 0); // reset so later strokes (crop marks) are solid
+}
+
+/**
  * Generate a print-ready PDF by compositing the source PDF with Fabric.js overlays.
  */
 export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blob> {
@@ -331,6 +356,8 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
       }
     } else if (objectType === "rect") {
       drawRectObject(doc, obj, CANVAS_DPI);
+    } else if (objectType === "line") {
+      drawLineObject(doc, obj, CANVAS_DPI);
     }
   }
 
