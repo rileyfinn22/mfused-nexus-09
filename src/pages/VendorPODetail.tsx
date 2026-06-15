@@ -1016,7 +1016,7 @@ Thank you for your business.`;
               </Button>
             </>
           )}
-          {isAdmin && po.status === 'created' && (
+          {isAdmin && (po.status === 'created' || po.status === 'draft') && (
             <Button
               variant="outline"
               onClick={async () => {
