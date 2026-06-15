@@ -842,14 +842,29 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     });
     canvas.on("object:modified", () => { clearGuidelines(canvas); syncCanvas(); });
     canvas.on("text:changed", syncCanvas);
-    // Live-update perf line measurement while dragging
-    const bumpPerf = (e: any) => {
-      const t = e?.target as any;
-      if (t && t.name === PERF_LINE_NAME) setPerfTick((n) => n + 1);
+    // Show perf measurement only on hover (after placement) or while drawing (handled in startDrawPerf)
+    const isPerf = (t: any) => t && (t.name === PERF_LINE_NAME || t.name === "_perfDraft");
+    canvas.on("mouse:over", (e: any) => {
+      if (isPerf(e?.target)) {
+        activePerfRef.current = e.target;
+        setPerfTick((n) => n + 1);
+      }
+    });
+    canvas.on("mouse:out", (e: any) => {
+      if (isPerf(e?.target) && activePerfRef.current === e.target) {
+        activePerfRef.current = null;
+        setPerfTick((n) => n + 1);
+      }
+    });
+    // Live-update measurement when an existing perf line is being moved
+    const bumpPerfMove = (e: any) => {
+      if (isPerf(e?.target)) {
+        activePerfRef.current = e.target;
+        setPerfTick((n) => n + 1);
+      }
     };
-    canvas.on("object:moving", bumpPerf);
-    canvas.on("object:scaling", bumpPerf);
-    canvas.on("object:modified", bumpPerf);
+    canvas.on("object:moving", bumpPerfMove);
+    canvas.on("object:modified", bumpPerfMove);
 
     // In use mode: auto-enter text editing on click
     if (mode === "use") {
