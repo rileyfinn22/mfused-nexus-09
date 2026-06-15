@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line, Polyline } from "fabric";
+import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line, Polyline, Group, loadSVGFromString } from "fabric";
 import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Scissors, Square } from "lucide-react";
+import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Scissors, Square, Layers } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
@@ -359,7 +359,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const serializeCanvasState = useCallback((includePdfBackground: boolean) => {
     if (!fabricRef.current) return null;
 
-    const data = fabricRef.current.toObject(['locked', 'editable', 'name']) as any;
+    const data = fabricRef.current.toObject(['locked', 'editable', 'name', '_displayName']) as any;
     delete data.backgroundImage;
 
     if (Array.isArray(data.objects)) {
@@ -795,7 +795,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       canvas.renderAll();
 
       // Seed undo stack with initial state
-      const initialData = canvas.toObject(['locked', 'editable', 'name']) as any;
+      const initialData = canvas.toObject(['locked', 'editable', 'name', '_displayName']) as any;
       delete initialData.backgroundImage;
       if (Array.isArray(initialData.objects)) {
         initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide" && obj?.name !== "_editHighlight" && obj?.name !== "_dieline" && obj?.name !== "_dielineLabel");
@@ -1330,6 +1330,80 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       } catch (err: any) {
         console.error("PDF artwork error:", err);
         toast.error("Failed to process PDF artwork");
+      }
+    };
+    input.click();
+  };
+
+  /**
+   * Import an SVG file and decompose it into individual editable vector layers.
+   * Each shape/text element becomes its own object (locked by default — admins
+   * unlock per-layer via the Layers panel). Phase 1 of the layered-editor plan.
+   */
+  const importSvg = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".svg,image/svg+xml";
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const canvas = fabricRef.current;
+      if (!canvas) return;
+      try {
+        const svgText = await file.text();
+        const result = await loadSVGFromString(svgText);
+        const objects = ((result?.objects || []) as (FabricObject | null)[]).filter(Boolean) as FabricObject[];
+        if (objects.length === 0) {
+          toast.error("No shapes found in that SVG");
+          return;
+        }
+
+        // Group to compute combined bounds + scale into the trim area, then disband
+        // (removeAll bakes the group transform back into each child) so every shape
+        // lands on the canvas as its own editable layer.
+        const group = new Group(objects as any);
+        const trimW = Math.round(width * DPI);
+        const trimH = Math.round(height * DPI);
+        const gW = group.width || trimW;
+        const gH = group.height || trimH;
+        const scale = Math.min(trimW / gW, trimH / gH, 1) || 1;
+        group.scale(scale);
+        group.set({
+          left: bleedPx + (trimW - group.getScaledWidth()) / 2,
+          top: bleedPx + (trimH - group.getScaledHeight()) / 2,
+        });
+        group.setCoords();
+
+        canvas.add(group);
+        const children = ((group.removeAll() as FabricObject[]) || []);
+        canvas.remove(group);
+
+        const baseName = file.name.replace(/\.svg$/i, "");
+        children.forEach((child: any, i: number) => {
+          const typeStr = String(child.type || "").toLowerCase();
+          const isText = typeStr.includes("text");
+          child.locked = true;       // imported layers locked by default
+          child.editable = false;
+          child.name = isText ? "locked_text" : (typeStr === "image" ? "locked_image" : "svg_shape");
+          if (!child._displayName) child._displayName = `${baseName} ${i + 1}`;
+          child.set({
+            selectable: true,
+            evented: true,
+            borderColor: "#94a3b8",
+            cornerColor: "#94a3b8",
+          });
+          child.setCoords?.();
+          canvas.add(child);
+        });
+
+        fixZOrder(canvas);
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+        syncCanvas();
+        toast.success(`Imported ${children.length} layer${children.length !== 1 ? "s" : ""} from SVG`);
+      } catch (err: any) {
+        console.error("SVG import error:", err);
+        toast.error("Failed to import SVG");
       }
     };
     input.click();
@@ -2474,6 +2548,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             <Button size="sm" variant="outline" onClick={addPdfArtwork} className="gap-1.5">
               <FileText className="h-3.5 w-3.5" />
               <span className="text-xs">PDF Art</span>
+            </Button>
+            <Button size="sm" variant="outline" onClick={importSvg} className="gap-1.5">
+              <Layers className="h-3.5 w-3.5" />
+              <span className="text-xs">Import SVG</span>
             </Button>
             <div className="w-px h-6 bg-border mx-1" />
             <AiImageDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
