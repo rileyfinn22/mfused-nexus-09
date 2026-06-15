@@ -1978,8 +1978,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       startPt = { x: pointer.x / zoom, y: pointer.y / zoom };
       perfLine = new Line([startPt.x, startPt.y, startPt.x, startPt.y], {
         stroke: PERF_COLOR,
-        strokeWidth: ptToPx(1),
-        strokeDashArray: [ptToPx(6), ptToPx(4)],
+        strokeWidth: 0.75,
+        strokeDashArray: [3, 3],
         strokeUniform: true,
         selectable: false,
         evented: false,
