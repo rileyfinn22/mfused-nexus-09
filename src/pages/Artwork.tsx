@@ -1631,8 +1631,14 @@ const Artwork = () => {
                     )}
                     
                     {/* Status badge */}
-                    <div className="absolute top-2 left-2">
+                    <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
                       {getStatusBadge(status)}
+                      {product.item_id && rejectedCountsBySku[product.item_id] > 0 && (
+                        <Badge className="bg-destructive text-destructive-foreground border-0">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          {rejectedCountsBySku[product.item_id]} Rejected
+                        </Badge>
+                      )}
                     </div>
                     
                     {/* Artwork count badge */}
