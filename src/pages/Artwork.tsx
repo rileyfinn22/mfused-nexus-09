@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -130,6 +130,28 @@ const Artwork = () => {
   
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
+
+  // Rejected file counts per SKU (derived from rejectedFiles)
+  const rejectedCountsBySku = useMemo(() => {
+    const m: Record<string, number> = {};
+    rejectedFiles.forEach((f: any) => {
+      if (!f?.sku) return;
+      m[f.sku] = (m[f.sku] || 0) + 1;
+    });
+    return m;
+  }, [rejectedFiles]);
+
+  // Rejected file counts per template (sum of SKU rejections for products in template)
+  const templateRejectedCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    templates.forEach(t => {
+      const skus = products.filter(p => p.template_id === t.id).map(p => p.item_id).filter(Boolean) as string[];
+      let n = 0;
+      skus.forEach(sku => { n += rejectedCountsBySku[sku] || 0; });
+      if (n > 0) m[t.id] = n;
+    });
+    return m;
+  }, [templates, products, rejectedCountsBySku]);
   
   // Derived template thumbnails from product artwork (fallback when template.thumbnail_url is null)
   const [templateDerivedThumbnails, setTemplateDerivedThumbnails] = useState<Record<string, string>>({});
@@ -1915,15 +1937,26 @@ const Artwork = () => {
                     {templateArtworkCounts[template.id] || 0} Art Files
                   </Badge>
                 </div>
-                {/* Pending artwork indicator */}
-                {templateStatus[template.id] === 'pending' && (
-                  <div className="absolute top-2 right-2">
+                {/* Status badges (pending + rejected) */}
+                <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                  {templateStatus[template.id] === 'pending' && (
                     <Badge variant="warning" className="bg-warning/90 text-warning-foreground backdrop-blur-sm">
                       <Clock className="h-3 w-3 mr-1" />
-                      Pending
+                      {(() => {
+                        let pendingCount = 0;
+                        const skus = products.filter(p => p.template_id === template.id).map(p => p.item_id).filter(Boolean) as string[];
+                        skus.forEach(s => { pendingCount += artworkCounts[s]?.pending || 0; });
+                        return pendingCount > 1 ? `${pendingCount} Pending` : 'Pending';
+                      })()}
                     </Badge>
-                  </div>
-                )}
+                  )}
+                  {templateRejectedCounts[template.id] > 0 && (
+                    <Badge className="bg-destructive/90 text-destructive-foreground border-0 backdrop-blur-sm">
+                      <XCircle className="h-3 w-3 mr-1" />
+                      {templateRejectedCounts[template.id]} Rejected
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div className="p-3 space-y-1">
                 <h3 className="font-medium text-sm leading-snug">{template.name}</h3>
