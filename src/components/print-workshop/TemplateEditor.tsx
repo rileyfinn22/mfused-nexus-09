@@ -2786,9 +2786,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-52 p-1.5 space-y-1">
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2"
+                  onClick={() => { addHorizontalPerf(); setOpenCat(null); }}>
+                  <Scissors className="h-3.5 w-3.5" /> Horizontal perf
+                </Button>
                 <Button size="sm" variant={drawPerfMode ? "default" : "ghost"} className="w-full justify-start gap-2"
                   onClick={() => { drawPerfMode ? endDrawPerf() : startDrawPerf(); setOpenCat(null); }}>
-                  <Scissors className="h-3.5 w-3.5" /> Perf line
+                  <Scissors className="h-3.5 w-3.5" /> Perf line (draw)
                 </Button>
                 <Button size="sm" variant={drawMaskMode ? "default" : "ghost"} className="w-full justify-start gap-2"
                   onClick={() => { drawMaskMode ? endDrawMask() : startDrawMask(); setOpenCat(null); }}>
