@@ -131,15 +131,21 @@ const Artwork = () => {
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
 
-  // Rejected file counts per SKU (derived from rejectedFiles)
+  // Rejected file counts per SKU (deduped by original_artwork_id, falling back to filename,
+  // so repeated reject-clicks on the same file count as 1)
   const rejectedCountsBySku = useMemo(() => {
-    const m: Record<string, number> = {};
+    const seenBySku: Record<string, Set<string>> = {};
     rejectedFiles.forEach((f: any) => {
       if (!f?.sku) return;
-      m[f.sku] = (m[f.sku] || 0) + 1;
+      const key = f.original_artwork_id || f.filename || f.id;
+      if (!seenBySku[f.sku]) seenBySku[f.sku] = new Set();
+      seenBySku[f.sku].add(String(key));
     });
+    const m: Record<string, number> = {};
+    Object.entries(seenBySku).forEach(([sku, set]) => { m[sku] = set.size; });
     return m;
   }, [rejectedFiles]);
+
 
   // Rejected file counts per template (sum of SKU rejections for products in template)
   const templateRejectedCounts = useMemo(() => {
