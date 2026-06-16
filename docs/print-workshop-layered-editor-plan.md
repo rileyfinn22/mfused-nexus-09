@@ -185,7 +185,7 @@ You already have the editor engine (Fabric). The work is: **(a)** upgrade the ob
 
 The quadlabels "Live Design Studio" is **OnPrintShop's** licensed web-to-print Design Studio (Angular SPA on CloudFront + PHP backend + direct-to-S3 uploads + OpenAI). It's the same *class* of system we're building (Fabric-class canvas designer); the gap is **breadth**, not architecture. Worth pulling into our build, in rough priority:
 
-1. **Shapes library** *(small)* — rectangle, rounded-rect, circle, ellipse, line, triangle, polygon, hexagon, octagon, star (5/6/12/24-pt). All native Fabric objects. Pairs naturally with the existing perf-line drawing tool.
+1. **Shapes library** *(small)* — ✅ **shipped (v1):** rectangle, rounded-rect, circle, ellipse, line, triangle, star, hexagon via a "Shapes" category in the grouped toolbar. Added locked-by-default (outline style), recolour comes with the property panel (UI Stage B). *Still TODO:* octagon + extra star variants, and a `circle/ellipse/triangle/polygon` branch in the hybrid PDF export (`printPdfExport.ts`) so non-rect/line shapes print when a template also has a source PDF (canvas-only export already rasterizes them).
 2. **QR code generator** *(small)* — URL / text / phone / email / WiFi / vCard payloads → QR added as a vector/image object. Very common label need. (`qrcode` lib or an edge function.)
 3. **Clip-art / icon library** *(medium)* — searchable categorized gallery of pre-approved SVG art; click to place as an editable layer. (We already have `IconPickerDialog` — extend it into a real categorized library.)
 4. **Curve / arc text** *(medium)* — text on a path (the reference ships preset arcs: circle, semicircle, wave, ribbon, spiral). High-impact for labels/badges.

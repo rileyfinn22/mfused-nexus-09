@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line, Polyline, Group, loadSVGFromString } from "fabric";
+import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line, Polyline, Group, loadSVGFromString, Circle as FabricCircle, Ellipse as FabricEllipse, Triangle as FabricTriangle, Polygon as FabricPolygon } from "fabric";
 import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Scissors, Square, Layers, Sparkles } from "lucide-react";
+import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Scissors, Square, Layers, Sparkles, Circle, Triangle, Star, Hexagon, Minus, Shapes } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AiImageDialog } from "./AiImageDialog";
@@ -141,6 +141,27 @@ const OCR_KNOCKOUT_NAME = "_ocrKnockout";
 // survives save/load and is included in print-ready exports.
 const PERF_LINE_NAME = "perf_line";
 const PERF_COLOR = "#16a34a";
+
+// Geometry helpers for the Shapes library. Points are laid out in a [0..2r] box
+// (center at r,r) so the polygon's bounding box starts near the origin and the
+// object can be positioned with plain left/top.
+function regularPolygonPoints(sides: number, r: number) {
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i < sides; i++) {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / sides;
+    pts.push({ x: r + r * Math.cos(a), y: r + r * Math.sin(a) });
+  }
+  return pts;
+}
+function starPolygonPoints(spikes: number, outerR: number, innerR: number) {
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const a = -Math.PI / 2 + (i * Math.PI) / spikes;
+    pts.push({ x: outerR + r * Math.cos(a), y: outerR + r * Math.sin(a) });
+  }
+  return pts;
+}
 
 function clearGuidelines(canvas: FabricCanvas) {
   const guides = canvas.getObjects().filter((o: any) => o.name === GUIDE_NAME);
@@ -1550,6 +1571,66 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     input.click();
   };
 
+  /**
+   * Add a vector shape to the canvas. Shapes are part of the template design,
+   * so they come in locked (customers can't edit them unless an admin unlocks
+   * the layer). Default style is a black outline (transparent fill) — useful as
+   * frames / dividers / accents; recolour comes with the property panel (Stage B).
+   */
+  const addShape = (kind: string) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const size = Math.round(Math.min(canvasWidth, canvasHeight) * 0.35);
+    const left = Math.round(canvasWidth / 2 - size / 2);
+    const top = Math.round(canvasHeight / 2 - size / 2);
+    const stroke = "#000000";
+    const strokeWidth = Math.max(2, ptToPx(1));
+    const base: any = { fill: "transparent", stroke, strokeWidth, strokeUniform: true };
+
+    let obj: FabricObject;
+    switch (kind) {
+      case "roundRect":
+        obj = new Rect({ left, top, width: size, height: Math.round(size * 0.66), rx: Math.round(size * 0.1), ry: Math.round(size * 0.1), ...base });
+        break;
+      case "circle":
+        obj = new FabricCircle({ left, top, radius: size / 2, ...base });
+        break;
+      case "ellipse":
+        obj = new FabricEllipse({ left, top, rx: size / 2, ry: Math.round(size * 0.33), ...base });
+        break;
+      case "triangle":
+        obj = new FabricTriangle({ left, top, width: size, height: size, ...base });
+        break;
+      case "line":
+        obj = new Line([left, top + size / 2, left + size, top + size / 2], { stroke, strokeWidth, strokeUniform: true } as any);
+        break;
+      case "star":
+        obj = new FabricPolygon(starPolygonPoints(5, size / 2, size / 4), base);
+        obj.set({ left, top });
+        break;
+      case "hexagon":
+        obj = new FabricPolygon(regularPolygonPoints(6, size / 2), base);
+        obj.set({ left, top });
+        break;
+      case "rect":
+      default:
+        obj = new Rect({ left, top, width: size, height: Math.round(size * 0.66), ...base });
+        break;
+    }
+
+    (obj as any).locked = true;
+    (obj as any).editable = false;
+    (obj as any).name = "shape";
+    obj.set({ borderColor: "#94a3b8", cornerColor: "#94a3b8" } as any);
+    obj.setCoords?.();
+    canvas.add(obj);
+    fixZOrder(canvas);
+    canvas.setActiveObject(obj);
+    canvas.requestRenderAll();
+    syncCanvas();
+    toast.success("Shape added");
+  };
+
   function pickImageFile(onLoad: (img: HTMLImageElement) => void) {
     const input = document.createElement("input");
     input.type = "file";
@@ -2695,6 +2776,35 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                   onClick={() => { drawTextMode === "locked" ? endDrawText() : startDrawText("locked"); setOpenCat(null); }}>
                   <Lock className="h-3.5 w-3.5" /> Draw locked text
                 </Button>
+              </PopoverContent>
+            </Popover>
+
+            {/* ── Shapes ── */}
+            <Popover open={openCat === "shapes"} onOpenChange={(o) => setOpenCat(o ? "shapes" : null)}>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant="outline" className="gap-1.5">
+                  <Shapes className="h-3.5 w-3.5" /><span className="text-xs">Shapes</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-52 p-2">
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { k: "rect", label: "Rect", Icon: Square },
+                    { k: "roundRect", label: "Round", Icon: Square },
+                    { k: "circle", label: "Circle", Icon: Circle },
+                    { k: "ellipse", label: "Ellipse", Icon: Circle },
+                    { k: "triangle", label: "Triangle", Icon: Triangle },
+                    { k: "line", label: "Line", Icon: Minus },
+                    { k: "star", label: "Star", Icon: Star },
+                    { k: "hexagon", label: "Hexagon", Icon: Hexagon },
+                  ].map(({ k, label, Icon }) => (
+                    <Button key={k} size="sm" variant="ghost" className="h-12 flex-col gap-0.5 p-1" title={label}
+                      onClick={() => { addShape(k); setOpenCat(null); }}>
+                      <Icon className="h-4 w-4" />
+                      <span className="text-[9px] leading-none">{label}</span>
+                    </Button>
+                  ))}
+                </div>
               </PopoverContent>
             </Popover>
 
