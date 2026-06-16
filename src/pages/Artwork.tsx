@@ -1335,6 +1335,51 @@ const Artwork = () => {
           </div>
         )}
 
+        {/* Rejected files for this SKU (deduped) */}
+        {(() => {
+          const skuRejected = rejectedFiles.filter((f: any) => f.sku === selectedProduct.item_id);
+          const seen = new Set<string>();
+          const deduped = skuRejected.filter((f: any) => {
+            const key = String(f.original_artwork_id || f.filename || f.id);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          if (deduped.length === 0) return null;
+          return (
+            <Card className="p-4 border-destructive/30 bg-destructive/5">
+              <div className="flex items-center gap-2 mb-3">
+                <XCircle className="h-4 w-4 text-destructive" />
+                <h3 className="font-semibold text-sm">Rejected Files</h3>
+                <Badge variant="destructive" className="text-xs">{deduped.length}</Badge>
+              </div>
+              <div className="space-y-2">
+                {deduped.map((f: any) => (
+                  <div key={f.id} className="flex items-center justify-between gap-3 p-2 rounded bg-background border text-sm">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate" title={f.filename}>{f.filename}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Rejected {new Date(f.rejected_at).toLocaleDateString()}
+                        {f.rejection_reason ? ` — ${f.rejection_reason}` : ''}
+                      </div>
+                    </div>
+                    {f.artwork_url && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownload(f.artwork_url, f.filename)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        })()}
+
+
         {/* Add Artwork Dialog - pre-filled with product, defaults to vibe_proof */}
         <AddArtworkDialog
           open={uploadDialogOpen}
