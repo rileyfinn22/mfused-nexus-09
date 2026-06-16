@@ -2249,6 +2249,41 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     canvas.on("mouse:up", onMouseUp);
   };
 
+  // Quick add: insert a full-width horizontal perf line at vertical center.
+  // The line is locked on the X axis so the user can only nudge/drag it up & down.
+  const addHorizontalPerf = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const y = canvasHeight / 2;
+    const line = new Line([0, y, canvasWidth, y], {
+      stroke: PERF_COLOR,
+      strokeWidth: 0.75,
+      strokeDashArray: [3, 3],
+      strokeUniform: true,
+      name: PERF_LINE_NAME,
+      selectable: true,
+      evented: true,
+      hasControls: false,
+      hasBorders: true,
+      lockMovementX: true,
+      lockScalingX: true,
+      lockScalingY: true,
+      lockRotation: true,
+      borderColor: PERF_COLOR,
+    } as any);
+    (line as any).locked = true;
+    (line as any).editable = false;
+    canvas.add(line);
+    line.setCoords();
+    canvas.setActiveObject(line);
+    activePerfRef.current = line;
+    setPerfTick((n) => n + 1);
+    fixZOrder(canvas);
+    syncCanvas();
+    canvas.renderAll();
+    toast.success("Horizontal perf line added — drag up/down to position");
+  };
+
   const endDrawPerf = () => {
     setDrawPerfMode(false);
     const canvas = fabricRef.current;
@@ -2751,9 +2786,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-52 p-1.5 space-y-1">
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2"
+                  onClick={() => { addHorizontalPerf(); setOpenCat(null); }}>
+                  <Scissors className="h-3.5 w-3.5" /> Horizontal perf
+                </Button>
                 <Button size="sm" variant={drawPerfMode ? "default" : "ghost"} className="w-full justify-start gap-2"
                   onClick={() => { drawPerfMode ? endDrawPerf() : startDrawPerf(); setOpenCat(null); }}>
-                  <Scissors className="h-3.5 w-3.5" /> Perf line
+                  <Scissors className="h-3.5 w-3.5" /> Perf line (draw)
                 </Button>
                 <Button size="sm" variant={drawMaskMode ? "default" : "ghost"} className="w-full justify-start gap-2"
                   onClick={() => { drawMaskMode ? endDrawMask() : startDrawMask(); setOpenCat(null); }}>
