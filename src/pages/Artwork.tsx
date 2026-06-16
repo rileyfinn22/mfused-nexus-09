@@ -130,6 +130,28 @@ const Artwork = () => {
   
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
+
+  // Rejected file counts per SKU (derived from rejectedFiles)
+  const rejectedCountsBySku = useMemo(() => {
+    const m: Record<string, number> = {};
+    rejectedFiles.forEach((f: any) => {
+      if (!f?.sku) return;
+      m[f.sku] = (m[f.sku] || 0) + 1;
+    });
+    return m;
+  }, [rejectedFiles]);
+
+  // Rejected file counts per template (sum of SKU rejections for products in template)
+  const templateRejectedCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    templates.forEach(t => {
+      const skus = products.filter(p => p.template_id === t.id).map(p => p.item_id).filter(Boolean) as string[];
+      let n = 0;
+      skus.forEach(sku => { n += rejectedCountsBySku[sku] || 0; });
+      if (n > 0) m[t.id] = n;
+    });
+    return m;
+  }, [templates, products, rejectedCountsBySku]);
   
   // Derived template thumbnails from product artwork (fallback when template.thumbnail_url is null)
   const [templateDerivedThumbnails, setTemplateDerivedThumbnails] = useState<Record<string, string>>({});
