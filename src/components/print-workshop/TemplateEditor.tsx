@@ -2249,6 +2249,41 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     canvas.on("mouse:up", onMouseUp);
   };
 
+  // Quick add: insert a full-width horizontal perf line at vertical center.
+  // The line is locked on the X axis so the user can only nudge/drag it up & down.
+  const addHorizontalPerf = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const y = canvasHeight / 2;
+    const line = new Line([0, y, canvasWidth, y], {
+      stroke: PERF_COLOR,
+      strokeWidth: 0.75,
+      strokeDashArray: [3, 3],
+      strokeUniform: true,
+      name: PERF_LINE_NAME,
+      selectable: true,
+      evented: true,
+      hasControls: false,
+      hasBorders: true,
+      lockMovementX: true,
+      lockScalingX: true,
+      lockScalingY: true,
+      lockRotation: true,
+      borderColor: PERF_COLOR,
+    } as any);
+    (line as any).locked = true;
+    (line as any).editable = false;
+    canvas.add(line);
+    line.setCoords();
+    canvas.setActiveObject(line);
+    activePerfRef.current = line;
+    setPerfTick((n) => n + 1);
+    fixZOrder(canvas);
+    syncCanvas();
+    canvas.renderAll();
+    toast.success("Horizontal perf line added — drag up/down to position");
+  };
+
   const endDrawPerf = () => {
     setDrawPerfMode(false);
     const canvas = fabricRef.current;
