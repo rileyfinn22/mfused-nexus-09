@@ -1937,15 +1937,26 @@ const Artwork = () => {
                     {templateArtworkCounts[template.id] || 0} Art Files
                   </Badge>
                 </div>
-                {/* Pending artwork indicator */}
-                {templateStatus[template.id] === 'pending' && (
-                  <div className="absolute top-2 right-2">
+                {/* Status badges (pending + rejected) */}
+                <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                  {templateStatus[template.id] === 'pending' && (
                     <Badge variant="warning" className="bg-warning/90 text-warning-foreground backdrop-blur-sm">
                       <Clock className="h-3 w-3 mr-1" />
-                      Pending
+                      {(() => {
+                        let pendingCount = 0;
+                        const skus = products.filter(p => p.template_id === template.id).map(p => p.item_id).filter(Boolean) as string[];
+                        skus.forEach(s => { pendingCount += artworkCounts[s]?.pending || 0; });
+                        return pendingCount > 1 ? `${pendingCount} Pending` : 'Pending';
+                      })()}
                     </Badge>
-                  </div>
-                )}
+                  )}
+                  {templateRejectedCounts[template.id] > 0 && (
+                    <Badge className="bg-destructive/90 text-destructive-foreground border-0 backdrop-blur-sm">
+                      <XCircle className="h-3 w-3 mr-1" />
+                      {templateRejectedCounts[template.id]} Rejected
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div className="p-3 space-y-1">
                 <h3 className="font-medium text-sm leading-snug">{template.name}</h3>
