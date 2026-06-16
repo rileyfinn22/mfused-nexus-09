@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -130,6 +130,34 @@ const Artwork = () => {
   
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
+
+  // Rejected file counts per SKU (deduped by original_artwork_id, falling back to filename,
+  // so repeated reject-clicks on the same file count as 1)
+  const rejectedCountsBySku = useMemo(() => {
+    const seenBySku: Record<string, Set<string>> = {};
+    rejectedFiles.forEach((f: any) => {
+      if (!f?.sku) return;
+      const key = f.original_artwork_id || f.filename || f.id;
+      if (!seenBySku[f.sku]) seenBySku[f.sku] = new Set();
+      seenBySku[f.sku].add(String(key));
+    });
+    const m: Record<string, number> = {};
+    Object.entries(seenBySku).forEach(([sku, set]) => { m[sku] = set.size; });
+    return m;
+  }, [rejectedFiles]);
+
+
+  // Rejected file counts per template (sum of SKU rejections for products in template)
+  const templateRejectedCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    templates.forEach(t => {
+      const skus = products.filter(p => p.template_id === t.id).map(p => p.item_id).filter(Boolean) as string[];
+      let n = 0;
+      skus.forEach(sku => { n += rejectedCountsBySku[sku] || 0; });
+      if (n > 0) m[t.id] = n;
+    });
+    return m;
+  }, [templates, products, rejectedCountsBySku]);
   
   // Derived template thumbnails from product artwork (fallback when template.thumbnail_url is null)
   const [templateDerivedThumbnails, setTemplateDerivedThumbnails] = useState<Record<string, string>>({});
@@ -1307,6 +1335,51 @@ const Artwork = () => {
           </div>
         )}
 
+        {/* Rejected files for this SKU (deduped) */}
+        {(() => {
+          const skuRejected = rejectedFiles.filter((f: any) => f.sku === selectedProduct.item_id);
+          const seen = new Set<string>();
+          const deduped = skuRejected.filter((f: any) => {
+            const key = String(f.original_artwork_id || f.filename || f.id);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          if (deduped.length === 0) return null;
+          return (
+            <Card className="p-4 border-destructive/30 bg-destructive/5">
+              <div className="flex items-center gap-2 mb-3">
+                <XCircle className="h-4 w-4 text-destructive" />
+                <h3 className="font-semibold text-sm">Rejected Files</h3>
+                <Badge variant="destructive" className="text-xs">{deduped.length}</Badge>
+              </div>
+              <div className="space-y-2">
+                {deduped.map((f: any) => (
+                  <div key={f.id} className="flex items-center justify-between gap-3 p-2 rounded bg-background border text-sm">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate" title={f.filename}>{f.filename}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Rejected {new Date(f.rejected_at).toLocaleDateString()}
+                        {f.rejection_reason ? ` — ${f.rejection_reason}` : ''}
+                      </div>
+                    </div>
+                    {f.artwork_url && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownload(f.artwork_url, f.filename)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        })()}
+
+
         {/* Add Artwork Dialog - pre-filled with product, defaults to vibe_proof */}
         <AddArtworkDialog
           open={uploadDialogOpen}
@@ -1609,8 +1682,14 @@ const Artwork = () => {
                     )}
                     
                     {/* Status badge */}
-                    <div className="absolute top-2 left-2">
+                    <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
                       {getStatusBadge(status)}
+                      {product.item_id && rejectedCountsBySku[product.item_id] > 0 && (
+                        <Badge className="bg-destructive text-destructive-foreground border-0">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          {rejectedCountsBySku[product.item_id]} Rejected
+                        </Badge>
+                      )}
                     </div>
                     
                     {/* Artwork count badge */}
@@ -1686,8 +1765,14 @@ const Artwork = () => {
                         <span className="text-sm text-muted-foreground">-</span>
                       )}
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-2 flex flex-col gap-1 items-start">
                       {getStatusBadge(getProductArtworkStatus(product.item_id))}
+                      {product.item_id && rejectedCountsBySku[product.item_id] > 0 && (
+                        <Badge className="bg-destructive text-destructive-foreground border-0">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          {rejectedCountsBySku[product.item_id]} Rejected
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 );
@@ -1915,15 +2000,26 @@ const Artwork = () => {
                     {templateArtworkCounts[template.id] || 0} Art Files
                   </Badge>
                 </div>
-                {/* Pending artwork indicator */}
-                {templateStatus[template.id] === 'pending' && (
-                  <div className="absolute top-2 right-2">
+                {/* Status badges (pending + rejected) */}
+                <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                  {templateStatus[template.id] === 'pending' && (
                     <Badge variant="warning" className="bg-warning/90 text-warning-foreground backdrop-blur-sm">
                       <Clock className="h-3 w-3 mr-1" />
-                      Pending
+                      {(() => {
+                        let pendingCount = 0;
+                        const skus = products.filter(p => p.template_id === template.id).map(p => p.item_id).filter(Boolean) as string[];
+                        skus.forEach(s => { pendingCount += artworkCounts[s]?.pending || 0; });
+                        return pendingCount > 1 ? `${pendingCount} Pending` : 'Pending';
+                      })()}
                     </Badge>
-                  </div>
-                )}
+                  )}
+                  {templateRejectedCounts[template.id] > 0 && (
+                    <Badge className="bg-destructive/90 text-destructive-foreground border-0 backdrop-blur-sm">
+                      <XCircle className="h-3 w-3 mr-1" />
+                      {templateRejectedCounts[template.id]} Rejected
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div className="p-3 space-y-1">
                 <h3 className="font-medium text-sm leading-snug">{template.name}</h3>
