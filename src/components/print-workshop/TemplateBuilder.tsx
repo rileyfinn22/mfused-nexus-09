@@ -306,7 +306,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         </h2>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
         {/* Settings panel */}
         <Card className="lg:col-span-1">
           <CardHeader className="pb-4">
@@ -430,7 +430,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         </Card>
 
         {/* Canvas editor */}
-        <div className="lg:col-span-2 min-w-0">
+        <div className="lg:col-span-3 min-w-0">
           <TemplateEditor
             canvasData={canvasData}
             width={widthInches}

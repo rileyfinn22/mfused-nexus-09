@@ -479,28 +479,24 @@ export default function PrintWorkshop() {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 min-w-0">
-            <TemplateEditor
-              canvasData={canvasData}
-              width={selectedTemplate.width_inches}
-              height={selectedTemplate.height_inches}
-              bleed={selectedTemplate.bleed_inches}
-              depth={selectedTemplate.depth_inches || 0}
-              productType={selectedTemplate.product_type || "label"}
-              onCanvasChange={setCanvasData}
-              sourcePdfPath={selectedTemplate.source_pdf_path}
-              mode={isCustomOrder ? "edit" : "use"}
-              fabricCanvasRef={useFabricCanvasRef}
-            />
-          </div>
-          <div>
-            <OrderPanel
-              template={selectedTemplate}
-              canvasData={canvasData}
-              onAddToCart={handleAddToCart}
-            />
-          </div>
+        <div className="space-y-4">
+          <TemplateEditor
+            canvasData={canvasData}
+            width={selectedTemplate.width_inches}
+            height={selectedTemplate.height_inches}
+            bleed={selectedTemplate.bleed_inches}
+            depth={selectedTemplate.depth_inches || 0}
+            productType={selectedTemplate.product_type || "label"}
+            onCanvasChange={setCanvasData}
+            sourcePdfPath={selectedTemplate.source_pdf_path}
+            mode={isCustomOrder ? "edit" : "use"}
+            fabricCanvasRef={useFabricCanvasRef}
+          />
+          <OrderPanel
+            template={selectedTemplate}
+            canvasData={canvasData}
+            onAddToCart={handleAddToCart}
+          />
         </div>
 
         {/* Floating saved design indicator */}

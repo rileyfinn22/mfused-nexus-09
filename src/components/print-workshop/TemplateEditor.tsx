@@ -2994,9 +2994,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border flex-wrap">
+    <div className="flex gap-3 h-[calc(100vh-140px)] min-h-[560px]">
+      {/* Left tool rail (Photopea/Quad-style) */}
+      <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-muted/50 border border-border w-44 shrink-0 overflow-y-auto">
         {/* Undo / Redo - admin only */}
         {mode === "edit" && (
           <>
@@ -3037,7 +3037,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                   <Type className="h-3.5 w-3.5" /><span className="text-xs">Text</span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-52 p-1.5 space-y-1">
+              <PopoverContent align="start" side="right" className="w-52 p-1.5 space-y-1">
                 <Button size="sm" variant={drawTextMode === "editable" ? "default" : "ghost"} className="w-full justify-start gap-2"
                   onClick={() => { drawTextMode === "editable" ? endDrawText() : startDrawText("editable"); setOpenCat(null); }}>
                   <Type className="h-3.5 w-3.5" /> Draw editable text
@@ -3056,7 +3056,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                   <Shapes className="h-3.5 w-3.5" /><span className="text-xs">Shapes</span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-52 p-2">
+              <PopoverContent align="start" side="right" className="w-52 p-2">
                 <div className="grid grid-cols-4 gap-1">
                   {[
                     { k: "rect", label: "Rect", Icon: Square },
@@ -3085,7 +3085,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                   <ImageIcon className="h-3.5 w-3.5" /><span className="text-xs">Images</span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-52 p-1.5 space-y-1">
+              <PopoverContent align="start" side="right" className="w-52 p-1.5 space-y-1">
                 <Button size="sm" variant="ghost" className="w-full justify-start gap-2" onClick={() => { addArtworkImage(true); setOpenCat(null); }}>
                   <Upload className="h-3.5 w-3.5" /> Add image (editable)
                 </Button>
@@ -3115,7 +3115,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                   <Sparkles className="h-3.5 w-3.5" /><span className="text-xs">AI</span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-56 p-1.5 space-y-1 flex flex-col items-stretch">
+              <PopoverContent align="start" side="right" className="w-56 p-1.5 space-y-1 flex flex-col items-stretch">
                 <AiImageDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
                 <AiEditDialog getCanvasImage={getCanvasImage} onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
                 <AiCleanupDialog onImageGenerated={(dataUrl) => addImageFromDataUrl(dataUrl, true)} />
@@ -3130,7 +3130,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                   <Scissors className="h-3.5 w-3.5" /><span className="text-xs">Dieline</span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-52 p-1.5 space-y-1">
+              <PopoverContent align="start" side="right" className="w-52 p-1.5 space-y-1">
                 <Button size="sm" variant="ghost" className="w-full justify-start gap-2"
                   onClick={() => { addHorizontalPerf(); setOpenCat(null); }}>
                   <Scissors className="h-3.5 w-3.5" /> Horizontal perf
@@ -3153,7 +3153,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                   <Scan className="h-3.5 w-3.5" /><span className="text-xs">Extract</span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-60 p-2 space-y-1.5">
+              <PopoverContent align="start" side="right" className="w-60 p-2 space-y-1.5">
                 <p className="text-[11px] text-muted-foreground px-1">Extracted text becomes…</p>
                 <div className="flex gap-1">
                   <Button size="sm" variant={zoneExtractLocked ? "outline" : "default"} className="flex-1 gap-1" onClick={() => setZoneExtractLocked(false)} disabled={extractingText}>
@@ -3236,6 +3236,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
         {/* Selected-object controls moved to the contextual Properties panel (Stage B) */}
       </div>
+
+      {/* Main workspace column (canvas + properties + layers) */}
+      <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-auto">
 
       {/* Draw text mode hint */}
       {drawTextMode !== "off" && (
@@ -3515,6 +3518,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             </>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
