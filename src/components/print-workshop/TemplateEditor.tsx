@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line, Polyline, Group, loadSVGFromString, Circle as FabricCircle, Ellipse as FabricEllipse, Triangle as FabricTriangle, Polygon as FabricPolygon } from "fabric";
+import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line, Polyline, Group, loadSVGFromString, Circle as FabricCircle, Ellipse as FabricEllipse, Triangle as FabricTriangle, Polygon as FabricPolygon, Point } from "fabric";
 import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -364,6 +364,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   // The measureRef div's width is determined by parent layout, not canvas content.
   const measureRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(600);
   const [containerHeight, setContainerHeight] = useState(400);
 
@@ -532,6 +533,59 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
     fabricRef.current = canvas;
     if (fabricCanvasRef) fabricCanvasRef.current = canvas;
+
+    // ── Artboard navigation: scroll to zoom, middle-mouse drag to pan ──
+    // Keep the HTML trim/bleed overlay locked to the Fabric viewport so it tracks
+    // pan/zoom (the overlay is laid out at the base fit scale; we apply the delta).
+    const syncOverlay = () => {
+      const el = overlayRef.current;
+      const vpt = canvas.viewportTransform;
+      if (!el || !vpt) return;
+      el.style.transformOrigin = "0 0";
+      el.style.transform = `translate(${vpt[4]}px, ${vpt[5]}px) scale(${(vpt[0] || displayScale) / displayScale})`;
+    };
+    canvas.on("after:render", syncOverlay);
+
+    canvas.on("mouse:wheel", (opt: any) => {
+      const e = opt.e;
+      let z = canvas.getZoom();
+      z *= 0.999 ** e.deltaY;
+      z = Math.min(Math.max(z, displayScale * 0.25), displayScale * 8);
+      canvas.zoomToPoint(new Point(e.offsetX, e.offsetY), z);
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    let isPanning = false;
+    let lastPanX = 0;
+    let lastPanY = 0;
+    canvas.on("mouse:down", (opt: any) => {
+      // Middle-mouse button pans (conflict-free with selecting/moving objects)
+      if (opt.e?.button === 1) {
+        isPanning = true;
+        canvas.selection = false;
+        lastPanX = opt.e.clientX;
+        lastPanY = opt.e.clientY;
+        canvas.setCursor("grabbing");
+        opt.e.preventDefault();
+      }
+    });
+    canvas.on("mouse:move", (opt: any) => {
+      if (!isPanning) return;
+      const vpt = canvas.viewportTransform;
+      if (!vpt) return;
+      vpt[4] += opt.e.clientX - lastPanX;
+      vpt[5] += opt.e.clientY - lastPanY;
+      canvas.setViewportTransform(vpt);
+      lastPanX = opt.e.clientX;
+      lastPanY = opt.e.clientY;
+    });
+    canvas.on("mouse:up", () => {
+      if (isPanning) {
+        isPanning = false;
+        canvas.selection = mode === "edit";
+      }
+    });
 
     // Bleed/trim visual guide is rendered as HTML overlay above the canvas
     // (more reliable than Fabric after:render across zoom/retina).
@@ -2189,8 +2243,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     canvas.renderAll();
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
+      const pointer = canvas.getScenePoint(e.e);
+      const zoom = 1;
       const x = pointer.x / zoom;
       const y = pointer.y / zoom;
       drawTextStartRef.current = { x, y };
@@ -2210,8 +2264,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
     const onMouseMove = (e: any) => {
       if (!drawTextStartRef.current || !drawTextRectRef.current) return;
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
+      const pointer = canvas.getScenePoint(e.e);
+      const zoom = 1;
       const x = pointer.x / zoom;
       const y = pointer.y / zoom;
       const start = drawTextStartRef.current;
@@ -2321,8 +2375,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     canvas.renderAll();
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
+      const pointer = canvas.getScenePoint(e.e);
+      const zoom = 1;
       const x = pointer.x / zoom;
       const y = pointer.y / zoom;
       drawMaskStartRef.current = { x, y };
@@ -2342,8 +2396,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
     const onMouseMove = (e: any) => {
       if (!drawMaskStartRef.current || !drawMaskRectRef.current) return;
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
+      const pointer = canvas.getScenePoint(e.e);
+      const zoom = 1;
       const x = pointer.x / zoom;
       const y = pointer.y / zoom;
       const start = drawMaskStartRef.current;
@@ -2437,8 +2491,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     let perfLine: Line | null = null;
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
+      const pointer = canvas.getScenePoint(e.e);
+      const zoom = 1;
       startPt = { x: pointer.x / zoom, y: pointer.y / zoom };
       perfLine = new Line([startPt.x, startPt.y, startPt.x, startPt.y], {
         stroke: PERF_COLOR,
@@ -2457,8 +2511,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
     const onMouseMove = (e: any) => {
       if (!startPt || !perfLine) return;
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
+      const pointer = canvas.getScenePoint(e.e);
+      const zoom = 1;
       const x = pointer.x / zoom;
       const y = pointer.y / zoom;
       // Snap to pure horizontal or vertical based on the dominant drag axis
@@ -2585,8 +2639,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     let rect: Rect | null = null;
 
     const onMouseDown = (e: any) => {
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
+      const pointer = canvas.getScenePoint(e.e);
+      const zoom = 1;
       startPt = { x: pointer.x / zoom, y: pointer.y / zoom };
       rect = new Rect({
         left: startPt.x, top: startPt.y, width: 1, height: 1,
@@ -2600,8 +2654,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
     const onMouseMove = (e: any) => {
       if (!startPt || !rect) return;
-      const pointer = canvas.getViewportPoint(e.e);
-      const zoom = canvas.getZoom();
+      const pointer = canvas.getScenePoint(e.e);
+      const zoom = 1;
       const x = pointer.x / zoom;
       const y = pointer.y / zoom;
       rect.set({
@@ -2960,6 +3014,21 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     canvas.requestRenderAll();
     syncCanvas();
   };
+  // ── Artboard view controls ──
+  const fitView = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.setViewportTransform([displayScale, 0, 0, displayScale, 0, 0]);
+    canvas.requestRenderAll();
+  };
+  const zoomByFactor = (f: number) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    let z = canvas.getZoom() * f;
+    z = Math.min(Math.max(z, displayScale * 0.25), displayScale * 8);
+    canvas.zoomToPoint(new Point(cssWidth / 2, cssHeight / 2), z);
+    canvas.requestRenderAll();
+  };
   const centerOrFitSelected = (kind: "center" | "fit") => {
     const canvas = fabricRef.current;
     if (!canvas) return;
@@ -3305,11 +3374,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       <div className="flex gap-4 items-stretch flex-1 min-h-0">
       <div ref={measureRef} className="flex-1 min-w-0 min-h-0 flex items-center justify-center overflow-hidden">
         <div ref={containerRef} className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex items-center justify-center w-full h-full">
-        <div className="relative shadow-lg shrink-0" style={{ width: cssWidth, height: cssHeight }}>
+        <div className="relative shadow-lg shrink-0 overflow-hidden" style={{ width: cssWidth, height: cssHeight }}>
           <canvas ref={canvasRef} />
 
-          {/* Always-on-top bleed/trim guide (visual only) */}
-          <div className="pointer-events-none absolute inset-0 z-20">
+          {/* Always-on-top bleed/trim guide (visual only) — tracks the Fabric viewport */}
+          <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-20">
             <div
               className="absolute left-0 top-0 right-0"
               style={{ height: displayBleedPx, background: "rgba(31, 41, 55, 0.35)" }}
@@ -3523,6 +3592,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             )}
           </div>
         )}
+      </div>
+
+      {/* Zoom / pan controls */}
+      <div className="flex items-center justify-center gap-1 shrink-0">
+        <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => zoomByFactor(1 / 1.2)} title="Zoom out">−</Button>
+        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={fitView} title="Fit to screen">Fit</Button>
+        <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => zoomByFactor(1.2)} title="Zoom in">+</Button>
+        <span className="text-[10px] text-muted-foreground ml-2">scroll to zoom · middle-drag to pan</span>
       </div>
 
       {/* Objects panel + Dimensions info */}
