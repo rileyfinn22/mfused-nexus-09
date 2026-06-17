@@ -141,6 +141,8 @@ Replace/augment the flatten-then-OCR flow: on PDF upload, run `getTextContent()`
 Add `ag-psd`; map each layer → object, text layers → editable text, preserve names/opacity/visibility/blend.
 **Why:** true Photoshop-style layers. **Effort:** M.
 
+**Status — v1 shipped:** `importPsdFile` (dynamic-imported `ag-psd`) decomposes a PSD into layers via the **Upload** button — text layers → editable text, raster layers → placed images, hidden layers skipped, names + opacity preserved, whole PSD scaled to the trim area. Locked by default. *Still TODO:* blend modes (flattened to normal), layer groups (currently flattened, not preserved as Fabric groups), and exact PSD text font-size/colour fidelity (approximated; admin can adjust).
+
 ### Phase 4 — PNG/JPG + AI segmentation
 Flat image import (trivial) plus optional AI-assisted segmentation reusing `decompose-design-image`/`generate-design-image`.
 **Effort:** S for flat; M for segmentation.

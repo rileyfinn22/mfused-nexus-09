@@ -1594,6 +1594,124 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     input.click();
   };
 
+  /**
+   * Import a PSD and decompose it into editable layers (Phase 3).
+   * Each Photoshop layer → its own object: text layers become editable text,
+   * raster layers become placed images. Locked by default; the whole PSD is
+   * scaled to fit the trim area. ag-psd is dynamic-imported to keep the bundle lean.
+   */
+  const importPsdFile = async (file: File) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    try {
+      const { readPsd } = await import("ag-psd");
+      const buf = await file.arrayBuffer();
+      const psd: any = readPsd(buf, { skipCompositeImageData: true, skipThumbnail: true });
+
+      const psdW = psd.width || 1;
+      const psdH = psd.height || 1;
+      const trimW = Math.round(width * DPI);
+      const trimH = Math.round(height * DPI);
+      const fit = Math.min(trimW / psdW, trimH / psdH) || 1;
+      const offX = bleedPx + (trimW - psdW * fit) / 2;
+      const offY = bleedPx + (trimH - psdH * fit) / 2;
+
+      // Flatten the layer tree (recurse into groups, collect leaf layers)
+      const flat: any[] = [];
+      const walk = (nodes: any[]) => {
+        for (const n of nodes || []) {
+          if (n.children && n.children.length) walk(n.children);
+          else flat.push(n);
+        }
+      };
+      walk(psd.children || []);
+
+      const baseName = file.name.replace(/\.psd$/i, "");
+      let added = 0;
+
+      for (let i = 0; i < flat.length; i++) {
+        const layer = flat[i];
+        if (layer.hidden) continue;
+        const lLeft = layer.left ?? 0;
+        const lTop = layer.top ?? 0;
+        const displayName = layer.name || `${baseName} ${i + 1}`;
+
+        // ── Text layer → editable text ──
+        if (layer.text && typeof layer.text.text === "string" && layer.text.text.trim()) {
+          const t = layer.text;
+          const style = t.style || (t.styleRuns && t.styleRuns[0] && t.styleRuns[0].style) || {};
+          const fontPx = (style.fontSize || 24) * fit;
+          let fill = "#000000";
+          const c = style.fillColor;
+          if (c && typeof c.r === "number") {
+            const to255 = (v: number) => (v <= 1 ? Math.round(v * 255) : Math.round(v));
+            fill = `rgb(${to255(c.r)}, ${to255(c.g)}, ${to255(c.b)})`;
+          }
+          const fam = (style.font && style.font.name) || "Arial";
+          const fontDef = FONT_OPTIONS.find((f) => f.value.toLowerCase() === String(fam).toLowerCase());
+          if (fontDef?.google) await loadGoogleFont(fontDef.value);
+
+          const textObj = new IText(t.text, {
+            left: offX + lLeft * fit,
+            top: offY + lTop * fit,
+            fontSize: fontPx,
+            fontFamily: fontDef?.value || "Arial",
+            fill,
+            editable: true,
+            originX: "left",
+            originY: "top",
+            padding: 0,
+          });
+          (textObj as any)._fontSizePt = pxToPt(fontPx);
+          (textObj as any).locked = true;
+          (textObj as any).editable = false;
+          (textObj as any).name = "locked_text";
+          (textObj as any)._displayName = displayName;
+          textObj.set({ borderColor: "#94a3b8", cornerColor: "#94a3b8" } as any);
+          canvas.add(textObj);
+          added++;
+          continue;
+        }
+
+        // ── Raster layer → placed image ──
+        const lcanvas = layer.canvas as HTMLCanvasElement | undefined;
+        if (lcanvas && lcanvas.width > 0 && lcanvas.height > 0) {
+          const dataUrl = lcanvas.toDataURL("image/png");
+          const imgEl = new window.Image();
+          await new Promise<void>((res) => {
+            imgEl.onload = () => res();
+            imgEl.onerror = () => res();
+            imgEl.src = dataUrl;
+          });
+          const fabricImg = new FabricImage(imgEl, {
+            left: offX + lLeft * fit,
+            top: offY + lTop * fit,
+            scaleX: fit,
+            scaleY: fit,
+          });
+          (fabricImg as any).locked = true;
+          (fabricImg as any).editable = false;
+          (fabricImg as any).name = "locked_image";
+          (fabricImg as any)._displayName = displayName;
+          if (typeof layer.opacity === "number") fabricImg.set({ opacity: layer.opacity });
+          fabricImg.set({ borderColor: "#94a3b8", cornerColor: "#94a3b8" } as any);
+          canvas.add(fabricImg);
+          added++;
+        }
+      }
+
+      fixZOrder(canvas);
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+      syncCanvas();
+      if (added > 0) toast.success(`Imported ${added} layer${added !== 1 ? "s" : ""} from PSD`);
+      else toast.warning("No visible layers found in that PSD");
+    } catch (err: any) {
+      console.error("PSD import error:", err);
+      toast.error("Failed to import PSD");
+    }
+  };
+
   /** Bring a raster image (PNG/JPG) in as the locked background. */
   const pickedImageAsBackground = (file: File) => {
     const reader = new FileReader();
@@ -1614,7 +1732,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const uploadFileToTemplate = () => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".pdf,.svg,image/*";
+    input.accept = ".pdf,.svg,.psd,image/*";
     input.onchange = (e: any) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -1622,12 +1740,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       const type = (file.type || "").toLowerCase();
       if (type.includes("svg") || name.endsWith(".svg")) {
         importSvgFile(file);
+      } else if (name.endsWith(".psd") || type.includes("photoshop")) {
+        importPsdFile(file);
       } else if (type.includes("pdf") || name.endsWith(".pdf")) {
         loadPdfFile(file, { extractText: true });
       } else if (type.startsWith("image/")) {
         pickedImageAsBackground(file);
       } else {
-        toast.error("Unsupported file. Upload a PDF, SVG, or image.");
+        toast.error("Unsupported file. Upload a PDF, SVG, PSD, or image.");
       }
     };
     input.click();
