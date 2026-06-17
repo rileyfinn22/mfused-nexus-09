@@ -365,26 +365,27 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const measureRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(600);
+  const [containerHeight, setContainerHeight] = useState(400);
 
   useEffect(() => {
     const el = measureRef.current;
     if (!el) return;
-    // Set initial value synchronously
-    const initialWidth = Math.max(200, Math.floor(el.getBoundingClientRect().width - 32));
-    setContainerWidth(initialWidth);
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = Math.max(200, Math.floor(entry.contentRect.width - 32));
-        setContainerWidth((prev) => (prev === w ? prev : w));
-      }
-    });
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setContainerWidth(Math.max(160, Math.floor(r.width - 32)));
+      setContainerHeight(Math.max(160, Math.floor(r.height - 32)));
+    };
+    measure();
+    const ro = new ResizeObserver(() => measure());
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const TARGET_DISPLAY_HEIGHT = 1100;
   // Oversample imported PDF backgrounds so rasterized text stays sharp in preview
   const PDF_BACKGROUND_OVERSAMPLE = 4;
-  const displayScale = Math.min(containerWidth / canvasWidth, TARGET_DISPLAY_HEIGHT / canvasHeight, 2.5);
+  // Fit-to-screen: fill the workspace on BOTH axes so the artboard is the dominant
+  // element. High-res zoom rendering keeps it crisp even when a small label scales up.
+  const MAX_ZOOM = 8;
+  const displayScale = Math.max(0.05, Math.min(containerWidth / canvasWidth, containerHeight / canvasHeight, MAX_ZOOM));
   const cssWidth = Math.round(canvasWidth * displayScale);
   const cssHeight = Math.round(canvasHeight * displayScale);
   const displayBleedPx = Math.max(1, Math.round(bleedPx * displayScale));
@@ -3266,7 +3267,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       </div>
 
       {/* Main workspace column (canvas + properties + layers) */}
-      <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-auto">
+      <div className="flex-1 min-w-0 flex flex-col gap-3 min-h-0">
 
       {/* Draw text mode hint */}
       {drawTextMode !== "off" && (
@@ -3301,9 +3302,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         </div>
       )}
 
-      <div className="flex gap-4 items-start">
-      <div ref={measureRef} className="flex-1 min-w-0">
-        <div ref={containerRef} className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center max-w-full">
+      <div className="flex gap-4 items-stretch flex-1 min-h-0">
+      <div ref={measureRef} className="flex-1 min-w-0 min-h-0 flex items-center justify-center overflow-hidden">
+        <div ref={containerRef} className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex items-center justify-center w-full h-full">
         <div className="relative shadow-lg shrink-0" style={{ width: cssWidth, height: cssHeight }}>
           <canvas ref={canvasRef} />
 
@@ -3373,7 +3374,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
         {/* ── Contextual Properties panel (Stage B) ── */}
         {mode === "edit" && (
-          <div className="w-64 shrink-0 rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+          <div className="w-64 shrink-0 rounded-lg border border-border bg-muted/30 p-3 space-y-3 overflow-y-auto min-h-0">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold">Properties</span>
               {selectedObject && (
