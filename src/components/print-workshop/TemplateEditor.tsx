@@ -381,10 +381,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const TARGET_DISPLAY_HEIGHT = 750;
+  const TARGET_DISPLAY_HEIGHT = 1100;
   // Oversample imported PDF backgrounds so rasterized text stays sharp in preview
   const PDF_BACKGROUND_OVERSAMPLE = 4;
-  const displayScale = Math.min(containerWidth / canvasWidth, TARGET_DISPLAY_HEIGHT / canvasHeight, 1.5);
+  const displayScale = Math.min(containerWidth / canvasWidth, TARGET_DISPLAY_HEIGHT / canvasHeight, 2.5);
   const cssWidth = Math.round(canvasWidth * displayScale);
   const cssHeight = Math.round(canvasHeight * displayScale);
   const displayBleedPx = Math.max(1, Math.round(bleedPx * displayScale));
@@ -434,7 +434,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const fixZOrder = useCallback((canvas: any) => {
     const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
     if (bg) {
-      bg.set({ selectable: false, evented: false, hasControls: false, hasBorders: false });
+      // In edit mode the uploaded file is a movable/scalable asset (Illustrator-style);
+      // only lock it down for customers in "use" mode.
+      if (mode !== "edit") {
+        bg.set({ selectable: false, evented: false, hasControls: false, hasBorders: false });
+      }
       canvas.sendObjectToBack(bg);
     }
     // Perforation lines sit above artwork but below the auto dieline guides
@@ -446,7 +450,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     // Trim guide on very top
     const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
     if (trim) canvas.bringObjectToFront(trim);
-  }, []);
+  }, [mode]);
 
   const undo = useCallback(async () => {
     const canvas = fabricRef.current;
@@ -996,18 +1000,23 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     const boxToleranceIn = 0.08;
 
     const addLockedPdfBackground = (left: number, top: number, scaleX: number, scaleY: number) => {
+      const interactive = mode === "edit";
       const fabricImg = new FabricImage(imgEl, {
         left,
         top,
         scaleX,
         scaleY,
         objectCaching: false,
-        selectable: false,
-        evented: false,
-        hasControls: false,
-        hasBorders: false,
+        selectable: interactive,
+        evented: interactive,
+        hasControls: interactive,
+        hasBorders: interactive,
       } as any);
       (fabricImg as any).name = "pdf_background";
+      (fabricImg as any).locked = !interactive;
+      if (interactive) {
+        fabricImg.set({ borderColor: "#3b82f6", cornerColor: "#3b82f6", cornerStyle: "circle", transparentCorners: false } as any);
+      }
       canvas.add(fabricImg);
       canvas.sendObjectToBack(fabricImg);
       canvas.renderAll();
@@ -2949,6 +2958,24 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     canvas.requestRenderAll();
     syncCanvas();
   };
+  const centerOrFitSelected = (kind: "center" | "fit") => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const o: any = canvas.getActiveObject();
+    if (!o) return;
+    if (kind === "fit") {
+      const baseW = o.width || 1;
+      const baseH = o.height || 1;
+      const s = Math.min(canvasWidth / baseW, canvasHeight / baseH);
+      o.set({ scaleX: s, scaleY: s });
+    }
+    const ow = (o.width || 0) * (o.scaleX || 1);
+    const oh = (o.height || 0) * (o.scaleY || 1);
+    o.set({ left: (canvasWidth - ow) / 2, top: (canvasHeight - oh) / 2 });
+    o.setCoords?.();
+    canvas.requestRenderAll();
+    syncCanvas();
+  };
 
   // Keep property-panel controls in sync with whatever is selected
   useEffect(() => {
@@ -3393,6 +3420,15 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                     <Button size="sm" variant="outline" className="flex-1 h-7 gap-1" onClick={() => arrangeSelected("back")}>
                       <ChevronDown className="h-3 w-3" /><span className="text-[10px]">Back</span>
                     </Button>
+                  </div>
+                </div>
+
+                {/* Position */}
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Position</span>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px]" onClick={() => centerOrFitSelected("center")}>Center</Button>
+                    <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px]" onClick={() => centerOrFitSelected("fit")}>Fit to canvas</Button>
                   </div>
                 </div>
 

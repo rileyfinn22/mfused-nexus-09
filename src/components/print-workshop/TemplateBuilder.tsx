@@ -306,7 +306,7 @@ export function TemplateBuilder({ template, onBack, onSaved }: TemplateBuilderPr
         </h2>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+      <div className="flex flex-col-reverse gap-6">
         {/* Settings panel */}
         <Card className="lg:col-span-1">
           <CardHeader className="pb-4">
