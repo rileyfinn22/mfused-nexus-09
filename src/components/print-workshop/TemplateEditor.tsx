@@ -1123,13 +1123,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     pickImageFile((imgEl) => setCanvasBackground(imgEl));
   };
 
-  const addPdfBackground = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "application/pdf";
-    input.onchange = async (e: any) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  const loadPdfFile = async (file: File, opts?: { extractText?: boolean }) => {
       try {
         // Read the PDF to validate its page size against template dimensions
         const arrayBuf = await file.arrayBuffer();
@@ -1188,14 +1182,28 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         const imgEl = new window.Image();
         const capturedW = pdfWidthIn;
         const capturedH = pdfHeightIn;
-        imgEl.onload = () => {
+        imgEl.onload = async () => {
           setCanvasBackground(imgEl, capturedW || undefined, capturedH || undefined, pdfBoxes);
+          // Auto-decompose: pull the PDF's real text into editable layers (not just a flat bg)
+          if (opts?.extractText) {
+            try { await extractPdfVectorText(await file.arrayBuffer()); }
+            catch (exErr) { console.warn("Auto text-extract failed:", exErr); }
+          }
         };
         imgEl.src = url;
       } catch (err: any) {
         console.error("PDF render error:", err);
         alert("Failed to render PDF. Make sure it's a valid PDF file.");
       }
+  };
+
+  const addPdfBackground = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/pdf";
+    input.onchange = (e: any) => {
+      const file = e.target.files?.[0];
+      if (file) loadPdfFile(file);
     };
     input.click();
   };
@@ -1207,10 +1215,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
    * with a knockout covering the original baked-in text. Placement is derived from the
    * on-canvas pdf_background rectangle, so it works regardless of crop/fit/centering.
    */
-  const extractPdfVectorText = async () => {
+  const extractPdfVectorText = async (bufOverride?: ArrayBuffer) => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    if (!sourcePdfPath) {
+    if (!bufOverride && !sourcePdfPath) {
       toast.error("Add a PDF background first, then extract its text");
       return;
     }
@@ -1221,11 +1229,16 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     }
     setExtractingVector(true);
     try {
-      const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(sourcePdfPath);
-      const cacheBusted = `${urlData.publicUrl}${urlData.publicUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(sourcePdfPath)}-${Date.now()}`;
-      const resp = await fetch(cacheBusted, { cache: "no-store" });
-      if (!resp.ok) throw new Error("Could not fetch the source PDF");
-      const buf = await resp.arrayBuffer();
+      let buf: ArrayBuffer;
+      if (bufOverride) {
+        buf = bufOverride;
+      } else {
+        const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(sourcePdfPath);
+        const cacheBusted = `${urlData.publicUrl}${urlData.publicUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(sourcePdfPath)}-${Date.now()}`;
+        const resp = await fetch(cacheBusted, { cache: "no-store" });
+        if (!resp.ok) throw new Error("Could not fetch the source PDF");
+        buf = await resp.arrayBuffer();
+      }
 
       const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
       const page = await pdf.getPage(1);
@@ -1509,13 +1522,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
    * Each shape/text element becomes its own object (locked by default — admins
    * unlock per-layer via the Layers panel). Phase 1 of the layered-editor plan.
    */
-  const importSvg = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".svg,image/svg+xml";
-    input.onchange = async (e: any) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  const importSvgFile = async (file: File) => {
       const canvas = fabricRef.current;
       if (!canvas) return;
       try {
@@ -1573,6 +1580,54 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       } catch (err: any) {
         console.error("SVG import error:", err);
         toast.error("Failed to import SVG");
+      }
+  };
+
+  const importSvg = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".svg,image/svg+xml";
+    input.onchange = (e: any) => {
+      const file = e.target.files?.[0];
+      if (file) importSvgFile(file);
+    };
+    input.click();
+  };
+
+  /** Bring a raster image (PNG/JPG) in as the locked background. */
+  const pickedImageAsBackground = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const imgEl = new window.Image();
+      imgEl.onload = () => setCanvasBackground(imgEl);
+      imgEl.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  /**
+   * Unified "Upload" entry point (admin). Picks one file and decomposes by type:
+   *  - SVG  → individual editable vector layers
+   *  - PDF  → background + auto-extracted real text layers (not a flat background)
+   *  - image → flat raster background (no layers exist in a raster to extract)
+   */
+  const uploadFileToTemplate = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,.svg,image/*";
+    input.onchange = (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const name = (file.name || "").toLowerCase();
+      const type = (file.type || "").toLowerCase();
+      if (type.includes("svg") || name.endsWith(".svg")) {
+        importSvgFile(file);
+      } else if (type.includes("pdf") || name.endsWith(".pdf")) {
+        loadPdfFile(file, { extractText: true });
+      } else if (type.startsWith("image/")) {
+        pickedImageAsBackground(file);
+      } else {
+        toast.error("Unsupported file. Upload a PDF, SVG, or image.");
       }
     };
     input.click();
@@ -2838,14 +2893,23 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
           <>
             <span className="text-xs text-muted-foreground px-2">Click a highlighted field to edit</span>
             <div className="w-px h-6 bg-border mx-1" />
+            <Button size="sm" onClick={() => addArtworkImage(true)} className="gap-1.5">
+              <Upload className="h-3.5 w-3.5" />
+              <span className="text-xs">Upload Your Art</span>
+            </Button>
             <Button size="sm" variant="outline" onClick={addPdfArtwork} className="gap-1.5">
               <FileText className="h-3.5 w-3.5" />
-              <span className="text-xs">Upload Art (PDF)</span>
+              <span className="text-xs">PDF</span>
             </Button>
           </>
         )}
         {mode === "edit" && (
           <>
+            {/* ── Upload (primary action — decomposes into layers) ── */}
+            <Button size="sm" onClick={uploadFileToTemplate} className="gap-1.5">
+              <Upload className="h-3.5 w-3.5" /><span className="text-xs">Upload</span>
+            </Button>
+            <div className="w-px h-6 bg-border mx-1" />
             {/* ── Text ── */}
             <Popover open={openCat === "text"} onOpenChange={(o) => setOpenCat(o ? "text" : null)}>
               <PopoverTrigger asChild>
