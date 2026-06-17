@@ -869,7 +869,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
             const { generatePdfThumbnailFromArrayBuffer } = await import("@/lib/pdfThumbnail");
             const blob = await generatePdfThumbnailFromArrayBuffer(buf, {
-              maxWidth: canvasWidth * PDF_BACKGROUND_OVERSAMPLE,
+              maxWidth: Math.max(canvasWidth * PDF_BACKGROUND_OVERSAMPLE, 2800),
               scale: 1,
             });
             const url = URL.createObjectURL(blob);
@@ -900,7 +900,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       redoStack.current = [];
     };
 
-    loadCanvasAndBackground();
+    loadCanvasAndBackground().then(() => setTimeout(() => fitView(), 120));
 
     canvas.on("selection:created", (e) => {
       const sel = canvas.getActiveObject();
@@ -1253,6 +1253,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             try { await extractPdfVectorText(await file.arrayBuffer()); }
             catch (exErr) { console.warn("Auto text-extract failed:", exErr); }
           }
+          setTimeout(() => fitView(), 60); // frame the whole uploaded file
         };
         imgEl.src = url;
       } catch (err: any) {
@@ -1641,6 +1642,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         canvas.requestRenderAll();
         syncCanvas();
         toast.success(`Imported ${children.length} layer${children.length !== 1 ? "s" : ""} from SVG`);
+        setTimeout(() => fitView(), 60);
       } catch (err: any) {
         console.error("SVG import error:", err);
         toast.error("Failed to import SVG");
@@ -1770,6 +1772,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       syncCanvas();
       if (added > 0) toast.success(`Imported ${added} layer${added !== 1 ? "s" : ""} from PSD`);
       else toast.warning("No visible layers found in that PSD");
+      setTimeout(() => fitView(), 60);
     } catch (err: any) {
       console.error("PSD import error:", err);
       toast.error("Failed to import PSD");
@@ -1781,7 +1784,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     const reader = new FileReader();
     reader.onload = (ev) => {
       const imgEl = new window.Image();
-      imgEl.onload = () => setCanvasBackground(imgEl);
+      imgEl.onload = () => { setCanvasBackground(imgEl); setTimeout(() => fitView(), 60); };
       imgEl.src = ev.target?.result as string;
     };
     reader.readAsDataURL(file);
@@ -3015,10 +3018,26 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     syncCanvas();
   };
   // ── Artboard view controls ──
+  // Fit the whole content (uploaded file + artwork + the template area) into view,
+  // so the editor opens framed on everything — not zoomed into the tiny template.
   const fitView = () => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    canvas.setViewportTransform([displayScale, 0, 0, displayScale, 0, 0]);
+    let minX = 0, minY = 0, maxX = canvasWidth, maxY = canvasHeight;
+    canvas.getObjects().forEach((o: any) => {
+      if (String(o.name || "").startsWith("_")) return; // skip guides / dieline labels
+      const l = o.left ?? 0, t = o.top ?? 0;
+      const w = (o.width ?? 0) * (o.scaleX ?? 1);
+      const h = (o.height ?? 0) * (o.scaleY ?? 1);
+      minX = Math.min(minX, l); minY = Math.min(minY, t);
+      maxX = Math.max(maxX, l + w); maxY = Math.max(maxY, t + h);
+    });
+    const bw = Math.max(1, maxX - minX);
+    const bh = Math.max(1, maxY - minY);
+    const z = Math.min(cssWidth / bw, cssHeight / bh) * 0.92;
+    const panX = (cssWidth - bw * z) / 2 - minX * z;
+    const panY = (cssHeight - bh * z) / 2 - minY * z;
+    canvas.setViewportTransform([z, 0, 0, z, panX, panY]);
     canvas.requestRenderAll();
   };
   const zoomByFactor = (f: number) => {
