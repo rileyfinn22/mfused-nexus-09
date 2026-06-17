@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Bold, Italic, Type, Lock, Unlock, Trash2, ImageIcon, Upload, FileText, Scan, Loader2, Undo2, Redo2, Palette, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Scissors, Square, Layers, Sparkles, Circle, Triangle, Star, Hexagon, Minus, Shapes } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import { AiImageDialog } from "./AiImageDialog";
 import { AiEditDialog } from "./AiEditDialog";
 import { AiCleanupDialog } from "./AiCleanupDialog";
@@ -219,6 +221,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const [drawPerfMode, setDrawPerfMode] = useState(false);
   // Which left-rail tool category popover is open (Quad-style grouped toolbar)
   const [openCat, setOpenCat] = useState<string | null>(null);
+  // Property-panel mirrors of the selected object's editable attributes (Stage B)
+  const [objFill, setObjFill] = useState("#000000");
+  const [objStroke, setObjStroke] = useState("#000000");
+  const [objStrokeWidth, setObjStrokeWidth] = useState(2);
+  const [objOpacity, setObjOpacity] = useState(100);
   const [perfTick, setPerfTick] = useState(0);
   const activePerfRef = useRef<any>(null);
 
@@ -2734,6 +2741,50 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     return false;
   })();
 
+  const isShapeObject = (() => {
+    const t = (selectedObject as any)?.type?.toLowerCase?.() || "";
+    return ["rect", "circle", "ellipse", "triangle", "polygon", "line", "path"].includes(t)
+      && (selectedObject as any)?.name !== "pdf_background";
+  })();
+
+  // Stage B property-panel actions — operate on the active object(s) and persist
+  const applyToSelection = (fn: (o: any) => void) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const active: any = canvas.getActiveObject();
+    if (!active) return;
+    const t = active.type?.toLowerCase?.() || "";
+    const targets = t.includes("activeselection") ? (active.getObjects?.() || []) : [active];
+    targets.forEach(fn);
+    canvas.requestRenderAll();
+    syncCanvas();
+  };
+  const setSelectedFill = (hex: string) => { setObjFill(hex); applyToSelection((o) => o.set("fill", hex)); };
+  const setSelectedStroke = (hex: string) => { setObjStroke(hex); applyToSelection((o) => o.set("stroke", hex)); };
+  const setSelectedStrokeWidth = (w: number) => { setObjStrokeWidth(w); applyToSelection((o) => o.set("strokeWidth", w)); };
+  const setSelectedOpacity = (pct: number) => { setObjOpacity(pct); applyToSelection((o) => o.set("opacity", Math.max(0, Math.min(1, pct / 100)))); };
+  const arrangeSelected = (dir: "forward" | "back") => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const a = canvas.getActiveObject();
+    if (!a) return;
+    if (dir === "forward") canvas.bringObjectForward(a);
+    else canvas.sendObjectBackwards(a);
+    fixZOrder(canvas);
+    canvas.requestRenderAll();
+    syncCanvas();
+  };
+
+  // Keep property-panel controls in sync with whatever is selected
+  useEffect(() => {
+    const o: any = selectedObject;
+    if (!o) return;
+    if (typeof o.opacity === "number") setObjOpacity(Math.round(o.opacity * 100));
+    if (typeof o.fill === "string") setObjFill(o.fill === "transparent" ? "#ffffff" : o.fill);
+    if (typeof o.stroke === "string") setObjStroke(o.stroke || "#000000");
+    if (typeof o.strokeWidth === "number") setObjStrokeWidth(Math.round(o.strokeWidth));
+  }, [selectedObject]);
+
   // Perf line measurement (relative to trim box). Recomputes on perfTick (drag) and selection change.
   const perfInfo = useMemo(() => {
     const obj: any = activePerfRef.current;
@@ -2999,168 +3050,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
           </Button>
         )}
 
-        {selectedObject && isTextObject && mode === "edit" && (
-          <>
-            <div className="flex items-center gap-1.5">
-              <Select value={fontFamily} onValueChange={(v) => { applyFontFamily(v); setFontSearch(""); }}>
-                <SelectTrigger className="w-[180px] h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="max-h-[350px]">
-                  <div className="px-2 py-1.5 sticky top-0 bg-popover z-10">
-                    <Input
-                      value={fontSearch}
-                      onChange={(e) => setFontSearch(e.target.value)}
-                      placeholder="Search fonts..."
-                      className="h-7 text-xs"
-                      onKeyDown={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                  {(() => {
-                    const q = fontSearch.toLowerCase();
-                    const systemFonts = FONT_OPTIONS.filter(f => !f.google && f.label.toLowerCase().includes(q));
-                    const googleFonts = FONT_OPTIONS.filter(f => f.google && f.label.toLowerCase().includes(q));
-                    return (
-                      <>
-                        {systemFonts.length > 0 && (
-                          <>
-                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">System Fonts</div>
-                            {systemFonts.map((f) => (
-                              <SelectItem key={f.value} value={f.value} className="text-xs" style={{ fontFamily: f.value }}>
-                                {f.label}
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                        {googleFonts.length > 0 && (
-                          <>
-                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Google Fonts</div>
-                            {googleFonts.map((f) => (
-                              <SelectItem key={f.value} value={f.value} className="text-xs">
-                                {f.label}
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                        {systemFonts.length === 0 && googleFonts.length === 0 && (
-                          <div className="px-2 py-3 text-xs text-muted-foreground text-center">No fonts match "{fontSearch}"</div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Type className="h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                type="number"
-                value={fontSizePt}
-                onChange={(e) => applyFontSize(Number(e.target.value))}
-                className="w-16 h-8 text-xs"
-                min={4}
-                max={200}
-                step={0.5}
-              />
-              <span className="text-[10px] text-muted-foreground">pt</span>
-            </div>
-            <Button size="sm" variant="ghost" onClick={toggleBold} className="h-8 w-8 p-0">
-              <Bold className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={toggleItalic} className="h-8 w-8 p-0">
-              <Italic className="h-3.5 w-3.5" />
-            </Button>
-            <div className="flex items-center gap-1">
-              <Palette className="h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                type="color"
-                value={fontColor}
-                onChange={(e) => applyFontColor(e.target.value)}
-                className="w-7 h-7 rounded border border-border cursor-pointer p-0"
-                title="Font color"
-              />
-            </div>
-            <div className="w-px h-6 bg-border mx-1" />
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline" onClick={splitSelectedText} className="h-8 gap-1.5">
-                    <Scissors className="h-3.5 w-3.5" />
-                    <span className="text-xs">Split</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Select text inside the box, then click Split to make it a separate editable element</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </>
-        )}
-
-        {/* Alignment buttons — admin only */}
-        {selectedObject && mode === "edit" && (
-          <>
-            <div className="w-px h-6 bg-border mx-1" />
-            <TooltipProvider delayDuration={200}>
-              <div className="flex items-center gap-0.5">
-                <Tooltip><TooltipTrigger asChild>
-                  <Button size="sm" variant="ghost" onClick={() => alignObject("left")} className="h-8 w-8 p-0">
-                    <AlignLeft className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Align Left</TooltipContent></Tooltip>
-                <Tooltip><TooltipTrigger asChild>
-                  <Button size="sm" variant="ghost" onClick={() => alignObject("centerH")} className="h-8 w-8 p-0">
-                    <AlignCenter className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Center Horizontally</TooltipContent></Tooltip>
-                <Tooltip><TooltipTrigger asChild>
-                  <Button size="sm" variant="ghost" onClick={() => alignObject("right")} className="h-8 w-8 p-0">
-                    <AlignRight className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Align Right</TooltipContent></Tooltip>
-                <div className="w-px h-4 bg-border mx-0.5" />
-                <Tooltip><TooltipTrigger asChild>
-                  <Button size="sm" variant="ghost" onClick={() => alignObject("top")} className="h-8 w-8 p-0">
-                    <AlignStartVertical className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Align Top</TooltipContent></Tooltip>
-                <Tooltip><TooltipTrigger asChild>
-                  <Button size="sm" variant="ghost" onClick={() => alignObject("centerV")} className="h-8 w-8 p-0">
-                    <AlignCenterVertical className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Center Vertically</TooltipContent></Tooltip>
-                <Tooltip><TooltipTrigger asChild>
-                  <Button size="sm" variant="ghost" onClick={() => alignObject("bottom")} className="h-8 w-8 p-0">
-                    <AlignEndVertical className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Align Bottom</TooltipContent></Tooltip>
-              </div>
-            </TooltipProvider>
-          </>
-        )}
-
-        {selectedObject && mode === "edit" && (
-          <>
-            <div className="w-px h-6 bg-border mx-1" />
-            <Button
-              size="sm"
-              variant={selectedLockedState ? "outline" : "default"}
-              onClick={() => setSelectionLockedState(false)}
-              className="h-8 gap-1.5"
-            >
-              <Unlock className="h-3.5 w-3.5" /><span className="text-xs">Editable</span>
-            </Button>
-            <Button
-              size="sm"
-              variant={selectedLockedState ? "default" : "outline"}
-              onClick={() => setSelectionLockedState(true)}
-              className="h-8 gap-1.5"
-            >
-              <Lock className="h-3.5 w-3.5" /><span className="text-xs">Locked</span>
-            </Button>
-            <Button size="sm" variant="ghost" onClick={deleteSelected} className="h-8 w-8 p-0 text-destructive">
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </>
-        )}
+        {/* Selected-object controls moved to the contextual Properties panel (Stage B) */}
       </div>
 
       {/* Draw text mode hint */}
@@ -3196,7 +3086,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         </div>
       )}
 
-      <div ref={measureRef} className="max-w-full">
+      <div className="flex gap-4 items-start">
+      <div ref={measureRef} className="flex-1 min-w-0">
         <div ref={containerRef} className="border border-border rounded-lg overflow-auto bg-muted/30 p-4 flex justify-center max-w-full">
         <div className="relative shadow-lg shrink-0" style={{ width: cssWidth, height: cssHeight }}>
           <canvas ref={canvasRef} />
@@ -3263,6 +3154,150 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
           )}
         </div>
       </div>
+      </div>
+
+        {/* ── Contextual Properties panel (Stage B) ── */}
+        {mode === "edit" && (
+          <div className="w-64 shrink-0 rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold">Properties</span>
+              {selectedObject && (
+                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={deleteSelected} title="Delete">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+
+            {!selectedObject && (
+              <p className="text-[11px] text-muted-foreground">Select an object on the canvas to edit its properties.</p>
+            )}
+
+            {selectedObject && (
+              <>
+                {/* Customer access */}
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Customer access</span>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant={selectedLockedState ? "outline" : "default"} className="flex-1 h-7 gap-1" onClick={() => setSelectionLockedState(false)}>
+                      <Unlock className="h-3 w-3" /><span className="text-[10px]">Editable</span>
+                    </Button>
+                    <Button size="sm" variant={selectedLockedState ? "default" : "outline"} className="flex-1 h-7 gap-1" onClick={() => setSelectionLockedState(true)}>
+                      <Lock className="h-3 w-3" /><span className="text-[10px]">Locked</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Opacity */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Opacity</span>
+                    <span className="text-[10px] text-muted-foreground">{objOpacity}%</span>
+                  </div>
+                  <Slider value={[objOpacity]} min={0} max={100} step={1} onValueChange={(v) => setSelectedOpacity(v[0])} />
+                </div>
+
+                {/* Arrange */}
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Arrange</span>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" className="flex-1 h-7 gap-1" onClick={() => arrangeSelected("forward")}>
+                      <ChevronUp className="h-3 w-3" /><span className="text-[10px]">Forward</span>
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1 h-7 gap-1" onClick={() => arrangeSelected("back")}>
+                      <ChevronDown className="h-3 w-3" /><span className="text-[10px]">Back</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Align */}
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Align</span>
+                  <div className="grid grid-cols-6 gap-0.5">
+                    <Button size="sm" variant="ghost" className="h-7 w-full p-0" onClick={() => alignObject("left")} title="Align left"><AlignLeft className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-full p-0" onClick={() => alignObject("centerH")} title="Center horizontally"><AlignCenter className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-full p-0" onClick={() => alignObject("right")} title="Align right"><AlignRight className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-full p-0" onClick={() => alignObject("top")} title="Align top"><AlignStartVertical className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-full p-0" onClick={() => alignObject("centerV")} title="Center vertically"><AlignCenterVertical className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-full p-0" onClick={() => alignObject("bottom")} title="Align bottom"><AlignEndVertical className="h-3.5 w-3.5" /></Button>
+                  </div>
+                </div>
+
+                {/* Text properties */}
+                {isTextObject && (
+                  <div className="space-y-2 border-t border-border pt-2">
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Text</span>
+                    <Select value={fontFamily} onValueChange={(v) => { applyFontFamily(v); setFontSearch(""); }}>
+                      <SelectTrigger className="w-full h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        <div className="px-2 py-1.5 sticky top-0 bg-popover z-10">
+                          <Input value={fontSearch} onChange={(e) => setFontSearch(e.target.value)} placeholder="Search fonts..." className="h-7 text-xs" onKeyDown={(e) => e.stopPropagation()} />
+                        </div>
+                        {(() => {
+                          const q = fontSearch.toLowerCase();
+                          const systemFonts = FONT_OPTIONS.filter(f => !f.google && f.label.toLowerCase().includes(q));
+                          const googleFonts = FONT_OPTIONS.filter(f => f.google && f.label.toLowerCase().includes(q));
+                          return (
+                            <>
+                              {systemFonts.length > 0 && (<>
+                                <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">System</div>
+                                {systemFonts.map((f) => (<SelectItem key={f.value} value={f.value} className="text-xs" style={{ fontFamily: f.value }}>{f.label}</SelectItem>))}
+                              </>)}
+                              {googleFonts.length > 0 && (<>
+                                <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">Google</div>
+                                {googleFonts.map((f) => (<SelectItem key={f.value} value={f.value} className="text-xs">{f.label}</SelectItem>))}
+                              </>)}
+                              {systemFonts.length === 0 && googleFonts.length === 0 && (<div className="px-2 py-3 text-xs text-muted-foreground text-center">No match</div>)}
+                            </>
+                          );
+                        })()}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 flex-1">
+                        <Type className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Input type="number" value={fontSizePt} onChange={(e) => applyFontSize(Number(e.target.value))} className="w-full h-8 text-xs" min={4} max={200} step={0.5} />
+                        <span className="text-[10px] text-muted-foreground">pt</span>
+                      </div>
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={toggleBold}><Bold className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={toggleItalic}><Italic className="h-3.5 w-3.5" /></Button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <Palette className="h-3.5 w-3.5 text-muted-foreground" />
+                        <input type="color" value={fontColor} onChange={(e) => applyFontColor(e.target.value)} className="w-7 h-7 rounded border border-border cursor-pointer p-0" title="Text color" />
+                      </div>
+                      <Button size="sm" variant="outline" className="h-7 gap-1" onClick={splitSelectedText}>
+                        <Scissors className="h-3 w-3" /><span className="text-[10px]">Split</span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Shape properties */}
+                {isShapeObject && (
+                  <div className="space-y-2 border-t border-border pt-2">
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Shape</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Fill</span>
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => setSelectedFill("transparent")}>None</Button>
+                        <input type="color" value={objFill} onChange={(e) => setSelectedFill(e.target.value)} className="w-7 h-7 rounded border border-border cursor-pointer p-0" title="Fill color" />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Stroke</span>
+                      <input type="color" value={objStroke} onChange={(e) => setSelectedStroke(e.target.value)} className="w-7 h-7 rounded border border-border cursor-pointer p-0" title="Stroke color" />
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-muted-foreground shrink-0">Stroke W</span>
+                      <Input type="number" value={objStrokeWidth} onChange={(e) => setSelectedStrokeWidth(Number(e.target.value))} className="w-16 h-7 text-xs" min={0} max={50} step={1} />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Objects panel + Dimensions info */}
