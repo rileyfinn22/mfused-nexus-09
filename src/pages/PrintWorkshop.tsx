@@ -370,7 +370,6 @@ export default function PrintWorkshop() {
               onDeleteTemplate={handleDeleteTemplate}
               onDuplicateTemplate={handleDuplicateTemplate}
               onNewTemplate={handleNewTemplate}
-              onStartCustomOrder={() => setView("custom")}
             />
           </TabsContent>
 
