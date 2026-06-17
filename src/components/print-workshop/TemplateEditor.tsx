@@ -519,14 +519,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
     const canvas = new FabricCanvas(canvasRef.current, {
       enableRetinaScaling: true,
-      width: canvasWidth,
-      height: canvasHeight,
+      width: cssWidth,
+      height: cssHeight,
     });
-    // Set CSS display size separately from backstore to avoid cursor misalignment.
-    // Fabric automatically maps mouse coords between CSS and backing-store dimensions.
-    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
-    // Do NOT setZoom here — CSS scaling handles visual sizing.
-    // setZoom would double-scale: content shrinks within backing store, then CSS shrinks again.
+    // High-res rendering: the backing store IS the on-screen size, and we zoom the
+    // 150-DPI scene into it. This keeps the uploaded file & artwork sharp instead of
+    // CSS-upscaling a low-res backing (which looked blurry once the canvas was enlarged).
+    canvas.setZoom(displayScale);
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
 
@@ -831,8 +830,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         }
       }
 
-      // Re-apply CSS dimensions after loadFromJSON which resets viewport
-      canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
+      // Re-apply size + zoom after loadFromJSON (which resets the viewport)
+      canvas.setDimensions({ width: cssWidth, height: cssHeight });
+      canvas.setZoom(displayScale);
       canvas.renderAll();
 
       // Seed undo stack with initial state
@@ -2297,11 +2297,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     canvas.renderAll();
   };
 
-  // Reactively update canvas CSS dimensions when container resizes (without recreating)
+  // Reactively update canvas size + zoom when the container resizes (without recreating)
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    canvas.setDimensions({ width: cssWidth, height: cssHeight }, { cssOnly: true });
+    canvas.setDimensions({ width: cssWidth, height: cssHeight });
+    canvas.setZoom(displayScale);
     canvas.renderAll();
   }, [displayScale, cssWidth, cssHeight]);
 
