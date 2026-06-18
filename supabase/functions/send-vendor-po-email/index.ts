@@ -14,6 +14,12 @@ interface Attachment {
   content: string; // base64 encoded
 }
 
+interface CaseStickerEntry {
+  orderNumber?: string;
+  invoiceNumber?: string;
+  customerPO?: string;
+}
+
 interface SendVendorPORequest {
   poId: string;
   recipientEmails: string[];
@@ -29,6 +35,7 @@ interface SendVendorPORequest {
   totalAmount: number;
   vendorName: string;
   additionalAttachments?: Attachment[];
+  caseStickerInfo?: CaseStickerEntry[];
 }
 
 const handler = async (req: Request): Promise<Response> => {
