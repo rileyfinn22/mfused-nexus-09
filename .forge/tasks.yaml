@@ -187,6 +187,11 @@ tasks:
     title: Lock/role + back-compat hardening
     phase: E
     size: S
+    status: done
+    note: Audited the admin→customer lock contract. Whole art toolbar (incl. Move-Dieline) is
+          gated to mode==="edit"; use-mode load loop forces locked objects AND the dieline frame
+          non-interactive; toggleDielineMove now no-ops outside edit mode (defense in depth).
+          Legacy back-compat handled by B2 (default frame) + C1 (identity export, golden-tested).
     contracts: [layers-properties, dieline-frame, print-export]
     depends_on: [B2, C1, D1]
     description: >

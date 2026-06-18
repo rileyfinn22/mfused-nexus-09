@@ -834,7 +834,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       if (mode === "use") {
         const editableObjects: any[] = [];
         canvas.getObjects().forEach((obj: any) => {
-          if (obj.name === "_trimGuide" || obj.name === "_ocrKnockout" || obj.name === "pdf_background" || obj.name === "mask_cover" || obj.name === "_dieline" || obj.name === "_dielineLabel") {
+          if (obj.name === "_trimGuide" || obj.name === "_ocrKnockout" || obj.name === "pdf_background" || obj.name === "mask_cover" || obj.name === "_dieline" || obj.name === "_dielineLabel" || obj.name === DIELINE_FRAME_NAME) {
+            // E1: the dieline frame is a non-interactive guide for customers — never grabbable
+            // in use mode (the Move-Dieline toggle is admin/edit-only).
             obj.set({ selectable: false, evented: false, hasControls: false });
             return;
           }
@@ -3140,6 +3142,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   // Toggle "Move Dieline": makes the dieline frame grabbable and freezes everything else,
   // so the designer can reposition/scale the frame without fighting the artwork beneath it.
   const toggleDielineMove = () => {
+    if (mode !== "edit") return; // E1: repositioning the dieline is admin-only, never in use mode
     const canvas = fabricRef.current;
     if (!canvas) return;
     const frame = canvas.getObjects().find((o: any) => o.name === DIELINE_FRAME_NAME) as any;
