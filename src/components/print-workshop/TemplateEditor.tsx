@@ -216,6 +216,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const [unlockZoneMode, setUnlockZoneMode] = useState(false);
   const [extractingAll, setExtractingAll] = useState(false);
   const [extractingVector, setExtractingVector] = useState(false);
+  const [extractingAssets, setExtractingAssets] = useState(false);
   const [drawMaskMode, setDrawMaskMode] = useState(false);
   const drawMaskStartRef = useRef<{ x: number; y: number } | null>(null);
   const drawMaskRectRef = useRef<Rect | null>(null);
@@ -1578,6 +1579,93 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       toast.error(err.message || "Failed to extract text from design");
     } finally {
       setExtractingAll(false);
+    }
+  };
+
+  // Separate a flat/PDF design into individual graphic assets: AI detects each non-text asset's
+  // bounding box, then we CROP that box out of the rendered art (the exact image the AI saw, so
+  // placement is pixel-accurate) and drop it in as its own locked, editable/movable image layer.
+  // A white knockout sits under each cut-out so moving it doesn't reveal a duplicate in the bg.
+  const extractPdfAssets = async () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    setExtractingAssets(true);
+    try {
+      const loadImg = (src: string) => new Promise<HTMLImageElement>((res, rej) => {
+        const im = new window.Image();
+        im.onload = () => res(im);
+        im.onerror = () => rej(new Error("image load failed"));
+        im.src = src;
+      });
+
+      // Render the full design (same view the text extractor uses) and reuse it as the crop source.
+      const M = 2;
+      const fullDataUrl = canvas.toDataURL({ format: "png", multiplier: M });
+      const fullImg = await loadImg(fullDataUrl);
+      const imgW = fullImg.width || canvasWidth * M;
+      const imgH = fullImg.height || canvasHeight * M;
+
+      const { data, error } = await supabase.functions.invoke("decompose-design-image", {
+        body: { image_url: fullDataUrl, extract_assets: true, canvas_width: canvasWidth, canvas_height: canvasHeight },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const regions: any[] = data?.regions || [];
+      if (regions.length === 0) {
+        toast.warning("No separate graphic assets detected");
+        return;
+      }
+
+      let added = 0;
+      for (const region of regions) {
+        const wPct = Number(region.w_percent), hPct = Number(region.h_percent);
+        const xPct = Number(region.x_percent), yPct = Number(region.y_percent);
+        if (![wPct, hPct, xPct, yPct].every((n) => Number.isFinite(n)) || wPct <= 0 || hPct <= 0) continue;
+
+        // Crop the asset out of the rendered art at full export resolution.
+        const sx = (xPct / 100) * imgW;
+        const sy = (yPct / 100) * imgH;
+        const sw = Math.max(1, (wPct / 100) * imgW);
+        const sh = Math.max(1, (hPct / 100) * imgH);
+        const crop = document.createElement("canvas");
+        crop.width = Math.round(sw);
+        crop.height = Math.round(sh);
+        const cctx = crop.getContext("2d");
+        if (!cctx) continue;
+        cctx.drawImage(fullImg, sx, sy, sw, sh, 0, 0, crop.width, crop.height);
+        const cropImg = await loadImg(crop.toDataURL("image/png"));
+
+        const left = (xPct / 100) * canvasWidth;
+        const top = (yPct / 100) * canvasHeight;
+        const targetW = (wPct / 100) * canvasWidth;
+        const targetH = (hPct / 100) * canvasHeight;
+        const scale = targetW / (cropImg.width || 1);
+
+        // Knockout the original region first (sits above bg, below the cut-out).
+        addOcrKnockoutCover(canvas, { left, top, width: targetW, height: targetH });
+
+        const fimg = new FabricImage(cropImg, { left, top, scaleX: scale, scaleY: scale });
+        (fimg as any).locked = true;
+        (fimg as any).editable = false;
+        (fimg as any).name = "locked_image";
+        (fimg as any)._displayName = region.label || `Asset ${added + 1}`;
+        fimg.set({ borderColor: "#94a3b8", cornerColor: "#94a3b8" } as any);
+        canvas.add(fimg);
+        canvas.bringObjectToFront(fimg);
+        added++;
+      }
+
+      fixZOrder(canvas);
+      canvas.renderAll();
+      syncCanvas();
+      if (added > 0) toast.success(`Separated ${added} asset${added !== 1 ? "s" : ""} — each is its own layer`);
+      else toast.warning("No usable asset regions detected");
+    } catch (err: any) {
+      console.error("Extract PDF assets error:", err);
+      toast.error(err.message || "Failed to separate assets");
+    } finally {
+      setExtractingAssets(false);
     }
   };
 
@@ -3453,6 +3541,12 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                   onClick={() => { extractAllText(); setOpenCat(null); }}>
                   {extractingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                   {extractingAll ? "Analyzing…" : "Extract all text (AI)"}
+                </Button>
+                <div className="h-px bg-border my-1" />
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2" disabled={extractingAssets}
+                  onClick={() => { extractPdfAssets(); setOpenCat(null); }}>
+                  {extractingAssets ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />}
+                  {extractingAssets ? "Separating…" : "Separate into assets (AI)"}
                 </Button>
               </PopoverContent>
             </Popover>
