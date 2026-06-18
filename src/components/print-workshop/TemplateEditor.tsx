@@ -224,6 +224,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const [openCat, setOpenCat] = useState<string | null>(null);
   // "Move Dieline" mode — temporarily makes the dieline frame the only grabbable object
   const [dielineMoveMode, setDielineMoveMode] = useState(false);
+  // Stable mirror of dielineMoveMode for callbacks (fixZOrder) that must not capture stale state
+  // or be recreated on every toggle.
+  const dielineMoveModeRef = useRef(false);
+  useEffect(() => { dielineMoveModeRef.current = dielineMoveMode; }, [dielineMoveMode]);
   // Property-panel mirrors of the selected object's editable attributes (Stage B)
   const [objFill, setObjFill] = useState("#000000");
   const [objStroke, setObjStroke] = useState("#000000");
@@ -469,9 +473,14 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     // Bring dieline guides and labels to front (above all artwork)
     const dielineObjs = canvas.getObjects().filter((o: any) => o.name === "_dieline" || o.name === "_dielineLabel");
     dielineObjs.forEach((o: any) => canvas.bringObjectToFront(o));
-    // The movable dieline trim frame sits above artwork so its guides stay visible
-    const frame = canvas.getObjects().find((o: any) => o.name === DIELINE_FRAME_NAME);
-    if (frame) canvas.bringObjectToFront(frame);
+    // The movable dieline trim frame sits above artwork so its guides stay visible. It must be a
+    // pass-through guide (evented:false) so it never eats clicks meant for assets beneath it — the
+    // "Move / scale dieline" toggle re-enables it on demand and is the only place that does.
+    const frame = canvas.getObjects().find((o: any) => o.name === DIELINE_FRAME_NAME) as any;
+    if (frame) {
+      if (!dielineMoveModeRef.current) frame.set({ selectable: false, evented: false });
+      canvas.bringObjectToFront(frame);
+    }
     // Trim guide on very top
     const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
     if (trim) canvas.bringObjectToFront(trim);
@@ -553,6 +562,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     canvas.setZoom(displayScale);
     canvas.backgroundColor = "#ffffff";
     canvas.selection = mode === "edit";
+    // Click selects the asset you actually SEE: transparent pixels of an overlapping layer pass
+    // the click through to the layer beneath (Illustrator/Photopea-style), instead of grabbing the
+    // top object's bounding box. targetFindTolerance keeps thin/small objects easy to hit.
+    canvas.perPixelTargetFind = true;
+    canvas.targetFindTolerance = 4;
 
     fabricRef.current = canvas;
     if (fabricCanvasRef) fabricCanvasRef.current = canvas;
@@ -606,7 +620,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       const e = opt.e;
       let z = canvas.getZoom();
       z *= 0.999 ** e.deltaY;
-      z = Math.min(Math.max(z, displayScale * 0.25), displayScale * 8);
+      // Absolute zoom range (NOT relative to the fit scale) so zoom-in always reaches well past
+      // 100% and zoom-out works the same regardless of artboard/template size.
+      z = Math.min(Math.max(z, 0.02), 16);
       canvas.zoomToPoint(new Point(e.offsetX, e.offsetY), z);
       e.preventDefault();
       e.stopPropagation();
@@ -2821,6 +2837,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         obj.set({ selectable: false, evented: false, hasControls: false });
         return;
       }
+      if (obj.name === DIELINE_FRAME_NAME) {
+        // The dieline frame is a pass-through guide; only "Move / scale dieline" makes it grabbable.
+        if (!dielineMoveModeRef.current) obj.set({ selectable: false, evented: false, hasControls: false });
+        return;
+      }
 
       if (mode === "edit") {
         // In template edit mode, everything should be selectable so lock/edit state can be adjusted.
@@ -3135,7 +3156,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     const canvas = fabricRef.current;
     if (!canvas) return;
     let z = canvas.getZoom() * f;
-    z = Math.min(Math.max(z, displayScale * 0.25), displayScale * 8);
+    z = Math.min(Math.max(z, 0.02), 16); // absolute range, matches the wheel-zoom clamp
     canvas.zoomToPoint(new Point(cssWidth / 2, cssHeight / 2), z);
     canvas.requestRenderAll();
   };
