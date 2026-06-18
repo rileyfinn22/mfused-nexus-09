@@ -222,6 +222,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const [drawPerfMode, setDrawPerfMode] = useState(false);
   // Which left-rail tool category popover is open (Quad-style grouped toolbar)
   const [openCat, setOpenCat] = useState<string | null>(null);
+  // "Move Dieline" mode — temporarily makes the dieline frame the only grabbable object
+  const [dielineMoveMode, setDielineMoveMode] = useState(false);
   // Property-panel mirrors of the selected object's editable attributes (Stage B)
   const [objFill, setObjFill] = useState("#000000");
   const [objStroke, setObjStroke] = useState("#000000");
@@ -940,9 +942,6 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       // generated fold dieline). Locked for customers in use mode.
       if (!dielineResult && !canvas.getObjects().some((o: any) => o.name === DIELINE_FRAME_NAME)) {
         const frame = createDielineFrame({ widthIn: width, heightIn: height, bleedIn: bleed, dpi: DPI });
-        const interactive = mode === "edit";
-        (frame as any).locked = !interactive;
-        frame.set({ selectable: interactive, evented: interactive, hasControls: interactive, hasBorders: interactive });
         canvas.add(frame);
         canvas.bringObjectToFront(frame);
         canvas.renderAll();
@@ -3109,6 +3108,38 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     canvas.zoomToPoint(new Point(cssWidth / 2, cssHeight / 2), z);
     canvas.requestRenderAll();
   };
+  // Toggle "Move Dieline": makes the dieline frame grabbable and freezes everything else,
+  // so the designer can reposition/scale the frame without fighting the artwork beneath it.
+  const toggleDielineMove = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const frame = canvas.getObjects().find((o: any) => o.name === DIELINE_FRAME_NAME) as any;
+    if (!frame) { toast.error("No dieline frame on this template"); return; }
+    const on = !dielineMoveMode;
+    setDielineMoveMode(on);
+    setOpenCat(null);
+    const bleedChild = frame.getObjects?.()[0];
+    if (on) {
+      frame.set({ selectable: true, evented: true, hasControls: true, hasBorders: true });
+      bleedChild?.set({ fill: "rgba(59,130,246,0.06)" });
+      frame.set({ dirty: true });
+      canvas.getObjects().forEach((o: any) => { if (o !== frame) o.set({ evented: false }); });
+      canvas.setActiveObject(frame);
+      canvas.requestRenderAll();
+      toast.info("Drag or scale the dieline frame, then click Done");
+    } else {
+      frame.set({ selectable: false, evented: false });
+      bleedChild?.set({ fill: "transparent" });
+      frame.set({ dirty: true });
+      canvas.discardActiveObject();
+      canvas.getObjects().forEach((o: any) => {
+        if (o.name === DIELINE_FRAME_NAME) return;
+        o.set({ evented: !String(o.name || "").startsWith("_") });
+      });
+      canvas.requestRenderAll();
+      syncCanvas();
+    }
+  };
   const centerOrFitSelected = (kind: "center" | "fit") => {
     const canvas = fabricRef.current;
     if (!canvas) return;
@@ -3304,11 +3335,16 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             {/* ── Dieline ── */}
             <Popover open={openCat === "dieline"} onOpenChange={(o) => setOpenCat(o ? "dieline" : null)}>
               <PopoverTrigger asChild>
-                <Button size="sm" variant={drawMaskMode || drawPerfMode ? "default" : "outline"} className="gap-1.5">
+                <Button size="sm" variant={drawMaskMode || drawPerfMode || dielineMoveMode ? "default" : "outline"} className="gap-1.5">
                   <Scissors className="h-3.5 w-3.5" /><span className="text-xs">Dieline</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" side="right" className="w-52 p-1.5 space-y-1">
+                <Button size="sm" variant={dielineMoveMode ? "default" : "ghost"} className="w-full justify-start gap-2"
+                  onClick={toggleDielineMove}>
+                  <Scissors className="h-3.5 w-3.5" /> {dielineMoveMode ? "Done moving dieline" : "Move / scale dieline"}
+                </Button>
+                <div className="h-px bg-border my-1" />
                 <Button size="sm" variant="ghost" className="w-full justify-start gap-2"
                   onClick={() => { addHorizontalPerf(); setOpenCat(null); }}>
                   <Scissors className="h-3.5 w-3.5" /> Horizontal perf

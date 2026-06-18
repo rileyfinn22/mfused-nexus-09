@@ -52,11 +52,16 @@ export function createDielineFrame(opts: DielineFrameOpts): Group {
     scaleY: opts.transform?.scaleY ?? 1,
     subTargetCheck: false,
     objectCaching: false,
+    // Default: a non-interactive guide so artwork stays freely editable. A "Move Dieline"
+    // toggle in the editor makes it grabbable when the designer wants to reposition it.
+    selectable: false,
+    evented: false,
   } as any);
 
   (group as any).name = DIELINE_FRAME_NAME;
   (group as any).locked = false;
   (group as any).editable = false;
+  (group as any)._displayName = "Dieline frame";
   (group as any)._physical = { widthIn, heightIn, bleedIn };
   group.set({
     borderColor: "#3b82f6", cornerColor: "#3b82f6", cornerStyle: "circle", transparentCorners: false,
