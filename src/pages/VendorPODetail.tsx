@@ -834,6 +834,39 @@ const VendorPODetail = () => {
       
       const itemsTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
       const totalAmount = itemsTotal + Number(po.shipping_cost || 0);
+
+      // Gather Invoice # + Customer PO # info to print on case stickers
+      const orderIdSet = new Set<string>();
+      if (po.order_id) orderIdSet.add(po.order_id);
+      const itemOrderIds = poItems.map((i: any) => i.order_item_id).filter(Boolean);
+      if (itemOrderIds.length > 0) {
+        const { data: oiRows } = await supabase
+          .from('order_items')
+          .select('order_id')
+          .in('id', itemOrderIds);
+        (oiRows || []).forEach((r: any) => r.order_id && orderIdSet.add(r.order_id));
+      }
+      let caseStickerInfo: Array<{ orderNumber?: string; invoiceNumber?: string; customerPO?: string }> = [];
+      if (orderIdSet.size > 0) {
+        const { data: invoices } = await supabase
+          .from('invoices')
+          .select('invoice_number, customer_po_number, order_id, orders(order_number, po_number)')
+          .in('order_id', Array.from(orderIdSet))
+          .is('deleted_at', null)
+          .neq('invoice_type', 'deposit')
+          .order('invoice_number');
+        const seen = new Set<string>();
+        (invoices || []).forEach((inv: any) => {
+          const key = `${inv.invoice_number}-${inv.order_id}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          caseStickerInfo.push({
+            orderNumber: inv.orders?.order_number,
+            invoiceNumber: inv.invoice_number,
+            customerPO: inv.customer_po_number || inv.orders?.po_number || undefined,
+          });
+        });
+      }
       
       const response = await supabase.functions.invoke('send-vendor-po-email', {
         body: {
