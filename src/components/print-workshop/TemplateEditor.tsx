@@ -1694,14 +1694,20 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
           return;
         }
 
-        // D1: lay the SVG out at NATURAL size (1 user unit → 1 artboard px) centered on the
-        // artboard — the dieline frame is placed over it — rather than shrinking it into the
-        // trim. Group to compute combined bounds + center, then disband (removeAll bakes the
-        // group transform back into each child) so every shape lands as its own editable layer.
+        // Bring the SVG in COMBINED + aligned: group to compute combined bounds, scale the whole
+        // thing to the template area as ONE unit (so all shapes keep their relative layout = the
+        // original design), then disband (removeAll bakes the group transform back into each child)
+        // so every shape lands as its own selectable/lockable layer, still perfectly aligned.
         const group = new Group(objects as any);
+        const trimW = Math.round(width * DPI);
+        const trimH = Math.round(height * DPI);
+        const gW = group.width || trimW;
+        const gH = group.height || trimH;
+        const scale = Math.min(trimW / gW, trimH / gH, 1) || 1;
+        group.scale(scale);
         group.set({
-          left: (canvasWidth - group.getScaledWidth()) / 2,
-          top: (canvasHeight - group.getScaledHeight()) / 2,
+          left: bleedPx + (trimW - group.getScaledWidth()) / 2,
+          top: bleedPx + (trimH - group.getScaledHeight()) / 2,
         });
         group.setCoords();
 
@@ -1753,9 +1759,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   /**
    * Import a PSD and decompose it into editable layers (Phase 3).
    * Each Photoshop layer → its own object: text layers become editable text,
-   * raster layers become placed images. Locked by default; the PSD is placed at its
-   * natural physical size (D1) and centered on the artboard, with the dieline frame
-   * positioned over it. ag-psd is dynamic-imported to keep the bundle lean.
+   * raster layers become placed images. Locked by default. All layers share one fit/origin
+   * so they reconstruct the original design (combined + aligned) over the template area;
+   * the dieline frame is moved over it. ag-psd is dynamic-imported to keep the bundle lean.
    */
   const importPsdFile = async (file: File) => {
     const canvas = fabricRef.current;
@@ -1767,13 +1773,15 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
       const psdW = psd.width || 1;
       const psdH = psd.height || 1;
-      // D1: place at NATURAL physical size on the artboard (not shrunk to the trim) so the
-      // designer slides the dieline frame over the art. Use the PSD's embedded resolution when
-      // present (scale = artboardDPI / psdDPI → true inches); fall back to 1:1 artboard px.
-      const psdRes = (psd as any).imageResources?.resolutionInfo?.horizontalResolution;
-      const fit = (typeof psdRes === "number" && psdRes > 0) ? (DPI / psdRes) : 1;
-      const offX = (canvasWidth - psdW * fit) / 2;
-      const offY = (canvasHeight - psdH * fit) / 2;
+      // Bring the PSD in COMBINED + aligned: every layer is scaled by the SAME fit factor and
+      // offset by the same origin, so the layers reconstruct the original design exactly (it looks
+      // like the flattened art). Fit it to the template area; the dieline frame is moved over it.
+      // Each decomposed layer stays an individually selectable/lockable object.
+      const trimW = Math.round(width * DPI);
+      const trimH = Math.round(height * DPI);
+      const fit = Math.min(trimW / psdW, trimH / psdH) || 1;
+      const offX = bleedPx + (trimW - psdW * fit) / 2;
+      const offY = bleedPx + (trimH - psdH * fit) / 2;
 
       // Flatten the layer tree (recurse into groups, collect leaf layers)
       const flat: any[] = [];
