@@ -34,6 +34,7 @@ tasks:
     title: HiResRenderManager — zoom-aware re-rasterization (sharp at deep zoom)
     phase: A
     size: M
+    status: done
     contracts: [importers]
     depends_on: [A1]
     description: >

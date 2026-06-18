@@ -365,6 +365,10 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const measureRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  // A2 — hi-res: cache the source PDF buffer + track the rendered resolution so we can
+  // re-rasterize the background sharper as the user zooms in.
+  const pdfBufferRef = useRef<ArrayBuffer | null>(null);
+  const hiResRef = useRef<{ renderedW: number; busy: boolean }>({ renderedW: 0, busy: false });
   const [containerWidth, setContainerWidth] = useState(600);
   const [containerHeight, setContainerHeight] = useState(400);
 
@@ -549,6 +553,48 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     };
     canvas.on("after:render", syncOverlay);
 
+    // A2 — re-rasterize the PDF background at higher resolution as the user zooms in,
+    // so it stays crisp instead of stretching one fixed-resolution raster.
+    let upscaleTimer: any = null;
+    const doUpscale = async () => {
+      const buf = pdfBufferRef.current;
+      if (!buf || hiResRef.current.busy) return;
+      const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background") as any;
+      if (!bg) return;
+      const dpr = window.devicePixelRatio || 1;
+      const onScreenW = bg.getScaledWidth() * canvas.getZoom() * dpr;
+      const target = Math.min(Math.ceil(onScreenW), 6000);
+      if (target <= hiResRef.current.renderedW * 1.25) return; // already sharp enough
+      hiResRef.current.busy = true;
+      try {
+        const { generatePdfThumbnailFromArrayBuffer } = await import("@/lib/pdfThumbnail");
+        const blob = await generatePdfThumbnailFromArrayBuffer(buf.slice(0), { maxWidth: target, scale: 1 });
+        const url = URL.createObjectURL(blob);
+        const imgEl = new window.Image();
+        await new Promise<void>((res) => { imgEl.onload = () => res(); imgEl.onerror = () => res(); imgEl.src = url; });
+        const stillBg = canvas.getObjects().find((o: any) => o.name === "pdf_background") as any;
+        if (stillBg && imgEl.width > 0) {
+          const sceneW = (stillBg.width || 1) * (stillBg.scaleX || 1);
+          const sceneH = (stillBg.height || 1) * (stillBg.scaleY || 1);
+          const l = stillBg.left, t = stillBg.top;
+          stillBg.setElement(imgEl);
+          stillBg.set({ left: l, top: t, scaleX: sceneW / imgEl.width, scaleY: sceneH / imgEl.height });
+          stillBg.setCoords();
+          canvas.requestRenderAll();
+          hiResRef.current.renderedW = target;
+        }
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.warn("hi-res upscale failed:", err);
+      } finally {
+        hiResRef.current.busy = false;
+      }
+    };
+    const scheduleUpscale = () => {
+      clearTimeout(upscaleTimer);
+      upscaleTimer = setTimeout(() => { doUpscale(); }, 180);
+    };
+
     canvas.on("mouse:wheel", (opt: any) => {
       const e = opt.e;
       let z = canvas.getZoom();
@@ -557,6 +603,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       canvas.zoomToPoint(new Point(e.offsetX, e.offsetY), z);
       e.preventDefault();
       e.stopPropagation();
+      scheduleUpscale();
     });
 
     let isPanning = false;
@@ -855,6 +902,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
             const buf = await resp.arrayBuffer();
             // Clone buffer so pdfjs doesn't detach it before thumbnail generation
             const bufCopy = buf.slice(0);
+            pdfBufferRef.current = buf.slice(0);              // cache for hi-res zoom re-render (A2)
+            hiResRef.current = { renderedW: 0, busy: false };
 
             let pdfWidthIn: number | undefined;
             let pdfHeightIn: number | undefined;
@@ -994,6 +1043,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     // Guidelines already cleared in object:modified above
 
     return () => {
+      clearTimeout(upscaleTimer);
       if (previewPdfUrlRef.current) {
         URL.revokeObjectURL(previewPdfUrlRef.current);
         previewPdfUrlRef.current = null;
@@ -1194,6 +1244,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       try {
         // Read the PDF to validate its page size against template dimensions
         const arrayBuf = await file.arrayBuffer();
+        pdfBufferRef.current = arrayBuf.slice(0);          // cache for hi-res zoom re-render (A2)
+        hiResRef.current = { renderedW: 0, busy: false };
         let pdfWidthIn = 0;
         let pdfHeightIn = 0;
         let pdfBoxes: ParsedPdfPageBoxes | undefined;
