@@ -75,7 +75,7 @@ export function SendVendorPOFromAssignDialog({
         supabase.from("vendors").select("*").eq("id", poData.vendor_id).single(),
         supabase
           .from("vendor_po_items")
-          .select("*, order_items(orders(order_number))")
+          .select("*, order_items(order_id, orders(order_number, po_number))")
           .eq("vendor_po_id", vendorPoId)
           .order("created_at"),
       ]);
