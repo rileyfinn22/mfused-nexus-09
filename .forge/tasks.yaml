@@ -1,0 +1,179 @@
+# Print Workshop — Artboard Editor Rework
+# Thin vertical slices, dependency-ordered. Editor stays shippable after each task;
+# existing templates must never regress. See .forge/prd.md, architecture.md, contracts/.
+
+meta:
+  surface: /print-workshop
+  stack: React + Fabric.js v6 + Supabase + pdfjs-dist + ag-psd
+  order: [A1, A2, B1, B2, B3, C1, C2, D1, E1]
+
+tasks:
+  - id: A1
+    title: Artboard space — canvas fills workspace, objects in artboard coords
+    phase: A
+    size: M
+    contracts: [artboard-canvas]
+    depends_on: []
+    description: >
+      Consolidate the artboard foundation. Canvas element fills the available
+      workspace; scene stays at INTERNAL_DPI=150 (no coord change → saved data safe);
+      pasteboard is empty scene around content. Keep pan/zoom (scroll/middle-drag/Fit)
+      and fit-to-content already added. Make fit-to-content the load + post-upload default.
+    acceptance:
+      - Canvas is the dominant element and fills the center workspace.
+      - Fit frames all content (artwork + dieline area); runs on open and after upload.
+      - Pan (middle-drag) and scroll-zoom work; objects remain selectable/movable.
+      - Existing saved templates open visually unchanged.
+    verify:
+      - tsc --noEmit && vite build green
+      - Manual: open a legacy template → looks identical; upload a file → frames whole file.
+    files: [src/components/print-workshop/TemplateEditor.tsx]
+
+  - id: A2
+    title: HiResRenderManager — zoom-aware re-rasterization (sharp at deep zoom)
+    phase: A
+    size: M
+    contracts: [importers]
+    depends_on: [A1]
+    description: >
+      New lib that re-renders PDF/PSD raster layers at a DPI tied to zoom and swaps the
+      FabricImage src, preserving transform. Debounced (~150ms on zoom-settle),
+      LRU/pixel-capped. SVG/vector bypass. Print export unaffected (renders from source).
+    acceptance:
+      - Deep zoom-in on a PDF-backed layer stays sharp (no visible softening at high zoom).
+      - Re-render is debounced and never blocks pan/zoom; memory capped.
+      - SVG layers bypass; raster always has a base fallback.
+    verify:
+      - tsc/build green
+      - Manual: upload PDF → zoom to 600%+ → text/edges crisp.
+    files:
+      - src/lib/print-workshop/hiResRender.ts (new)
+      - src/components/print-workshop/TemplateEditor.tsx
+
+  - id: B1
+    title: DielineFrame object — movable/scalable trim+bleed+safe, replaces HTML overlay
+    phase: B
+    size: M
+    contracts: [dieline-frame, artboard-canvas]
+    depends_on: [A1]
+    description: >
+      Create a Fabric group named "dieline_frame" (bleed/trim/safe rects + labels) at the
+      template physical size (in × DPI). Movable + scalable in edit mode; locked/non-interactive
+      in use mode. Remove the edge-anchored HTML bleed overlay (and its viewport-sync hack).
+      Expose getRegion()/getPhysical().
+    acceptance:
+      - Frame renders at the template's physical size with trim/bleed/safe lines.
+      - In edit mode it can be dragged and scaled; in use mode it's locked.
+      - HTML bleed overlay removed; guides not serialized/exported.
+    verify:
+      - tsc/build green
+      - Manual: frame appears, drag/scale works in edit, fixed in use.
+    files:
+      - src/components/print-workshop/DielineFrame.ts (new)
+      - src/components/print-workshop/TemplateEditor.tsx
+
+  - id: B2
+    title: Persist dieline frame in canvas_data + legacy migration
+    phase: B
+    size: S
+    contracts: [dieline-frame, artboard-canvas]
+    depends_on: [B1]
+    description: >
+      Serialize the frame transform ({left,top,scaleX,scaleY,widthIn,heightIn,bleedIn})
+      inside canvas_data (extend the toObject whitelist). On load of a template with no
+      dieline_frame, synthesize one from the physical size at origin (ADR-003) so legacy
+      templates open identically.
+    acceptance:
+      - Move/scale the frame, save, reload → identical placement.
+      - Legacy template (no frame) opens with a frame matching its old print area; no regression.
+    verify:
+      - tsc/build green
+      - Manual: round-trip a new template; open an old template.
+    files: [src/components/print-workshop/TemplateEditor.tsx, src/components/print-workshop/DielineFrame.ts]
+
+  - id: B3
+    title: Numeric physical-size field for the dieline frame
+    phase: B
+    size: S
+    contracts: [dieline-frame, layers-properties]
+    depends_on: [B1]
+    description: >
+      In the Properties panel (frame selected), show numeric W×H + bleed inputs that call
+      setPhysicalSize (with confirm). Dragging/scaling changes region; this changes physical size.
+    acceptance:
+      - Editing W/H/bleed rebuilds the frame's physical size.
+      - On-artboard scale/position of existing art is not silently changed.
+    verify:
+      - tsc/build green
+      - Manual: change size numerically → frame + export size update.
+    files: [src/components/print-workshop/TemplateEditor.tsx]
+
+  - id: C1
+    title: Region-based print export — output = dieline-frame region at true size/DPI
+    phase: C
+    size: L
+    contracts: [print-export, dieline-frame]
+    depends_on: [B2]
+    description: >
+      Refactor printPdfExport.ts to compute the frame region, build a region→output transform
+      (output = physical inches × EXPORT_DPI), render only objects intersecting region+bleed,
+      re-render source PDF at EXPORT_DPI placed by the transform, add crop/perf/knockouts.
+      Legacy (no frame) synthesizes from physical size.
+    acceptance:
+      - Exported page = exact physical size (+bleed); only frame-region content; pasteboard excluded.
+      - On-screen proof (frame) ≈ printed output.
+    verify:
+      - tsc/build green
+      - Golden test (C2)
+    files: [src/lib/printPdfExport.ts, src/components/print-workshop/TemplateEditor.tsx]
+
+  - id: C2
+    title: Golden-size export tests
+    phase: C
+    size: S
+    contracts: [print-export]
+    depends_on: [C1]
+    description: >
+      Unit tests: a known template + frame exports to the exact page dimensions and places a
+      reference object at the expected output position/scale.
+    acceptance:
+      - Page width/height in points = physical inches × 72 (±0).
+      - Reference mark lands at expected output coords.
+    verify:
+      - test runner green
+    files: [src/lib/__tests__/printPdfExport.test.ts (new)]
+
+  - id: D1
+    title: Decompose-at-natural-size + per-asset editing
+    phase: D
+    size: M
+    contracts: [importers, dieline-frame]
+    depends_on: [B1, A2]
+    description: >
+      Importers place decomposed layers at natural size in artboard coords (not fit to template);
+      PDF/PSD raster layers register hi-res sources; assets are individually selectable/movable.
+      Default lock; admin unlocks.
+    acceptance:
+      - Upload → individual editable layers (not one blob); naturally sized; sharp.
+      - Frame is positioned over the art to define print.
+    verify:
+      - tsc/build green
+      - Manual: upload multi-element art → select/move single asset.
+    files: [src/components/print-workshop/TemplateEditor.tsx]
+
+  - id: E1
+    title: Lock/role + back-compat hardening
+    phase: E
+    size: S
+    contracts: [layers-properties, dieline-frame, print-export]
+    depends_on: [B2, C1, D1]
+    description: >
+      Verify the admin→customer lock contract end-to-end (locked art + frame not editable in use),
+      and that legacy templates open + print correctly under the new pipeline.
+    acceptance:
+      - Customer (use mode) cannot edit locked elements or the frame.
+      - A pre-rework template opens and exports at correct size.
+    verify:
+      - tsc/build green
+      - Manual: use-mode edit gating; legacy template export.
+    files: [src/components/print-workshop/TemplateEditor.tsx, src/lib/printPdfExport.ts]
