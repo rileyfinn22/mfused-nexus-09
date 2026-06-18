@@ -119,6 +119,10 @@ tasks:
     title: Region-based print export — output = dieline-frame region at true size/DPI
     phase: C
     size: L
+    status: done
+    note: Region→output transform pre-maps objects + source-PDF placement through the dieline
+          frame region; legacy (no frame) = identity = byte-identical pre-C1 output. Pure math
+          extracted to lib/print-workshop/regionTransform.ts. Fixed Fabric "i-text" type gap.
     contracts: [print-export, dieline-frame]
     depends_on: [B2]
     description: >
@@ -138,6 +142,10 @@ tasks:
     title: Golden-size export tests
     phase: C
     size: S
+    status: done
+    note: vitest golden tests on the pure region math (page size independent of frame scale;
+          reference object lands at expected output coords). Run via `npm test` (npx vitest, no
+          committed dep → Lovable lockfiles untouched). Tests excluded from tsconfig.app build.
     contracts: [print-export]
     depends_on: [C1]
     description: >

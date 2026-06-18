@@ -9,6 +9,8 @@
 import jsPDF from "jspdf";
 import * as pdfjsLib from "pdfjs-dist";
 import { supabase } from "@/integrations/supabase/client";
+// Region → output transform (C1). Pure geometry kept in its own module for unit-testability.
+import { CANVAS_DPI, computeRegionTransform, mapObjectToRegion, isTextType } from "@/lib/print-workshop/regionTransform";
 
 // Reuse the same worker setup as pdfThumbnail
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -235,6 +237,9 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
   const totalW = widthInches + bleedInches * 2;
   const totalH = heightInches + bleedInches * 2;
 
+  // Region → output transform (C1). Identity for legacy templates (no dieline frame).
+  const rt = computeRegionTransform(canvasData, widthInches, heightInches, bleedInches);
+
   // Create jsPDF document with exact page size in inches
   const orientation = totalW > totalH ? "landscape" : "portrait";
   const doc = new jsPDF({
@@ -257,19 +262,12 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
     bleedInches,
     EXPORT_DPI
   );
-  doc.addImage(
-    bgLayer.dataUrl,
-    "PNG",
-    bgLayer.xInches,
-    bgLayer.yInches,
-    bgLayer.widthInches,
-    bgLayer.heightInches,
-    undefined,
-    "NONE"
-  );
-
-  // 2. Internal DPI used by the Fabric.js canvas (must match TemplateEditor)
-  const CANVAS_DPI = 150;
+  // Map the source-PDF placement through the region transform (identity for legacy).
+  const bgX = ((bgLayer.xInches * CANVAS_DPI) - rt.left) * rt.RSx / CANVAS_DPI;
+  const bgY = ((bgLayer.yInches * CANVAS_DPI) - rt.top) * rt.RSy / CANVAS_DPI;
+  const bgW = (bgLayer.widthInches * CANVAS_DPI) * rt.RSx / CANVAS_DPI;
+  const bgH = (bgLayer.heightInches * CANVAS_DPI) * rt.RSy / CANVAS_DPI;
+  doc.addImage(bgLayer.dataUrl, "PNG", bgX, bgY, bgW, bgH, undefined, "NONE");
 
   // 3. Overlay Fabric.js objects
   const objects: any[] = canvasData?.objects || [];
@@ -281,40 +279,43 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
 
     if (shouldSkipExportObject(objName)) continue;
 
+    // Map artboard coords → region/output frame (identity for legacy templates).
+    const mobj = mapObjectToRegion(obj, rt);
+
     if (objName === "_ocrKnockout" && objectType === "rect") {
-      drawRectObject(doc, obj, CANVAS_DPI);
+      drawRectObject(doc, mobj, CANVAS_DPI);
       continue;
     }
 
     // Convert canvas px position to inches
-    const xIn = (obj.left ?? 0) / CANVAS_DPI;
-    const yIn = (obj.top ?? 0) / CANVAS_DPI;
+    const xIn = (mobj.left ?? 0) / CANVAS_DPI;
+    const yIn = (mobj.top ?? 0) / CANVAS_DPI;
 
-    if (objectType === "itext" || objectType === "textbox" || objectType === "text") {
-      const fontSizePx = obj.fontSize || 24;
-      const scaleX = obj.scaleX || 1;
-      const scaleY = obj.scaleY || 1;
+    if (isTextType(objectType)) {
+      const fontSizePx = mobj.fontSize || 24;
+      const scaleX = mobj.scaleX || 1;
+      const scaleY = mobj.scaleY || 1;
       const fontSizePt = ((fontSizePx * scaleY) * 72) / CANVAS_DPI;
 
-      const jspdfFont = JSPDF_FONT_MAP[obj.fontFamily];
+      const jspdfFont = JSPDF_FONT_MAP[mobj.fontFamily];
       if (jspdfFont) {
         const style =
-          obj.fontWeight === "bold" && obj.fontStyle === "italic"
+          mobj.fontWeight === "bold" && mobj.fontStyle === "italic"
             ? "bolditalic"
-            : obj.fontWeight === "bold"
+            : mobj.fontWeight === "bold"
               ? "bold"
-              : obj.fontStyle === "italic"
+              : mobj.fontStyle === "italic"
                 ? "italic"
                 : "normal";
 
         doc.setFont(jspdfFont, style);
         doc.setFontSize(fontSizePt);
 
-        const { r, g, b } = parseColor(obj.fill);
+        const { r, g, b } = parseColor(mobj.fill);
         doc.setTextColor(r, g, b);
 
-        const textLines = String(obj.text || "").split("\n");
-        const lineHeightFactor = obj.lineHeight || 1.16;
+        const textLines = String(mobj.text || "").split("\n");
+        const lineHeightFactor = mobj.lineHeight || 1.16;
         const lineHeightIn = (fontSizePt / 72) * lineHeightFactor;
         const baselineY = yIn + (fontSizePt / 72) * 0.82;
 
@@ -340,24 +341,24 @@ export async function generatePrintReadyPdf(options: ExportOptions): Promise<Blo
         }
       } else {
         // Non-standard font: rasterize at high DPI to preserve appearance
-        const textCanvas = renderTextToCanvas(obj, CANVAS_DPI, EXPORT_DPI);
+        const textCanvas = renderTextToCanvas(mobj, CANVAS_DPI, EXPORT_DPI);
         const textDataUrl = textCanvas.toDataURL("image/png");
         const wIn = textCanvas.width / EXPORT_DPI;
         const hIn = textCanvas.height / EXPORT_DPI;
         doc.addImage(textDataUrl, "PNG", xIn, yIn, wIn, hIn, undefined, "NONE");
       }
     } else if (objectType === "image") {
-      if (obj.src) {
+      if (mobj.src) {
         try {
-          renderImageObjectToPdf(doc, obj, CANVAS_DPI, EXPORT_DPI);
+          renderImageObjectToPdf(doc, mobj, CANVAS_DPI, EXPORT_DPI);
         } catch {
-          console.warn("Could not embed image in PDF export", obj.name);
+          console.warn("Could not embed image in PDF export", mobj.name);
         }
       }
     } else if (objectType === "rect") {
-      drawRectObject(doc, obj, CANVAS_DPI);
+      drawRectObject(doc, mobj, CANVAS_DPI);
     } else if (objectType === "line") {
-      drawLineObject(doc, obj, CANVAS_DPI);
+      drawLineObject(doc, mobj, CANVAS_DPI);
     }
   }
 
@@ -605,7 +606,8 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
 
   clipToPageBounds(doc, totalW, totalH);
 
-  const CANVAS_DPI = 150;
+  // Region → output transform (C1). Identity for legacy templates (no dieline frame).
+  const rt = computeRegionTransform(canvasData, widthInches, heightInches, bleedInches);
 
   // ---------- Full-canvas rasterisation ----------
   // We rebuild a temporary Fabric canvas at export DPI, render it, and embed the
@@ -614,8 +616,10 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
 
   const { Canvas: FabricCanvas } = await import("fabric");
 
-  const canvasPxW = Math.round(totalW * CANVAS_DPI);
-  const canvasPxH = Math.round(totalH * CANVAS_DPI);
+  // Size the off-screen canvas to contain the dieline region even if it was moved/scaled
+  // beyond the default print area; identity (legacy) → exactly the old print-area size.
+  const canvasPxW = Math.round(Math.max(totalW * CANVAS_DPI, rt.left + rt.width));
+  const canvasPxH = Math.round(Math.max(totalH * CANVAS_DPI, rt.top + rt.height));
 
   // Create an off-screen HTML canvas for Fabric — Fabric manages its own pixel buffer
   const tmpHtmlCanvas = document.createElement("canvas");
@@ -633,7 +637,7 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
     if (Array.isArray(safeData.objects)) {
       safeData.objects = safeData.objects.filter((obj: any) => {
         const n = String(obj?.name || "");
-        if (n === "_trimGuide" || n === "_snapGuide" || n === "_editHighlight" || n === "_dieline" || n === "_dielineLabel") return false;
+        if (n === "_trimGuide" || n === "_snapGuide" || n === "_editHighlight" || n === "_dieline" || n === "_dielineLabel" || n === "dieline_frame") return false;
         if (obj?.src && typeof obj.src === "string" && obj.src.startsWith("blob:")) return false;
         return true;
       });
@@ -683,15 +687,20 @@ export async function generateCanvasOnlyPdf(options: Omit<ExportOptions, "source
     });
   }
 
-  // Use Fabric's native toDataURL with a multiplier for high-res export.
-  // This lets Fabric handle its own transforms/scaling correctly.
-  const exportMultiplier = Math.min(EXPORT_DPI / CANVAS_DPI, 4); // cap at 4× for browser limits
+  // Use Fabric's native toDataURL with a multiplier for high-res export, cropping to the
+  // dieline region. For legacy templates the region is the whole print area → full canvas.
+  // multiplier maps region px → output px so the region fills the page at EXPORT_DPI.
+  const exportMultiplier = Math.min((rt.RSx * EXPORT_DPI) / CANVAS_DPI, 4); // cap for browser limits
   const rasterDataUrl = tmpFabric.toDataURL({
     format: "png",
     multiplier: exportMultiplier,
+    left: rt.left,
+    top: rt.top,
+    width: rt.width,
+    height: rt.height,
   });
 
-  // Place the full raster on the PDF page
+  // Place the cropped region raster onto the full PDF page (= physical size + bleed)
   doc.addImage(rasterDataUrl, "PNG", 0, 0, totalW, totalH, undefined, "NONE");
 
   // Clean up
