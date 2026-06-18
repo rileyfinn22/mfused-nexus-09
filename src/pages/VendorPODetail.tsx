@@ -883,6 +883,7 @@ const VendorPODetail = () => {
           totalAmount: totalAmount,
           vendorName: vendor?.contact_name || vendor?.name || 'Vendor',
           additionalAttachments: additionalAttachmentsData && additionalAttachmentsData.length > 0 ? additionalAttachmentsData : undefined,
+          caseStickerInfo: caseStickerInfo.length > 0 ? caseStickerInfo : undefined,
         }
       });
 
