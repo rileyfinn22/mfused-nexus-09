@@ -79,6 +79,7 @@ tasks:
     title: Persist dieline frame in canvas_data + legacy migration
     phase: B
     size: S
+    status: done
     contracts: [dieline-frame, artboard-canvas]
     depends_on: [B1]
     description: >

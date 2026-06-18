@@ -418,6 +418,17 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       });
     }
 
+    // B2 — persist the dieline frame transform (the frame is recreated on load, not stored as an object)
+    const frameObj = fabricRef.current.getObjects().find((o: any) => o.name === DIELINE_FRAME_NAME) as any;
+    if (frameObj) {
+      data.dieline_frame = {
+        left: frameObj.left ?? 0,
+        top: frameObj.top ?? 0,
+        scaleX: frameObj.scaleX ?? 1,
+        scaleY: frameObj.scaleY ?? 1,
+      };
+    }
+
     return data;
   }, [sourcePdfPath]);
 
@@ -941,7 +952,13 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       // B1 — add the movable/scalable dieline trim frame (labels-first; box/bag keep their
       // generated fold dieline). Locked for customers in use mode.
       if (!dielineResult && !canvas.getObjects().some((o: any) => o.name === DIELINE_FRAME_NAME)) {
-        const frame = createDielineFrame({ widthIn: width, heightIn: height, bleedIn: bleed, dpi: DPI });
+        // B2 — restore persisted frame transform; legacy templates (no transform) get a
+        // default frame at the old print area (origin, scale 1) → no visual regression.
+        const ft = (canvasData as any)?.dieline_frame;
+        const frame = createDielineFrame({
+          widthIn: width, heightIn: height, bleedIn: bleed, dpi: DPI,
+          transform: ft ? { left: ft.left ?? 0, top: ft.top ?? 0, scaleX: ft.scaleX ?? 1, scaleY: ft.scaleY ?? 1 } : undefined,
+        });
         canvas.add(frame);
         canvas.bringObjectToFront(frame);
         canvas.renderAll();
