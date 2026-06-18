@@ -3064,8 +3064,22 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   const isShapeObject = (() => {
     const t = (selectedObject as any)?.type?.toLowerCase?.() || "";
     return ["rect", "circle", "ellipse", "triangle", "polygon", "line", "path"].includes(t)
-      && (selectedObject as any)?.name !== "pdf_background";
+      && (selectedObject as any)?.name !== "pdf_background"
+      && (selectedObject as any)?.name !== DIELINE_FRAME_NAME;
   })();
+  const isDielineFrame = (selectedObject as any)?.name === DIELINE_FRAME_NAME;
+
+  // Reset the dieline frame to 1:1 with the template (on-artboard scale = 100%)
+  const resetFrameScale = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const frame = canvas.getObjects().find((o: any) => o.name === DIELINE_FRAME_NAME) as any;
+    if (!frame) return;
+    frame.set({ scaleX: 1, scaleY: 1 });
+    frame.setCoords();
+    canvas.requestRenderAll();
+    syncCanvas();
+  };
 
   // Stage B property-panel actions — operate on the active object(s) and persist
   const applyToSelection = (fn: (o: any) => void) => {
@@ -3670,6 +3684,18 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                         <Scissors className="h-3 w-3" /><span className="text-[10px]">Split</span>
                       </Button>
                     </div>
+                  </div>
+                )}
+
+                {/* Dieline frame */}
+                {isDielineFrame && (
+                  <div className="space-y-2 border-t border-border pt-2">
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Dieline</span>
+                    <p className="text-[11px] text-muted-foreground">{width}" × {height}" trim · {bleed}" bleed</p>
+                    <p className="text-[10px] text-muted-foreground">Change the physical size in Template Settings below.</p>
+                    <Button size="sm" variant="outline" className="w-full h-7 text-[10px]" onClick={resetFrameScale}>
+                      Reset frame to 100% (match template)
+                    </Button>
                   </div>
                 )}
 

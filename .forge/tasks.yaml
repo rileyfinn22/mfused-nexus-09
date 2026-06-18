@@ -99,6 +99,9 @@ tasks:
     title: Numeric physical-size field for the dieline frame
     phase: B
     size: S
+    status: done
+    note: Physical size is edited in Template Settings (drives the frame via props);
+          Properties adds a frame-selected readout + "reset to 100%" convenience.
     contracts: [dieline-frame, layers-properties]
     depends_on: [B1]
     description: >
