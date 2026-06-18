@@ -162,6 +162,13 @@ tasks:
     title: Decompose-at-natural-size + per-asset editing
     phase: D
     size: M
+    status: done
+    note: PSD/SVG already decompose into individually selectable layers; D1 makes them land at
+          NATURAL physical size (PSD via embedded resolution, SVG 1:1) centered on the artboard
+          instead of shrunk to the trim, so the dieline frame is placed over the art. These are
+          persisted objects → C1 region export maps them correctly. Flat PNG/JPG + PDF-without-
+          text remain single backgrounds by nature (AI decompose-design-image handles raster
+          splitting separately); PDF sharpness is covered by A2.
     contracts: [importers, dieline-frame]
     depends_on: [B1, A2]
     description: >
