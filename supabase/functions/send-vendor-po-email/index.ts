@@ -62,6 +62,7 @@ const handler = async (req: Request): Promise<Response> => {
       totalAmount,
       vendorName,
       additionalAttachments,
+      caseStickerInfo,
     }: SendVendorPORequest = await req.json();
 
     // Validate required fields
