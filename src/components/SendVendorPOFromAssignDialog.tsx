@@ -477,6 +477,7 @@ ${formattedDeliveryDate ? `<tr><td style="padding-top:16px;border-top:1px solid 
         content: a.base64,
       }));
       const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
+      const caseStickerInfo = await fetchCaseStickerInfo();
 
       const response = await supabase.functions.invoke("send-vendor-po-email", {
         body: {
