@@ -498,6 +498,7 @@ ${formattedDeliveryDate ? `<tr><td style="padding-top:16px;border-top:1px solid 
             additionalAttachmentsData && additionalAttachmentsData.length > 0
               ? additionalAttachmentsData
               : undefined,
+          caseStickerInfo: caseStickerInfo.length > 0 ? caseStickerInfo : undefined,
         },
       });
 
