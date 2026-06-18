@@ -19,6 +19,7 @@ import { computePdfBoxPlacement, extractPdfPageBoxes, type ParsedPdfPageBoxes } 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { generateDieline } from "@/lib/dielineGenerator";
+import { createDielineFrame, DIELINE_FRAME_NAME } from "./DielineFrame";
 
 // Popular print-ready fonts (web-safe + Google Fonts)
 const FONT_OPTIONS = [
@@ -406,7 +407,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
 
     if (Array.isArray(data.objects)) {
       data.objects = data.objects.filter((obj: any) => {
-        if (obj?.name === "_trimGuide" || obj?.name === "_snapGuide" || obj?.name === "_editHighlight" || obj?.name === "_dieline" || obj?.name === "_dielineLabel") return false;
+        if (obj?.name === "_trimGuide" || obj?.name === "_snapGuide" || obj?.name === "_editHighlight" || obj?.name === "_dieline" || obj?.name === "_dielineLabel" || obj?.name === DIELINE_FRAME_NAME) return false;
         if (!includePdfBackground && obj?.name === "pdf_background") {
           const src = typeof obj?.src === "string" ? obj.src : "";
           if (sourcePdfPath || src.startsWith("blob:")) return false;
@@ -455,6 +456,9 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     // Bring dieline guides and labels to front (above all artwork)
     const dielineObjs = canvas.getObjects().filter((o: any) => o.name === "_dieline" || o.name === "_dielineLabel");
     dielineObjs.forEach((o: any) => canvas.bringObjectToFront(o));
+    // The movable dieline trim frame sits above artwork so its guides stay visible
+    const frame = canvas.getObjects().find((o: any) => o.name === DIELINE_FRAME_NAME);
+    if (frame) canvas.bringObjectToFront(frame);
     // Trim guide on very top
     const trim = canvas.getObjects().find((o: any) => o.name === "_trimGuide");
     if (trim) canvas.bringObjectToFront(trim);
@@ -541,17 +545,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     if (fabricCanvasRef) fabricCanvasRef.current = canvas;
 
     // ── Artboard navigation: scroll to zoom, middle-mouse drag to pan ──
-    // Keep the HTML trim/bleed overlay locked to the Fabric viewport so it tracks
-    // pan/zoom (the overlay is laid out at the base fit scale; we apply the delta).
-    const syncOverlay = () => {
-      const el = overlayRef.current;
-      const vpt = canvas.viewportTransform;
-      if (!el || !vpt) return;
-      el.style.transformOrigin = "0 0";
-      // Overlay is laid out in scene px (template size); map scene→screen via the viewport.
-      el.style.transform = `translate(${vpt[4]}px, ${vpt[5]}px) scale(${vpt[0] || displayScale})`;
-    };
-    canvas.on("after:render", syncOverlay);
+    // (The trim/bleed/safe boundary is now a Fabric dieline-frame object, not an overlay.)
 
     // A2 — re-rasterize the PDF background at higher resolution as the user zooms in,
     // so it stays crisp instead of stretching one fixed-resolution raster.
@@ -942,11 +936,23 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       canvas.setZoom(displayScale);
       canvas.renderAll();
 
+      // B1 — add the movable/scalable dieline trim frame (labels-first; box/bag keep their
+      // generated fold dieline). Locked for customers in use mode.
+      if (!dielineResult && !canvas.getObjects().some((o: any) => o.name === DIELINE_FRAME_NAME)) {
+        const frame = createDielineFrame({ widthIn: width, heightIn: height, bleedIn: bleed, dpi: DPI });
+        const interactive = mode === "edit";
+        (frame as any).locked = !interactive;
+        frame.set({ selectable: interactive, evented: interactive, hasControls: interactive, hasBorders: interactive });
+        canvas.add(frame);
+        canvas.bringObjectToFront(frame);
+        canvas.renderAll();
+      }
+
       // Seed undo stack with initial state
       const initialData = canvas.toObject(['locked', 'editable', 'name', '_displayName']) as any;
       delete initialData.backgroundImage;
       if (Array.isArray(initialData.objects)) {
-        initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide" && obj?.name !== "_editHighlight" && obj?.name !== "_dieline" && obj?.name !== "_dielineLabel");
+        initialData.objects = initialData.objects.filter((obj: any) => obj?.name !== "_trimGuide" && obj?.name !== "_snapGuide" && obj?.name !== "_editHighlight" && obj?.name !== "_dieline" && obj?.name !== "_dielineLabel" && obj?.name !== DIELINE_FRAME_NAME);
       }
       undoStack.current = [JSON.stringify(initialData)];
       redoStack.current = [];
@@ -3451,21 +3457,7 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         <div className="relative shadow-lg shrink-0 overflow-hidden" style={{ width: cssWidth, height: cssHeight }}>
           <canvas ref={canvasRef} />
 
-          {/* Template trim/bleed guide — laid out in scene px, transformed to track the viewport */}
-          <div
-            ref={overlayRef}
-            className="pointer-events-none absolute top-0 left-0 z-20"
-            style={{ width: canvasWidth, height: canvasHeight, transformOrigin: "0 0" }}
-          >
-            <div className="absolute left-0 top-0 right-0" style={{ height: bleedPx, background: "rgba(31, 41, 55, 0.28)" }} />
-            <div className="absolute left-0 bottom-0 right-0" style={{ height: bleedPx, background: "rgba(31, 41, 55, 0.28)" }} />
-            <div className="absolute left-0" style={{ top: bleedPx, bottom: bleedPx, width: bleedPx, background: "rgba(31, 41, 55, 0.28)" }} />
-            <div className="absolute right-0" style={{ top: bleedPx, bottom: bleedPx, width: bleedPx, background: "rgba(31, 41, 55, 0.28)" }} />
-            <div
-              className="absolute border border-dashed border-destructive"
-              style={{ left: bleedPx, top: bleedPx, right: bleedPx, bottom: bleedPx }}
-            />
-          </div>
+          {/* Trim/bleed/safe boundary is rendered as the Fabric "dieline_frame" object */}
 
           {/* Perf line measurement overlay (relative to trim) */}
           {perfInfo && perfInfo.orientation === "h" && (
