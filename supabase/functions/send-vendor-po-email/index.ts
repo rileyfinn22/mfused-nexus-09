@@ -14,6 +14,12 @@ interface Attachment {
   content: string; // base64 encoded
 }
 
+interface CaseStickerEntry {
+  orderNumber?: string;
+  invoiceNumber?: string;
+  customerPO?: string;
+}
+
 interface SendVendorPORequest {
   poId: string;
   recipientEmails: string[];
@@ -29,6 +35,7 @@ interface SendVendorPORequest {
   totalAmount: number;
   vendorName: string;
   additionalAttachments?: Attachment[];
+  caseStickerInfo?: CaseStickerEntry[];
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -55,6 +62,7 @@ const handler = async (req: Request): Promise<Response> => {
       totalAmount,
       vendorName,
       additionalAttachments,
+      caseStickerInfo,
     }: SendVendorPORequest = await req.json();
 
     // Validate required fields
@@ -189,6 +197,35 @@ const handler = async (req: Request): Promise<Response> => {
                         </td>
                       </tr>
                     </table>
+                    
+                    ${caseStickerInfo && caseStickerInfo.length > 0 ? `
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; margin-bottom: 24px;">
+                      <tr>
+                        <td style="padding: 20px 24px;">
+                          <p style="margin: 0 0 8px 0; color: #92400e; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                            ⚠️ Required on Case Stickers
+                          </p>
+                          <p style="margin: 0 0 12px 0; color: #78350f; font-size: 14px; line-height: 1.5;">
+                            Please include the following Invoice # and Customer PO # on the case stickers for this order:
+                          </p>
+                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 6px;">
+                            <tr style="background-color: #fde68a;">
+                              <th align="left" style="padding: 8px 12px; color: #78350f; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Order #</th>
+                              <th align="left" style="padding: 8px 12px; color: #78350f; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Inv #</th>
+                              <th align="left" style="padding: 8px 12px; color: #78350f; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">CPO #</th>
+                            </tr>
+                            ${caseStickerInfo.map((e) => `
+                            <tr>
+                              <td style="padding: 8px 12px; color: #111827; font-size: 14px; font-weight: 600; border-top: 1px solid #fde68a;">${e.orderNumber || '—'}</td>
+                              <td style="padding: 8px 12px; color: #111827; font-size: 14px; font-weight: 600; border-top: 1px solid #fde68a;">${e.invoiceNumber || '—'}</td>
+                              <td style="padding: 8px 12px; color: #111827; font-size: 14px; font-weight: 600; border-top: 1px solid #fde68a;">${e.customerPO || '—'}</td>
+                            </tr>
+                            `).join('')}
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                    ` : ''}
                     
                     <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
                       The purchase order PDF is attached to this email for your records.
