@@ -168,6 +168,38 @@ export function SendVendorPOFromAssignDialog({
     return Array.from(set);
   };
 
+  const fetchCaseStickerInfo = async () => {
+    const orderIds = new Set<string>();
+    poItems.forEach((item: any) => {
+      const oid = item?.order_items?.order_id;
+      if (oid) orderIds.add(oid);
+    });
+    if (orderIds.size === 0 && po?.order_id) orderIds.add(po.order_id);
+    if (orderIds.size === 0) return [];
+
+    const { data: invoices } = await supabase
+      .from("invoices")
+      .select("invoice_number, customer_po_number, order_id, orders(order_number, po_number)")
+      .in("order_id", Array.from(orderIds))
+      .is("deleted_at", null)
+      .neq("invoice_type", "deposit")
+      .order("invoice_number");
+
+    const seen = new Set<string>();
+    const entries: Array<{ orderNumber?: string; invoiceNumber?: string; customerPO?: string }> = [];
+    (invoices || []).forEach((inv: any) => {
+      const key = `${inv.invoice_number}-${inv.order_id}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      entries.push({
+        orderNumber: inv.orders?.order_number,
+        invoiceNumber: inv.invoice_number,
+        customerPO: inv.customer_po_number || inv.orders?.po_number || undefined,
+      });
+    });
+    return entries;
+  };
+
   const generatePdfBase64 = async (): Promise<string> => {
     if (!po || !vendor || poItems.length === 0) throw new Error("Missing PO data");
 
