@@ -387,9 +387,11 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
   // element. High-res zoom rendering keeps it crisp even when a small label scales up.
   const MAX_ZOOM = 8;
   const displayScale = Math.max(0.05, Math.min(containerWidth / canvasWidth, containerHeight / canvasHeight, MAX_ZOOM));
-  const cssWidth = Math.round(canvasWidth * displayScale);
-  const cssHeight = Math.round(canvasHeight * displayScale);
-  const displayBleedPx = Math.max(1, Math.round(bleedPx * displayScale));
+  // Artboard: the canvas element fills the workspace; the template/content is framed
+  // via the Fabric viewport (zoom/pan). This gives a true pasteboard around the art.
+  const cssWidth = Math.max(200, containerWidth);
+  const cssHeight = Math.max(200, containerHeight);
+  const displayBleedPx = Math.max(1, Math.round(bleedPx * displayScale)); // legacy; new overlay is scene-anchored
   // Let Fabric handle retina backing-store scaling internally for consistent cross-device rendering.
 
   const serializeCanvasState = useCallback((includePdfBackground: boolean) => {
@@ -542,7 +544,8 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
       const vpt = canvas.viewportTransform;
       if (!el || !vpt) return;
       el.style.transformOrigin = "0 0";
-      el.style.transform = `translate(${vpt[4]}px, ${vpt[5]}px) scale(${(vpt[0] || displayScale) / displayScale})`;
+      // Overlay is laid out in scene px (template size); map scene→screen via the viewport.
+      el.style.transform = `translate(${vpt[4]}px, ${vpt[5]}px) scale(${vpt[0] || displayScale})`;
     };
     canvas.on("after:render", syncOverlay);
 
@@ -3396,32 +3399,19 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
         <div className="relative shadow-lg shrink-0 overflow-hidden" style={{ width: cssWidth, height: cssHeight }}>
           <canvas ref={canvasRef} />
 
-          {/* Always-on-top bleed/trim guide (visual only) — tracks the Fabric viewport */}
-          <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-20">
-            <div
-              className="absolute left-0 top-0 right-0"
-              style={{ height: displayBleedPx, background: "rgba(31, 41, 55, 0.35)" }}
-            />
-            <div
-              className="absolute left-0 bottom-0 right-0"
-              style={{ height: displayBleedPx, background: "rgba(31, 41, 55, 0.35)" }}
-            />
-            <div
-              className="absolute left-0"
-              style={{ top: displayBleedPx, bottom: displayBleedPx, width: displayBleedPx, background: "rgba(31, 41, 55, 0.35)" }}
-            />
-            <div
-              className="absolute right-0"
-              style={{ top: displayBleedPx, bottom: displayBleedPx, width: displayBleedPx, background: "rgba(31, 41, 55, 0.35)" }}
-            />
+          {/* Template trim/bleed guide — laid out in scene px, transformed to track the viewport */}
+          <div
+            ref={overlayRef}
+            className="pointer-events-none absolute top-0 left-0 z-20"
+            style={{ width: canvasWidth, height: canvasHeight, transformOrigin: "0 0" }}
+          >
+            <div className="absolute left-0 top-0 right-0" style={{ height: bleedPx, background: "rgba(31, 41, 55, 0.28)" }} />
+            <div className="absolute left-0 bottom-0 right-0" style={{ height: bleedPx, background: "rgba(31, 41, 55, 0.28)" }} />
+            <div className="absolute left-0" style={{ top: bleedPx, bottom: bleedPx, width: bleedPx, background: "rgba(31, 41, 55, 0.28)" }} />
+            <div className="absolute right-0" style={{ top: bleedPx, bottom: bleedPx, width: bleedPx, background: "rgba(31, 41, 55, 0.28)" }} />
             <div
               className="absolute border border-dashed border-destructive"
-              style={{
-                left: displayBleedPx,
-                top: displayBleedPx,
-                right: displayBleedPx,
-                bottom: displayBleedPx,
-              }}
+              style={{ left: bleedPx, top: bleedPx, right: bleedPx, bottom: bleedPx }}
             />
           </div>
 

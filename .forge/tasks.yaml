@@ -12,6 +12,7 @@ tasks:
     title: Artboard space — canvas fills workspace, objects in artboard coords
     phase: A
     size: M
+    status: done
     contracts: [artboard-canvas]
     depends_on: []
     description: >
