@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line, Polyline, Group, loadSVGFromString, Circle as FabricCircle, Ellipse as FabricEllipse, Triangle as FabricTriangle, Polygon as FabricPolygon, Point } from "fabric";
+import { Canvas as FabricCanvas, IText, Rect, Image as FabricImage, FabricObject, Line, Polyline, Group, loadSVGFromString, Circle as FabricCircle, Ellipse as FabricEllipse, Triangle as FabricTriangle, Polygon as FabricPolygon, Path as FabricPath, Point, util as fabricUtil } from "fabric";
 import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { generateDieline } from "@/lib/dielineGenerator";
 import { createDielineFrame, DIELINE_FRAME_NAME } from "./DielineFrame";
+import { extractPdfContent } from "@/lib/print-workshop/pdfExtract";
 
 // Popular print-ready fonts (web-safe + Google Fonts)
 const FONT_OPTIONS = [
@@ -1664,6 +1665,114 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
     } catch (err: any) {
       console.error("Extract PDF assets error:", err);
       toast.error(err.message || "Failed to separate assets");
+    } finally {
+      setExtractingAssets(false);
+    }
+  };
+
+  // DETERMINISTIC (no-AI) PDF decomposition — reads the PDF's real content stream and rebuilds
+  // every vector shape + placed image as its own object at exact coordinates, plus the PDF's real
+  // text. Print-accurate registration. The original flattened background is then removed so the
+  // design is fully separated into editable layers.
+  const decomposePdfReal = async () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const bg = canvas.getObjects().find((o: any) => o.name === "pdf_background") as any;
+    if (!bg) { toast.error("Upload a PDF first, then decompose it"); return; }
+
+    // Source PDF: prefer the cached buffer (A2), else fetch the stored original.
+    let buf: ArrayBuffer | null = pdfBufferRef.current ? pdfBufferRef.current.slice(0) : null;
+    if (!buf && sourcePdfPath) {
+      try {
+        const { data: urlData } = supabase.storage.from("print-files").getPublicUrl(sourcePdfPath);
+        const cb = `${urlData.publicUrl}${urlData.publicUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(sourcePdfPath)}-${Date.now()}`;
+        const resp = await fetch(cb, { cache: "no-store" });
+        if (resp.ok) buf = await resp.arrayBuffer();
+      } catch { /* ignore */ }
+    }
+    if (!buf) { toast.error("Couldn't read the source PDF to decompose"); return; }
+
+    setExtractingAssets(true);
+    try {
+      const fitRect = { left: bg.left ?? 0, top: bg.top ?? 0, width: bg.getScaledWidth(), height: bg.getScaledHeight() };
+      const { items, truncated } = await extractPdfContent(buf.slice(0), DPI, fitRect);
+
+      const loadImg = (src: string) => new Promise<HTMLImageElement>((res, rej) => {
+        const im = new window.Image();
+        im.onload = () => res(im);
+        im.onerror = () => rej(new Error("image load failed"));
+        im.src = src;
+      });
+
+      let paths = 0;
+      let imgs = 0;
+      for (const item of items) {
+        if (item.kind === "path") {
+          if (!item.fill && !item.stroke) continue;
+          const p = new FabricPath(item.d, {
+            fill: item.fill || "",
+            stroke: item.stroke || "",
+            strokeWidth: item.strokeWidth || 0,
+            strokeUniform: true,
+            fillRule: item.evenOdd ? "evenodd" : "nonzero",
+            objectCaching: true,
+          } as any);
+          (p as any).locked = true;
+          (p as any).editable = false;
+          (p as any).name = "pdf_vector";
+          (p as any)._displayName = `Vector ${paths + 1}`;
+          p.set({ borderColor: "#94a3b8", cornerColor: "#94a3b8" } as any);
+          canvas.add(p);
+          paths++;
+        } else {
+          try {
+            const el = await loadImg(item.dataUrl);
+            const d = fabricUtil.qrDecompose(item.matrix as any);
+            const img = new FabricImage(el, {
+              left: d.translateX,
+              top: d.translateY,
+              scaleX: Math.abs(d.scaleX),
+              scaleY: Math.abs(d.scaleY),
+              angle: d.angle,
+              skewX: d.skewX || 0,
+              flipX: d.scaleX < 0,
+              flipY: d.scaleY < 0,
+              originX: "left",
+              originY: "top",
+            } as any);
+            (img as any).locked = true;
+            (img as any).editable = false;
+            (img as any).name = "pdf_image";
+            (img as any)._displayName = `Image ${imgs + 1}`;
+            img.set({ borderColor: "#94a3b8", cornerColor: "#94a3b8" } as any);
+            canvas.add(img);
+            imgs++;
+          } catch { /* skip unreadable image */ }
+        }
+      }
+
+      // Add the PDF's real text as editable layers (precise, font-detected), then strip the
+      // OCR knockout covers it adds (no background left to knock out).
+      try {
+        await extractPdfVectorText(buf.slice(0));
+      } catch { /* text extraction is best-effort */ }
+      canvas.getObjects().forEach((o: any) => { if (o.name === OCR_KNOCKOUT_NAME) canvas.remove(o); });
+
+      // Remove the flattened original — the design is now fully separated into layers.
+      const stillBg = canvas.getObjects().find((o: any) => o.name === "pdf_background");
+      if (stillBg && (paths > 0 || imgs > 0)) canvas.remove(stillBg);
+
+      fixZOrder(canvas);
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+      syncCanvas();
+      const msg = `Decomposed PDF → ${paths} vector${paths !== 1 ? "s" : ""}, ${imgs} image${imgs !== 1 ? "s" : ""}`;
+      if (truncated) toast.warning(`${msg} (capped — very complex PDF; some detail kept as-is)`);
+      else if (paths + imgs > 0) toast.success(`${msg} + real text`);
+      else toast.warning("No separable vector/image content found — this PDF may be a flattened image");
+    } catch (err: any) {
+      console.error("PDF decompose error:", err);
+      toast.error(err.message || "Failed to decompose the PDF");
     } finally {
       setExtractingAssets(false);
     }
@@ -3543,10 +3652,15 @@ export function TemplateEditor({ canvasData, width, height, bleed, depth = 0, pr
                   {extractingAll ? "Analyzing…" : "Extract all text (AI)"}
                 </Button>
                 <div className="h-px bg-border my-1" />
+                <p className="text-[11px] text-muted-foreground px-1">Separate graphics…</p>
                 <Button size="sm" variant="ghost" className="w-full justify-start gap-2" disabled={extractingAssets}
-                  onClick={() => { extractPdfAssets(); setOpenCat(null); }}>
+                  onClick={() => { decomposePdfReal(); setOpenCat(null); }}>
                   {extractingAssets ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />}
-                  {extractingAssets ? "Separating…" : "Separate into assets (AI)"}
+                  {extractingAssets ? "Decomposing…" : "Decompose PDF into layers (real)"}
+                </Button>
+                <Button size="sm" variant="ghost" className="w-full justify-start gap-2 text-muted-foreground" disabled={extractingAssets}
+                  onClick={() => { extractPdfAssets(); setOpenCat(null); }}>
+                  <Sparkles className="h-3.5 w-3.5" /> Separate into assets (AI fallback)
                 </Button>
               </PopoverContent>
             </Popover>
