@@ -24,6 +24,7 @@ const EditProduct = () => {
   const [productCompanyId, setProductCompanyId] = useState<string | null>(null);
   const [productTemplateId, setProductTemplateId] = useState<string | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const [originalItemId, setOriginalItemId] = useState<string>("");
   
   const [formData, setFormData] = useState({
     item_id: "",
