@@ -332,6 +332,85 @@ const VendorPODetail = () => {
     }
   };
 
+  const fetchCaseStickerInfo = async (): Promise<Array<{ orderNumber?: string; invoiceNumber?: string; customerPO?: string }>> => {
+    if (!po) return [];
+    const orderIdSet = new Set<string>();
+    if (po.order_id) orderIdSet.add(po.order_id);
+    const itemOrderItemIds = poItems.map((i: any) => i.order_item_id).filter(Boolean);
+    if (itemOrderItemIds.length > 0) {
+      const { data: oiRows } = await supabase
+        .from('order_items')
+        .select('order_id')
+        .in('id', itemOrderItemIds);
+      (oiRows || []).forEach((r: any) => r.order_id && orderIdSet.add(r.order_id));
+    }
+    if (orderIdSet.size === 0) return [];
+    const { data: invoices } = await supabase
+      .from('invoices')
+      .select('invoice_number, customer_po_number, order_id, orders(order_number, po_number)')
+      .in('order_id', Array.from(orderIdSet))
+      .is('deleted_at', null)
+      .neq('invoice_type', 'deposit')
+      .order('invoice_number');
+    const seen = new Set<string>();
+    const entries: Array<{ orderNumber?: string; invoiceNumber?: string; customerPO?: string }> = [];
+    (invoices || []).forEach((inv: any) => {
+      const key = `${inv.invoice_number}-${inv.order_id}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      entries.push({
+        orderNumber: inv.orders?.order_number,
+        invoiceNumber: inv.invoice_number,
+        customerPO: inv.customer_po_number || inv.orders?.po_number || undefined,
+      });
+    });
+    return entries;
+  };
+
+  const drawCaseStickerCallout = (
+    doc: jsPDF,
+    startY: number,
+    pageWidth: number,
+    info: Array<{ orderNumber?: string; invoiceNumber?: string; customerPO?: string }>
+  ): number => {
+    if (!info || info.length === 0) return startY;
+    const boxX = 14;
+    const boxW = pageWidth - 28;
+    const lineHeight = 5;
+    const padding = 4;
+    const boxH = 14 + info.length * lineHeight + padding;
+
+    doc.setFillColor(254, 243, 199);
+    doc.setDrawColor(217, 119, 6);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(boxX, startY, boxW, boxH, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(146, 64, 14);
+    doc.text('REQUIRED ON CASE STICKERS', boxX + padding, startY + padding + 3);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(60, 60, 60);
+    doc.text('Each case label must include the Vibe Invoice # and Customer PO # below:', boxX + padding, startY + padding + 8);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(17, 24, 39);
+    let y = startY + padding + 14;
+    info.forEach((row) => {
+      const parts: string[] = [];
+      if (row.orderNumber) parts.push(`Order #${row.orderNumber}`);
+      if (row.invoiceNumber) parts.push(`Inv # ${row.invoiceNumber}`);
+      if (row.customerPO) parts.push(`PO ${row.customerPO}`);
+      doc.text('• ' + parts.join('   |   '), boxX + padding, y);
+      y += lineHeight;
+    });
+
+    return startY + boxH + 6;
+  };
+
   const handleDownloadPDF = async () => {
     if (!po || !vendor) return;
 
@@ -485,7 +564,11 @@ const VendorPODetail = () => {
     }
     
     yPos += 28;
-    
+
+    // Case sticker callout (Vibe Invoice # + Customer PO #)
+    const csInfoDownload = await fetchCaseStickerInfo();
+    yPos = drawCaseStickerCallout(doc, yPos, pageWidth, csInfoDownload);
+
     // ============ ITEMS TABLE ============
     const tableData = poItems.map(item => [
       item.sku,
@@ -734,7 +817,11 @@ const VendorPODetail = () => {
     }
     
     yPos += 28;
-    
+
+    // Case sticker callout (Vibe Invoice # + Customer PO #)
+    const csInfoEmail = await fetchCaseStickerInfo();
+    yPos = drawCaseStickerCallout(doc, yPos, pageWidth, csInfoEmail);
+
     // ============ ITEMS TABLE ============
     const tableData = poItems.map(item => [
       item.sku,
@@ -835,38 +922,7 @@ const VendorPODetail = () => {
       const itemsTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
       const totalAmount = itemsTotal + Number(po.shipping_cost || 0);
 
-      // Gather Invoice # + Customer PO # info to print on case stickers
-      const orderIdSet = new Set<string>();
-      if (po.order_id) orderIdSet.add(po.order_id);
-      const itemOrderIds = poItems.map((i: any) => i.order_item_id).filter(Boolean);
-      if (itemOrderIds.length > 0) {
-        const { data: oiRows } = await supabase
-          .from('order_items')
-          .select('order_id')
-          .in('id', itemOrderIds);
-        (oiRows || []).forEach((r: any) => r.order_id && orderIdSet.add(r.order_id));
-      }
-      let caseStickerInfo: Array<{ orderNumber?: string; invoiceNumber?: string; customerPO?: string }> = [];
-      if (orderIdSet.size > 0) {
-        const { data: invoices } = await supabase
-          .from('invoices')
-          .select('invoice_number, customer_po_number, order_id, orders(order_number, po_number)')
-          .in('order_id', Array.from(orderIdSet))
-          .is('deleted_at', null)
-          .neq('invoice_type', 'deposit')
-          .order('invoice_number');
-        const seen = new Set<string>();
-        (invoices || []).forEach((inv: any) => {
-          const key = `${inv.invoice_number}-${inv.order_id}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-          caseStickerInfo.push({
-            orderNumber: inv.orders?.order_number,
-            invoiceNumber: inv.invoice_number,
-            customerPO: inv.customer_po_number || inv.orders?.po_number || undefined,
-          });
-        });
-      }
+      const caseStickerInfo = await fetchCaseStickerInfo();
       
       const response = await supabase.functions.invoke('send-vendor-po-email', {
         body: {
@@ -926,6 +982,8 @@ Order Date: ${new Date(po.order_date).toLocaleDateString()}
 Total Amount: $${totalAmount.toFixed(2)}
 
 Please confirm receipt of this order and provide an estimated delivery date.
+
+IMPORTANT: Each case sticker must include the Vibe Invoice # and Customer PO # shown on the attached PO. These references are required for our customer to receive the shipment.
 
 Thank you for your business.`;
   };
