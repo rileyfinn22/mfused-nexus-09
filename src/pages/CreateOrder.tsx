@@ -1853,7 +1853,7 @@ const CreateOrder = () => {
             terms: formData.terms,
             memo: formData.memo || null,
           })
-          .eq('id', orderId)
+          .eq('id', effectiveOrderId)
           .select()
           .single();
 
@@ -1864,7 +1864,7 @@ const CreateOrder = () => {
         const { data: existingItems } = await supabase
           .from('order_items')
           .select('*')
-          .eq('order_id', orderId);
+          .eq('order_id', effectiveOrderId);
 
         // Track existing items by their ID to preserve them during update
         existingItemsMap = new Map(
@@ -1942,7 +1942,7 @@ const CreateOrder = () => {
         return data || cached || null;
       };
 
-      if (orderId && existingItemsMap) {
+      if (effectiveOrderId && existingItemsMap) {
         // Update existing items and add new ones, preserving vendor assignments
         for (const item of selectedItems) {
           const product = await resolveProduct(item.productId);
