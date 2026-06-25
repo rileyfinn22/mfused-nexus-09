@@ -345,23 +345,44 @@ const VendorPODetail = () => {
       (oiRows || []).forEach((r: any) => r.order_id && orderIdSet.add(r.order_id));
     }
     if (orderIdSet.size === 0) return [];
-    const { data: invoices } = await supabase
-      .from('invoices')
-      .select('invoice_number, customer_po_number, order_id, orders(order_number, po_number)')
-      .in('order_id', Array.from(orderIdSet))
-      .is('deleted_at', null)
-      .neq('invoice_type', 'deposit')
-      .order('invoice_number');
+    const orderIds = Array.from(orderIdSet);
+    const [{ data: invoices }, { data: orderRows }] = await Promise.all([
+      supabase
+        .from('invoices')
+        .select('invoice_number, customer_po_number, order_id, orders(order_number, po_number)')
+        .in('order_id', orderIds)
+        .is('deleted_at', null)
+        .neq('invoice_type', 'deposit')
+        .order('invoice_number'),
+      supabase
+        .from('orders')
+        .select('id, order_number, po_number')
+        .in('id', orderIds),
+    ]);
+    const orderMap = new Map<string, any>((orderRows || []).map((o: any) => [o.id, o]));
     const seen = new Set<string>();
     const entries: Array<{ orderNumber?: string; invoiceNumber?: string; customerPO?: string }> = [];
+    const ordersWithInvoice = new Set<string>();
     (invoices || []).forEach((inv: any) => {
       const key = `${inv.invoice_number}-${inv.order_id}`;
       if (seen.has(key)) return;
       seen.add(key);
+      ordersWithInvoice.add(inv.order_id);
       entries.push({
         orderNumber: inv.orders?.order_number,
         invoiceNumber: inv.invoice_number,
         customerPO: inv.customer_po_number || inv.orders?.po_number || undefined,
+      });
+    });
+    // Fallback: include any order that has no invoice yet so the CPO still prints
+    orderIds.forEach((oid) => {
+      if (ordersWithInvoice.has(oid)) return;
+      const o = orderMap.get(oid);
+      if (!o) return;
+      entries.push({
+        orderNumber: o.order_number,
+        invoiceNumber: undefined,
+        customerPO: o.po_number || undefined,
       });
     });
     return entries;
