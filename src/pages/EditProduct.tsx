@@ -24,6 +24,7 @@ const EditProduct = () => {
   const [productCompanyId, setProductCompanyId] = useState<string | null>(null);
   const [productTemplateId, setProductTemplateId] = useState<string | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const [originalItemId, setOriginalItemId] = useState<string>("");
   
   const [formData, setFormData] = useState({
     item_id: "",
@@ -100,6 +101,7 @@ const EditProduct = () => {
 
       setProductCompanyId(data.company_id);
       setProductTemplateId(data.template_id || null);
+      setOriginalItemId(data.item_id || "");
       setFormData({
         item_id: data.item_id || "",
         customer_item_id: (data as any).customer_item_id || "",
@@ -238,6 +240,24 @@ const EditProduct = () => {
         }, { onConflict: 'product_id' });
 
       if (costError) throw costError;
+
+      // If the SKU (item_id) changed, re-link existing artwork files so they stay attached
+      const newItemId = formData.item_id?.trim() || "";
+      if (originalItemId && newItemId && originalItemId !== newItemId) {
+        const { error: artErr } = await supabase
+          .from('artwork_files')
+          .update({ sku: newItemId })
+          .eq('sku', originalItemId);
+        if (artErr) console.error('Failed to re-link artwork_files:', artErr);
+
+        const { error: rejErr } = await (supabase as any)
+          .from('rejected_artwork_files')
+          .update({ sku: newItemId })
+          .eq('sku', originalItemId);
+        if (rejErr) console.error('Failed to re-link rejected_artwork_files:', rejErr);
+
+        setOriginalItemId(newItemId);
+      }
 
       toast.success("Product updated successfully");
       if (productTemplateId) {
