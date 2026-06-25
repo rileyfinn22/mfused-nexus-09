@@ -1942,7 +1942,7 @@ const CreateOrder = () => {
         return data || cached || null;
       };
 
-      if (orderId && existingItemsMap) {
+      if (effectiveOrderId && existingItemsMap) {
         // Update existing items and add new ones, preserving vendor assignments
         for (const item of selectedItems) {
           const product = await resolveProduct(item.productId);
