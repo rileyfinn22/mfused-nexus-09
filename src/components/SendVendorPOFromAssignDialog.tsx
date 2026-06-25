@@ -359,6 +359,10 @@ export function SendVendorPOFromAssignDialog({
       yPos += 28;
     }
 
+    // Case sticker callout (Vibe Invoice # + Customer PO #)
+    const csInfo = await fetchCaseStickerInfo();
+    yPos = drawCaseStickerCallout(doc, yPos, pageWidth, csInfo);
+
     // Items table
     const tableData = poItems.map((item) => [
       item.sku,
