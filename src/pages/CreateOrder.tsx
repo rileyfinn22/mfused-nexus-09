@@ -1864,7 +1864,7 @@ const CreateOrder = () => {
         const { data: existingItems } = await supabase
           .from('order_items')
           .select('*')
-          .eq('order_id', orderId);
+          .eq('order_id', effectiveOrderId);
 
         // Track existing items by their ID to preserve them during update
         existingItemsMap = new Map(
