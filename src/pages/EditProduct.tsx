@@ -101,6 +101,7 @@ const EditProduct = () => {
 
       setProductCompanyId(data.company_id);
       setProductTemplateId(data.template_id || null);
+      setOriginalItemId(data.item_id || "");
       setFormData({
         item_id: data.item_id || "",
         customer_item_id: (data as any).customer_item_id || "",
