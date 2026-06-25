@@ -817,7 +817,11 @@ const VendorPODetail = () => {
     }
     
     yPos += 28;
-    
+
+    // Case sticker callout (Vibe Invoice # + Customer PO #)
+    const csInfoEmail = await fetchCaseStickerInfo();
+    yPos = drawCaseStickerCallout(doc, yPos, pageWidth, csInfoEmail);
+
     // ============ ITEMS TABLE ============
     const tableData = poItems.map(item => [
       item.sku,
