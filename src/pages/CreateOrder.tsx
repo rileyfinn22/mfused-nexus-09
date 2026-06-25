@@ -1853,7 +1853,7 @@ const CreateOrder = () => {
             terms: formData.terms,
             memo: formData.memo || null,
           })
-          .eq('id', orderId)
+          .eq('id', effectiveOrderId)
           .select()
           .single();
 
