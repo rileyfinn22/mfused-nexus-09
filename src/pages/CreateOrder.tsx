@@ -1824,7 +1824,10 @@ const CreateOrder = () => {
       let orderNumber = existingOrderNumber;
       let existingItemsMap: Map<string, any> | null = null;
 
-      if (orderId) {
+      // Promote any auto-saved draft instead of creating a duplicate order
+      const effectiveOrderId = orderId || autoSavedOrderId;
+
+      if (effectiveOrderId) {
         // Update existing order
         const { data: updatedOrder, error: orderError } = await supabase
           .from('orders')
