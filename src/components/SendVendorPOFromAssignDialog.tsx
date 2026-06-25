@@ -177,24 +177,44 @@ export function SendVendorPOFromAssignDialog({
     if (orderIds.size === 0 && po?.order_id) orderIds.add(po.order_id);
     if (orderIds.size === 0) return [];
 
-    const { data: invoices } = await supabase
-      .from("invoices")
-      .select("invoice_number, customer_po_number, order_id, orders(order_number, po_number)")
-      .in("order_id", Array.from(orderIds))
-      .is("deleted_at", null)
-      .neq("invoice_type", "deposit")
-      .order("invoice_number");
+    const orderIdList = Array.from(orderIds);
+    const [{ data: invoices }, { data: orderRows }] = await Promise.all([
+      supabase
+        .from("invoices")
+        .select("invoice_number, customer_po_number, order_id, orders(order_number, po_number)")
+        .in("order_id", orderIdList)
+        .is("deleted_at", null)
+        .neq("invoice_type", "deposit")
+        .order("invoice_number"),
+      supabase
+        .from("orders")
+        .select("id, order_number, po_number")
+        .in("id", orderIdList),
+    ]);
 
+    const orderMap = new Map<string, any>((orderRows || []).map((o: any) => [o.id, o]));
     const seen = new Set<string>();
     const entries: Array<{ orderNumber?: string; invoiceNumber?: string; customerPO?: string }> = [];
+    const ordersWithInvoice = new Set<string>();
     (invoices || []).forEach((inv: any) => {
       const key = `${inv.invoice_number}-${inv.order_id}`;
       if (seen.has(key)) return;
       seen.add(key);
+      ordersWithInvoice.add(inv.order_id);
       entries.push({
         orderNumber: inv.orders?.order_number,
         invoiceNumber: inv.invoice_number,
         customerPO: inv.customer_po_number || inv.orders?.po_number || undefined,
+      });
+    });
+    orderIdList.forEach((oid) => {
+      if (ordersWithInvoice.has(oid)) return;
+      const o = orderMap.get(oid);
+      if (!o) return;
+      entries.push({
+        orderNumber: o.order_number,
+        invoiceNumber: undefined,
+        customerPO: o.po_number || undefined,
       });
     });
     return entries;
