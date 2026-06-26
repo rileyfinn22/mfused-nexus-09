@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package, ChevronsUpDown, FileSpreadsheet, Sparkles } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package, ChevronsUpDown, FileSpreadsheet, Sparkles, Plus, X } from "lucide-react";
 
 import { format } from "date-fns";
 import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
@@ -55,6 +55,7 @@ const InvoiceDetail = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedItems, setEditedItems] = useState<any[]>([]);
+  const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [editShippingCost, setEditShippingCost] = useState<string>('');
   const [editShippingNote, setEditShippingNote] = useState<string>('');
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
@@ -892,8 +893,42 @@ const InvoiceDetail = () => {
         }
       }
       
-      // Update each order item IN PARALLEL (was sequential — very slow for many items)
-      await Promise.all(editedItems.map(async (item) => {
+      // Delete removed line items (blanket direct-edit only)
+      if (deletedItemIds.length > 0 && order?.id) {
+        // Detach from vendor PO items first to avoid cascade wiping
+        await supabase.from('vendor_po_items').update({ order_item_id: null }).in('order_item_id', deletedItemIds);
+        await supabase.from('order_items').delete().in('id', deletedItemIds);
+      }
+
+      // Insert any newly added line items, then swap their temp ids
+      const newItems = editedItems.filter((it: any) => typeof it.id === 'string' && it.id.startsWith('new-'));
+      const tempIdToRealId: Record<string, string> = {};
+      if (newItems.length > 0 && order?.id) {
+        const rows = newItems.map((it: any) => ({
+          order_id: order.id,
+          name: it.name || 'New line item',
+          sku: it.sku || it.item_id || null,
+          item_id: it.item_id || null,
+          product_id: it.product_id || null,
+          description: it.description || null,
+          quantity: Number(it.quantity) || 0,
+          shipped_quantity: Number(it.shipped_quantity ?? it.quantity) || 0,
+          unit_price: Number(it.unit_price) || 0,
+          total: (Number(it.quantity) || 0) * (Number(it.unit_price) || 0),
+        }));
+        const { data: inserted, error: insertErr } = await supabase
+          .from('order_items')
+          .insert(rows)
+          .select('id');
+        if (insertErr) throw insertErr;
+        (inserted || []).forEach((row: any, idx: number) => {
+          tempIdToRealId[newItems[idx].id] = row.id;
+        });
+      }
+
+      // Update each EXISTING order item IN PARALLEL
+      const existingItems = editedItems.filter((it: any) => !(typeof it.id === 'string' && it.id.startsWith('new-')));
+      await Promise.all(existingItems.map(async (item) => {
         const editedShippedQty = Number(item.shipped_quantity) || 0;
         const dbShipped = dbShippedMap[item.id] ?? 0;
         const newShippedQty = preserveChildShipmentQuantities
@@ -904,6 +939,7 @@ const InvoiceDetail = () => {
         const { error } = await supabase.from('order_items').update({
           shipped_quantity: newShippedQty,
           unit_price: item.unit_price,
+          quantity: item.quantity,
           total: orderedTotal,
           name: item.name,
           sku: item.sku || item.item_id,
@@ -1006,11 +1042,18 @@ const InvoiceDetail = () => {
       }).eq('id', invoiceId);
       if (invoiceError) throw invoiceError;
       // Update local state instead of refetching
-      const updatedOrderItems = (order?.order_items || []).map((oi: any) => {
+      const remainingExisting = (order?.order_items || []).filter((oi: any) => !deletedItemIds.includes(oi.id));
+      const mergedExisting = remainingExisting.map((oi: any) => {
         const edited = editedItems.find((ei: any) => ei.id === oi.id);
         return edited ? { ...oi, ...edited } : oi;
       });
+      const appendedNew = editedItems
+        .filter((ei: any) => typeof ei.id === 'string' && ei.id.startsWith('new-'))
+        .map((ei: any) => ({ ...ei, id: tempIdToRealId[ei.id] || ei.id }));
+      const updatedOrderItems = [...mergedExisting, ...appendedNew];
       setOrder({ ...order, order_items: updatedOrderItems });
+      setEditedItems(updatedOrderItems);
+      setDeletedItemIds([]);
       setInvoice({
         ...invoice,
         subtotal: newSubtotal,
@@ -1021,7 +1064,7 @@ const InvoiceDetail = () => {
       });
       toast({
         title: "Success",
-        description: "Prices and quantities updated successfully"
+        description: "Invoice line items updated"
       });
       setIsEditMode(false);
     } catch (error: any) {
@@ -1043,14 +1086,41 @@ const InvoiceDetail = () => {
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity < 0) return;
     const isBlanket = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
+    const isNewLine = typeof itemId === 'string' && itemId.startsWith('new-');
     setEditedItems(items => items.map(item => item.id === itemId ? {
       ...item,
-      // For blanket invoices, only update shipped_quantity - keep original ordered quantity intact
-      ...(isBlanket
+      // New blanket lines: update BOTH ordered + shipped so they show up on the order too.
+      // Existing blanket rows: only shipped (preserves original ordered qty).
+      ...((isBlanket && !isNewLine)
         ? { shipped_quantity: newQuantity }
         : { quantity: newQuantity, shipped_quantity: newQuantity, total: newQuantity * Number(item.unit_price) }
       )
     } : item));
+  };
+
+  const handleAddInvoiceLineItem = () => {
+    const tempId = `new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setEditedItems(items => [...items, {
+      id: tempId,
+      name: '',
+      sku: '',
+      item_id: null,
+      product_id: null,
+      description: '',
+      quantity: 0,
+      shipped_quantity: 0,
+      unit_price: 0,
+      total: 0,
+    }]);
+  };
+
+  const handleRemoveInvoiceLineItem = (itemId: string) => {
+    if (typeof itemId === 'string' && itemId.startsWith('new-')) {
+      setEditedItems(items => items.filter(i => i.id !== itemId));
+    } else {
+      setDeletedItemIds(prev => prev.includes(itemId) ? prev : [...prev, itemId]);
+      setEditedItems(items => items.filter(i => i.id !== itemId));
+    }
   };
   const handleSyncToQuickBooks = async (billingPercentage: number) => {
     if (!invoiceId) return;
@@ -1552,6 +1622,7 @@ const InvoiceDetail = () => {
                   <Button size="sm" variant="outline" onClick={() => {
               setIsEditMode(false);
               setEditedItems(order?.order_items || []);
+              setDeletedItemIds([]);
             }}>
                     Cancel
                   </Button>
@@ -2592,22 +2663,48 @@ const InvoiceDetail = () => {
                   ? (editedItem.shipped_quantity || 0)
                   : (invoice?.invoice_type === 'partial' ? item.quantity || 0 : orderItem?.shipped_quantity || 0);
                 
+                const isNewLine = typeof item.id === 'string' && item.id.startsWith('new-');
+                const showRowDelete = isEditMode && isVibeAdmin && invoice?.invoice_type === 'full';
                 return <TableRow key={item.id}>
-                      <TableCell className="font-mono text-xs">{item.sku || item.item_id || '-'}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {isEditMode ? (
+                          <Input
+                            value={item.sku || item.item_id || ''}
+                            onChange={e => setEditedItems(items => items.map(i => i.id === item.id ? { ...i, sku: e.target.value, item_id: e.target.value } : i))}
+                            placeholder="SKU"
+                            className="h-8 w-32 font-mono text-xs"
+                          />
+                        ) : (item.sku || item.item_id || '-')}
+                      </TableCell>
                       <TableCell className="font-medium">
                         {isEditMode ? (
                           <Popover open={openCombobox[`inv-item-${item.id}`]} onOpenChange={(open) => setOpenCombobox(prev => ({ ...prev, [`inv-item-${item.id}`]: open }))}>
                             <PopoverTrigger asChild>
                               <Button variant="outline" className="w-full justify-between text-left font-medium h-auto py-1.5 px-2">
-                                <span className="truncate text-sm">{item.name}</span>
+                                <span className="truncate text-sm">{item.name || 'Pick product / type name…'}</span>
                                 <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[350px] p-0" align="start">
                               <Command>
-                                <CommandInput placeholder="Search products..." />
+                                <CommandInput
+                                  placeholder="Search products or type custom name…"
+                                  onValueChange={(val) => setEditedItems(items => items.map(i => i.id === item.id ? { ...i, _typedName: val } : i))}
+                                />
                                 <CommandList>
-                                  <CommandEmpty>No product found.</CommandEmpty>
+                                  <CommandEmpty>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditedItems(items => items.map(i => i.id === item.id ? { ...i, name: (i._typedName || '').trim() || i.name, product_id: null } : i));
+                                        setOpenCombobox(prev => ({ ...prev, [`inv-item-${item.id}`]: false }));
+                                      }}
+                                    >
+                                      Use custom name
+                                    </Button>
+                                  </CommandEmpty>
                                   <CommandGroup>
                                     {products.map((product) => (
                                       <CommandItem
@@ -2644,7 +2741,14 @@ const InvoiceDetail = () => {
                         )}
                       </TableCell>
                       <TableCell className="max-w-xs">
-                        {isVibeAdmin ? (
+                        {isEditMode ? (
+                          <Input
+                            value={item.description || ''}
+                            onChange={e => setEditedItems(items => items.map(i => i.id === item.id ? { ...i, description: e.target.value } : i))}
+                            placeholder="Description"
+                            className="h-8 text-sm"
+                          />
+                        ) : isVibeAdmin ? (
                           <EditableDescription
                             value={item.description}
                             onSave={async (newValue) => {
@@ -2670,10 +2774,12 @@ const InvoiceDetail = () => {
                       {invoice?.invoice_type === 'full' ? (
                         <>
                           <TableCell className="text-center">
-                            {orderedQty}
+                            {isEditMode && isNewLine ? (
+                              <Input type="number" min="0" value={item.quantity || 0} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" />
+                            ) : orderedQty}
                           </TableCell>
                           <TableCell className="text-center">
-                            {isEditMode ? <Input type="number" min="0" max={orderedQty} value={shippedQty} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" /> : shippedQty}
+                            {isEditMode ? <Input type="number" min="0" value={shippedQty} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" /> : shippedQty}
                           </TableCell>
                         </>
                       ) : (
@@ -2685,15 +2791,39 @@ const InvoiceDetail = () => {
                         {isEditMode ? <Input type="number" step="0.001" min="0" value={item.unit_price} onChange={e => handlePriceChange(item.id, parseFloat(e.target.value) || 0)} className="w-28 text-right" /> : formatUnitPrice(Number(item.unit_price))}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {/* Line total: for blanket invoices use ordered qty as placeholder when nothing shipped */}
-                        {formatCurrency(
-                          invoice?.invoice_type === 'full'
-                            ? (shippedQty > 0 ? shippedQty : orderedQty) * Number(item.unit_price)
-                            : shippedQty * Number(item.unit_price)
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          <span>
+                            {formatCurrency(
+                              invoice?.invoice_type === 'full'
+                                ? (shippedQty > 0 ? shippedQty : (Number(item.quantity) || 0)) * Number(item.unit_price)
+                                : shippedQty * Number(item.unit_price)
+                            )}
+                          </span>
+                          {showRowDelete && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => handleRemoveInvoiceLineItem(item.id)}
+                              title="Remove line"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>;
               })}
+              {isEditMode && isVibeAdmin && invoice?.invoice_type === 'full' && (
+                <TableRow>
+                  <TableCell colSpan={invoice?.invoice_type === 'full' ? 7 : 6}>
+                    <Button type="button" variant="outline" size="sm" onClick={handleAddInvoiceLineItem}>
+                      <Plus className="h-4 w-4 mr-1.5" /> Add Line Item
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              )}
               </TableBody>
             </Table>
 
