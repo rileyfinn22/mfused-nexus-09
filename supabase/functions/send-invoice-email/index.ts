@@ -256,12 +256,19 @@ const handler = async (req: Request): Promise<Response> => {
       'Carrie@vibepkg.com',
     ];
 
+    // CC the sender so they're on the email thread (e.g. jack@vibepkg.com sending → jack gets cc'd)
+    const ccRecipients: string[] = [];
+    if (senderEmail && !recipientEmails.map(e => e.toLowerCase()).includes(senderEmail.toLowerCase())) {
+      ccRecipients.push(senderEmail);
+    }
+
     // Send the email - use verified domain for sending
     const emailResponse = await resend.emails.send({
       from: `VibePKG <invoices@vibepkgportal.com>`,
       replyTo: senderEmail,
       to: recipientEmails,
-      bcc: internalBccRecipients,
+      cc: ccRecipients.length > 0 ? ccRecipients : undefined,
+      bcc: internalBccRecipients.filter(e => e.toLowerCase() !== (senderEmail || '').toLowerCase()),
       subject: `Invoice ${invoiceNumber} from VibePKG - ${formattedAmount} Due ${formattedDueDate}`,
       html: emailHtml,
       attachments,
