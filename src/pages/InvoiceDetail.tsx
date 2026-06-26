@@ -893,8 +893,42 @@ const InvoiceDetail = () => {
         }
       }
       
-      // Update each order item IN PARALLEL (was sequential — very slow for many items)
-      await Promise.all(editedItems.map(async (item) => {
+      // Delete removed line items (blanket direct-edit only)
+      if (deletedItemIds.length > 0 && order?.id) {
+        // Detach from vendor PO items first to avoid cascade wiping
+        await supabase.from('vendor_po_items').update({ order_item_id: null }).in('order_item_id', deletedItemIds);
+        await supabase.from('order_items').delete().in('id', deletedItemIds);
+      }
+
+      // Insert any newly added line items, then swap their temp ids
+      const newItems = editedItems.filter((it: any) => typeof it.id === 'string' && it.id.startsWith('new-'));
+      const tempIdToRealId: Record<string, string> = {};
+      if (newItems.length > 0 && order?.id) {
+        const rows = newItems.map((it: any) => ({
+          order_id: order.id,
+          name: it.name || 'New line item',
+          sku: it.sku || it.item_id || null,
+          item_id: it.item_id || null,
+          product_id: it.product_id || null,
+          description: it.description || null,
+          quantity: Number(it.quantity) || 0,
+          shipped_quantity: Number(it.shipped_quantity ?? it.quantity) || 0,
+          unit_price: Number(it.unit_price) || 0,
+          total: (Number(it.quantity) || 0) * (Number(it.unit_price) || 0),
+        }));
+        const { data: inserted, error: insertErr } = await supabase
+          .from('order_items')
+          .insert(rows)
+          .select('id');
+        if (insertErr) throw insertErr;
+        (inserted || []).forEach((row: any, idx: number) => {
+          tempIdToRealId[newItems[idx].id] = row.id;
+        });
+      }
+
+      // Update each EXISTING order item IN PARALLEL
+      const existingItems = editedItems.filter((it: any) => !(typeof it.id === 'string' && it.id.startsWith('new-')));
+      await Promise.all(existingItems.map(async (item) => {
         const editedShippedQty = Number(item.shipped_quantity) || 0;
         const dbShipped = dbShippedMap[item.id] ?? 0;
         const newShippedQty = preserveChildShipmentQuantities
@@ -905,6 +939,7 @@ const InvoiceDetail = () => {
         const { error } = await supabase.from('order_items').update({
           shipped_quantity: newShippedQty,
           unit_price: item.unit_price,
+          quantity: item.quantity,
           total: orderedTotal,
           name: item.name,
           sku: item.sku || item.item_id,
