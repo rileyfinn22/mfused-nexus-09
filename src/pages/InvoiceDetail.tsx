@@ -2790,6 +2790,8 @@ const InvoiceDetail = () => {
                   </p>}
               </div>
             </div>
+              );
+            })()}
           </div>
         </CardContent>
       </Card>
