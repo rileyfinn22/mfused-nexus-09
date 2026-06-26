@@ -1086,14 +1086,41 @@ const InvoiceDetail = () => {
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity < 0) return;
     const isBlanket = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
+    const isNewLine = typeof itemId === 'string' && itemId.startsWith('new-');
     setEditedItems(items => items.map(item => item.id === itemId ? {
       ...item,
-      // For blanket invoices, only update shipped_quantity - keep original ordered quantity intact
-      ...(isBlanket
+      // New blanket lines: update BOTH ordered + shipped so they show up on the order too.
+      // Existing blanket rows: only shipped (preserves original ordered qty).
+      ...((isBlanket && !isNewLine)
         ? { shipped_quantity: newQuantity }
         : { quantity: newQuantity, shipped_quantity: newQuantity, total: newQuantity * Number(item.unit_price) }
       )
     } : item));
+  };
+
+  const handleAddInvoiceLineItem = () => {
+    const tempId = `new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setEditedItems(items => [...items, {
+      id: tempId,
+      name: '',
+      sku: '',
+      item_id: null,
+      product_id: null,
+      description: '',
+      quantity: 0,
+      shipped_quantity: 0,
+      unit_price: 0,
+      total: 0,
+    }]);
+  };
+
+  const handleRemoveInvoiceLineItem = (itemId: string) => {
+    if (typeof itemId === 'string' && itemId.startsWith('new-')) {
+      setEditedItems(items => items.filter(i => i.id !== itemId));
+    } else {
+      setDeletedItemIds(prev => prev.includes(itemId) ? prev : [...prev, itemId]);
+      setEditedItems(items => items.filter(i => i.id !== itemId));
+    }
   };
   const handleSyncToQuickBooks = async (billingPercentage: number) => {
     if (!invoiceId) return;
