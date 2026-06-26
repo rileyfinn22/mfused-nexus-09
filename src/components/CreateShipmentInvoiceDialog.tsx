@@ -354,9 +354,14 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       // shipment invoice exists, those children ARE the draw-down ledger — don't
       // double-count the deposit on top of children (it would over-cap remaining).
       const hasChildShipments = existingInvoices.some(inv => inv.invoice_type !== 'full');
-      const blanketDepositAmount = !hasChildShipments && Number(blanketInvoice.billed_percentage || 100) < 100
+      const depositPctAmount = !hasChildShipments && Number(blanketInvoice.billed_percentage || 100) < 100
         ? blanketTotal * (Number(blanketInvoice.billed_percentage) / 100)
         : 0;
+      // If the deposit was already paid, billed_percentage gets cleared by the
+      // payment trigger. Fall back to the parent's total_paid so the deposit still
+      // draws down the remaining blanket amount on the first shipment child.
+      const depositPaidAmount = !hasChildShipments ? Number(blanketInvoice.total_paid || 0) : 0;
+      const blanketDepositAmount = Math.max(depositPctAmount, depositPaidAmount);
 
       const totalAlreadyBilled = totalAlreadyBilledFromChildren + blanketDepositAmount;
       const remainingBlanketAmount = Math.max(0, blanketTotal - totalAlreadyBilled);
