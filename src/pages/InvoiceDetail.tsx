@@ -2702,13 +2702,26 @@ const InvoiceDetail = () => {
             {/* Invoice Totals */}
             {(() => {
               // For partial/shipment child invoices, show the deposit drawdown explicitly.
+              // Only show when this is the SOLE live child of the blanket AND the parent's paid
+              // amount plus this child's total reconciles to the blanket total (within $1).
+              // This avoids false positives where parent payments are stranded/misapplied
+              // across multi-shipment blankets.
               const isPartialChild = invoice && invoice.invoice_type !== 'full' && invoice.parent_invoice_id;
               const parentBlanket = isPartialChild
                 ? relatedInvoices.find((ri: any) => ri.id === invoice.parent_invoice_id && ri.invoice_type === 'full')
                 : null;
-              const depositCredit = parentBlanket ? Number(parentBlanket.total_paid || 0) : 0;
-              const showDepositCredit = !!parentBlanket && depositCredit > 0;
+              const liveChildren = parentBlanket
+                ? relatedInvoices.filter((ri: any) => ri.parent_invoice_id === parentBlanket.id && !ri.deleted_at)
+                : [];
+              const parentPaid = parentBlanket ? Number(parentBlanket.total_paid || 0) : 0;
+              const parentTotal = parentBlanket ? Number(parentBlanket.total || 0) : 0;
+              const reconciles = parentBlanket
+                && liveChildren.length === 1
+                && Math.abs((parentPaid + Number(invoice.total || 0)) - parentTotal) < 1;
+              const depositCredit = reconciles ? parentPaid : 0;
+              const showDepositCredit = depositCredit > 0;
               const grossSubtotal = displaySubtotal + (showDepositCredit ? depositCredit : 0);
+
               return (
             <div className="flex justify-end mt-8">
               <div className="space-y-2 w-80">
