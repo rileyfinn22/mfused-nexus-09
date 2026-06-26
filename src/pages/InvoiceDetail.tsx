@@ -55,6 +55,7 @@ const InvoiceDetail = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedItems, setEditedItems] = useState<any[]>([]);
+  const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [editShippingCost, setEditShippingCost] = useState<string>('');
   const [editShippingNote, setEditShippingNote] = useState<string>('');
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
