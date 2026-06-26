@@ -2700,10 +2700,34 @@ const InvoiceDetail = () => {
             {/* Billing Breakdown - Only for child invoices (deposits and shipments) */}
 
             {/* Invoice Totals */}
+            {(() => {
+              // For partial/shipment child invoices, show the deposit drawdown explicitly.
+              const isPartialChild = invoice && invoice.invoice_type !== 'full' && invoice.parent_invoice_id;
+              const parentBlanket = isPartialChild
+                ? relatedInvoices.find((ri: any) => ri.id === invoice.parent_invoice_id && ri.invoice_type === 'full')
+                : null;
+              const depositCredit = parentBlanket ? Number(parentBlanket.total_paid || 0) : 0;
+              const showDepositCredit = !!parentBlanket && depositCredit > 0;
+              const grossSubtotal = displaySubtotal + (showDepositCredit ? depositCredit : 0);
+              return (
             <div className="flex justify-end mt-8">
               <div className="space-y-2 w-80">
+                {showDepositCredit && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Gross Shipment Value</span>
+                      <span className="font-semibold">{formatCurrency(grossSubtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Less Deposit Applied (Inv #{parentBlanket.invoice_number})
+                      </span>
+                      <span className="font-semibold text-green-600">({formatCurrency(depositCredit)})</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="text-muted-foreground">Subtotal{showDepositCredit ? ' (Net)' : ''}</span>
                   <span className="font-semibold">{formatCurrency(displaySubtotal)}</span>
                 </div>
                 {/* Shipping Line - editable for vibe admins */}
@@ -2766,6 +2790,8 @@ const InvoiceDetail = () => {
                   </p>}
               </div>
             </div>
+              );
+            })()}
           </div>
         </CardContent>
       </Card>
