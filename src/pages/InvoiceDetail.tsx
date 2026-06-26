@@ -1622,6 +1622,7 @@ const InvoiceDetail = () => {
                   <Button size="sm" variant="outline" onClick={() => {
               setIsEditMode(false);
               setEditedItems(order?.order_items || []);
+              setDeletedItemIds([]);
             }}>
                     Cancel
                   </Button>
