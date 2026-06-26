@@ -1042,11 +1042,18 @@ const InvoiceDetail = () => {
       }).eq('id', invoiceId);
       if (invoiceError) throw invoiceError;
       // Update local state instead of refetching
-      const updatedOrderItems = (order?.order_items || []).map((oi: any) => {
+      const remainingExisting = (order?.order_items || []).filter((oi: any) => !deletedItemIds.includes(oi.id));
+      const mergedExisting = remainingExisting.map((oi: any) => {
         const edited = editedItems.find((ei: any) => ei.id === oi.id);
         return edited ? { ...oi, ...edited } : oi;
       });
+      const appendedNew = editedItems
+        .filter((ei: any) => typeof ei.id === 'string' && ei.id.startsWith('new-'))
+        .map((ei: any) => ({ ...ei, id: tempIdToRealId[ei.id] || ei.id }));
+      const updatedOrderItems = [...mergedExisting, ...appendedNew];
       setOrder({ ...order, order_items: updatedOrderItems });
+      setEditedItems(updatedOrderItems);
+      setDeletedItemIds([]);
       setInvoice({
         ...invoice,
         subtotal: newSubtotal,
@@ -1057,7 +1064,7 @@ const InvoiceDetail = () => {
       });
       toast({
         title: "Success",
-        description: "Prices and quantities updated successfully"
+        description: "Invoice line items updated"
       });
       setIsEditMode(false);
     } catch (error: any) {
