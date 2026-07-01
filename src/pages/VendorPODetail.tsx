@@ -1536,9 +1536,9 @@ Thank you for your business.`;
                 {poItems.map((item, index) => (
                   <TableRow key={item.id} className={item.sku === 'SHIPPING' ? 'bg-muted/50' : ''}>
                     <TableCell>
-                      {isEditMode && item.isNew ? (
+                      {isEditMode && (item.isNew || !item.order_item_id) ? (
                         <Input
-                          value={item.sku}
+                          value={item.sku || ''}
                           onChange={(e) => {
                             const updated = [...poItems];
                             updated[index].sku = e.target.value;
@@ -1552,16 +1552,28 @@ Thank you for your business.`;
                       )}
                     </TableCell>
                     <TableCell>
-                      {isEditMode && item.isNew ? (
-                        <Input
-                          value={item.name}
-                          onChange={(e) => {
-                            const updated = [...poItems];
-                            updated[index].name = e.target.value;
-                            setPOItems(updated);
-                          }}
-                          placeholder="Product name"
-                        />
+                      {isEditMode && (item.isNew || !item.order_item_id) ? (
+                        <div className="space-y-1">
+                          <Input
+                            value={item.name || ''}
+                            onChange={(e) => {
+                              const updated = [...poItems];
+                              updated[index].name = e.target.value;
+                              setPOItems(updated);
+                            }}
+                            placeholder="Product name"
+                          />
+                          <Input
+                            value={item.description || ''}
+                            onChange={(e) => {
+                              const updated = [...poItems];
+                              updated[index].description = e.target.value;
+                              setPOItems(updated);
+                            }}
+                            placeholder="Description (optional)"
+                            className="text-xs"
+                          />
+                        </div>
                       ) : (
                         <div>
                           <span>{item.name}</span>
