@@ -36,6 +36,7 @@ const VendorPODetail = () => {
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedPO, setEditedPO] = useState<any>({});
+  const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
