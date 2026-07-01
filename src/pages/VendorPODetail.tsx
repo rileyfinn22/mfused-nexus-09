@@ -36,6 +36,7 @@ const VendorPODetail = () => {
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedPO, setEditedPO] = useState<any>({});
+  const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
@@ -144,6 +145,18 @@ const VendorPODetail = () => {
     if (!isAdmin) return;
 
     try {
+      // Delete removed items first
+      for (const delId of deletedItemIds) {
+        const { error: delErr } = await supabase
+          .from('vendor_po_items')
+          .delete()
+          .eq('id', delId);
+        if (delErr) {
+          console.error('Delete error:', delErr);
+          throw new Error(`Failed to delete line: ${delErr.message}`);
+        }
+      }
+
       // Update existing items with edited quantities and costs
       for (const item of poItems) {
         if (!item.isNew) {
@@ -151,15 +164,24 @@ const VendorPODetail = () => {
           const effectiveQty = Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity);
           // Round to 2 decimal places to avoid floating point precision issues
           const newTotal = Math.round(effectiveQty * Number(item.unit_cost) * 100) / 100;
-          
+          const isCustom = !item.order_item_id;
+
+          const updatePayload: any = {
+            quantity: item.quantity,
+            shipped_quantity: item.shipped_quantity,
+            unit_cost: item.unit_cost,
+            total: newTotal,
+          };
+          // Only allow editing name/description on custom lines (not linked to order items)
+          if (isCustom) {
+            updatePayload.sku = item.sku;
+            updatePayload.name = item.name;
+            updatePayload.description = item.description ?? null;
+          }
+
           const { error: updateError } = await supabase
             .from('vendor_po_items')
-            .update({
-              quantity: item.quantity,
-              shipped_quantity: item.shipped_quantity,
-              unit_cost: item.unit_cost,
-              total: newTotal
-            })
+            .update(updatePayload)
             .eq('id', item.id);
 
           if (updateError) {
@@ -224,6 +246,7 @@ const VendorPODetail = () => {
         description: "Purchase order updated successfully"
       });
       setIsEditMode(false);
+      setDeletedItemIds([]);
       fetchPODetails();
     } catch (error: any) {
       console.error('Save error:', error);
@@ -1092,6 +1115,8 @@ Thank you for your business.`;
                   <Button variant="outline" onClick={() => {
                     setIsEditMode(false);
                     setEditedPO(po);
+                    setDeletedItemIds([]);
+                    fetchPODetails();
                   }}>
                     <X className="h-4 w-4 mr-2" />
                     Cancel
@@ -1511,9 +1536,9 @@ Thank you for your business.`;
                 {poItems.map((item, index) => (
                   <TableRow key={item.id} className={item.sku === 'SHIPPING' ? 'bg-muted/50' : ''}>
                     <TableCell>
-                      {isEditMode && item.isNew ? (
+                      {isEditMode && (item.isNew || !item.order_item_id) ? (
                         <Input
-                          value={item.sku}
+                          value={item.sku || ''}
                           onChange={(e) => {
                             const updated = [...poItems];
                             updated[index].sku = e.target.value;
@@ -1527,16 +1552,28 @@ Thank you for your business.`;
                       )}
                     </TableCell>
                     <TableCell>
-                      {isEditMode && item.isNew ? (
-                        <Input
-                          value={item.name}
-                          onChange={(e) => {
-                            const updated = [...poItems];
-                            updated[index].name = e.target.value;
-                            setPOItems(updated);
-                          }}
-                          placeholder="Product name"
-                        />
+                      {isEditMode && (item.isNew || !item.order_item_id) ? (
+                        <div className="space-y-1">
+                          <Input
+                            value={item.name || ''}
+                            onChange={(e) => {
+                              const updated = [...poItems];
+                              updated[index].name = e.target.value;
+                              setPOItems(updated);
+                            }}
+                            placeholder="Product name"
+                          />
+                          <Input
+                            value={item.description || ''}
+                            onChange={(e) => {
+                              const updated = [...poItems];
+                              updated[index].description = e.target.value;
+                              setPOItems(updated);
+                            }}
+                            placeholder="Description (optional)"
+                            className="text-xs"
+                          />
+                        </div>
                       ) : (
                         <div>
                           <span>{item.name}</span>
@@ -1635,18 +1672,22 @@ Thank you for your business.`;
                     </TableCell>
                     {isAdmin && isEditMode && (
                       <TableCell className="text-center">
-                        {item.isNew && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const updated = poItems.filter((_, i) => i !== index);
-                              setPOItems(updated);
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            if (!item.isNew) {
+                              const ok = window.confirm(`Remove line "${item.sku || item.name}" from this PO?`);
+                              if (!ok) return;
+                              setDeletedItemIds((prev) => [...prev, item.id]);
+                            }
+                            const updated = poItems.filter((_, i) => i !== index);
+                            setPOItems(updated);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     )}
                   </TableRow>
