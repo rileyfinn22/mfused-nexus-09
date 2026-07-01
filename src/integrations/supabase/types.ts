@@ -3548,6 +3548,53 @@ export type Database = {
           },
         ]
       }
+      vendor_po_status_history: {
+        Row: {
+          changed_by: string | null
+          committed_ship_date: string | null
+          created_at: string
+          delay_reason: string | null
+          id: string
+          is_delayed: boolean | null
+          new_status: string | null
+          note: string | null
+          previous_status: string | null
+          vendor_po_id: string
+        }
+        Insert: {
+          changed_by?: string | null
+          committed_ship_date?: string | null
+          created_at?: string
+          delay_reason?: string | null
+          id?: string
+          is_delayed?: boolean | null
+          new_status?: string | null
+          note?: string | null
+          previous_status?: string | null
+          vendor_po_id: string
+        }
+        Update: {
+          changed_by?: string | null
+          committed_ship_date?: string | null
+          created_at?: string
+          delay_reason?: string | null
+          id?: string
+          is_delayed?: boolean | null
+          new_status?: string | null
+          note?: string | null
+          previous_status?: string | null
+          vendor_po_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_po_status_history_vendor_po_id_fkey"
+            columns: ["vendor_po_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_pos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_pos: {
         Row: {
           attachment_name: string | null
@@ -3555,16 +3602,21 @@ export type Database = {
           company_id: string
           created_at: string
           customer_company_id: string | null
+          delay_reason: string | null
           description: string | null
           expected_delivery_date: string | null
           expense_category: string | null
           final_total: number | null
           id: string
+          is_delayed: boolean
           notes: string | null
           order_date: string
           order_id: string | null
           po_number: string
           po_type: string
+          production_status: string
+          production_status_updated_at: string | null
+          production_status_updated_by: string | null
           quickbooks_id: string | null
           quickbooks_sync_status: string | null
           quickbooks_synced_at: string | null
@@ -3582,6 +3634,7 @@ export type Database = {
           tracking_number: string | null
           tracking_url: string | null
           updated_at: string
+          vendor_committed_ship_date: string | null
           vendor_id: string
         }
         Insert: {
@@ -3590,16 +3643,21 @@ export type Database = {
           company_id: string
           created_at?: string
           customer_company_id?: string | null
+          delay_reason?: string | null
           description?: string | null
           expected_delivery_date?: string | null
           expense_category?: string | null
           final_total?: number | null
           id?: string
+          is_delayed?: boolean
           notes?: string | null
           order_date?: string
           order_id?: string | null
           po_number: string
           po_type?: string
+          production_status?: string
+          production_status_updated_at?: string | null
+          production_status_updated_by?: string | null
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
@@ -3617,6 +3675,7 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           updated_at?: string
+          vendor_committed_ship_date?: string | null
           vendor_id: string
         }
         Update: {
@@ -3625,16 +3684,21 @@ export type Database = {
           company_id?: string
           created_at?: string
           customer_company_id?: string | null
+          delay_reason?: string | null
           description?: string | null
           expected_delivery_date?: string | null
           expense_category?: string | null
           final_total?: number | null
           id?: string
+          is_delayed?: boolean
           notes?: string | null
           order_date?: string
           order_id?: string | null
           po_number?: string
           po_type?: string
+          production_status?: string
+          production_status_updated_at?: string | null
+          production_status_updated_by?: string | null
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
@@ -3652,6 +3716,7 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           updated_at?: string
+          vendor_committed_ship_date?: string | null
           vendor_id?: string
         }
         Relationships: [
@@ -4070,6 +4135,17 @@ export type Database = {
         Returns: Json
       }
       validate_vendor_invitation: { Args: { p_token: string }; Returns: Json }
+      vendor_update_po_status: {
+        Args: {
+          p_committed_ship_date?: string
+          p_delay_reason?: string
+          p_is_delayed?: boolean
+          p_note?: string
+          p_po_id: string
+          p_status: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role:
