@@ -1115,6 +1115,8 @@ Thank you for your business.`;
                   <Button variant="outline" onClick={() => {
                     setIsEditMode(false);
                     setEditedPO(po);
+                    setDeletedItemIds([]);
+                    fetchPODetails();
                   }}>
                     <X className="h-4 w-4 mr-2" />
                     Cancel
