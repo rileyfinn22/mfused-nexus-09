@@ -145,6 +145,18 @@ const VendorPODetail = () => {
     if (!isAdmin) return;
 
     try {
+      // Delete removed items first
+      for (const delId of deletedItemIds) {
+        const { error: delErr } = await supabase
+          .from('vendor_po_items')
+          .delete()
+          .eq('id', delId);
+        if (delErr) {
+          console.error('Delete error:', delErr);
+          throw new Error(`Failed to delete line: ${delErr.message}`);
+        }
+      }
+
       // Update existing items with edited quantities and costs
       for (const item of poItems) {
         if (!item.isNew) {
@@ -152,15 +164,24 @@ const VendorPODetail = () => {
           const effectiveQty = Number(item.shipped_quantity) > 0 ? Number(item.shipped_quantity) : Number(item.quantity);
           // Round to 2 decimal places to avoid floating point precision issues
           const newTotal = Math.round(effectiveQty * Number(item.unit_cost) * 100) / 100;
-          
+          const isCustom = !item.order_item_id;
+
+          const updatePayload: any = {
+            quantity: item.quantity,
+            shipped_quantity: item.shipped_quantity,
+            unit_cost: item.unit_cost,
+            total: newTotal,
+          };
+          // Only allow editing name/description on custom lines (not linked to order items)
+          if (isCustom) {
+            updatePayload.sku = item.sku;
+            updatePayload.name = item.name;
+            updatePayload.description = item.description ?? null;
+          }
+
           const { error: updateError } = await supabase
             .from('vendor_po_items')
-            .update({
-              quantity: item.quantity,
-              shipped_quantity: item.shipped_quantity,
-              unit_cost: item.unit_cost,
-              total: newTotal
-            })
+            .update(updatePayload)
             .eq('id', item.id);
 
           if (updateError) {
