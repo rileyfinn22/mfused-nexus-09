@@ -1672,18 +1672,22 @@ Thank you for your business.`;
                     </TableCell>
                     {isAdmin && isEditMode && (
                       <TableCell className="text-center">
-                        {item.isNew && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const updated = poItems.filter((_, i) => i !== index);
-                              setPOItems(updated);
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            if (!item.isNew) {
+                              const ok = window.confirm(`Remove line "${item.sku || item.name}" from this PO?`);
+                              if (!ok) return;
+                              setDeletedItemIds((prev) => [...prev, item.id]);
+                            }
+                            const updated = poItems.filter((_, i) => i !== index);
+                            setPOItems(updated);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     )}
                   </TableRow>
