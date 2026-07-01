@@ -246,6 +246,7 @@ const VendorPODetail = () => {
         description: "Purchase order updated successfully"
       });
       setIsEditMode(false);
+      setDeletedItemIds([]);
       fetchPODetails();
     } catch (error: any) {
       console.error('Save error:', error);
