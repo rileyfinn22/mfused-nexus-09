@@ -59,6 +59,7 @@ const vibeAdminNavigationItems = [
   { title: "Pull & Ship Orders", url: "/pull-ship-orders", icon: FileText },
   { title: "Vendors", url: "/vendors", icon: Building2 },
   { title: "Vendor PO / Bills", url: "/vendor-pos", icon: Package },
+  { title: "Vendor Status", url: "/vendor-status", icon: Factory },
   { title: "Invoices", url: "/invoices", icon: FileText },
   { title: "Companies", url: "/customers", icon: Building2 },
   { title: "Products", url: "/products", icon: Package },
@@ -73,7 +74,7 @@ const vibeAdminNavigationItems = [
 ];
 
 const vendorNavigationItems = [
-  { title: "My Production", url: "/production", icon: Factory },
+  { title: "My POs", url: "/vendor-portal", icon: Package },
 ];
 
 const financeNavigationItems = [

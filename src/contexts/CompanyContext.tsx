@@ -16,8 +16,10 @@ interface CompanyContextType {
   hasFinanceRole: boolean;
   hasVibeAdminRole: boolean;
   hasForwarderRole: boolean;
+  hasVendorRole: boolean;
   isFinancePortalUser: boolean;
   isForwarderPortalUser: boolean;
+  isVendorPortalUser: boolean;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -31,6 +33,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [hasFinanceRole, setHasFinanceRole] = useState(false);
   const [hasVibeAdminRole, setHasVibeAdminRole] = useState(false);
   const [hasForwarderRole, setHasForwarderRole] = useState(false);
+  const [hasVendorRole, setHasVendorRole] = useState(false);
 
   // Highest privilege first. If a user has multiple role rows for the same company,
   // we pick the most privileged one to keep UI + permissions stable.
@@ -54,6 +57,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
         setHasForwarderRole(false);
+      setHasVendorRole(false);
         localStorage.removeItem(ACTIVE_COMPANY_KEY);
       }
     });
@@ -70,6 +74,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
         setHasForwarderRole(false);
+      setHasVendorRole(false);
         setLoading(false);
         return;
       }
@@ -94,6 +99,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
         setHasForwarderRole(false);
+      setHasVendorRole(false);
         setLoading(false);
         return;
       }
@@ -102,6 +108,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       setHasFinanceRole(roleSet.has("finance"));
       setHasVibeAdminRole(roleSet.has("vibe_admin"));
       setHasForwarderRole(roleSet.has("forwarder"));
+      setHasVendorRole(roleSet.has("vendor"));
 
       // De-dupe by company_id and choose the highest-privilege role per company.
       const byCompanyId = new Map<string, Company>();
@@ -154,6 +161,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       setHasFinanceRole(false);
       setHasVibeAdminRole(false);
       setHasForwarderRole(false);
+      setHasVendorRole(false);
     } finally {
       setLoading(false);
     }
@@ -175,8 +183,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         hasFinanceRole,
         hasVibeAdminRole,
         hasForwarderRole,
+        hasVendorRole,
         isFinancePortalUser: hasFinanceRole && !hasVibeAdminRole,
         isForwarderPortalUser: hasForwarderRole && !hasVibeAdminRole && !hasFinanceRole,
+        isVendorPortalUser: hasVendorRole && !hasVibeAdminRole && !hasFinanceRole && !hasForwarderRole,
       }}
     >
       {children}
@@ -198,8 +208,10 @@ export function useCompany() {
       hasFinanceRole: false,
       hasVibeAdminRole: false,
       hasForwarderRole: false,
+      hasVendorRole: false,
       isFinancePortalUser: false,
       isForwarderPortalUser: false,
+      isVendorPortalUser: false,
     } as CompanyContextType;
   }
   return context;

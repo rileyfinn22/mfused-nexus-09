@@ -27,6 +27,9 @@ import MyPOs from "./pages/MyPOs";
 import Vendors from "./pages/Vendors";
 import VendorPOs from "./pages/VendorPOs";
 import VendorPODetail from "./pages/VendorPODetail";
+import VendorPortal from "./pages/VendorPortal";
+import VendorPortalPODetail from "./pages/VendorPortalPODetail";
+import VendorStatus from "./pages/VendorStatus";
 import Production from "./pages/Production";
 import ProductionDetail from "./pages/ProductionDetail";
 import Login from "./pages/Login";
@@ -99,6 +102,9 @@ const App = () => (
           <Route path="/vendors" element={<DashboardLayout><Vendors /></DashboardLayout>} />
           <Route path="/vendor-pos" element={<DashboardLayout><VendorPOs /></DashboardLayout>} />
           <Route path="/vendor-pos/:poId" element={<DashboardLayout><VendorPODetail /></DashboardLayout>} />
+          <Route path="/vendor-portal" element={<DashboardLayout><VendorPortal /></DashboardLayout>} />
+          <Route path="/vendor-portal/:poId" element={<DashboardLayout><VendorPortalPODetail /></DashboardLayout>} />
+          <Route path="/vendor-status" element={<DashboardLayout><VendorStatus /></DashboardLayout>} />
           <Route path="/production" element={<DashboardLayout><Production /></DashboardLayout>} />
           <Route path="/production/:orderId" element={<DashboardLayout><ProductionDetail /></DashboardLayout>} />
           <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />

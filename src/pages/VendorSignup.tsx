@@ -115,7 +115,7 @@ export default function VendorSignup() {
         description: "Vendor account created successfully",
       });
 
-      navigate("/dashboard");
+      navigate("/vendor-portal");
     } catch (error: any) {
       toast({
         title: "Error",
