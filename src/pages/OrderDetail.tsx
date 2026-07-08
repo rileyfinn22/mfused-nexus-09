@@ -92,6 +92,8 @@ const OrderDetail = () => {
   const [uploadingVibeAttachment, setUploadingVibeAttachment] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [bulkPrice, setBulkPrice] = useState<string>('');
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+
   const [isSaving, setIsSaving] = useState(false);
   
   // Re-upload PO states
@@ -208,6 +210,17 @@ const OrderDetail = () => {
       setVibeProcessed(data.vibe_processed || false);
       setOrderFinalized(data.order_finalized || false);
       setArtApprovedManually(data.art_approved_manually || false);
+
+      // Load saved customer addresses for this company to offer quick-load in edit mode
+      if (data.company_id) {
+        supabase
+          .from('customer_addresses')
+          .select('id, address_type, customer_name, name, street, city, state, zip')
+          .eq('company_id', data.company_id)
+          .order('updated_at', { ascending: false })
+          .then(({ data: addrs }) => setSavedAddresses(addrs || []));
+      }
+
       
       // Check artwork approval status for all products in order
       if (data.order_items && data.order_items.length > 0) {
@@ -2311,7 +2324,25 @@ const OrderDetail = () => {
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Ship To</h3>
                 {isEditMode ? (
                   <div className="space-y-2">
+                    {savedAddresses.filter(a => a.address_type === 'shipping').length > 0 && (
+                      <Select onValueChange={(id) => {
+                        const a = savedAddresses.find(x => x.id === id);
+                        if (a) setEditedOrder({
+                          ...editedOrder,
+                          shipping_name: a.name, shipping_street: a.street,
+                          shipping_city: a.city, shipping_state: a.state, shipping_zip: a.zip,
+                        });
+                      }}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Load saved address…" /></SelectTrigger>
+                        <SelectContent>
+                          {savedAddresses.filter(a => a.address_type === 'shipping').map(a => (
+                            <SelectItem key={a.id} value={a.id}>{a.name} — {a.city}, {a.state}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <Input
+
                       value={editedOrder.shipping_name}
                       onChange={(e) => setEditedOrder({...editedOrder, shipping_name: e.target.value})}
                       placeholder="Name"
@@ -2355,7 +2386,25 @@ const OrderDetail = () => {
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Bill To</h3>
                 {isEditMode ? (
                   <div className="space-y-2">
+                    {savedAddresses.filter(a => a.address_type === 'billing').length > 0 && (
+                      <Select onValueChange={(id) => {
+                        const a = savedAddresses.find(x => x.id === id);
+                        if (a) setEditedOrder({
+                          ...editedOrder,
+                          billing_name: a.name, billing_street: a.street,
+                          billing_city: a.city, billing_state: a.state, billing_zip: a.zip,
+                        });
+                      }}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Load saved address…" /></SelectTrigger>
+                        <SelectContent>
+                          {savedAddresses.filter(a => a.address_type === 'billing').map(a => (
+                            <SelectItem key={a.id} value={a.id}>{a.name} — {a.city}, {a.state}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <Input
+
                       value={editedOrder.billing_name || editedOrder.shipping_name}
                       onChange={(e) => setEditedOrder({...editedOrder, billing_name: e.target.value})}
                       placeholder="Name"
