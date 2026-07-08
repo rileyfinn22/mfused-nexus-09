@@ -133,9 +133,18 @@ export function EditInvoiceAddressesDialog({ open, onOpenChange, invoice, order,
       };
       const { error } = await supabase.from("invoices").update(payload).eq("id", invoice.id);
       if (error) throw error;
+
+      // Also propagate to the parent order so future invoices/documents match.
+      const orderId = invoice.order_id ?? order?.id;
+      if (orderId) {
+        const { error: orderErr } = await supabase.from("orders").update(payload).eq("id", orderId);
+        if (orderErr) console.error("Failed to sync addresses to order:", orderErr);
+      }
+
       onSaved({ ...invoice, ...payload });
-      toast({ title: "Addresses updated" });
+      toast({ title: "Addresses updated", description: "Invoice and order addresses are now in sync." });
       onOpenChange(false);
+
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to update", variant: "destructive" });
     } finally {
