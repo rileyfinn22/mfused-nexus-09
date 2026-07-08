@@ -2324,7 +2324,25 @@ const OrderDetail = () => {
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Ship To</h3>
                 {isEditMode ? (
                   <div className="space-y-2">
+                    {savedAddresses.filter(a => a.address_type === 'shipping').length > 0 && (
+                      <Select onValueChange={(id) => {
+                        const a = savedAddresses.find(x => x.id === id);
+                        if (a) setEditedOrder({
+                          ...editedOrder,
+                          shipping_name: a.name, shipping_street: a.street,
+                          shipping_city: a.city, shipping_state: a.state, shipping_zip: a.zip,
+                        });
+                      }}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Load saved address…" /></SelectTrigger>
+                        <SelectContent>
+                          {savedAddresses.filter(a => a.address_type === 'shipping').map(a => (
+                            <SelectItem key={a.id} value={a.id}>{a.name} — {a.city}, {a.state}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <Input
+
                       value={editedOrder.shipping_name}
                       onChange={(e) => setEditedOrder({...editedOrder, shipping_name: e.target.value})}
                       placeholder="Name"
