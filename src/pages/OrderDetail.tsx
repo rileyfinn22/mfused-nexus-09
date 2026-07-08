@@ -210,6 +210,17 @@ const OrderDetail = () => {
       setVibeProcessed(data.vibe_processed || false);
       setOrderFinalized(data.order_finalized || false);
       setArtApprovedManually(data.art_approved_manually || false);
+
+      // Load saved customer addresses for this company to offer quick-load in edit mode
+      if (data.company_id) {
+        supabase
+          .from('customer_addresses')
+          .select('id, address_type, customer_name, name, street, city, state, zip')
+          .eq('company_id', data.company_id)
+          .order('updated_at', { ascending: false })
+          .then(({ data: addrs }) => setSavedAddresses(addrs || []));
+      }
+
       
       // Check artwork approval status for all products in order
       if (data.order_items && data.order_items.length > 0) {
