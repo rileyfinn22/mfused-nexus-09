@@ -92,6 +92,8 @@ const OrderDetail = () => {
   const [uploadingVibeAttachment, setUploadingVibeAttachment] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [bulkPrice, setBulkPrice] = useState<string>('');
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+
   const [isSaving, setIsSaving] = useState(false);
   
   // Re-upload PO states
