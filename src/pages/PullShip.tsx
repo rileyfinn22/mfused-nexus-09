@@ -39,6 +39,7 @@ import {
 const PullShip = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [orderData, setOrderData] = useState({
     companyId: "",
     state: "",
