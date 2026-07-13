@@ -4135,6 +4135,20 @@ export type Database = {
         Returns: Json
       }
       validate_vendor_invitation: { Args: { p_token: string }; Returns: Json }
+      vendor_update_item_final_qty: {
+        Args: { p_final_quantity: number; p_item_id: string }
+        Returns: Json
+      }
+      vendor_update_po_details: {
+        Args: {
+          p_notes?: string
+          p_po_id: string
+          p_tracking_carrier?: string
+          p_tracking_number?: string
+          p_tracking_url?: string
+        }
+        Returns: Json
+      }
       vendor_update_po_status: {
         Args: {
           p_committed_ship_date?: string

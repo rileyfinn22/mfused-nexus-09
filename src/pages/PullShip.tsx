@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
@@ -38,6 +39,7 @@ import {
 const PullShip = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [orderData, setOrderData] = useState({
     companyId: "",
     state: "",
@@ -66,12 +68,12 @@ const PullShip = () => {
   useEffect(() => {
     fetchPullShipOrders();
     fetchCompanies();
-  }, []);
+  }, [activeCompanyId, isVibeAdmin]);
 
   const fetchPullShipOrders = async () => {
     setLoadingOrders(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           *,
@@ -80,6 +82,13 @@ const PullShip = () => {
         `)
         .eq('order_type', 'pull_ship')
         .order('created_at', { ascending: false });
+
+      // Non-admin users only see their active company's pull & ship orders
+      if (!isVibeAdmin && activeCompanyId) {
+        query = query.eq('company_id', activeCompanyId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setOrders(data || []);
