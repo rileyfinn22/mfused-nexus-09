@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addPdfBrandingSync, addPdfFooter } from "@/lib/pdfBranding";
