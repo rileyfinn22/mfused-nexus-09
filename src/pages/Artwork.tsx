@@ -699,7 +699,8 @@ const Artwork = () => {
       // Download each file and add to zip
       for (const file of filesToDownload) {
         try {
-          const response = await fetch(file.artwork_url);
+          const signedArtworkUrl = await signStorageUrl('artwork', file.artwork_url);
+          const response = await fetch(signedArtworkUrl);
           const blob = await response.blob();
           // Organize by SKU in folders
           const folderPath = file.sku ? `${file.sku}/${file.filename}` : file.filename;
