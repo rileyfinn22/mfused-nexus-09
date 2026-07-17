@@ -28,6 +28,7 @@ import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { SendOrderConfirmationDialog } from "@/components/SendOrderConfirmationDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
+import { fetchRestRowsViaAuth, fetchUserCompanyRolesViaRest, formatPostgrestInFilter, readStoredAuthSession } from "@/lib/authSession";
 
 
 const STAGE_DEFINITIONS = [
@@ -44,6 +45,8 @@ const STAGE_DEFINITIONS = [
   { value: 'in_transit', label: 'In Transit', order: 10, weight: 15 },
   { value: 'delivered', label: 'Delivered', order: 11, weight: 5 },
 ];
+
+const ORDER_DETAIL_TIMEOUT_MS = 10000;
 
 // Keep STAGE_NAMES for backward compatibility
 const STAGE_NAMES = STAGE_DEFINITIONS;
@@ -145,23 +148,25 @@ const OrderDetail = () => {
 
   const fetchProducts = async (companyId?: string) => {
     if (!companyId) return;
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .eq('company_id', companyId)
-      .order('name');
-    if (data) setProducts(data);
+    try {
+      const data = await fetchRestRowsViaAuth<any>('products', {
+        select: 'id,name,item_id,description,price,company_id',
+        company_id: `eq.${companyId}`,
+        order: 'name.asc',
+      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
+      setProducts(data || []);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
   };
   const checkAdminStatus = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const session = readStoredAuthSession();
+    const user = session?.user;
     if (user) {
-      // Users can have multiple role rows; never use .single() here.
-      const { data: roleRows, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-
-      if (error) {
+      let roleRows: any[] = [];
+      try {
+        roleRows = await fetchUserCompanyRolesViaRest(session);
+      } catch (error) {
         console.error('Error fetching roles:', error);
       }
 
@@ -194,53 +199,66 @@ const OrderDetail = () => {
   };
   const fetchOrder = async () => {
     setLoading(true);
-    const {
-      data,
-      error
-    } = await supabase
-      .from('orders')
-      .select('*, order_items(*)')
-      .eq('id', orderId)
-      .order('line_number', { ascending: true, nullsFirst: false, foreignTable: 'order_items' })
-      .single();
-    if (!error && data) {
+    try {
+      const [orderRows, itemRows] = await Promise.all([
+        fetchRestRowsViaAuth<any>('orders', {
+          select: '*',
+          id: `eq.${orderId}`,
+          limit: 1,
+        }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS }),
+        fetchRestRowsViaAuth<any>('order_items', {
+          select: '*',
+          order_id: `eq.${orderId}`,
+          order: 'line_number.asc.nullslast',
+        }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS }),
+      ]);
+
+      const data = orderRows?.[0] ? { ...orderRows[0], order_items: itemRows || [] } : null;
+      if (!data) {
+        setOrder(null);
+        return;
+      }
+
       setOrder(data);
       setEditedOrder(data);
       setEditedItems(data.order_items || []);
       setVibeProcessed(data.vibe_processed || false);
       setOrderFinalized(data.order_finalized || false);
       setArtApprovedManually(data.art_approved_manually || false);
+      setArtApproved(data.art_approved_manually || false);
 
-      // Load saved customer addresses for this company to offer quick-load in edit mode
+      // Non-blocking side loads so the order page can render immediately.
       if (data.company_id) {
-        supabase
-          .from('customer_addresses')
-          .select('id, address_type, customer_name, name, street, city, state, zip')
-          .eq('company_id', data.company_id)
-          .order('updated_at', { ascending: false })
-          .then(({ data: addrs }) => setSavedAddresses(addrs || []));
+        fetchRestRowsViaAuth<any>('customer_addresses', {
+          select: 'id,address_type,customer_name,name,street,city,state,zip',
+          company_id: `eq.${data.company_id}`,
+          order: 'updated_at.desc',
+        }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS })
+          .then((addrs) => setSavedAddresses(addrs || []))
+          .catch((error) => console.error('Error fetching saved addresses:', error));
       }
 
-      
-      // Check artwork approval status for all products in order
       if (data.order_items && data.order_items.length > 0) {
-        const productIds = data.order_items.map((item: any) => item.product_id);
-        const { data: artworkData } = await supabase
-          .from('artwork_files')
-          .select('is_approved, sku')
-          .in('sku', data.order_items.map((item: any) => item.sku));
-        
-        // All products must have approved artwork (or manual override)
-        const allApproved = data.order_items.every((item: any) => 
-          artworkData?.some((art: any) => art.sku === item.sku && art.is_approved)
-        );
-        setArtApproved(allApproved || data.art_approved_manually);
-      } else {
-        // If no items, check manual override
-        setArtApproved(data.art_approved_manually || false);
+        const skus = Array.from(new Set(data.order_items.map((item: any) => item.sku).filter(Boolean)));
+        if (skus.length > 0) {
+          fetchRestRowsViaAuth<any>('artwork_files', {
+            select: 'is_approved,sku',
+            sku: formatPostgrestInFilter(skus),
+          }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS })
+            .then((artworkData) => {
+              const approvedSkus = new Set((artworkData || []).filter((art: any) => art.is_approved).map((art: any) => art.sku));
+              const allApproved = data.order_items.every((item: any) => approvedSkus.has(item.sku));
+              setArtApproved(allApproved || data.art_approved_manually);
+            })
+            .catch((error) => console.error('Error fetching artwork approval:', error));
+        }
       }
+    } catch (error) {
+      console.error('Error fetching order:', error);
+      setOrder(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchProductionStages = async () => {
