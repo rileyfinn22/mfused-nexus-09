@@ -49,7 +49,7 @@ import { exportToCSV } from "@/lib/exportUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel } from "@/components/RowExpandPanel";
-import { fetchRestRowsViaAuth, formatPostgrestInFilter } from "@/lib/authSession";
+import { fetchRestRowsViaAuth, formatPostgrestInFilter, readStoredAuthSession } from "@/lib/authSession";
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -85,9 +85,8 @@ const Orders = () => {
   useEffect(() => {
     if (activeCompanyLoading) return;
 
-    if (!isVibeAdmin && !activeCompanyId) {
-      setOrders([]);
-      setLoading(false);
+    if (!activeCompanyId && !readStoredAuthSession()?.user?.id) {
+      navigate('/login');
       return;
     }
 
@@ -128,9 +127,8 @@ const Orders = () => {
   const fetchOrders = async () => {
     setLoading(true);
 
-    if (!isVibeAdmin && !activeCompanyId) {
-      setOrders([]);
-      setLoading(false);
+    if (!activeCompanyId && !readStoredAuthSession()?.user?.id) {
+      navigate('/login');
       return;
     }
 
