@@ -31,6 +31,8 @@ import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
 
+const INVOICE_LIST_LIMIT = 500;
+
 const Invoices = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -110,12 +112,29 @@ const Invoices = () => {
     let query = supabase
       .from('invoices')
       .select(`
-        *,
+        id,
+        invoice_number,
+        company_id,
+        order_id,
+        parent_invoice_id,
+        invoice_type,
+        status,
+        total,
+        total_paid,
+        due_date,
+        shipped_date,
+        description,
+        notes,
+        quickbooks_id,
+        quickbooks_sync_status,
+        quickbooks_payment_link,
+        shipment_number,
         orders(order_number, customer_name, po_number, description),
         companies(name)
       `)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(INVOICE_LIST_LIMIT);
 
     // For vibe admins: use URL company filter if set
     // For regular users: always filter by their active company
