@@ -20,6 +20,7 @@ import { VendorPOPackingListSection } from "@/components/VendorPOPackingListSect
 import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 import { normalizeStorageObjectPath, openStorageObjectInNewTab } from "@/lib/storageUrl";
+import { signStorageUrlsInRows } from "@/lib/storageUrl";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
@@ -1059,7 +1060,8 @@ Thank you for your business.`;
         return;
       }
       
-      setArtworkFiles(data || []);
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url']);
+      setArtworkFiles(signedData || []);
     } catch (error) {
       console.error('Error fetching artwork files:', error);
       setArtworkFiles([]);
