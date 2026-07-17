@@ -65,7 +65,7 @@ export default function ArtworkReconcile() {
     try {
       const { data, error } = await supabase.functions.invoke('reconcile-artwork-skus', { body: { action: 'list' } });
       if (error) throw error;
-      const signedOrphans = await signStorageUrlsInRows('artwork', data.orphans || [], ['artwork_url', 'preview_url']);
+      const signedOrphans = await signStorageUrlsInRows<Orphan>('artwork', data.orphans || [], ['artwork_url', 'preview_url']);
       setOrphans(signedOrphans || []);
       setProducts(data.products || []);
       setCompanies(data.companies || []);
