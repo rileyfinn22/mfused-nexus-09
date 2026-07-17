@@ -49,6 +49,7 @@ import { exportToCSV } from "@/lib/exportUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel } from "@/components/RowExpandPanel";
+import { fetchRestRowsViaAuth, formatPostgrestInFilter } from "@/lib/authSession";
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -113,16 +114,14 @@ const Orders = () => {
   };
 
   const fetchCompanies = async () => {
-    const { signal, cleanup } = createAbortSignal();
-    const { data, error } = await supabase
-      .from('companies')
-      .select('id, name')
-      .order('name')
-      .abortSignal(signal);
-    cleanup();
-    
-    if (!error && data) {
+    try {
+      const data = await fetchRestRowsViaAuth('companies', {
+        select: 'id,name',
+        order: 'name.asc',
+      });
       setCompanies(data);
+    } catch (error) {
+      console.error('Companies fetch error:', error);
     }
   };
 
@@ -135,48 +134,26 @@ const Orders = () => {
       return;
     }
 
-    let query = supabase
-      .from('orders')
-      .select(`
-        id,
-        order_number,
-        order_date,
-        company_id,
-        customer_name,
-        po_number,
-        description,
-        total,
-        status,
-        estimated_delivery_date,
-        order_type,
-        order_finalized,
-        vibe_processed,
-        production_progress,
-        shipping_city,
-        shipping_state,
-        order_items(id, sku, name, quantity, shipped_quantity, unit_price, line_number),
-        companies(name)
-      `)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(ORDER_LIST_LIMIT);
+    const params: Record<string, string | number> = {
+      select: 'id,order_number,order_date,company_id,customer_name,po_number,description,total,status,estimated_delivery_date,order_type,order_finalized,vibe_processed,production_progress,shipping_city,shipping_state,order_items(id,sku,name,quantity,shipped_quantity,unit_price,line_number),companies(name)',
+      deleted_at: 'is.null',
+      order: 'created_at.desc',
+      limit: ORDER_LIST_LIMIT,
+    };
 
     // For vibe admins: use URL company filter if set
     // For regular users: always filter by their active company
     if (isVibeAdmin) {
       if (companyFilter !== 'all') {
-        query = query.eq('company_id', companyFilter);
+        params.company_id = `eq.${companyFilter}`;
       }
     } else if (activeCompanyId) {
       // Non-admin users: filter by their active company
-      query = query.eq('company_id', activeCompanyId);
+      params.company_id = `eq.${activeCompanyId}`;
     }
 
-    const { signal, cleanup } = createAbortSignal();
-    const { data, error } = await query.abortSignal(signal);
-    cleanup();
-    
-    if (!error && data) {
+    try {
+      const data = await fetchRestRowsViaAuth<any>('orders', params);
       // For non-vibe admins, filter out draft orders (they can only see pending and later)
       const filteredData = isVibeAdmin 
         ? data 
@@ -199,9 +176,8 @@ const Orders = () => {
       setOrders(ordersWithChecklist);
       setLoading(false);
       hydrateArtworkApproval(filteredData);
-
-    } else {
-      if (error) console.error('Orders fetch error:', error);
+    } catch (error) {
+      console.error('Orders fetch error:', error);
       setLoading(false);
     }
   };
@@ -218,19 +194,11 @@ const Orders = () => {
     try {
       for (let i = 0; i < allSkus.length; i += ARTWORK_SKU_BATCH_SIZE) {
         const batch = allSkus.slice(i, i + ARTWORK_SKU_BATCH_SIZE);
-        const { signal, cleanup } = createAbortSignal(8000);
-        const { data, error } = await supabase
-          .from('artwork_files')
-          .select('sku')
-          .in('sku', batch)
-          .eq('is_approved', true)
-          .abortSignal(signal);
-        cleanup();
-
-        if (error) {
-          console.error('Artwork approval fetch error:', error);
-          continue;
-        }
+        const data = await fetchRestRowsViaAuth<{ sku: string }>('artwork_files', {
+          select: 'sku',
+          sku: formatPostgrestInFilter(batch),
+          is_approved: 'eq.true',
+        }, { timeoutMs: 8000 });
 
         (data || []).forEach((a: any) => approvedSkus.add(a.sku));
       }
