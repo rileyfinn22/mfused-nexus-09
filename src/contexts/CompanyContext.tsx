@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Company {
@@ -48,6 +48,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [hasVibeAdminRole, setHasVibeAdminRole] = useState(false);
   const [hasForwarderRole, setHasForwarderRole] = useState(false);
   const [hasVendorRole, setHasVendorRole] = useState(false);
+  const loadRequestIdRef = useRef(0);
 
   // Highest privilege first. If a user has multiple role rows for the same company,
   // we pick the most privileged one to keep UI + permissions stable.
@@ -63,9 +64,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     loadCompanies();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        loadCompanies();
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        window.setTimeout(() => loadCompanies(), 0);
       } else if (event === "SIGNED_OUT") {
+        loadRequestIdRef.current += 1;
         setCompanies([]);
         setActiveCompanyState(null);
         setHasFinanceRole(false);
@@ -80,6 +82,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadCompanies = async () => {
+    const requestId = ++loadRequestIdRef.current;
+
+    const isCurrentRequest = () => requestId === loadRequestIdRef.current;
+
     try {
       setLoading(true);
 
@@ -89,6 +95,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       );
       const user = session?.user;
       if (!user) {
+        if (!isCurrentRequest()) return;
         setCompanies([]);
         setActiveCompanyState(null);
         setHasFinanceRole(false);
@@ -117,6 +124,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error("Error fetching user companies:", error);
+        if (!isCurrentRequest()) return;
         setCompanies([]);
         setActiveCompanyState(null);
         setHasFinanceRole(false);
@@ -126,6 +134,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
+
+      if (!isCurrentRequest()) return;
 
       const roleSet = new Set((userRoles || []).map((ur: any) => String(ur.role)));
       setHasFinanceRole(roleSet.has("finance"));
@@ -179,6 +189,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error("Error loading companies:", err);
+      if (!isCurrentRequest()) return;
       setCompanies([]);
       setActiveCompanyState(null);
       setHasFinanceRole(false);
@@ -186,7 +197,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       setHasForwarderRole(false);
       setHasVendorRole(false);
     } finally {
-      setLoading(false);
+      if (isCurrentRequest()) {
+        setLoading(false);
+      }
     }
   };
 
