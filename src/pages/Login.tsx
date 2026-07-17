@@ -17,6 +17,15 @@ export default function Login() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const navigateWithFallback = (target: string, replace = false) => {
+    navigate(target, { replace });
+    window.setTimeout(() => {
+      if (window.location.pathname === "/login") {
+        window.location.assign(target);
+      }
+    }, 300);
+  };
+
   // Check for invoice redirect context
   const invoiceId = searchParams.get("invoice");
   const redirectTo = searchParams.get("redirect");
@@ -35,36 +44,37 @@ export default function Login() {
   useEffect(() => {
     let active = true;
 
-    const go = async () => {
+    const go = async (userId: string) => {
       if (!active) return;
       if (redirectTo) {
-        navigate(redirectTo);
+        navigateWithFallback(redirectTo, true);
         return;
       }
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!active || !user) return;
         const { data: roles } = await supabase
           .from("user_roles")
           .select("role")
-          .eq("user_id", user.id);
+          .eq("user_id", userId);
         const roleList = (roles || []).map((r: any) => r.role);
         if (roleList.length === 1 && roleList[0] === "finance") {
-          navigate("/financing", { replace: true });
+          navigateWithFallback("/financing", true);
         } else {
-          navigate("/dashboard", { replace: true });
+          navigateWithFallback("/dashboard", true);
         }
       } catch {
-        if (active) navigate("/dashboard", { replace: true });
+        if (active) navigateWithFallback("/dashboard", true);
       }
     };
 
     void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) go();
+      if (data.session?.user?.id) go(data.session.user.id);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) go();
+      // Do not call Supabase queries synchronously inside auth callbacks; it can stall navigation.
+      if (session?.user?.id) {
+        window.setTimeout(() => go(session.user.id), 0);
+      }
     });
 
     return () => {
@@ -163,7 +173,7 @@ export default function Login() {
           const pendingRedirect = sessionStorage.getItem("pendingRedirect");
           sessionStorage.removeItem("pendingRedirect");
 
-          navigate(
+          navigateWithFallback(
             pendingRedirect ||
               (associatedInvoiceId ? `/invoices/${associatedInvoiceId}` : "/dashboard")
           );
@@ -206,29 +216,29 @@ export default function Login() {
         sessionStorage.removeItem("pendingRedirect");
 
         if (associatedInvoiceId) {
-          navigate(pendingRedirect || `/invoices/${associatedInvoiceId}`);
+          navigateWithFallback(pendingRedirect || `/invoices/${associatedInvoiceId}`);
         } else if (pendingRedirect) {
-          navigate(pendingRedirect);
+          navigateWithFallback(pendingRedirect);
         } else {
           // Try to detect finance-only user, but never let this block navigation.
           try {
-            const rolePromise = supabase.auth.getUser().then(async ({ data: { user: currentUser } }) => {
-              if (!currentUser) return null;
+            const rolePromise = supabase.auth.getSession().then(async ({ data: { session } }) => {
+              if (!session?.user?.id) return null;
               const { data: roles } = await supabase
                 .from("user_roles")
                 .select("role")
-                .eq("user_id", currentUser.id);
+                .eq("user_id", session.user.id);
               return (roles || []).map((r: any) => r.role);
             });
             const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
             const roleList = (await Promise.race([rolePromise, timeout])) as string[] | null;
             if (roleList && roleList.length === 1 && roleList[0] === "finance") {
-              navigate("/financing");
+              navigateWithFallback("/financing");
             } else {
-              navigate("/dashboard");
+              navigateWithFallback("/dashboard");
             }
           } catch {
-            navigate("/dashboard");
+            navigateWithFallback("/dashboard");
           }
         }
       }

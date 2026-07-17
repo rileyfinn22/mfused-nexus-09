@@ -57,7 +57,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
         setHasForwarderRole(false);
-      setHasVendorRole(false);
+        setHasVendorRole(false);
         localStorage.removeItem(ACTIVE_COMPANY_KEY);
       }
     });
@@ -67,14 +67,15 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
   const loadCompanies = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) {
         setCompanies([]);
         setActiveCompanyState(null);
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
         setHasForwarderRole(false);
-      setHasVendorRole(false);
+        setHasVendorRole(false);
         setLoading(false);
         return;
       }
@@ -99,7 +100,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
         setHasForwarderRole(false);
-      setHasVendorRole(false);
+        setHasVendorRole(false);
         setLoading(false);
         return;
       }
