@@ -3188,9 +3188,10 @@ const OrderDetail = () => {
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2"
-                            onClick={() => {
+                            onClick={async () => {
+                              const signedUrl = await signStorageUrl('artwork', artwork.artwork_url);
                               const link = document.createElement('a');
-                              link.href = artwork.artwork_url;
+                              link.href = signedUrl;
                               link.download = artwork.filename;
                               link.click();
                             }}
