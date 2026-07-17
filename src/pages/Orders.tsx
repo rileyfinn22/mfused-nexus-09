@@ -13,6 +13,8 @@ const parseDateAsLocal = (dateStr: string | null): Date | undefined => {
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, month - 1, day);
 };
+
+const ORDER_LIST_LIMIT = 300;
 import {
   AlertDialog,
   AlertDialogAction,
@@ -124,9 +126,29 @@ const Orders = () => {
 
     let query = supabase
       .from('orders')
-      .select('*, order_items(*), companies(name)')
+      .select(`
+        id,
+        order_number,
+        order_date,
+        company_id,
+        customer_name,
+        po_number,
+        description,
+        total,
+        status,
+        estimated_delivery_date,
+        order_type,
+        order_finalized,
+        vibe_processed,
+        production_progress,
+        shipping_city,
+        shipping_state,
+        order_items(id, sku, name, quantity, shipped_quantity, unit_price, line_number),
+        companies(name)
+      `)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(ORDER_LIST_LIMIT);
 
     // For vibe admins: use URL company filter if set
     // For regular users: always filter by their active company
@@ -470,7 +492,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
 
         {/* All Orders */}
         <div className="space-y-3">
-          <h2 className="text-lg font-medium">All Orders</h2>
+            <h2 className="text-lg font-medium">All Orders</h2>
           <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
             <div className="bg-muted border-b-2 border-border">
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
