@@ -10,6 +10,7 @@ import { NotificationsDropdown } from "./NotificationsDropdown";
 import { ThemeToggle } from "./ThemeToggle";
 import { useCompany } from "@/contexts/CompanyContext";
 import { CompanyHeaderSwitcher } from "./CompanyHeaderSwitcher";
+import { readStoredAuthSession } from "@/lib/authSession";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -67,12 +68,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const checkAuth = async () => {
     try {
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Auth check timeout')), 5000)
-      );
-      
-      const authPromise = supabase.auth.getSession();
-      const { data: { session } } = await Promise.race([authPromise, timeoutPromise]) as any;
+      const session = readStoredAuthSession();
       
       if (!session) {
         navigate('/login');
@@ -80,11 +76,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     } catch (error) {
       console.error('Auth check error:', error);
-      if (error instanceof Error && error.message === 'Auth check timeout') {
-        console.error('Auth check timed out - showing default state');
-      } else {
-        navigate('/login');
-      }
+      navigate('/login');
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AUTH_SESSION_EVENT,
+  CompanyRoleRow,
+  fetchUserCompanyRolesViaRest,
+  readStoredAuthSession,
+} from "@/lib/authSession";
+import type { Session } from "@supabase/supabase-js";
 
 interface Company {
   id: string;
@@ -25,20 +32,6 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 const ACTIVE_COMPANY_KEY = "activeCompanyId";
-const COMPANY_LOAD_TIMEOUT_MS = 10000;
-
-const withTimeout = async <T,>(promise: PromiseLike<T>, label: string): Promise<T> => {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(`${label} timeout`)), COMPANY_LOAD_TIMEOUT_MS);
-  });
-
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
-};
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -49,6 +42,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [hasForwarderRole, setHasForwarderRole] = useState(false);
   const [hasVendorRole, setHasVendorRole] = useState(false);
   const loadRequestIdRef = useRef(0);
+  const backgroundRetryRef = useRef(0);
 
   // Highest privilege first. If a user has multiple role rows for the same company,
   // we pick the most privileged one to keep UI + permissions stable.
@@ -61,13 +55,23 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   ];
 
   useEffect(() => {
-    loadCompanies();
+    loadCompanies(readStoredAuthSession());
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const handleAuthSession = (event: Event) => {
+      const session = (event as CustomEvent<{ session?: Session }>).detail?.session;
+      if (session?.user?.id) {
+        loadCompanies(session);
+      }
+    };
+
+    window.addEventListener(AUTH_SESSION_EVENT, handleAuthSession);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        window.setTimeout(() => loadCompanies(), 0);
+        window.setTimeout(() => loadCompanies(session ?? readStoredAuthSession()), 0);
       } else if (event === "SIGNED_OUT") {
         loadRequestIdRef.current += 1;
+        backgroundRetryRef.current = 0;
         setCompanies([]);
         setActiveCompanyState(null);
         setHasFinanceRole(false);
@@ -78,24 +82,25 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      window.removeEventListener(AUTH_SESSION_EVENT, handleAuthSession);
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const loadCompanies = async () => {
+  const loadCompanies = async (sessionOverride?: Session | null, options?: { background?: boolean }) => {
     const requestId = ++loadRequestIdRef.current;
 
     const isCurrentRequest = () => requestId === loadRequestIdRef.current;
 
     try {
-      setLoading(true);
+      if (!options?.background) setLoading(true);
 
-      const { data: { session } } = await withTimeout(
-        supabase.auth.getSession(),
-        "Auth session restore"
-      );
+      const session = sessionOverride ?? readStoredAuthSession();
       const user = session?.user;
       if (!user) {
         if (!isCurrentRequest()) return;
+        backgroundRetryRef.current = 0;
         setCompanies([]);
         setActiveCompanyState(null);
         setHasFinanceRole(false);
@@ -107,31 +112,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       }
 
       // Fetch all companies the user has access to
-      const { data: userRoles, error } = await withTimeout(
-        supabase
-          .from("user_roles")
-          .select(`
-            role,
-            company_id,
-            companies:company_id (
-              id,
-              name
-            )
-          `)
-          .eq("user_id", user.id),
-        "Company roles load"
-      );
-
-      if (error) {
-        console.error("Error fetching user companies:", error);
-        if (!isCurrentRequest()) return;
-        // Preserve any previously loaded state rather than wiping it, so a
-        // transient RLS/network error doesn't blank the header to "Packaging Portal".
-        setLoading(false);
-        return;
-      }
+      const userRoles = await fetchUserCompanyRolesViaRest(session);
 
       if (!isCurrentRequest()) return;
+      backgroundRetryRef.current = 0;
 
       const roleSet = new Set((userRoles || []).map((ur: any) => String(ur.role)));
       setHasFinanceRole(roleSet.has("finance"));
@@ -143,10 +127,13 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       const byCompanyId = new Map<string, Company>();
 
       (userRoles || [])
-        .filter((ur: any) => ur.companies)
-        .forEach((ur: any) => {
-          const id = String(ur.companies.id);
-          const name = String(ur.companies.name);
+        .filter((ur: CompanyRoleRow) => ur.companies)
+        .forEach((ur: CompanyRoleRow) => {
+          const company = Array.isArray(ur.companies) ? ur.companies[0] : ur.companies;
+          if (!company) return;
+
+          const id = String(company.id);
+          const name = String(company.name);
           const role = String(ur.role);
 
           const existing = byCompanyId.get(id);
@@ -186,12 +173,17 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error("Error loading companies:", err);
       if (!isCurrentRequest()) return;
-      // Preserve prior state on timeout/network failure — retry once shortly.
-      window.setTimeout(() => {
-        if (loadRequestIdRef.current === requestId) {
-          loadCompanies();
-        }
-      }, 1500);
+
+      // Preserve prior state on timeout/network failure and retry in the
+      // background so slow Wi-Fi does not trap users behind the global spinner.
+      if (backgroundRetryRef.current < 2) {
+        backgroundRetryRef.current += 1;
+        window.setTimeout(() => {
+          if (loadRequestIdRef.current === requestId) {
+            loadCompanies(readStoredAuthSession(), { background: true });
+          }
+        }, 3000);
+      }
     } finally {
       if (isCurrentRequest()) {
         setLoading(false);

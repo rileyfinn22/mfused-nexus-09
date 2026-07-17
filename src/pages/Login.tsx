@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { dispatchAuthSession, fetchUserCompanyRolesViaRest, readStoredAuthSession } from "@/lib/authSession";
+import type { Session } from "@supabase/supabase-js";
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -44,17 +46,15 @@ export default function Login() {
   useEffect(() => {
     let active = true;
 
-    const go = async (userId: string) => {
+    const go = async (session: Session) => {
       if (!active) return;
+      dispatchAuthSession(session);
       if (redirectTo) {
         navigateWithFallback(redirectTo, true);
         return;
       }
       try {
-        const { data: roles } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userId);
+        const roles = await fetchUserCompanyRolesViaRest(session);
         const roleList = (roles || []).map((r: any) => r.role);
         if (roleList.length === 1 && roleList[0] === "finance") {
           navigateWithFallback("/financing", true);
@@ -66,14 +66,13 @@ export default function Login() {
       }
     };
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user?.id) go(data.session.user.id);
-    });
+    const storedSession = readStoredAuthSession();
+    if (storedSession?.user?.id) void go(storedSession);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       // Do not call Supabase queries synchronously inside auth callbacks; it can stall navigation.
       if (session?.user?.id) {
-        window.setTimeout(() => go(session.user.id), 0);
+        window.setTimeout(() => go(session), 0);
       }
     });
 
@@ -152,6 +151,7 @@ export default function Login() {
         });
 
         if (!signInError && signInData.user) {
+          dispatchAuthSession(signInData.session);
           const association = await associateWithInvoice(email);
           const associatedInvoiceId = association.invoiceId;
 
@@ -190,11 +190,12 @@ export default function Login() {
         setPassword("");
         setConfirmPassword("");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data: signInData, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
+        dispatchAuthSession(signInData.session);
 
         const association = await associateWithInvoice(email);
         const associatedInvoiceId = association.invoiceId;
@@ -222,14 +223,12 @@ export default function Login() {
         } else {
           // Try to detect finance-only user, but never let this block navigation.
           try {
-            const rolePromise = supabase.auth.getSession().then(async ({ data: { session } }) => {
+            const rolePromise = (async () => {
+              const session = signInData.session ?? readStoredAuthSession();
               if (!session?.user?.id) return null;
-              const { data: roles } = await supabase
-                .from("user_roles")
-                .select("role")
-                .eq("user_id", session.user.id);
+              const roles = await fetchUserCompanyRolesViaRest(session);
               return (roles || []).map((r: any) => r.role);
-            });
+            })();
             const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
             const roleList = (await Promise.race([rolePromise, timeout])) as string[] | null;
             if (roleList && roleList.length === 1 && roleList[0] === "finance") {
