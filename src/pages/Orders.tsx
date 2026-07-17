@@ -83,9 +83,10 @@ const Orders = () => {
   };
 
   useEffect(() => {
-    if (activeCompanyLoading) return;
+    const hasStoredSession = Boolean(readStoredAuthSession()?.user?.id);
+    if (activeCompanyLoading && !hasStoredSession) return;
 
-    if (!activeCompanyId && !readStoredAuthSession()?.user?.id) {
+    if (!activeCompanyId && !hasStoredSession) {
       navigate('/login');
       return;
     }
