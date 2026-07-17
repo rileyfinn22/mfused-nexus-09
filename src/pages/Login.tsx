@@ -31,15 +31,32 @@ export default function Login() {
     }
   }, [invoiceId, redirectTo]);
 
-  // If the user is already logged in and this is an invoice deep-link, skip the login screen.
+  // If the user is already logged in, get them off the login screen.
   useEffect(() => {
-    if (!redirectTo) return;
-
     let active = true;
 
-    const go = () => {
+    const go = async () => {
       if (!active) return;
-      navigate(redirectTo);
+      if (redirectTo) {
+        navigate(redirectTo);
+        return;
+      }
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!active || !user) return;
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id);
+        const roleList = (roles || []).map((r: any) => r.role);
+        if (roleList.length === 1 && roleList[0] === "finance") {
+          navigate("/financing", { replace: true });
+        } else {
+          navigate("/dashboard", { replace: true });
+        }
+      } catch {
+        if (active) navigate("/dashboard", { replace: true });
+      }
     };
 
     void supabase.auth.getSession().then(({ data }) => {
@@ -55,6 +72,7 @@ export default function Login() {
       subscription.unsubscribe();
     };
   }, [redirectTo, navigate]);
+
 
   const associateWithInvoice = async (userEmail: string) => {
     const pendingInvoiceId = sessionStorage.getItem("pendingInvoiceAccess");
