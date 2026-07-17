@@ -30,7 +30,7 @@ interface RecentOrder {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { activeCompanyId, isVibeAdmin, activeCompanyRole, isFinancePortalUser } = useActiveCompany();
+  const { activeCompanyId, isVibeAdmin, activeCompanyRole, isFinancePortalUser, loading: companyLoading } = useActiveCompany();
   const [loading, setLoading] = useState(true);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [openOrdersCount, setOpenOrdersCount] = useState(0);
@@ -46,11 +46,21 @@ const Dashboard = () => {
   }, [isFinancePortalUser, activeCompanyRole, navigate]);
 
   useEffect(() => {
+    if (companyLoading) return;
+
+    if (isFinancePortalUser) {
+      setLoading(false);
+      return;
+    }
+
     if (!isFinancePortalUser && (activeCompanyId || isVibeAdmin)) {
       setLoading(true);
       fetchDashboardData(activeCompanyId, isVibeAdmin);
+      return;
     }
-  }, [activeCompanyId, isVibeAdmin, isFinancePortalUser]);
+
+    setLoading(false);
+  }, [activeCompanyId, isVibeAdmin, isFinancePortalUser, companyLoading]);
 
   const fetchDashboardData = async (companyId: string | null, isAdmin: boolean) => {
     try {
