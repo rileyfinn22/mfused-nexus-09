@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, FileImage, CheckCircle, Clock, Eye, Upload, Trash2 } from "lucide-react";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
-import { signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
+import { normalizeStorageObjectPath, signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
 
 const EditProduct = () => {
   const navigate = useNavigate();
@@ -182,13 +182,13 @@ const EditProduct = () => {
 
     try {
       // Delete from storage
-      const artworkPath = artworkUrl.split('/artwork/')[1];
+      const artworkPath = normalizeStorageObjectPath(artworkUrl, 'artwork');
       if (artworkPath) {
         await supabase.storage.from('artwork').remove([artworkPath]);
       }
 
       if (previewUrl) {
-        const previewPath = previewUrl.split('/artwork/')[1];
+        const previewPath = normalizeStorageObjectPath(previewUrl, 'artwork');
         if (previewPath) {
           await supabase.storage.from('artwork').remove([previewPath]);
         }
