@@ -30,7 +30,7 @@ import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
-import { fetchRestRowsViaAuth } from "@/lib/authSession";
+import { fetchRestRowsViaAuth, readStoredAuthSession } from "@/lib/authSession";
 
 const INVOICE_LIST_LIMIT = 500;
 const LIST_QUERY_TIMEOUT_MS = 10000;
@@ -88,9 +88,8 @@ const Invoices = () => {
       return;
     }
 
-    if (!activeCompanyId) {
-      setInvoices([]);
-      setLoading(false);
+    if (!activeCompanyId && !readStoredAuthSession()?.user?.id) {
+      navigate('/login');
       return;
     }
 
@@ -118,9 +117,8 @@ const Invoices = () => {
     setLoading(true);
 
     // For non-admin users we must have an active company before querying.
-    if (!isVibeAdmin && !activeCompanyId) {
-      setInvoices([]);
-      setLoading(false);
+    if (!activeCompanyId && !readStoredAuthSession()?.user?.id) {
+      navigate('/login');
       return;
     }
 
