@@ -223,34 +223,58 @@ export const fetchRestRowsViaAuth = async <T = any>(
   const session = await getFreshAuthSession(options?.session);
   if (!isUsableSession(session)) return [];
 
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), options?.timeoutMs ?? AUTH_REST_TIMEOUT_MS);
+  const requestedLimit = Number(params.limit);
+  const shouldPaginate = Number.isFinite(requestedLimit) && requestedLimit > 1000;
+  const pageSize = shouldPaginate ? 1000 : undefined;
 
-  try {
+  const buildSearchParams = (includeLimit = true) => {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
+      if (value !== undefined && value !== null && (includeLimit || key !== "limit")) {
         searchParams.set(key, String(value));
       }
     });
+    return searchParams;
+  };
 
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${searchParams.toString()}`, {
-      headers: {
-        apikey: SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${session.access_token}`,
-        Accept: "application/json",
-      },
-      signal: controller.signal,
-    });
+  const fetchPage = async (range?: string) => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), options?.timeoutMs ?? AUTH_REST_TIMEOUT_MS);
 
-    if (!response.ok) {
-      throw new Error(`${table} load failed (${response.status})`);
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${buildSearchParams(!shouldPaginate).toString()}`, {
+        headers: {
+          apikey: SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${session.access_token}`,
+          Accept: "application/json",
+          ...(range ? { Range: range } : {}),
+        },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`${table} load failed (${response.status})`);
+      }
+
+      return (await response.json()) as T[];
+    } finally {
+      window.clearTimeout(timeoutId);
     }
+  };
 
-    return (await response.json()) as T[];
-  } finally {
-    window.clearTimeout(timeoutId);
+  if (!shouldPaginate || !pageSize) {
+    return fetchPage();
   }
+
+  const rows: T[] = [];
+  for (let offset = 0; offset < requestedLimit; offset += pageSize) {
+    const to = Math.min(offset + pageSize - 1, requestedLimit - 1);
+    const page = await fetchPage(`${offset}-${to}`);
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  return rows;
 };
 
 export const fetchRestRowViaAuth = async <T = any>(
