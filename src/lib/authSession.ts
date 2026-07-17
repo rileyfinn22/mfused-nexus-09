@@ -14,6 +14,7 @@ type RestQueryParams = Record<string, string | number | boolean | null | undefin
 export const AUTH_SESSION_EVENT = "vibe-auth-session";
 const AUTH_REST_TIMEOUT_MS = 7000;
 const TOKEN_REFRESH_BUFFER_SECONDS = 60;
+let refreshInFlight: Promise<Session | null> | null = null;
 
 const getExpectedAuthStorageKey = () => {
   try {
@@ -139,7 +140,17 @@ export const getFreshAuthSession = async (sessionOverride?: Session | null): Pro
   if (!isUsableSession(session)) return null;
   if (!isSessionExpiredOrExpiring(session)) return session;
 
-  return refreshStoredAuthSession(session);
+  if (!refreshInFlight) {
+    refreshInFlight = refreshStoredAuthSession(session).finally(() => {
+      refreshInFlight = null;
+    });
+  }
+
+  const refreshed = await refreshInFlight;
+  if (isUsableSession(refreshed)) return refreshed;
+
+  const latestStoredSession = readStoredAuthSession();
+  return isUsableSession(latestStoredSession) ? latestStoredSession : null;
 };
 
 export const fetchUserCompanyRolesViaRest = async (session: Session): Promise<CompanyRoleRow[]> => {
