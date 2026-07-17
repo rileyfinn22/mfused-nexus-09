@@ -71,10 +71,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         setTimeout(() => reject(new Error('Auth check timeout')), 5000)
       );
       
-      const authPromise = supabase.auth.getUser();
-      const { data: { user } } = await Promise.race([authPromise, timeoutPromise]) as any;
+      const authPromise = supabase.auth.getSession();
+      const { data: { session } } = await Promise.race([authPromise, timeoutPromise]) as any;
       
-      if (!user) {
+      if (!session) {
         navigate('/login');
         return;
       }
