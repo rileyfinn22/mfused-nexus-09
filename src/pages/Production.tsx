@@ -20,6 +20,7 @@ import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipment
 import { GenerateShipmentLinkDialog } from "@/components/GenerateShipmentLinkDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
 import { normalizeStorageObjectPath } from "@/lib/storageUrl";
+import { fetchRestRowsViaAuth, formatPostgrestInFilter, getStoredUserId, withTimeout } from "@/lib/authSession";
 
 // Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
 const parseDateAsLocal = (dateStr: string | null): Date | undefined => {
@@ -202,13 +203,11 @@ export default function Production() {
 
   const fetchCompanies = async () => {
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
+      const data = await fetchRestRowsViaAuth<Company>('companies', {
+        select: 'id,name',
+        is_active: 'eq.true',
+        order: 'name.asc',
+      }, { timeoutMs: 8000 });
       setCompanies(data || []);
     } catch (error) {
       console.error('Error fetching companies:', error);
@@ -217,20 +216,16 @@ export default function Production() {
 
   const checkRole = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         setRoleChecked(true);
         return;
       }
 
-      // IMPORTANT: users can have multiple role rows (multi-company, admin + company, etc.)
-      // so never use .single() / .maybeSingle() here.
-      const { data: roleRows, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-
-      if (error) throw error;
+      const roleRows = await fetchRestRowsViaAuth<any>('user_roles', {
+        select: 'role',
+        user_id: `eq.${userId}`,
+      }, { timeoutMs: 8000 });
 
       const roles = (roleRows || []).map((r: any) => String(r.role));
       const vibeAdmin = roles.includes('vibe_admin');
@@ -241,11 +236,11 @@ export default function Production() {
 
       if (vendor) {
         // Get vendor ID for this user
-        const { data: vendorData } = await supabase
-          .from('vendors')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
+        const [vendorData] = await fetchRestRowsViaAuth<any>('vendors', {
+          select: 'id',
+          user_id: `eq.${userId}`,
+          limit: 1,
+        }, { timeoutMs: 8000 });
 
         setVendorId(vendorData?.id || null);
       } else {
@@ -262,171 +257,72 @@ export default function Production() {
     try {
       let ordersData: any[] = [];
       let completedOrdersData: any[] = [];
+      const productionSelect = 'id,order_number,customer_name,order_date,company_id,po_number,description,shipping_state,total,estimated_delivery_date,production_progress,is_delayed,delay_reason,order_finalized_at,updated_at,status,companies(name)';
 
       if (isVendor && vendorId) {
         // Vendors: get orders where they have assigned stages (exclude pull_ship)
-        const { data: stages, error: stagesError } = await supabase
-          .from('production_stages')
-          .select('order_id')
-          .eq('vendor_id', vendorId);
-
-        if (stagesError) throw stagesError;
+        const stages = await fetchRestRowsViaAuth<any>('production_stages', {
+          select: 'order_id',
+          vendor_id: `eq.${vendorId}`,
+        }, { timeoutMs: 8000 });
 
         const orderIds = [...new Set(stages?.map(s => s.order_id) || [])];
         
         if (orderIds.length > 0) {
           // Fetch in-production orders
-          const { data, error } = await supabase
-            .from('orders')
-            .select(`
-              id,
-              order_number,
-              customer_name,
-              order_date,
-              company_id,
-              po_number,
-              description,
-              shipping_state,
-              total,
-              estimated_delivery_date,
-              production_progress,
-              is_delayed,
-              delay_reason,
-              updated_at,
-              status,
-              companies (
-                name
-              )
-            `)
-            .in('id', orderIds)
-            .eq('status', 'in production')
-            .neq('order_type', 'pull_ship')
-            .is('parent_order_id', null)
-            .is('deleted_at', null)
-            .order('order_date', { ascending: false });
-
-          if (error) throw error;
-          ordersData = data || [];
+          ordersData = await fetchRestRowsViaAuth<any>('orders', {
+            select: productionSelect,
+            id: formatPostgrestInFilter(orderIds as string[]),
+            status: 'eq.in production',
+            order_type: 'neq.pull_ship',
+            parent_order_id: 'is.null',
+            deleted_at: 'is.null',
+            order: 'order_date.desc',
+          }, { timeoutMs: 10000 });
 
           // Fetch completed orders
-          const { data: completedData, error: completedError } = await supabase
-            .from('orders')
-            .select(`
-            id,
-            order_number,
-            customer_name,
-            order_date,
-            company_id,
-            po_number,
-            description,
-            shipping_state,
-            total,
-            estimated_delivery_date,
-            production_progress,
-            is_delayed,
-            delay_reason,
-            updated_at,
-            status,
-            companies (
-              name
-            )
-          `)
-          .in('id', orderIds)
-          .in('status', ['shipped', 'delivered', 'completed'])
-            .neq('order_type', 'pull_ship')
-            .is('parent_order_id', null)
-            .is('deleted_at', null)
-            .order('order_date', { ascending: false });
-
-          if (completedError) throw completedError;
-          completedOrdersData = completedData || [];
+          completedOrdersData = await fetchRestRowsViaAuth<any>('orders', {
+            select: productionSelect,
+            id: formatPostgrestInFilter(orderIds as string[]),
+            status: 'in.("shipped","delivered","completed")',
+            order_type: 'neq.pull_ship',
+            parent_order_id: 'is.null',
+            deleted_at: 'is.null',
+            order: 'order_date.desc',
+          }, { timeoutMs: 10000 });
         }
       } else {
         // Admin/Customer: get all production orders (exclude pull_ship and child orders)
-        let query = supabase
-          .from('orders')
-          .select(`
-            id,
-            order_number,
-            customer_name,
-            order_date,
-            company_id,
-            po_number,
-            description,
-            shipping_state,
-            total,
-            estimated_delivery_date,
-            production_progress,
-            is_delayed,
-            delay_reason,
-            order_finalized_at,
-            updated_at,
-            status,
-            companies (
-              name
-            )
-          `)
-          .eq('status', 'in production')
-          .neq('order_type', 'pull_ship')
-          .is('parent_order_id', null)
-          .is('deleted_at', null);
+        const baseParams: Record<string, string> = {
+          select: productionSelect,
+          order_type: 'neq.pull_ship',
+          parent_order_id: 'is.null',
+          deleted_at: 'is.null',
+          order: 'order_date.desc',
+        };
 
         // Apply company filter
         if (isVibeAdmin) {
           if (selectedCompanyId && selectedCompanyId !== 'all') {
-            query = query.eq('company_id', selectedCompanyId);
+            baseParams.company_id = `eq.${selectedCompanyId}`;
           }
         } else if (activeCompanyId) {
-          query = query.eq('company_id', activeCompanyId);
+          baseParams.company_id = `eq.${activeCompanyId}`;
         }
 
-        const { data, error } = await query.order('order_date', { ascending: false });
+        const [activeRows, completedRows] = await Promise.all([
+          fetchRestRowsViaAuth<any>('orders', {
+            ...baseParams,
+            status: 'eq.in production',
+          }, { timeoutMs: 10000 }),
+          fetchRestRowsViaAuth<any>('orders', {
+            ...baseParams,
+            status: 'in.("shipped","delivered","completed")',
+          }, { timeoutMs: 10000 }),
+        ]);
 
-        if (error) throw error;
-        ordersData = data || [];
-
-        // Fetch completed orders for admin/customer
-        let completedQuery = supabase
-          .from('orders')
-          .select(`
-            id,
-            order_number,
-            customer_name,
-            order_date,
-            company_id,
-            po_number,
-            description,
-            shipping_state,
-            total,
-            estimated_delivery_date,
-            production_progress,
-            is_delayed,
-            delay_reason,
-            order_finalized_at,
-            updated_at,
-            status,
-            companies (
-              name
-            )
-          `)
-          .in('status', ['shipped', 'delivered', 'completed'])
-          .neq('order_type', 'pull_ship')
-          .is('parent_order_id', null)
-          .is('deleted_at', null);
-
-        // Apply company filter
-        if (isVibeAdmin) {
-          if (selectedCompanyId && selectedCompanyId !== 'all') {
-            completedQuery = completedQuery.eq('company_id', selectedCompanyId);
-          }
-        } else if (activeCompanyId) {
-          completedQuery = completedQuery.eq('company_id', activeCompanyId);
-        }
-
-        const { data: completedData, error: completedError } = await completedQuery.order('order_date', { ascending: false });
-
-        if (completedError) throw completedError;
-        completedOrdersData = completedData || [];
+        ordersData = activeRows || [];
+        completedOrdersData = completedRows || [];
       }
       
       // Use production_progress from the database directly

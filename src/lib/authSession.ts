@@ -16,6 +16,32 @@ const AUTH_REST_TIMEOUT_MS = 7000;
 const TOKEN_REFRESH_BUFFER_SECONDS = 60;
 let refreshInFlight: Promise<Session | null> | null = null;
 
+export const withTimeout = async <T,>(
+  promise: PromiseLike<T>,
+  timeoutMs = AUTH_REST_TIMEOUT_MS,
+  fallback?: T
+): Promise<T> => {
+  let timeoutId: number | undefined;
+
+  const timeoutPromise = new Promise<T>((resolve, reject) => {
+    timeoutId = window.setTimeout(() => {
+      if (arguments.length >= 3) {
+        resolve(fallback as T);
+      } else {
+        reject(new Error("Request timed out"));
+      }
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([Promise.resolve(promise), timeoutPromise]);
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
+};
+
+export const getStoredUserId = () => readStoredAuthSession()?.user?.id ?? null;
+
 const getExpectedAuthStorageKey = () => {
   try {
     const projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];

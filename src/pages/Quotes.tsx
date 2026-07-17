@@ -28,6 +28,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { fetchRestRowsViaAuth } from "@/lib/authSession";
 
 interface Quote {
   id: string;
@@ -74,28 +75,29 @@ const Quotes = () => {
   }, [isVibeAdmin, activeCompanyId]);
 
   const fetchCompanies = async () => {
-    const { data } = await supabase
-      .from('companies')
-      .select('id, name')
-      .order('name');
-    setCompanies(data || []);
+    try {
+      const data = await fetchRestRowsViaAuth<Company>('companies', {
+        select: 'id,name',
+        order: 'name.asc',
+      }, { timeoutMs: 8000 });
+      setCompanies(data || []);
+    } catch (error) {
+      console.error('Error loading companies:', error);
+    }
   };
 
   const fetchQuotes = async () => {
     try {
-      let query = supabase
-        .from('quotes')
-        .select('*, company:companies(name)')
-        .order('created_at', { ascending: false });
+      const params: Record<string, string> = {
+        select: '*,company:companies(name)',
+        order: 'created_at.desc',
+      };
 
-      // Non-admin users: filter by active company
       if (!isVibeAdmin && activeCompanyId) {
-        query = query.eq('company_id', activeCompanyId);
+        params.company_id = `eq.${activeCompanyId}`;
       }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
+      const data = await fetchRestRowsViaAuth<Quote>('quotes', params, { timeoutMs: 10000 });
       
       // For non-admin users (customers), filter out internal workflow quotes
       // Customers should only see:
