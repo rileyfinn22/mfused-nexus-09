@@ -186,13 +186,18 @@ const OrderDetail = () => {
       setIsCustomer(customer);
 
       if (vendor) {
-        const { data: vendorData } = await supabase
-          .from('vendors')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        setVendorId(vendorData?.id || null);
+        try {
+          const vendorRows = await fetchRestRowsViaAuth<any>('vendors', {
+            select: 'id',
+            user_id: `eq.${user.id}`,
+            limit: 1,
+          }, { session, timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
+
+          setVendorId(vendorRows?.[0]?.id || null);
+        } catch (error) {
+          console.error('Error fetching vendor role record:', error);
+          setVendorId(null);
+        }
       } else {
         setVendorId(null);
       }
@@ -263,75 +268,93 @@ const OrderDetail = () => {
   };
 
   const fetchProductionStages = async () => {
-    let stagesQuery = supabase
-      .from('production_stages')
-      .select('*, vendors(name)')
-      .eq('order_id', orderId)
-      .order('sequence_order');
+    if (!orderId) return;
 
-    // Vendors only see their assigned stages
-    if (isVendor && vendorId) {
-      stagesQuery = stagesQuery.eq('vendor_id', vendorId);
-    }
+    try {
+      const params: Record<string, string | number | boolean> = {
+        select: '*,vendors(name)',
+        order_id: `eq.${orderId}`,
+        order: 'sequence_order.asc',
+      };
 
-    const { data, error } = await stagesQuery;
-    
-    if (!error && data) {
-      setProductionStages(data);
+      // Vendors only see their assigned stages once the vendor id is known.
+      if (isVendor && vendorId) {
+        params.vendor_id = `eq.${vendorId}`;
+      }
+
+      const data = await fetchRestRowsViaAuth<any>('production_stages', params, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
+      setProductionStages(data || []);
 
       // Batch-fetch ALL stage updates in ONE query (was N+1 per stage)
-      const stageIds = data.map((s: any) => s.id);
+      const stageIds = (data || []).map((s: any) => s.id).filter(Boolean);
       const updates: { [key: string]: any[] } = {};
+      for (const id of stageIds) updates[id] = [];
+
       if (stageIds.length > 0) {
-        const { data: updatesData } = await supabase
-          .from('production_stage_updates')
-          .select('*')
-          .in('stage_id', stageIds)
-          .order('created_at', { ascending: false });
-        for (const id of stageIds) updates[id] = [];
+        const updatesData = await fetchRestRowsViaAuth<any>('production_stage_updates', {
+          select: '*',
+          stage_id: formatPostgrestInFilter(stageIds),
+          order: 'created_at.desc',
+        }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
+
         (updatesData || []).forEach((u: any) => {
           (updates[u.stage_id] ||= []).push(u);
         });
       }
+
       setStageUpdates(updates);
+    } catch (error) {
+      console.error('Error fetching production stages:', error);
+      setProductionStages([]);
+      setStageUpdates({});
     }
   };
 
 
   const fetchVendors = async () => {
-    const { data, error } = await supabase
-      .from('vendors')
-      .select('*')
-      .eq('is_active', true)
-      .order('name');
-    
-    if (!error && data) {
-      setVendors(data);
+    try {
+      const data = await fetchRestRowsViaAuth<any>('vendors', {
+        select: '*',
+        is_active: 'eq.true',
+        order: 'name.asc',
+      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
+
+      setVendors(data || []);
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
     }
   };
 
   const fetchInvoices = async () => {
-    const { data } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('order_id', orderId)
-      .is('deleted_at', null)
-      .order('shipment_number');
-    
-    if (data) {
-      setInvoices(data);
+    if (!orderId) return;
+
+    try {
+      const data = await fetchRestRowsViaAuth<any>('invoices', {
+        select: '*',
+        order_id: `eq.${orderId}`,
+        deleted_at: 'is.null',
+        order: 'shipment_number.asc',
+      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
+
+      setInvoices(data || []);
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
     }
   };
 
   const fetchVibeAttachments = async () => {
-    const { data } = await supabase
-      .from('vibe_note_attachments')
-      .select('*')
-      .eq('order_id', orderId)
-      .order('created_at', { ascending: false });
-    
-    if (data) {
-      setVibeAttachments(data);
+    if (!orderId) return;
+
+    try {
+      const data = await fetchRestRowsViaAuth<any>('vibe_note_attachments', {
+        select: '*',
+        order_id: `eq.${orderId}`,
+        order: 'created_at.desc',
+      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
+
+      setVibeAttachments(data || []);
+    } catch (error) {
+      console.error('Error fetching vibe attachments:', error);
     }
   };
 
@@ -417,14 +440,18 @@ const OrderDetail = () => {
 
   // Order Attachments Functions
   const fetchOrderAttachments = async () => {
-    const { data } = await supabase
-      .from('order_attachments')
-      .select('*')
-      .eq('order_id', orderId)
-      .order('created_at', { ascending: false });
-    
-    if (data) {
-      setOrderAttachments(data);
+    if (!orderId) return;
+
+    try {
+      const data = await fetchRestRowsViaAuth<any>('order_attachments', {
+        select: '*',
+        order_id: `eq.${orderId}`,
+        order: 'created_at.desc',
+      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
+
+      setOrderAttachments(data || []);
+    } catch (error) {
+      console.error('Error fetching order attachments:', error);
     }
   };
 
