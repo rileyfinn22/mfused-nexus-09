@@ -52,6 +52,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { signStorageUrlsInRows } from "@/lib/storageUrl";
 
 interface Product {
   id: string;
@@ -375,8 +376,9 @@ const Products = () => {
 
       if (error) throw error;
 
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
       const thumbnailMap: Record<string, string> = {};
-      data?.forEach((artwork) => {
+      signedData?.forEach((artwork) => {
         if (thumbnailMap[artwork.sku]) return;
 
         if (isUsableArtworkPreviewUrl(artwork.filename, artwork.preview_url)) {
