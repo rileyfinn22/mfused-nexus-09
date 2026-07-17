@@ -3990,6 +3990,10 @@ export type Database = {
         Args: { p_invoice_id: string; p_user_email: string }
         Returns: Json
       }
+      can_access_artwork_storage_file: {
+        Args: { _object_name: string; _user_id: string }
+        Returns: boolean
+      }
       can_access_packing_list_file: {
         Args: { _object_name: string; _user_id: string }
         Returns: boolean
