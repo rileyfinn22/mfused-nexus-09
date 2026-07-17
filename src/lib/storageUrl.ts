@@ -262,7 +262,7 @@ export const signStorageUrlsInRows = async <T extends Record<string, any>>(
 
   return rowList.map((row) => {
     let changed = false;
-    const next = { ...row };
+    const next: Record<string, any> = { ...row };
 
     urlKeys.forEach((key) => {
       const value = next[key];
@@ -272,7 +272,7 @@ export const signStorageUrlsInRows = async <T extends Record<string, any>>(
       }
     });
 
-    return changed ? next : row;
+    return changed ? (next as T) : row;
   });
 };
 
