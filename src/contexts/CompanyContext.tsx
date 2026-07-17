@@ -186,12 +186,12 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error("Error loading companies:", err);
       if (!isCurrentRequest()) return;
-      setCompanies([]);
-      setActiveCompanyState(null);
-      setHasFinanceRole(false);
-      setHasVibeAdminRole(false);
-      setHasForwarderRole(false);
-      setHasVendorRole(false);
+      // Preserve prior state on timeout/network failure — retry once shortly.
+      window.setTimeout(() => {
+        if (loadRequestIdRef.current === requestId) {
+          loadCompanies();
+        }
+      }, 1500);
     } finally {
       if (isCurrentRequest()) {
         setLoading(false);
