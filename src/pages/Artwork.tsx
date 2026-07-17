@@ -51,7 +51,7 @@ import { cn } from "@/lib/utils";
 import PdfThumbnail from "@/components/PdfThumbnail";
 import { FileArchive, FileCode, AlertCircle } from "lucide-react";
 import JSZip from "jszip";
-import { signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
+import { normalizeStorageObjectPath, signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
 
 interface ProductTemplate {
   id: string;
@@ -848,13 +848,13 @@ const Artwork = () => {
     if (!selectedFile) return;
 
     try {
-      const artworkPath = selectedFile.artwork_url.split('/artwork/')[1];
+      const artworkPath = normalizeStorageObjectPath(selectedFile.artwork_url, 'artwork');
       if (artworkPath) {
         await supabase.storage.from('artwork').remove([artworkPath]);
       }
 
       if (selectedFile.preview_url) {
-        const previewPath = selectedFile.preview_url.split('/artwork/')[1];
+        const previewPath = normalizeStorageObjectPath(selectedFile.preview_url, 'artwork');
         if (previewPath) {
           await supabase.storage.from('artwork').remove([previewPath]);
         }
