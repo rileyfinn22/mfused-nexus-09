@@ -16,6 +16,33 @@ const AUTH_REST_TIMEOUT_MS = 7000;
 const TOKEN_REFRESH_BUFFER_SECONDS = 60;
 let refreshInFlight: Promise<Session | null> | null = null;
 
+export const withTimeout = async <T,>(
+  promise: PromiseLike<T>,
+  timeoutMs = AUTH_REST_TIMEOUT_MS,
+  fallback?: T
+): Promise<T> => {
+  let timeoutId: number | undefined;
+  const hasFallback = fallback !== undefined;
+
+  const timeoutPromise = new Promise<T>((resolve, reject) => {
+    timeoutId = window.setTimeout(() => {
+      if (hasFallback) {
+        resolve(fallback as T);
+      } else {
+        reject(new Error("Request timed out"));
+      }
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([Promise.resolve(promise), timeoutPromise]);
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
+};
+
+export const getStoredUserId = () => readStoredAuthSession()?.user?.id ?? null;
+
 const getExpectedAuthStorageKey = () => {
   try {
     const projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];
@@ -196,6 +223,77 @@ export const fetchRestRowsViaAuth = async <T = any>(
   const session = await getFreshAuthSession(options?.session);
   if (!isUsableSession(session)) return [];
 
+  const requestedLimit = Number(params.limit);
+  const shouldPaginate = Number.isFinite(requestedLimit) && requestedLimit > 1000;
+  const pageSize = shouldPaginate ? 1000 : undefined;
+
+  const buildSearchParams = (includeLimit = true) => {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && (includeLimit || key !== "limit")) {
+        searchParams.set(key, String(value));
+      }
+    });
+    return searchParams;
+  };
+
+  const fetchPage = async (range?: string) => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), options?.timeoutMs ?? AUTH_REST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${buildSearchParams(!shouldPaginate).toString()}`, {
+        headers: {
+          apikey: SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${session.access_token}`,
+          Accept: "application/json",
+          ...(range ? { Range: range } : {}),
+        },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`${table} load failed (${response.status})`);
+      }
+
+      return (await response.json()) as T[];
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  };
+
+  if (!shouldPaginate || !pageSize) {
+    return fetchPage();
+  }
+
+  const rows: T[] = [];
+  for (let offset = 0; offset < requestedLimit; offset += pageSize) {
+    const to = Math.min(offset + pageSize - 1, requestedLimit - 1);
+    const page = await fetchPage(`${offset}-${to}`);
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  return rows;
+};
+
+export const fetchRestRowViaAuth = async <T = any>(
+  table: string,
+  params: RestQueryParams,
+  options?: { session?: Session | null; timeoutMs?: number }
+): Promise<T | null> => {
+  const rows = await fetchRestRowsViaAuth<T>(table, { ...params, limit: params.limit ?? 1 }, options);
+  return rows[0] ?? null;
+};
+
+export const fetchRestCountViaAuth = async (
+  table: string,
+  params: RestQueryParams,
+  options?: { session?: Session | null; timeoutMs?: number }
+): Promise<number> => {
+  const session = await getFreshAuthSession(options?.session);
+  if (!isUsableSession(session)) return 0;
+
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), options?.timeoutMs ?? AUTH_REST_TIMEOUT_MS);
 
@@ -208,19 +306,20 @@ export const fetchRestRowsViaAuth = async <T = any>(
     });
 
     const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${searchParams.toString()}`, {
+      method: "HEAD",
       headers: {
         apikey: SUPABASE_PUBLISHABLE_KEY,
         Authorization: `Bearer ${session.access_token}`,
-        Accept: "application/json",
+        Prefer: "count=exact",
       },
       signal: controller.signal,
     });
 
-    if (!response.ok) {
-      throw new Error(`${table} load failed (${response.status})`);
-    }
+    if (!response.ok) return 0;
 
-    return (await response.json()) as T[];
+    const contentRange = response.headers.get("content-range");
+    const total = Number(contentRange?.split("/")[1]);
+    return Number.isFinite(total) ? total : 0;
   } finally {
     window.clearTimeout(timeoutId);
   }

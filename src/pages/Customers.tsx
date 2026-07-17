@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { z } from "zod";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { fetchRestRowsViaAuth } from "@/lib/authSession";
 
 const customerSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name too long"),
@@ -90,29 +91,26 @@ const Customers = () => {
 
   const fetchCustomers = async () => {
     setLoading(true);
-    let query = supabase
-      .from('companies')
-      .select('*')
-      .neq('name', 'VibePKG')
-      .order('name');
-
-    // Non-admin users: only show their active company
-    if (!isVibeAdmin && activeCompanyId) {
-      query = query.eq('id', activeCompanyId);
-    }
-
-    const { data, error } = await query;
-    
-    if (error) {
+    try {
+      const params: Record<string, string> = {
+        select: '*',
+        name: 'neq.VibePKG',
+        order: 'name.asc',
+      };
+      if (!isVibeAdmin && activeCompanyId) {
+        params.id = `eq.${activeCompanyId}`;
+      }
+      const data = await fetchRestRowsViaAuth<any>('companies', params, { timeoutMs: 9000 });
+      setCustomers(data || []);
+    } catch (error: any) {
       toast({
         title: "Error loading companies",
         description: error.message,
         variant: "destructive",
       });
-    } else {
-      setCustomers(data || []);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleOpenDialog = (customer?: any) => {

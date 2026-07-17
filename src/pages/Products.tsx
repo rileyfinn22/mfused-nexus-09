@@ -53,6 +53,7 @@ import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { signStorageUrlsInRows } from "@/lib/storageUrl";
+import { fetchRestRowsViaAuth, formatPostgrestInFilter, withTimeout } from "@/lib/authSession";
 
 interface Product {
   id: string;
@@ -173,13 +174,14 @@ const Products = () => {
   }, [isVibeAdmin, companyFilter, activeCompanyId, activeCompanyLoading]);
 
   const fetchCompanies = async () => {
-    const { data, error } = await supabase
-      .from('companies')
-      .select('*')
-      .order('name');
-    
-    if (!error && data) {
+    try {
+      const data = await fetchRestRowsViaAuth<any>('companies', {
+        select: '*',
+        order: 'name.asc',
+      }, { timeoutMs: 8000 });
       setCompanies(data);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
     }
   };
 
@@ -192,46 +194,48 @@ const Products = () => {
     }
 
     try {
-      let query = supabase
-        .from('products')
-        .select('*, product_states(*)')
-        .order('created_at', { ascending: false })
-        .limit(50000);
+      const params: Record<string, string | number> = {
+        select: '*,product_states(*)',
+        order: 'created_at.desc',
+        limit: 50000,
+      };
 
       // For vibe admins: use URL company filter if set
       // For regular users: always filter by their active company
       if (isVibeAdmin) {
         if (companyFilter !== 'all') {
-          query = query.eq('company_id', companyFilter);
+          params.company_id = `eq.${companyFilter}`;
         }
       } else {
-        query = query.eq('company_id', activeCompanyId);
+        params.company_id = `eq.${activeCompanyId}`;
       }
 
-      const { data: productsData, error: productsError } = await query;
-
-      if (productsError) throw productsError;
+      const productsData = await fetchRestRowsViaAuth<any>('products', params, { timeoutMs: 10000 });
 
       // Batch fetch product_states + inventory in 2 queries (was N+1 per product)
       const productIds = (productsData || []).map((p: any) => p.id);
-      const [{ data: statesData }, { data: inventoryRows }] = productIds.length > 0
+      const inFilter = productIds.length > 0 && productIds.length < 1500 ? formatPostgrestInFilter(productIds) : null;
+      const [statesData, inventoryRows, costRows] = inFilter
         ? await Promise.all([
-            supabase.from('product_states').select('*').in('product_id', productIds),
-            supabase.from('inventory').select('sku, product_id').in('product_id', productIds),
+            withTimeout(fetchRestRowsViaAuth<any>('product_states', {
+              select: '*',
+              product_id: inFilter,
+            }, { timeoutMs: 8000 }), 9000, []),
+            withTimeout(fetchRestRowsViaAuth<any>('inventory', {
+              select: 'sku,product_id',
+              product_id: inFilter,
+            }, { timeoutMs: 8000 }), 9000, []),
+            withTimeout(fetchRestRowsViaAuth<any>('product_costs', {
+              select: 'product_id,cost',
+              product_id: inFilter,
+            }, { timeoutMs: 8000 }), 9000, []),
           ])
-        : [{ data: [] as any[] }, { data: [] as any[] }];
+        : [[], [], []];
 
-      // Product cost moved to companion table product_costs
       const productCostMap: Record<string, number | null> = {};
-      if (productIds.length > 0) {
-        const { data: costRows } = await (supabase as any)
-          .from('product_costs')
-          .select('product_id, cost')
-          .in('product_id', productIds);
-        (costRows || []).forEach((row: any) => {
-          productCostMap[row.product_id] = row.cost;
-        });
-      }
+      (costRows || []).forEach((row: any) => {
+        productCostMap[row.product_id] = row.cost;
+      });
 
       const statesByProduct = new Map<string, any[]>();
       (statesData || []).forEach((s: any) => {
@@ -283,49 +287,49 @@ const Products = () => {
     if (!isVibeAdmin && !activeCompanyId) return;
 
     try {
-      let templatesQuery = supabase
-        .from('product_templates')
-        .select('*');
+      const templateParams: Record<string, string> = {
+        select: '*',
+        order: 'name.asc',
+      };
 
       if (isVibeAdmin) {
         if (companyFilter !== 'all') {
-          templatesQuery = templatesQuery.or(`company_id.eq.${companyFilter},company_id.is.null`);
+          templateParams.or = `(company_id.eq.${companyFilter},company_id.is.null)`;
         }
       } else if (activeCompanyId) {
-        templatesQuery = templatesQuery.or(`company_id.eq.${activeCompanyId},company_id.is.null`);
+        templateParams.or = `(company_id.eq.${activeCompanyId},company_id.is.null)`;
       }
 
-      const { data: templatesData, error: templatesError } = await templatesQuery.order('name');
-
-      if (templatesError) throw templatesError;
+      const templatesData = await fetchRestRowsViaAuth<any>('product_templates', templateParams, { timeoutMs: 9000 });
 
       // Batch product counts per template in ONE query (was N+1 per template)
       const templateIds = (templatesData || []).map((t: any) => t.id);
 
       // Template cost moved to companion table product_template_costs
       const templateCostMap: Record<string, number | null> = {};
-      if (templateIds.length > 0) {
-        const { data: tCostRows } = await (supabase as any)
-          .from('product_template_costs')
-          .select('template_id, cost')
-          .in('template_id', templateIds);
+      const templateInFilter = templateIds.length > 0 && templateIds.length < 1500 ? formatPostgrestInFilter(templateIds) : null;
+      if (templateInFilter) {
+        const tCostRows = await withTimeout(fetchRestRowsViaAuth<any>('product_template_costs', {
+          select: 'template_id,cost',
+          template_id: templateInFilter,
+        }, { timeoutMs: 8000 }), 9000, []);
         (tCostRows || []).forEach((row: any) => {
           templateCostMap[row.template_id] = row.cost;
         });
       }
 
       let countsByTemplate = new Map<string, number>();
-      if (templateIds.length > 0) {
-        let countsQuery = supabase
-          .from('products')
-          .select('template_id')
-          .in('template_id', templateIds);
+      if (templateInFilter) {
+        const countParams: Record<string, string> = {
+          select: 'template_id',
+          template_id: templateInFilter,
+        };
         if (isVibeAdmin) {
-          if (companyFilter !== 'all') countsQuery = countsQuery.eq('company_id', companyFilter);
+          if (companyFilter !== 'all') countParams.company_id = `eq.${companyFilter}`;
         } else if (activeCompanyId) {
-          countsQuery = countsQuery.eq('company_id', activeCompanyId);
+          countParams.company_id = `eq.${activeCompanyId}`;
         }
-        const { data: countRows } = await countsQuery;
+        const countRows = await withTimeout(fetchRestRowsViaAuth<any>('products', countParams, { timeoutMs: 8000 }), 9000, []);
         (countRows || []).forEach((row: any) => {
           countsByTemplate.set(row.template_id, (countsByTemplate.get(row.template_id) || 0) + 1);
         });
@@ -346,12 +350,10 @@ const Products = () => {
 
   const fetchArtworkStatus = async () => {
     try {
-      const { data, error } = await supabase
-        .from('artwork_files')
-        .select('sku, is_approved')
-        .limit(50000);
-
-      if (error) throw error;
+      const data = await fetchRestRowsViaAuth<any>('artwork_files', {
+        select: 'sku,is_approved',
+        limit: 50000,
+      }, { timeoutMs: 9000 });
 
       const statusMap: Record<string, boolean> = {};
       data?.forEach(artwork => {
@@ -367,14 +369,11 @@ const Products = () => {
 
   const fetchArtworkThumbnails = async () => {
     try {
-      const { data, error } = await supabase
-        .from('artwork_files')
-        .select('sku, filename, preview_url, artwork_url, is_approved')
-        .order('is_approved', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(50000);
-
-      if (error) throw error;
+      const data = await fetchRestRowsViaAuth<any>('artwork_files', {
+        select: 'sku,filename,preview_url,artwork_url,is_approved',
+        order: 'is_approved.desc,created_at.desc',
+        limit: 50000,
+      }, { timeoutMs: 9000 });
 
       const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
       const thumbnailMap: Record<string, string> = {};

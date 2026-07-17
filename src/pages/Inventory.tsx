@@ -40,6 +40,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { signStorageUrlsInRows } from "@/lib/storageUrl";
+import { fetchRestRowsViaAuth, getStoredUserId } from "@/lib/authSession";
 
 interface InventoryItem {
   id: string;
@@ -124,16 +125,21 @@ const Inventory = () => {
   }, [isVibeAdmin, companyFilter, activeCompanyId]);
 
   const checkAdminStatus = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
-      setIsAdmin(data?.role === 'admin' || data?.role === 'vibe_admin');
-    }
+    const userId = getStoredUserId();
+    if (!userId) return;
+    const roles = await fetchRestRowsViaAuth<any>('user_roles', {
+      select: 'role',
+      user_id: `eq.${userId}`,
+    }, { timeoutMs: 8000 });
+    setIsAdmin((roles || []).some((row: any) => row.role === 'admin' || row.role === 'vibe_admin'));
   };
 
   const fetchCompanies = async () => {
-    const { data } = await supabase.from('companies').select('*').order('name');
-    if (data) setCompanies(data);
+    const data = await fetchRestRowsViaAuth<any>('companies', {
+      select: '*',
+      order: 'name.asc',
+    }, { timeoutMs: 8000 });
+    setCompanies(data || []);
   };
 
   const fetchBlanketOrders = async (companyId: string) => {
@@ -142,22 +148,14 @@ const Inventory = () => {
       return;
     }
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          id, 
-          order_number, 
-          description,
-          customer_name,
-          invoices!inner(invoice_type)
-        `)
-        .eq('company_id', companyId)
-        .eq('order_type', 'standard')
-        .eq('invoices.invoice_type', 'full')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
+      const data = await fetchRestRowsViaAuth<any>('orders', {
+        select: 'id,order_number,description,customer_name,invoices!inner(invoice_type)',
+        company_id: `eq.${companyId}`,
+        order_type: 'eq.standard',
+        'invoices.invoice_type': 'eq.full',
+        order: 'created_at.desc',
+        limit: 50,
+      }, { timeoutMs: 8000 });
       setBlanketOrders(data || []);
     } catch (error) {
       console.error('Error fetching blanket orders:', error);
@@ -166,24 +164,22 @@ const Inventory = () => {
 
   const fetchInventory = async () => {
     try {
-      let query = supabase
-        .from('inventory')
-        .select('*, products(image_url, name, item_id), orders(order_number, description)')
-        .order('created_at', { ascending: false });
+      const params: Record<string, string> = {
+        select: '*,products(image_url,name,item_id),orders(order_number,description)',
+        order: 'created_at.desc',
+      };
 
       // For vibe admins: use URL company filter if set
       // For regular users: always filter by their active company
       if (isVibeAdmin) {
         if (companyFilter !== 'all') {
-          query = query.eq('company_id', companyFilter);
+          params.company_id = `eq.${companyFilter}`;
         }
       } else if (activeCompanyId) {
-        query = query.eq('company_id', activeCompanyId);
+        params.company_id = `eq.${activeCompanyId}`;
       }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
+      const data = await fetchRestRowsViaAuth<any>('inventory', params, { timeoutMs: 10000 });
       setInventory(data || []);
     } catch (error) {
       console.error('Error fetching inventory:', error);
@@ -194,12 +190,10 @@ const Inventory = () => {
 
   const fetchArtworkStatus = async () => {
     try {
-      const { data, error } = await supabase
-        .from('artwork_files')
-        .select('sku, is_approved')
-        .limit(50000);
-
-      if (error) throw error;
+      const data = await fetchRestRowsViaAuth<any>('artwork_files', {
+        select: 'sku,is_approved',
+        limit: 50000,
+      }, { timeoutMs: 9000 });
 
       // Create a map of SKU to approval status
       const statusMap: Record<string, boolean> = {};
@@ -216,13 +210,11 @@ const Inventory = () => {
 
   const fetchArtworkThumbnails = async () => {
     try {
-      const { data, error } = await supabase
-        .from('artwork_files')
-        .select('sku, preview_url, artwork_url')
-        .eq('is_approved', true)
-        .limit(50000);
-
-      if (error) throw error;
+      const data = await fetchRestRowsViaAuth<any>('artwork_files', {
+        select: 'sku,preview_url,artwork_url',
+        is_approved: 'eq.true',
+        limit: 50000,
+      }, { timeoutMs: 9000 });
 
       const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
 
@@ -325,33 +317,33 @@ const Inventory = () => {
       
       if (!isVibeAdmin) {
         // For non-vibe admins, get their company
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const userId = getStoredUserId();
+        if (!userId) return;
 
-        const { data: userRole } = await supabase
-          .from('user_roles')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .single();
+        const [userRole] = await fetchRestRowsViaAuth<any>('user_roles', {
+          select: 'company_id',
+          user_id: `eq.${userId}`,
+          limit: 1,
+        }, { timeoutMs: 8000 });
 
         if (userRole) {
           targetCompanyId = userRole.company_id;
         }
       }
 
-      let query = supabase
-        .from('products')
-        .select('id, name, item_id, company_id, state')
-        .order('name')
-        .limit(50000);
+      const params: Record<string, string | number> = {
+        select: 'id,name,item_id,company_id,state',
+        order: 'name.asc',
+        limit: 50000,
+      };
 
       // Filter by company if we have one
       if (targetCompanyId) {
-        query = query.eq('company_id', targetCompanyId);
+        params.company_id = `eq.${targetCompanyId}`;
       }
 
-      const { data } = await query;
-      if (data) setProducts(data);
+      const data = await fetchRestRowsViaAuth<any>('products', params, { timeoutMs: 9000 });
+      setProducts(data || []);
     } catch (error) {
       console.error('Error fetching products:', error);
     }

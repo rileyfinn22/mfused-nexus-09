@@ -10,9 +10,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { fetchRestCountViaAuth, fetchRestRowsViaAuth, formatPostgrestInFilter, withTimeout } from "@/lib/authSession";
 interface LowStockItem {
   sku: string;
   state: string;
@@ -66,17 +66,38 @@ const Dashboard = () => {
     try {
       // Build base query conditions - filter by company unless vibe admin
       const companyFilter = !isAdmin && companyId ? companyId : null;
+      const companyParams = companyFilter ? { company_id: `eq.${companyFilter}` } : {};
 
-      // Fetch low stock items (where available < redline)
-      let inventoryQuery = supabase
-        .from('inventory')
-        .select('sku, state, available, redline, company_id');
-
-      if (companyFilter) {
-        inventoryQuery = inventoryQuery.eq('company_id', companyFilter);
-      }
-
-      const { data: inventoryData } = await inventoryQuery;
+      const [inventoryData, ordersCount, inventoryValueData, productsData, ordersData] = await Promise.all([
+        withTimeout(fetchRestRowsViaAuth<any>('inventory', {
+          select: 'sku,state,available,redline,company_id',
+          ...companyParams,
+          limit: 50000,
+        }, { timeoutMs: 9000 }), 10000, []),
+        withTimeout(fetchRestCountViaAuth('orders', {
+          select: 'id',
+          status: 'in.("pending","in_production","approved")',
+          deleted_at: 'is.null',
+          ...companyParams,
+        }, { timeoutMs: 9000 }), 10000, 0),
+        withTimeout(fetchRestRowsViaAuth<any>('inventory', {
+          select: 'available,product_id,company_id',
+          ...companyParams,
+          limit: 50000,
+        }, { timeoutMs: 9000 }), 10000, []),
+        withTimeout(fetchRestRowsViaAuth<any>('products', {
+          select: 'id,company_id',
+          ...companyParams,
+          limit: 50000,
+        }, { timeoutMs: 9000 }), 10000, []),
+        withTimeout(fetchRestRowsViaAuth<any>('orders', {
+          select: 'id,order_number,status,customer_name',
+          deleted_at: 'is.null',
+          ...companyParams,
+          order: 'created_at.desc',
+          limit: 5,
+        }, { timeoutMs: 9000 }), 10000, []),
+      ]);
 
       const lowStock = (inventoryData || [])
         .filter(item => item.available < item.redline)
@@ -91,46 +112,16 @@ const Dashboard = () => {
 
       setLowStockItems(lowStock);
       setLowStockCount((inventoryData || []).filter(item => item.available < item.redline).length);
-
-      // Fetch open orders count
-      let ordersCountQuery = supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ['pending', 'in_production', 'approved'])
-        .is('deleted_at', null);
-
-      if (companyFilter) {
-        ordersCountQuery = ordersCountQuery.eq('company_id', companyFilter);
-      }
-
-      const { count: ordersCount } = await ordersCountQuery;
       setOpenOrdersCount(ordersCount || 0);
-
-      // Calculate inventory value
-      let inventoryValueQuery = supabase
-        .from('inventory')
-        .select('available, product_id, company_id');
-
-      if (companyFilter) {
-        inventoryValueQuery = inventoryValueQuery.eq('company_id', companyFilter);
-      }
-
-      const { data: inventoryValueData } = await inventoryValueQuery;
-
-      let productsQuery = supabase.from('products').select('id, company_id').limit(50000);
-      if (companyFilter) {
-        productsQuery = productsQuery.eq('company_id', companyFilter);
-      }
-      const { data: productsData } = await productsQuery;
 
       // Product cost moved to companion table product_costs
       const dashProductIds = (productsData || []).map(p => p.id);
       const dashCostMap: Record<string, number> = {};
-      if (dashProductIds.length > 0) {
-        const { data: costRows } = await (supabase as any)
-          .from('product_costs')
-          .select('product_id, cost')
-          .in('product_id', dashProductIds);
+      if (dashProductIds.length > 0 && dashProductIds.length < 1500) {
+        const costRows = await withTimeout(fetchRestRowsViaAuth<any>('product_costs', {
+          select: 'product_id,cost',
+          product_id: formatPostgrestInFilter(dashProductIds),
+        }, { timeoutMs: 7000 }), 8000, []);
         (costRows || []).forEach((row: any) => {
           dashCostMap[row.product_id] = row.cost || 0;
         });
@@ -143,20 +134,6 @@ const Dashboard = () => {
       }, 0);
 
       setInventoryValue(totalValue);
-
-      // Fetch recent orders
-      let ordersDataQuery = supabase
-        .from('orders')
-        .select('id, order_number, status, customer_name')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (companyFilter) {
-        ordersDataQuery = ordersDataQuery.eq('company_id', companyFilter);
-      }
-
-      const { data: ordersData } = await ordersDataQuery;
 
       setRecentOrders((ordersData || []).map(order => ({
         id: order.id,
