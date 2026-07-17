@@ -25,7 +25,7 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 const ACTIVE_COMPANY_KEY = "activeCompanyId";
-const COMPANY_LOAD_TIMEOUT_MS = 4000;
+const COMPANY_LOAD_TIMEOUT_MS = 10000;
 
 const withTimeout = async <T,>(promise: PromiseLike<T>, label: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
