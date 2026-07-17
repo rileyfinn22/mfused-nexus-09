@@ -80,7 +80,8 @@ const Invoices = () => {
   useEffect(() => {
     // For customer/company users, wait until the active company is resolved before fetching.
     // This prevents brief "wrong company" fetches that can lead to deny/redirect flicker.
-    if (activeCompanyLoading) return;
+    const hasStoredSession = Boolean(readStoredAuthSession()?.user?.id);
+    if (activeCompanyLoading && !hasStoredSession) return;
 
     if (isVibeAdmin) {
       fetchCompanies();
@@ -88,7 +89,7 @@ const Invoices = () => {
       return;
     }
 
-    if (!activeCompanyId && !readStoredAuthSession()?.user?.id) {
+    if (!activeCompanyId && !hasStoredSession) {
       navigate('/login');
       return;
     }
