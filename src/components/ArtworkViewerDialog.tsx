@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, FileImage, FileText, FileCode, CheckCircle, Clock, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
 import { signStorageUrl } from "@/lib/storageUrl";
 
@@ -48,15 +48,37 @@ const ArtworkViewerDialog = ({
   onDownload,
 }: ArtworkViewerDialogProps) => {
   const [pdfLoadError, setPdfLoadError] = useState(false);
+  const [signedArtworkUrl, setSignedArtworkUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const signUrl = async () => {
+      if (!file?.artwork_url) {
+        setSignedArtworkUrl(null);
+        return;
+      }
+
+      const signedUrl = await signStorageUrl('artwork', file.artwork_url);
+      if (!cancelled) setSignedArtworkUrl(signedUrl);
+    };
+
+    signUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [file?.artwork_url]);
 
   if (!file) return null;
 
   const fileType = getFileType(file.filename);
   const fileTypeLabel = getFileTypeLabel(file.filename);
   const previewUrl = isUsableArtworkPreviewUrl(file.filename, file.preview_url) ? file.preview_url : null;
+  const displayArtworkUrl = signedArtworkUrl || file.artwork_url;
 
   const googleDocsViewerUrl = fileType === "pdf"
-    ? `https://docs.google.com/viewer?url=${encodeURIComponent(file.artwork_url)}&embedded=true`
+    ? `https://docs.google.com/viewer?url=${encodeURIComponent(displayArtworkUrl)}&embedded=true`
     : null;
 
   const openArtworkInTab = async () => {
@@ -115,11 +137,11 @@ const ArtworkViewerDialog = ({
           ) : fileType === "image" ? (
             <div className="flex items-center justify-center bg-muted/30 rounded-lg p-4">
               <img
-                src={file.artwork_url}
+                src={displayArtworkUrl}
                 alt={file.filename}
                 className="max-w-full max-h-[60vh] object-contain rounded"
                 onError={(e) => {
-                  console.log("Artwork image failed to load:", file.artwork_url);
+                  console.log("Artwork image failed to load:", displayArtworkUrl);
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
               />
