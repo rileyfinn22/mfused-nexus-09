@@ -91,7 +91,7 @@ interface ProductTemplate {
 const Products = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
+  const { activeCompanyId, isVibeAdmin, loading: activeCompanyLoading } = useActiveCompany();
   const [expandedProducts, setExpandedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
@@ -151,6 +151,17 @@ const Products = () => {
   }, [templates, searchParams]);
 
   useEffect(() => {
+    if (activeCompanyLoading) return;
+
+    if (!isVibeAdmin && !activeCompanyId) {
+      setProducts([]);
+      setTemplates([]);
+      setArtworkStatus({});
+      setArtworkThumbnails({});
+      setLoading(false);
+      return;
+    }
+
     fetchProducts();
     fetchTemplates();
     fetchArtworkStatus();
@@ -158,7 +169,7 @@ const Products = () => {
     if (isVibeAdmin) {
       fetchCompanies();
     }
-  }, [isVibeAdmin, companyFilter, activeCompanyId]);
+  }, [isVibeAdmin, companyFilter, activeCompanyId, activeCompanyLoading]);
 
   const fetchCompanies = async () => {
     const { data, error } = await supabase
@@ -173,7 +184,11 @@ const Products = () => {
 
   const fetchProducts = async () => {
     // Don't fetch until we have an active company (prevents showing all companies' data)
-    if (!isVibeAdmin && !activeCompanyId) return;
+    if (!isVibeAdmin && !activeCompanyId) {
+      setProducts([]);
+      setLoading(false);
+      return;
+    }
 
     try {
       let query = supabase
