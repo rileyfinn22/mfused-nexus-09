@@ -15,6 +15,14 @@ const parseDateAsLocal = (dateStr: string | null): Date | undefined => {
 };
 
 const ORDER_LIST_LIMIT = 300;
+const LIST_QUERY_TIMEOUT_MS = 10000;
+const ARTWORK_SKU_BATCH_SIZE = 75;
+
+const createAbortSignal = (timeoutMs = LIST_QUERY_TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  return { signal: controller.signal, cleanup: () => window.clearTimeout(timeoutId) };
+};
 import {
   AlertDialog,
   AlertDialogAction,
@@ -105,10 +113,13 @@ const Orders = () => {
   };
 
   const fetchCompanies = async () => {
+    const { signal, cleanup } = createAbortSignal();
     const { data, error } = await supabase
       .from('companies')
-      .select('*')
-      .order('name');
+      .select('id, name')
+      .order('name')
+      .abortSignal(signal);
+    cleanup();
     
     if (!error && data) {
       setCompanies(data);
@@ -161,7 +172,9 @@ const Orders = () => {
       query = query.eq('company_id', activeCompanyId);
     }
 
-    const { data, error } = await query;
+    const { signal, cleanup } = createAbortSignal();
+    const { data, error } = await query.abortSignal(signal);
+    cleanup();
     
     if (!error && data) {
       // For non-vibe admins, filter out draft orders (they can only see pending and later)
@@ -169,41 +182,71 @@ const Orders = () => {
         ? data 
         : data.filter(order => order.status !== 'draft');
       
-      // Batch-fetch artwork approval status for ALL orders in ONE query (was N+1)
-      const allSkus = Array.from(new Set(
-        filteredData.flatMap((o: any) => (o.order_items || []).map((i: any) => i.sku).filter(Boolean))
-      ));
-      let approvedSkus = new Set<string>();
-      if (allSkus.length > 0) {
-        const { data: artworkData } = await supabase
-          .from('artwork_files')
-          .select('sku, is_approved')
-          .in('sku', allSkus)
-          .eq('is_approved', true);
-        approvedSkus = new Set((artworkData || []).map((a: any) => a.sku));
-      }
-
       const completedStatuses = ['completed', 'shipped', 'delivered'];
       const ordersWithChecklist = filteredData.map((order: any) => {
         const productionProgress = completedStatuses.includes(order.status?.toLowerCase())
           ? 100
           : (order.production_progress ?? 0);
 
-        const items = order.order_items || [];
-        const allApproved = items.length > 0 && items.every((item: any) => approvedSkus.has(item.sku));
-
         return {
           ...order,
-          artApproved: allApproved,
-          checklistComplete: allApproved && order.order_finalized && order.vibe_processed,
+          artApproved: false,
+          checklistComplete: false,
           productionProgress,
         };
       });
 
       setOrders(ordersWithChecklist);
+      setLoading(false);
+      hydrateArtworkApproval(filteredData);
 
+    } else {
+      if (error) console.error('Orders fetch error:', error);
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const hydrateArtworkApproval = async (sourceOrders: any[]) => {
+    const allSkus = Array.from(new Set(
+      sourceOrders.flatMap((o: any) => (o.order_items || []).map((i: any) => i.sku).filter(Boolean))
+    ));
+
+    if (allSkus.length === 0) return;
+
+    const approvedSkus = new Set<string>();
+
+    try {
+      for (let i = 0; i < allSkus.length; i += ARTWORK_SKU_BATCH_SIZE) {
+        const batch = allSkus.slice(i, i + ARTWORK_SKU_BATCH_SIZE);
+        const { signal, cleanup } = createAbortSignal(8000);
+        const { data, error } = await supabase
+          .from('artwork_files')
+          .select('sku')
+          .in('sku', batch)
+          .eq('is_approved', true)
+          .abortSignal(signal);
+        cleanup();
+
+        if (error) {
+          console.error('Artwork approval fetch error:', error);
+          continue;
+        }
+
+        (data || []).forEach((a: any) => approvedSkus.add(a.sku));
+      }
+
+      setOrders((prev) => prev.map((order: any) => {
+        const items = order.order_items || [];
+        const allApproved = items.length > 0 && items.every((item: any) => approvedSkus.has(item.sku));
+        return {
+          ...order,
+          artApproved: allApproved,
+          checklistComplete: allApproved && order.order_finalized && order.vibe_processed,
+        };
+      }));
+    } catch (error) {
+      console.error('Artwork approval hydrate failed:', error);
+    }
   };
 
   const handleDeleteOrder = async () => {
@@ -314,10 +357,6 @@ const Orders = () => {
     const matchesStatus = statusFilter === "all" || order.status.toLowerCase() === statusFilter;
     return matchesSearch && matchesStatus;
   });
-
-  useEffect(() => {
-    fetchOrders();
-  }, [companyFilter]);
 
   const draftOrders = filteredOrders.filter(o => o.status.toLowerCase() === 'draft');
   const allNonDraftOrders = filteredOrders.filter(o => o.status.toLowerCase() !== 'draft');

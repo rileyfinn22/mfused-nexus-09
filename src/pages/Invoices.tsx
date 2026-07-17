@@ -32,6 +32,13 @@ import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
 
 const INVOICE_LIST_LIMIT = 500;
+const LIST_QUERY_TIMEOUT_MS = 10000;
+
+const createAbortSignal = (timeoutMs = LIST_QUERY_TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  return { signal: controller.signal, cleanup: () => window.clearTimeout(timeoutId) };
+};
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -95,8 +102,14 @@ const Invoices = () => {
   }, [statusFilter]);
 
   const fetchCompanies = async () => {
-    const { data } = await supabase.from('companies').select('*').order('name');
-    if (data) setCompanies(data);
+    const { signal, cleanup } = createAbortSignal();
+    const { data, error } = await supabase
+      .from('companies')
+      .select('id, name')
+      .order('name')
+      .abortSignal(signal);
+    cleanup();
+    if (!error && data) setCompanies(data);
   };
 
   const fetchInvoices = async () => {
@@ -146,15 +159,23 @@ const Invoices = () => {
       query = query.eq('company_id', activeCompanyId);
     }
 
-    const { data, error } = await query;
-    if (error) {
+    try {
+      const { signal, cleanup } = createAbortSignal();
+      const { data, error } = await query.abortSignal(signal);
+      cleanup();
+
+      if (error) {
+        console.error('Invoice fetch error:', error);
+      }
+      
+      if (data) {
+        setInvoices(data);
+      }
+    } catch (error) {
       console.error('Invoice fetch error:', error);
+    } finally {
+      setLoading(false);
     }
-    
-    if (data) {
-      setInvoices(data);
-    }
-    setLoading(false);
   };
 
   const getInvoiceTypeColor = (type: string) => {
