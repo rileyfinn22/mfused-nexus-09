@@ -33,6 +33,7 @@ import AddArtworkDialog from "@/components/AddArtworkDialog";
 import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
 import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkViewerDialog";
 import { cn } from "@/lib/utils";
+import { normalizeStorageObjectPath, signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
 
 interface ProductTemplate {
   id: string;
@@ -171,7 +172,8 @@ export function CustomerArtworkTab({
         artworkQuery = artworkQuery.eq('company_id', companyFilter);
       }
       
-      const { data: artworkData } = await artworkQuery;
+      const { data: artworkRows } = await artworkQuery;
+      const artworkData = await signStorageUrlsInRows('artwork', artworkRows || [], ['artwork_url', 'preview_url']);
       
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
       const skuThumbnails: Record<string, string | null> = {};
@@ -285,7 +287,8 @@ export function CustomerArtworkTab({
         .eq('artwork_type', 'customer')
         .order('created_at', { ascending: false });
       
-      setArtworkFiles(data || []);
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+      setArtworkFiles(signedData || []);
     } catch (error) {
       console.error('Error fetching artwork:', error);
     }
@@ -300,7 +303,8 @@ export function CustomerArtworkTab({
 
   const handleDownload = async (url: string, filename: string) => {
     try {
-      const response = await fetch(url);
+      const signedUrl = await signStorageUrl('artwork', url);
+      const response = await fetch(signedUrl);
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -324,13 +328,13 @@ export function CustomerArtworkTab({
     if (!selectedFile) return;
 
     try {
-      const artworkPath = selectedFile.artwork_url.split('/artwork/')[1];
+      const artworkPath = normalizeStorageObjectPath(selectedFile.artwork_url, 'artwork');
       if (artworkPath) {
         await supabase.storage.from('artwork').remove([artworkPath]);
       }
 
       if (selectedFile.preview_url) {
-        const previewPath = selectedFile.preview_url.split('/artwork/')[1];
+        const previewPath = normalizeStorageObjectPath(selectedFile.preview_url, 'artwork');
         if (previewPath) {
           await supabase.storage.from('artwork').remove([previewPath]);
         }

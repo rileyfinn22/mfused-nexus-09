@@ -29,6 +29,7 @@ import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { SendOrderConfirmationDialog } from "@/components/SendOrderConfirmationDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
 import { fetchRestRowsViaAuth, fetchUserCompanyRolesViaRest, formatPostgrestInFilter, readStoredAuthSession } from "@/lib/authSession";
+import { signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
 
 
 const STAGE_DEFINITIONS = [
@@ -438,14 +439,18 @@ const OrderDetail = () => {
     
     if (skus.length === 0) return;
     
-    const { data } = await supabase
-      .from('artwork_files')
-      .select('*')
-      .in('sku', skus)
-      .order('created_at', { ascending: false });
-    
-    if (data) {
-      setOrderArtwork(data);
+    try {
+      const data = await fetchRestRowsViaAuth<any>('artwork_files', {
+        select: '*',
+        sku: formatPostgrestInFilter(skus),
+        order: 'created_at.desc',
+      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
+
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+      setOrderArtwork(signedData);
+    } catch (error) {
+      console.error('Error fetching order artwork:', error);
+      setOrderArtwork([]);
     }
   };
 
@@ -3174,7 +3179,7 @@ const OrderDetail = () => {
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2"
-                            onClick={() => window.open(artwork.artwork_url, '_blank')}
+                            onClick={async () => window.open(await signStorageUrl('artwork', artwork.artwork_url), '_blank')}
                           >
                             <ExternalLink className="h-3 w-3 mr-1" />
                             View
@@ -3183,9 +3188,10 @@ const OrderDetail = () => {
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2"
-                            onClick={() => {
+                            onClick={async () => {
+                              const signedUrl = await signStorageUrl('artwork', artwork.artwork_url);
                               const link = document.createElement('a');
-                              link.href = artwork.artwork_url;
+                              link.href = signedUrl;
                               link.download = artwork.filename;
                               link.click();
                             }}

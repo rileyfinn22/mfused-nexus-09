@@ -39,6 +39,7 @@ import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { signStorageUrlsInRows } from "@/lib/storageUrl";
 
 interface InventoryItem {
   id: string;
@@ -223,9 +224,11 @@ const Inventory = () => {
 
       if (error) throw error;
 
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+
       // Create a map of SKU to thumbnail URL
       const thumbnailMap: Record<string, string> = {};
-      data?.forEach(artwork => {
+      signedData?.forEach(artwork => {
         if (!thumbnailMap[artwork.sku]) {
           thumbnailMap[artwork.sku] = artwork.preview_url || artwork.artwork_url;
         }

@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
 
 const RejectedArchive = () => {
   const navigate = useNavigate();
@@ -36,7 +37,8 @@ const RejectedArchive = () => {
         .order('rejected_at', { ascending: false });
 
       if (error) throw error;
-      setRejectedFiles(data || []);
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+      setRejectedFiles(signedData || []);
     } catch (error) {
       console.error('Error fetching rejected artwork:', error);
       toast({
@@ -51,7 +53,8 @@ const RejectedArchive = () => {
 
   const handleDownload = async (url: string, filename: string) => {
     try {
-      const response = await fetch(url);
+      const signedUrl = await signStorageUrl('artwork', url);
+      const response = await fetch(signedUrl);
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');

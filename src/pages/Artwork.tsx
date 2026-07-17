@@ -51,6 +51,7 @@ import { cn } from "@/lib/utils";
 import PdfThumbnail from "@/components/PdfThumbnail";
 import { FileArchive, FileCode, AlertCircle } from "lucide-react";
 import JSZip from "jszip";
+import { normalizeStorageObjectPath, signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
 
 interface ProductTemplate {
   id: string;
@@ -341,6 +342,8 @@ const Artwork = () => {
         }
       }
 
+      artworkData = await signStorageUrlsInRows('artwork', artworkData, ['artwork_url', 'preview_url']);
+
       // Populate the flat artwork list used by the "All Artwork" tab.
       if (!selectedProduct) {
         setArtworkFiles(artworkData);
@@ -501,8 +504,9 @@ const Artwork = () => {
       }
       
       const { data } = await query;
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
       if (selectedProductIdRef.current === requestProductId) {
-        setArtworkFiles(data || []);
+        setArtworkFiles(signedData || []);
       }
     } catch (error) {
       console.error('Error fetching artwork:', error);
@@ -528,8 +532,9 @@ const Artwork = () => {
       }
 
       const { data } = await query;
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
       if (!selectedProduct) {
-        setArtworkFiles(data || []);
+        setArtworkFiles(signedData || []);
       }
     } catch (error) {
       console.error('Error fetching artwork:', error);
@@ -550,7 +555,8 @@ const Artwork = () => {
       }
 
       const { data } = await query;
-      setRejectedFiles(data || []);
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+      setRejectedFiles(signedData || []);
     } catch (error) {
       console.error('Error fetching rejected artwork:', error);
     }
@@ -616,7 +622,8 @@ const Artwork = () => {
 
   const handleDownload = async (url: string, filename: string) => {
     try {
-      const response = await fetch(url);
+      const signedUrl = await signStorageUrl('artwork', url);
+      const response = await fetch(signedUrl);
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -670,7 +677,7 @@ const Artwork = () => {
         }
 
         const { data } = await query;
-        filesToDownload = data || [];
+        filesToDownload = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
         zipName = selectedTemplate.name.replace(/[^a-zA-Z0-9]/g, '_');
       } else if (selectedProduct) {
         // Download all files for current product
@@ -692,7 +699,8 @@ const Artwork = () => {
       // Download each file and add to zip
       for (const file of filesToDownload) {
         try {
-          const response = await fetch(file.artwork_url);
+          const signedArtworkUrl = await signStorageUrl('artwork', file.artwork_url);
+          const response = await fetch(signedArtworkUrl);
           const blob = await response.blob();
           // Organize by SKU in folders
           const folderPath = file.sku ? `${file.sku}/${file.filename}` : file.filename;
@@ -741,8 +749,8 @@ const Artwork = () => {
           company_id: file.company_id,
           sku: file.sku,
           filename: file.filename,
-          artwork_url: file.artwork_url,
-          preview_url: file.preview_url,
+          artwork_url: normalizeStorageObjectPath(file.artwork_url, 'artwork'),
+          preview_url: file.preview_url ? normalizeStorageObjectPath(file.preview_url, 'artwork') : null,
           notes: file.notes,
           rejection_reason: 'Archived (replaced by newer version)',
           rejected_by: user.id,
@@ -798,8 +806,8 @@ const Artwork = () => {
           company_id: selectedFile.company_id,
           sku: selectedFile.sku,
           filename: selectedFile.filename,
-          artwork_url: selectedFile.artwork_url,
-          preview_url: selectedFile.preview_url,
+          artwork_url: normalizeStorageObjectPath(selectedFile.artwork_url, 'artwork'),
+          preview_url: selectedFile.preview_url ? normalizeStorageObjectPath(selectedFile.preview_url, 'artwork') : null,
           notes: selectedFile.notes,
           rejection_reason: rejectionReason,
           rejected_by: user.id,
@@ -841,13 +849,13 @@ const Artwork = () => {
     if (!selectedFile) return;
 
     try {
-      const artworkPath = selectedFile.artwork_url.split('/artwork/')[1];
+      const artworkPath = normalizeStorageObjectPath(selectedFile.artwork_url, 'artwork');
       if (artworkPath) {
         await supabase.storage.from('artwork').remove([artworkPath]);
       }
 
       if (selectedFile.preview_url) {
-        const previewPath = selectedFile.preview_url.split('/artwork/')[1];
+        const previewPath = normalizeStorageObjectPath(selectedFile.preview_url, 'artwork');
         if (previewPath) {
           await supabase.storage.from('artwork').remove([previewPath]);
         }
