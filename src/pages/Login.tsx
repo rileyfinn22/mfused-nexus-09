@@ -173,7 +173,7 @@ export default function Login() {
           const pendingRedirect = sessionStorage.getItem("pendingRedirect");
           sessionStorage.removeItem("pendingRedirect");
 
-          navigate(
+          navigateWithFallback(
             pendingRedirect ||
               (associatedInvoiceId ? `/invoices/${associatedInvoiceId}` : "/dashboard")
           );
