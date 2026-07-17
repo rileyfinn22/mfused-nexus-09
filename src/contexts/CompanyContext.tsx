@@ -100,22 +100,20 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       }
 
       // Fetch all companies the user has access to
-      const { data: userRoles, error } = await supabase
-        ? await withTimeout(
-            supabase
-              .from("user_roles")
-              .select(`
-                role,
-                company_id,
-                companies:company_id (
-                  id,
-                  name
-                )
-              `)
-              .eq("user_id", user.id),
-            "Company roles load"
-          )
-        : { data: [], error: null };
+      const { data: userRoles, error } = await withTimeout(
+        supabase
+          .from("user_roles")
+          .select(`
+            role,
+            company_id,
+            companies:company_id (
+              id,
+              name
+            )
+          `)
+          .eq("user_id", user.id),
+        "Company roles load"
+      );
 
       if (error) {
         console.error("Error fetching user companies:", error);
