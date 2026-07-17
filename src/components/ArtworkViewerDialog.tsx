@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Download, FileImage, FileText, FileCode, CheckCircle, Clock, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
+import { signStorageUrl } from "@/lib/storageUrl";
 
 interface ArtworkFile {
   id: string;
@@ -57,6 +58,11 @@ const ArtworkViewerDialog = ({
   const googleDocsViewerUrl = fileType === "pdf"
     ? `https://docs.google.com/viewer?url=${encodeURIComponent(file.artwork_url)}&embedded=true`
     : null;
+
+  const openArtworkInTab = async () => {
+    const signedUrl = await signStorageUrl('artwork', file.artwork_url);
+    window.open(signedUrl, "_blank");
+  };
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -137,7 +143,7 @@ const ArtworkViewerDialog = ({
                   <div className="flex gap-3">
                     <Button
                       variant="outline"
-                      onClick={() => window.open(file.artwork_url, "_blank")}
+                      onClick={openArtworkInTab}
                     >
                       <ExternalLink className="h-5 w-5 mr-2" />
                       Open in New Tab
@@ -183,7 +189,7 @@ const ArtworkViewerDialog = ({
             {fileType === "pdf" && (
               <Button
                 variant="outline"
-                onClick={() => window.open(file.artwork_url, "_blank")}
+                onClick={openArtworkInTab}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open in Tab
