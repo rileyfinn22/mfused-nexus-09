@@ -125,12 +125,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error("Error fetching user companies:", error);
         if (!isCurrentRequest()) return;
-        setCompanies([]);
-        setActiveCompanyState(null);
-        setHasFinanceRole(false);
-        setHasVibeAdminRole(false);
-        setHasForwarderRole(false);
-        setHasVendorRole(false);
+        // Preserve any previously loaded state rather than wiping it, so a
+        // transient RLS/network error doesn't blank the header to "Packaging Portal".
         setLoading(false);
         return;
       }
