@@ -43,6 +43,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { AddProductToTemplateDialog } from "@/components/AddProductToTemplateDialog";
+import { signStorageUrlsInRows } from "@/lib/storageUrl";
 
 interface ProductTemplate {
   id: string;
@@ -242,8 +243,9 @@ export function CompanyProductTemplates({
         .order('is_approved', { ascending: false })
         .order('created_at', { ascending: false });
 
+      const signedThumbData = await signStorageUrlsInRows('artwork', thumbData || [], ['artwork_url', 'preview_url']);
       const thumbnailMap: Record<string, string> = {};
-      thumbData?.forEach(artwork => {
+      signedThumbData?.forEach(artwork => {
         if (!thumbnailMap[artwork.sku]) {
           thumbnailMap[artwork.sku] = artwork.preview_url || artwork.artwork_url;
         }
