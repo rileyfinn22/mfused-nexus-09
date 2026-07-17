@@ -30,6 +30,7 @@ import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
+import { fetchRestRowsViaAuth, readStoredAuthSession } from "@/lib/authSession";
 
 const INVOICE_LIST_LIMIT = 500;
 const LIST_QUERY_TIMEOUT_MS = 10000;
@@ -79,7 +80,8 @@ const Invoices = () => {
   useEffect(() => {
     // For customer/company users, wait until the active company is resolved before fetching.
     // This prevents brief "wrong company" fetches that can lead to deny/redirect flicker.
-    if (activeCompanyLoading) return;
+    const hasStoredSession = Boolean(readStoredAuthSession()?.user?.id);
+    if (activeCompanyLoading && !hasStoredSession) return;
 
     if (isVibeAdmin) {
       fetchCompanies();
@@ -87,9 +89,8 @@ const Invoices = () => {
       return;
     }
 
-    if (!activeCompanyId) {
-      setInvoices([]);
-      setLoading(false);
+    if (!activeCompanyId && !hasStoredSession) {
+      navigate('/login');
       return;
     }
 
@@ -102,72 +103,45 @@ const Invoices = () => {
   }, [statusFilter]);
 
   const fetchCompanies = async () => {
-    const { signal, cleanup } = createAbortSignal();
-    const { data, error } = await supabase
-      .from('companies')
-      .select('id, name')
-      .order('name')
-      .abortSignal(signal);
-    cleanup();
-    if (!error && data) setCompanies(data);
+    try {
+      const data = await fetchRestRowsViaAuth('companies', {
+        select: 'id,name',
+        order: 'name.asc',
+      });
+      setCompanies(data);
+    } catch (error) {
+      console.error('Companies fetch error:', error);
+    }
   };
 
   const fetchInvoices = async () => {
     setLoading(true);
 
     // For non-admin users we must have an active company before querying.
-    if (!isVibeAdmin && !activeCompanyId) {
-      setInvoices([]);
-      setLoading(false);
+    if (!activeCompanyId && !readStoredAuthSession()?.user?.id) {
+      navigate('/login');
       return;
     }
 
-    let query = supabase
-      .from('invoices')
-      .select(`
-        id,
-        invoice_number,
-        company_id,
-        order_id,
-        parent_invoice_id,
-        invoice_type,
-        status,
-        total,
-        total_paid,
-        due_date,
-        shipped_date,
-        description,
-        notes,
-        quickbooks_id,
-        quickbooks_sync_status,
-        quickbooks_payment_link,
-        shipment_number,
-        orders(order_number, customer_name, po_number, description),
-        companies(name)
-      `)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(INVOICE_LIST_LIMIT);
+    const params: Record<string, string | number> = {
+      select: 'id,invoice_number,company_id,order_id,parent_invoice_id,invoice_type,status,total,total_paid,due_date,shipped_date,description,notes,quickbooks_id,quickbooks_sync_status,quickbooks_payment_link,shipment_number,orders(order_number,customer_name,po_number,description),companies(name)',
+      deleted_at: 'is.null',
+      order: 'created_at.desc',
+      limit: INVOICE_LIST_LIMIT,
+    };
 
     // For vibe admins: use URL company filter if set
     // For regular users: always filter by their active company
     if (isVibeAdmin) {
       if (companyFilter !== 'all') {
-        query = query.eq('company_id', companyFilter);
+        params.company_id = `eq.${companyFilter}`;
       }
     } else if (activeCompanyId) {
-      query = query.eq('company_id', activeCompanyId);
+      params.company_id = `eq.${activeCompanyId}`;
     }
 
     try {
-      const { signal, cleanup } = createAbortSignal();
-      const { data, error } = await query.abortSignal(signal);
-      cleanup();
-
-      if (error) {
-        console.error('Invoice fetch error:', error);
-      }
-      
+      const data = await fetchRestRowsViaAuth<any>('invoices', params);
       if (data) {
         setInvoices(data);
       }
