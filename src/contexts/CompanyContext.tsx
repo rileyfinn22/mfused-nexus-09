@@ -182,6 +182,11 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       if (cachedState && !options?.background) {
         applyCompanyCache(cachedState);
         setLoading(false);
+      } else if (!options?.background) {
+        // The user is authenticated from local storage. Do not hold the whole
+        // portal behind the company-role request on slow connections; pages
+        // will hydrate once the role fetch completes.
+        setLoading(false);
       }
 
       // Fetch all companies the user has access to

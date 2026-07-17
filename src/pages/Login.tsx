@@ -53,17 +53,7 @@ export default function Login() {
         navigateWithFallback(redirectTo, true);
         return;
       }
-      try {
-        const roles = await fetchUserCompanyRolesViaRest(session);
-        const roleList = (roles || []).map((r: any) => r.role);
-        if (roleList.length === 1 && roleList[0] === "finance") {
-          navigateWithFallback("/financing", true);
-        } else {
-          navigateWithFallback("/dashboard", true);
-        }
-      } catch {
-        if (active) navigateWithFallback("/dashboard", true);
-      }
+      navigateWithFallback("/dashboard", true);
     };
 
     const storedSession = readStoredAuthSession();
