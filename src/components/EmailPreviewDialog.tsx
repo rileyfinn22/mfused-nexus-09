@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { X, Mail, Plus, Send, Loader2, Eye, FileText, Paperclip, Upload, Trash2, Image, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { signStorageUrl } from "@/lib/storageUrl";
 
 export interface AdditionalAttachment {
   file: File;
@@ -221,7 +222,8 @@ export function EmailPreviewDialog({
       
       try {
         // Fetch the file from the URL
-        const response = await fetch(artwork.artwork_url);
+        const signedArtworkUrl = await signStorageUrl('artwork', artwork.artwork_url);
+        const response = await fetch(signedArtworkUrl);
         if (!response.ok) throw new Error('Failed to fetch artwork file');
         
         const blob = await response.blob();
