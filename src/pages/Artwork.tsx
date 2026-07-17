@@ -51,6 +51,7 @@ import { cn } from "@/lib/utils";
 import PdfThumbnail from "@/components/PdfThumbnail";
 import { FileArchive, FileCode, AlertCircle } from "lucide-react";
 import JSZip from "jszip";
+import { signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
 
 interface ProductTemplate {
   id: string;
@@ -341,6 +342,8 @@ const Artwork = () => {
         }
       }
 
+      artworkData = await signStorageUrlsInRows('artwork', artworkData, ['artwork_url', 'preview_url']);
+
       // Populate the flat artwork list used by the "All Artwork" tab.
       if (!selectedProduct) {
         setArtworkFiles(artworkData);
@@ -501,8 +504,9 @@ const Artwork = () => {
       }
       
       const { data } = await query;
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
       if (selectedProductIdRef.current === requestProductId) {
-        setArtworkFiles(data || []);
+        setArtworkFiles(signedData || []);
       }
     } catch (error) {
       console.error('Error fetching artwork:', error);
@@ -528,8 +532,9 @@ const Artwork = () => {
       }
 
       const { data } = await query;
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
       if (!selectedProduct) {
-        setArtworkFiles(data || []);
+        setArtworkFiles(signedData || []);
       }
     } catch (error) {
       console.error('Error fetching artwork:', error);
@@ -550,7 +555,8 @@ const Artwork = () => {
       }
 
       const { data } = await query;
-      setRejectedFiles(data || []);
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+      setRejectedFiles(signedData || []);
     } catch (error) {
       console.error('Error fetching rejected artwork:', error);
     }
@@ -616,7 +622,8 @@ const Artwork = () => {
 
   const handleDownload = async (url: string, filename: string) => {
     try {
-      const response = await fetch(url);
+      const signedUrl = await signStorageUrl('artwork', url);
+      const response = await fetch(signedUrl);
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -670,7 +677,7 @@ const Artwork = () => {
         }
 
         const { data } = await query;
-        filesToDownload = data || [];
+        filesToDownload = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
         zipName = selectedTemplate.name.replace(/[^a-zA-Z0-9]/g, '_');
       } else if (selectedProduct) {
         // Download all files for current product
