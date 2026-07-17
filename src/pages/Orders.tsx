@@ -43,7 +43,7 @@ import { ExpandToggleButton, ExpandDetailsPanel } from "@/components/RowExpandPa
 const Orders = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
+  const { activeCompanyId, isVibeAdmin, loading: activeCompanyLoading } = useActiveCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   // Read company filter from URL, default to "all" (only for vibe admins)
@@ -72,11 +72,19 @@ const Orders = () => {
   };
 
   useEffect(() => {
+    if (activeCompanyLoading) return;
+
+    if (!isVibeAdmin && !activeCompanyId) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
+
     fetchOrders();
     if (isVibeAdmin) {
       fetchCompanies();
     }
-  }, [isVibeAdmin, companyFilter, activeCompanyId]);
+  }, [isVibeAdmin, companyFilter, activeCompanyId, activeCompanyLoading]);
 
   const handleDescriptionChange = async (orderId: string, description: string) => {
     const { error } = await supabase
@@ -107,6 +115,13 @@ const Orders = () => {
 
   const fetchOrders = async () => {
     setLoading(true);
+
+    if (!isVibeAdmin && !activeCompanyId) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
+
     let query = supabase
       .from('orders')
       .select('*, order_items(*), companies(name)')
