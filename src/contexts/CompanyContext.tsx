@@ -25,6 +25,20 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 const ACTIVE_COMPANY_KEY = "activeCompanyId";
+const COMPANY_LOAD_TIMEOUT_MS = 4000;
+
+const withTimeout = async <T,>(promise: PromiseLike<T>, label: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} timeout`)), COMPANY_LOAD_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -67,7 +81,12 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
   const loadCompanies = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      setLoading(true);
+
+      const { data: { session } } = await withTimeout(
+        supabase.auth.getSession(),
+        "Auth session restore"
+      );
       const user = session?.user;
       if (!user) {
         setCompanies([]);
@@ -82,16 +101,21 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
       // Fetch all companies the user has access to
       const { data: userRoles, error } = await supabase
-        .from("user_roles")
-        .select(`
-          role,
-          company_id,
-          companies:company_id (
-            id,
-            name
+        ? await withTimeout(
+            supabase
+              .from("user_roles")
+              .select(`
+                role,
+                company_id,
+                companies:company_id (
+                  id,
+                  name
+                )
+              `)
+              .eq("user_id", user.id),
+            "Company roles load"
           )
-        `)
-        .eq("user_id", user.id);
+        : { data: [], error: null };
 
       if (error) {
         console.error("Error fetching user companies:", error);
