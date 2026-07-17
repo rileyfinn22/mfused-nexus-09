@@ -32,6 +32,15 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 const ACTIVE_COMPANY_KEY = "activeCompanyId";
+const COMPANY_CACHE_PREFIX = "companyContext";
+
+type CompanyCache = {
+  companies: Company[];
+  hasFinanceRole: boolean;
+  hasVibeAdminRole: boolean;
+  hasForwarderRole: boolean;
+  hasVendorRole: boolean;
+};
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -53,6 +62,64 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     "company",
     "vendor",
   ];
+
+  const applyCompanyState = (companyList: Company[], roleSet: Set<string>) => {
+    setHasFinanceRole(roleSet.has("finance"));
+    setHasVibeAdminRole(roleSet.has("vibe_admin"));
+    setHasForwarderRole(roleSet.has("forwarder"));
+    setHasVendorRole(roleSet.has("vendor"));
+    setCompanies(companyList);
+
+    const savedCompanyId = localStorage.getItem(ACTIVE_COMPANY_KEY);
+    const savedCompany = companyList.find((c) => c.id === savedCompanyId);
+
+    if (savedCompany) {
+      setActiveCompanyState(savedCompany);
+    } else if (companyList.length > 0) {
+      setActiveCompanyState(companyList[0]);
+      localStorage.setItem(ACTIVE_COMPANY_KEY, companyList[0].id);
+    } else {
+      setActiveCompanyState(null);
+    }
+  };
+
+  const readCompanyCache = (userId: string): CompanyCache | null => {
+    try {
+      const raw = localStorage.getItem(`${COMPANY_CACHE_PREFIX}:${userId}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as CompanyCache;
+      return Array.isArray(parsed.companies) ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const writeCompanyCache = (userId: string, companyList: Company[], roleSet: Set<string>) => {
+    try {
+      const cache: CompanyCache = {
+        companies: companyList,
+        hasFinanceRole: roleSet.has("finance"),
+        hasVibeAdminRole: roleSet.has("vibe_admin"),
+        hasForwarderRole: roleSet.has("forwarder"),
+        hasVendorRole: roleSet.has("vendor"),
+      };
+      localStorage.setItem(`${COMPANY_CACHE_PREFIX}:${userId}`, JSON.stringify(cache));
+    } catch {
+      // localStorage may be unavailable; live fetch still works.
+    }
+  };
+
+  const applyCompanyCache = (cache: CompanyCache) => {
+    setHasFinanceRole(cache.hasFinanceRole);
+    setHasVibeAdminRole(cache.hasVibeAdminRole);
+    setHasForwarderRole(cache.hasForwarderRole);
+    setHasVendorRole(cache.hasVendorRole);
+    setCompanies(cache.companies);
+
+    const savedCompanyId = localStorage.getItem(ACTIVE_COMPANY_KEY);
+    const savedCompany = cache.companies.find((c) => c.id === savedCompanyId);
+    setActiveCompanyState(savedCompany ?? cache.companies[0] ?? null);
+  };
 
   useEffect(() => {
     loadCompanies(readStoredAuthSession());
@@ -111,6 +178,12 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const cachedState = readCompanyCache(user.id);
+      if (cachedState && !options?.background) {
+        applyCompanyCache(cachedState);
+        setLoading(false);
+      }
+
       // Fetch all companies the user has access to
       const userRoles = await fetchUserCompanyRolesViaRest(session);
 
@@ -118,10 +191,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       backgroundRetryRef.current = 0;
 
       const roleSet = new Set((userRoles || []).map((ur: any) => String(ur.role)));
-      setHasFinanceRole(roleSet.has("finance"));
-      setHasVibeAdminRole(roleSet.has("vibe_admin"));
-      setHasForwarderRole(roleSet.has("forwarder"));
-      setHasVendorRole(roleSet.has("vendor"));
 
       // De-dupe by company_id and choose the highest-privilege role per company.
       const byCompanyId = new Map<string, Company>();
@@ -155,21 +224,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         });
 
       const companyList: Company[] = Array.from(byCompanyId.values());
-
-      setCompanies(companyList);
-
-      // Restore saved active company or use first one
-      const savedCompanyId = localStorage.getItem(ACTIVE_COMPANY_KEY);
-      const savedCompany = companyList.find((c) => c.id === savedCompanyId);
-
-      if (savedCompany) {
-        setActiveCompanyState(savedCompany);
-      } else if (companyList.length > 0) {
-        setActiveCompanyState(companyList[0]);
-        localStorage.setItem(ACTIVE_COMPANY_KEY, companyList[0].id);
-      } else {
-        setActiveCompanyState(null);
-      }
+      applyCompanyState(companyList, roleSet);
+      writeCompanyCache(user.id, companyList, roleSet);
     } catch (err) {
       console.error("Error loading companies:", err);
       if (!isCurrentRequest()) return;
