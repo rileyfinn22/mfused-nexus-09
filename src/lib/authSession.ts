@@ -252,3 +252,51 @@ export const fetchRestRowsViaAuth = async <T = any>(
     window.clearTimeout(timeoutId);
   }
 };
+
+export const fetchRestRowViaAuth = async <T = any>(
+  table: string,
+  params: RestQueryParams,
+  options?: { session?: Session | null; timeoutMs?: number }
+): Promise<T | null> => {
+  const rows = await fetchRestRowsViaAuth<T>(table, { ...params, limit: params.limit ?? 1 }, options);
+  return rows[0] ?? null;
+};
+
+export const fetchRestCountViaAuth = async (
+  table: string,
+  params: RestQueryParams,
+  options?: { session?: Session | null; timeoutMs?: number }
+): Promise<number> => {
+  const session = await getFreshAuthSession(options?.session);
+  if (!isUsableSession(session)) return 0;
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), options?.timeoutMs ?? AUTH_REST_TIMEOUT_MS);
+
+  try {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.set(key, String(value));
+      }
+    });
+
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${searchParams.toString()}`, {
+      method: "HEAD",
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${session.access_token}`,
+        Prefer: "count=exact",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) return 0;
+
+    const contentRange = response.headers.get("content-range");
+    const total = Number(contentRange?.split("/")[1]);
+    return Number.isFinite(total) ? total : 0;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};

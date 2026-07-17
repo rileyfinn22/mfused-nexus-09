@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Edit, Search, Building2, Mail } from "lucide-react";
 import VendorInviteDialog from "@/components/VendorInviteDialog";
+import { fetchRestRowsViaAuth, getStoredUserId } from "@/lib/authSession";
 
 const Vendors = () => {
   const [vendors, setVendors] = useState<any[]>([]);
@@ -51,31 +52,30 @@ const Vendors = () => {
   }, []);
 
   const fetchCompanyId = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase
-        .from("user_roles")
-        .select("company_id")
-        .eq("user_id", user.id)
-        .single();
-      
-      if (data) {
-        setCompanyId(data.company_id);
-      }
-    }
+    const userId = getStoredUserId();
+    if (!userId) return;
+
+    const [data] = await fetchRestRowsViaAuth<any>('user_roles', {
+      select: 'company_id',
+      user_id: `eq.${userId}`,
+      limit: 1,
+    }, { timeoutMs: 8000 });
+    if (data) setCompanyId(data.company_id);
   };
 
   const fetchVendors = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('vendors')
-      .select('*')
-      .order('name');
-    
-    if (!error && data) {
-      setVendors(data);
+    try {
+      const data = await fetchRestRowsViaAuth<any>('vendors', {
+        select: '*',
+        order: 'name.asc',
+      }, { timeoutMs: 9000 });
+      setVendors(data || []);
+    } catch (error) {
+      console.error('Error loading vendors:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
