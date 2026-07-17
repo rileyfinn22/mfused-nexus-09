@@ -10,7 +10,7 @@ export type CompanyRoleRow = {
 };
 
 export const AUTH_SESSION_EVENT = "vibe-auth-session";
-const AUTH_REST_TIMEOUT_MS = 30000;
+const AUTH_REST_TIMEOUT_MS = 7000;
 
 const getExpectedAuthStorageKey = () => {
   try {
