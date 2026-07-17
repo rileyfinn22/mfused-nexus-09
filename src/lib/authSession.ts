@@ -9,6 +9,8 @@ export type CompanyRoleRow = {
   companies?: { id: string; name: string } | { id: string; name: string }[] | null;
 };
 
+type RestQueryParams = Record<string, string | number | boolean | null | undefined>;
+
 export const AUTH_SESSION_EVENT = "vibe-auth-session";
 const AUTH_REST_TIMEOUT_MS = 7000;
 
@@ -89,6 +91,47 @@ export const fetchUserCompanyRolesViaRest = async (session: Session): Promise<Co
     }
 
     return (await response.json()) as CompanyRoleRow[];
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
+export const formatPostgrestInFilter = (values: string[]) =>
+  `in.(${values.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")})`;
+
+export const fetchRestRowsViaAuth = async <T = any>(
+  table: string,
+  params: RestQueryParams,
+  options?: { session?: Session | null; timeoutMs?: number }
+): Promise<T[]> => {
+  const session = options?.session ?? readStoredAuthSession();
+  if (!isUsableSession(session)) return [];
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), options?.timeoutMs ?? AUTH_REST_TIMEOUT_MS);
+
+  try {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.set(key, String(value));
+      }
+    });
+
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${searchParams.toString()}`, {
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${session.access_token}`,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`${table} load failed (${response.status})`);
+    }
+
+    return (await response.json()) as T[];
   } finally {
     window.clearTimeout(timeoutId);
   }
