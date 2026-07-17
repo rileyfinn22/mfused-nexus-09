@@ -25,7 +25,7 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 const ACTIVE_COMPANY_KEY = "activeCompanyId";
-const COMPANY_LOAD_TIMEOUT_MS = 4000;
+const COMPANY_LOAD_TIMEOUT_MS = 10000;
 
 const withTimeout = async <T,>(promise: PromiseLike<T>, label: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -125,12 +125,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error("Error fetching user companies:", error);
         if (!isCurrentRequest()) return;
-        setCompanies([]);
-        setActiveCompanyState(null);
-        setHasFinanceRole(false);
-        setHasVibeAdminRole(false);
-        setHasForwarderRole(false);
-        setHasVendorRole(false);
+        // Preserve any previously loaded state rather than wiping it, so a
+        // transient RLS/network error doesn't blank the header to "Packaging Portal".
         setLoading(false);
         return;
       }
@@ -190,12 +186,12 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error("Error loading companies:", err);
       if (!isCurrentRequest()) return;
-      setCompanies([]);
-      setActiveCompanyState(null);
-      setHasFinanceRole(false);
-      setHasVibeAdminRole(false);
-      setHasForwarderRole(false);
-      setHasVendorRole(false);
+      // Preserve prior state on timeout/network failure — retry once shortly.
+      window.setTimeout(() => {
+        if (loadRequestIdRef.current === requestId) {
+          loadCompanies();
+        }
+      }, 1500);
     } finally {
       if (isCurrentRequest()) {
         setLoading(false);
