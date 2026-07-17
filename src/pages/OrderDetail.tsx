@@ -29,6 +29,7 @@ import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { SendOrderConfirmationDialog } from "@/components/SendOrderConfirmationDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
 import { fetchRestRowsViaAuth, fetchUserCompanyRolesViaRest, formatPostgrestInFilter, readStoredAuthSession } from "@/lib/authSession";
+import { signStorageUrlsInRows } from "@/lib/storageUrl";
 
 
 const STAGE_DEFINITIONS = [
@@ -438,14 +439,18 @@ const OrderDetail = () => {
     
     if (skus.length === 0) return;
     
-    const { data } = await supabase
-      .from('artwork_files')
-      .select('*')
-      .in('sku', skus)
-      .order('created_at', { ascending: false });
-    
-    if (data) {
-      setOrderArtwork(data);
+    try {
+      const data = await fetchRestRowsViaAuth<any>('artwork_files', {
+        select: '*',
+        sku: formatPostgrestInFilter(skus),
+        order: 'created_at.desc',
+      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
+
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+      setOrderArtwork(signedData);
+    } catch (error) {
+      console.error('Error fetching order artwork:', error);
+      setOrderArtwork([]);
     }
   };
 
