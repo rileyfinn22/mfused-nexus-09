@@ -20,7 +20,7 @@ import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipment
 import { GenerateShipmentLinkDialog } from "@/components/GenerateShipmentLinkDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
 import { normalizeStorageObjectPath } from "@/lib/storageUrl";
-import { fetchRestRowsViaAuth, formatPostgrestInFilter, getStoredUserId, withTimeout } from "@/lib/authSession";
+import { fetchRestRowsViaAuth, formatPostgrestInFilter, getStoredUserId } from "@/lib/authSession";
 
 // Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
 const parseDateAsLocal = (dateStr: string | null): Date | undefined => {

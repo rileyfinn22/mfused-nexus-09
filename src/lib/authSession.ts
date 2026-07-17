@@ -22,10 +22,11 @@ export const withTimeout = async <T,>(
   fallback?: T
 ): Promise<T> => {
   let timeoutId: number | undefined;
+  const hasFallback = fallback !== undefined;
 
   const timeoutPromise = new Promise<T>((resolve, reject) => {
     timeoutId = window.setTimeout(() => {
-      if (arguments.length >= 3) {
+      if (hasFallback) {
         resolve(fallback as T);
       } else {
         reject(new Error("Request timed out"));
