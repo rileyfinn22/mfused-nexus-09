@@ -29,7 +29,7 @@ import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { SendOrderConfirmationDialog } from "@/components/SendOrderConfirmationDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
 import { fetchRestRowsViaAuth, fetchUserCompanyRolesViaRest, formatPostgrestInFilter, readStoredAuthSession } from "@/lib/authSession";
-import { signStorageUrlsInRows } from "@/lib/storageUrl";
+import { signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
 
 
 const STAGE_DEFINITIONS = [
@@ -3179,7 +3179,7 @@ const OrderDetail = () => {
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2"
-                            onClick={() => window.open(artwork.artwork_url, '_blank')}
+                            onClick={async () => window.open(await signStorageUrl('artwork', artwork.artwork_url), '_blank')}
                           >
                             <ExternalLink className="h-3 w-3 mr-1" />
                             View
