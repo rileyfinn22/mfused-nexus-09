@@ -210,24 +210,29 @@ export default function Login() {
         } else if (pendingRedirect) {
           navigate(pendingRedirect);
         } else {
-          // Check if finance-only user
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
-          if (currentUser) {
-            const { data: roles } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", currentUser.id);
-            const roleList = (roles || []).map((r: any) => r.role);
-            if (roleList.length === 1 && roleList[0] === "finance") {
+          // Try to detect finance-only user, but never let this block navigation.
+          try {
+            const rolePromise = supabase.auth.getUser().then(async ({ data: { user: currentUser } }) => {
+              if (!currentUser) return null;
+              const { data: roles } = await supabase
+                .from("user_roles")
+                .select("role")
+                .eq("user_id", currentUser.id);
+              return (roles || []).map((r: any) => r.role);
+            });
+            const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+            const roleList = (await Promise.race([rolePromise, timeout])) as string[] | null;
+            if (roleList && roleList.length === 1 && roleList[0] === "finance") {
               navigate("/financing");
             } else {
               navigate("/dashboard");
             }
-          } else {
+          } catch {
             navigate("/dashboard");
           }
         }
       }
+
     } catch (error: any) {
       toast({
         title: "Error",
