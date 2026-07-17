@@ -13,6 +13,7 @@ type RestQueryParams = Record<string, string | number | boolean | null | undefin
 
 export const AUTH_SESSION_EVENT = "vibe-auth-session";
 const AUTH_REST_TIMEOUT_MS = 7000;
+const TOKEN_REFRESH_BUFFER_SECONDS = 60;
 
 const getExpectedAuthStorageKey = () => {
   try {
@@ -26,6 +27,32 @@ const getExpectedAuthStorageKey = () => {
 const isUsableSession = (value: unknown): value is Session => {
   const session = value as Session | null | undefined;
   return Boolean(session?.access_token && session?.user?.id);
+};
+
+const getSessionExpiry = (session: Session | null | undefined) => {
+  const expiresAt = Number(session?.expires_at);
+  if (Number.isFinite(expiresAt) && expiresAt > 0) return expiresAt;
+
+  const token = session?.access_token;
+  if (!token) return null;
+
+  try {
+    const [, payload] = token.split(".");
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    const decoded = JSON.parse(window.atob(padded));
+    const exp = Number(decoded?.exp);
+    return Number.isFinite(exp) ? exp : null;
+  } catch {
+    return null;
+  }
+};
+
+const isSessionExpiredOrExpiring = (session: Session | null | undefined) => {
+  const expiry = getSessionExpiry(session);
+  if (!expiry) return false;
+  return expiry <= Math.floor(Date.now() / 1000) + TOKEN_REFRESH_BUFFER_SECONDS;
 };
 
 const parseStoredSession = (raw: string | null): Session | null => {
@@ -65,8 +92,59 @@ export const dispatchAuthSession = (session: Session | null | undefined) => {
   window.dispatchEvent(new CustomEvent(AUTH_SESSION_EVENT, { detail: { session } }));
 };
 
+const persistAuthSession = (session: Session) => {
+  if (typeof window === "undefined" || !isUsableSession(session)) return;
+
+  const expectedKey = getExpectedAuthStorageKey();
+  if (expectedKey) {
+    window.localStorage.setItem(expectedKey, JSON.stringify(session));
+  }
+
+  dispatchAuthSession(session);
+};
+
+const refreshStoredAuthSession = async (session: Session): Promise<Session | null> => {
+  if (!session?.refresh_token) return null;
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), AUTH_REST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) return null;
+
+    const refreshed = (await response.json()) as Session;
+    if (!isUsableSession(refreshed)) return null;
+
+    persistAuthSession(refreshed);
+    return refreshed;
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
+export const getFreshAuthSession = async (sessionOverride?: Session | null): Promise<Session | null> => {
+  const session = sessionOverride ?? readStoredAuthSession();
+  if (!isUsableSession(session)) return null;
+  if (!isSessionExpiredOrExpiring(session)) return session;
+
+  return refreshStoredAuthSession(session);
+};
+
 export const fetchUserCompanyRolesViaRest = async (session: Session): Promise<CompanyRoleRow[]> => {
-  if (!isUsableSession(session)) return [];
+  const freshSession = await getFreshAuthSession(session);
+  if (!isUsableSession(freshSession)) return [];
 
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), AUTH_REST_TIMEOUT_MS);
@@ -80,7 +158,7 @@ export const fetchUserCompanyRolesViaRest = async (session: Session): Promise<Co
     const response = await fetch(`${SUPABASE_URL}/rest/v1/user_roles?${params.toString()}`, {
       headers: {
         apikey: SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${freshSession.access_token}`,
         Accept: "application/json",
       },
       signal: controller.signal,
@@ -104,7 +182,7 @@ export const fetchRestRowsViaAuth = async <T = any>(
   params: RestQueryParams,
   options?: { session?: Session | null; timeoutMs?: number }
 ): Promise<T[]> => {
-  const session = options?.session ?? readStoredAuthSession();
+  const session = await getFreshAuthSession(options?.session);
   if (!isUsableSession(session)) return [];
 
   const controller = new AbortController();
