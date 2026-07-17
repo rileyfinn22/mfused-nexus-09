@@ -42,6 +42,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Papa from "papaparse";
 import { z } from "zod";
+import { signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
 
 const customerSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
@@ -694,7 +695,8 @@ const CustomerDetail = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setArtworkFiles(data || []);
+      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+      setArtworkFiles(signedData || []);
     } catch (error) {
       console.error('Error fetching artwork:', error);
       setArtworkFiles([]);
@@ -2055,7 +2057,7 @@ const CustomerDetail = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.open(artwork.artwork_url, '_blank')}
+                          onClick={async () => window.open(await signStorageUrl('artwork', artwork.artwork_url), '_blank')}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
