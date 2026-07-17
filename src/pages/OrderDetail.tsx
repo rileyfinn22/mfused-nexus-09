@@ -239,7 +239,7 @@ const OrderDetail = () => {
       }
 
       if (data.order_items && data.order_items.length > 0) {
-        const skus = Array.from(new Set(data.order_items.map((item: any) => item.sku).filter(Boolean)));
+        const skus = Array.from(new Set<string>(data.order_items.map((item: any) => String(item.sku || '')).filter(Boolean)));
         if (skus.length > 0) {
           fetchRestRowsViaAuth<any>('artwork_files', {
             select: 'is_approved,sku',
