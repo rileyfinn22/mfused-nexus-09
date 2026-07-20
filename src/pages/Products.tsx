@@ -314,17 +314,16 @@ const Products = () => {
       }
 
       let countsByTemplate = new Map<string, number>();
-      if (templateInFilter) {
+      if (templateIds.length > 0) {
         const countParams: Record<string, string> = {
           select: 'template_id',
-          template_id: templateInFilter,
         };
         if (isVibeAdmin) {
           if (companyFilter !== 'all') countParams.company_id = `eq.${companyFilter}`;
         } else if (activeCompanyId) {
           countParams.company_id = `eq.${activeCompanyId}`;
         }
-        const countRows = await withTimeout(fetchRestRowsViaAuth<any>('products', countParams, { timeoutMs: 8000 }), 9000, []);
+        const countRows = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('products', countParams, 'template_id', templateIds, { timeoutMs: 6000, chunkSize: 100 }), 7000, []);
         (countRows || []).forEach((row: any) => {
           countsByTemplate.set(row.template_id, (countsByTemplate.get(row.template_id) || 0) + 1);
         });
