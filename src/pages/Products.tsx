@@ -53,7 +53,7 @@ import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { signStorageUrlsInRows } from "@/lib/storageUrl";
-import { fetchRestRowsViaAuth, formatPostgrestInFilter, withTimeout } from "@/lib/authSession";
+import { fetchRestRowsByInFilterViaAuth, fetchRestRowsViaAuth, formatPostgrestInFilter, withTimeout } from "@/lib/authSession";
 
 interface Product {
   id: string;
@@ -213,22 +213,19 @@ const Products = () => {
       const productsData = await fetchRestRowsViaAuth<any>('products', params, { timeoutMs: 10000 });
 
       // Batch fetch product_states + inventory in 2 queries (was N+1 per product)
-      const productIds = (productsData || []).map((p: any) => p.id);
-      const inFilter = productIds.length > 0 && productIds.length < 1500 ? formatPostgrestInFilter(productIds) : null;
-      const [statesData, inventoryRows, costRows] = inFilter
+      const productIds = (productsData || []).map((p: any) => p.id).filter(Boolean);
+      const inFilter = productIds.length > 0 ? formatPostgrestInFilter(productIds.slice(0, 1000)) : null;
+      const [statesData, inventoryRows, costRows] = productIds.length > 0
         ? await Promise.all([
-            withTimeout(fetchRestRowsViaAuth<any>('product_states', {
+            withTimeout(fetchRestRowsByInFilterViaAuth<any>('product_states', {
               select: '*',
-              product_id: inFilter,
-            }, { timeoutMs: 8000 }), 9000, []),
-            withTimeout(fetchRestRowsViaAuth<any>('inventory', {
+            }, 'product_id', productIds, { timeoutMs: 6000, chunkSize: 100 }), 7000, []),
+            withTimeout(fetchRestRowsByInFilterViaAuth<any>('inventory', {
               select: 'sku,product_id',
-              product_id: inFilter,
-            }, { timeoutMs: 8000 }), 9000, []),
-            withTimeout(fetchRestRowsViaAuth<any>('product_costs', {
+            }, 'product_id', productIds, { timeoutMs: 6000, chunkSize: 100 }), 7000, []),
+            withTimeout(fetchRestRowsByInFilterViaAuth<any>('product_costs', {
               select: 'product_id,cost',
-              product_id: inFilter,
-            }, { timeoutMs: 8000 }), 9000, []),
+            }, 'product_id', productIds, { timeoutMs: 5000, chunkSize: 75 }), 6000, []),
           ])
         : [[], [], []];
 
@@ -307,12 +304,10 @@ const Products = () => {
 
       // Template cost moved to companion table product_template_costs
       const templateCostMap: Record<string, number | null> = {};
-      const templateInFilter = templateIds.length > 0 && templateIds.length < 1500 ? formatPostgrestInFilter(templateIds) : null;
-      if (templateInFilter) {
-        const tCostRows = await withTimeout(fetchRestRowsViaAuth<any>('product_template_costs', {
+      if (templateIds.length > 0) {
+        const tCostRows = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('product_template_costs', {
           select: 'template_id,cost',
-          template_id: templateInFilter,
-        }, { timeoutMs: 8000 }), 9000, []);
+        }, 'template_id', templateIds, { timeoutMs: 5000, chunkSize: 100 }), 6000, []);
         (tCostRows || []).forEach((row: any) => {
           templateCostMap[row.template_id] = row.cost;
         });
