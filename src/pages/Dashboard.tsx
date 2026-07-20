@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
-import { fetchRestCountViaAuth, fetchRestRowsViaAuth, formatPostgrestInFilter, withTimeout } from "@/lib/authSession";
+import { fetchRestCountViaAuth, fetchRestRowsByInFilterViaAuth, fetchRestRowsViaAuth, withTimeout } from "@/lib/authSession";
 interface LowStockItem {
   sku: string;
   state: string;
@@ -68,35 +68,30 @@ const Dashboard = () => {
       const companyFilter = !isAdmin && companyId ? companyId : null;
       const companyParams = companyFilter ? { company_id: `eq.${companyFilter}` } : {};
 
-      const [inventoryData, ordersCount, inventoryValueData, productsData, ordersData] = await Promise.all([
+      const [inventoryData, ordersCount, inventoryValueData, ordersData] = await Promise.all([
         withTimeout(fetchRestRowsViaAuth<any>('inventory', {
           select: 'sku,state,available,redline,company_id',
           ...companyParams,
-          limit: 50000,
-        }, { timeoutMs: 9000 }), 10000, []),
+          limit: 5000,
+        }, { timeoutMs: 7000 }), 8000, []),
         withTimeout(fetchRestCountViaAuth('orders', {
           select: 'id',
           status: 'in.("pending","in_production","approved")',
           deleted_at: 'is.null',
           ...companyParams,
-        }, { timeoutMs: 9000 }), 10000, 0),
+        }, { timeoutMs: 7000 }), 8000, 0),
         withTimeout(fetchRestRowsViaAuth<any>('inventory', {
           select: 'available,product_id,company_id',
           ...companyParams,
-          limit: 50000,
-        }, { timeoutMs: 9000 }), 10000, []),
-        withTimeout(fetchRestRowsViaAuth<any>('products', {
-          select: 'id,company_id',
-          ...companyParams,
-          limit: 50000,
-        }, { timeoutMs: 9000 }), 10000, []),
+          limit: 5000,
+        }, { timeoutMs: 7000 }), 8000, []),
         withTimeout(fetchRestRowsViaAuth<any>('orders', {
           select: 'id,order_number,status,customer_name',
           deleted_at: 'is.null',
           ...companyParams,
           order: 'created_at.desc',
           limit: 5,
-        }, { timeoutMs: 9000 }), 10000, []),
+        }, { timeoutMs: 7000 }), 8000, []),
       ]);
 
       const lowStock = (inventoryData || [])
@@ -115,21 +110,19 @@ const Dashboard = () => {
       setOpenOrdersCount(ordersCount || 0);
 
       // Product cost moved to companion table product_costs
-      const dashProductIds = (productsData || []).map(p => p.id);
+      const dashProductIds = Array.from(new Set((inventoryValueData || []).map((item: any) => item.product_id).filter(Boolean)));
       const dashCostMap: Record<string, number> = {};
-      if (dashProductIds.length > 0 && dashProductIds.length < 1500) {
-        const costRows = await withTimeout(fetchRestRowsViaAuth<any>('product_costs', {
+      if (dashProductIds.length > 0) {
+        const costRows = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('product_costs', {
           select: 'product_id,cost',
-          product_id: formatPostgrestInFilter(dashProductIds),
-        }, { timeoutMs: 7000 }), 8000, []);
+        }, 'product_id', dashProductIds, { timeoutMs: 5000, chunkSize: 75 }), 6000, []);
         (costRows || []).forEach((row: any) => {
           dashCostMap[row.product_id] = row.cost || 0;
         });
       }
 
-      const productCostMap = new Map((productsData || []).map(p => [p.id, dashCostMap[p.id] || 0]));
       const totalValue = (inventoryValueData || []).reduce((sum, item) => {
-        const cost = productCostMap.get(item.product_id) || 0;
+        const cost = dashCostMap[item.product_id] || 0;
         return sum + (item.available * cost);
       }, 0);
 
