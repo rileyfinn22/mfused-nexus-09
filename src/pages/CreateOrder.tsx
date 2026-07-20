@@ -319,6 +319,11 @@ const CreateOrder = () => {
         if (isMounted) {
           setIsVibeAdmin(isAdmin);
           setRoleChecked(true);
+          if (!orderId) {
+            // Show the order form as soon as identity/role is known; products,
+            // companies, and saved addresses can continue filling in below.
+            setInitialLoading(false);
+          }
         }
 
         // For admins, wait until a customer company is selected or loaded from the order.
