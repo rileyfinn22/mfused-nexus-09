@@ -97,7 +97,7 @@ const companyFromRoleRow = (roleRow: CompanyRoleRow): CachedCompany | null => {
 const Invoices = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { activeCompanyId, isVibeAdmin, loading: activeCompanyLoading } = useActiveCompany();
+  const { activeCompanyId, activeCompanyName, isVibeAdmin, loading: activeCompanyLoading } = useActiveCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   // Read company filter from URL, default to "all" (only for vibe admins)
@@ -170,7 +170,7 @@ const Invoices = () => {
     }
 
     if (activeCompanyId) {
-      return { isAdmin: false, companyId: activeCompanyId, companyName: "", session };
+      return { isAdmin: false, companyId: activeCompanyId, companyName: activeCompanyName ?? "", session };
     }
 
     // CompanyContext intentionally releases the app shell before roles finish
@@ -746,6 +746,13 @@ const Invoices = () => {
           {loading ? (
             <div className="text-center py-12 text-muted-foreground">
               Loading invoices...
+            </div>
+          ) : loadError ? (
+            <div className="text-center py-12 space-y-3">
+              <p className="text-sm text-muted-foreground">{loadError}</p>
+              <Button size="sm" variant="outline" onClick={fetchInvoices}>
+                Retry
+              </Button>
             </div>
           ) : filteredInvoices.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
