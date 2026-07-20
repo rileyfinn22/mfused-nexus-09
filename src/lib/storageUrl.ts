@@ -199,6 +199,13 @@ export const createSignedStorageUrlMap = async (bucketName: string, filePaths: s
       return;
     }
 
+    // Serve from in-memory cache when possible
+    const cached = getCachedSignedUrl(bucketName, normalizedPath);
+    if (cached) {
+      result[filePath] = cached;
+      return;
+    }
+
     const originals = pathToOriginals.get(normalizedPath) || [];
     originals.push(filePath);
     pathToOriginals.set(normalizedPath, originals);
@@ -217,8 +224,13 @@ export const createSignedStorageUrlMap = async (bucketName: string, filePaths: s
     return result;
   }
 
+  // Split into chunks, then run several chunks in parallel to slash wall time.
+  const chunks: string[][] = [];
   for (let i = 0; i < paths.length; i += STORAGE_SIGN_BATCH_SIZE) {
-    const chunk = paths.slice(i, i + STORAGE_SIGN_BATCH_SIZE);
+    chunks.push(paths.slice(i, i + STORAGE_SIGN_BATCH_SIZE));
+  }
+
+  const runChunk = async (chunk: string[]) => {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), STORAGE_SIGN_TIMEOUT_MS);
 
@@ -241,6 +253,8 @@ export const createSignedStorageUrlMap = async (bucketName: string, filePaths: s
         const signedUrl = signedRows?.[index]?.signedUrl || signedRows?.[index]?.signedURL;
         const resolvedUrl = signedUrl ? resolveStorageSignedUrl(signedUrl) : null;
 
+        if (resolvedUrl) setCachedSignedUrl(bucketName, path, resolvedUrl);
+
         (pathToOriginals.get(path) || []).forEach((original) => {
           result[original] = resolvedUrl || original;
         });
@@ -255,6 +269,12 @@ export const createSignedStorageUrlMap = async (bucketName: string, filePaths: s
     } finally {
       window.clearTimeout(timeoutId);
     }
+  };
+
+  // Simple parallel pool
+  for (let i = 0; i < chunks.length; i += STORAGE_SIGN_MAX_PARALLEL) {
+    const batch = chunks.slice(i, i + STORAGE_SIGN_MAX_PARALLEL);
+    await Promise.all(batch.map(runChunk));
   }
 
   return result;
