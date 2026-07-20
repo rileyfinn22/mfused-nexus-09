@@ -318,7 +318,6 @@ const Artwork = () => {
       
       // Fetch all artwork rows once (parallel pagination) and reuse for
       // both the artwork list and the per-SKU template counts/thumbnails.
-      // This replaces what used to be a separate fetchAllArtwork() call.
       const artworkParams: Record<string, string | number> = {
         select: '*',
         order: 'created_at.desc',
@@ -330,14 +329,56 @@ const Artwork = () => {
         artworkParams.company_id = `eq.${companyFilter}`;
       }
 
-      let artworkData = await withTimeout(fetchRestRowsViaAuth<any>('artwork_files', artworkParams, { timeoutMs: 10000 }), 11000, []);
+      const artworkData = await withTimeout(fetchRestRowsViaAuth<any>('artwork_files', artworkParams, { timeoutMs: 10000 }), 11000, []) || [];
 
-      artworkData = await signStorageUrlsInRows('artwork', artworkData, ['artwork_url', 'preview_url']);
-
-      // Populate the flat artwork list used by the "All Artwork" tab.
+      // Render the flat artwork list immediately with unsigned URLs; sign in background.
       if (!selectedProduct) {
         setArtworkFiles(artworkData);
       }
+
+      // Sign artwork thumbnails/urls in background so the grid appears fast.
+      (async () => {
+        try {
+          const signed = await signStorageUrlsInRows('artwork', artworkData, ['artwork_url', 'preview_url']);
+          if (!selectedProduct) setArtworkFiles(signed);
+
+          const signedThumbs: Record<string, string | null> = {};
+          const signedPdfs: Record<string, string> = {};
+          signed?.forEach((art: any) => {
+            if (!signedThumbs[art.sku] || art.is_approved) {
+              if (isUsableArtworkPreviewUrl(art.filename, art.preview_url)) {
+                signedThumbs[art.sku] = art.preview_url;
+              } else if (art.filename && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(art.filename)) {
+                signedThumbs[art.sku] = art.artwork_url;
+              }
+            }
+            if ((!signedPdfs[art.sku] || art.is_approved) && art.filename && /\.pdf$/i.test(art.filename)) {
+              signedPdfs[art.sku] = art.artwork_url;
+            }
+          });
+          setSkuArtworkThumbnails(signedThumbs);
+          setSkuPdfArtworkUrls(signedPdfs);
+
+          // Rebuild derived template thumbnails with signed URLs
+          const derived: Record<string, string> = {};
+          templatesData?.forEach((template: any) => {
+            const tps = filteredProductsData.filter((p: any) => p.template_id === template.id);
+            const skus = tps.map((p: any) => p.item_id).filter(Boolean) as string[];
+            for (const sku of skus) {
+              if (signedThumbs[sku]) { derived[template.id] = signedThumbs[sku]!; break; }
+            }
+            if (!derived[template.id]) {
+              for (const prod of tps) {
+                if (prod.image_url) { derived[template.id] = prod.image_url; break; }
+              }
+            }
+          });
+          setTemplateDerivedThumbnails(derived);
+        } catch (e) {
+          console.error('Background artwork URL signing failed:', e);
+        }
+      })();
+
 
       
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
