@@ -53,6 +53,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [isVendorPortalUser, companyLoading, navigate]);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadingFailsafe = window.setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 1500);
+
     checkAuth();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -63,7 +68,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(loadingFailsafe);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const checkAuth = async () => {
