@@ -1,4 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -160,6 +161,18 @@ const refreshStoredAuthSession = async (session: Session): Promise<Session | nul
     if (!isUsableSession(refreshed)) return null;
 
     persistAuthSession(refreshed);
+    try {
+      // Keep the Supabase JS client's in-memory session aligned with the
+      // direct REST refresh path. Without this, pages that still use the SDK
+      // can keep an expired token while REST helpers have a fresh one.
+      await supabase.auth.setSession({
+        access_token: refreshed.access_token,
+        refresh_token: refreshed.refresh_token,
+      });
+    } catch {
+      // The refreshed session is already persisted for REST callers; don't
+      // fail the app shell if the SDK sync path is unavailable.
+    }
     return refreshed;
   } catch {
     return null;
