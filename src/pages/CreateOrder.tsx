@@ -19,6 +19,13 @@ import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import {
+  fetchRestRowsByInFilterViaAuth,
+  fetchRestRowsViaAuth,
+  fetchUserCompanyRolesViaRest,
+  readStoredAuthSession,
+  withTimeout,
+} from "@/lib/authSession";
 
 const orderSchema = z.object({
   customerName: z.string().trim().min(1, "Customer name is required").max(200),
@@ -62,43 +69,40 @@ interface ProductTemplateOption {
 }
 
 const PRODUCT_PAGE_SIZE = 1000;
+const ORDER_FORM_TIMEOUT_MS = 7000;
 
 const fetchAllOrderProducts = async (companyId?: string | null): Promise<Product[]> => {
-  const allProducts: Product[] = [];
+  // Never pull the whole product catalog while the order form is opening.
+  // Admin users choose a company first; company users are scoped by their role.
+  if (!companyId) return [];
 
-  for (let from = 0; ; from += PRODUCT_PAGE_SIZE) {
-    const to = from + PRODUCT_PAGE_SIZE - 1;
-    let query = supabase
-      .from('products')
-      .select('id, name, item_id, price, description, image_url, company_id, state')
-      .order('name')
-      .range(from, to);
-    if (companyId) {
-      query = query.eq('company_id', companyId);
-    }
-    const { data, error } = await query;
+  const productRows = await fetchRestRowsViaAuth<any>(
+    "products",
+    {
+      select: "id,name,item_id,price,description,image_url,company_id,state",
+      company_id: `eq.${companyId}`,
+      order: "name.asc",
+      limit: 5000,
+    },
+    { timeoutMs: ORDER_FORM_TIMEOUT_MS }
+  );
 
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-
-    allProducts.push(...(data as any[]).map((p) => ({ ...p, cost: null as number | null })));
-    if (data.length < PRODUCT_PAGE_SIZE) break;
-  }
+  const allProducts: Product[] = productRows.map((p) => ({ ...p, cost: null as number | null }));
 
   // Product cost moved to companion table product_costs
   const productIds = allProducts.map((p) => p.id);
   if (productIds.length > 0) {
     const costMap: Record<string, number | null> = {};
-    for (let i = 0; i < productIds.length; i += PRODUCT_PAGE_SIZE) {
-      const batch = productIds.slice(i, i + PRODUCT_PAGE_SIZE);
-      const { data: costRows } = await (supabase as any)
-        .from('product_costs')
-        .select('product_id, cost')
-        .in('product_id', batch);
-      (costRows || []).forEach((row: any) => {
-        costMap[row.product_id] = row.cost;
-      });
-    }
+    const costRows = await fetchRestRowsByInFilterViaAuth<any>(
+      "product_costs",
+      { select: "product_id,cost" },
+      "product_id",
+      productIds,
+      { timeoutMs: ORDER_FORM_TIMEOUT_MS, chunkSize: 100 }
+    );
+    (costRows || []).forEach((row: any) => {
+      costMap[row.product_id] = row.cost;
+    });
     allProducts.forEach((p) => {
       p.cost = costMap[p.id] ?? null;
     });
@@ -207,7 +211,7 @@ interface SavedAddress {
 const CreateOrder = () => {
   const navigate = useNavigate();
   const { orderId } = useParams();
-  const { activeCompanyId } = useActiveCompany();
+  const { activeCompanyId, isVibeAdmin: contextIsVibeAdmin } = useActiveCompany();
   const [products, setProducts] = useState<Product[]>([]);
   const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
@@ -300,29 +304,31 @@ const CreateOrder = () => {
       try {
         setInitialLoading(true);
         
-        // Check role first
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || !isMounted) return;
+        // Use the stored session first so a slow auth round-trip never traps the form behind a spinner.
+        const session = readStoredAuthSession();
+        const user = session?.user;
+        if (!user || !session || !isMounted) return;
 
-        const { data: userRoles } = await supabase
-          .from('user_roles')
-          .select('role, company_id')
-          .eq('user_id', user.id);
+        const userRoles = await withTimeout(
+          fetchUserCompanyRolesViaRest(session),
+          ORDER_FORM_TIMEOUT_MS,
+          []
+        );
 
-        const isAdmin = (userRoles || []).some((r: any) => r.role === 'vibe_admin');
+        const isAdmin = contextIsVibeAdmin || (userRoles || []).some((r: any) => r.role === 'vibe_admin');
         if (isMounted) {
           setIsVibeAdmin(isAdmin);
           setRoleChecked(true);
         }
 
-        // For non-admins, scope to the currently active company (handles multi-company users).
-        // Fall back to the first role's company_id only if the active company isn't ready yet.
-        const productsCompanyId = isAdmin
-          ? null
-          : (activeCompanyId ?? (userRoles?.[0]?.company_id ?? null));
-        const productsData = await fetchAllOrderProducts(productsCompanyId);
-        if (isMounted) {
-          setProducts(productsData);
+        // For admins, wait until a customer company is selected or loaded from the order.
+        // For company users, scope to their active/company role. Never fetch all products here.
+        const productsCompanyId = !isAdmin ? (activeCompanyId ?? (userRoles?.[0]?.company_id ?? null)) : null;
+        if (productsCompanyId) {
+          const productsData = await fetchAllOrderProducts(productsCompanyId);
+          if (isMounted) {
+            setProducts(productsData);
+          }
         }
 
         // Fetch all companies for reference
@@ -517,6 +523,10 @@ const CreateOrder = () => {
       const companyId = isVibeAdmin
         ? (selectedCompanyId || null)
         : (activeCompanyId || null);
+      if (!companyId) {
+        setProducts([]);
+        return;
+      }
       const data = await fetchAllOrderProducts(companyId);
       setProducts(data);
     })();
