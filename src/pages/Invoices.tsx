@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,15 +30,68 @@ import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
-import { fetchRestRowsViaAuth, readStoredAuthSession } from "@/lib/authSession";
+import {
+  CompanyRoleRow,
+  fetchRestRowsViaAuth,
+  fetchUserCompanyRolesViaRest,
+  readStoredAuthSession,
+  withTimeout,
+} from "@/lib/authSession";
 
 const INVOICE_LIST_LIMIT = 500;
 const LIST_QUERY_TIMEOUT_MS = 10000;
+const INVOICE_SCOPE_TIMEOUT_MS = 5000;
+const ACTIVE_COMPANY_KEY = "activeCompanyId";
+const COMPANY_CACHE_PREFIX = "companyContext";
+
+type CachedCompany = {
+  id: string;
+  name: string;
+  role: string;
+};
+
+type CachedCompanyState = {
+  companies: CachedCompany[];
+  hasVibeAdminRole?: boolean;
+};
+
+type InvoiceScope = {
+  isAdmin: boolean;
+  companyId: string | null;
+  companyName: string;
+  session: NonNullable<ReturnType<typeof readStoredAuthSession>>;
+};
 
 const createAbortSignal = (timeoutMs = LIST_QUERY_TIMEOUT_MS) => {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   return { signal: controller.signal, cleanup: () => window.clearTimeout(timeoutId) };
+};
+
+const readCachedCompanyState = (userId: string): CachedCompanyState | null => {
+  try {
+    const raw = window.localStorage.getItem(`${COMPANY_CACHE_PREFIX}:${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedCompanyState;
+    return Array.isArray(parsed.companies) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const getPreferredCachedCompany = (companies: CachedCompany[]) => {
+  const savedCompanyId = window.localStorage.getItem(ACTIVE_COMPANY_KEY);
+  return companies.find((company) => company.id === savedCompanyId) ?? companies[0] ?? null;
+};
+
+const companyFromRoleRow = (roleRow: CompanyRoleRow): CachedCompany | null => {
+  const company = Array.isArray(roleRow.companies) ? roleRow.companies[0] : roleRow.companies;
+  if (!company?.id) return null;
+  return {
+    id: String(company.id),
+    name: String(company.name ?? ""),
+    role: String(roleRow.role),
+  };
 };
 
 const Invoices = () => {
@@ -55,6 +108,8 @@ const Invoices = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const invoiceFetchIdRef = useRef(0);
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
   const [expandedDetailRows, setExpandedDetailRows] = useState<Set<string>>(new Set());
   const toggleDetailRow = (id: string) => {
@@ -78,18 +133,10 @@ const Invoices = () => {
   };
 
   useEffect(() => {
-    // For customer/company users, wait until the active company is resolved before fetching.
-    // This prevents brief "wrong company" fetches that can lead to deny/redirect flicker.
     const hasStoredSession = Boolean(readStoredAuthSession()?.user?.id);
-    if (activeCompanyLoading && !hasStoredSession) return;
+    if (!hasStoredSession && activeCompanyLoading) return;
 
-    if (isVibeAdmin) {
-      fetchCompanies();
-      fetchInvoices();
-      return;
-    }
-
-    if (!activeCompanyId && !hasStoredSession) {
+    if (!hasStoredSession) {
       navigate('/login');
       return;
     }
@@ -114,41 +161,114 @@ const Invoices = () => {
     }
   };
 
-  const fetchInvoices = async () => {
-    setLoading(true);
+  const resolveInvoiceScope = async (): Promise<InvoiceScope | null> => {
+    const session = readStoredAuthSession();
+    if (!session?.user?.id) return null;
 
-    // For non-admin users we must have an active company before querying.
-    if (!activeCompanyId && !readStoredAuthSession()?.user?.id) {
-      navigate('/login');
-      return;
-    }
-
-    const params: Record<string, string | number> = {
-      select: 'id,invoice_number,company_id,order_id,parent_invoice_id,invoice_type,status,total,total_paid,due_date,shipped_date,description,notes,quickbooks_id,quickbooks_sync_status,quickbooks_payment_link,shipment_number,orders(order_number,customer_name,po_number,description),companies(name)',
-      deleted_at: 'is.null',
-      order: 'created_at.desc',
-      limit: INVOICE_LIST_LIMIT,
-    };
-
-    // For vibe admins: use URL company filter if set
-    // For regular users: always filter by their active company
     if (isVibeAdmin) {
-      if (companyFilter !== 'all') {
-        params.company_id = `eq.${companyFilter}`;
-      }
-    } else if (activeCompanyId) {
-      params.company_id = `eq.${activeCompanyId}`;
+      return { isAdmin: true, companyId: null, companyName: "", session };
     }
+
+    if (activeCompanyId) {
+      return { isAdmin: false, companyId: activeCompanyId, companyName: "", session };
+    }
+
+    // CompanyContext intentionally releases the app shell before roles finish
+    // loading. Use its local cache first so invoices never issue a broad,
+    // unscoped query while the role fetch is still in flight.
+    const cached = readCachedCompanyState(session.user.id);
+    if (cached?.hasVibeAdminRole) {
+      return { isAdmin: true, companyId: null, companyName: "", session };
+    }
+
+    const cachedCompany = cached ? getPreferredCachedCompany(cached.companies) : null;
+    if (cachedCompany) {
+      return {
+        isAdmin: false,
+        companyId: cachedCompany.id,
+        companyName: cachedCompany.name,
+        session,
+      };
+    }
+
+    const roleRows = await withTimeout(
+      fetchUserCompanyRolesViaRest(session),
+      INVOICE_SCOPE_TIMEOUT_MS,
+      [] as CompanyRoleRow[]
+    );
+
+    if (roleRows.some((roleRow) => roleRow.role === "vibe_admin")) {
+      return { isAdmin: true, companyId: null, companyName: "", session };
+    }
+
+    const roleCompany = roleRows.map(companyFromRoleRow).find(Boolean) ?? null;
+    if (!roleCompany) return null;
+
+    return {
+      isAdmin: false,
+      companyId: roleCompany.id,
+      companyName: roleCompany.name,
+      session,
+    };
+  };
+
+  const fetchInvoices = async () => {
+    const requestId = ++invoiceFetchIdRef.current;
+    setLoading(true);
+    setLoadError(null);
 
     try {
-      const data = await fetchRestRowsViaAuth<any>('invoices', params);
-      if (data) {
-        setInvoices(data);
+      const scope = await resolveInvoiceScope();
+      if (requestId !== invoiceFetchIdRef.current) return;
+
+      if (!scope) {
+        setInvoices([]);
+        setIsCompanyUser(false);
+        setUserCompanyId(null);
+        setUserCompanyName("");
+        setLoadError("Invoice access is still loading. Try again in a moment.");
+        return;
       }
+
+      setIsCompanyUser(!scope.isAdmin && Boolean(scope.companyId));
+      setUserCompanyId(scope.companyId);
+      setUserCompanyName(scope.companyName);
+
+      if (scope.isAdmin) fetchCompanies();
+
+      const params: Record<string, string | number> = {
+        select: 'id,invoice_number,company_id,order_id,parent_invoice_id,invoice_type,status,total,total_paid,due_date,shipped_date,description,notes,quickbooks_id,quickbooks_sync_status,quickbooks_payment_link,shipment_number,orders(order_number,customer_name,po_number,description),companies(name)',
+        deleted_at: 'is.null',
+        order: 'created_at.desc',
+        limit: INVOICE_LIST_LIMIT,
+      };
+
+      // For vibe admins: use URL company filter if set.
+      // For regular users: always query their resolved company scope.
+      if (scope.isAdmin) {
+        if (companyFilter !== 'all') {
+          params.company_id = `eq.${companyFilter}`;
+        }
+      } else if (scope.companyId) {
+        params.company_id = `eq.${scope.companyId}`;
+      }
+
+      const data = await fetchRestRowsViaAuth<any>('invoices', params, {
+        session: scope.session,
+        timeoutMs: LIST_QUERY_TIMEOUT_MS,
+      });
+
+      if (requestId !== invoiceFetchIdRef.current) return;
+      setInvoices(data || []);
     } catch (error) {
+      if (requestId !== invoiceFetchIdRef.current) return;
       console.error('Invoice fetch error:', error);
+      setInvoices([]);
+      setLoadError("Invoices took too long to load. Please retry.");
     } finally {
-      setLoading(false);
+      if (requestId === invoiceFetchIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
