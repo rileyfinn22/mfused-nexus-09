@@ -36,6 +36,12 @@ export const withTimeout = async <T,>(
 
   try {
     return await Promise.race([Promise.resolve(promise), timeoutPromise]);
+  } catch (error) {
+    if (hasFallback) {
+      return fallback as T;
+    }
+
+    throw error;
   } finally {
     if (timeoutId) window.clearTimeout(timeoutId);
   }
@@ -272,6 +278,35 @@ export const fetchRestRowsViaAuth = async <T = any>(
     const page = await fetchPage(`${offset}-${to}`);
     rows.push(...page);
     if (page.length < pageSize) break;
+  }
+
+  return rows;
+};
+
+export const fetchRestRowsByInFilterViaAuth = async <T = any>(
+  table: string,
+  params: RestQueryParams,
+  filterColumn: string,
+  values: string[],
+  options?: { session?: Session | null; timeoutMs?: number; chunkSize?: number }
+): Promise<T[]> => {
+  const uniqueValues = Array.from(new Set(values.filter(Boolean)));
+  if (uniqueValues.length === 0) return [];
+
+  const chunkSize = Math.max(1, Math.min(options?.chunkSize ?? 100, 250));
+  const rows: T[] = [];
+
+  for (let start = 0; start < uniqueValues.length; start += chunkSize) {
+    const chunk = uniqueValues.slice(start, start + chunkSize);
+    const page = await fetchRestRowsViaAuth<T>(
+      table,
+      {
+        ...params,
+        [filterColumn]: formatPostgrestInFilter(chunk),
+      },
+      options
+    );
+    rows.push(...page);
   }
 
   return rows;
