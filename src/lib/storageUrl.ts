@@ -5,8 +5,29 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 const STORAGE_PATH_PREFIX = "/storage/v1";
 const STORAGE_OBJECT_PATH_PATTERN = /\/storage\/v1\/object\/(?:sign|public|authenticated)\/([^/]+)\/(.+)$/;
-const STORAGE_SIGN_TIMEOUT_MS = 7000;
-const STORAGE_SIGN_BATCH_SIZE = 100;
+const STORAGE_SIGN_TIMEOUT_MS = 10000;
+const STORAGE_SIGN_BATCH_SIZE = 500;
+const STORAGE_SIGN_MAX_PARALLEL = 6;
+const STORAGE_SIGN_CACHE_TTL_MS = 55 * 60 * 1000; // signed URLs last 60m; cache slightly less
+
+type SignedCacheEntry = { url: string; expiresAt: number };
+const signedUrlCache = new Map<string, SignedCacheEntry>();
+
+const cacheKey = (bucket: string, path: string) => `${bucket}::${path}`;
+
+const getCachedSignedUrl = (bucket: string, path: string) => {
+  const entry = signedUrlCache.get(cacheKey(bucket, path));
+  if (!entry) return null;
+  if (entry.expiresAt < Date.now()) {
+    signedUrlCache.delete(cacheKey(bucket, path));
+    return null;
+  }
+  return entry.url;
+};
+
+const setCachedSignedUrl = (bucket: string, path: string, url: string) => {
+  signedUrlCache.set(cacheKey(bucket, path), { url, expiresAt: Date.now() + STORAGE_SIGN_CACHE_TTL_MS });
+};
 
 const stripStoragePathDecorators = (value: string) => value.split("#")[0].split("?")[0];
 
