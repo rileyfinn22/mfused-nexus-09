@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { AddProductToTemplateDialog } from "@/components/AddProductToTemplateDialog";
 import { signStorageUrlsInRows } from "@/lib/storageUrl";
+import { fetchRestRowsByInFilterViaAuth, fetchRestRowsViaAuth, withTimeout } from "@/lib/authSession";
 
 interface ProductTemplate {
   id: string;
@@ -134,46 +135,46 @@ export function CompanyProductTemplates({
   }, [selectedTemplate]);
 
   const fetchTemplates = async () => {
+    setLoading(true);
     try {
       // Fetch templates that belong to this company OR are global (no company_id)
       // This ensures company-specific templates are only visible to their owner
-      const { data: templatesData, error: templatesError } = await supabase
-        .from('product_templates')
-        .select('*')
-        .or(`company_id.eq.${companyId},company_id.is.null`)
-        .order('name');
-
-      if (templatesError) throw templatesError;
+      const templatesData = await withTimeout(fetchRestRowsViaAuth<any>('product_templates', {
+        select: '*',
+        or: `(company_id.eq.${companyId},company_id.is.null)`,
+        order: 'name.asc',
+        limit: 1000,
+      }, { timeoutMs: 7000 }), 8000, []);
 
       // Template cost moved to companion table product_template_costs
       const templateIds = (templatesData || []).map(t => t.id);
       const costMap: Record<string, number | null> = {};
       if (templateIds.length > 0) {
-        const { data: costRows } = await (supabase as any)
-          .from('product_template_costs')
-          .select('template_id, cost')
-          .in('template_id', templateIds);
+        const costRows = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('product_template_costs', {
+          select: 'template_id,cost',
+        }, 'template_id', templateIds, { timeoutMs: 7000, chunkSize: 100 }), 8000, []);
         (costRows || []).forEach((row: any) => {
           costMap[row.template_id] = row.cost;
         });
       }
 
-      // Fetch product counts for this company
-      const templatesWithCounts = await Promise.all(
-        (templatesData || []).map(async (template) => {
-          const { count } = await supabase
-            .from('products')
-            .select('id', { count: 'exact', head: true })
-            .eq('template_id', template.id)
-            .eq('company_id', companyId);
+      const countMap: Record<string, number> = {};
+      if (templateIds.length > 0) {
+        const productRows = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('products', {
+          select: 'template_id',
+          company_id: `eq.${companyId}`,
+          limit: 10000,
+        }, 'template_id', templateIds, { timeoutMs: 7000, chunkSize: 75 }), 8000, []);
+        (productRows || []).forEach((row: any) => {
+          if (row.template_id) countMap[row.template_id] = (countMap[row.template_id] || 0) + 1;
+        });
+      }
 
-          return {
-            ...template,
-            cost: costMap[template.id] ?? null,
-            product_count: count || 0
-          };
-        })
-      );
+      const templatesWithCounts = (templatesData || []).map((template: any) => ({
+        ...template,
+        cost: costMap[template.id] ?? null,
+        product_count: countMap[template.id] || 0,
+      }));
 
       // Show all templates owned by this company (even with 0 products)
       // For global templates (no company_id), only show if they have products
@@ -206,10 +207,9 @@ export function CompanyProductTemplates({
       const productIds = (data || []).map(p => p.id);
       const productCostMap: Record<string, number | null> = {};
       if (productIds.length > 0) {
-        const { data: costRows } = await (supabase as any)
-          .from('product_costs')
-          .select('product_id, cost')
-          .in('product_id', productIds);
+        const costRows = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('product_costs', {
+          select: 'product_id,cost',
+        }, 'product_id', productIds, { timeoutMs: 7000, chunkSize: 100 }), 8000, []);
         (costRows || []).forEach((row: any) => {
           productCostMap[row.product_id] = row.cost;
         });
@@ -225,9 +225,22 @@ export function CompanyProductTemplates({
 
   const fetchArtworkData = async () => {
     try {
-      const { data: statusData } = await supabase
-        .from('artwork_files')
-        .select('sku, is_approved');
+      const companyProducts = await withTimeout(fetchRestRowsViaAuth<any>('products', {
+        select: 'item_id',
+        company_id: `eq.${companyId}`,
+        limit: 10000,
+      }, { timeoutMs: 7000 }), 8000, []);
+      const skus = Array.from(new Set((companyProducts || []).map((p: any) => p.item_id).filter(Boolean)));
+      if (skus.length === 0) {
+        setArtworkStatus({});
+        setArtworkThumbnails({});
+        return;
+      }
+
+      const statusData = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('artwork_files', {
+        select: 'sku,is_approved',
+        limit: 10000,
+      }, 'sku', skus, { timeoutMs: 7000, chunkSize: 75 }), 8000, []);
 
       const statusMap: Record<string, boolean> = {};
       statusData?.forEach(artwork => {
@@ -237,11 +250,11 @@ export function CompanyProductTemplates({
       });
       setArtworkStatus(statusMap);
 
-      const { data: thumbData } = await supabase
-        .from('artwork_files')
-        .select('sku, preview_url, artwork_url, is_approved')
-        .order('is_approved', { ascending: false })
-        .order('created_at', { ascending: false });
+      const thumbData = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('artwork_files', {
+        select: 'sku,preview_url,artwork_url,is_approved,created_at',
+        order: 'is_approved.desc,created_at.desc',
+        limit: 10000,
+      }, 'sku', skus, { timeoutMs: 7000, chunkSize: 75 }), 8000, []);
 
       const signedThumbData = await signStorageUrlsInRows('artwork', thumbData || [], ['artwork_url', 'preview_url']);
       const thumbnailMap: Record<string, string> = {};

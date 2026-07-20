@@ -1,0 +1,12 @@
+CREATE INDEX IF NOT EXISTS idx_product_templates_company_name ON public.product_templates (company_id, name);
+CREATE INDEX IF NOT EXISTS idx_product_templates_global_name ON public.product_templates (name) WHERE company_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_print_template_companies_company_template ON public.print_template_companies (company_id, template_id);
+CREATE INDEX IF NOT EXISTS idx_print_templates_type_created_at_desc ON public.print_templates (product_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_workshop_orders_company_created_at_desc ON public.workshop_orders (company_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_print_orders_workshop_order_id ON public.print_orders (workshop_order_id);
+CREATE INDEX IF NOT EXISTS idx_financed_invoices_financed_date_desc ON public.financed_invoices (financed_date DESC);
+CREATE INDEX IF NOT EXISTS idx_financed_invoices_finance_status ON public.financed_invoices (finance_status);
+CREATE INDEX IF NOT EXISTS idx_finance_deposits_payment_date_desc ON public.finance_deposits (payment_date DESC);
+CREATE INDEX IF NOT EXISTS idx_finance_repayments_payment_date_desc ON public.finance_repayments (payment_date DESC);
+CREATE INDEX IF NOT EXISTS idx_finance_repayments_confirmation_batch ON public.finance_repayments (confirmation_status, payment_batch_id);
+CREATE INDEX IF NOT EXISTS idx_finance_deposits_confirmation_status ON public.finance_deposits (confirmation_status);

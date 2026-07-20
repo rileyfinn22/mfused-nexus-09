@@ -11,6 +11,7 @@ import { formatUSD } from "@/lib/financeUtils";
 import { DualCurrency } from "@/components/DualCurrency";
 import type { FinanceLang } from "@/lib/financeI18n";
 import { useFinanceLang } from "@/lib/financeI18n";
+import { fetchRestRowsViaAuth, withTimeout } from "@/lib/authSession";
 
 interface Props {
   isVibeAdmin: boolean;
@@ -42,19 +43,28 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser, lang: lang
 
   const fetchAll = async () => {
     setLoading(true);
-    const [repRes, depRes] = await Promise.all([
-      supabase
-        .from("finance_repayments")
-        .select("*, financed_invoices(id, description, financed_amount, exchange_rate, vendor_pos(po_number, description))")
-        .order("payment_date", { ascending: false }),
-      supabase
-        .from("finance_deposits")
-        .select("*")
-        .order("payment_date", { ascending: false }),
-    ]);
-    setRepayments(repRes.data || []);
-    setDeposits(depRes.data || []);
-    setLoading(false);
+    try {
+      const [repRows, depRows] = await Promise.all([
+        withTimeout(fetchRestRowsViaAuth<any>("finance_repayments", {
+          select: "*,financed_invoices(id,description,financed_amount,exchange_rate,vendor_pos(po_number,description))",
+          order: "payment_date.desc",
+          limit: 5000,
+        }, { timeoutMs: 7000 }), 8000, []),
+        withTimeout(fetchRestRowsViaAuth<any>("finance_deposits", {
+          select: "*",
+          order: "payment_date.desc",
+          limit: 1000,
+        }, { timeoutMs: 7000 }), 8000, []),
+      ]);
+      setRepayments(repRows || []);
+      setDeposits(depRows || []);
+    } catch (error) {
+      console.error("Error loading finance confirmations:", error);
+      setRepayments([]);
+      setDeposits([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleConfirm = async (id: string, table: "finance_repayments" | "finance_deposits") => {
