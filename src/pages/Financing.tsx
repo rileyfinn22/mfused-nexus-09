@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useFinanceLang } from "@/lib/financeI18n";
 import { FinanceLangToggle } from "@/components/FinanceLangToggle";
 import { CardCurrency, DualCurrency } from "@/components/DualCurrency";
+import { fetchRestRowsViaAuth, getFreshAuthSession, withTimeout } from "@/lib/authSession";
 
 // Inline-editable text cell for the financing table (description / invoice #).
 // Click to edit; Enter or blur saves; Escape cancels. Stops row-navigation clicks.
@@ -132,35 +133,58 @@ export default function Financing() {
   useEffect(() => { checkAccess(); }, []);
 
   const checkAccess = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { navigate("/login"); return; }
-    const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).in("role", ["vibe_admin", "finance"]);
+    const session = await getFreshAuthSession();
+    if (!session?.user?.id) { navigate("/login"); return; }
+    const data = await withTimeout(fetchRestRowsViaAuth<any>("user_roles", {
+      select: "role",
+      user_id: `eq.${session.user.id}`,
+      role: 'in.("vibe_admin","finance")',
+    }, { session, timeoutMs: 7000 }), 8000, []);
     if (!data || data.length === 0) { navigate("/dashboard"); return; }
     const roles = data.map((r: any) => r.role as string);
     if (roles.includes("vibe_admin")) setUserRole("vibe_admin");
     else setUserRole("finance");
     setIsAuthorized(true);
-    fetchData();
+    fetchData(session);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (sessionOverride?: any) => {
     setLoading(true);
-    const [invRes, depRes, repRes] = await Promise.all([
-      supabase.from("financed_invoices").select("*, invoices(invoice_number, total, orders(order_number, customer_name, description)), vendor_pos(po_number, description, total, orders(order_number, customer_name, description), vendors(name))").order("financed_date", { ascending: false }),
-      supabase.from("finance_deposits").select("*").order("payment_date", { ascending: false }),
-      supabase.from("finance_repayments").select("id, amount, source, payment_method, payment_batch_id, confirmation_status, payment_date"),
-    ]);
-    setInvoices(invRes.data || []);
-    setDeposits(depRes.data || []);
-    const reps = repRes.data || [];
-    setRepayments(reps);
-    // Count pending confirmations by BATCH: a wire / deposit-pull batch is one confirmation, not one per allocation row.
-    const pendingReps = reps.filter((r: any) => r.confirmation_status === "pending");
-    const pendingBatches = new Set(pendingReps.filter((r: any) => r.payment_batch_id).map((r: any) => r.payment_batch_id));
-    const pendingUnbatched = pendingReps.filter((r: any) => !r.payment_batch_id).length;
-    const pendingDeposits = (depRes.data || []).filter((d: any) => d.confirmation_status === "pending").length;
-    setPendingConfirmations(pendingBatches.size + pendingUnbatched + pendingDeposits);
-    setLoading(false);
+    try {
+      const [invRows, depRows, repRows] = await Promise.all([
+        withTimeout(fetchRestRowsViaAuth<any>("financed_invoices", {
+          select: "*,invoices(invoice_number,total,orders(order_number,customer_name,description)),vendor_pos(po_number,description,total,orders(order_number,customer_name,description),vendors(name))",
+          order: "financed_date.desc",
+          limit: 1000,
+        }, { session: sessionOverride, timeoutMs: 7000 }), 8000, []),
+        withTimeout(fetchRestRowsViaAuth<any>("finance_deposits", {
+          select: "*",
+          order: "payment_date.desc",
+          limit: 1000,
+        }, { session: sessionOverride, timeoutMs: 7000 }), 8000, []),
+        withTimeout(fetchRestRowsViaAuth<any>("finance_repayments", {
+          select: "id,amount,source,payment_method,payment_batch_id,confirmation_status,payment_date",
+          limit: 5000,
+        }, { session: sessionOverride, timeoutMs: 7000 }), 8000, []),
+      ]);
+      setInvoices(invRows || []);
+      setDeposits(depRows || []);
+      const reps = repRows || [];
+      setRepayments(reps);
+      // Count pending confirmations by BATCH: a wire / deposit-pull batch is one confirmation, not one per allocation row.
+      const pendingReps = reps.filter((r: any) => r.confirmation_status === "pending");
+      const pendingBatches = new Set(pendingReps.filter((r: any) => r.payment_batch_id).map((r: any) => r.payment_batch_id));
+      const pendingUnbatched = pendingReps.filter((r: any) => !r.payment_batch_id).length;
+      const pendingDeposits = (depRows || []).filter((d: any) => d.confirmation_status === "pending").length;
+      setPendingConfirmations(pendingBatches.size + pendingUnbatched + pendingDeposits);
+    } catch (error) {
+      console.error("Error loading financing data:", error);
+      setInvoices([]);
+      setDeposits([]);
+      setRepayments([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Inline-edit save for description / invoice_number directly on the table.

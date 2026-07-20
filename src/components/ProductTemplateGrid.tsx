@@ -32,6 +32,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Package, Plus, Pencil, Upload, X, ImageIcon, Copy, Trash2, LayoutGrid, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { fetchRestRowsByInFilterViaAuth, fetchRestRowsViaAuth, withTimeout } from "@/lib/authSession";
 
 interface ProductTemplate {
   id: string;
@@ -94,54 +95,45 @@ export function ProductTemplateGrid({
   }, [companyFilter]);
 
   const fetchTemplates = async () => {
+    setLoading(true);
     try {
       // Fetch templates (when a company is selected, only show that company's templates + global)
-      let templatesQuery = supabase
-        .from('product_templates')
-        .select('*');
-
-      if (companyFilter !== 'all') {
-        templatesQuery = templatesQuery.or(`company_id.eq.${companyFilter},company_id.is.null`);
-      }
-
-      const { data: templatesData, error: templatesError } = await templatesQuery.order('name');
-
-      if (templatesError) throw templatesError;
+      const templatesData = await withTimeout(fetchRestRowsViaAuth<any>('product_templates', {
+        select: '*',
+        ...(companyFilter !== 'all' ? { or: `(company_id.eq.${companyFilter},company_id.is.null)` } : {}),
+        order: 'name.asc',
+        limit: 1000,
+      }, { timeoutMs: 7000 }), 8000, []);
 
       // Template cost moved to companion table product_template_costs
       const templateIds = (templatesData || []).map(t => t.id);
       const costMap: Record<string, number | null> = {};
       if (templateIds.length > 0) {
-        const { data: costRows } = await (supabase as any)
-          .from('product_template_costs')
-          .select('template_id, cost')
-          .in('template_id', templateIds);
+        const costRows = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('product_template_costs', {
+          select: 'template_id,cost',
+        }, 'template_id', templateIds, { timeoutMs: 7000, chunkSize: 100 }), 8000, []);
         (costRows || []).forEach((row: any) => {
           costMap[row.template_id] = row.cost;
         });
       }
 
-      // Fetch product counts for each template (scoped to selected company when filtered)
-      const templatesWithCounts = await Promise.all(
-        (templatesData || []).map(async (template) => {
-          let query = supabase
-            .from('products')
-            .select('id', { count: 'exact', head: true })
-            .eq('template_id', template.id);
+      const countMap: Record<string, number> = {};
+      if (templateIds.length > 0) {
+        const productRows = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('products', {
+          select: 'template_id',
+          ...(companyFilter !== 'all' ? { company_id: `eq.${companyFilter}` } : {}),
+          limit: 10000,
+        }, 'template_id', templateIds, { timeoutMs: 7000, chunkSize: 75 }), 8000, []);
+        (productRows || []).forEach((row: any) => {
+          if (row.template_id) countMap[row.template_id] = (countMap[row.template_id] || 0) + 1;
+        });
+      }
 
-          if (companyFilter !== 'all') {
-            query = query.eq('company_id', companyFilter);
-          }
-
-          const { count } = await query;
-
-          return {
-            ...template,
-            cost: costMap[template.id] ?? null,
-            product_count: count || 0
-          };
-        })
-      );
+      const templatesWithCounts = (templatesData || []).map((template: any) => ({
+        ...template,
+        cost: costMap[template.id] ?? null,
+        product_count: countMap[template.id] || 0,
+      }));
 
       setTemplates(templatesWithCounts);
     } catch (error) {
