@@ -31,12 +31,12 @@ import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
 import {
-  CompanyRoleRow,
   fetchRestRowsViaAuth,
   fetchUserCompanyRolesViaRest,
   readStoredAuthSession,
   withTimeout,
 } from "@/lib/authSession";
+import type { CompanyRoleRow } from "@/lib/authSession";
 
 const INVOICE_LIST_LIMIT = 500;
 const LIST_QUERY_TIMEOUT_MS = 10000;
