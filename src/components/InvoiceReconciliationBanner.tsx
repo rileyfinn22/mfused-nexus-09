@@ -36,7 +36,7 @@ export default function InvoiceReconciliationBanner({ enabled }: Props) {
         .select("*")
         .limit(25);
       if (error || cancelled) return;
-      setRows((data as DriftRow[]) ?? []);
+      setRows(((data as unknown) as DriftRow[]) ?? []);
     })();
     return () => {
       cancelled = true;
