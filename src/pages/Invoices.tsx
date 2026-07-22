@@ -30,6 +30,7 @@ import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
+import InvoiceReconciliationBanner from "@/components/InvoiceReconciliationBanner";
 
 const Invoices = () => {
   const navigate = useNavigate();
