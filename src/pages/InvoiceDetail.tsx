@@ -3629,8 +3629,11 @@ const InvoiceDetail = () => {
                   <Input
                     type="number"
                     min={0}
+                    placeholder="0"
                     value={quickShipQtys[oi.id] ?? ''}
                     onChange={(e) => setQuickShipQtys((prev) => ({ ...prev, [oi.id]: e.target.value }))}
+                    className={(quickShipQtys[oi.id] ?? '') === '' ? 'text-muted-foreground/50 italic' : ''}
+                    title={(quickShipQtys[oi.id] ?? '') === '' ? 'Placeholder — leave blank until shipped, or type 0 to intentionally record no shipment' : ''}
                   />
                 </div>
               </div>
