@@ -392,18 +392,18 @@ export default function VendorPortalPODetail() {
             </div>
           )}
 
-          {/* Line items sheet — one SKU per line; shipped qty is free-write,
-              total = shipped x price/pc */}
-          <div className="border border-border rounded-lg overflow-x-auto">
-            <table className="w-full text-xs border-collapse min-w-[560px]">
+          {/* Line items — standard PO document look (matches the PDF), with
+              Shipped Qty as the vendor's editable extra */}
+          <div className="rounded-md overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
-                <tr>
-                  {["SKU", "Ordered Qty", "Shipped Qty", "Price/pc", "Total"].map((h, i) => (
+                <tr className="bg-[#4CAF50] text-white">
+                  {["SKU", "Description", "Ordered Qty", "Shipped Qty", "Price/pc", "Amount"].map((h, i) => (
                     <th
                       key={h}
                       className={cn(
-                        "px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-r border-border last:border-r-0 bg-muted select-none",
-                        i >= 1 ? "text-right" : "text-left"
+                        "px-3 py-2 text-[11px] font-bold uppercase tracking-wide select-none",
+                        i >= 2 ? "text-right" : "text-left"
                       )}
                     >
                       {h}
@@ -412,32 +412,23 @@ export default function VendorPortalPODetail() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it) => {
-                  const shipped = it.shipped_quantity ?? null;
-                  const shippedTotal = (shipped ?? 0) * Number(it.unit_cost || 0);
-                  return (
-                    <tr key={it.id} className="hover:bg-muted/20">
-                      <td className="px-2 py-1 border-b border-r border-border/60">
-                        <div className="font-mono whitespace-nowrap">{it.sku}</div>
-                        {it.name && <div className="text-[11px] text-muted-foreground">{it.name}</div>}
-                      </td>
-                      <td className="px-2 py-1 text-right font-mono border-b border-r border-border/60">
-                        {it.quantity?.toLocaleString("en-US")}
-                      </td>
-                      <td className="p-0 align-middle border-b border-r border-border/60 w-24">
-                        <QtyCell value={shipped} onSave={(v) => saveShippedQty(it, v)} />
-                      </td>
-                      <td className="px-2 py-1 text-right font-mono border-b border-r border-border/60">
-                        {`$${Number(it.unit_cost || 0).toFixed(3)}`}
-                      </td>
-                      <td className={cn("px-2 py-1 text-right font-mono font-medium border-b border-border/60", shipped == null && "text-muted-foreground/40")}>
-                        {shipped == null ? "—" : fmtMoney(shippedTotal)}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {items.map((it, idx) => (
+                  <tr key={it.id} className={idx % 2 === 1 ? "bg-muted/40" : undefined}>
+                    <td className="px-3 py-2 font-mono text-xs whitespace-nowrap align-top">{it.sku}</td>
+                    <td className="px-3 py-2 align-top">
+                      <div>{it.name}</div>
+                      {it.description && <div className="text-xs text-muted-foreground">{it.description}</div>}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono align-top">{it.quantity?.toLocaleString("en-US")}</td>
+                    <td className="px-1 py-1 align-top w-28">
+                      <QtyCell value={it.shipped_quantity ?? null} onSave={(v) => saveShippedQty(it, v)} />
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono align-top">{`$${Number(it.unit_cost || 0).toFixed(3)}`}</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold align-top">{fmtMoney(it.total)}</td>
+                  </tr>
+                ))}
                 {items.length === 0 && (
-                  <tr><td colSpan={5} className="py-4 text-center text-muted-foreground border-b border-border/60">No line items on this PO.</td></tr>
+                  <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">No line items on this PO.</td></tr>
                 )}
               </tbody>
             </table>
