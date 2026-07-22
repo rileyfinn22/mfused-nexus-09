@@ -1404,7 +1404,11 @@ const InvoiceDetail = () => {
   const openQuickShipDialog = () => {
     const initial: Record<string, string> = {};
     (order?.order_items || []).forEach((oi: any) => {
-      initial[oi.id] = String(Number(oi.shipped_quantity ?? oi.quantity ?? 0));
+      // null shipped_quantity = placeholder (blank input, dimmed "0" placeholder)
+      // 0 or any number = intentional value
+      initial[oi.id] = oi.shipped_quantity === null || oi.shipped_quantity === undefined
+        ? ''
+        : String(Number(oi.shipped_quantity));
     });
     setQuickShipQtys(initial);
     setShowQuickShipDialog(true);
