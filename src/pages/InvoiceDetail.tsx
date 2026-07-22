@@ -2824,7 +2824,7 @@ const InvoiceDetail = () => {
                               if (invoice?.invoice_type !== 'full') {
                                 return formatCurrency(shippedQty * price);
                               }
-                              return formatCurrency((shippedQty > 0 ? shippedQty : (Number(item.quantity) || 0)) * price);
+                              return formatCurrency((isShippedPlaceholder ? (Number(item.quantity) || 0) : shippedQty) * price);
                             })()}
                           </span>
 
