@@ -2834,38 +2834,31 @@ const InvoiceDetail = () => {
               const parentBlanket = isPartialChild
                 ? relatedInvoices.find((ri: any) => ri.id === invoice.parent_invoice_id && ri.invoice_type === 'full')
                 : null;
-              const liveChildren = parentBlanket
-                ? relatedInvoices.filter((ri: any) => ri.parent_invoice_id === parentBlanket.id && !ri.deleted_at)
-                : [];
               const parentPaid = parentBlanket ? Number(parentBlanket.total_paid || 0) : 0;
               const parentTotal = parentBlanket ? Number(parentBlanket.total || 0) : 0;
-              const depositCredit = 0;
-              const showDepositCredit = false;
-              const grossSubtotal = displaySubtotal;
+              const parentSubtotal = parentBlanket ? Number(parentBlanket.subtotal || 0) : 0;
+
+              // Child shipment invoices mirror the blanket: Subtotal = blanket subtotal,
+              // Less Deposit = whatever has already been paid on the blanket,
+              // Balance Due = blanket remaining. Never double-count the deposit.
+              const useMirrorLayout = !!parentBlanket && parentPaid > 0;
+              const mirroredSubtotal = useMirrorLayout ? parentSubtotal : displaySubtotal;
+              const mirroredShipping = useMirrorLayout ? Number(parentBlanket.shipping_cost || 0) : (Number(invoice?.shipping_cost || 0) + childShippingTotal);
+              const mirroredTotal = useMirrorLayout ? parentTotal : displayBilledTotal;
+              const depositCredit = useMirrorLayout ? parentPaid : 0;
+              const showDepositCredit = depositCredit > 0.005;
+              const mirroredBalance = useMirrorLayout ? (parentTotal - parentPaid) : displayBalance;
+              const showBalanceRow = useMirrorLayout ? true : displayTotalPaid > 0;
 
               return (
             <div className="flex justify-end mt-8">
               <div className="space-y-2 w-80">
-                {showDepositCredit && (
-                  <>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Gross Shipment Value</span>
-                      <span className="font-semibold">{formatCurrency(grossSubtotal)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        Less Deposit Applied (Inv #{parentBlanket.invoice_number})
-                      </span>
-                      <span className="font-semibold text-green-600">({formatCurrency(depositCredit)})</span>
-                    </div>
-                  </>
-                )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal{showDepositCredit ? ' (Net)' : ''}</span>
-                  <span className="font-semibold">{formatCurrency(displaySubtotal)}</span>
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-semibold">{formatCurrency(mirroredSubtotal)}</span>
                 </div>
                 {/* Shipping Line - editable for vibe admins */}
-                {(Number(invoice?.shipping_cost || 0) > 0 || childShippingTotal > 0 || (isVibeAdmin && isEditMode)) ? (
+                {(mirroredShipping > 0 || (isVibeAdmin && isEditMode)) ? (
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm items-center gap-2">
                       <span className="text-muted-foreground">Shipping{childShippingTotal > 0 && isBlanketDisplay ? ' (from shipments)' : ''}</span>
@@ -2880,7 +2873,7 @@ const InvoiceDetail = () => {
                           placeholder="0.00"
                         />
                       ) : (
-                        <span className="font-semibold">{formatCurrency(Number(invoice?.shipping_cost || 0) + childShippingTotal)}</span>
+                        <span className="font-semibold">{formatCurrency(mirroredShipping)}</span>
                       )}
                     </div>
                     {isVibeAdmin && isEditMode ? (
@@ -2908,7 +2901,15 @@ const InvoiceDetail = () => {
                     <span className="font-semibold">{formatCurrency(displayBilledTotal)}</span>
                   </div>
                 )}
-                {displayTotalPaid > 0 && (
+                {showDepositCredit && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Less Deposit Paid (Inv #{parentBlanket.invoice_number})
+                    </span>
+                    <span className="font-semibold text-green-600">({formatCurrency(depositCredit)})</span>
+                  </div>
+                )}
+                {!useMirrorLayout && displayTotalPaid > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Less Payments</span>
                     <span className="font-semibold text-green-600">({formatCurrency(displayTotalPaid)})</span>
@@ -2916,8 +2917,8 @@ const InvoiceDetail = () => {
                 )}
                 <div className="h-px bg-border my-2"></div>
                 <div className="flex justify-between">
-                  <span className="text-lg font-semibold">{displayTotalPaid > 0 ? 'Balance Due' : (isDepositBilling ? 'Deposit Due' : 'Total')}</span>
-                  <span className="text-2xl font-bold">{formatCurrency(displayTotalPaid > 0 ? displayBalance : displayBilledTotal)}</span>
+                  <span className="text-lg font-semibold">{showBalanceRow ? 'Balance Due' : (isDepositBilling ? 'Deposit Due' : 'Total')}</span>
+                  <span className="text-2xl font-bold">{formatCurrency(showBalanceRow ? mirroredBalance : mirroredTotal)}</span>
                 </div>
                 {isEditMode && <p className="text-xs text-muted-foreground italic mt-2">
                     Totals will be saved when you click "Save Changes"
