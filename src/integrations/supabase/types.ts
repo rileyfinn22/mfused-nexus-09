@@ -3583,6 +3583,47 @@ export type Database = {
           },
         ]
       }
+      vendor_po_production_updates: {
+        Row: {
+          attachment_name: string | null
+          attachment_url: string | null
+          created_at: string
+          created_by: string
+          id: string
+          note: string | null
+          percent_at_time: number | null
+          vendor_po_id: string
+        }
+        Insert: {
+          attachment_name?: string | null
+          attachment_url?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          note?: string | null
+          percent_at_time?: number | null
+          vendor_po_id: string
+        }
+        Update: {
+          attachment_name?: string | null
+          attachment_url?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          note?: string | null
+          percent_at_time?: number | null
+          vendor_po_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_po_production_updates_vendor_po_id_fkey"
+            columns: ["vendor_po_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_pos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_po_status_history: {
         Row: {
           changed_by: string | null
@@ -3650,6 +3691,7 @@ export type Database = {
           order_id: string | null
           po_number: string
           po_type: string
+          production_percent: number
           production_status: string
           production_status_updated_at: string | null
           production_status_updated_by: string | null
@@ -3695,6 +3737,7 @@ export type Database = {
           order_id?: string | null
           po_number: string
           po_type?: string
+          production_percent?: number
           production_status?: string
           production_status_updated_at?: string | null
           production_status_updated_by?: string | null
@@ -3740,6 +3783,7 @@ export type Database = {
           order_id?: string | null
           po_number?: string
           po_type?: string
+          production_percent?: number
           production_status?: string
           production_status_updated_at?: string | null
           production_status_updated_by?: string | null
@@ -4220,6 +4264,7 @@ export type Database = {
           cpo: string
           invoice_numbers: string[]
           order_description: string
+          order_number: string
           po_id: string
         }[]
       }
@@ -4227,11 +4272,16 @@ export type Database = {
         Args: { p_final_quantity: number; p_item_id: string }
         Returns: Json
       }
+      vendor_update_item_shipped_qty: {
+        Args: { p_item_id: string; p_shipped_quantity: number }
+        Returns: Json
+      }
       vendor_update_po_details: {
         Args: {
           p_completion_date?: string
           p_notes?: string
           p_po_id: string
+          p_production_percent?: number
           p_sheet_completed?: boolean
           p_sheet_description?: string
           p_ship_to_city?: string

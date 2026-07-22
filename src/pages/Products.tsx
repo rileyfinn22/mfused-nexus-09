@@ -905,220 +905,173 @@ const Products = () => {
 
       {/* Unified Grid View */}
       {viewMode === "grid" && (
-        <div className="space-y-8">
-          {/* Templates Section */}
-          {filteredTemplates.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Layers className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold">Templates</h2>
-                <Badge variant="secondary">{filteredTemplates.length}</Badge>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {filteredTemplates.map((template) => (
-                  <Card
-                    key={template.id}
-                    className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative"
-                    onClick={() => setSelectedTemplate(template)}
-                  >
-                    {/* Admin action buttons - always visible for vibe admins */}
-                    {isVibeAdmin && (
-                      <div className="absolute top-2 left-2 z-10 flex gap-1">
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditTemplate(template);
-                          }}
-                          title="Edit template"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDuplicateTemplate(template);
-                          }}
-                          title="Duplicate to company"
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm hover:bg-destructive hover:text-destructive-foreground"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteTemplate(template);
-                          }}
-                          title="Delete template"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Template Image/Icon Area */}
-                    <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                      {getTemplateDisplayThumbnail(template) ? (
-                        <img 
-                          src={getTemplateDisplayThumbnail(template) || undefined}
-                          alt={template.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package className="h-16 w-16 text-muted-foreground/30" />
-                      )}
-                      
-                      {/* Product count badge */}
-                      <Badge 
-                        variant="secondary" 
-                        className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm"
-                      >
-                        {template.product_count} SKU{template.product_count !== 1 ? 's' : ''}
-                      </Badge>
-                    </div>
-
-                    {/* Template Info */}
-                    <div className="p-3 space-y-1">
-                      <h3 className="font-medium text-sm leading-snug truncate">{template.name}</h3>
-                      {template.state && (
-                        <Badge variant="outline" className="text-xs">{template.state}</Badge>
-                      )}
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Individual Products Section (products without templates) */}
-          {filteredProducts.filter(p => !p.template_id).length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-muted-foreground" />
-                <h2 className="text-lg font-semibold">Individual Products</h2>
-                <Badge variant="secondary">{filteredProducts.filter(p => !p.template_id).length}</Badge>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {filteredProducts.filter(p => !p.template_id).map((product) => (
-                  <Card
-                    key={product.id}
-                    className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative"
-                    onClick={() => navigate(`/products/edit/${product.id}`)}
-                  >
-                    {/* Product Image/Icon Area */}
-                    <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                      {/* Priority: 1. Artwork thumbnail, 2. Product image_url, 3. Package icon */}
-                      {product.sku && artworkThumbnails[product.sku] ? (
-                        <img 
-                          src={artworkThumbnails[product.sku]} 
-                          alt={product.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : product.image_url ? (
-                        <img 
-                          src={product.image_url} 
-                          alt={product.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package className="h-16 w-16 text-muted-foreground/30" />
-                      )}
-                      
-                      {/* Artwork warning */}
-                      {product.sku && !hasApprovedArtwork(product.sku) && (
-                        <div className="absolute top-2 left-2">
-                          <AlertTriangle className="h-5 w-5 text-warning" />
-                        </div>
-                      )}
-                      
-                      {/* State badge */}
-                      {product.state && (
-                        <Badge 
-                          variant="outline" 
-                          className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm text-xs"
-                        >
-                          {product.state}
-                        </Badge>
-                      )}
-
-                      {/* Action buttons on hover */}
-                      {isVibeAdmin && (
-                        <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <AssignTemplateDropdown
-                            productId={product.id}
-                            currentTemplateId={product.template_id || null}
-                            companyId={companyFilter !== 'all' ? companyFilter : undefined}
-                            onTemplateAssigned={() => {
-                              fetchProducts();
-                              fetchTemplates();
-                            }}
-                          />
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDuplicateProduct(product);
-                            }}
-                            title="Duplicate product"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteClick(product.id);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Product Info */}
-                    <div className="p-3 space-y-1">
-                      <h3 className="font-medium text-sm leading-snug truncate">{product.name}</h3>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {product.item_id || product.id.slice(0, 8)}
-                      </p>
-                      {product.customer_item_id && (
-                        <p className="text-xs text-muted-foreground truncate">
-                          CID: {product.customer_item_id}
-                        </p>
-                      )}
-                      <p className="text-sm font-medium">
-                        {isVibeAdmin 
-                          ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
-                          : (product.price ? `$${product.price.toFixed(3)}` : '—')}
-                      </p>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {filteredTemplates.length === 0 && filteredProducts.filter(p => !p.template_id).length === 0 && (
+        <div className="space-y-4">
+          {filteredTemplates.length === 0 && filteredProducts.filter(p => !p.template_id).length === 0 ? (
             <div className="empty-state py-16">
               <Package className="h-12 w-12 mb-4 text-muted-foreground/50" />
               <p className="font-medium">No products found</p>
               <p className="text-sm">{searchQuery ? 'Try adjusting your search.' : 'Add your first product to get started.'}</p>
             </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {/* Templates (folders) first */}
+              {filteredTemplates.map((template) => (
+                <Card
+                  key={`tmpl-${template.id}`}
+                  className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative"
+                  onClick={() => setSelectedTemplate(template)}
+                >
+                  {/* Count badge (top-left) */}
+                  <Badge
+                    variant="secondary"
+                    className="absolute top-2 left-2 z-10 bg-background/90 backdrop-blur-sm shadow-sm"
+                    title={`${template.product_count} SKU${template.product_count !== 1 ? 's' : ''} in this template`}
+                  >
+                    <Layers className="h-3 w-3 mr-1" />
+                    {template.product_count}
+                  </Badge>
+
+                  {/* Admin action buttons (top-right) */}
+                  {isVibeAdmin && (
+                    <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
+                        onClick={(e) => { e.stopPropagation(); handleEditTemplate(template); }}
+                        title="Edit template"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm"
+                        onClick={(e) => { e.stopPropagation(); handleDuplicateTemplate(template); }}
+                        title="Duplicate to company"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(template); }}
+                        title="Delete template"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Template Image/Icon Area */}
+                  <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+                    {getTemplateDisplayThumbnail(template) ? (
+                      <img
+                        src={getTemplateDisplayThumbnail(template) || undefined}
+                        alt={template.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Package className="h-16 w-16 text-muted-foreground/30" />
+                    )}
+                  </div>
+
+                  {/* Template Info */}
+                  <div className="p-3 space-y-1">
+                    <h3 className="font-medium text-sm leading-snug truncate">{template.name}</h3>
+                    {template.state && (
+                      <Badge variant="outline" className="text-xs">{template.state}</Badge>
+                    )}
+                  </div>
+                </Card>
+              ))}
+
+              {/* Individual products (no template) */}
+              {filteredProducts.filter(p => !p.template_id).map((product) => (
+                <Card
+                  key={`prod-${product.id}`}
+                  className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative"
+                  onClick={() => navigate(`/products/edit/${product.id}`)}
+                >
+                  {/* Product Image/Icon Area */}
+                  <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+                    {product.sku && artworkThumbnails[product.sku] ? (
+                      <img src={artworkThumbnails[product.sku]} alt={product.name} className="w-full h-full object-cover" />
+                    ) : product.image_url ? (
+                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Package className="h-16 w-16 text-muted-foreground/30" />
+                    )}
+
+                    {product.sku && !hasApprovedArtwork(product.sku) && (
+                      <div className="absolute top-2 left-2">
+                        <AlertTriangle className="h-5 w-5 text-warning" />
+                      </div>
+                    )}
+
+                    {product.state && (
+                      <Badge
+                        variant="outline"
+                        className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm text-xs"
+                      >
+                        {product.state}
+                      </Badge>
+                    )}
+
+                    {isVibeAdmin && (
+                      <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <AssignTemplateDropdown
+                          productId={product.id}
+                          currentTemplateId={product.template_id || null}
+                          companyId={companyFilter !== 'all' ? companyFilter : undefined}
+                          onTemplateAssigned={() => { fetchProducts(); fetchTemplates(); }}
+                        />
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => { e.stopPropagation(); handleDuplicateProduct(product); }}
+                          title="Duplicate product"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteClick(product.id); }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Product Info */}
+                  <div className="p-3 space-y-1">
+                    <h3 className="font-medium text-sm leading-snug truncate">{product.name}</h3>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {product.item_id || product.id.slice(0, 8)}
+                    </p>
+                    {product.customer_item_id && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        CID: {product.customer_item_id}
+                      </p>
+                    )}
+                    <p className="text-sm font-medium">
+                      {isVibeAdmin
+                        ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
+                        : (product.price ? `$${product.price.toFixed(3)}` : '—')}
+                    </p>
+                  </div>
+                </Card>
+              ))}
+            </div>
           )}
         </div>
       )}
+
 
       {/* Products Table/List View */}
       {viewMode === "list" && (
