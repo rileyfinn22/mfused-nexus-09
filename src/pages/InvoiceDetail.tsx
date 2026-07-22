@@ -1331,34 +1331,20 @@ const InvoiceDetail = () => {
   };
 
   const handleCloseInvoice = async () => {
-    if (!confirm('Close this blanket invoice? The subtotal will collapse to the actual shipped total (Σ shipped × price). Any unpaid remainder becomes the final balance due.')) {
+    if (!confirm('Close this blanket invoice? This finalizes the blanket. Use "Update Blanket" first if the subtotal needs to be recalculated to actual shipped totals.')) {
       return;
     }
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const shippedSubtotal = (order?.order_items || []).reduce(
-        (sum: number, oi: any) =>
-          sum + Number(oi.shipped_quantity || 0) * Number(oi.unit_price || 0),
-        0
-      );
-      const childrenShipping = (relatedInvoices || [])
-        .filter((ri: any) => ri.parent_invoice_id === invoiceId && !ri.deleted_at)
-        .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0);
-      const newTotal = shippedSubtotal + Number(invoice?.tax || 0) + childrenShipping;
-      const {
-        error
-      } = await supabase.from('invoices').update({
+      const { error } = await supabase.from('invoices').update({
         status: 'closed',
         blanket_closed_at: new Date().toISOString(),
         blanket_closed_by: user?.id ?? null,
-        subtotal: shippedSubtotal,
-        shipping_cost: childrenShipping,
-        total: newTotal,
       }).eq('id', invoiceId);
       if (error) throw error;
       toast({
         title: "Blanket Closed",
-        description: "Blanket total is now locked to the actual shipped amount."
+        description: "Blanket has been finalized."
       });
       fetchInvoiceDetails();
     } catch (error: any) {
@@ -1369,6 +1355,8 @@ const InvoiceDetail = () => {
       });
     }
   };
+
+
 
 
   const handleUpdateBlanketTotal = async () => {
