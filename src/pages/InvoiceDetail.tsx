@@ -1576,6 +1576,12 @@ const InvoiceDetail = () => {
   const totalVendorCost = vendorPOs.reduce((sum, po) => sum + Number(po.total), 0);
   const totalProfit = displayTotal - totalVendorCost;
   const profitMargin = displayTotal > 0 ? (totalProfit / displayTotal * 100).toFixed(2) : '0.00';
+  const shipmentInvoicesForBlanket = isBlanketDisplay && invoice
+    ? relatedInvoices.filter((ri: any) =>
+        ri.parent_invoice_id === invoice.id ||
+        (ri.invoice_type === 'partial' && Number(ri.shipment_number || 0) > 1)
+      )
+    : [];
   if (loading) {
     return <div className="max-w-7xl mx-auto py-12 text-center">
         <p className="text-muted-foreground">Loading invoice...</p>
@@ -3141,13 +3147,12 @@ const InvoiceDetail = () => {
                   <Package className="h-5 w-5" />
                   Shipments & Invoices
                 </h2>
-                {relatedInvoices.length > 0 && (() => {
-                  const allInvoices = [invoice, ...relatedInvoices];
-                  const totalBilled = allInvoices.reduce((sum, inv) => sum + Number(inv.total), 0);
+                {shipmentInvoicesForBlanket.length > 0 && (() => {
+                  const totalBilled = shipmentInvoicesForBlanket.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
                   const billingProgress = order ? (totalBilled / Number(order.total)) * 100 : 0;
                   return (
                     <p className="text-sm text-muted-foreground mt-1">
-                      {allInvoices.length} invoice(s) • {formatCurrency(totalBilled)} billed ({billingProgress.toFixed(1)}% of order total)
+                      {shipmentInvoicesForBlanket.length} shipment invoice(s) • {formatCurrency(totalBilled)} billed ({billingProgress.toFixed(1)}% of order total)
                     </p>
                   );
                 })()}
@@ -3158,11 +3163,11 @@ const InvoiceDetail = () => {
               </Button>
             </div>
 
-            {relatedInvoices.length === 0 ? (
+            {shipmentInvoicesForBlanket.length === 0 ? (
               <p className="text-sm text-muted-foreground">No shipment invoices created yet. Create your first one to start billing partial shipments.</p>
             ) : (
               <div className="space-y-3">
-                {relatedInvoices.map((relInvoice: any, idx: number) => (
+                {shipmentInvoicesForBlanket.map((relInvoice: any, idx: number) => (
                   <div
                     key={relInvoice.id}
                     className="p-4 bg-muted/30 rounded-lg border border-table-border hover:border-primary/40 transition-colors cursor-pointer"
@@ -3174,7 +3179,7 @@ const InvoiceDetail = () => {
                           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-sm">
                             {relInvoice.shipment_number}
                           </div>
-                          {idx < relatedInvoices.length - 1 && (
+                          {idx < shipmentInvoicesForBlanket.length - 1 && (
                             <div className="w-0.5 h-8 bg-table-border mt-2"></div>
                           )}
                         </div>
