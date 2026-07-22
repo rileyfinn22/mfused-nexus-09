@@ -3635,6 +3635,7 @@ export type Database = {
           attachment_name: string | null
           attachment_url: string | null
           company_id: string
+          completion_date: string | null
           created_at: string
           customer_company_id: string | null
           delay_reason: string | null
@@ -3671,11 +3672,13 @@ export type Database = {
           updated_at: string
           vendor_committed_ship_date: string | null
           vendor_id: string
+          vendor_invoice_number: string | null
         }
         Insert: {
           attachment_name?: string | null
           attachment_url?: string | null
           company_id: string
+          completion_date?: string | null
           created_at?: string
           customer_company_id?: string | null
           delay_reason?: string | null
@@ -3712,11 +3715,13 @@ export type Database = {
           updated_at?: string
           vendor_committed_ship_date?: string | null
           vendor_id: string
+          vendor_invoice_number?: string | null
         }
         Update: {
           attachment_name?: string | null
           attachment_url?: string | null
           company_id?: string
+          completion_date?: string | null
           created_at?: string
           customer_company_id?: string | null
           delay_reason?: string | null
@@ -3753,6 +3758,7 @@ export type Database = {
           updated_at?: string
           vendor_committed_ship_date?: string | null
           vendor_id?: string
+          vendor_invoice_number?: string | null
         }
         Relationships: [
           {
@@ -4208,11 +4214,13 @@ export type Database = {
       }
       vendor_update_po_details: {
         Args: {
+          p_completion_date?: string
           p_notes?: string
           p_po_id: string
           p_tracking_carrier?: string
           p_tracking_number?: string
           p_tracking_url?: string
+          p_vendor_invoice_number?: string
         }
         Returns: Json
       }
