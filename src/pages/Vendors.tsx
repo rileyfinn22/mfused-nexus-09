@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Edit, Search, Building2, Mail } from "lucide-react";
+import { Plus, Edit, Search, Building2, Mail, UserPlus } from "lucide-react";
 import VendorInviteDialog from "@/components/VendorInviteDialog";
 
 const Vendors = () => {
