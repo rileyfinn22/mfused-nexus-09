@@ -491,8 +491,8 @@ const Vendors = () => {
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(vendor)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleInvite(vendor)} title="Invite vendor to portal">
-                          <Mail className="h-4 w-4" />
+                        <Button variant="ghost" size="sm" onClick={() => handleInvite(vendor)} title="Create account / invite to portal">
+                          <UserPlus className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
