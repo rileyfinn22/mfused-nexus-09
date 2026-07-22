@@ -684,8 +684,11 @@ const Artwork = () => {
       // Download each file and add to zip
       for (const file of filesToDownload) {
         try {
-          const response = await fetch(file.artwork_url);
-          const blob = await response.blob();
+          const path = normalizeStorageObjectPath(file.artwork_url, 'artwork');
+          const { data: blob, error: dlErr } = await supabase.storage
+            .from('artwork')
+            .download(path);
+          if (dlErr || !blob) throw dlErr ?? new Error('download failed');
           // Organize by SKU in folders
           const folderPath = file.sku ? `${file.sku}/${file.filename}` : file.filename;
           zip.file(folderPath, blob);
