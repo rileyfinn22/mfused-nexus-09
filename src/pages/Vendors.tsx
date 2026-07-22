@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Edit, Search, Building2, Mail } from "lucide-react";
+import { Plus, Edit, Search, Building2, Mail, UserPlus } from "lucide-react";
 import VendorInviteDialog from "@/components/VendorInviteDialog";
 
 const Vendors = () => {
@@ -491,8 +491,8 @@ const Vendors = () => {
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(vendor)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleInvite(vendor)} title="Invite vendor to portal">
-                          <Mail className="h-4 w-4" />
+                        <Button variant="ghost" size="sm" onClick={() => handleInvite(vendor)} title="Create account / invite to portal">
+                          <UserPlus className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
