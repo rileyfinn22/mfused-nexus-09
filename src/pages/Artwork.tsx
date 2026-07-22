@@ -35,6 +35,7 @@ import {
   Loader2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { downloadStorageObject, normalizeStorageObjectPath } from "@/lib/storageUrl";
 import { useToast } from "@/hooks/use-toast";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import {
@@ -616,16 +617,7 @@ const Artwork = () => {
 
   const handleDownload = async (url: string, filename: string) => {
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
+      await downloadStorageObject('artwork', url, filename);
     } catch (error) {
       console.error('Error downloading file:', error);
       toast({
@@ -692,8 +684,11 @@ const Artwork = () => {
       // Download each file and add to zip
       for (const file of filesToDownload) {
         try {
-          const response = await fetch(file.artwork_url);
-          const blob = await response.blob();
+          const path = normalizeStorageObjectPath(file.artwork_url, 'artwork');
+          const { data: blob, error: dlErr } = await supabase.storage
+            .from('artwork')
+            .download(path);
+          if (dlErr || !blob) throw dlErr ?? new Error('download failed');
           // Organize by SKU in folders
           const folderPath = file.sku ? `${file.sku}/${file.filename}` : file.filename;
           zip.file(folderPath, blob);
