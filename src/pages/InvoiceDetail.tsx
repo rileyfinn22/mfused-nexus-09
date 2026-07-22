@@ -2656,9 +2656,12 @@ const InvoiceDetail = () => {
                 // Otherwise get from order_items
                 const orderItem = order?.order_items?.find((oi: any) => oi.sku === item.sku);
                 const editedItem = editedItems.find((ei: any) => ei.id === item.id);
-                const shippedQty = isEditMode && editedItem 
-                  ? (editedItem.shipped_quantity || 0)
-                  : (invoice?.invoice_type === 'partial' ? item.quantity || 0 : orderItem?.shipped_quantity || 0);
+                const shippedRaw = isEditMode && editedItem
+                  ? editedItem.shipped_quantity
+                  : (invoice?.invoice_type === 'partial' ? item.quantity : orderItem?.shipped_quantity);
+                const isShippedPlaceholder = shippedRaw === null || shippedRaw === undefined;
+                const shippedQty = Number(shippedRaw ?? 0);
+                
                 
                 const isNewLine = typeof item.id === 'string' && item.id.startsWith('new-');
                 const showRowDelete = isEditMode && isVibeAdmin && invoice?.invoice_type === 'full';
