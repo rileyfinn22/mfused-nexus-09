@@ -17,6 +17,7 @@ interface VendorPoRow {
   vendor_invoice_number: string | null;
   completion_date: string | null;
   sheet_description: string | null;
+  sheet_completed_at: string | null;
   order_date: string;
   expected_delivery_date: string | null;
   vendor_committed_ship_date: string | null;
@@ -62,7 +63,7 @@ export default function VendorPortal() {
       const { data, error } = await (supabase as any)
         .from("vendor_pos")
         .select(
-          `id, po_number, vendor_invoice_number, completion_date, sheet_description, order_date, expected_delivery_date, vendor_committed_ship_date,
+          `id, po_number, vendor_invoice_number, completion_date, sheet_description, sheet_completed_at, order_date, expected_delivery_date, vendor_committed_ship_date,
            production_status, is_delayed, delay_reason, description, notes,
            ship_to_name, ship_to_street, ship_to_city, ship_to_state, ship_to_zip,
            tracking_carrier, tracking_number, tracking_url,
@@ -153,6 +154,16 @@ export default function VendorPortal() {
     const ok = await rpc("vendor_update_po_details", {
       p_po_id: po.id,
       p_sheet_description: value.trim() === "" ? "" : value,
+    });
+    if (!ok && before) patchRow(po.id, before);
+  };
+
+  const toggleComplete = async (po: SheetPo, completed: boolean) => {
+    const before = pos.find((r) => r.id === po.id);
+    patchRow(po.id, { sheet_completed_at: completed ? new Date().toISOString() : null });
+    const ok = await rpc("vendor_update_po_details", {
+      p_po_id: po.id,
+      p_sheet_completed: completed,
     });
     if (!ok && before) patchRow(po.id, before);
   };
@@ -274,6 +285,7 @@ export default function VendorPortal() {
         onSaveVendorInvoice={saveVendorInvoice}
         onSaveDescription={saveDescription}
         onSaveShipTo={saveShipTo}
+        onToggleComplete={toggleComplete}
       />
     </div>
   );

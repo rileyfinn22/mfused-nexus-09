@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, ExternalLink } from "lucide-react";
+import { AlertCircle, Check, ExternalLink } from "lucide-react";
 import { parseISO } from "date-fns";
 import { matchVendorPoStatus } from "@/lib/vendorPoStatus";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,8 @@ export interface SheetPo {
   orderDescription?: string | null;
   /** Sheet-only description override (vendor_pos.sheet_description). */
   sheet_description?: string | null;
+  /** Set = row is marked complete: green, sunk to the Completed section. */
+  sheet_completed_at?: string | null;
   vendor_invoice_number?: string | null;
   completion_date?: string | null;
   production_status: string | null;
@@ -63,6 +65,7 @@ export interface OrdersSheetProps {
   onSaveShipDate?: (po: SheetPo, cellText: string) => void;
   onSaveVendorInvoice?: (po: SheetPo, value: string) => void;
   onSaveDescription?: (po: SheetPo, value: string) => void;
+  onToggleComplete?: (po: SheetPo, completed: boolean) => void;
   /** Raw cell text like "UPS: 1Z999…" — parsed into carrier/number upstream via parseTracking. */
   onSaveTracking?: (po: SheetPo, cellText: string) => void;
   onSaveNotes?: (po: SheetPo, value: string) => void;
@@ -198,6 +201,7 @@ interface ColDef {
 }
 
 const buildCols = (showVendor: boolean, showInvoice: boolean): ColDef[] => [
+  { id: "done", label: "", width: 34, minWidth: 30 },
   ...(showVendor ? [{ id: "vendor", label: "Vendor", width: 120, minWidth: 70 }] : []),
   { id: "vendorInvoice", label: "Vendor Invoice", width: 100, minWidth: 60 },
   ...(showInvoice ? [{ id: "invoice", label: "Vibe Invoice", width: 90, minWidth: 50 }] : []),
@@ -309,6 +313,7 @@ export default function OrdersSheet({
   onSaveShipTo,
   onSaveVendorInvoice,
   onSaveDescription,
+  onToggleComplete,
 }: OrdersSheetProps) {
   const cols = buildCols(showVendor, showInvoice);
   const widthsKey = `${storageKey}:colWidths`;
@@ -368,6 +373,11 @@ export default function OrdersSheet({
 
   const tableWidth = cols.reduce((sum, c) => sum + (widths[c.id] || c.width), 0);
 
+  // Completed rows sink to the bottom under a divider, open work stays on top.
+  const openRows = pos.filter((p) => !p.sheet_completed_at);
+  const completedRows = pos.filter((p) => p.sheet_completed_at);
+  const orderedRows = [...openRows, ...completedRows];
+
   const th = "relative px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-r border-border last:border-r-0 bg-muted/60 select-none";
   const td = "relative p-0 align-top border-b border-r border-border/60 last:border-r-0";
 
@@ -401,7 +411,9 @@ export default function OrdersSheet({
               </td>
             </tr>
           )}
-          {pos.map((po) => {
+          {orderedRows.map((po, rowIdx) => {
+            const isCompleted = !!po.sheet_completed_at;
+            const isFirstCompleted = isCompleted && rowIdx === openRows.length;
             const statusMeta = matchVendorPoStatus(po.production_status || "");
             // "Not started" reads as empty on a sheet — no badge, blank cell.
             const showStatusBadge = statusMeta && statusMeta.value !== "not_started";
@@ -410,6 +422,24 @@ export default function OrdersSheet({
 
             const cell = (id: string): React.ReactNode => {
               switch (id) {
+                case "done":
+                  return (
+                    <button
+                      className="w-full flex items-center justify-center py-1.5 group"
+                      onClick={() => onToggleComplete?.(po, !isCompleted)}
+                      disabled={!editable || !onToggleComplete}
+                      title={isCompleted ? "Move back to open" : "Mark complete"}
+                    >
+                      <Check
+                        className={cn(
+                          "h-3.5 w-3.5",
+                          isCompleted
+                            ? "text-success"
+                            : "text-muted-foreground/25 group-hover:text-muted-foreground"
+                        )}
+                      />
+                    </button>
+                  );
                 case "vendorInvoice":
                   return (
                     <SheetCell
@@ -543,22 +573,37 @@ export default function OrdersSheet({
             };
 
             return (
-              <tr key={po.id} className="hover:bg-muted/20" style={{ height: rowHeights[po.id] }}>
-                {cols.map((c, idx) => (
-                  <td key={c.id} className={td}>
-                    {cell(c.id)}
-                    {/* Excel-style row edge (first column): drag to resize row height */}
-                    {idx === 0 && (
-                      <div
-                        className="absolute bottom-0 left-0 w-full h-[5px] cursor-row-resize hover:bg-primary/40 -mb-[2.5px] z-10"
-                        onMouseDown={(e) =>
-                          startDrag("row", po.id, e, rowHeights[po.id] || (e.currentTarget.closest("tr")?.getBoundingClientRect().height ?? 28))
-                        }
-                      />
-                    )}
-                  </td>
-                ))}
-              </tr>
+              <Fragment key={po.id}>
+                {isFirstCompleted && (
+                  <tr>
+                    <td
+                      colSpan={cols.length}
+                      className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-success bg-success/10 border-y border-border"
+                    >
+                      Completed
+                    </td>
+                  </tr>
+                )}
+                <tr
+                  className={cn(isCompleted ? "bg-success/10 hover:bg-success/15" : "hover:bg-muted/20")}
+                  style={{ height: rowHeights[po.id] }}
+                >
+                  {cols.map((c, idx) => (
+                    <td key={c.id} className={td}>
+                      {cell(c.id)}
+                      {/* Excel-style row edge (first column): drag to resize row height */}
+                      {idx === 0 && (
+                        <div
+                          className="absolute bottom-0 left-0 w-full h-[5px] cursor-row-resize hover:bg-primary/40 -mb-[2.5px] z-10"
+                          onMouseDown={(e) =>
+                            startDrag("row", po.id, e, rowHeights[po.id] || (e.currentTarget.closest("tr")?.getBoundingClientRect().height ?? 28))
+                          }
+                        />
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              </Fragment>
             );
           })}
         </tbody>

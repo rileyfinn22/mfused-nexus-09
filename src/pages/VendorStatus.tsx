@@ -14,6 +14,7 @@ interface Row {
   vendor_invoice_number: string | null;
   completion_date: string | null;
   sheet_description: string | null;
+  sheet_completed_at: string | null;
   production_status: string | null;
   vendor_committed_ship_date: string | null;
   expected_delivery_date: string | null;
@@ -58,7 +59,7 @@ export default function VendorStatus() {
       const { data, error } = await (supabase as any)
         .from("vendor_pos")
         .select(
-          `id, po_number, vendor_invoice_number, completion_date, sheet_description, production_status, vendor_committed_ship_date, expected_delivery_date,
+          `id, po_number, vendor_invoice_number, completion_date, sheet_description, sheet_completed_at, production_status, vendor_committed_ship_date, expected_delivery_date,
            is_delayed, delay_reason, production_status_updated_at, order_date, description, notes,
            ship_to_name, ship_to_street, ship_to_city, ship_to_state, ship_to_zip,
            tracking_carrier, tracking_number, tracking_url,
@@ -218,6 +219,9 @@ export default function VendorStatus() {
         }}
         onSaveVendorInvoice={(po, value) => savePoFields(po, { vendor_invoice_number: value.trim() || null })}
         onSaveDescription={(po, value) => savePoFields(po, { sheet_description: value.trim() || null })}
+        onToggleComplete={(po, completed) =>
+          savePoFields(po, { sheet_completed_at: completed ? new Date().toISOString() : null })
+        }
         onSaveTracking={(po, text) => {
           const t = parseTracking(text);
           savePoFields(po, {
