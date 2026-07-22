@@ -2922,10 +2922,17 @@ const InvoiceDetail = () => {
                   </div>
                 )}
                 <div className="h-px bg-border my-2"></div>
-                <div className="flex justify-between">
-                  <span className="text-lg font-semibold">{displayTotalPaid > 0 ? 'Balance Due' : (isDepositBilling ? 'Deposit Due' : 'Total')}</span>
-                  <span className="text-2xl font-bold">{formatCurrency(displayTotalPaid > 0 ? displayBalance : displayBilledTotal)}</span>
-                </div>
+                {(() => {
+                  const effectivePaid = displayTotalPaid + depositCredit;
+                  const effectiveBalance = displayBalance - depositCredit;
+                  const showBalance = effectivePaid > 0;
+                  return (
+                    <div className="flex justify-between">
+                      <span className="text-lg font-semibold">{showBalance ? 'Balance Due' : (isDepositBilling ? 'Deposit Due' : 'Total')}</span>
+                      <span className="text-2xl font-bold">{formatCurrency(showBalance ? effectiveBalance : displayBilledTotal)}</span>
+                    </div>
+                  );
+                })()}
                 {isEditMode && <p className="text-xs text-muted-foreground italic mt-2">
                     Totals will be saved when you click "Save Changes"
                   </p>}
