@@ -30,6 +30,7 @@ import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
+import InvoiceReconciliationBanner from "@/components/InvoiceReconciliationBanner";
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -493,6 +494,8 @@ const Invoices = () => {
         </TabsList>
 
         <TabsContent value="invoices" className="space-y-6">
+          <InvoiceReconciliationBanner enabled={isVibeAdmin} />
+
           {/* Summary Row */}
           <div className="grid grid-cols-3 gap-6">
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm">

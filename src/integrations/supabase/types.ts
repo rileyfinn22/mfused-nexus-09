@@ -947,6 +947,13 @@ export type Database = {
             foreignKeyName: "financed_invoices_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
+            referencedRelation: "invoice_subtotal_reconciliation"
+            referencedColumns: ["invoice_id"]
+          },
+          {
+            foreignKeyName: "financed_invoices_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
             referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
@@ -1078,6 +1085,13 @@ export type Database = {
             foreignKeyName: "inventory_allocations_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
+            referencedRelation: "invoice_subtotal_reconciliation"
+            referencedColumns: ["invoice_id"]
+          },
+          {
+            foreignKeyName: "inventory_allocations_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
             referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
@@ -1158,6 +1172,13 @@ export type Database = {
           source?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "invoice_packing_lists_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_subtotal_reconciliation"
+            referencedColumns: ["invoice_id"]
+          },
           {
             foreignKeyName: "invoice_packing_lists_invoice_id_fkey"
             columns: ["invoice_id"]
@@ -1329,6 +1350,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_parent_invoice_id_fkey"
+            columns: ["parent_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_subtotal_reconciliation"
+            referencedColumns: ["invoice_id"]
           },
           {
             foreignKeyName: "invoices_parent_invoice_id_fkey"
@@ -1872,6 +1900,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_subtotal_reconciliation"
+            referencedColumns: ["invoice_id"]
+          },
           {
             foreignKeyName: "payments_invoice_id_fkey"
             columns: ["invoice_id"]
@@ -3961,7 +3996,35 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      invoice_subtotal_reconciliation: {
+        Row: {
+          company_id: string | null
+          drift: number | null
+          expected_subtotal: number | null
+          invoice_id: string | null
+          invoice_kind: string | null
+          invoice_number: string | null
+          order_id: string | null
+          status: string | null
+          stored_subtotal: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_company_invitation: {
