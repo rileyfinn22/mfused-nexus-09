@@ -590,6 +590,7 @@ serve(async (req) => {
     // Build invoice line items - always use full prices
     let lineItems = [];
     let calculatedSubtotal = 0;
+    let parentDepositCreditApplied = 0;
 
     // Track which order_item IDs are covered by allocations
     const allocatedOrderItemIds = new Set<string>();
@@ -864,6 +865,70 @@ serve(async (req) => {
       });
     }
 
+    // Child shipment invoices should send the actual shipped lines, then apply any
+    // parent blanket deposit/payment as a credit exactly once across child invoices.
+    if (isChildInvoice && billingPercentage === 100) {
+      const { data: parentInvoice } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, total_paid')
+        .eq('id', invoice.parent_invoice_id)
+        .maybeSingle();
+
+      const parentPaidTotal = Number(parentInvoice?.total_paid || 0);
+
+      if (parentPaidTotal > 0) {
+        const { data: siblingInvoices } = await supabase
+          .from('invoices')
+          .select('id, invoice_number, shipment_number, subtotal, created_at')
+          .eq('parent_invoice_id', invoice.parent_invoice_id)
+          .is('deleted_at', null)
+          .order('shipment_number', { ascending: true })
+          .order('created_at', { ascending: true });
+
+        const siblings = siblingInvoices || [];
+        const currentIndex = siblings.findIndex((child: any) => child.id === invoice.id);
+        const priorShipmentValue = currentIndex > 0
+          ? siblings
+              .slice(0, currentIndex)
+              .reduce((sum: number, child: any) => sum + Math.max(0, Number(child.subtotal || 0)), 0)
+          : 0;
+
+        const remainingDepositCredit = Math.max(0, parentPaidTotal - priorShipmentValue);
+        const depositCredit = Math.min(remainingDepositCredit, Math.max(0, calculatedSubtotal));
+
+        if (depositCredit > 0.005) {
+          console.log(
+            `Applying $${depositCredit} parent blanket deposit credit from invoice ${parentInvoice?.invoice_number} ` +
+            `(parent paid $${parentPaidTotal}, prior child shipped value $${priorShipmentValue})`
+          );
+
+          const depositItemId = await findOrCreateQBItem(
+            'Deposit Applied',
+            'Previously received blanket deposit payment',
+            depositCredit
+          );
+
+          lineItems.push({
+            DetailType: 'SalesItemLineDetail',
+            Amount: -depositCredit,
+            Description: `Less: Deposit Paid (Invoice #${parentInvoice?.invoice_number || 'Blanket'})`,
+            SalesItemLineDetail: {
+              ItemRef: {
+                value: depositItemId,
+                name: 'Deposit Applied',
+              },
+              Qty: 1,
+              UnitPrice: -depositCredit,
+            },
+          });
+
+          parentDepositCreditApplied = depositCredit;
+          calculatedSubtotal -= depositCredit;
+          console.log(`Adjusted child shipment subtotal after parent deposit credit: ${calculatedSubtotal}`);
+        }
+      }
+    }
+
     // Validate that we have at least one line item
     if (lineItems.length === 0) {
       console.error('No line items to sync. Invoice must have order items.');
@@ -957,7 +1022,7 @@ serve(async (req) => {
     const calculatedTotal = calculatedSubtotal + Number(invoice.tax || 0);
     const dbTotal = Number(invoice.total);
     const totalPaidFinal = Number(invoice.total_paid || 0);
-    const expectedQBOAmount = dbTotal - totalPaidFinal;
+    const expectedQBOAmount = dbTotal - totalPaidFinal - parentDepositCreditApplied;
     
     console.log('Calculated subtotal:', calculatedSubtotal);
     console.log('Calculated total (with tax):', calculatedTotal);
