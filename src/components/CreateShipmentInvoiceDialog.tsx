@@ -342,36 +342,11 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
       // Shipment invoice - based on quantities
       itemsToShip = order.order_items.filter((item: any) => shipmentQuantities[item.id] > 0);
       
-      // Calculate how much has already been billed:
-      // 1) Child invoice totals (shipments)
-      // 2) Deposit billed directly on blanket invoice (if <100%)
-      const totalAlreadyBilledFromChildren = existingInvoices
-        .filter(inv => inv.invoice_type !== 'full') // Exclude blanket invoice
-        .reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
-
-      const blanketTotal = Number(blanketInvoice.total);
-      // Deposit % on the blanket is a one-shot upfront billing flag. Once ANY child
-      // shipment invoice exists, those children ARE the draw-down ledger — don't
-      // double-count the deposit on top of children (it would over-cap remaining).
-      const hasChildShipments = existingInvoices.some(inv => inv.invoice_type !== 'full');
-      const depositPctAmount = !hasChildShipments && Number(blanketInvoice.billed_percentage || 100) < 100
-        ? blanketTotal * (Number(blanketInvoice.billed_percentage) / 100)
-        : 0;
-      // If the deposit was already paid, billed_percentage gets cleared by the
-      // payment trigger. Fall back to the parent's total_paid so the deposit still
-      // draws down the remaining blanket amount on the first shipment child.
-      const depositPaidAmount = !hasChildShipments ? Number(blanketInvoice.total_paid || 0) : 0;
-      const blanketDepositAmount = Math.max(depositPctAmount, depositPaidAmount);
-
-      const totalAlreadyBilled = totalAlreadyBilledFromChildren + blanketDepositAmount;
-      const remainingBlanketAmount = Math.max(0, blanketTotal - totalAlreadyBilled);
-      
-      console.log('Blanket total:', blanketTotal);
-      console.log('Total already billed (children + blanket deposit):', totalAlreadyBilled);
-      console.log('Remaining blanket amount:', remainingBlanketAmount);
-      
-      // Calculate billing for this shipment with proper handling of overs
-      let baseSubtotal = 0; // Amount within original order (subject to blanket cap)
+      // Calculate billing for this shipment with proper handling of overs.
+      // Shipment children must store the actual shipped value (qty × price).
+      // Blanket deposits are credits/payments against the balance due, not a reducer
+      // of the child invoice's shipped subtotal.
+      let baseSubtotal = 0; // Amount within original order
       let oversSubtotal = 0; // Amount for overs (always billed in full)
       
       itemsToShip.forEach((item: any) => {
@@ -393,25 +368,18 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         baseSubtotal += baseQty * item.unit_price;
       });
       
-      console.log('Base subtotal (subject to cap):', baseSubtotal);
+      console.log('Base subtotal:', baseSubtotal);
       console.log('Overs subtotal (always full):', oversSubtotal);
-      
-      // Apply blanket cap only to base quantities
-      let billedBaseSubtotal = baseSubtotal;
-      if (baseSubtotal > remainingBlanketAmount) {
-        console.log(`Capping base subtotal from ${baseSubtotal} to ${remainingBlanketAmount}`);
-        billedBaseSubtotal = remainingBlanketAmount;
-      }
-      
-      // Total = capped base + full overs
-      subtotal = billedBaseSubtotal + oversSubtotal;
-      console.log('Final shipment subtotal (base + overs):', subtotal);
+
+      // Total = actual shipped base + full overs. Do not subtract deposits here.
+      subtotal = baseSubtotal + oversSubtotal;
+      console.log('Final shipment subtotal (actual shipped value):', subtotal);
 
       // Calculate percentage for shipment based on dollar amount billed vs full value
       const fullShipmentValue = itemsToShip.reduce((sum: number, item: any) => 
         sum + (shipmentQuantities[item.id] * item.unit_price), 0
       );
-      billedPercentage = fullShipmentValue > 0 ? (subtotal / fullShipmentValue) * 100 : 100;
+      billedPercentage = 100;
       console.log('Billed percentage:', billedPercentage, '% (subtotal:', subtotal, '/ full value:', fullShipmentValue, ')');
       
       invoiceType = 'partial';
