@@ -2779,9 +2779,35 @@ const InvoiceDetail = () => {
                             ) : orderedQty}
                           </TableCell>
                           <TableCell className="text-center">
-                            {isEditMode ? <Input type="number" min="0" value={shippedQty} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" /> : shippedQty}
+                            {isEditMode ? (
+                              <Input type="number" min="0" value={isShippedPlaceholder ? '' : shippedQty} placeholder="0" onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className={`w-24 text-center ${isShippedPlaceholder ? 'text-muted-foreground/50 italic' : ''}`} title={isShippedPlaceholder ? 'Placeholder — not yet shipped. Type 0 to intentionally record no shipment.' : ''} />
+                            ) : isShippedPlaceholder ? (
+                              <span className="inline-flex items-center gap-1 text-muted-foreground/50 italic" title="Placeholder — not yet shipped. Click Quick Ship to record actual qty.">0</span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1">
+                                {shippedQty}
+                                {isVibeAdmin && orderItem && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                                    title="Reset to placeholder (not yet shipped)"
+                                    onClick={async () => {
+                                      const { error } = await supabase.from('order_items').update({ shipped_quantity: null }).eq('id', orderItem.id);
+                                      if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+                                      toast({ title: 'Reset to placeholder', description: `${item.sku} shipped qty cleared.` });
+                                      fetchInvoiceDetails();
+                                    }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </span>
+                            )}
                           </TableCell>
                         </>
+
                       ) : (
                         <TableCell className="text-center">
                           {isEditMode ? <Input type="number" min="0" value={item.quantity || 0} onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className="w-24 text-center" /> : (item.quantity || 0)}
