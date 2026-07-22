@@ -20,7 +20,6 @@ import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipment
 import { GenerateShipmentLinkDialog } from "@/components/GenerateShipmentLinkDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
 import { normalizeStorageObjectPath } from "@/lib/storageUrl";
-import { fetchRestRowsViaAuth, formatPostgrestInFilter, getStoredUserId } from "@/lib/authSession";
 
 // Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
 const parseDateAsLocal = (dateStr: string | null): Date | undefined => {
@@ -203,11 +202,13 @@ export default function Production() {
 
   const fetchCompanies = async () => {
     try {
-      const data = await fetchRestRowsViaAuth<Company>('companies', {
-        select: 'id,name',
-        is_active: 'eq.true',
-        order: 'name.asc',
-      }, { timeoutMs: 8000 });
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
       setCompanies(data || []);
     } catch (error) {
       console.error('Error fetching companies:', error);
@@ -216,16 +217,20 @@ export default function Production() {
 
   const checkRole = async () => {
     try {
-      const userId = getStoredUserId();
-      if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         setRoleChecked(true);
         return;
       }
 
-      const roleRows = await fetchRestRowsViaAuth<any>('user_roles', {
-        select: 'role',
-        user_id: `eq.${userId}`,
-      }, { timeoutMs: 8000 });
+      // IMPORTANT: users can have multiple role rows (multi-company, admin + company, etc.)
+      // so never use .single() / .maybeSingle() here.
+      const { data: roleRows, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
 
       const roles = (roleRows || []).map((r: any) => String(r.role));
       const vibeAdmin = roles.includes('vibe_admin');
@@ -236,11 +241,11 @@ export default function Production() {
 
       if (vendor) {
         // Get vendor ID for this user
-        const [vendorData] = await fetchRestRowsViaAuth<any>('vendors', {
-          select: 'id',
-          user_id: `eq.${userId}`,
-          limit: 1,
-        }, { timeoutMs: 8000 });
+        const { data: vendorData } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
         setVendorId(vendorData?.id || null);
       } else {
@@ -257,72 +262,171 @@ export default function Production() {
     try {
       let ordersData: any[] = [];
       let completedOrdersData: any[] = [];
-      const productionSelect = 'id,order_number,customer_name,order_date,company_id,po_number,description,shipping_state,total,estimated_delivery_date,production_progress,is_delayed,delay_reason,order_finalized_at,updated_at,status,companies(name)';
 
       if (isVendor && vendorId) {
         // Vendors: get orders where they have assigned stages (exclude pull_ship)
-        const stages = await fetchRestRowsViaAuth<any>('production_stages', {
-          select: 'order_id',
-          vendor_id: `eq.${vendorId}`,
-        }, { timeoutMs: 8000 });
+        const { data: stages, error: stagesError } = await supabase
+          .from('production_stages')
+          .select('order_id')
+          .eq('vendor_id', vendorId);
+
+        if (stagesError) throw stagesError;
 
         const orderIds = [...new Set(stages?.map(s => s.order_id) || [])];
         
         if (orderIds.length > 0) {
           // Fetch in-production orders
-          ordersData = await fetchRestRowsViaAuth<any>('orders', {
-            select: productionSelect,
-            id: formatPostgrestInFilter(orderIds as string[]),
-            status: 'eq.in production',
-            order_type: 'neq.pull_ship',
-            parent_order_id: 'is.null',
-            deleted_at: 'is.null',
-            order: 'order_date.desc',
-          }, { timeoutMs: 10000 });
+          const { data, error } = await supabase
+            .from('orders')
+            .select(`
+              id,
+              order_number,
+              customer_name,
+              order_date,
+              company_id,
+              po_number,
+              description,
+              shipping_state,
+              total,
+              estimated_delivery_date,
+              production_progress,
+              is_delayed,
+              delay_reason,
+              updated_at,
+              status,
+              companies (
+                name
+              )
+            `)
+            .in('id', orderIds)
+            .eq('status', 'in production')
+            .neq('order_type', 'pull_ship')
+            .is('parent_order_id', null)
+            .is('deleted_at', null)
+            .order('order_date', { ascending: false });
+
+          if (error) throw error;
+          ordersData = data || [];
 
           // Fetch completed orders
-          completedOrdersData = await fetchRestRowsViaAuth<any>('orders', {
-            select: productionSelect,
-            id: formatPostgrestInFilter(orderIds as string[]),
-            status: 'in.("shipped","delivered","completed")',
-            order_type: 'neq.pull_ship',
-            parent_order_id: 'is.null',
-            deleted_at: 'is.null',
-            order: 'order_date.desc',
-          }, { timeoutMs: 10000 });
+          const { data: completedData, error: completedError } = await supabase
+            .from('orders')
+            .select(`
+            id,
+            order_number,
+            customer_name,
+            order_date,
+            company_id,
+            po_number,
+            description,
+            shipping_state,
+            total,
+            estimated_delivery_date,
+            production_progress,
+            is_delayed,
+            delay_reason,
+            updated_at,
+            status,
+            companies (
+              name
+            )
+          `)
+          .in('id', orderIds)
+          .in('status', ['shipped', 'delivered', 'completed'])
+            .neq('order_type', 'pull_ship')
+            .is('parent_order_id', null)
+            .is('deleted_at', null)
+            .order('order_date', { ascending: false });
+
+          if (completedError) throw completedError;
+          completedOrdersData = completedData || [];
         }
       } else {
         // Admin/Customer: get all production orders (exclude pull_ship and child orders)
-        const baseParams: Record<string, string> = {
-          select: productionSelect,
-          order_type: 'neq.pull_ship',
-          parent_order_id: 'is.null',
-          deleted_at: 'is.null',
-          order: 'order_date.desc',
-        };
+        let query = supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            customer_name,
+            order_date,
+            company_id,
+            po_number,
+            description,
+            shipping_state,
+            total,
+            estimated_delivery_date,
+            production_progress,
+            is_delayed,
+            delay_reason,
+            order_finalized_at,
+            updated_at,
+            status,
+            companies (
+              name
+            )
+          `)
+          .eq('status', 'in production')
+          .neq('order_type', 'pull_ship')
+          .is('parent_order_id', null)
+          .is('deleted_at', null);
 
         // Apply company filter
         if (isVibeAdmin) {
           if (selectedCompanyId && selectedCompanyId !== 'all') {
-            baseParams.company_id = `eq.${selectedCompanyId}`;
+            query = query.eq('company_id', selectedCompanyId);
           }
         } else if (activeCompanyId) {
-          baseParams.company_id = `eq.${activeCompanyId}`;
+          query = query.eq('company_id', activeCompanyId);
         }
 
-        const [activeRows, completedRows] = await Promise.all([
-          fetchRestRowsViaAuth<any>('orders', {
-            ...baseParams,
-            status: 'eq.in production',
-          }, { timeoutMs: 10000 }),
-          fetchRestRowsViaAuth<any>('orders', {
-            ...baseParams,
-            status: 'in.("shipped","delivered","completed")',
-          }, { timeoutMs: 10000 }),
-        ]);
+        const { data, error } = await query.order('order_date', { ascending: false });
 
-        ordersData = activeRows || [];
-        completedOrdersData = completedRows || [];
+        if (error) throw error;
+        ordersData = data || [];
+
+        // Fetch completed orders for admin/customer
+        let completedQuery = supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            customer_name,
+            order_date,
+            company_id,
+            po_number,
+            description,
+            shipping_state,
+            total,
+            estimated_delivery_date,
+            production_progress,
+            is_delayed,
+            delay_reason,
+            order_finalized_at,
+            updated_at,
+            status,
+            companies (
+              name
+            )
+          `)
+          .in('status', ['shipped', 'delivered', 'completed'])
+          .neq('order_type', 'pull_ship')
+          .is('parent_order_id', null)
+          .is('deleted_at', null);
+
+        // Apply company filter
+        if (isVibeAdmin) {
+          if (selectedCompanyId && selectedCompanyId !== 'all') {
+            completedQuery = completedQuery.eq('company_id', selectedCompanyId);
+          }
+        } else if (activeCompanyId) {
+          completedQuery = completedQuery.eq('company_id', activeCompanyId);
+        }
+
+        const { data: completedData, error: completedError } = await completedQuery.order('order_date', { ascending: false });
+
+        if (completedError) throw completedError;
+        completedOrdersData = completedData || [];
       }
       
       // Use production_progress from the database directly

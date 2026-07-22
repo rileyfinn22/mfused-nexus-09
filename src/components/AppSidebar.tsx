@@ -34,7 +34,6 @@ import {
 import { cn } from "@/lib/utils";
 import { CompanySwitcher } from "./CompanySwitcher";
 import { useCompany } from "@/contexts/CompanyContext";
-import { fetchUserCompanyRolesViaRest, readStoredAuthSession } from "@/lib/authSession";
 
 const companyNavigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -105,8 +104,9 @@ export function AppSidebar() {
   const [currentUserIdSidebar, setCurrentUserIdSidebar] = useState<string | null>(null);
 
   useEffect(() => {
-    const session = readStoredAuthSession();
-    if (session?.user?.id) setCurrentUserIdSidebar(session.user.id);
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setCurrentUserIdSidebar(data.user.id);
+    });
   }, []);
 
   useEffect(() => {
@@ -217,10 +217,13 @@ export function AppSidebar() {
       return;
     }
 
-    // Fallback to local session + direct REST so slow auth/user calls don't block the shell.
-    const session = readStoredAuthSession();
-    if (session?.user?.id) {
-      const data = await fetchUserCompanyRolesViaRest(session);
+    // Fallback to fetching from DB
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
       const roles = (data || []).map((row: any) => row.role as string);
       setIsVibeAdmin(roles.includes('vibe_admin'));
       setIsVendor(roles.includes('vendor'));

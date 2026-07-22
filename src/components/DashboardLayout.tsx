@@ -10,7 +10,6 @@ import { NotificationsDropdown } from "./NotificationsDropdown";
 import { ThemeToggle } from "./ThemeToggle";
 import { useCompany } from "@/contexts/CompanyContext";
 import { CompanyHeaderSwitcher } from "./CompanyHeaderSwitcher";
-import { readStoredAuthSession } from "@/lib/authSession";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -53,11 +52,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [isVendorPortalUser, companyLoading, navigate]);
 
   useEffect(() => {
-    let cancelled = false;
-    const loadingFailsafe = window.setTimeout(() => {
-      if (!cancelled) setLoading(false);
-    }, 1500);
-
     checkAuth();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -68,24 +62,29 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     );
 
-    return () => {
-      cancelled = true;
-      window.clearTimeout(loadingFailsafe);
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const checkAuth = async () => {
     try {
-      const session = readStoredAuthSession();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth check timeout')), 5000)
+      );
       
-      if (!session) {
+      const authPromise = supabase.auth.getUser();
+      const { data: { user } } = await Promise.race([authPromise, timeoutPromise]) as any;
+      
+      if (!user) {
         navigate('/login');
         return;
       }
     } catch (error) {
       console.error('Auth check error:', error);
-      navigate('/login');
+      if (error instanceof Error && error.message === 'Auth check timeout') {
+        console.error('Auth check timed out - showing default state');
+      } else {
+        navigate('/login');
+      }
     } finally {
       setLoading(false);
     }
@@ -112,7 +111,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const companyName = activeCompany?.name || "Packaging Portal";
 
-  if (loading) {
+  if (loading || companyLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">

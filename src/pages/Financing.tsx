@@ -21,8 +21,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useFinanceLang } from "@/lib/financeI18n";
 import { FinanceLangToggle } from "@/components/FinanceLangToggle";
 import { CardCurrency, DualCurrency } from "@/components/DualCurrency";
-import { fetchRestRowsViaAuth, getFreshAuthSession, readStoredAuthSession, withTimeout } from "@/lib/authSession";
-import { useCompany } from "@/contexts/CompanyContext";
 
 // Inline-editable text cell for the financing table (description / invoice #).
 // Click to edit; Enter or blur saves; Escape cancels. Stops row-navigation clicks.
@@ -93,8 +91,6 @@ export default function Financing() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
-  const [accessChecking, setAccessChecking] = useState(true);
-  const [accessError, setAccessError] = useState<string | null>(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [userRole, setUserRole] = useState<"vibe_admin" | "finance" | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -115,7 +111,6 @@ export default function Financing() {
   const [pendingConfirmations, setPendingConfirmations] = useState(0);
 
   const { lang, toggleLang, t } = useFinanceLang();
-  const { hasVibeAdminRole, hasFinanceRole } = useCompany();
 
   const isVibeAdmin = userRole === "vibe_admin";
   const isFinanceUser = userRole === "finance";
@@ -134,109 +129,38 @@ export default function Financing() {
     }
   }, [searchParams, isVibeAdmin]);
 
-  const getCachedFinanceRole = (userId: string): "vibe_admin" | "finance" | null => {
-    try {
-      const cached = JSON.parse(localStorage.getItem(`companyContext:${userId}`) || "null");
-      const cachedRoles = new Set<string>((cached?.companies || []).map((company: any) => String(company?.role || "")));
-      if (cached?.hasVibeAdminRole || cachedRoles.has("vibe_admin")) return "vibe_admin";
-      if (cached?.hasFinanceRole || cachedRoles.has("finance")) return "finance";
-    } catch {
-      // Ignore stale cache; live role check below is authoritative.
-    }
-    return null;
-  };
-
-  const authorizeAndLoad = (role: "vibe_admin" | "finance", session: any) => {
-    setUserRole(role);
-    setIsAuthorized(true);
-    setAccessChecking(false);
-    setAccessError(null);
-    fetchData(session);
-  };
-
   useEffect(() => { checkAccess(); }, []);
 
-  useEffect(() => {
-    if (isAuthorized || accessChecking) return;
-    const session = readStoredAuthSession();
-    if (!session?.user?.id) return;
-    if (hasVibeAdminRole) authorizeAndLoad("vibe_admin", session);
-    else if (hasFinanceRole) authorizeAndLoad("finance", session);
-  }, [hasVibeAdminRole, hasFinanceRole, isAuthorized, accessChecking]);
-
   const checkAccess = async () => {
-    setAccessChecking(true);
-    setAccessError(null);
-    try {
-      const session = await withTimeout(getFreshAuthSession(), 5000, readStoredAuthSession());
-      if (!session?.user?.id) { navigate("/login"); return; }
-
-      const cachedRole = getCachedFinanceRole(session.user.id)
-        || (hasVibeAdminRole ? "vibe_admin" : hasFinanceRole ? "finance" : null);
-      if (cachedRole) {
-        authorizeAndLoad(cachedRole, session);
-        return;
-      }
-
-      const data = await withTimeout(fetchRestRowsViaAuth<any>("user_roles", {
-        select: "role",
-        user_id: `eq.${session.user.id}`,
-        role: 'in.("vibe_admin","finance")',
-      }, { session, timeoutMs: 7000 }), 8000, null);
-
-      if (!data) {
-        setAccessError("Financing access is taking too long to verify. Try again in a moment.");
-        return;
-      }
-
-      if (data.length === 0) { navigate("/dashboard"); return; }
-      const roles = data.map((r: any) => r.role as string);
-      authorizeAndLoad(roles.includes("vibe_admin") ? "vibe_admin" : "finance", session);
-    } catch (error) {
-      console.error("Error checking financing access:", error);
-      setAccessError("Financing access could not be verified. Try again in a moment.");
-    } finally {
-      setAccessChecking(false);
-    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { navigate("/login"); return; }
+    const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).in("role", ["vibe_admin", "finance"]);
+    if (!data || data.length === 0) { navigate("/dashboard"); return; }
+    const roles = data.map((r: any) => r.role as string);
+    if (roles.includes("vibe_admin")) setUserRole("vibe_admin");
+    else setUserRole("finance");
+    setIsAuthorized(true);
+    fetchData();
   };
 
-  const fetchData = async (sessionOverride?: any) => {
+  const fetchData = async () => {
     setLoading(true);
-    try {
-      const [invRows, depRows, repRows] = await Promise.all([
-        withTimeout(fetchRestRowsViaAuth<any>("financed_invoices", {
-          select: "*,invoices(invoice_number,total,orders(order_number,customer_name,description)),vendor_pos(po_number,description,total,orders(order_number,customer_name,description),vendors(name))",
-          order: "financed_date.desc",
-          limit: 1000,
-        }, { session: sessionOverride, timeoutMs: 7000 }), 8000, []),
-        withTimeout(fetchRestRowsViaAuth<any>("finance_deposits", {
-          select: "*",
-          order: "payment_date.desc",
-          limit: 1000,
-        }, { session: sessionOverride, timeoutMs: 7000 }), 8000, []),
-        withTimeout(fetchRestRowsViaAuth<any>("finance_repayments", {
-          select: "id,amount,source,payment_method,payment_batch_id,confirmation_status,payment_date",
-          limit: 5000,
-        }, { session: sessionOverride, timeoutMs: 7000 }), 8000, []),
-      ]);
-      setInvoices(invRows || []);
-      setDeposits(depRows || []);
-      const reps = repRows || [];
-      setRepayments(reps);
-      // Count pending confirmations by BATCH: a wire / deposit-pull batch is one confirmation, not one per allocation row.
-      const pendingReps = reps.filter((r: any) => r.confirmation_status === "pending");
-      const pendingBatches = new Set(pendingReps.filter((r: any) => r.payment_batch_id).map((r: any) => r.payment_batch_id));
-      const pendingUnbatched = pendingReps.filter((r: any) => !r.payment_batch_id).length;
-      const pendingDeposits = (depRows || []).filter((d: any) => d.confirmation_status === "pending").length;
-      setPendingConfirmations(pendingBatches.size + pendingUnbatched + pendingDeposits);
-    } catch (error) {
-      console.error("Error loading financing data:", error);
-      setInvoices([]);
-      setDeposits([]);
-      setRepayments([]);
-    } finally {
-      setLoading(false);
-    }
+    const [invRes, depRes, repRes] = await Promise.all([
+      supabase.from("financed_invoices").select("*, invoices(invoice_number, total, orders(order_number, customer_name, description)), vendor_pos(po_number, description, total, orders(order_number, customer_name, description), vendors(name))").order("financed_date", { ascending: false }),
+      supabase.from("finance_deposits").select("*").order("payment_date", { ascending: false }),
+      supabase.from("finance_repayments").select("id, amount, source, payment_method, payment_batch_id, confirmation_status, payment_date"),
+    ]);
+    setInvoices(invRes.data || []);
+    setDeposits(depRes.data || []);
+    const reps = repRes.data || [];
+    setRepayments(reps);
+    // Count pending confirmations by BATCH: a wire / deposit-pull batch is one confirmation, not one per allocation row.
+    const pendingReps = reps.filter((r: any) => r.confirmation_status === "pending");
+    const pendingBatches = new Set(pendingReps.filter((r: any) => r.payment_batch_id).map((r: any) => r.payment_batch_id));
+    const pendingUnbatched = pendingReps.filter((r: any) => !r.payment_batch_id).length;
+    const pendingDeposits = (depRes.data || []).filter((d: any) => d.confirmation_status === "pending").length;
+    setPendingConfirmations(pendingBatches.size + pendingUnbatched + pendingDeposits);
+    setLoading(false);
   };
 
   // Inline-edit save for description / invoice_number directly on the table.
@@ -252,25 +176,7 @@ export default function Financing() {
     setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, [field]: next || null } : i)));
   };
 
-  if (!isAuthorized) {
-    return (
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold">Financing</h1>
-          <p className="text-sm text-muted-foreground">
-            {accessError || (accessChecking ? "Loading financing access…" : "Preparing financing…")}
-          </p>
-        </div>
-        {accessError ? (
-          <Button size="sm" onClick={checkAccess}>Retry</Button>
-        ) : (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
-          </div>
-        )}
-      </div>
-    );
-  }
+  if (!isAuthorized) return null;
 
   const filterBySearchAndDate = (list: any[]) => {
     let filtered = list;

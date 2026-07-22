@@ -1,12 +1,5 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  AUTH_SESSION_EVENT,
-  CompanyRoleRow,
-  fetchUserCompanyRolesViaRest,
-  readStoredAuthSession,
-} from "@/lib/authSession";
-import type { Session } from "@supabase/supabase-js";
 
 interface Company {
   id: string;
@@ -32,15 +25,6 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 const ACTIVE_COMPANY_KEY = "activeCompanyId";
-const COMPANY_CACHE_PREFIX = "companyContext";
-
-type CompanyCache = {
-  companies: Company[];
-  hasFinanceRole: boolean;
-  hasVibeAdminRole: boolean;
-  hasForwarderRole: boolean;
-  hasVendorRole: boolean;
-};
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -50,8 +34,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [hasVibeAdminRole, setHasVibeAdminRole] = useState(false);
   const [hasForwarderRole, setHasForwarderRole] = useState(false);
   const [hasVendorRole, setHasVendorRole] = useState(false);
-  const loadRequestIdRef = useRef(0);
-  const backgroundRetryRef = useRef(0);
 
   // Highest privilege first. If a user has multiple role rows for the same company,
   // we pick the most privileged one to keep UI + permissions stable.
@@ -63,151 +45,79 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     "vendor",
   ];
 
-  const applyCompanyState = (companyList: Company[], roleSet: Set<string>) => {
-    setHasFinanceRole(roleSet.has("finance"));
-    setHasVibeAdminRole(roleSet.has("vibe_admin"));
-    setHasForwarderRole(roleSet.has("forwarder"));
-    setHasVendorRole(roleSet.has("vendor"));
-    setCompanies(companyList);
-
-    const savedCompanyId = localStorage.getItem(ACTIVE_COMPANY_KEY);
-    const savedCompany = companyList.find((c) => c.id === savedCompanyId);
-
-    if (savedCompany) {
-      setActiveCompanyState(savedCompany);
-    } else if (companyList.length > 0) {
-      setActiveCompanyState(companyList[0]);
-      localStorage.setItem(ACTIVE_COMPANY_KEY, companyList[0].id);
-    } else {
-      setActiveCompanyState(null);
-    }
-  };
-
-  const readCompanyCache = (userId: string): CompanyCache | null => {
-    try {
-      const raw = localStorage.getItem(`${COMPANY_CACHE_PREFIX}:${userId}`);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as CompanyCache;
-      return Array.isArray(parsed.companies) ? parsed : null;
-    } catch {
-      return null;
-    }
-  };
-
-  const writeCompanyCache = (userId: string, companyList: Company[], roleSet: Set<string>) => {
-    try {
-      const cache: CompanyCache = {
-        companies: companyList,
-        hasFinanceRole: roleSet.has("finance"),
-        hasVibeAdminRole: roleSet.has("vibe_admin"),
-        hasForwarderRole: roleSet.has("forwarder"),
-        hasVendorRole: roleSet.has("vendor"),
-      };
-      localStorage.setItem(`${COMPANY_CACHE_PREFIX}:${userId}`, JSON.stringify(cache));
-    } catch {
-      // localStorage may be unavailable; live fetch still works.
-    }
-  };
-
-  const applyCompanyCache = (cache: CompanyCache) => {
-    setHasFinanceRole(cache.hasFinanceRole);
-    setHasVibeAdminRole(cache.hasVibeAdminRole);
-    setHasForwarderRole(cache.hasForwarderRole);
-    setHasVendorRole(cache.hasVendorRole);
-    setCompanies(cache.companies);
-
-    const savedCompanyId = localStorage.getItem(ACTIVE_COMPANY_KEY);
-    const savedCompany = cache.companies.find((c) => c.id === savedCompanyId);
-    setActiveCompanyState(savedCompany ?? cache.companies[0] ?? null);
-  };
-
   useEffect(() => {
-    loadCompanies(readStoredAuthSession());
+    loadCompanies();
 
-    const handleAuthSession = (event: Event) => {
-      const session = (event as CustomEvent<{ session?: Session }>).detail?.session;
-      if (session?.user?.id) {
-        loadCompanies(session);
-      }
-    };
-
-    window.addEventListener(AUTH_SESSION_EVENT, handleAuthSession);
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        window.setTimeout(() => loadCompanies(session ?? readStoredAuthSession()), 0);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        loadCompanies();
       } else if (event === "SIGNED_OUT") {
-        loadRequestIdRef.current += 1;
-        backgroundRetryRef.current = 0;
         setCompanies([]);
         setActiveCompanyState(null);
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
         setHasForwarderRole(false);
-        setHasVendorRole(false);
+      setHasVendorRole(false);
         localStorage.removeItem(ACTIVE_COMPANY_KEY);
       }
     });
 
-    return () => {
-      window.removeEventListener(AUTH_SESSION_EVENT, handleAuthSession);
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
-  const loadCompanies = async (sessionOverride?: Session | null, options?: { background?: boolean }) => {
-    const requestId = ++loadRequestIdRef.current;
-
-    const isCurrentRequest = () => requestId === loadRequestIdRef.current;
-
+  const loadCompanies = async () => {
     try {
-      if (!options?.background) setLoading(true);
-
-      const session = sessionOverride ?? readStoredAuthSession();
-      const user = session?.user;
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        if (!isCurrentRequest()) return;
-        backgroundRetryRef.current = 0;
         setCompanies([]);
         setActiveCompanyState(null);
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
         setHasForwarderRole(false);
-        setHasVendorRole(false);
+      setHasVendorRole(false);
         setLoading(false);
         return;
       }
 
-      const cachedState = readCompanyCache(user.id);
-      if (cachedState && !options?.background) {
-        applyCompanyCache(cachedState);
+      // Fetch all companies the user has access to
+      const { data: userRoles, error } = await supabase
+        .from("user_roles")
+        .select(`
+          role,
+          company_id,
+          companies:company_id (
+            id,
+            name
+          )
+        `)
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("Error fetching user companies:", error);
+        setCompanies([]);
+        setActiveCompanyState(null);
+        setHasFinanceRole(false);
+        setHasVibeAdminRole(false);
+        setHasForwarderRole(false);
+      setHasVendorRole(false);
         setLoading(false);
-      } else if (!options?.background) {
-        // The user is authenticated from local storage. Do not hold the whole
-        // portal behind the company-role request on slow connections; pages
-        // will hydrate once the role fetch completes.
-        setLoading(false);
+        return;
       }
 
-      // Fetch all companies the user has access to
-      const userRoles = await fetchUserCompanyRolesViaRest(session);
-
-      if (!isCurrentRequest()) return;
-      backgroundRetryRef.current = 0;
-
       const roleSet = new Set((userRoles || []).map((ur: any) => String(ur.role)));
+      setHasFinanceRole(roleSet.has("finance"));
+      setHasVibeAdminRole(roleSet.has("vibe_admin"));
+      setHasForwarderRole(roleSet.has("forwarder"));
+      setHasVendorRole(roleSet.has("vendor"));
 
       // De-dupe by company_id and choose the highest-privilege role per company.
       const byCompanyId = new Map<string, Company>();
 
       (userRoles || [])
-        .filter((ur: CompanyRoleRow) => ur.companies)
-        .forEach((ur: CompanyRoleRow) => {
-          const company = Array.isArray(ur.companies) ? ur.companies[0] : ur.companies;
-          if (!company) return;
-
-          const id = String(company.id);
-          const name = String(company.name);
+        .filter((ur: any) => ur.companies)
+        .forEach((ur: any) => {
+          const id = String(ur.companies.id);
+          const name = String(ur.companies.name);
           const role = String(ur.role);
 
           const existing = byCompanyId.get(id);
@@ -229,26 +139,31 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         });
 
       const companyList: Company[] = Array.from(byCompanyId.values());
-      applyCompanyState(companyList, roleSet);
-      writeCompanyCache(user.id, companyList, roleSet);
+
+      setCompanies(companyList);
+
+      // Restore saved active company or use first one
+      const savedCompanyId = localStorage.getItem(ACTIVE_COMPANY_KEY);
+      const savedCompany = companyList.find((c) => c.id === savedCompanyId);
+
+      if (savedCompany) {
+        setActiveCompanyState(savedCompany);
+      } else if (companyList.length > 0) {
+        setActiveCompanyState(companyList[0]);
+        localStorage.setItem(ACTIVE_COMPANY_KEY, companyList[0].id);
+      } else {
+        setActiveCompanyState(null);
+      }
     } catch (err) {
       console.error("Error loading companies:", err);
-      if (!isCurrentRequest()) return;
-
-      // Preserve prior state on timeout/network failure and retry in the
-      // background so slow Wi-Fi does not trap users behind the global spinner.
-      if (backgroundRetryRef.current < 2) {
-        backgroundRetryRef.current += 1;
-        window.setTimeout(() => {
-          if (loadRequestIdRef.current === requestId) {
-            loadCompanies(readStoredAuthSession(), { background: true });
-          }
-        }, 3000);
-      }
+      setCompanies([]);
+      setActiveCompanyState(null);
+      setHasFinanceRole(false);
+      setHasVibeAdminRole(false);
+      setHasForwarderRole(false);
+      setHasVendorRole(false);
     } finally {
-      if (isCurrentRequest()) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 

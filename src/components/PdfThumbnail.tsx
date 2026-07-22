@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
-import { signStorageUrl } from "@/lib/storageUrl";
 
 let workerConfigured = false;
 function ensureWorker() {
@@ -27,13 +26,8 @@ const PdfThumbnail = ({ pdfUrl, alt, className = "", maxWidth = 400 }: PdfThumbn
 
     const render = async () => {
       try {
-        setLoaded(false);
-        setError(false);
         ensureWorker();
-        const signedPdfUrl = await signStorageUrl('artwork', pdfUrl);
-        if (cancelled) return;
-
-        const loadingTask = pdfjsLib.getDocument({ url: signedPdfUrl });
+        const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
         const pdf = await loadingTask.promise;
         if (cancelled) return;
 

@@ -2,9 +2,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, FileImage, FileText, FileCode, CheckCircle, Clock, ExternalLink } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
-import { signStorageUrl } from "@/lib/storageUrl";
 
 interface ArtworkFile {
   id: string;
@@ -48,52 +47,16 @@ const ArtworkViewerDialog = ({
   onDownload,
 }: ArtworkViewerDialogProps) => {
   const [pdfLoadError, setPdfLoadError] = useState(false);
-  const [signedArtworkUrl, setSignedArtworkUrl] = useState<string | null>(null);
-  const [signedPreviewUrl, setSignedPreviewUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const signUrl = async () => {
-      if (!file?.artwork_url) {
-        setSignedArtworkUrl(null);
-        setSignedPreviewUrl(null);
-        return;
-      }
-
-      const [signedUrl, signedPreview] = await Promise.all([
-        signStorageUrl('artwork', file.artwork_url),
-        file.preview_url ? signStorageUrl('artwork', file.preview_url) : Promise.resolve(null),
-      ]);
-
-      if (!cancelled) {
-        setSignedArtworkUrl(signedUrl);
-        setSignedPreviewUrl(signedPreview);
-      }
-    };
-
-    signUrl();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [file?.artwork_url, file?.preview_url]);
 
   if (!file) return null;
 
   const fileType = getFileType(file.filename);
   const fileTypeLabel = getFileTypeLabel(file.filename);
-  const previewUrl = isUsableArtworkPreviewUrl(file.filename, file.preview_url) ? (signedPreviewUrl || file.preview_url) : null;
-  const displayArtworkUrl = signedArtworkUrl || file.artwork_url;
+  const previewUrl = isUsableArtworkPreviewUrl(file.filename, file.preview_url) ? file.preview_url : null;
 
   const googleDocsViewerUrl = fileType === "pdf"
-    ? `https://docs.google.com/viewer?url=${encodeURIComponent(displayArtworkUrl)}&embedded=true`
+    ? `https://docs.google.com/viewer?url=${encodeURIComponent(file.artwork_url)}&embedded=true`
     : null;
-
-  const openArtworkInTab = async () => {
-    const signedUrl = await signStorageUrl('artwork', file.artwork_url);
-    window.open(signedUrl, "_blank");
-  };
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -146,11 +109,11 @@ const ArtworkViewerDialog = ({
           ) : fileType === "image" ? (
             <div className="flex items-center justify-center bg-muted/30 rounded-lg p-4">
               <img
-                src={displayArtworkUrl}
+                src={file.artwork_url}
                 alt={file.filename}
                 className="max-w-full max-h-[60vh] object-contain rounded"
                 onError={(e) => {
-                  console.log("Artwork image failed to load:", displayArtworkUrl);
+                  console.log("Artwork image failed to load:", file.artwork_url);
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
               />
@@ -174,12 +137,12 @@ const ArtworkViewerDialog = ({
                   <div className="flex gap-3">
                     <Button
                       variant="outline"
-                      onClick={openArtworkInTab}
+                      onClick={() => window.open(file.artwork_url, "_blank")}
                     >
                       <ExternalLink className="h-5 w-5 mr-2" />
                       Open in New Tab
                     </Button>
-                    <Button onClick={() => onDownload(displayArtworkUrl, file.filename)}>
+                    <Button onClick={() => onDownload(file.artwork_url, file.filename)}>
                       <Download className="h-5 w-5 mr-2" />
                       Download PDF
                     </Button>
@@ -200,7 +163,7 @@ const ArtworkViewerDialog = ({
                 This file type cannot be previewed in the browser.
                 Please download to view in the appropriate application.
               </p>
-              <Button size="lg" onClick={() => onDownload(displayArtworkUrl, file.filename)}>
+              <Button size="lg" onClick={() => onDownload(file.artwork_url, file.filename)}>
                 <Download className="h-5 w-5 mr-2" />
                 Download {fileTypeLabel} File
               </Button>
@@ -220,13 +183,13 @@ const ArtworkViewerDialog = ({
             {fileType === "pdf" && (
               <Button
                 variant="outline"
-                onClick={openArtworkInTab}
+                onClick={() => window.open(file.artwork_url, "_blank")}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open in Tab
               </Button>
             )}
-            <Button variant="outline" onClick={() => onDownload(displayArtworkUrl, file.filename)}>
+            <Button variant="outline" onClick={() => onDownload(file.artwork_url, file.filename)}>
               <Download className="h-4 w-4 mr-2" />
               Download
             </Button>

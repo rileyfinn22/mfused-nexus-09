@@ -13,16 +13,6 @@ const parseDateAsLocal = (dateStr: string | null): Date | undefined => {
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, month - 1, day);
 };
-
-const ORDER_LIST_LIMIT = 300;
-const LIST_QUERY_TIMEOUT_MS = 10000;
-const ARTWORK_SKU_BATCH_SIZE = 75;
-
-const createAbortSignal = (timeoutMs = LIST_QUERY_TIMEOUT_MS) => {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-  return { signal: controller.signal, cleanup: () => window.clearTimeout(timeoutId) };
-};
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,12 +39,11 @@ import { exportToCSV } from "@/lib/exportUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel } from "@/components/RowExpandPanel";
-import { fetchRestRowsViaAuth, formatPostgrestInFilter, readStoredAuthSession } from "@/lib/authSession";
 
 const Orders = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { activeCompanyId, isVibeAdmin, loading: activeCompanyLoading } = useActiveCompany();
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   // Read company filter from URL, default to "all" (only for vibe admins)
@@ -83,19 +72,11 @@ const Orders = () => {
   };
 
   useEffect(() => {
-    const hasStoredSession = Boolean(readStoredAuthSession()?.user?.id);
-    if (activeCompanyLoading && !hasStoredSession) return;
-
-    if (!activeCompanyId && !hasStoredSession) {
-      navigate('/login');
-      return;
-    }
-
     fetchOrders();
     if (isVibeAdmin) {
       fetchCompanies();
     }
-  }, [isVibeAdmin, companyFilter, activeCompanyId, activeCompanyLoading]);
+  }, [isVibeAdmin, companyFilter, activeCompanyId]);
 
   const handleDescriptionChange = async (orderId: string, description: string) => {
     const { error } = await supabase
@@ -114,106 +95,78 @@ const Orders = () => {
   };
 
   const fetchCompanies = async () => {
-    try {
-      const data = await fetchRestRowsViaAuth('companies', {
-        select: 'id,name',
-        order: 'name.asc',
-      });
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .order('name');
+    
+    if (!error && data) {
       setCompanies(data);
-    } catch (error) {
-      console.error('Companies fetch error:', error);
     }
   };
 
   const fetchOrders = async () => {
     setLoading(true);
-
-    if (!activeCompanyId && !readStoredAuthSession()?.user?.id) {
-      navigate('/login');
-      return;
-    }
-
-    const params: Record<string, string | number> = {
-      select: 'id,order_number,order_date,company_id,customer_name,po_number,description,total,status,estimated_delivery_date,order_type,order_finalized,vibe_processed,production_progress,shipping_city,shipping_state,order_items(id,sku,name,quantity,shipped_quantity,unit_price,line_number),companies(name)',
-      deleted_at: 'is.null',
-      order: 'created_at.desc',
-      limit: ORDER_LIST_LIMIT,
-    };
+    let query = supabase
+      .from('orders')
+      .select('*, order_items(*), companies(name)')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
 
     // For vibe admins: use URL company filter if set
     // For regular users: always filter by their active company
     if (isVibeAdmin) {
       if (companyFilter !== 'all') {
-        params.company_id = `eq.${companyFilter}`;
+        query = query.eq('company_id', companyFilter);
       }
     } else if (activeCompanyId) {
       // Non-admin users: filter by their active company
-      params.company_id = `eq.${activeCompanyId}`;
+      query = query.eq('company_id', activeCompanyId);
     }
 
-    try {
-      const data = await fetchRestRowsViaAuth<any>('orders', params);
+    const { data, error } = await query;
+    
+    if (!error && data) {
       // For non-vibe admins, filter out draft orders (they can only see pending and later)
       const filteredData = isVibeAdmin 
         ? data 
         : data.filter(order => order.status !== 'draft');
       
+      // Batch-fetch artwork approval status for ALL orders in ONE query (was N+1)
+      const allSkus = Array.from(new Set(
+        filteredData.flatMap((o: any) => (o.order_items || []).map((i: any) => i.sku).filter(Boolean))
+      ));
+      let approvedSkus = new Set<string>();
+      if (allSkus.length > 0) {
+        const { data: artworkData } = await supabase
+          .from('artwork_files')
+          .select('sku, is_approved')
+          .in('sku', allSkus)
+          .eq('is_approved', true);
+        approvedSkus = new Set((artworkData || []).map((a: any) => a.sku));
+      }
+
       const completedStatuses = ['completed', 'shipped', 'delivered'];
       const ordersWithChecklist = filteredData.map((order: any) => {
         const productionProgress = completedStatuses.includes(order.status?.toLowerCase())
           ? 100
           : (order.production_progress ?? 0);
 
+        const items = order.order_items || [];
+        const allApproved = items.length > 0 && items.every((item: any) => approvedSkus.has(item.sku));
+
         return {
           ...order,
-          artApproved: false,
-          checklistComplete: false,
+          artApproved: allApproved,
+          checklistComplete: allApproved && order.order_finalized && order.vibe_processed,
           productionProgress,
         };
       });
 
       setOrders(ordersWithChecklist);
-      setLoading(false);
-      hydrateArtworkApproval(filteredData);
-    } catch (error) {
-      console.error('Orders fetch error:', error);
-      setLoading(false);
+
     }
-  };
-
-  const hydrateArtworkApproval = async (sourceOrders: any[]) => {
-    const allSkus = Array.from(new Set(
-      sourceOrders.flatMap((o: any) => (o.order_items || []).map((i: any) => i.sku).filter(Boolean))
-    ));
-
-    if (allSkus.length === 0) return;
-
-    const approvedSkus = new Set<string>();
-
-    try {
-      for (let i = 0; i < allSkus.length; i += ARTWORK_SKU_BATCH_SIZE) {
-        const batch = allSkus.slice(i, i + ARTWORK_SKU_BATCH_SIZE);
-        const data = await fetchRestRowsViaAuth<{ sku: string }>('artwork_files', {
-          select: 'sku',
-          sku: formatPostgrestInFilter(batch),
-          is_approved: 'eq.true',
-        }, { timeoutMs: 8000 });
-
-        (data || []).forEach((a: any) => approvedSkus.add(a.sku));
-      }
-
-      setOrders((prev) => prev.map((order: any) => {
-        const items = order.order_items || [];
-        const allApproved = items.length > 0 && items.every((item: any) => approvedSkus.has(item.sku));
-        return {
-          ...order,
-          artApproved: allApproved,
-          checklistComplete: allApproved && order.order_finalized && order.vibe_processed,
-        };
-      }));
-    } catch (error) {
-      console.error('Artwork approval hydrate failed:', error);
-    }
+    setLoading(false);
   };
 
   const handleDeleteOrder = async () => {
@@ -324,6 +277,10 @@ const Orders = () => {
     const matchesStatus = statusFilter === "all" || order.status.toLowerCase() === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  useEffect(() => {
+    fetchOrders();
+  }, [companyFilter]);
 
   const draftOrders = filteredOrders.filter(o => o.status.toLowerCase() === 'draft');
   const allNonDraftOrders = filteredOrders.filter(o => o.status.toLowerCase() !== 'draft');
@@ -498,7 +455,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
 
         {/* All Orders */}
         <div className="space-y-3">
-            <h2 className="text-lg font-medium">All Orders</h2>
+          <h2 className="text-lg font-medium">All Orders</h2>
           <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
             <div className="bg-muted border-b-2 border-border">
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">

@@ -52,8 +52,6 @@ import { useToast } from "@/hooks/use-toast";
 import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
-import { signStorageUrlsInRows } from "@/lib/storageUrl";
-import { fetchRestRowsByInFilterViaAuth, fetchRestRowsViaAuth, formatPostgrestInFilter, withTimeout } from "@/lib/authSession";
 
 interface Product {
   id: string;
@@ -93,7 +91,7 @@ interface ProductTemplate {
 const Products = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { activeCompanyId, isVibeAdmin, loading: activeCompanyLoading } = useActiveCompany();
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [expandedProducts, setExpandedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
@@ -153,17 +151,6 @@ const Products = () => {
   }, [templates, searchParams]);
 
   useEffect(() => {
-    if (activeCompanyLoading) return;
-
-    if (!isVibeAdmin && !activeCompanyId) {
-      setProducts([]);
-      setTemplates([]);
-      setArtworkStatus({});
-      setArtworkThumbnails({});
-      setLoading(false);
-      return;
-    }
-
     fetchProducts();
     fetchTemplates();
     fetchArtworkStatus();
@@ -171,68 +158,64 @@ const Products = () => {
     if (isVibeAdmin) {
       fetchCompanies();
     }
-  }, [isVibeAdmin, companyFilter, activeCompanyId, activeCompanyLoading]);
+  }, [isVibeAdmin, companyFilter, activeCompanyId]);
 
   const fetchCompanies = async () => {
-    try {
-      const data = await fetchRestRowsViaAuth<any>('companies', {
-        select: '*',
-        order: 'name.asc',
-      }, { timeoutMs: 8000 });
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .order('name');
+    
+    if (!error && data) {
       setCompanies(data);
-    } catch (error) {
-      console.error('Error fetching companies:', error);
     }
   };
 
   const fetchProducts = async () => {
     // Don't fetch until we have an active company (prevents showing all companies' data)
-    if (!isVibeAdmin && !activeCompanyId) {
-      setProducts([]);
-      setLoading(false);
-      return;
-    }
+    if (!isVibeAdmin && !activeCompanyId) return;
 
     try {
-      const params: Record<string, string | number> = {
-        select: '*,product_states(*)',
-        order: 'created_at.desc',
-        limit: 50000,
-      };
+      let query = supabase
+        .from('products')
+        .select('*, product_states(*)')
+        .order('created_at', { ascending: false })
+        .limit(50000);
 
       // For vibe admins: use URL company filter if set
       // For regular users: always filter by their active company
       if (isVibeAdmin) {
         if (companyFilter !== 'all') {
-          params.company_id = `eq.${companyFilter}`;
+          query = query.eq('company_id', companyFilter);
         }
       } else {
-        params.company_id = `eq.${activeCompanyId}`;
+        query = query.eq('company_id', activeCompanyId);
       }
 
-      const productsData = await fetchRestRowsViaAuth<any>('products', params, { timeoutMs: 10000 });
+      const { data: productsData, error: productsError } = await query;
+
+      if (productsError) throw productsError;
 
       // Batch fetch product_states + inventory in 2 queries (was N+1 per product)
-      const productIds = (productsData || []).map((p: any) => p.id).filter(Boolean);
-      const inFilter = productIds.length > 0 ? formatPostgrestInFilter(productIds.slice(0, 1000)) : null;
-      const [statesData, inventoryRows, costRows] = productIds.length > 0
+      const productIds = (productsData || []).map((p: any) => p.id);
+      const [{ data: statesData }, { data: inventoryRows }] = productIds.length > 0
         ? await Promise.all([
-            withTimeout(fetchRestRowsByInFilterViaAuth<any>('product_states', {
-              select: '*',
-            }, 'product_id', productIds, { timeoutMs: 6000, chunkSize: 100 }), 7000, []),
-            withTimeout(fetchRestRowsByInFilterViaAuth<any>('inventory', {
-              select: 'sku,product_id',
-            }, 'product_id', productIds, { timeoutMs: 6000, chunkSize: 100 }), 7000, []),
-            withTimeout(fetchRestRowsByInFilterViaAuth<any>('product_costs', {
-              select: 'product_id,cost',
-            }, 'product_id', productIds, { timeoutMs: 5000, chunkSize: 75 }), 6000, []),
+            supabase.from('product_states').select('*').in('product_id', productIds),
+            supabase.from('inventory').select('sku, product_id').in('product_id', productIds),
           ])
-        : [[], [], []];
+        : [{ data: [] as any[] }, { data: [] as any[] }];
 
+      // Product cost moved to companion table product_costs
       const productCostMap: Record<string, number | null> = {};
-      (costRows || []).forEach((row: any) => {
-        productCostMap[row.product_id] = row.cost;
-      });
+      if (productIds.length > 0) {
+        const { data: costRows } = await (supabase as any)
+          .from('product_costs')
+          .select('product_id, cost')
+          .in('product_id', productIds);
+        (costRows || []).forEach((row: any) => {
+          productCostMap[row.product_id] = row.cost;
+        });
+      }
 
       const statesByProduct = new Map<string, any[]>();
       (statesData || []).forEach((s: any) => {
@@ -284,20 +267,21 @@ const Products = () => {
     if (!isVibeAdmin && !activeCompanyId) return;
 
     try {
-      const templateParams: Record<string, string> = {
-        select: '*',
-        order: 'name.asc',
-      };
+      let templatesQuery = supabase
+        .from('product_templates')
+        .select('*');
 
       if (isVibeAdmin) {
         if (companyFilter !== 'all') {
-          templateParams.or = `(company_id.eq.${companyFilter},company_id.is.null)`;
+          templatesQuery = templatesQuery.or(`company_id.eq.${companyFilter},company_id.is.null`);
         }
       } else if (activeCompanyId) {
-        templateParams.or = `(company_id.eq.${activeCompanyId},company_id.is.null)`;
+        templatesQuery = templatesQuery.or(`company_id.eq.${activeCompanyId},company_id.is.null`);
       }
 
-      const templatesData = await fetchRestRowsViaAuth<any>('product_templates', templateParams, { timeoutMs: 9000 });
+      const { data: templatesData, error: templatesError } = await templatesQuery.order('name');
+
+      if (templatesError) throw templatesError;
 
       // Batch product counts per template in ONE query (was N+1 per template)
       const templateIds = (templatesData || []).map((t: any) => t.id);
@@ -305,9 +289,10 @@ const Products = () => {
       // Template cost moved to companion table product_template_costs
       const templateCostMap: Record<string, number | null> = {};
       if (templateIds.length > 0) {
-        const tCostRows = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('product_template_costs', {
-          select: 'template_id,cost',
-        }, 'template_id', templateIds, { timeoutMs: 5000, chunkSize: 100 }), 6000, []);
+        const { data: tCostRows } = await (supabase as any)
+          .from('product_template_costs')
+          .select('template_id, cost')
+          .in('template_id', templateIds);
         (tCostRows || []).forEach((row: any) => {
           templateCostMap[row.template_id] = row.cost;
         });
@@ -315,15 +300,16 @@ const Products = () => {
 
       let countsByTemplate = new Map<string, number>();
       if (templateIds.length > 0) {
-        const countParams: Record<string, string> = {
-          select: 'template_id',
-        };
+        let countsQuery = supabase
+          .from('products')
+          .select('template_id')
+          .in('template_id', templateIds);
         if (isVibeAdmin) {
-          if (companyFilter !== 'all') countParams.company_id = `eq.${companyFilter}`;
+          if (companyFilter !== 'all') countsQuery = countsQuery.eq('company_id', companyFilter);
         } else if (activeCompanyId) {
-          countParams.company_id = `eq.${activeCompanyId}`;
+          countsQuery = countsQuery.eq('company_id', activeCompanyId);
         }
-        const countRows = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('products', countParams, 'template_id', templateIds, { timeoutMs: 6000, chunkSize: 100 }), 7000, []);
+        const { data: countRows } = await countsQuery;
         (countRows || []).forEach((row: any) => {
           countsByTemplate.set(row.template_id, (countsByTemplate.get(row.template_id) || 0) + 1);
         });
@@ -344,10 +330,12 @@ const Products = () => {
 
   const fetchArtworkStatus = async () => {
     try {
-      const data = await fetchRestRowsViaAuth<any>('artwork_files', {
-        select: 'sku,is_approved',
-        limit: 50000,
-      }, { timeoutMs: 9000 });
+      const { data, error } = await supabase
+        .from('artwork_files')
+        .select('sku, is_approved')
+        .limit(50000);
+
+      if (error) throw error;
 
       const statusMap: Record<string, boolean> = {};
       data?.forEach(artwork => {
@@ -363,15 +351,17 @@ const Products = () => {
 
   const fetchArtworkThumbnails = async () => {
     try {
-      const data = await fetchRestRowsViaAuth<any>('artwork_files', {
-        select: 'sku,filename,preview_url,artwork_url,is_approved',
-        order: 'is_approved.desc,created_at.desc',
-        limit: 50000,
-      }, { timeoutMs: 9000 });
+      const { data, error } = await supabase
+        .from('artwork_files')
+        .select('sku, filename, preview_url, artwork_url, is_approved')
+        .order('is_approved', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(50000);
 
-      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+      if (error) throw error;
+
       const thumbnailMap: Record<string, string> = {};
-      signedData?.forEach((artwork) => {
+      data?.forEach((artwork) => {
         if (thumbnailMap[artwork.sku]) return;
 
         if (isUsableArtworkPreviewUrl(artwork.filename, artwork.preview_url)) {

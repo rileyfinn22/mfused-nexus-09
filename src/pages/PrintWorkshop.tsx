@@ -20,8 +20,6 @@ import { Plus, Printer, ArrowLeft, Pencil, Trash2, Copy, Package, ShoppingBag, S
 import { toast } from "sonner";
 import { generatePrintReadyPdf, generateCanvasOnlyPdf } from "@/lib/printPdfExport";
 import { generatePdfThumbnailFromArrayBuffer } from "@/lib/pdfThumbnail";
-import { fetchRestRowsViaAuth, withTimeout } from "@/lib/authSession";
-import { signStorageUrlsInRows } from "@/lib/storageUrl";
 
 type View = "browse" | "build" | "use" | "checkout" | "custom" | "new-template";
 
@@ -80,44 +78,46 @@ export default function PrintWorkshop() {
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
-    const templateSelect = "id,name,description,product_type,width_inches,height_inches,depth_inches,bleed_inches,panel_zones,canvas_data,source_pdf_path,thumbnail_url,preset_price_per_unit,material_options,is_global,company_id,created_at";
 
-    try {
-      if (isVibeAdmin) {
-        const data = await withTimeout(fetchRestRowsViaAuth<any>("print_templates", {
-          select: templateSelect,
-          order: "created_at.desc",
-          limit: 500,
-        }, { timeoutMs: 7000 }), 8000, []);
-        const signed = await signStorageUrlsInRows("print-files", data || [], ["thumbnail_url"]);
-        setTemplates(signed || []);
-      } else if (activeCompanyId) {
-        const assignments = await withTimeout(fetchRestRowsViaAuth<any>("print_template_companies", {
-          select: "template_id",
-          company_id: `eq.${activeCompanyId}`,
-          limit: 1000,
-        }, { timeoutMs: 7000 }), 8000, []);
-
-        const assignedIds = Array.from(new Set((assignments || []).map((a: any) => a.template_id).filter(Boolean)));
-        const assignedFilter = assignedIds.length > 0 ? `,id.in.(${assignedIds.map((id) => `"${id}"`).join(",")})` : "";
-        const data = await withTimeout(fetchRestRowsViaAuth<any>("print_templates", {
-          select: templateSelect,
-          or: `(is_global.eq.true${assignedFilter})`,
-          order: "created_at.desc",
-          limit: 500,
-        }, { timeoutMs: 7000 }), 8000, []);
-        const signed = await signStorageUrlsInRows("print-files", data || [], ["thumbnail_url"]);
-        setTemplates(signed || []);
+    if (isVibeAdmin) {
+      // Admins see all templates
+      const { data, error } = await supabase
+        .from("print_templates")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) {
+        toast.error("Failed to load templates");
       } else {
-        setTemplates([]);
+        setTemplates(data || []);
       }
-    } catch (error) {
-      console.error("Failed to load print templates:", error);
-      toast.error("Failed to load templates");
+    } else if (activeCompanyId) {
+      // Company users see global templates + templates assigned to their company
+      const { data: allTemplates, error: tErr } = await supabase
+        .from("print_templates")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (tErr) {
+        toast.error("Failed to load templates");
+        setTemplates([]);
+      } else {
+        const { data: assignments } = await supabase
+          .from("print_template_companies")
+          .select("template_id")
+          .eq("company_id", activeCompanyId);
+
+        const assignedIds = new Set((assignments || []).map((a: any) => a.template_id));
+
+        const visible = (allTemplates || []).filter(
+          (t: any) => t.is_global || assignedIds.has(t.id)
+        );
+        setTemplates(visible);
+      }
+    } else {
       setTemplates([]);
-    } finally {
-      setLoading(false);
     }
+
+    setLoading(false);
   }, [activeCompanyId, isVibeAdmin]);
 
   useEffect(() => {

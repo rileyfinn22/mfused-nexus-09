@@ -6,8 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { dispatchAuthSession, fetchUserCompanyRolesViaRest, readStoredAuthSession } from "@/lib/authSession";
-import type { Session } from "@supabase/supabase-js";
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -18,15 +16,6 @@ export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-
-  const navigateWithFallback = (target: string, replace = false) => {
-    navigate(target, { replace });
-    window.setTimeout(() => {
-      if (window.location.pathname === "/login") {
-        window.location.assign(target);
-      }
-    }, 300);
-  };
 
   // Check for invoice redirect context
   const invoiceId = searchParams.get("invoice");
@@ -42,28 +31,23 @@ export default function Login() {
     }
   }, [invoiceId, redirectTo]);
 
-  // If the user is already logged in, get them off the login screen.
+  // If the user is already logged in and this is an invoice deep-link, skip the login screen.
   useEffect(() => {
+    if (!redirectTo) return;
+
     let active = true;
 
-    const go = async (session: Session) => {
+    const go = () => {
       if (!active) return;
-      dispatchAuthSession(session);
-      if (redirectTo) {
-        navigateWithFallback(redirectTo, true);
-        return;
-      }
-      navigateWithFallback("/dashboard", true);
+      navigate(redirectTo);
     };
 
-    const storedSession = readStoredAuthSession();
-    if (storedSession?.user?.id) void go(storedSession);
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session) go();
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      // Do not call Supabase queries synchronously inside auth callbacks; it can stall navigation.
-      if (session?.user?.id) {
-        window.setTimeout(() => go(session), 0);
-      }
+      if (session) go();
     });
 
     return () => {
@@ -71,7 +55,6 @@ export default function Login() {
       subscription.unsubscribe();
     };
   }, [redirectTo, navigate]);
-
 
   const associateWithInvoice = async (userEmail: string) => {
     const pendingInvoiceId = sessionStorage.getItem("pendingInvoiceAccess");
@@ -141,7 +124,6 @@ export default function Login() {
         });
 
         if (!signInError && signInData.user) {
-          dispatchAuthSession(signInData.session);
           const association = await associateWithInvoice(email);
           const associatedInvoiceId = association.invoiceId;
 
@@ -163,7 +145,7 @@ export default function Login() {
           const pendingRedirect = sessionStorage.getItem("pendingRedirect");
           sessionStorage.removeItem("pendingRedirect");
 
-          navigateWithFallback(
+          navigate(
             pendingRedirect ||
               (associatedInvoiceId ? `/invoices/${associatedInvoiceId}` : "/dashboard")
           );
@@ -180,12 +162,11 @@ export default function Login() {
         setPassword("");
         setConfirmPassword("");
       } else {
-        const { data: signInData, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        dispatchAuthSession(signInData.session);
 
         const association = await associateWithInvoice(email);
         const associatedInvoiceId = association.invoiceId;
@@ -207,31 +188,28 @@ export default function Login() {
         sessionStorage.removeItem("pendingRedirect");
 
         if (associatedInvoiceId) {
-          navigateWithFallback(pendingRedirect || `/invoices/${associatedInvoiceId}`);
+          navigate(pendingRedirect || `/invoices/${associatedInvoiceId}`);
         } else if (pendingRedirect) {
-          navigateWithFallback(pendingRedirect);
+          navigate(pendingRedirect);
         } else {
-          // Try to detect finance-only user, but never let this block navigation.
-          try {
-            const rolePromise = (async () => {
-              const session = signInData.session ?? readStoredAuthSession();
-              if (!session?.user?.id) return null;
-              const roles = await fetchUserCompanyRolesViaRest(session);
-              return (roles || []).map((r: any) => r.role);
-            })();
-            const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
-            const roleList = (await Promise.race([rolePromise, timeout])) as string[] | null;
-            if (roleList && roleList.length === 1 && roleList[0] === "finance") {
-              navigateWithFallback("/financing");
+          // Check if finance-only user
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (currentUser) {
+            const { data: roles } = await supabase
+              .from("user_roles")
+              .select("role")
+              .eq("user_id", currentUser.id);
+            const roleList = (roles || []).map((r: any) => r.role);
+            if (roleList.length === 1 && roleList[0] === "finance") {
+              navigate("/financing");
             } else {
-              navigateWithFallback("/dashboard");
+              navigate("/dashboard");
             }
-          } catch {
-            navigateWithFallback("/dashboard");
+          } else {
+            navigate("/dashboard");
           }
         }
       }
-
     } catch (error: any) {
       toast({
         title: "Error",

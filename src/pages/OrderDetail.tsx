@@ -28,8 +28,6 @@ import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { SendOrderConfirmationDialog } from "@/components/SendOrderConfirmationDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
-import { fetchRestRowsViaAuth, fetchUserCompanyRolesViaRest, formatPostgrestInFilter, readStoredAuthSession } from "@/lib/authSession";
-import { signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
 
 
 const STAGE_DEFINITIONS = [
@@ -46,8 +44,6 @@ const STAGE_DEFINITIONS = [
   { value: 'in_transit', label: 'In Transit', order: 10, weight: 15 },
   { value: 'delivered', label: 'Delivered', order: 11, weight: 5 },
 ];
-
-const ORDER_DETAIL_TIMEOUT_MS = 10000;
 
 // Keep STAGE_NAMES for backward compatibility
 const STAGE_NAMES = STAGE_DEFINITIONS;
@@ -149,25 +145,23 @@ const OrderDetail = () => {
 
   const fetchProducts = async (companyId?: string) => {
     if (!companyId) return;
-    try {
-      const data = await fetchRestRowsViaAuth<any>('products', {
-        select: 'id,name,item_id,description,price,company_id',
-        company_id: `eq.${companyId}`,
-        order: 'name.asc',
-      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
-      setProducts(data || []);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    }
+    const { data } = await supabase
+      .from('products')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('name');
+    if (data) setProducts(data);
   };
   const checkAdminStatus = async () => {
-    const session = readStoredAuthSession();
-    const user = session?.user;
+    const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      let roleRows: any[] = [];
-      try {
-        roleRows = await fetchUserCompanyRolesViaRest(session);
-      } catch (error) {
+      // Users can have multiple role rows; never use .single() here.
+      const { data: roleRows, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      if (error) {
         console.error('Error fetching roles:', error);
       }
 
@@ -186,18 +180,13 @@ const OrderDetail = () => {
       setIsCustomer(customer);
 
       if (vendor) {
-        try {
-          const vendorRows = await fetchRestRowsViaAuth<any>('vendors', {
-            select: 'id',
-            user_id: `eq.${user.id}`,
-            limit: 1,
-          }, { session, timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
-
-          setVendorId(vendorRows?.[0]?.id || null);
-        } catch (error) {
-          console.error('Error fetching vendor role record:', error);
-          setVendorId(null);
-        }
+        const { data: vendorData } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        setVendorId(vendorData?.id || null);
       } else {
         setVendorId(null);
       }
@@ -205,156 +194,125 @@ const OrderDetail = () => {
   };
   const fetchOrder = async () => {
     setLoading(true);
-    try {
-      const [orderRows, itemRows] = await Promise.all([
-        fetchRestRowsViaAuth<any>('orders', {
-          select: '*',
-          id: `eq.${orderId}`,
-          limit: 1,
-        }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS }),
-        fetchRestRowsViaAuth<any>('order_items', {
-          select: '*',
-          order_id: `eq.${orderId}`,
-          order: 'line_number.asc.nullslast',
-        }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS }),
-      ]);
-
-      const data = orderRows?.[0] ? { ...orderRows[0], order_items: itemRows || [] } : null;
-      if (!data) {
-        setOrder(null);
-        return;
-      }
-
+    const {
+      data,
+      error
+    } = await supabase
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('id', orderId)
+      .order('line_number', { ascending: true, nullsFirst: false, foreignTable: 'order_items' })
+      .single();
+    if (!error && data) {
       setOrder(data);
       setEditedOrder(data);
       setEditedItems(data.order_items || []);
       setVibeProcessed(data.vibe_processed || false);
       setOrderFinalized(data.order_finalized || false);
       setArtApprovedManually(data.art_approved_manually || false);
-      setArtApproved(data.art_approved_manually || false);
 
-      // Non-blocking side loads so the order page can render immediately.
+      // Load saved customer addresses for this company to offer quick-load in edit mode
       if (data.company_id) {
-        fetchRestRowsViaAuth<any>('customer_addresses', {
-          select: 'id,address_type,customer_name,name,street,city,state,zip',
-          company_id: `eq.${data.company_id}`,
-          order: 'updated_at.desc',
-        }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS })
-          .then((addrs) => setSavedAddresses(addrs || []))
-          .catch((error) => console.error('Error fetching saved addresses:', error));
+        supabase
+          .from('customer_addresses')
+          .select('id, address_type, customer_name, name, street, city, state, zip')
+          .eq('company_id', data.company_id)
+          .order('updated_at', { ascending: false })
+          .then(({ data: addrs }) => setSavedAddresses(addrs || []));
       }
 
+      
+      // Check artwork approval status for all products in order
       if (data.order_items && data.order_items.length > 0) {
-        const skus = Array.from(new Set<string>(data.order_items.map((item: any) => String(item.sku || '')).filter(Boolean)));
-        if (skus.length > 0) {
-          fetchRestRowsViaAuth<any>('artwork_files', {
-            select: 'is_approved,sku',
-            sku: formatPostgrestInFilter(skus),
-          }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS })
-            .then((artworkData) => {
-              const approvedSkus = new Set((artworkData || []).filter((art: any) => art.is_approved).map((art: any) => art.sku));
-              const allApproved = data.order_items.every((item: any) => approvedSkus.has(item.sku));
-              setArtApproved(allApproved || data.art_approved_manually);
-            })
-            .catch((error) => console.error('Error fetching artwork approval:', error));
-        }
+        const productIds = data.order_items.map((item: any) => item.product_id);
+        const { data: artworkData } = await supabase
+          .from('artwork_files')
+          .select('is_approved, sku')
+          .in('sku', data.order_items.map((item: any) => item.sku));
+        
+        // All products must have approved artwork (or manual override)
+        const allApproved = data.order_items.every((item: any) => 
+          artworkData?.some((art: any) => art.sku === item.sku && art.is_approved)
+        );
+        setArtApproved(allApproved || data.art_approved_manually);
+      } else {
+        // If no items, check manual override
+        setArtApproved(data.art_approved_manually || false);
       }
-    } catch (error) {
-      console.error('Error fetching order:', error);
-      setOrder(null);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   const fetchProductionStages = async () => {
-    if (!orderId) return;
+    let stagesQuery = supabase
+      .from('production_stages')
+      .select('*, vendors(name)')
+      .eq('order_id', orderId)
+      .order('sequence_order');
 
-    try {
-      const params: Record<string, string | number | boolean> = {
-        select: '*,vendors(name)',
-        order_id: `eq.${orderId}`,
-        order: 'sequence_order.asc',
-      };
+    // Vendors only see their assigned stages
+    if (isVendor && vendorId) {
+      stagesQuery = stagesQuery.eq('vendor_id', vendorId);
+    }
 
-      // Vendors only see their assigned stages once the vendor id is known.
-      if (isVendor && vendorId) {
-        params.vendor_id = `eq.${vendorId}`;
-      }
-
-      const data = await fetchRestRowsViaAuth<any>('production_stages', params, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
-      setProductionStages(data || []);
+    const { data, error } = await stagesQuery;
+    
+    if (!error && data) {
+      setProductionStages(data);
 
       // Batch-fetch ALL stage updates in ONE query (was N+1 per stage)
-      const stageIds = (data || []).map((s: any) => s.id).filter(Boolean);
+      const stageIds = data.map((s: any) => s.id);
       const updates: { [key: string]: any[] } = {};
-      for (const id of stageIds) updates[id] = [];
-
       if (stageIds.length > 0) {
-        const updatesData = await fetchRestRowsViaAuth<any>('production_stage_updates', {
-          select: '*',
-          stage_id: formatPostgrestInFilter(stageIds),
-          order: 'created_at.desc',
-        }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
-
+        const { data: updatesData } = await supabase
+          .from('production_stage_updates')
+          .select('*')
+          .in('stage_id', stageIds)
+          .order('created_at', { ascending: false });
+        for (const id of stageIds) updates[id] = [];
         (updatesData || []).forEach((u: any) => {
           (updates[u.stage_id] ||= []).push(u);
         });
       }
-
       setStageUpdates(updates);
-    } catch (error) {
-      console.error('Error fetching production stages:', error);
-      setProductionStages([]);
-      setStageUpdates({});
     }
   };
 
 
   const fetchVendors = async () => {
-    try {
-      const data = await fetchRestRowsViaAuth<any>('vendors', {
-        select: '*',
-        is_active: 'eq.true',
-        order: 'name.asc',
-      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
-
-      setVendors(data || []);
-    } catch (error) {
-      console.error('Error fetching vendors:', error);
+    const { data, error } = await supabase
+      .from('vendors')
+      .select('*')
+      .eq('is_active', true)
+      .order('name');
+    
+    if (!error && data) {
+      setVendors(data);
     }
   };
 
   const fetchInvoices = async () => {
-    if (!orderId) return;
-
-    try {
-      const data = await fetchRestRowsViaAuth<any>('invoices', {
-        select: '*',
-        order_id: `eq.${orderId}`,
-        deleted_at: 'is.null',
-        order: 'shipment_number.asc',
-      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
-
-      setInvoices(data || []);
-    } catch (error) {
-      console.error('Error fetching invoices:', error);
+    const { data } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('order_id', orderId)
+      .is('deleted_at', null)
+      .order('shipment_number');
+    
+    if (data) {
+      setInvoices(data);
     }
   };
 
   const fetchVibeAttachments = async () => {
-    if (!orderId) return;
-
-    try {
-      const data = await fetchRestRowsViaAuth<any>('vibe_note_attachments', {
-        select: '*',
-        order_id: `eq.${orderId}`,
-        order: 'created_at.desc',
-      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
-
-      setVibeAttachments(data || []);
-    } catch (error) {
-      console.error('Error fetching vibe attachments:', error);
+    const { data } = await supabase
+      .from('vibe_note_attachments')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false });
+    
+    if (data) {
+      setVibeAttachments(data);
     }
   };
 
@@ -440,18 +398,14 @@ const OrderDetail = () => {
 
   // Order Attachments Functions
   const fetchOrderAttachments = async () => {
-    if (!orderId) return;
-
-    try {
-      const data = await fetchRestRowsViaAuth<any>('order_attachments', {
-        select: '*',
-        order_id: `eq.${orderId}`,
-        order: 'created_at.desc',
-      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
-
-      setOrderAttachments(data || []);
-    } catch (error) {
-      console.error('Error fetching order attachments:', error);
+    const { data } = await supabase
+      .from('order_attachments')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false });
+    
+    if (data) {
+      setOrderAttachments(data);
     }
   };
 
@@ -466,18 +420,14 @@ const OrderDetail = () => {
     
     if (skus.length === 0) return;
     
-    try {
-      const data = await fetchRestRowsViaAuth<any>('artwork_files', {
-        select: '*',
-        sku: formatPostgrestInFilter(skus),
-        order: 'created_at.desc',
-      }, { timeoutMs: ORDER_DETAIL_TIMEOUT_MS });
-
-      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
-      setOrderArtwork(signedData);
-    } catch (error) {
-      console.error('Error fetching order artwork:', error);
-      setOrderArtwork([]);
+    const { data } = await supabase
+      .from('artwork_files')
+      .select('*')
+      .in('sku', skus)
+      .order('created_at', { ascending: false });
+    
+    if (data) {
+      setOrderArtwork(data);
     }
   };
 
@@ -3206,7 +3156,7 @@ const OrderDetail = () => {
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2"
-                            onClick={async () => window.open(await signStorageUrl('artwork', artwork.artwork_url), '_blank')}
+                            onClick={() => window.open(artwork.artwork_url, '_blank')}
                           >
                             <ExternalLink className="h-3 w-3 mr-1" />
                             View
@@ -3215,10 +3165,9 @@ const OrderDetail = () => {
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2"
-                            onClick={async () => {
-                              const signedUrl = await signStorageUrl('artwork', artwork.artwork_url);
+                            onClick={() => {
                               const link = document.createElement('a');
-                              link.href = signedUrl;
+                              link.href = artwork.artwork_url;
                               link.download = artwork.filename;
                               link.click();
                             }}

@@ -13,7 +13,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { signStorageUrlsInRows } from "@/lib/storageUrl";
 
 interface Orphan {
   id: string;
@@ -65,8 +64,7 @@ export default function ArtworkReconcile() {
     try {
       const { data, error } = await supabase.functions.invoke('reconcile-artwork-skus', { body: { action: 'list' } });
       if (error) throw error;
-      const signedOrphans = await signStorageUrlsInRows<Orphan>('artwork', data.orphans || [], ['artwork_url', 'preview_url']);
-      setOrphans(signedOrphans || []);
+      setOrphans(data.orphans || []);
       setProducts(data.products || []);
       setCompanies(data.companies || []);
     } catch (e: any) {

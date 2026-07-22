@@ -27,7 +27,6 @@ import { VIBE_COMPANY } from "@/lib/pdfBranding";
 import { EmailPreviewDialog, AdditionalAttachment, ArtworkFile } from "@/components/EmailPreviewDialog";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { signStorageUrlsInRows } from "@/lib/storageUrl";
 
 interface SendVendorPOFromAssignDialogProps {
   open: boolean;
@@ -151,8 +150,7 @@ export function SendVendorPOFromAssignDialog({
         .from("artwork_files")
         .select("id, sku, filename, artwork_url, artwork_type, is_approved")
         .in("sku", skus);
-      const signedData = await signStorageUrlsInRows('artwork', (data as ArtworkFile[]) || [], ['artwork_url']);
-      setArtworkFiles(signedData || []);
+      setArtworkFiles((data as ArtworkFile[]) || []);
     } catch {
       setArtworkFiles([]);
     } finally {

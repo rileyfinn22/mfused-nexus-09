@@ -1,33 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
-import { getFreshAuthSession } from "@/lib/authSession";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 const STORAGE_PATH_PREFIX = "/storage/v1";
 const STORAGE_OBJECT_PATH_PATTERN = /\/storage\/v1\/object\/(?:sign|public|authenticated)\/([^/]+)\/(.+)$/;
-const STORAGE_SIGN_TIMEOUT_MS = 10000;
-const STORAGE_SIGN_BATCH_SIZE = 500;
-const STORAGE_SIGN_MAX_PARALLEL = 6;
-const STORAGE_SIGN_CACHE_TTL_MS = 55 * 60 * 1000; // signed URLs last 60m; cache slightly less
-
-type SignedCacheEntry = { url: string; expiresAt: number };
-const signedUrlCache = new Map<string, SignedCacheEntry>();
-
-const cacheKey = (bucket: string, path: string) => `${bucket}::${path}`;
-
-const getCachedSignedUrl = (bucket: string, path: string) => {
-  const entry = signedUrlCache.get(cacheKey(bucket, path));
-  if (!entry) return null;
-  if (entry.expiresAt < Date.now()) {
-    signedUrlCache.delete(cacheKey(bucket, path));
-    return null;
-  }
-  return entry.url;
-};
-
-const setCachedSignedUrl = (bucket: string, path: string, url: string) => {
-  signedUrlCache.set(cacheKey(bucket, path), { url, expiresAt: Date.now() + STORAGE_SIGN_CACHE_TTL_MS });
-};
 
 const stripStoragePathDecorators = (value: string) => value.split("#")[0].split("?")[0];
 
@@ -43,11 +17,11 @@ export const resolveStorageSignedUrl = (signedUrl: string) => {
   if (signedUrl.startsWith("http")) return signedUrl;
 
   if (signedUrl.startsWith(STORAGE_PATH_PREFIX)) {
-    return `${SUPABASE_URL}${signedUrl}`;
+    return `${import.meta.env.VITE_SUPABASE_URL}${signedUrl}`;
   }
 
   const normalizedPath = signedUrl.startsWith("/") ? signedUrl : `/${signedUrl}`;
-  return `${SUPABASE_URL}${STORAGE_PATH_PREFIX}${normalizedPath}`;
+  return `${import.meta.env.VITE_SUPABASE_URL}${STORAGE_PATH_PREFIX}${normalizedPath}`;
 };
 
 export const normalizeStorageObjectPath = (filePath: string, bucketName?: string) => {
@@ -168,153 +142,6 @@ const createSignedStorageUrl = async (
   }
 
   return resolveStorageSignedUrl(data.signedUrl);
-};
-
-const getStoragePathForSigning = (filePath: string, bucketName: string) => {
-  if (!filePath) return null;
-
-  const strippedPath = stripStoragePathDecorators(filePath.trim());
-  const normalizedFilePath = normalizeStorageObjectPath(filePath, bucketName);
-
-  if (!normalizedFilePath) return null;
-
-  // External, non-storage URLs cannot be signed by our storage API.
-  if (isDirectHttpUrl(strippedPath) && normalizedFilePath === strippedPath) {
-    return null;
-  }
-
-  return normalizedFilePath;
-};
-
-export const createSignedStorageUrlMap = async (bucketName: string, filePaths: string[]) => {
-  const result: Record<string, string> = {};
-  const pathToOriginals = new Map<string, string[]>();
-
-  filePaths.forEach((filePath) => {
-    if (!filePath) return;
-
-    const normalizedPath = getStoragePathForSigning(filePath, bucketName);
-    if (!normalizedPath) {
-      result[filePath] = filePath;
-      return;
-    }
-
-    // Serve from in-memory cache when possible
-    const cached = getCachedSignedUrl(bucketName, normalizedPath);
-    if (cached) {
-      result[filePath] = cached;
-      return;
-    }
-
-    const originals = pathToOriginals.get(normalizedPath) || [];
-    originals.push(filePath);
-    pathToOriginals.set(normalizedPath, originals);
-  });
-
-  const paths = Array.from(pathToOriginals.keys());
-  if (paths.length === 0) return result;
-
-  const session = await getFreshAuthSession();
-  if (!session?.access_token) {
-    paths.forEach((path) => {
-      (pathToOriginals.get(path) || []).forEach((original) => {
-        result[original] = original;
-      });
-    });
-    return result;
-  }
-
-  // Split into chunks, then run several chunks in parallel to slash wall time.
-  const chunks: string[][] = [];
-  for (let i = 0; i < paths.length; i += STORAGE_SIGN_BATCH_SIZE) {
-    chunks.push(paths.slice(i, i + STORAGE_SIGN_BATCH_SIZE));
-  }
-
-  const runChunk = async (chunk: string[]) => {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), STORAGE_SIGN_TIMEOUT_MS);
-
-    try {
-      const response = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${bucketName}`, {
-        method: "POST",
-        headers: {
-          apikey: SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ expiresIn: 3600, paths: chunk }),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) throw new Error(`Storage signing failed (${response.status})`);
-
-      const signedRows = (await response.json()) as Array<{ signedURL?: string; signedUrl?: string; path?: string }>;
-      chunk.forEach((path, index) => {
-        const signedUrl = signedRows?.[index]?.signedUrl || signedRows?.[index]?.signedURL;
-        const resolvedUrl = signedUrl ? resolveStorageSignedUrl(signedUrl) : null;
-
-        if (resolvedUrl) setCachedSignedUrl(bucketName, path, resolvedUrl);
-
-        (pathToOriginals.get(path) || []).forEach((original) => {
-          result[original] = resolvedUrl || original;
-        });
-      });
-    } catch (error) {
-      console.error("Error signing storage URLs:", error);
-      chunk.forEach((path) => {
-        (pathToOriginals.get(path) || []).forEach((original) => {
-          result[original] = original;
-        });
-      });
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
-  };
-
-  // Simple parallel pool
-  for (let i = 0; i < chunks.length; i += STORAGE_SIGN_MAX_PARALLEL) {
-    const batch = chunks.slice(i, i + STORAGE_SIGN_MAX_PARALLEL);
-    await Promise.all(batch.map(runChunk));
-  }
-
-  return result;
-};
-
-export const signStorageUrl = async (bucketName: string, filePath: string) => {
-  const signedMap = await createSignedStorageUrlMap(bucketName, [filePath]);
-  return signedMap[filePath] || filePath;
-};
-
-export const signStorageUrlsInRows = async <T extends Record<string, any>>(
-  bucketName: string,
-  rows: T[] | null | undefined,
-  urlKeys: string[],
-): Promise<T[]> => {
-  const rowList = rows || [];
-  const values = rowList.flatMap((row) =>
-    urlKeys
-      .map((key) => row[key])
-      .filter((value): value is string => typeof value === "string" && value.length > 0)
-  );
-
-  if (values.length === 0) return rowList;
-
-  const signedMap = await createSignedStorageUrlMap(bucketName, values);
-
-  return rowList.map((row) => {
-    let changed = false;
-    const next: Record<string, any> = { ...row };
-
-    urlKeys.forEach((key) => {
-      const value = next[key];
-      if (typeof value === "string" && signedMap[value] && signedMap[value] !== value) {
-        next[key] = signedMap[value];
-        changed = true;
-      }
-    });
-
-    return changed ? (next as T) : row;
-  });
 };
 
 export const getStoragePreviewUrl = async (bucketName: string, filePath: string) => {

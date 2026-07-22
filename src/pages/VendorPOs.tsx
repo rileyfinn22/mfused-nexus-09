@@ -33,7 +33,6 @@ import { VendorPaymentsLedger } from "@/components/VendorPaymentsLedger";
 import { VendorBalanceBreakdown } from "@/components/VendorBalanceBreakdown";
 import { VendorAPStatementTab } from "@/components/VendorAPStatementTab";
 import { ExpandToggleButton, ExpandDetailsPanel, useVendorPOItems, useVendorPOPayments } from "@/components/RowExpandPanel";
-import { fetchRestRowsViaAuth, getStoredUserId } from "@/lib/authSession";
 
 const VendorPOs = () => {
   const navigate = useNavigate();
@@ -82,36 +81,29 @@ const VendorPOs = () => {
   }, [isVibeAdmin]);
 
   const checkAdminStatus = async () => {
-    try {
-      const userId = getStoredUserId();
-      if (!userId) {
-        setIsVibeAdmin(false);
-        return;
-      }
-      const roles = await fetchRestRowsViaAuth<any>('user_roles', {
-        select: 'role',
-        user_id: `eq.${userId}`,
-      }, { timeoutMs: 8000 });
-      setIsVibeAdmin((roles || []).some((row: any) => row.role === 'vibe_admin'));
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      setIsVibeAdmin(false);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      const role = data?.role as string;
+      setIsVibeAdmin(role === 'vibe_admin');
     }
   };
 
   const fetchVendorPOs = async () => {
     setLoading(true);
-    try {
-      const data = await fetchRestRowsViaAuth<any>('vendor_pos', {
-        select: '*,vendors(id,name),orders(order_number,description),customer_company:companies!vendor_pos_customer_company_id_fkey(name)',
-        order: 'created_at.desc',
-      }, { timeoutMs: 10000 });
-      setPOs(data || []);
-    } catch (error) {
-      console.error('Error loading vendor POs:', error);
-    } finally {
-      setLoading(false);
+    const { data, error } = await (supabase as any)
+      .from('vendor_pos')
+      .select('*, vendors(id, name), orders(order_number, description), customer_company:companies!vendor_pos_customer_company_id_fkey(name)')
+      .order('created_at', { ascending: false });
+    
+    if (!error && data) {
+      setPOs(data);
     }
+    setLoading(false);
   };
 
   const handleDeleteClick = (po: any) => {

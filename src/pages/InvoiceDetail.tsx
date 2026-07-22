@@ -39,16 +39,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { triggerBlobFileDownload } from "@/lib/storageUrl";
 import { CARRIERS, getTrackingUrl } from "@/lib/trackingUtils";
 import { EditInvoiceAddressesDialog } from "@/components/EditInvoiceAddressesDialog";
-import {
-  fetchRestRowsByInFilterViaAuth,
-  fetchRestRowsViaAuth,
-  getFreshAuthSession,
-  readStoredAuthSession,
-  withTimeout,
-} from "@/lib/authSession";
-
-const INVOICE_DETAIL_TIMEOUT_MS = 8000;
-const INVOICE_SIDE_QUERY_TIMEOUT_MS = 6000;
 
 const InvoiceDetail = () => {
   const {
@@ -187,37 +177,37 @@ const InvoiceDetail = () => {
     }
   }, [showPaymentPortal, isVibeAdmin, invoice?.quickbooks_id, invoice?.quickbooks_payment_link, refreshingLink, paymentLinkAttempted]);
   const checkAdminStatus = async () => {
-    const session = await getFreshAuthSession(readStoredAuthSession());
-    const user = session?.user;
-    if (!user) return;
-
-    setCurrentUserEmail(user.email || "");
-    const emailName = user.email?.split("@")[0] || "";
-    const formattedName = emailName.charAt(0).toUpperCase() + emailName.slice(1);
-    setCurrentUserName(formattedName);
-
-    try {
+    const {
+      data: {
+        user
+      }
+    } = await supabase.auth.getUser();
+    if (user) {
       // Users can have multiple role rows; never use .single() here.
-      const roleRows = await withTimeout(
-        fetchRestRowsViaAuth<any>('user_roles', {
-          select: 'role',
-          user_id: `eq.${user.id}`,
-        }, { session, timeoutMs: INVOICE_SIDE_QUERY_TIMEOUT_MS }),
-        INVOICE_SIDE_QUERY_TIMEOUT_MS,
-        [] as any[]
-      );
+      const { data: roleRows, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Role fetch error:', error);
+      }
+
       const roles = (roleRows || []).map((r: any) => String(r.role));
       setIsVibeAdmin(roles.includes('vibe_admin'));
-    } catch (error) {
-      console.error('Role fetch error:', error);
+      setCurrentUserEmail(user.email || "");
+      // Extract name from email or use full email
+      const emailName = user.email?.split("@")[0] || "";
+      const formattedName = emailName.charAt(0).toUpperCase() + emailName.slice(1);
+      setCurrentUserName(formattedName);
     }
   };
   const fetchInvoiceDetails = async () => {
     setLoading(true);
-    const session = await getFreshAuthSession(readStoredAuthSession());
-    const user = session?.user;
 
-    if (!session || !user) {
+    // First check if user is authenticated and has access
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       // Not logged in - redirect to login with invoice context
       navigate(`/login?invoice=${invoiceId}&redirect=/invoices/${invoiceId}`);
       return;
@@ -227,32 +217,26 @@ const InvoiceDetail = () => {
     // Some customer accounts may not be allowed to read role rows directly.
     // Instead we use security-definer permission helpers (RPCs) below.
 
-    let invoiceData: any = null;
-
-    try {
-      const invoiceRows = await fetchRestRowsViaAuth<any>('invoices', {
-        select: `
+    // Fetch invoice with order details and company info
+    const {
+      data: invoiceData,
+      error: invoiceError
+    } = await supabase
+      .from('invoices')
+      .select(`
         *,
         orders(
           *,
-          order_items(*),
+          order_items(*, shipped_quantity, quantity),
           parent_order:parent_order_id(id, order_number, order_type)
         ),
         companies!company_id(name)
-      `,
-        id: `eq.${invoiceId}`,
-        limit: 1,
-      }, { session, timeoutMs: INVOICE_DETAIL_TIMEOUT_MS });
-
-      invoiceData = invoiceRows?.[0] ?? null;
-      if (invoiceData?.orders?.order_items) {
-        invoiceData.orders.order_items.sort((a: any, b: any) => (a.line_number ?? 999) - (b.line_number ?? 999));
-      }
-    } catch (error) {
-      console.error('Invoice fetch error:', error);
-    }
-
-    if (!invoiceData) {
+      `)
+      .eq('id', invoiceId)
+      .order('line_number', { ascending: true, nullsFirst: false, foreignTable: 'orders.order_items' })
+      .single();
+    if (invoiceError || !invoiceData) {
+      console.error('Invoice fetch error:', invoiceError);
       toast({
         title: "Error",
         description: "Failed to load invoice",
@@ -271,10 +255,10 @@ const InvoiceDetail = () => {
 
     try {
       // Run both permission checks in parallel (was sequential)
-      const [adminRes, accessRes] = await withTimeout(Promise.all([
+      const [adminRes, accessRes] = await Promise.all([
         supabase.rpc('has_role', { _user_id: user.id, _role: 'vibe_admin' }),
         supabase.rpc('user_has_company_access', { _user_id: user.id, _company_id: invoiceCompanyId }),
-      ]), INVOICE_SIDE_QUERY_TIMEOUT_MS, [{ data: false }, { data: true }] as any);
+      ]);
       if (adminRes.error) console.error('has_role error:', adminRes.error);
       if (accessRes.error) console.error('user_has_company_access error:', accessRes.error);
       isVibeAdminUser = !!adminRes.data;
@@ -322,7 +306,6 @@ const InvoiceDetail = () => {
     console.log('Fetched invoice with company:', invoiceData);
     setInvoice(invoiceData);
     setOrder(invoiceData.orders);
-    setLoading(false);
 
     const isBlanketInvoice = invoiceData.invoice_type === 'full' && invoiceData.shipment_number === 1;
 
@@ -337,58 +320,59 @@ const InvoiceDetail = () => {
       attachmentsRes,
     ] = await Promise.all([
       invoiceData.company_id
-        ? withTimeout(fetchRestRowsViaAuth<any>('products', {
-            select: 'id,name,item_id,description,price',
-            company_id: `eq.${invoiceData.company_id}`,
-            order: 'name.asc',
-          }, { session, timeoutMs: INVOICE_SIDE_QUERY_TIMEOUT_MS }), INVOICE_SIDE_QUERY_TIMEOUT_MS, [] as any[])
-        : Promise.resolve([]),
-      withTimeout(fetchRestRowsViaAuth<any>('inventory_allocations', {
-        select: `
+        ? supabase
+            .from('products')
+            .select('id, name, item_id, description, price')
+            .eq('company_id', invoiceData.company_id)
+            .order('name')
+        : Promise.resolve({ data: null }),
+      supabase
+        .from('inventory_allocations')
+        .select(`
           *,
           order_items(id, name, sku, unit_price, quantity, shipped_quantity, item_id, description, line_number),
           inventory(state, available)
-        `,
-        invoice_id: `eq.${invoiceId}`,
-        order: 'created_at.asc',
-      }, { session, timeoutMs: INVOICE_SIDE_QUERY_TIMEOUT_MS }), INVOICE_SIDE_QUERY_TIMEOUT_MS, [] as any[]),
-      withTimeout(fetchRestRowsViaAuth<any>('vendor_pos', {
-        select: `
+        `)
+        .eq('invoice_id', invoiceId)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('vendor_pos')
+        .select(`
           *,
           vendors(name, contact_name, contact_email),
           vendor_po_items(*)
-        `,
-        order_id: `eq.${invoiceData.order_id}`,
-        order: 'created_at.asc',
-      }, { session, timeoutMs: INVOICE_SIDE_QUERY_TIMEOUT_MS }), INVOICE_SIDE_QUERY_TIMEOUT_MS, [] as any[]),
-      withTimeout(fetchRestRowsViaAuth<any>('invoices', {
-        select: '*',
-        order_id: `eq.${invoiceData.order_id}`,
-        id: `neq.${invoiceId}`,
-        deleted_at: 'is.null',
-        order: 'shipment_number.asc',
-      }, { session, timeoutMs: INVOICE_SIDE_QUERY_TIMEOUT_MS }), INVOICE_SIDE_QUERY_TIMEOUT_MS, [] as any[]),
-      withTimeout(fetchRestRowsViaAuth<any>('inventory_allocations', {
-        select: 'quantity_allocated,invoice_id,invoices!inner(order_id)',
-        'invoices.order_id': `eq.${invoiceData.order_id}`,
-      }, { session, timeoutMs: INVOICE_SIDE_QUERY_TIMEOUT_MS }), INVOICE_SIDE_QUERY_TIMEOUT_MS, [] as any[]),
-      withTimeout(fetchRestRowsViaAuth<any>('quickbooks_settings', {
-        select: 'realm_id',
-        is_connected: 'eq.true',
-        limit: 1,
-      }, { session, timeoutMs: INVOICE_SIDE_QUERY_TIMEOUT_MS }), INVOICE_SIDE_QUERY_TIMEOUT_MS, [] as any[]),
+        `)
+        .eq('order_id', invoiceData.order_id)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('invoices')
+        .select('*')
+        .eq('order_id', invoiceData.order_id)
+        .neq('id', invoiceId)
+        .is('deleted_at', null)
+        .order('shipment_number'),
+      supabase
+        .from('inventory_allocations')
+        .select(`quantity_allocated, invoice_id, invoices!inner(order_id)`)
+        .eq('invoices.order_id', invoiceData.order_id),
+      supabase
+        .from('quickbooks_settings')
+        .select('realm_id')
+        .eq('is_connected', true)
+        .limit(1)
+        .maybeSingle(),
       invoiceData.order_id
-        ? withTimeout(fetchRestRowsViaAuth<any>('order_attachments', {
-            select: '*',
-            order_id: `eq.${invoiceData.order_id}`,
-            order: 'created_at.desc',
-          }, { session, timeoutMs: INVOICE_SIDE_QUERY_TIMEOUT_MS }), INVOICE_SIDE_QUERY_TIMEOUT_MS, [] as any[])
-        : Promise.resolve([]),
+        ? supabase
+            .from('order_attachments')
+            .select('*')
+            .eq('order_id', invoiceData.order_id)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: null }),
     ]);
 
-    if (productsRes) setProducts(productsRes);
+    if (productsRes.data) setProducts(productsRes.data);
 
-    const allocationsData = allocationsRes;
+    const allocationsData = allocationsRes.data;
     if (allocationsData) {
       allocationsData.sort((a: any, b: any) => {
         const lineA = a.order_items?.line_number ?? 999;
@@ -415,7 +399,7 @@ const InvoiceDetail = () => {
       setEditedItems(invoiceData.orders?.order_items || []);
     }
 
-    const vendorPOData = vendorPOsRes;
+    const vendorPOData = vendorPOsRes.data;
     if (vendorPOData) {
       vendorPOData.forEach((po: any) => {
         if (po.vendor_po_items) {
@@ -427,17 +411,17 @@ const InvoiceDetail = () => {
       setVendorPOs(vendorPOData);
     }
 
-    const relatedData = relatedRes;
+    const relatedData = relatedRes.data;
     if (relatedData) setRelatedInvoices(relatedData);
 
-    const totalShippedAcrossAllInvoices = allAllocationsRes?.reduce(
+    const totalShippedAcrossAllInvoices = allAllocationsRes.data?.reduce(
       (sum: number, alloc: any) => sum + Number(alloc.quantity_allocated || 0),
       0
     ) || 0;
     setTotalShippedAllInvoices(totalShippedAcrossAllInvoices);
 
-    if (qbSettingsRes?.[0]?.realm_id) setQbRealmId(qbSettingsRes[0].realm_id);
-    if (attachmentsRes) setOrderAttachments(attachmentsRes);
+    if (qbSettingsRes.data?.realm_id) setQbRealmId(qbSettingsRes.data.realm_id);
+    if (attachmentsRes.data) setOrderAttachments(attachmentsRes.data);
 
     // Payments need relatedData, so fetch after the parallel batch
     let paymentsData;
@@ -446,10 +430,12 @@ const InvoiceDetail = () => {
       if (relatedData && relatedData.length > 0) {
         allInvoiceIds.push(...relatedData.map((inv: any) => inv.id));
       }
-      const allPayments = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('payments', {
-        select: '*',
-        order: 'payment_date.desc',
-      }, 'invoice_id', allInvoiceIds.filter(Boolean), { session, timeoutMs: INVOICE_SIDE_QUERY_TIMEOUT_MS }), INVOICE_SIDE_QUERY_TIMEOUT_MS, [] as any[]);
+      const { data: allPayments, error: paymentsError } = await supabase
+        .from('payments')
+        .select('*')
+        .in('invoice_id', allInvoiceIds)
+        .order('payment_date', { ascending: false });
+      if (paymentsError) console.error('Error fetching payments:', paymentsError);
       if (allPayments) {
         paymentsData = allPayments.map((payment: any) => {
           const relatedInvoice = relatedData?.find((inv: any) => inv.id === payment.invoice_id);
@@ -476,10 +462,12 @@ const InvoiceDetail = () => {
       if (relatedData && relatedData.length > 0) {
         parentAndSelfIds.push(...relatedData.map((inv: any) => inv.id));
       }
-      const allRelatedPayments = await withTimeout(fetchRestRowsByInFilterViaAuth<any>('payments', {
-        select: '*',
-        order: 'payment_date.desc',
-      }, 'invoice_id', parentAndSelfIds.filter(Boolean), { session, timeoutMs: INVOICE_SIDE_QUERY_TIMEOUT_MS }), INVOICE_SIDE_QUERY_TIMEOUT_MS, [] as any[]);
+      const { data: allRelatedPayments, error: relatedPaymentsError } = await supabase
+        .from('payments')
+        .select('*')
+        .in('invoice_id', parentAndSelfIds)
+        .order('payment_date', { ascending: false });
+      if (relatedPaymentsError) console.error('Error fetching related payments:', relatedPaymentsError);
       if (allRelatedPayments) {
         paymentsData = allRelatedPayments.map((payment: any) => {
           if (payment.invoice_id === invoiceId) {
@@ -493,15 +481,17 @@ const InvoiceDetail = () => {
         });
       }
     } else {
-      const singleInvoicePayments = await withTimeout(fetchRestRowsViaAuth<any>('payments', {
-        select: '*',
-        invoice_id: `eq.${invoiceId}`,
-        order: 'payment_date.desc',
-      }, { session, timeoutMs: INVOICE_SIDE_QUERY_TIMEOUT_MS }), INVOICE_SIDE_QUERY_TIMEOUT_MS, [] as any[]);
+      const { data: singleInvoicePayments } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('invoice_id', invoiceId)
+        .order('payment_date', { ascending: false });
       paymentsData = singleInvoicePayments;
     }
 
     if (paymentsData) setPayments(paymentsData);
+
+    setLoading(false);
   };
 
   const handleDownloadOrderAttachment = async (filePath: string, fileName: string) => {

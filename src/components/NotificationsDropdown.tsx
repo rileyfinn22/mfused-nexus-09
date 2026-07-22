@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { readStoredAuthSession } from "@/lib/authSession";
 
 interface Notification {
   id: string;
@@ -53,13 +52,13 @@ export function NotificationsDropdown() {
 
   const loadNotifications = async () => {
     try {
-      const userId = readStoredAuthSession()?.user?.id;
-      if (!userId) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
       const { data } = await supabase
         .from("notifications")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(10);
 

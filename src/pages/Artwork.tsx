@@ -51,8 +51,6 @@ import { cn } from "@/lib/utils";
 import PdfThumbnail from "@/components/PdfThumbnail";
 import { FileArchive, FileCode, AlertCircle } from "lucide-react";
 import JSZip from "jszip";
-import { normalizeStorageObjectPath, signStorageUrl, signStorageUrlsInRows } from "@/lib/storageUrl";
-import { fetchRestRowsViaAuth, formatPostgrestInFilter, withTimeout } from "@/lib/authSession";
 
 interface ProductTemplate {
   id: string;
@@ -249,23 +247,17 @@ const Artwork = () => {
   }, [companyCtxLoading, isVibeAdminFromCtx, activeCompanyId]);
 
   const fetchCompanies = async () => {
-    try {
-      const data = await fetchRestRowsViaAuth<any>('companies', {
-        select: '*',
-        order: 'name.asc',
-      }, { timeoutMs: 8000 });
-      setCompanies(data || []);
-    } catch (error) {
-      console.error('Error fetching companies:', error);
-    }
+    const { data } = await supabase.from('companies').select('*').order('name');
+    if (data) setCompanies(data);
   };
 
   const fetchAvailableStates = async () => {
     try {
-      const statesData = await fetchRestRowsViaAuth<any>('product_states', {
-        select: 'state,product_id',
-        limit: 50000,
-      }, { timeoutMs: 8000 });
+      let query = supabase
+        .from('product_states')
+        .select('state, product_id');
+      
+      const { data: statesData } = await query;
       if (statesData) {
         const uniqueStates = [...new Set(statesData.map(s => s.state))].sort();
         setAvailableStates(uniqueStates);
@@ -278,27 +270,26 @@ const Artwork = () => {
   const fetchTemplates = async () => {
     try {
       // Get all products
-      const productParams: Record<string, string | number> = {
-        select: 'id,name,item_id,template_id,company_id,image_url',
-        limit: 50000,
-      };
+      let productsQuery = supabase
+        .from('products')
+        .select('id, name, item_id, template_id, company_id, image_url')
+        .limit(50000);
       
       if (!isVibeAdmin && userCompanyId) {
-        productParams.company_id = `eq.${userCompanyId}`;
+        productsQuery = productsQuery.eq('company_id', userCompanyId);
       } else if (isVibeAdmin && companyFilter !== 'all') {
-        productParams.company_id = `eq.${companyFilter}`;
+        productsQuery = productsQuery.eq('company_id', companyFilter);
       }
       
-      const productsData = await fetchRestRowsViaAuth<any>('products', productParams, { timeoutMs: 10000 });
+      const { data: productsData } = await productsQuery;
       
       // If state filter is active, get product IDs for that state and filter
       let filteredProductsData = productsData || [];
       if (stateFilter !== 'all') {
-        const stateProducts = await withTimeout(fetchRestRowsViaAuth<any>('product_states', {
-          select: 'product_id',
-          state: `eq.${stateFilter}`,
-          limit: 50000,
-        }, { timeoutMs: 8000 }), 9000, []);
+        const { data: stateProducts } = await supabase
+          .from('product_states')
+          .select('product_id')
+          .eq('state', stateFilter);
         const stateProductIds = new Set(stateProducts?.map(sp => sp.product_id) || []);
         filteredProductsData = filteredProductsData.filter(p => stateProductIds.has(p.id));
       }
@@ -310,75 +301,50 @@ const Artwork = () => {
       setSingleProducts(singleProds);
       
       // Fetch templates
-      const templatesData = await withTimeout(fetchRestRowsViaAuth<any>('product_templates', {
-        select: '*',
-        id: formatPostgrestInFilter((templateIds.length > 0 ? templateIds : ['none']) as string[]),
-        order: 'name.asc',
-      }, { timeoutMs: 9000 }), 10000, []);
+      const { data: templatesData } = await supabase
+        .from('product_templates')
+        .select('*')
+        .in('id', templateIds.length > 0 ? templateIds : ['none'])
+        .order('name');
       
       // Fetch all artwork rows once (parallel pagination) and reuse for
       // both the artwork list and the per-SKU template counts/thumbnails.
-      const artworkParams: Record<string, string | number> = {
-        select: '*',
-        order: 'created_at.desc',
-        limit: 50000,
+      // This replaces what used to be a separate fetchAllArtwork() call.
+      const buildArtworkBaseQuery = () => {
+        let q = supabase
+          .from('artwork_files')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false });
+        if (!isVibeAdmin && userCompanyId) {
+          q = q.eq('company_id', userCompanyId);
+        } else if (isVibeAdmin && companyFilter !== 'all') {
+          q = q.eq('company_id', companyFilter);
+        }
+        return q;
       };
-      if (!isVibeAdmin && userCompanyId) {
-        artworkParams.company_id = `eq.${userCompanyId}`;
-      } else if (isVibeAdmin && companyFilter !== 'all') {
-        artworkParams.company_id = `eq.${companyFilter}`;
+
+      const PAGE_SIZE = 1000;
+      const firstPage = await buildArtworkBaseQuery().range(0, PAGE_SIZE - 1);
+      let artworkData: any[] = firstPage.data ?? [];
+      const totalCount = firstPage.count ?? artworkData.length;
+
+      if (totalCount > PAGE_SIZE) {
+        const pagePromises: Promise<any>[] = [];
+        for (let from = PAGE_SIZE; from < totalCount; from += PAGE_SIZE) {
+          pagePromises.push(
+            Promise.resolve(buildArtworkBaseQuery().range(from, from + PAGE_SIZE - 1))
+          );
+        }
+        const pages = await Promise.all(pagePromises);
+        for (const p of pages) {
+          if (p.data) artworkData = artworkData.concat(p.data);
+        }
       }
 
-      const artworkData = await withTimeout(fetchRestRowsViaAuth<any>('artwork_files', artworkParams, { timeoutMs: 10000 }), 11000, []) || [];
-
-      // Render the flat artwork list immediately with unsigned URLs; sign in background.
+      // Populate the flat artwork list used by the "All Artwork" tab.
       if (!selectedProduct) {
         setArtworkFiles(artworkData);
       }
-
-      // Sign artwork thumbnails/urls in background so the grid appears fast.
-      (async () => {
-        try {
-          const signed = await signStorageUrlsInRows('artwork', artworkData, ['artwork_url', 'preview_url']);
-          if (!selectedProduct) setArtworkFiles(signed);
-
-          const signedThumbs: Record<string, string | null> = {};
-          const signedPdfs: Record<string, string> = {};
-          signed?.forEach((art: any) => {
-            if (!signedThumbs[art.sku] || art.is_approved) {
-              if (isUsableArtworkPreviewUrl(art.filename, art.preview_url)) {
-                signedThumbs[art.sku] = art.preview_url;
-              } else if (art.filename && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(art.filename)) {
-                signedThumbs[art.sku] = art.artwork_url;
-              }
-            }
-            if ((!signedPdfs[art.sku] || art.is_approved) && art.filename && /\.pdf$/i.test(art.filename)) {
-              signedPdfs[art.sku] = art.artwork_url;
-            }
-          });
-          setSkuArtworkThumbnails(signedThumbs);
-          setSkuPdfArtworkUrls(signedPdfs);
-
-          // Rebuild derived template thumbnails with signed URLs
-          const derived: Record<string, string> = {};
-          templatesData?.forEach((template: any) => {
-            const tps = filteredProductsData.filter((p: any) => p.template_id === template.id);
-            const skus = tps.map((p: any) => p.item_id).filter(Boolean) as string[];
-            for (const sku of skus) {
-              if (signedThumbs[sku]) { derived[template.id] = signedThumbs[sku]!; break; }
-            }
-            if (!derived[template.id]) {
-              for (const prod of tps) {
-                if (prod.image_url) { derived[template.id] = prod.image_url; break; }
-              }
-            }
-          });
-          setTemplateDerivedThumbnails(derived);
-        } catch (e) {
-          console.error('Background artwork URL signing failed:', e);
-        }
-      })();
-
 
       
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
@@ -483,27 +449,26 @@ const Artwork = () => {
     if (!selectedTemplate) return;
     
     try {
-      const productParams: Record<string, string> = {
-        select: 'id,name,item_id,template_id,company_id,image_url',
-        template_id: `eq.${selectedTemplate.id}`,
-        order: 'name.asc',
-      };
+      let query = supabase
+        .from('products')
+        .select('id, name, item_id, template_id, company_id, image_url')
+        .eq('template_id', selectedTemplate.id)
+        .order('name');
       
       if (!isVibeAdmin && userCompanyId) {
-        productParams.company_id = `eq.${userCompanyId}`;
+        query = query.eq('company_id', userCompanyId);
       } else if (isVibeAdmin && companyFilter !== 'all') {
-        productParams.company_id = `eq.${companyFilter}`;
+        query = query.eq('company_id', companyFilter);
       }
       
-      const data = await fetchRestRowsViaAuth<any>('products', productParams, { timeoutMs: 9000 });
+      const { data } = await query;
       let filteredData = data || [];
       
       if (stateFilter !== 'all') {
-        const stateProducts = await withTimeout(fetchRestRowsViaAuth<any>('product_states', {
-          select: 'product_id',
-          state: `eq.${stateFilter}`,
-          limit: 50000,
-        }, { timeoutMs: 8000 }), 9000, []);
+        const { data: stateProducts } = await supabase
+          .from('product_states')
+          .select('product_id')
+          .eq('state', stateFilter);
         const stateProductIds = new Set(stateProducts?.map(sp => sp.product_id) || []);
         filteredData = filteredData.filter(p => stateProductIds.has(p.id));
       }
@@ -523,22 +488,21 @@ const Artwork = () => {
     setProductArtworkLoading(true);
     
     try {
-      const artworkParams: Record<string, string> = {
-        select: '*',
-        sku: `eq.${product.item_id}`,
-        order: 'created_at.desc',
-      };
+      let query = supabase
+        .from('artwork_files')
+        .select('*')
+        .eq('sku', product.item_id)
+        .order('created_at', { ascending: false });
       
       if (statusFilter === 'approved') {
-        artworkParams.is_approved = 'eq.true';
+        query = query.eq('is_approved', true);
       } else if (statusFilter === 'pending') {
-        artworkParams.is_approved = 'eq.false';
+        query = query.eq('is_approved', false);
       }
       
-      const data = await fetchRestRowsViaAuth<any>('artwork_files', artworkParams, { timeoutMs: 9000 });
-      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+      const { data } = await query;
       if (selectedProductIdRef.current === requestProductId) {
-        setArtworkFiles(signedData || []);
+        setArtworkFiles(data || []);
       }
     } catch (error) {
       console.error('Error fetching artwork:', error);
@@ -551,22 +515,21 @@ const Artwork = () => {
 
   const fetchAllArtwork = async () => {
     try {
-      const artworkParams: Record<string, string | number> = {
-        select: '*',
-        order: 'created_at.desc',
-        limit: 50000,
-      };
+      let query = supabase
+        .from('artwork_files')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50000);
 
       if (!isVibeAdmin && userCompanyId) {
-        artworkParams.company_id = `eq.${userCompanyId}`;
+        query = query.eq('company_id', userCompanyId);
       } else if (isVibeAdmin && companyFilter !== 'all') {
-        artworkParams.company_id = `eq.${companyFilter}`;
+        query = query.eq('company_id', companyFilter);
       }
 
-      const data = await fetchRestRowsViaAuth<any>('artwork_files', artworkParams, { timeoutMs: 10000 });
-      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+      const { data } = await query;
       if (!selectedProduct) {
-        setArtworkFiles(signedData || []);
+        setArtworkFiles(data || []);
       }
     } catch (error) {
       console.error('Error fetching artwork:', error);
@@ -575,20 +538,19 @@ const Artwork = () => {
 
   const fetchRejectedArtwork = async () => {
     try {
-      const rejectedParams: Record<string, string> = {
-        select: '*',
-        order: 'rejected_at.desc',
-      };
+      let query = supabase
+        .from('rejected_artwork_files')
+        .select('*')
+        .order('rejected_at', { ascending: false });
 
       if (!isVibeAdmin && userCompanyId) {
-        rejectedParams.company_id = `eq.${userCompanyId}`;
+        query = query.eq('company_id', userCompanyId);
       } else if (isVibeAdmin && companyFilter !== 'all') {
-        rejectedParams.company_id = `eq.${companyFilter}`;
+        query = query.eq('company_id', companyFilter);
       }
 
-      const data = await fetchRestRowsViaAuth<any>('rejected_artwork_files', rejectedParams, { timeoutMs: 9000 });
-      const signedData = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
-      setRejectedFiles(signedData || []);
+      const { data } = await query;
+      setRejectedFiles(data || []);
     } catch (error) {
       console.error('Error fetching rejected artwork:', error);
     }
@@ -654,8 +616,7 @@ const Artwork = () => {
 
   const handleDownload = async (url: string, filename: string) => {
     try {
-      const signedUrl = await signStorageUrl('artwork', url);
-      const response = await fetch(signedUrl);
+      const response = await fetch(url);
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -709,7 +670,7 @@ const Artwork = () => {
         }
 
         const { data } = await query;
-        filesToDownload = await signStorageUrlsInRows('artwork', data || [], ['artwork_url', 'preview_url']);
+        filesToDownload = data || [];
         zipName = selectedTemplate.name.replace(/[^a-zA-Z0-9]/g, '_');
       } else if (selectedProduct) {
         // Download all files for current product
@@ -731,8 +692,7 @@ const Artwork = () => {
       // Download each file and add to zip
       for (const file of filesToDownload) {
         try {
-          const signedArtworkUrl = await signStorageUrl('artwork', file.artwork_url);
-          const response = await fetch(signedArtworkUrl);
+          const response = await fetch(file.artwork_url);
           const blob = await response.blob();
           // Organize by SKU in folders
           const folderPath = file.sku ? `${file.sku}/${file.filename}` : file.filename;
@@ -781,8 +741,8 @@ const Artwork = () => {
           company_id: file.company_id,
           sku: file.sku,
           filename: file.filename,
-          artwork_url: normalizeStorageObjectPath(file.artwork_url, 'artwork'),
-          preview_url: file.preview_url ? normalizeStorageObjectPath(file.preview_url, 'artwork') : null,
+          artwork_url: file.artwork_url,
+          preview_url: file.preview_url,
           notes: file.notes,
           rejection_reason: 'Archived (replaced by newer version)',
           rejected_by: user.id,
@@ -838,8 +798,8 @@ const Artwork = () => {
           company_id: selectedFile.company_id,
           sku: selectedFile.sku,
           filename: selectedFile.filename,
-          artwork_url: normalizeStorageObjectPath(selectedFile.artwork_url, 'artwork'),
-          preview_url: selectedFile.preview_url ? normalizeStorageObjectPath(selectedFile.preview_url, 'artwork') : null,
+          artwork_url: selectedFile.artwork_url,
+          preview_url: selectedFile.preview_url,
           notes: selectedFile.notes,
           rejection_reason: rejectionReason,
           rejected_by: user.id,
@@ -881,13 +841,13 @@ const Artwork = () => {
     if (!selectedFile) return;
 
     try {
-      const artworkPath = normalizeStorageObjectPath(selectedFile.artwork_url, 'artwork');
+      const artworkPath = selectedFile.artwork_url.split('/artwork/')[1];
       if (artworkPath) {
         await supabase.storage.from('artwork').remove([artworkPath]);
       }
 
       if (selectedFile.preview_url) {
-        const previewPath = normalizeStorageObjectPath(selectedFile.preview_url, 'artwork');
+        const previewPath = selectedFile.preview_url.split('/artwork/')[1];
         if (previewPath) {
           await supabase.storage.from('artwork').remove([previewPath]);
         }
