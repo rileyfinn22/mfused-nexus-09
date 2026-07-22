@@ -1108,7 +1108,7 @@ const InvoiceDetail = () => {
       product_id: null,
       description: '',
       quantity: 0,
-      shipped_quantity: 0,
+      shipped_quantity: null,
       unit_price: 0,
       total: 0,
     }]);
@@ -1404,7 +1404,11 @@ const InvoiceDetail = () => {
   const openQuickShipDialog = () => {
     const initial: Record<string, string> = {};
     (order?.order_items || []).forEach((oi: any) => {
-      initial[oi.id] = String(Number(oi.shipped_quantity ?? oi.quantity ?? 0));
+      // null shipped_quantity = placeholder (blank input, dimmed "0" placeholder)
+      // 0 or any number = intentional value
+      initial[oi.id] = oi.shipped_quantity === null || oi.shipped_quantity === undefined
+        ? ''
+        : String(Number(oi.shipped_quantity));
     });
     setQuickShipQtys(initial);
     setShowQuickShipDialog(true);
@@ -1418,11 +1422,13 @@ const InvoiceDetail = () => {
       for (const oi of order.order_items) {
         const raw = quickShipQtys[oi.id];
         if (raw === undefined) continue;
-        const qty = Number(raw);
-        if (!isFinite(qty) || qty < 0) continue;
+        // Empty string means "clear back to placeholder" -> null.
+        // Any typed value (including "0") is intentional and stored as a number.
+        const newVal: number | null = raw === '' ? null : Number(raw);
+        if (newVal !== null && (!isFinite(newVal) || newVal < 0)) continue;
         const { error } = await supabase
           .from('order_items')
-          .update({ shipped_quantity: qty })
+          .update({ shipped_quantity: newVal })
           .eq('id', oi.id);
         if (error) throw error;
       }
@@ -3623,8 +3629,11 @@ const InvoiceDetail = () => {
                   <Input
                     type="number"
                     min={0}
+                    placeholder="0"
                     value={quickShipQtys[oi.id] ?? ''}
                     onChange={(e) => setQuickShipQtys((prev) => ({ ...prev, [oi.id]: e.target.value }))}
+                    className={(quickShipQtys[oi.id] ?? '') === '' ? 'text-muted-foreground/50 italic' : ''}
+                    title={(quickShipQtys[oi.id] ?? '') === '' ? 'Placeholder — leave blank until shipped, or type 0 to intentionally record no shipment' : ''}
                   />
                 </div>
               </div>

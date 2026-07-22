@@ -301,7 +301,7 @@ export const VendorAssignmentDialog = ({
               name: item.name,
               description: item.description || null,
               quantity: item.quantity,
-              shipped_quantity: 0,
+              shipped_quantity: null,
               unit_cost: parseFloat(assignment.vendorCost),
               total: newItemTotal
             } as any);
@@ -342,7 +342,7 @@ export const VendorAssignmentDialog = ({
             name: item.name,
             description: item.description || null,
             quantity: item.quantity,
-            shipped_quantity: 0,
+            shipped_quantity: null,
             unit_cost: parseFloat(assignment.vendorCost),
             total: newItemTotal
           } as any);
@@ -552,7 +552,7 @@ export const VendorAssignmentDialog = ({
                 name: item.name,
                 description: item.description || null,
                 quantity: item.quantity,
-                shipped_quantity: 0,
+                shipped_quantity: null,
                 unit_cost: parseFloat(bulkCost),
                 total: newItemTotal
               } as any);
@@ -592,7 +592,7 @@ export const VendorAssignmentDialog = ({
               name: item.name,
               description: item.description || null,
               quantity: item.quantity,
-              shipped_quantity: 0,
+              shipped_quantity: null,
               unit_cost: parseFloat(bulkCost),
               total: newItemTotal
             } as any);

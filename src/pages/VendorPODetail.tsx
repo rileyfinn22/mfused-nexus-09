@@ -203,7 +203,7 @@ const VendorPODetail = () => {
               name: item.name,
               description: item.description || null,
               quantity: item.quantity,
-              shipped_quantity: 0,
+              shipped_quantity: null,
               unit_cost: item.unit_cost,
               total: item.total
             } as any);
@@ -1505,7 +1505,7 @@ Thank you for your business.`;
                       sku: '',
                       name: '',
                       quantity: 1,
-                      shipped_quantity: 0,
+                      shipped_quantity: null,
                       unit_cost: 0,
                       total: 0,
                       isNew: true
