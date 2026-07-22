@@ -1461,10 +1461,10 @@ const InvoiceDetail = () => {
       return;
     }
     try {
-      const {
-        error
-      } = await supabase.from('invoices').update({
-        status: 'open'
+      const { error } = await supabase.from('invoices').update({
+        status: 'open',
+        blanket_closed_at: null,
+        blanket_closed_by: null,
       }).eq('id', invoiceId);
       if (error) throw error;
       toast({
@@ -1480,6 +1480,7 @@ const InvoiceDetail = () => {
       });
     }
   };
+
 
   // Notice dialogs are now handled by SendInvoiceNoticeDialog
 
