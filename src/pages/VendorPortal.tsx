@@ -1,44 +1,37 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, Package, ChevronRight, CalendarClock, AlertCircle, MapPin } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import {
-  VENDOR_PO_STATUSES,
-  getVendorPoStatusMeta,
-  type VendorPoStatus,
-} from "@/lib/vendorPoStatus";
-import { cn } from "@/lib/utils";
+import { Loader2, Search } from "lucide-react";
+import { normalizeVendorPoStatusInput } from "@/lib/vendorPoStatus";
+import OrdersSheet, { parseTracking, type SheetItem, type SheetPo } from "@/components/vendor/OrdersSheet";
 
 interface VendorPoRow {
   id: string;
   po_number: string;
+  vendor_invoice_number: string | null;
+  completion_date: string | null;
+  sheet_description: string | null;
   order_date: string;
   expected_delivery_date: string | null;
   vendor_committed_ship_date: string | null;
-  production_status: VendorPoStatus | null;
+  production_status: string | null;
   is_delayed: boolean;
   delay_reason: string | null;
   description: string | null;
+  notes: string | null;
   ship_to_name: string | null;
-  total: number;
+  ship_to_street: string | null;
+  ship_to_city: string | null;
+  ship_to_state: string | null;
+  ship_to_zip: string | null;
+  tracking_carrier: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  vendor_po_items: SheetItem[] | null;
+  orders: { po_number: string | null; description: string | null } | null;
 }
-
-const parseLocalDate = (s: string | null): Date | null => {
-  if (!s) return null;
-  const parts = s.split("T")[0].split("-");
-  if (parts.length === 3) return new Date(+parts[0], +parts[1] - 1, +parts[2]);
-  try { return parseISO(s); } catch { return null; }
-};
-
-const fmtDate = (s: string | null): string => {
-  const d = parseLocalDate(s);
-  return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
-};
 
 export default function VendorPortal() {
   const [pos, setPos] = useState<VendorPoRow[]>([]);
@@ -59,11 +52,17 @@ export default function VendorPortal() {
         return;
       }
 
-      // RLS ("Vendors view own POs") scopes this to the signed-in vendor's POs only.
+      // RLS ("Vendors view own POs" / "Vendors view own PO items") scopes this
+      // to the signed-in vendor's POs only.
       const { data, error } = await (supabase as any)
         .from("vendor_pos")
         .select(
-          "id, po_number, order_date, expected_delivery_date, vendor_committed_ship_date, production_status, is_delayed, delay_reason, description, ship_to_name, total"
+          `id, po_number, vendor_invoice_number, completion_date, sheet_description, order_date, expected_delivery_date, vendor_committed_ship_date,
+           production_status, is_delayed, delay_reason, description, notes,
+           ship_to_name, ship_to_street, ship_to_city, ship_to_state, ship_to_zip,
+           tracking_carrier, tracking_number, tracking_url,
+           vendor_po_items ( id, name, description, quantity, final_quantity, shipped_quantity, is_adjustment ),
+           orders ( po_number, description )`
         )
         .order("order_date", { ascending: false });
 
@@ -77,20 +76,136 @@ export default function VendorPortal() {
     }
   };
 
+  /* ---------- inline-edit persistence (SECURITY DEFINER RPCs check PO ownership) ---------- */
+
+  const patchRow = (id: string, patch: Partial<VendorPoRow>) =>
+    setPos((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+
+  const rpc = async (fn: string, args: Record<string, any>): Promise<boolean> => {
+    const { data, error } = await (supabase as any).rpc(fn, args);
+    if (error || data?.success === false) {
+      console.error(`Error in ${fn}:`, error || data?.error);
+      toast({
+        title: "Change didn't save",
+        description: error?.message || data?.error || "Unknown error — try again",
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const saveStatus = async (po: SheetPo, text: string) => {
+    const status = normalizeVendorPoStatusInput(text);
+    if (!status) return;
+    const before = pos.find((r) => r.id === po.id);
+    patchRow(po.id, { production_status: status });
+    const ok = await rpc("vendor_update_po_status", {
+      p_po_id: po.id,
+      p_status: status,
+      p_committed_ship_date: null,
+      p_is_delayed: po.is_delayed,
+      p_delay_reason: po.delay_reason,
+      p_note: null,
+    });
+    if (!ok && before) patchRow(po.id, before);
+  };
+
+  const saveCompletionDate = async (po: SheetPo, text: string) => {
+    const before = pos.find((r) => r.id === po.id);
+    patchRow(po.id, { completion_date: text.trim() || null });
+    // The RPC stores the raw text and syncs the real date column when it parses.
+    const ok = await rpc("vendor_update_po_details", {
+      p_po_id: po.id,
+      p_tracking_carrier: null,
+      p_tracking_number: null,
+      p_tracking_url: null,
+      p_notes: null,
+      p_completion_date: text.trim() === "" ? "" : text,
+      p_vendor_invoice_number: null,
+    });
+    if (!ok && before) patchRow(po.id, before);
+  };
+
+  const saveVendorInvoice = async (po: SheetPo, value: string) => {
+    const before = pos.find((r) => r.id === po.id);
+    patchRow(po.id, { vendor_invoice_number: value.trim() || null });
+    const ok = await rpc("vendor_update_po_details", {
+      p_po_id: po.id,
+      p_tracking_carrier: null,
+      p_tracking_number: null,
+      p_tracking_url: null,
+      p_notes: null,
+      p_completion_date: null,
+      p_vendor_invoice_number: value.trim() === "" ? "" : value,
+    });
+    if (!ok && before) patchRow(po.id, before);
+  };
+
+  const saveTracking = async (po: SheetPo, text: string) => {
+    const t = parseTracking(text);
+    const before = pos.find((r) => r.id === po.id);
+    patchRow(po.id, {
+      tracking_carrier: t.carrier || null,
+      tracking_number: t.number || null,
+      tracking_url: t.url || null,
+    });
+    const ok = await rpc("vendor_update_po_details", {
+      p_po_id: po.id,
+      p_tracking_carrier: t.carrier || "",
+      p_tracking_number: t.number || "",
+      p_tracking_url: t.url || "",
+      p_notes: null,
+    });
+    if (!ok && before) patchRow(po.id, before);
+  };
+
+  const saveNotes = async (po: SheetPo, value: string) => {
+    const before = pos.find((r) => r.id === po.id);
+    patchRow(po.id, { notes: value || null });
+    const ok = await rpc("vendor_update_po_details", {
+      p_po_id: po.id,
+      p_tracking_carrier: null,
+      p_tracking_number: null,
+      p_tracking_url: null,
+      p_notes: value, // "" clears
+    });
+    if (!ok && before) patchRow(po.id, before);
+  };
+
+  /* ---------- display ---------- */
+
   const q = search.trim().toLowerCase();
-  const filtered = pos.filter(
-    (p) =>
-      !q ||
-      p.po_number.toLowerCase().includes(q) ||
-      (p.description || "").toLowerCase().includes(q) ||
-      (p.ship_to_name || "").toLowerCase().includes(q)
+  const filtered = useMemo(
+    () =>
+      pos
+        .filter(
+          (p) =>
+            !q ||
+            p.po_number.toLowerCase().includes(q) ||
+            (p.description || "").toLowerCase().includes(q) ||
+            (p.ship_to_name || "").toLowerCase().includes(q) ||
+            (p.vendor_po_items || []).some((i) => (i.name || "").toLowerCase().includes(q))
+        )
+        // Open work first (delayed at the very top), shipped at the bottom.
+        .sort((a, b) => {
+          const aShipped = a.production_status === "shipped" ? 1 : 0;
+          const bShipped = b.production_status === "shipped" ? 1 : 0;
+          if (aShipped !== bShipped) return aShipped - bShipped;
+          return Number(b.is_delayed) - Number(a.is_delayed);
+        }),
+    [pos, q]
   );
 
-  // Surface still-open work first (anything not shipped), delayed at the very top.
-  const open = filtered
-    .filter((p) => p.production_status !== "shipped")
-    .sort((a, b) => Number(b.is_delayed) - Number(a.is_delayed));
-  const shipped = filtered.filter((p) => p.production_status === "shipped");
+  const sheetPos: SheetPo[] = filtered.map((r) => ({
+    ...r,
+    cpo: r.orders?.po_number || null,
+    // Vendors usually can't read the linked order (RLS) — fall back to the PO text
+    // so their description cell isn't blank.
+    orderDescription: r.orders?.description || r.description || null,
+    companyName: r.ship_to_name,
+    items: (r.vendor_po_items || []).filter((i) => !i.is_adjustment),
+  }));
 
   if (loading) {
     return (
@@ -100,101 +215,37 @@ export default function VendorPortal() {
     );
   }
 
-  const POCard = ({ po }: { po: VendorPoRow }) => {
-    const meta = getVendorPoStatusMeta(po.production_status);
-    return (
-      <div
-        className="group border rounded-xl p-4 bg-card hover:shadow-md transition-all cursor-pointer"
-        onClick={() => navigate(`/vendor-portal/${po.id}`)}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <Package className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="font-mono font-bold text-lg truncate">{po.po_number}</span>
-            </div>
-            {po.description && (
-              <p className="text-sm text-muted-foreground leading-snug line-clamp-2">{po.description}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge className={meta.badgeClass}>{meta.label}</Badge>
-            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-          </div>
-        </div>
-
-        {po.is_delayed && (
-          <div className="mt-2 flex items-center gap-1.5 text-xs text-destructive">
-            <AlertCircle className="h-3.5 w-3.5" />
-            <span>Delayed{po.delay_reason ? `: ${po.delay_reason}` : ""}</span>
-          </div>
-        )}
-
-        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-            <span className="font-medium text-foreground">Your ship date:</span>
-            <span className="truncate">{fmtDate(po.vendor_committed_ship_date)}</span>
-          </div>
-          {po.ship_to_name && (
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{po.ship_to_name}</span>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-          <span>Ordered {fmtDate(po.order_date)}</span>
-          {po.expected_delivery_date && <span>Requested by {fmtDate(po.expected_delivery_date)}</span>}
-        </div>
-      </div>
-    );
-  };
-
-  const Section = ({ title, list, empty }: { title: string; list: VendorPoRow[]; empty: string }) => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <Badge variant="secondary">{list.length}</Badge>
-      </div>
-      {list.length === 0 ? (
-        <div className="border border-dashed border-border rounded-xl p-10 text-center text-muted-foreground">
-          {empty}
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((po) => (
-            <POCard key={po.id} po={po} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="border-b border-border pb-4">
         <h1 className="text-2xl font-semibold">My Purchase Orders</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          View your POs and keep each one's production status up to date.
+          Update your orders right in the sheet — status, ship date, tracking, and notes.
+          Click a PO # for full details.
         </p>
       </div>
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by PO #, description, or ship-to…"
+          placeholder="Search by PO #, item, or ship-to…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10"
         />
       </div>
 
-      <div className="space-y-8">
-        <Section title="Open" list={open} empty="No open purchase orders" />
-        <Section title="Shipped" list={shipped} empty="Nothing shipped yet" />
-      </div>
+      <OrdersSheet
+        pos={sheetPos}
+        editable
+        storageKey="vendor-portal-sheet"
+        onOpenPo={(po) => navigate(`/vendor-portal/${po.id}`)}
+        onSaveStatus={saveStatus}
+        onSaveShipDate={saveCompletionDate}
+        onSaveTracking={saveTracking}
+        onSaveNotes={saveNotes}
+        onSaveVendorInvoice={saveVendorInvoice}
+      />
     </div>
   );
 }

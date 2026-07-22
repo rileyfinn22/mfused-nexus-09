@@ -1,6 +1,7 @@
 // Shared definition of the vendor-reported production status for a PO.
 // Used by the vendor portal (list + detail) and the vibe-admin monitoring tab.
-// Mirror of the vendor_pos.production_status check constraint + vendor_update_po_status RPC.
+// production_status is free text in the DB; these are the canonical values that
+// get badge styling, progress steps, and filter chips. Anything else is shown as-is.
 
 export type VendorPoStatus =
   | "not_started"
@@ -32,6 +33,20 @@ export function getVendorPoStatusMeta(status: string | null | undefined): Vendor
   return (
     VENDOR_PO_STATUSES.find((s) => s.value === status) ?? VENDOR_PO_STATUSES[0]
   );
+}
+
+/** Match free text against a canonical status by value or label ("In Production" → in_production). */
+export function matchVendorPoStatus(input: string | null | undefined): VendorPoStatusMeta | undefined {
+  if (!input) return undefined;
+  const t = input.trim().toLowerCase();
+  return VENDOR_PO_STATUSES.find(
+    (s) => s.value === t.replace(/\s+/g, "_") || s.label.toLowerCase() === t
+  );
+}
+
+/** Canonical value when the text matches a known status, otherwise the trimmed text itself. */
+export function normalizeVendorPoStatusInput(input: string): string {
+  return matchVendorPoStatus(input)?.value ?? input.trim();
 }
 
 /** 0-100 progress for a status, for progress bars. */
