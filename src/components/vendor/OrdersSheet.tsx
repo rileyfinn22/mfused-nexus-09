@@ -55,6 +55,8 @@ export interface OrdersSheetProps {
   showVendor?: boolean;
   /** Show the Vibe invoice column (numbers only; the vendor portal supplies them via an ownership-checked RPC). */
   showInvoice?: boolean;
+  /** Company column — redundant on the vendor portal where it duplicates ship-to. */
+  showCompany?: boolean;
   editable?: boolean;
   /** localStorage key prefix for persisted column widths. */
   storageKey?: string;
@@ -200,7 +202,7 @@ interface ColDef {
   minWidth: number;
 }
 
-const buildCols = (showVendor: boolean, showInvoice: boolean): ColDef[] => [
+const buildCols = (showVendor: boolean, showInvoice: boolean, showCompany: boolean): ColDef[] => [
   { id: "done", label: "", width: 34, minWidth: 30 },
   ...(showVendor ? [{ id: "vendor", label: "Vendor", width: 120, minWidth: 70 }] : []),
   { id: "vendorInvoice", label: "Vendor Invoice", width: 100, minWidth: 60 },
@@ -213,7 +215,7 @@ const buildCols = (showVendor: boolean, showInvoice: boolean): ColDef[] => [
   { id: "notes", label: "Notes", width: 190, minWidth: 90 },
   { id: "tracking", label: "Tracking", width: 160, minWidth: 90 },
   { id: "shipTo", label: "Ship to", width: 180, minWidth: 100 },
-  { id: "company", label: "Company", width: 130, minWidth: 80 },
+  ...(showCompany ? [{ id: "company", label: "Company", width: 130, minWidth: 80 }] : []),
 ];
 
 /* ---------- free-write cell (Excel-style) ----------
@@ -303,6 +305,7 @@ export default function OrdersSheet({
   pos,
   showVendor = false,
   showInvoice = false,
+  showCompany = true,
   editable = false,
   storageKey = "orders-sheet",
   onOpenPo,
@@ -315,7 +318,7 @@ export default function OrdersSheet({
   onSaveDescription,
   onToggleComplete,
 }: OrdersSheetProps) {
-  const cols = buildCols(showVendor, showInvoice);
+  const cols = buildCols(showVendor, showInvoice, showCompany);
   const widthsKey = `${storageKey}:colWidths`;
 
   const [widths, setWidths] = useState<Record<string, number>>(() => {
@@ -378,11 +381,12 @@ export default function OrdersSheet({
   const completedRows = pos.filter((p) => p.sheet_completed_at);
   const orderedRows = [...openRows, ...completedRows];
 
-  const th = "relative px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-r border-border last:border-r-0 bg-muted/60 select-none";
+  // Sticky so the header stays visible while the sheet scrolls (solid bg — rows pass under it).
+  const th = "sticky top-0 z-20 relative px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-r border-border last:border-r-0 bg-muted select-none";
   const td = "relative p-0 align-top border-b border-r border-border/60 last:border-r-0";
 
   return (
-    <div className="border border-border rounded-lg overflow-x-auto">
+    <div className="border border-border rounded-lg overflow-auto max-h-[calc(100vh-230px)]">
       <table className="text-xs border-collapse table-fixed" style={{ width: tableWidth }}>
         <colgroup>
           {cols.map((c) => (

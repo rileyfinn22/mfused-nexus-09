@@ -252,29 +252,36 @@ export default function VendorPortal() {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="border-b border-border pb-4">
-        <h1 className="text-2xl font-semibold">My Purchase Orders</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Update your orders right in the sheet — status, ship date, tracking, and notes.
-          Click a PO # for full details.
-        </p>
-      </div>
+  const openCount = pos.filter((p) => !p.sheet_completed_at).length;
+  const completedCount = pos.length - openCount;
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by PO #, item, or ship-to…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10"
-        />
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-3 border-b border-border pb-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-semibold">My Purchase Orders</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Click any cell to edit — changes save automatically. Click a PO # for full details.
+          </p>
+        </div>
+        <div className="text-xs text-muted-foreground whitespace-nowrap sm:mb-1">
+          {openCount} open · {completedCount} completed
+        </div>
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search PO #, description, ship-to…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 h-9"
+          />
+        </div>
       </div>
 
       <OrdersSheet
         pos={sheetPos}
         showInvoice
+        showCompany={false}
         editable
         storageKey="vendor-portal-sheet"
         onOpenPo={(po) => navigate(`/vendor-portal/${po.id}`)}
