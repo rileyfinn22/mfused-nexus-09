@@ -1422,11 +1422,13 @@ const InvoiceDetail = () => {
       for (const oi of order.order_items) {
         const raw = quickShipQtys[oi.id];
         if (raw === undefined) continue;
-        const qty = Number(raw);
-        if (!isFinite(qty) || qty < 0) continue;
+        // Empty string means "clear back to placeholder" -> null.
+        // Any typed value (including "0") is intentional and stored as a number.
+        const newVal: number | null = raw === '' ? null : Number(raw);
+        if (newVal !== null && (!isFinite(newVal) || newVal < 0)) continue;
         const { error } = await supabase
           .from('order_items')
-          .update({ shipped_quantity: qty })
+          .update({ shipped_quantity: newVal })
           .eq('id', oi.id);
         if (error) throw error;
       }
