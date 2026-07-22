@@ -1108,7 +1108,7 @@ const InvoiceDetail = () => {
       product_id: null,
       description: '',
       quantity: 0,
-      shipped_quantity: 0,
+      shipped_quantity: null,
       unit_price: 0,
       total: 0,
     }]);

@@ -270,7 +270,7 @@ export function CreateCustomVendorPODialog({
         quantity: item.quantity,
         unit_cost: item.unit_cost,
         total: item.total,
-        shipped_quantity: 0
+        shipped_quantity: null
       }));
 
       const { error: itemsError } = await supabase

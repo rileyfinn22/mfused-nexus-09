@@ -510,7 +510,7 @@ const QuoteDetail = () => {
         name: item.name,
         description: item.description,
         quantity: item.quantity,
-        shipped_quantity: 0,
+        shipped_quantity: null,
         unit_price: item.unit_price,
         total: item.total,
       }));
@@ -583,7 +583,7 @@ const QuoteDetail = () => {
         name: item.name,
         description: item.description,
         quantity: item.quantity,
-        shipped_quantity: 0,
+        shipped_quantity: null,
         unit_price: item.unit_price,
         total: item.total,
       }));

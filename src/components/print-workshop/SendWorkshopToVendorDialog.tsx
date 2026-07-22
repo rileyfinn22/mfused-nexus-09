@@ -314,7 +314,7 @@ export function SendWorkshopToVendorDialog({
           quantity: line.quantity,
           unit_cost: line.unitCost,
           total: line.total,
-          shipped_quantity: 0,
+          shipped_quantity: null,
         } as any);
 
         if (printFileUrl && printFileUrl !== line.printFileUrl) {

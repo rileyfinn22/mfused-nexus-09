@@ -756,7 +756,7 @@ const PullShip = () => {
         name: item.name,
         item_id: item.itemId,
         quantity: item.quantity,
-        shipped_quantity: 0,
+        shipped_quantity: null,
         unit_price: item.unitPrice,
         total: item.itemTotal
       }));
