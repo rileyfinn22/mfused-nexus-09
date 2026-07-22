@@ -2839,16 +2839,9 @@ const InvoiceDetail = () => {
                 : [];
               const parentPaid = parentBlanket ? Number(parentBlanket.total_paid || 0) : 0;
               const parentTotal = parentBlanket ? Number(parentBlanket.total || 0) : 0;
-              // Sole-live-child rule: apply parent deposit to this child, capped so
-              // the child's net balance never drops below (blanket balance = parentTotal - parentPaid).
-              // depositCredit = max(0, childTotal + parentPaid - parentTotal)
-              const childTotalNum = Number(invoice?.total || 0);
-              const soleLiveChild = parentBlanket && liveChildren.length === 1;
-              const depositCredit = soleLiveChild
-                ? Math.max(0, Math.min(childTotalNum, childTotalNum + parentPaid - parentTotal))
-                : 0;
-              const showDepositCredit = depositCredit > 0.005;
-              const grossSubtotal = displaySubtotal + (showDepositCredit ? depositCredit : 0);
+              const depositCredit = 0;
+              const showDepositCredit = false;
+              const grossSubtotal = displaySubtotal;
 
               return (
             <div className="flex justify-end mt-8">
