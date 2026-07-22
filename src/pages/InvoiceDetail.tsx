@@ -1336,12 +1336,22 @@ const InvoiceDetail = () => {
     }
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      const childrenSubtotal = (relatedInvoices || [])
+        .filter((ri: any) => ri.parent_invoice_id === invoiceId && !ri.deleted_at)
+        .reduce((sum: number, ri: any) => sum + Number(ri.subtotal || 0), 0);
+      const childrenShipping = (relatedInvoices || [])
+        .filter((ri: any) => ri.parent_invoice_id === invoiceId && !ri.deleted_at)
+        .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0);
+      const newTotal = childrenSubtotal + Number(invoice?.tax || 0) + childrenShipping;
       const {
         error
       } = await supabase.from('invoices').update({
         status: 'closed',
         blanket_closed_at: new Date().toISOString(),
         blanket_closed_by: user?.id ?? null,
+        subtotal: childrenSubtotal,
+        shipping_cost: childrenShipping,
+        total: newTotal,
       }).eq('id', invoiceId);
       if (error) throw error;
       toast({
