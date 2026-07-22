@@ -1529,25 +1529,8 @@ const InvoiceDetail = () => {
       const items = blanketTotalItems(editedItems, hasChildren);
       return calculateInvoiceTotals(items, Number(invoice?.tax || 0), displayShipping);
     }
-    if (isBlanketDisplay) {
-      // Use blanketTotalItems which respects child invoice placeholder logic:
-      // hasChildren → max(shipped, ordered) per item to keep blanket at full order total
-      // no children, any shipped → shipped-only
-      // no children, nothing shipped → ordered (placeholder)
-      const hasChildren = relatedInvoices.some(
-        (ri: any) => ri.parent_invoice_id === invoiceId
-      );
-      const itemsWithShipped = displayItems.map((item: any) => {
-        const orderItem = order?.order_items?.find((oi: any) => oi.id === item.id);
-        return {
-          ...item,
-          shipped_quantity: Number(orderItem?.shipped_quantity || item.shipped_quantity || 0),
-        };
-      });
-      const totalItems = blanketTotalItems(itemsWithShipped, hasChildren);
-      return calculateInvoiceTotals(totalItems, Number(invoice?.tax || 0), displayShipping);
-    }
-    // Partial invoices or non-blanket: use stored DB values
+    // Non-edit display uses stored invoice totals. This preserves the manual
+    // "Update Blanket" value instead of re-freezing open blankets to ordered total.
     return { subtotal: Number(invoice?.subtotal || 0), total: Number(invoice?.subtotal || 0) + Number(invoice?.tax || 0) + displayShipping };
   };
   
@@ -2799,13 +2782,6 @@ const InvoiceDetail = () => {
                               const price = Number(item.unit_price) || 0;
                               if (invoice?.invoice_type !== 'full') {
                                 return formatCurrency(shippedQty * price);
-                              }
-                              // Blanket: if it has open children, freeze line at ordered × price so lines sum to the frozen subtotal.
-                              const hasOpenChildren = relatedInvoices.some(
-                                (ri: any) => ri.parent_invoice_id === invoiceId
-                              ) && !invoice?.blanket_closed_at;
-                              if (hasOpenChildren) {
-                                return formatCurrency((Number(orderedQty) || 0) * price);
                               }
                               return formatCurrency((shippedQty > 0 ? shippedQty : (Number(item.quantity) || 0)) * price);
                             })()}
