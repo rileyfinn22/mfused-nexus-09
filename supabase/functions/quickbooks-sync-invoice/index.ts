@@ -590,6 +590,7 @@ serve(async (req) => {
     // Build invoice line items - always use full prices
     let lineItems = [];
     let calculatedSubtotal = 0;
+    let parentDepositCreditApplied = 0;
 
     // Track which order_item IDs are covered by allocations
     const allocatedOrderItemIds = new Set<string>();
@@ -921,6 +922,7 @@ serve(async (req) => {
             },
           });
 
+          parentDepositCreditApplied = depositCredit;
           calculatedSubtotal -= depositCredit;
           console.log(`Adjusted child shipment subtotal after parent deposit credit: ${calculatedSubtotal}`);
         }
@@ -1020,7 +1022,7 @@ serve(async (req) => {
     const calculatedTotal = calculatedSubtotal + Number(invoice.tax || 0);
     const dbTotal = Number(invoice.total);
     const totalPaidFinal = Number(invoice.total_paid || 0);
-    const expectedQBOAmount = dbTotal - totalPaidFinal;
+    const expectedQBOAmount = dbTotal - totalPaidFinal - parentDepositCreditApplied;
     
     console.log('Calculated subtotal:', calculatedSubtotal);
     console.log('Calculated total (with tax):', calculatedTotal);
