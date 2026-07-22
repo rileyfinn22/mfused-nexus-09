@@ -42,7 +42,8 @@ export function RecordVendorPOPaymentDialog({ open, onOpenChange, vendorPO, onSu
 
       const poTotal = vendorPO.final_total ?? vendorPO.total;
       const remainingBalance = poTotal - (vendorPO.total_paid || 0);
-      if (paymentAmount > remainingBalance) {
+      // Allow up to 1 cent over to handle sub-cent rounding on stored totals
+      if (paymentAmount > remainingBalance + 0.01) {
         toast({
           title: "Amount Too Large",
           description: `Payment amount cannot exceed remaining balance of $${remainingBalance.toFixed(2)}`,
