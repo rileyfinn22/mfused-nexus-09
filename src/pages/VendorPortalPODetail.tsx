@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, ArrowLeft, MapPin, Package, Paperclip, Send, X } from "lucide-react";
+import { Loader2, ArrowLeft, MapPin, Package, Paperclip, Send, X, Download } from "lucide-react";
 import { parseISO } from "date-fns";
 import { matchVendorPoStatus } from "@/lib/vendorPoStatus";
+import { downloadVendorPoPdf } from "@/lib/vendorPoPdf";
 import { cn } from "@/lib/utils";
 
 interface PoItem {
@@ -52,6 +53,15 @@ interface PoDetail {
   ship_to_zip: string | null;
   shipping_cost: number | null;
   total: number;
+  vendors: { name: string | null; contact_name: string | null; contact_email: string | null; contact_phone: string | null } | null;
+}
+
+interface SheetInfo {
+  po_id: string;
+  cpo: string | null;
+  order_number: string | null;
+  order_description: string | null;
+  invoice_numbers: string[];
 }
 
 const parseLocalDate = (s: string | null): Date | undefined => {
@@ -75,6 +85,7 @@ export default function VendorPortalPODetail() {
   const [po, setPo] = useState<PoDetail | null>(null);
   const [items, setItems] = useState<PoItem[]>([]);
   const [updates, setUpdates] = useState<ProductionUpdate[]>([]);
+  const [info, setInfo] = useState<SheetInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [percent, setPercent] = useState(0);
@@ -95,7 +106,8 @@ export default function VendorPortalPODetail() {
         .select(
           `id, po_number, order_date, expected_delivery_date, vendor_committed_ship_date, completion_date,
            production_status, production_percent, is_delayed, delay_reason, description, sheet_description,
-           ship_to_name, ship_to_street, ship_to_city, ship_to_state, ship_to_zip, shipping_cost, total`
+           ship_to_name, ship_to_street, ship_to_city, ship_to_state, ship_to_zip, shipping_cost, total,
+           vendors ( name, contact_name, contact_email, contact_phone )`
         )
         .eq("id", id)
         .maybeSingle();
@@ -109,6 +121,11 @@ export default function VendorPortalPODetail() {
 
       setPo(poData as PoDetail);
       setPercent(poData.production_percent ?? 0);
+
+      // CPO / Vibe invoice / order number via the ownership-checked pipe.
+      (supabase as any)
+        .rpc("vendor_po_sheet_info", { p_po_ids: [id] })
+        .then(({ data }: any) => setInfo((data?.[0] as SheetInfo) || null));
 
       const [{ data: itemData }, { data: updateData }] = await Promise.all([
         (supabase as any)
@@ -214,6 +231,40 @@ export default function VendorPortalPODetail() {
   }
   if (!po) return null;
 
+  const handleDownloadPdf = () =>
+    downloadVendorPoPdf({
+      poNumber: po.po_number,
+      orderDate: po.order_date,
+      expectedDeliveryDate: po.expected_delivery_date,
+      orderNumber: info?.order_number || null,
+      vendorName: po.vendors?.name || "",
+      vendorContact: {
+        name: po.vendors?.contact_name,
+        email: po.vendors?.contact_email,
+        phone: po.vendors?.contact_phone,
+      },
+      shipTo: {
+        name: po.ship_to_name,
+        street: po.ship_to_street,
+        city: po.ship_to_city,
+        state: po.ship_to_state,
+        zip: po.ship_to_zip,
+      },
+      stickerInfo:
+        (info?.invoice_numbers?.length
+          ? info.invoice_numbers.map((inv) => ({
+              orderNumber: info.order_number || undefined,
+              invoiceNumber: inv,
+              customerPO: info.cpo || undefined,
+            }))
+          : info?.cpo
+            ? [{ orderNumber: info.order_number || undefined, customerPO: info.cpo }]
+            : []),
+      items,
+      shippingCost: Number(po.shipping_cost || 0),
+      total: po.total,
+    });
+
   const statusMeta = matchVendorPoStatus(po.production_status || "");
   const shipToLines = [
     po.ship_to_name,
@@ -250,10 +301,19 @@ export default function VendorPortalPODetail() {
               </CardTitle>
               {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
             </div>
-            <div className="text-right text-sm text-muted-foreground">
-              <div>Order date: {fmtDate(po.order_date)}</div>
-              {po.expected_delivery_date && <div>Requested by: {fmtDate(po.expected_delivery_date)}</div>}
-              {po.completion_date && <div>Completion: {po.completion_date}</div>}
+            <div className="flex flex-col items-end gap-2">
+              <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+                <Download className="h-4 w-4 mr-1.5" /> Download PDF
+              </Button>
+              <div className="text-right text-sm text-muted-foreground">
+                <div>Order date: {fmtDate(po.order_date)}</div>
+                {po.expected_delivery_date && <div>Requested by: {fmtDate(po.expected_delivery_date)}</div>}
+                {po.completion_date && <div>Completion: {po.completion_date}</div>}
+                {info?.cpo && <div>CPO: <span className="font-mono text-foreground">{info.cpo}</span></div>}
+                {(info?.invoice_numbers?.length ?? 0) > 0 && (
+                  <div>Vibe Invoice: <span className="font-mono text-foreground">{info!.invoice_numbers.join(", ")}</span></div>
+                )}
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -268,32 +328,39 @@ export default function VendorPortalPODetail() {
             </div>
           )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          {/* Line items — same spreadsheet grid look as the orders sheet */}
+          <div className="border border-border rounded-lg overflow-x-auto">
+            <table className="w-full text-xs border-collapse min-w-[560px]">
               <thead>
-                <tr className="border-b border-border text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  <th className="text-left py-2 pr-3">SKU</th>
-                  <th className="text-left py-2 pr-3">Item</th>
-                  <th className="text-right py-2 pr-3">Qty</th>
-                  <th className="text-right py-2 pr-3">Unit Cost</th>
-                  <th className="text-right py-2">Total</th>
+                <tr>
+                  {["SKU", "Item", "Qty", "Unit Cost", "Amount"].map((h, i) => (
+                    <th
+                      key={h}
+                      className={cn(
+                        "px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-r border-border last:border-r-0 bg-muted select-none",
+                        i >= 2 ? "text-right" : "text-left"
+                      )}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {items.map((it) => (
-                  <tr key={it.id} className="border-b border-border/60">
-                    <td className="py-2 pr-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{it.sku}</td>
-                    <td className="py-2 pr-3">
+                  <tr key={it.id} className="hover:bg-muted/20">
+                    <td className="px-2 py-1 font-mono text-muted-foreground whitespace-nowrap border-b border-r border-border/60">{it.sku}</td>
+                    <td className="px-2 py-1 border-b border-r border-border/60">
                       <div className="font-medium">{it.name}</div>
-                      {it.description && <div className="text-xs text-muted-foreground">{it.description}</div>}
+                      {it.description && <div className="text-[11px] text-muted-foreground">{it.description}</div>}
                     </td>
-                    <td className="py-2 pr-3 text-right font-mono">{it.quantity?.toLocaleString("en-US")}</td>
-                    <td className="py-2 pr-3 text-right font-mono">{fmtMoney(it.unit_cost)}</td>
-                    <td className="py-2 text-right font-mono">{fmtMoney(it.total)}</td>
+                    <td className="px-2 py-1 text-right font-mono border-b border-r border-border/60">{it.quantity?.toLocaleString("en-US")}</td>
+                    <td className="px-2 py-1 text-right font-mono border-b border-r border-border/60">{fmtMoney(it.unit_cost)}</td>
+                    <td className="px-2 py-1 text-right font-mono font-medium border-b border-border/60">{fmtMoney(it.total)}</td>
                   </tr>
                 ))}
                 {items.length === 0 && (
-                  <tr><td colSpan={5} className="py-4 text-center text-muted-foreground">No line items on this PO.</td></tr>
+                  <tr><td colSpan={5} className="py-4 text-center text-muted-foreground border-b border-border/60">No line items on this PO.</td></tr>
                 )}
               </tbody>
             </table>
