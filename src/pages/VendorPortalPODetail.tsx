@@ -78,55 +78,6 @@ const fmtDate = (s: string | null): string => {
 const fmtMoney = (n: number) => `$${(n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const isImage = (name: string | null) => !!name && /\.(png|jpe?g|gif|webp)$/i.test(name);
 
-/** Click-to-edit numeric cell for the line-items sheet (Enter/blur saves, Esc cancels). */
-function QtyCell({ value, onSave }: { value: number | null; onSave: (v: number | null) => void }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing) {
-      setDraft(value == null ? "" : String(value));
-      requestAnimationFrame(() => { inputRef.current?.focus(); inputRef.current?.select(); });
-    }
-  }, [editing]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const commit = () => {
-    setEditing(false);
-    const cleaned = draft.replace(/[^0-9]/g, "");
-    const next = cleaned === "" ? null : Number(cleaned);
-    if (next !== value) onSave(next);
-  };
-
-  if (editing) {
-    return (
-      <input
-        ref={inputRef}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commit();
-          if (e.key === "Escape") setEditing(false);
-        }}
-        className="w-full bg-background text-xs text-right font-mono px-1 py-0.5 border-0 outline-none ring-2 ring-primary"
-      />
-    );
-  }
-
-  return (
-    <div
-      onClick={() => setEditing(true)}
-      className={cn(
-        "min-h-[1.4rem] px-1 py-0.5 text-right font-mono cursor-text hover:bg-primary/5",
-        value == null && "text-muted-foreground/40"
-      )}
-    >
-      {value == null ? "" : value.toLocaleString("en-US")}
-    </div>
-  );
-}
-
 export default function VendorPortalPODetail() {
   const { poId } = useParams();
   const navigate = useNavigate();
@@ -226,20 +177,6 @@ export default function VendorPortalPODetail() {
       setPercent(po.production_percent ?? 0);
     } else {
       setPo({ ...po, production_percent: value });
-    }
-  };
-
-  const saveShippedQty = async (item: PoItem, qty: number | null) => {
-    const before = items;
-    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, shipped_quantity: qty } : i)));
-    const { data, error } = await (supabase as any).rpc("vendor_update_item_shipped_qty", {
-      p_item_id: item.id,
-      p_shipped_quantity: qty,
-    });
-    if (error || data?.success === false) {
-      console.error("Error saving shipped qty:", error || data?.error);
-      toast({ title: "Change didn't save", description: error?.message || data?.error || "Try again", variant: "destructive" });
-      setItems(before);
     }
   };
 
@@ -398,7 +335,7 @@ export default function VendorPortalPODetail() {
             <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-[#4CAF50] text-white">
-                  {["SKU", "Description", "Ordered Qty", "Shipped Qty", "Price/pc", "Amount"].map((h, i) => (
+                  {["SKU", "Description", "Qty", "Unit Cost", "Amount"].map((h, i) => (
                     <th
                       key={h}
                       className={cn(
@@ -420,15 +357,12 @@ export default function VendorPortalPODetail() {
                       {it.description && <div className="text-xs text-muted-foreground">{it.description}</div>}
                     </td>
                     <td className="px-3 py-2 text-right font-mono align-top">{it.quantity?.toLocaleString("en-US")}</td>
-                    <td className="px-1 py-1 align-top w-28">
-                      <QtyCell value={it.shipped_quantity ?? null} onSave={(v) => saveShippedQty(it, v)} />
-                    </td>
                     <td className="px-3 py-2 text-right font-mono align-top">{`$${Number(it.unit_cost || 0).toFixed(3)}`}</td>
                     <td className="px-3 py-2 text-right font-mono font-semibold align-top">{fmtMoney(it.total)}</td>
                   </tr>
                 ))}
                 {items.length === 0 && (
-                  <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">No line items on this PO.</td></tr>
+                  <tr><td colSpan={5} className="py-4 text-center text-muted-foreground">No line items on this PO.</td></tr>
                 )}
               </tbody>
             </table>
