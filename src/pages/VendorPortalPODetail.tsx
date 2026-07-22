@@ -19,6 +19,7 @@ interface PoItem {
   name: string;
   description: string | null;
   quantity: number;
+  shipped_quantity: number | null;
   unit_cost: number;
   total: number;
 }
@@ -77,6 +78,55 @@ const fmtDate = (s: string | null): string => {
 const fmtMoney = (n: number) => `$${(n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const isImage = (name: string | null) => !!name && /\.(png|jpe?g|gif|webp)$/i.test(name);
 
+/** Click-to-edit numeric cell for the line-items sheet (Enter/blur saves, Esc cancels). */
+function QtyCell({ value, onSave }: { value: number | null; onSave: (v: number | null) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      setDraft(value == null ? "" : String(value));
+      requestAnimationFrame(() => { inputRef.current?.focus(); inputRef.current?.select(); });
+    }
+  }, [editing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commit = () => {
+    setEditing(false);
+    const cleaned = draft.replace(/[^0-9]/g, "");
+    const next = cleaned === "" ? null : Number(cleaned);
+    if (next !== value) onSave(next);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") setEditing(false);
+        }}
+        className="w-full bg-background text-xs text-right font-mono px-1 py-0.5 border-0 outline-none ring-2 ring-primary"
+      />
+    );
+  }
+
+  return (
+    <div
+      onClick={() => setEditing(true)}
+      className={cn(
+        "min-h-[1.4rem] px-1 py-0.5 text-right font-mono cursor-text hover:bg-primary/5",
+        value == null && "text-muted-foreground/40"
+      )}
+    >
+      {value == null ? "" : value.toLocaleString("en-US")}
+    </div>
+  );
+}
+
 export default function VendorPortalPODetail() {
   const { poId } = useParams();
   const navigate = useNavigate();
@@ -130,7 +180,7 @@ export default function VendorPortalPODetail() {
       const [{ data: itemData }, { data: updateData }] = await Promise.all([
         (supabase as any)
           .from("vendor_po_items")
-          .select("id, sku, name, description, quantity, unit_cost, total")
+          .select("id, sku, name, description, quantity, shipped_quantity, unit_cost, total")
           .eq("vendor_po_id", id),
         (supabase as any)
           .from("vendor_po_production_updates")
@@ -176,6 +226,20 @@ export default function VendorPortalPODetail() {
       setPercent(po.production_percent ?? 0);
     } else {
       setPo({ ...po, production_percent: value });
+    }
+  };
+
+  const saveShippedQty = async (item: PoItem, qty: number | null) => {
+    const before = items;
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, shipped_quantity: qty } : i)));
+    const { data, error } = await (supabase as any).rpc("vendor_update_item_shipped_qty", {
+      p_item_id: item.id,
+      p_shipped_quantity: qty,
+    });
+    if (error || data?.success === false) {
+      console.error("Error saving shipped qty:", error || data?.error);
+      toast({ title: "Change didn't save", description: error?.message || data?.error || "Try again", variant: "destructive" });
+      setItems(before);
     }
   };
 
@@ -328,17 +392,18 @@ export default function VendorPortalPODetail() {
             </div>
           )}
 
-          {/* Line items — same spreadsheet grid look as the orders sheet */}
+          {/* Line items sheet — one SKU per line; shipped qty is free-write,
+              total = shipped x price/pc */}
           <div className="border border-border rounded-lg overflow-x-auto">
             <table className="w-full text-xs border-collapse min-w-[560px]">
               <thead>
                 <tr>
-                  {["SKU", "Item", "Qty", "Unit Cost", "Amount"].map((h, i) => (
+                  {["SKU", "Ordered Qty", "Shipped Qty", "Price/pc", "Total"].map((h, i) => (
                     <th
                       key={h}
                       className={cn(
                         "px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-r border-border last:border-r-0 bg-muted select-none",
-                        i >= 2 ? "text-right" : "text-left"
+                        i >= 1 ? "text-right" : "text-left"
                       )}
                     >
                       {h}
@@ -347,18 +412,30 @@ export default function VendorPortalPODetail() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it) => (
-                  <tr key={it.id} className="hover:bg-muted/20">
-                    <td className="px-2 py-1 font-mono text-muted-foreground whitespace-nowrap border-b border-r border-border/60">{it.sku}</td>
-                    <td className="px-2 py-1 border-b border-r border-border/60">
-                      <div className="font-medium">{it.name}</div>
-                      {it.description && <div className="text-[11px] text-muted-foreground">{it.description}</div>}
-                    </td>
-                    <td className="px-2 py-1 text-right font-mono border-b border-r border-border/60">{it.quantity?.toLocaleString("en-US")}</td>
-                    <td className="px-2 py-1 text-right font-mono border-b border-r border-border/60">{fmtMoney(it.unit_cost)}</td>
-                    <td className="px-2 py-1 text-right font-mono font-medium border-b border-border/60">{fmtMoney(it.total)}</td>
-                  </tr>
-                ))}
+                {items.map((it) => {
+                  const shipped = it.shipped_quantity ?? null;
+                  const shippedTotal = (shipped ?? 0) * Number(it.unit_cost || 0);
+                  return (
+                    <tr key={it.id} className="hover:bg-muted/20">
+                      <td className="px-2 py-1 border-b border-r border-border/60">
+                        <div className="font-mono whitespace-nowrap">{it.sku}</div>
+                        {it.name && <div className="text-[11px] text-muted-foreground">{it.name}</div>}
+                      </td>
+                      <td className="px-2 py-1 text-right font-mono border-b border-r border-border/60">
+                        {it.quantity?.toLocaleString("en-US")}
+                      </td>
+                      <td className="p-0 align-middle border-b border-r border-border/60 w-24">
+                        <QtyCell value={shipped} onSave={(v) => saveShippedQty(it, v)} />
+                      </td>
+                      <td className="px-2 py-1 text-right font-mono border-b border-r border-border/60">
+                        {`$${Number(it.unit_cost || 0).toFixed(3)}`}
+                      </td>
+                      <td className={cn("px-2 py-1 text-right font-mono font-medium border-b border-border/60", shipped == null && "text-muted-foreground/40")}>
+                        {shipped == null ? "—" : fmtMoney(shippedTotal)}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {items.length === 0 && (
                   <tr><td colSpan={5} className="py-4 text-center text-muted-foreground border-b border-border/60">No line items on this PO.</td></tr>
                 )}
