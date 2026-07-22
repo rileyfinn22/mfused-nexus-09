@@ -2786,21 +2786,21 @@ const InvoiceDetail = () => {
                             ) : (
                               <span className="inline-flex items-center gap-1">
                                 {shippedQty}
-                                {isVibeAdmin && orderItem && (
+                                {isVibeAdmin && orderItem && shippedQty === 0 && (
                                   <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                                    title="Reset to placeholder (not yet shipped)"
+                                    className="h-4 w-4 text-muted-foreground hover:text-foreground"
+                                    title="Revert to placeholder (not yet shipped)"
                                     onClick={async () => {
                                       const { error } = await supabase.from('order_items').update({ shipped_quantity: null }).eq('id', orderItem.id);
                                       if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-                                      toast({ title: 'Reset to placeholder', description: `${item.sku} shipped qty cleared.` });
+                                      toast({ title: 'Reverted to placeholder', description: `${item.sku} shipped qty cleared.` });
                                       fetchInvoiceDetails();
                                     }}
                                   >
-                                    <X className="h-3 w-3" />
+                                    <RotateCcw className="h-2.5 w-2.5" />
                                   </Button>
                                 )}
                               </span>
