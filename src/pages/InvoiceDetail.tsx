@@ -2793,12 +2793,22 @@ const InvoiceDetail = () => {
                       <TableCell className="text-right font-semibold">
                         <div className="flex items-center justify-end gap-2">
                           <span>
-                            {formatCurrency(
-                              invoice?.invoice_type === 'full'
-                                ? (shippedQty > 0 ? shippedQty : (Number(item.quantity) || 0)) * Number(item.unit_price)
-                                : shippedQty * Number(item.unit_price)
-                            )}
+                            {(() => {
+                              const price = Number(item.unit_price) || 0;
+                              if (invoice?.invoice_type !== 'full') {
+                                return formatCurrency(shippedQty * price);
+                              }
+                              // Blanket: if it has open children, freeze line at ordered × price so lines sum to the frozen subtotal.
+                              const hasOpenChildren = relatedInvoices.some(
+                                (ri: any) => ri.parent_invoice_id === invoiceId
+                              ) && !invoice?.blanket_closed_at;
+                              if (hasOpenChildren) {
+                                return formatCurrency((Number(orderedQty) || 0) * price);
+                              }
+                              return formatCurrency((shippedQty > 0 ? shippedQty : (Number(item.quantity) || 0)) * price);
+                            })()}
                           </span>
+
                           {showRowDelete && (
                             <Button
                               type="button"
