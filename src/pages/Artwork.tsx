@@ -1913,28 +1913,68 @@ const Artwork = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {/* Single Products Card */}
-          {singleProducts.length > 0 && (
-            <Card
-              className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 border-dashed"
-              onClick={() => setShowingSingleProducts(true)}
-            >
-              <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                <Package className="h-16 w-16 text-muted-foreground/50" />
-                <div className="absolute top-2 right-2">
-                  <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm">
-                    {singleProducts.length}
-                  </Badge>
-                </div>
-              </div>
-              <div className="p-3 space-y-1">
-                <h3 className="font-medium text-sm leading-snug">Single Products</h3>
-                <p className="text-xs text-muted-foreground">
-                  Products without a template
-                </p>
-              </div>
-            </Card>
-          )}
+          {/* Single Products (no template) - rendered inline like templates */}
+          {singleProducts
+            .filter(p =>
+              p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              (p.item_id && p.item_id.toLowerCase().includes(searchQuery.toLowerCase()))
+            )
+            .map((product) => {
+              const artCount = getProductArtworkCount(product.item_id);
+              const status = getProductArtworkStatus(product.item_id);
+              return (
+                <Card
+                  key={`single-${product.id}`}
+                  className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
+                  onClick={() => handleSelectProduct(product)}
+                >
+                  <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+                    {skuArtworkThumbnails[product.item_id || ''] ? (
+                      <img
+                        src={skuArtworkThumbnails[product.item_id || '']!}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : skuPdfArtworkUrls[product.item_id || ''] ? (
+                      <PdfThumbnail
+                        pdfUrl={skuPdfArtworkUrls[product.item_id || '']}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : product.image_url ? (
+                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Package className="h-16 w-16 text-muted-foreground/30" />
+                    )}
+
+                    <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                      {getStatusBadge(status)}
+                      {product.item_id && rejectedCountsBySku[product.item_id] > 0 && (
+                        <Badge className="bg-destructive text-destructive-foreground border-0">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          {rejectedCountsBySku[product.item_id]} Rejected
+                        </Badge>
+                      )}
+                    </div>
+
+                    {artCount.total > 0 && (
+                      <div className="absolute top-2 right-2">
+                        <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm">
+                          <ImageIcon className="h-3 w-3 mr-1" />
+                          {artCount.total}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <h3 className="font-medium text-sm truncate">{getDisplayName(product.name)}</h3>
+                    <p className="text-xs text-muted-foreground font-mono">{product.item_id || 'No SKU'}</p>
+                  </div>
+                </Card>
+              );
+            })}
+
           
           {/* Template Cards */}
           {templates
