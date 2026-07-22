@@ -2839,16 +2839,9 @@ const InvoiceDetail = () => {
                 : [];
               const parentPaid = parentBlanket ? Number(parentBlanket.total_paid || 0) : 0;
               const parentTotal = parentBlanket ? Number(parentBlanket.total || 0) : 0;
-              // Sole-live-child rule: apply parent deposit to this child, capped so
-              // the child's net balance never drops below (blanket balance = parentTotal - parentPaid).
-              // depositCredit = max(0, childTotal + parentPaid - parentTotal)
-              const childTotalNum = Number(invoice?.total || 0);
-              const soleLiveChild = parentBlanket && liveChildren.length === 1;
-              const depositCredit = soleLiveChild
-                ? Math.max(0, Math.min(childTotalNum, childTotalNum + parentPaid - parentTotal))
-                : 0;
-              const showDepositCredit = depositCredit > 0.005;
-              const grossSubtotal = displaySubtotal + (showDepositCredit ? depositCredit : 0);
+              const depositCredit = 0;
+              const showDepositCredit = false;
+              const grossSubtotal = displaySubtotal;
 
               return (
             <div className="flex justify-end mt-8">
@@ -2922,17 +2915,10 @@ const InvoiceDetail = () => {
                   </div>
                 )}
                 <div className="h-px bg-border my-2"></div>
-                {(() => {
-                  const effectivePaid = displayTotalPaid + depositCredit;
-                  const effectiveBalance = displayBalance - depositCredit;
-                  const showBalance = effectivePaid > 0;
-                  return (
-                    <div className="flex justify-between">
-                      <span className="text-lg font-semibold">{showBalance ? 'Balance Due' : (isDepositBilling ? 'Deposit Due' : 'Total')}</span>
-                      <span className="text-2xl font-bold">{formatCurrency(showBalance ? effectiveBalance : displayBilledTotal)}</span>
-                    </div>
-                  );
-                })()}
+                <div className="flex justify-between">
+                  <span className="text-lg font-semibold">{displayTotalPaid > 0 ? 'Balance Due' : (isDepositBilling ? 'Deposit Due' : 'Total')}</span>
+                  <span className="text-2xl font-bold">{formatCurrency(displayTotalPaid > 0 ? displayBalance : displayBilledTotal)}</span>
+                </div>
                 {isEditMode && <p className="text-xs text-muted-foreground italic mt-2">
                     Totals will be saved when you click "Save Changes"
                   </p>}
