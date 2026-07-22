@@ -1,24 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, ArrowLeft, CalendarClock, MapPin, Package, History, Save } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import {
-  VENDOR_PO_STATUSES,
-  getVendorPoStatusMeta,
-  type VendorPoStatus,
-} from "@/lib/vendorPoStatus";
+import { Loader2, ArrowLeft, MapPin, Package, Paperclip, Send, X } from "lucide-react";
+import { parseISO } from "date-fns";
+import { matchVendorPoStatus } from "@/lib/vendorPoStatus";
+import { cn } from "@/lib/utils";
 
 interface PoItem {
   id: string;
@@ -30,13 +22,14 @@ interface PoItem {
   total: number;
 }
 
-interface HistoryRow {
+interface ProductionUpdate {
   id: string;
-  previous_status: string | null;
-  new_status: string | null;
   note: string | null;
-  is_delayed: boolean | null;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  percent_at_time: number | null;
   created_at: string;
+  signedUrl?: string;
 }
 
 interface PoDetail {
@@ -45,15 +38,19 @@ interface PoDetail {
   order_date: string;
   expected_delivery_date: string | null;
   vendor_committed_ship_date: string | null;
-  production_status: VendorPoStatus | null;
+  completion_date: string | null;
+  production_status: string | null;
+  production_percent: number;
   is_delayed: boolean;
   delay_reason: string | null;
   description: string | null;
+  sheet_description: string | null;
   ship_to_name: string | null;
   ship_to_street: string | null;
   ship_to_city: string | null;
   ship_to_state: string | null;
   ship_to_zip: string | null;
+  shipping_cost: number | null;
   total: number;
 }
 
@@ -68,6 +65,7 @@ const fmtDate = (s: string | null): string => {
   return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
 };
 const fmtMoney = (n: number) => `$${(n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const isImage = (name: string | null) => !!name && /\.(png|jpe?g|gif|webp)$/i.test(name);
 
 export default function VendorPortalPODetail() {
   const { poId } = useParams();
@@ -76,17 +74,14 @@ export default function VendorPortalPODetail() {
 
   const [po, setPo] = useState<PoDetail | null>(null);
   const [items, setItems] = useState<PoItem[]>([]);
-  const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [updates, setUpdates] = useState<ProductionUpdate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
-  // Editable form state
-  const [status, setStatus] = useState<VendorPoStatus>("not_started");
-  const [shipDate, setShipDate] = useState<Date | undefined>(undefined);
-  const [isDelayed, setIsDelayed] = useState(false);
-  const [delayReason, setDelayReason] = useState("");
+  const [percent, setPercent] = useState(0);
   const [note, setNote] = useState("");
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [posting, setPosting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (poId) load(poId);
@@ -98,7 +93,9 @@ export default function VendorPortalPODetail() {
       const { data: poData, error: poErr } = await (supabase as any)
         .from("vendor_pos")
         .select(
-          "id, po_number, order_date, expected_delivery_date, vendor_committed_ship_date, production_status, is_delayed, delay_reason, description, ship_to_name, ship_to_street, ship_to_city, ship_to_state, ship_to_zip, total"
+          `id, po_number, order_date, expected_delivery_date, vendor_committed_ship_date, completion_date,
+           production_status, production_percent, is_delayed, delay_reason, description, sheet_description,
+           ship_to_name, ship_to_street, ship_to_city, ship_to_state, ship_to_zip, shipping_cost, total`
         )
         .eq("id", id)
         .maybeSingle();
@@ -111,25 +108,37 @@ export default function VendorPortalPODetail() {
       }
 
       setPo(poData as PoDetail);
-      setStatus((poData.production_status as VendorPoStatus) || "not_started");
-      setShipDate(parseLocalDate(poData.vendor_committed_ship_date));
-      setIsDelayed(!!poData.is_delayed);
-      setDelayReason(poData.delay_reason || "");
+      setPercent(poData.production_percent ?? 0);
 
-      const [{ data: itemData }, { data: histData }] = await Promise.all([
+      const [{ data: itemData }, { data: updateData }] = await Promise.all([
         (supabase as any)
           .from("vendor_po_items")
           .select("id, sku, name, description, quantity, unit_cost, total")
           .eq("vendor_po_id", id),
         (supabase as any)
-          .from("vendor_po_status_history")
-          .select("id, previous_status, new_status, note, is_delayed, created_at")
+          .from("vendor_po_production_updates")
+          .select("id, note, attachment_url, attachment_name, percent_at_time, created_at")
           .eq("vendor_po_id", id)
           .order("created_at", { ascending: false }),
       ]);
 
       setItems((itemData || []) as PoItem[]);
-      setHistory((histData || []) as HistoryRow[]);
+
+      // Attachments live in the private po-documents bucket — sign for display.
+      const rows = (updateData || []) as ProductionUpdate[];
+      const paths = rows.filter((u) => u.attachment_url).map((u) => u.attachment_url as string);
+      if (paths.length > 0) {
+        const { data: signed } = await (supabase as any).storage
+          .from("po-documents")
+          .createSignedUrls(paths, 60 * 60);
+        const byPath = new Map<string, string>(
+          (signed || []).filter((s: any) => s.signedUrl).map((s: any) => [s.path, s.signedUrl])
+        );
+        rows.forEach((u) => {
+          if (u.attachment_url) u.signedUrl = byPath.get(u.attachment_url);
+        });
+      }
+      setUpdates(rows);
     } catch (error: any) {
       console.error("Error loading PO:", error);
       toast({ title: "Error", description: "Failed to load this PO", variant: "destructive" });
@@ -138,33 +147,61 @@ export default function VendorPortalPODetail() {
     }
   };
 
-  const handleSave = async () => {
+  const savePercent = async (value: number) => {
     if (!po) return;
-    if (isDelayed && !delayReason.trim()) {
-      toast({ title: "Reason needed", description: "Add a reason when marking a PO delayed.", variant: "destructive" });
-      return;
+    const { data, error } = await (supabase as any).rpc("vendor_update_po_details", {
+      p_po_id: po.id,
+      p_production_percent: value,
+    });
+    if (error || data?.success === false) {
+      console.error("Error saving percent:", error || data?.error);
+      toast({ title: "Change didn't save", description: error?.message || data?.error || "Try again", variant: "destructive" });
+      setPercent(po.production_percent ?? 0);
+    } else {
+      setPo({ ...po, production_percent: value });
     }
-    setSaving(true);
-    try {
-      const { data, error } = await (supabase as any).rpc("vendor_update_po_status", {
-        p_po_id: po.id,
-        p_status: status,
-        p_committed_ship_date: shipDate ? format(shipDate, "yyyy-MM-dd") : null,
-        p_is_delayed: isDelayed,
-        p_delay_reason: isDelayed ? delayReason.trim() : null,
-        p_note: note.trim() || null,
-      });
-      if (error) throw error;
-      if (data && data.success === false) throw new Error(data.error || "Update failed");
+  };
 
-      toast({ title: "Saved", description: "Production status updated." });
+  const postUpdate = async () => {
+    if (!po) return;
+    if (!note.trim() && !file) return;
+    setPosting(true);
+    try {
+      let attachmentPath: string | null = null;
+      let attachmentName: string | null = null;
+
+      if (file) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not signed in");
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        attachmentPath = `${user.id}/vendor-updates/${po.id}/${Date.now()}_${safeName}`;
+        attachmentName = file.name;
+        const { error: upErr } = await (supabase as any).storage
+          .from("po-documents")
+          .upload(attachmentPath, file);
+        if (upErr) throw upErr;
+      }
+
+      const { error: insErr } = await (supabase as any)
+        .from("vendor_po_production_updates")
+        .insert({
+          vendor_po_id: po.id,
+          note: note.trim() || null,
+          attachment_url: attachmentPath,
+          attachment_name: attachmentName,
+          percent_at_time: percent,
+        });
+      if (insErr) throw insErr;
+
       setNote("");
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       await load(po.id);
     } catch (error: any) {
-      console.error("Error saving status:", error);
-      toast({ title: "Error", description: error.message || "Failed to save", variant: "destructive" });
+      console.error("Error posting update:", error);
+      toast({ title: "Update didn't post", description: error.message || "Try again", variant: "destructive" });
     } finally {
-      setSaving(false);
+      setPosting(false);
     }
   };
 
@@ -177,8 +214,15 @@ export default function VendorPortalPODetail() {
   }
   if (!po) return null;
 
-  const meta = getVendorPoStatusMeta(po.production_status);
-  const shipTo = [po.ship_to_street, po.ship_to_city, po.ship_to_state, po.ship_to_zip].filter(Boolean).join(", ");
+  const statusMeta = matchVendorPoStatus(po.production_status || "");
+  const shipToLines = [
+    po.ship_to_name,
+    po.ship_to_street,
+    [po.ship_to_city, [po.ship_to_state, po.ship_to_zip].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+  ].filter(Boolean) as string[];
+  const itemsTotal = items.reduce((sum, it) => sum + Number(it.total || 0), 0);
+  const shippingCost = Number(po.shipping_cost || 0);
+  const description = po.sheet_description || po.description;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -189,163 +233,185 @@ export default function VendorPortalPODetail() {
         <ArrowLeft className="h-4 w-4" /> Back to my POs
       </button>
 
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-muted-foreground" />
-            <h1 className="text-2xl font-semibold font-mono">{po.po_number}</h1>
-            <Badge className={meta.badgeClass}>{meta.label}</Badge>
-          </div>
-          {po.description && <p className="text-sm text-muted-foreground mt-1">{po.description}</p>}
-        </div>
-        <div className="text-right text-sm text-muted-foreground">
-          <div>Ordered {fmtDate(po.order_date)}</div>
-          {po.expected_delivery_date && <div>Requested by {fmtDate(po.expected_delivery_date)}</div>}
-        </div>
-      </div>
-
-      {/* Update panel */}
+      {/* PO document — mirrors the vibe-admin PO view */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Update production status</CardTitle>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Package className="h-5 w-5 text-muted-foreground" />
+                <span className="font-mono">{po.po_number}</span>
+                {statusMeta && statusMeta.value !== "not_started" && (
+                  <Badge className={statusMeta.badgeClass}>{statusMeta.label}</Badge>
+                )}
+                {!statusMeta && po.production_status && (
+                  <span className="text-sm font-normal text-muted-foreground">{po.production_status}</span>
+                )}
+              </CardTitle>
+              {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
+            </div>
+            <div className="text-right text-sm text-muted-foreground">
+              <div>Order date: {fmtDate(po.order_date)}</div>
+              {po.expected_delivery_date && <div>Requested by: {fmtDate(po.expected_delivery_date)}</div>}
+              {po.completion_date && <div>Completion: {po.completion_date}</div>}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {shipToLines.length > 0 && (
+            <div className="mb-4">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Ship To</div>
+              <div className="flex items-start gap-1.5 text-sm">
+                <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                <div>{shipToLines.map((l, i) => <div key={i}>{l}</div>)}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <th className="text-left py-2 pr-3">SKU</th>
+                  <th className="text-left py-2 pr-3">Item</th>
+                  <th className="text-right py-2 pr-3">Qty</th>
+                  <th className="text-right py-2 pr-3">Unit Cost</th>
+                  <th className="text-right py-2">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it) => (
+                  <tr key={it.id} className="border-b border-border/60">
+                    <td className="py-2 pr-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{it.sku}</td>
+                    <td className="py-2 pr-3">
+                      <div className="font-medium">{it.name}</div>
+                      {it.description && <div className="text-xs text-muted-foreground">{it.description}</div>}
+                    </td>
+                    <td className="py-2 pr-3 text-right font-mono">{it.quantity?.toLocaleString("en-US")}</td>
+                    <td className="py-2 pr-3 text-right font-mono">{fmtMoney(it.unit_cost)}</td>
+                    <td className="py-2 text-right font-mono">{fmtMoney(it.total)}</td>
+                  </tr>
+                ))}
+                {items.length === 0 && (
+                  <tr><td colSpan={5} className="py-4 text-center text-muted-foreground">No line items on this PO.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end mt-3">
+            <div className="w-56 space-y-1 text-sm">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Subtotal</span><span className="font-mono">{fmtMoney(itemsTotal)}</span>
+              </div>
+              {shippingCost > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Shipping</span><span className="font-mono">{fmtMoney(shippingCost)}</span>
+                </div>
+              )}
+              <Separator />
+              <div className="flex justify-between font-semibold">
+                <span>Total</span><span className="font-mono">{fmtMoney(po.total)}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Production progress */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Production progress</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as VendorPoStatus)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {VENDOR_PO_STATUSES.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={percent}
+              onChange={(e) => setPercent(Number(e.target.value))}
+              onMouseUp={() => savePercent(percent)}
+              onTouchEnd={() => savePercent(percent)}
+              onKeyUp={() => savePercent(percent)}
+              className="flex-1 accent-primary cursor-pointer"
+            />
+            <div className={cn("text-2xl font-semibold w-20 text-right", percent === 100 && "text-success")}>
+              {percent}%
             </div>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className={cn("h-full rounded-full transition-all", percent === 100 ? "bg-success" : "bg-primary")}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
 
-            <div className="space-y-2">
-              <Label>Your committed ship date</Label>
-              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start font-normal">
-                    <CalendarClock className="h-4 w-4 mr-2" />
-                    {shipDate ? format(shipDate, "MMM d, yyyy") : "Select a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={shipDate}
-                    onSelect={(d) => { setShipDate(d); setDatePickerOpen(false); }}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                  {shipDate && (
-                    <div className="p-2 border-t">
-                      <Button variant="ghost" size="sm" className="w-full text-xs"
-                        onClick={() => { setShipDate(undefined); setDatePickerOpen(false); }}>
-                        Clear
-                      </Button>
-                    </div>
-                  )}
-                </PopoverContent>
-              </Popover>
+          {/* Post a production note / attachment */}
+          <div className="space-y-2 pt-1">
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Add a production note for the team…"
+              rows={2}
+            />
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              />
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <Paperclip className="h-4 w-4 mr-1.5" /> Attach file
+              </Button>
+              {file && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
+                  <span className="truncate max-w-[200px]">{file.name}</span>
+                  <button onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              )}
+              <div className="flex-1" />
+              <Button size="sm" onClick={postUpdate} disabled={posting || (!note.trim() && !file)}>
+                {posting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Send className="h-4 w-4 mr-1.5" />}
+                Post update
+              </Button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-border p-3">
-            <div>
-              <Label className="text-sm">Flag as delayed</Label>
-              <p className="text-xs text-muted-foreground">Let the team know this PO is behind schedule.</p>
-            </div>
-            <Switch checked={isDelayed} onCheckedChange={setIsDelayed} />
-          </div>
-
-          {isDelayed && (
-            <div className="space-y-2">
-              <Label>Delay reason</Label>
-              <Textarea value={delayReason} onChange={(e) => setDelayReason(e.target.value)}
-                placeholder="What's causing the delay?" rows={2} />
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label>Note (optional)</Label>
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)}
-              placeholder="Add an update for the team — recorded in the history below." rows={2} />
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              {saving ? "Saving…" : "Save update"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Line items */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Items ({items.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {shipTo && (
-            <div className="flex items-start gap-1.5 text-sm text-muted-foreground mb-4">
-              <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>{po.ship_to_name ? `${po.ship_to_name} — ` : ""}{shipTo}</span>
-            </div>
-          )}
-          <div className="divide-y divide-border">
-            {items.map((it) => (
-              <div key={it.id} className="py-3 flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="font-medium truncate">{it.name}</p>
-                  <p className="text-xs text-muted-foreground font-mono">{it.sku}</p>
-                  {it.description && <p className="text-xs text-muted-foreground mt-0.5">{it.description}</p>}
-                </div>
-                <div className="text-right text-sm shrink-0">
-                  <div className="font-medium">Qty {it.quantity}</div>
-                  <div className="text-xs text-muted-foreground">{fmtMoney(it.unit_cost)} ea · {fmtMoney(it.total)}</div>
-                </div>
-              </div>
-            ))}
-            {items.length === 0 && <p className="py-3 text-sm text-muted-foreground">No line items on this PO.</p>}
-          </div>
-          <Separator className="my-3" />
-          <div className="flex justify-end text-sm font-semibold">Total {fmtMoney(po.total)}</div>
-        </CardContent>
-      </Card>
-
-      {/* History */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <History className="h-4 w-4" /> Status history
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {history.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No updates yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {history.map((h) => (
-                <div key={h.id} className="flex items-start gap-3 text-sm">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="font-medium">{getVendorPoStatusMeta(h.new_status).label}</span>
-                      {h.previous_status && (
-                        <span className="text-xs text-muted-foreground">
-                          from {getVendorPoStatusMeta(h.previous_status).label}
-                        </span>
-                      )}
-                      {h.is_delayed && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Delayed</Badge>}
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(h.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+          {/* Updates feed */}
+          {updates.length > 0 && (
+            <div className="space-y-4 pt-2 border-t border-border">
+              {updates.map((u) => (
+                <div key={u.id} className="flex items-start gap-3 text-sm">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                      <span>
+                        {new Date(u.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                       </span>
+                      {u.percent_at_time != null && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{u.percent_at_time}%</Badge>}
                     </div>
-                    {h.note && <p className="text-muted-foreground mt-0.5">{h.note}</p>}
+                    {u.note && <p className="mt-0.5 whitespace-pre-wrap">{u.note}</p>}
+                    {u.signedUrl && (
+                      isImage(u.attachment_name) ? (
+                        <a href={u.signedUrl} target="_blank" rel="noreferrer" className="block mt-2">
+                          <img src={u.signedUrl} alt={u.attachment_name || "attachment"} className="max-h-40 rounded-md border border-border" />
+                        </a>
+                      ) : (
+                        <a
+                          href={u.signedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 mt-1 text-primary hover:underline text-xs"
+                        >
+                          <Paperclip className="h-3.5 w-3.5" /> {u.attachment_name || "Attachment"}
+                        </a>
+                      )
+                    )}
                   </div>
                 </div>
               ))}
