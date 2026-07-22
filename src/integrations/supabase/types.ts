@@ -3656,6 +3656,8 @@ export type Database = {
           quickbooks_id: string | null
           quickbooks_sync_status: string | null
           quickbooks_synced_at: string | null
+          sheet_completed_at: string | null
+          sheet_description: string | null
           ship_to_city: string | null
           ship_to_name: string | null
           ship_to_state: string | null
@@ -3699,6 +3701,8 @@ export type Database = {
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
+          sheet_completed_at?: string | null
+          sheet_description?: string | null
           ship_to_city?: string | null
           ship_to_name?: string | null
           ship_to_state?: string | null
@@ -3742,6 +3746,8 @@ export type Database = {
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
+          sheet_completed_at?: string | null
+          sheet_description?: string | null
           ship_to_city?: string | null
           ship_to_name?: string | null
           ship_to_state?: string | null
@@ -4208,6 +4214,15 @@ export type Database = {
         Returns: Json
       }
       validate_vendor_invitation: { Args: { p_token: string }; Returns: Json }
+      vendor_po_sheet_info: {
+        Args: { p_po_ids: string[] }
+        Returns: {
+          cpo: string
+          invoice_numbers: string[]
+          order_description: string
+          po_id: string
+        }[]
+      }
       vendor_update_item_final_qty: {
         Args: { p_final_quantity: number; p_item_id: string }
         Returns: Json
@@ -4217,6 +4232,13 @@ export type Database = {
           p_completion_date?: string
           p_notes?: string
           p_po_id: string
+          p_sheet_completed?: boolean
+          p_sheet_description?: string
+          p_ship_to_city?: string
+          p_ship_to_name?: string
+          p_ship_to_state?: string
+          p_ship_to_street?: string
+          p_ship_to_zip?: string
           p_tracking_carrier?: string
           p_tracking_number?: string
           p_tracking_url?: string
