@@ -51,7 +51,7 @@ export interface OrdersSheetProps {
   pos: SheetPo[];
   /** Show the vendor column (admin view). */
   showVendor?: boolean;
-  /** Show the invoice column (admin view — vendors can't read invoices). */
+  /** Show the Vibe invoice column (numbers only; the vendor portal supplies them via an ownership-checked RPC). */
   showInvoice?: boolean;
   editable?: boolean;
   /** localStorage key prefix for persisted column widths. */

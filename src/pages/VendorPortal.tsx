@@ -5,7 +5,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search } from "lucide-react";
 import { normalizeVendorPoStatusInput } from "@/lib/vendorPoStatus";
-import OrdersSheet, { parseTracking, type SheetItem, type SheetPo } from "@/components/vendor/OrdersSheet";
+import OrdersSheet, { parseTracking, parseShipTo, type SheetItem, type SheetPo } from "@/components/vendor/OrdersSheet";
+
+/** CPO / order description / vibe invoice numbers, piped through an
+    ownership-checked RPC (vendors can't read orders/invoices directly). */
+type SheetInfo = { po_id: string; cpo: string | null; order_description: string | null; invoice_numbers: string[] };
 
 interface VendorPoRow {
   id: string;
@@ -35,6 +39,7 @@ interface VendorPoRow {
 
 export default function VendorPortal() {
   const [pos, setPos] = useState<VendorPoRow[]>([]);
+  const [sheetInfo, setSheetInfo] = useState<Record<string, SheetInfo>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const { toast } = useToast();
@@ -67,7 +72,17 @@ export default function VendorPortal() {
         .order("order_date", { ascending: false });
 
       if (error) throw error;
-      setPos((data || []) as VendorPoRow[]);
+      const rows = (data || []) as VendorPoRow[];
+      setPos(rows);
+
+      if (rows.length > 0) {
+        const { data: info } = await (supabase as any).rpc("vendor_po_sheet_info", {
+          p_po_ids: rows.map((r) => r.id),
+        });
+        if (info) {
+          setSheetInfo(Object.fromEntries((info as SheetInfo[]).map((i) => [i.po_id, i])));
+        }
+      }
     } catch (error: any) {
       console.error("Error loading vendor POs:", error);
       toast({ title: "Error", description: "Failed to load your purchase orders", variant: "destructive" });
@@ -117,12 +132,7 @@ export default function VendorPortal() {
     // The RPC stores the raw text and syncs the real date column when it parses.
     const ok = await rpc("vendor_update_po_details", {
       p_po_id: po.id,
-      p_tracking_carrier: null,
-      p_tracking_number: null,
-      p_tracking_url: null,
-      p_notes: null,
       p_completion_date: text.trim() === "" ? "" : text,
-      p_vendor_invoice_number: null,
     });
     if (!ok && before) patchRow(po.id, before);
   };
@@ -132,12 +142,33 @@ export default function VendorPortal() {
     patchRow(po.id, { vendor_invoice_number: value.trim() || null });
     const ok = await rpc("vendor_update_po_details", {
       p_po_id: po.id,
-      p_tracking_carrier: null,
-      p_tracking_number: null,
-      p_tracking_url: null,
-      p_notes: null,
-      p_completion_date: null,
       p_vendor_invoice_number: value.trim() === "" ? "" : value,
+    });
+    if (!ok && before) patchRow(po.id, before);
+  };
+
+  const saveDescription = async (po: SheetPo, value: string) => {
+    const before = pos.find((r) => r.id === po.id);
+    patchRow(po.id, { sheet_description: value.trim() || null });
+    const ok = await rpc("vendor_update_po_details", {
+      p_po_id: po.id,
+      p_sheet_description: value.trim() === "" ? "" : value,
+    });
+    if (!ok && before) patchRow(po.id, before);
+  };
+
+  const saveShipTo = async (po: SheetPo, text: string) => {
+    const parsed = parseShipTo(text);
+    const before = pos.find((r) => r.id === po.id);
+    patchRow(po.id, parsed);
+    // '' clears a field; the whole block is replaced by whatever was typed.
+    const ok = await rpc("vendor_update_po_details", {
+      p_po_id: po.id,
+      p_ship_to_name: parsed.ship_to_name ?? "",
+      p_ship_to_street: parsed.ship_to_street ?? "",
+      p_ship_to_city: parsed.ship_to_city ?? "",
+      p_ship_to_state: parsed.ship_to_state ?? "",
+      p_ship_to_zip: parsed.ship_to_zip ?? "",
     });
     if (!ok && before) patchRow(po.id, before);
   };
@@ -155,7 +186,6 @@ export default function VendorPortal() {
       p_tracking_carrier: t.carrier || "",
       p_tracking_number: t.number || "",
       p_tracking_url: t.url || "",
-      p_notes: null,
     });
     if (!ok && before) patchRow(po.id, before);
   };
@@ -165,9 +195,6 @@ export default function VendorPortal() {
     patchRow(po.id, { notes: value || null });
     const ok = await rpc("vendor_update_po_details", {
       p_po_id: po.id,
-      p_tracking_carrier: null,
-      p_tracking_number: null,
-      p_tracking_url: null,
       p_notes: value, // "" clears
     });
     if (!ok && before) patchRow(po.id, before);
@@ -199,10 +226,9 @@ export default function VendorPortal() {
 
   const sheetPos: SheetPo[] = filtered.map((r) => ({
     ...r,
-    cpo: r.orders?.po_number || null,
-    // Vendors usually can't read the linked order (RLS) — fall back to the PO text
-    // so their description cell isn't blank.
-    orderDescription: r.orders?.description || r.description || null,
+    cpo: sheetInfo[r.id]?.cpo || r.orders?.po_number || null,
+    orderDescription: sheetInfo[r.id]?.order_description || r.orders?.description || r.description || null,
+    invoiceNumbers: sheetInfo[r.id]?.invoice_numbers || [],
     companyName: r.ship_to_name,
     items: (r.vendor_po_items || []).filter((i) => !i.is_adjustment),
   }));
@@ -237,6 +263,7 @@ export default function VendorPortal() {
 
       <OrdersSheet
         pos={sheetPos}
+        showInvoice
         editable
         storageKey="vendor-portal-sheet"
         onOpenPo={(po) => navigate(`/vendor-portal/${po.id}`)}
@@ -245,6 +272,8 @@ export default function VendorPortal() {
         onSaveTracking={saveTracking}
         onSaveNotes={saveNotes}
         onSaveVendorInvoice={saveVendorInvoice}
+        onSaveDescription={saveDescription}
+        onSaveShipTo={saveShipTo}
       />
     </div>
   );
