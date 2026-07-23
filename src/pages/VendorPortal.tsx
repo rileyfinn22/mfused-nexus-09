@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Search } from "lucide-react";
 import OrdersSheet, { parseTracking, parseShipTo, type SheetItem, type SheetPo } from "@/components/vendor/OrdersSheet";
 
@@ -38,11 +39,14 @@ interface VendorPoRow {
   orders: { po_number: string | null; description: string | null } | null;
 }
 
+const ALL = "__all__";
+
 export default function VendorPortal() {
   const [pos, setPos] = useState<VendorPoRow[]>([]);
   const [sheetInfo, setSheetInfo] = useState<Record<string, SheetInfo>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [companyFilter, setCompanyFilter] = useState<string>(ALL);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -233,7 +237,20 @@ export default function VendorPortal() {
     [pos, q]
   );
 
-  const sheetPos: SheetPo[] = filtered.map((r) => ({
+  const companyNames = useMemo(
+    () =>
+      [...new Set(Object.values(sheetInfo).map((i) => i.company_name?.trim() || "").filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [sheetInfo]
+  );
+
+  const companyFiltered =
+    companyFilter === ALL
+      ? filtered
+      : filtered.filter((r) => (sheetInfo[r.id]?.company_name?.trim() || "") === companyFilter);
+
+  const sheetPos: SheetPo[] = companyFiltered.map((r) => ({
     ...r,
     cpo: sheetInfo[r.id]?.cpo || r.orders?.po_number || null,
     // No description preset on the vendor side — only what's typed in the sheet shows.
@@ -267,7 +284,7 @@ export default function VendorPortal() {
         <div className="text-xs text-muted-foreground whitespace-nowrap sm:mb-1">
           {openCount} open · {completedCount} completed
         </div>
-        <div className="relative w-full sm:w-72">
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search PO #, description, ship-to…"
@@ -276,6 +293,19 @@ export default function VendorPortal() {
             className="pl-10 h-9"
           />
         </div>
+        {companyNames.length > 1 && (
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="w-full sm:w-[190px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All companies</SelectItem>
+              {companyNames.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <OrdersSheet
