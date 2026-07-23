@@ -47,6 +47,7 @@ import { AnalyzePOProductsDialog } from "@/components/AnalyzePOProductsDialog";
 import { QuickAddProductsDialog } from "@/components/QuickAddProductsDialog";
 import { TemplateProductsView } from "@/components/TemplateProductsView";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
+import SignedImage from "@/components/SignedImage";
 import { useToast } from "@/hooks/use-toast";
 import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
 import { cn } from "@/lib/utils";
@@ -937,7 +938,7 @@ const Products = () => {
                   {/* Template Image/Icon Area */}
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
                     {getTemplateDisplayThumbnail(template) ? (
-                      <img
+                      <SignedImage
                         src={getTemplateDisplayThumbnail(template) || undefined}
                         alt={template.name}
                         className="w-full h-full object-cover"
@@ -967,9 +968,9 @@ const Products = () => {
                   {/* Product Image/Icon Area */}
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
                     {product.sku && artworkThumbnails[product.sku] ? (
-                      <img src={artworkThumbnails[product.sku]} alt={product.name} className="w-full h-full object-cover" />
+                      <SignedImage src={artworkThumbnails[product.sku]} alt={product.name} className="w-full h-full object-cover" />
                     ) : product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                      <SignedImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="h-16 w-16 text-muted-foreground/30" />
                     )}
@@ -1114,14 +1115,14 @@ const Products = () => {
                       <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
                         {/* Priority: 1. Artwork thumbnail, 2. Product image_url, 3. Package icon */}
                         {product.sku && artworkThumbnails[product.sku] ? (
-                          <img 
+                          <SignedImage
                             src={artworkThumbnails[product.sku]} 
                             alt={product.name}
                             className="w-10 h-10 object-cover rounded-md border border-border cursor-pointer hover:opacity-80 transition-opacity"
                             onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.sku)}`)}
                           />
                         ) : product.image_url ? (
-                          <img 
+                          <SignedImage
                             src={product.image_url} 
                             alt={product.name}
                             className="w-10 h-10 object-cover rounded-md border border-border cursor-pointer hover:opacity-80 transition-opacity"
