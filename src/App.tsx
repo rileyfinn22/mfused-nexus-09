@@ -32,6 +32,7 @@ import VendorPortalPODetail from "./pages/VendorPortalPODetail";
 import VendorStatus from "./pages/VendorStatus";
 import Production from "./pages/Production";
 import ProductionDetail from "./pages/ProductionDetail";
+import CustomerProductionPODetail from "./pages/CustomerProductionPODetail";
 import Login from "./pages/Login";
 import VendorSignup from "./pages/VendorSignup";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -106,6 +107,7 @@ const App = () => (
           <Route path="/vendor-portal/:poId" element={<DashboardLayout><VendorPortalPODetail /></DashboardLayout>} />
           <Route path="/vendor-status" element={<DashboardLayout><VendorStatus /></DashboardLayout>} />
           <Route path="/production" element={<DashboardLayout><Production /></DashboardLayout>} />
+          <Route path="/production/po/:poId" element={<DashboardLayout><CustomerProductionPODetail /></DashboardLayout>} />
           <Route path="/production/:orderId" element={<DashboardLayout><ProductionDetail /></DashboardLayout>} />
           <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
           <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />

@@ -16,6 +16,8 @@ import { ProductionProgressBar, ProductionStatusIndicator } from "@/components/P
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { useCompany } from "@/contexts/CompanyContext";
+import CustomerProduction from "./CustomerProduction";
 import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipmentLegDialog";
 import { GenerateShipmentLinkDialog } from "@/components/GenerateShipmentLinkDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
@@ -78,6 +80,7 @@ export default function Production() {
   const [syncSheetName, setSyncSheetName] = useState("");
   const [syncing, setSyncing] = useState(false);
   const { activeCompanyId } = useActiveCompany();
+  const { activeCompany, hasVibeAdminRole } = useCompany();
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [bulkLegDialogOpen, setBulkLegDialogOpen] = useState(false);
   const [shareLinkDialogOpen, setShareLinkDialogOpen] = useState(false);
@@ -502,6 +505,12 @@ export default function Production() {
     order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (isVibeAdmin && order.companies.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  // Test rollout: Mfused customers get the new production sheet instead of the
+  // legacy tiles while we iterate. Admins keep the legacy monitoring view.
+  if (!hasVibeAdminRole && /^mfused/i.test(activeCompany?.name || "")) {
+    return <CustomerProduction />;
+  }
 
   if (loading) {
     return (

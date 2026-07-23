@@ -56,6 +56,8 @@ export interface OrdersSheetProps {
   showInvoice?: boolean;
   /** Company column — redundant on the vendor portal where it duplicates ship-to. */
   showCompany?: boolean;
+  /** Customer production view: read-only customer-safe column set; the invoice cell opens the PO. */
+  customerView?: boolean;
   editable?: boolean;
   /** localStorage key prefix for persisted column widths. */
   storageKey?: string;
@@ -200,6 +202,19 @@ interface ColDef {
   minWidth: number;
 }
 
+// Customer production view: only customer-safe columns, their PO number front
+// and center, no vendor identity anywhere.
+const CUSTOMER_COLS: ColDef[] = [
+  { id: "invoice", label: "Vibe Invoice", width: 110, minWidth: 60 },
+  { id: "cpo", label: "PO #", width: 100, minWidth: 60 },
+  { id: "item", label: "Description", width: 260, minWidth: 120 },
+  { id: "shipDate", label: "Complete date", width: 120, minWidth: 80 },
+  { id: "deliveryDate", label: "Delivery date", width: 120, minWidth: 80 },
+  { id: "statusNotes", label: "Status / Notes", width: 220, minWidth: 100 },
+  { id: "tracking", label: "Tracking", width: 160, minWidth: 90 },
+  { id: "shipTo", label: "Ship to", width: 180, minWidth: 100 },
+];
+
 const buildCols = (showVendor: boolean, showInvoice: boolean, showCompany: boolean): ColDef[] => [
   { id: "done", label: "", width: 34, minWidth: 30 },
   ...(showVendor ? [{ id: "vendor", label: "Vendor", width: 120, minWidth: 70 }] : []),
@@ -308,6 +323,7 @@ export default function OrdersSheet({
   showVendor = false,
   showInvoice = false,
   showCompany = true,
+  customerView = false,
   editable = false,
   storageKey = "orders-sheet",
   onOpenPo,
@@ -320,7 +336,7 @@ export default function OrdersSheet({
   onSaveDescription,
   onToggleComplete,
 }: OrdersSheetProps) {
-  const cols = buildCols(showVendor, showInvoice, showCompany);
+  const cols = customerView ? CUSTOMER_COLS : buildCols(showVendor, showInvoice, showCompany);
   const widthsKey = `${storageKey}:colWidths`;
 
   const [widths, setWidths] = useState<Record<string, number>>(() => {
@@ -453,7 +469,15 @@ export default function OrdersSheet({
                 case "vendor":
                   return <div className="px-1.5 py-1 whitespace-pre-wrap break-words">{po.vendorName || "—"}</div>;
                 case "invoice":
-                  return (
+                  return customerView && onOpenPo ? (
+                    <button
+                      className="px-1.5 py-1 font-mono text-primary hover:underline text-left whitespace-pre-wrap break-words"
+                      onClick={() => onOpenPo(po)}
+                      title="Open production details"
+                    >
+                      {(po.invoiceNumbers || []).join("\n") || "View"}
+                    </button>
+                  ) : (
                     <div className="px-1.5 py-1 font-mono whitespace-pre-wrap break-words">
                       {(po.invoiceNumbers || []).join("\n") || "—"}
                     </div>
