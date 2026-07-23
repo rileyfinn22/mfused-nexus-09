@@ -1926,7 +1926,7 @@ const Artwork = () => {
                         className="w-full h-full object-cover"
                       />
                     ) : product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                      <SignedImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="h-16 w-16 text-muted-foreground/30" />
                     )}
