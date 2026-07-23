@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -285,102 +286,121 @@ export default function VendorPortalPODetail() {
         <ArrowLeft className="h-4 w-4" /> Back to my POs
       </button>
 
-      {/* PO document — mirrors the vibe-admin PO view */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Package className="h-5 w-5 text-muted-foreground" />
-                <span className="font-mono">{po.po_number}</span>
-                {statusMeta && statusMeta.value !== "not_started" && (
-                  <Badge className={statusMeta.badgeClass}>{statusMeta.label}</Badge>
+      {/* PO document — same layout as the vibe-admin Vendor PO page */}
+      <Card className="shadow-lg">
+        <CardContent className="p-0">
+          {/* Header band */}
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b p-8">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">Vendor PO #{po.po_number}</h1>
+                {info?.cpo && (
+                  <p className="text-sm text-muted-foreground">Customer PO: {info.cpo}</p>
                 )}
-                {!statusMeta && po.production_status && (
-                  <span className="text-sm font-normal text-muted-foreground">{po.production_status}</span>
-                )}
-              </CardTitle>
-              {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
-                <Download className="h-4 w-4 mr-1.5" /> Download PDF
-              </Button>
-              <div className="text-right text-sm text-muted-foreground">
-                <div>Order date: {fmtDate(po.order_date)}</div>
-                {po.expected_delivery_date && <div>Requested by: {fmtDate(po.expected_delivery_date)}</div>}
-                {po.completion_date && <div>Completion: {po.completion_date}</div>}
-                {info?.cpo && <div>CPO: <span className="font-mono text-foreground">{info.cpo}</span></div>}
                 {(info?.invoice_numbers?.length ?? 0) > 0 && (
-                  <div>Vibe Invoice: <span className="font-mono text-foreground">{info!.invoice_numbers.join(", ")}</span></div>
+                  <p className="text-sm text-muted-foreground">Vibe Invoice: {info!.invoice_numbers.join(", ")}</p>
                 )}
+                {description && <p className="text-sm text-muted-foreground">{description}</p>}
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                {statusMeta && statusMeta.value !== "not_started" ? (
+                  <Badge className={statusMeta.badgeClass}>{statusMeta.label}</Badge>
+                ) : !statusMeta && po.production_status ? (
+                  <Badge variant="secondary">{po.production_status}</Badge>
+                ) : null}
+                <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+                  <Download className="h-4 w-4 mr-1.5" /> Download PDF
+                </Button>
+              </div>
+            </div>
+
+            {/* Dates and Ship To */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6 bg-background/80 backdrop-blur rounded-lg p-6">
+              <div className="space-y-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">Order Date</div>
+                  <p className="font-medium">{fmtDate(po.order_date)}</p>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Requested Due Date</div>
+                  <p className="font-medium">{fmtDate(po.expected_delivery_date)}</p>
+                </div>
+                {po.completion_date && (
+                  <div>
+                    <div className="text-xs text-muted-foreground">Completion Date</div>
+                    <p className="font-medium">{po.completion_date}</p>
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-2">Ship To Address</div>
+                <div className="text-sm">
+                  {po.ship_to_name || po.ship_to_street ? (
+                    <>
+                      {po.ship_to_name && <p className="font-medium">{po.ship_to_name}</p>}
+                      {po.ship_to_street && <p>{po.ship_to_street}</p>}
+                      {(po.ship_to_city || po.ship_to_state || po.ship_to_zip) && (
+                        <p>{[po.ship_to_city, po.ship_to_state, po.ship_to_zip].filter(Boolean).join(", ")}</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground">Not set</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {shipToLines.length > 0 && (
-            <div className="mb-5">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Ship To</div>
-              <div className="text-sm">
-                {shipToLines.map((l, i) => (
-                  <div key={i} className={i === 0 ? "font-medium" : "text-muted-foreground"}>{l}</div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* Line items — standard invoice-style document table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[640px]">
-              <thead>
-                <tr className="border-b-2 border-border">
-                  {["SKU", "Description", "Qty", "Unit Cost", "Amount"].map((h, i) => (
-                    <th
-                      key={h}
-                      className={cn(
-                        "px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground select-none",
-                        i >= 2 ? "text-right" : "text-left"
-                      )}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
+          {/* Line Items */}
+          <div className="p-8">
+            <h2 className="text-lg font-semibold mb-4">Line Items</h2>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-center">Qty</TableHead>
+                  <TableHead className="text-right">Unit Cost</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {items.map((it) => (
-                  <tr key={it.id} className="border-b border-border/60">
-                    <td className="px-3 py-2 font-mono text-xs whitespace-nowrap align-top">{it.sku}</td>
-                    <td className="px-3 py-2 align-top">
-                      <div>{it.name}</div>
+                  <TableRow key={it.id}>
+                    <TableCell className="font-mono text-xs whitespace-nowrap">{it.sku}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{it.name}</div>
                       {it.description && <div className="text-xs text-muted-foreground">{it.description}</div>}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono align-top">{it.quantity?.toLocaleString("en-US")}</td>
-                    <td className="px-3 py-2 text-right font-mono align-top">{`$${Number(it.unit_cost || 0).toFixed(3)}`}</td>
-                    <td className="px-3 py-2 text-right font-mono font-semibold align-top">{fmtMoney(it.total)}</td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="text-center">{it.quantity?.toLocaleString("en-US")}</TableCell>
+                    <TableCell className="text-right">{`$${Number(it.unit_cost || 0).toFixed(3)}`}</TableCell>
+                    <TableCell className="text-right font-medium">{fmtMoney(it.total)}</TableCell>
+                  </TableRow>
                 ))}
                 {items.length === 0 && (
-                  <tr><td colSpan={5} className="py-4 text-center text-muted-foreground">No line items on this PO.</td></tr>
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">No line items on this PO.</TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
 
-          <div className="flex justify-end mt-3">
-            <div className="w-56 space-y-1 text-sm">
-              <div className="flex justify-between text-muted-foreground">
-                <span>Subtotal</span><span className="font-mono">{fmtMoney(itemsTotal)}</span>
-              </div>
-              {shippingCost > 0 && (
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Shipping</span><span className="font-mono">{fmtMoney(shippingCost)}</span>
+            <div className="flex justify-end mt-6">
+              <div className="w-72 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">{fmtMoney(itemsTotal)}</span>
                 </div>
-              )}
-              <Separator />
-              <div className="flex justify-between font-semibold">
-                <span>Total</span><span className="font-mono">{fmtMoney(po.total)}</span>
+                {shippingCost > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Shipping</span>
+                    <span className="font-medium">{fmtMoney(shippingCost)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-3 border-t">
+                  <span className="text-sm font-semibold">Total</span>
+                  <span className="text-2xl font-bold">{fmtMoney(po.total)}</span>
+                </div>
               </div>
             </div>
           </div>
