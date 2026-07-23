@@ -192,22 +192,25 @@ export default function Login() {
         } else if (pendingRedirect) {
           navigate(pendingRedirect);
         } else {
-          // Check if finance-only user
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
-          if (currentUser) {
-            const { data: roles } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", currentUser.id);
-            const roleList = (roles || []).map((r: any) => r.role);
-            if (roleList.length === 1 && roleList[0] === "finance") {
-              navigate("/financing");
-            } else {
-              navigate("/dashboard");
+          // Route finance-only users to /financing; never let this lookup
+          // strand a signed-in user on the login page.
+          let target = "/dashboard";
+          try {
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            if (currentUser) {
+              const { data: roles } = await supabase
+                .from("user_roles")
+                .select("role")
+                .eq("user_id", currentUser.id);
+              const roleList = (roles || []).map((r: any) => r.role);
+              if (roleList.length === 1 && roleList[0] === "finance") {
+                target = "/financing";
+              }
             }
-          } else {
-            navigate("/dashboard");
+          } catch {
+            // fall through to dashboard
           }
+          navigate(target);
         }
       }
     } catch (error: any) {
