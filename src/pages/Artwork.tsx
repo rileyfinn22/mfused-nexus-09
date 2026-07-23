@@ -1917,11 +1917,10 @@ const Artwork = () => {
                 >
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
                     {skuArtworkThumbnails[product.item_id || ''] ? (
-                      <img
+                      <SignedImage
                         src={skuArtworkThumbnails[product.item_id || '']!}
                         alt={product.name}
                         className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     ) : skuPdfArtworkUrls[product.item_id || ''] ? (
                       <PdfThumbnail
