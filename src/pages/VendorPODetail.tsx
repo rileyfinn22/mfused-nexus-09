@@ -53,7 +53,7 @@ const VendorPODetail = () => {
     (async () => {
       const { data } = await (supabase as any)
         .from('vendor_po_production_updates')
-        .select('id, note, attachment_url, attachment_name, percent_at_time, created_at')
+        .select('id, kind, note, attachment_url, attachment_name, percent_at_time, created_at')
         .eq('vendor_po_id', poId)
         .order('created_at', { ascending: false });
       const rows = (data || []) as any[];
@@ -1781,6 +1781,11 @@ Thank you for your business.`;
                       </span>
                       {u.percent_at_time != null && (
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0">{u.percent_at_time}%</Badge>
+                      )}
+                      {u.kind && u.kind !== 'update' && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">
+                          {String(u.kind).replace(/_/g, ' ')}
+                        </Badge>
                       )}
                     </div>
                     {u.note && <p className="mt-0.5 whitespace-pre-wrap">{u.note}</p>}
