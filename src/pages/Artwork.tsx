@@ -1973,7 +1973,7 @@ const Artwork = () => {
             >
               <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
                 {templateThumbnail ? (
-                  <img src={templateThumbnail} alt={template.name} className="w-full h-full object-cover" />
+                  <SignedImage src={templateThumbnail} alt={template.name} className="w-full h-full object-cover" />
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
