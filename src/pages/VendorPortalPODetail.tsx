@@ -325,11 +325,11 @@ export default function VendorPortalPODetail() {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Package className="h-5 w-5 text-muted-foreground" />
           Vendor PO #{po.po_number}
-          {statusMeta && statusMeta.value !== "not_started" ? (
-            <Badge className={statusMeta.badgeClass}>{statusMeta.label}</Badge>
-          ) : !statusMeta && po.production_status ? (
-            <Badge variant="secondary">{po.production_status}</Badge>
-          ) : null}
+          {po.production_status && statusMeta?.value !== "not_started" && (
+            <span className="text-sm font-normal text-muted-foreground">
+              {statusMeta ? statusMeta.label : po.production_status}
+            </span>
+          )}
         </h1>
         <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
           <Download className="h-4 w-4 mr-1.5" /> Download PDF

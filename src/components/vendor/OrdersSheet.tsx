@@ -1,5 +1,4 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Check, ExternalLink } from "lucide-react";
 import { parseISO } from "date-fns";
 import { matchVendorPoStatus } from "@/lib/vendorPoStatus";
@@ -419,8 +418,7 @@ export default function OrdersSheet({
             const isCompleted = !!po.sheet_completed_at;
             const isFirstCompleted = isCompleted && rowIdx === openRows.length;
             const statusMeta = matchVendorPoStatus(po.production_status || "");
-            // "Not started" reads as empty on a sheet — no badge, blank cell.
-            const showStatusBadge = statusMeta && statusMeta.value !== "not_started";
+            // Plain text only — no badges. "Not started" reads as an empty cell.
             const statusEmpty = !po.production_status || statusMeta?.value === "not_started";
             const url = po.tracking_url || trackingUrl(po.tracking_carrier || "", po.tracking_number || "");
 
@@ -503,13 +501,6 @@ export default function OrdersSheet({
                       <div className="flex-1 min-w-0">
                         <SheetCell
                           value={statusEmpty ? "" : (statusMeta ? statusMeta.label : po.production_status || "")}
-                          display={
-                            showStatusBadge ? (
-                              <Badge className={cn("text-[11px] whitespace-nowrap", statusMeta.badgeClass)}>
-                                {statusMeta.label}
-                              </Badge>
-                            ) : undefined
-                          }
                           editable={editable && !!onSaveStatus}
                           onSave={(v) => onSaveStatus?.(po, v)}
                         />
